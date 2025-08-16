@@ -1090,6 +1090,8 @@ export const updateNewsletterSchema = z.object({
   selectedContactIds: z.array(z.string()).optional(),
   selectedTagIds: z.array(z.string()).optional(),
   recipientCount: z.number().int().nonnegative().optional(),
+  openCount: z.number().int().nonnegative().optional(),
+  clickCount: z.number().int().nonnegative().optional(),
 });
 
 export const insertNewsletterSchema = createInsertSchema(newsletters).omit({

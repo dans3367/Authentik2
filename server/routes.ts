@@ -4178,12 +4178,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const activity = await storage.createEmailActivity(activityData, tenantId);
       
+      // Extract newsletter ID from email tags for newsletter engagement tracking
+      let newsletterId: string | undefined;
+      if (data.tags && Array.isArray(data.tags)) {
+        // Look for newsletter ID in tags
+        for (const tag of data.tags) {
+          if (typeof tag === 'string' && tag.startsWith('newsletter-')) {
+            newsletterId = tag.replace('newsletter-', '');
+            break;
+          }
+        }
+      }
+      
       // Update contact statistics based on activity type
       if (activityType === 'opened') {
         await storage.updateEmailContact(contact.id, { 
           emailsOpened: (contact.emailsOpened || 0) + 1,
           lastActivity: new Date() 
         }, tenantId);
+        
+        // Update newsletter open count if this is a newsletter email
+        if (newsletterId) {
+          const newsletter = await storage.getNewsletter(newsletterId, tenantId);
+          if (newsletter) {
+            await storage.updateNewsletter(newsletterId, {
+              openCount: (newsletter.openCount || 0) + 1
+            }, tenantId);
+            console.log(`[Webhook] Updated newsletter ${newsletterId} openCount to ${(newsletter.openCount || 0) + 1}`);
+          }
+        }
+      } else if (activityType === 'clicked') {
+        await storage.updateEmailContact(contact.id, { 
+          lastActivity: new Date() 
+        }, tenantId);
+        
+        // Update newsletter click count if this is a newsletter email
+        if (newsletterId) {
+          const newsletter = await storage.getNewsletter(newsletterId, tenantId);
+          if (newsletter) {
+            await storage.updateNewsletter(newsletterId, {
+              clickCount: (newsletter.clickCount || 0) + 1
+            }, tenantId);
+            console.log(`[Webhook] Updated newsletter ${newsletterId} clickCount to ${(newsletter.clickCount || 0) + 1}`);
+          }
+        }
       } else if (activityType === 'bounced') {
         await storage.updateEmailContact(contact.id, { 
           status: 'bounced' as any,
@@ -4202,10 +4240,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (activityType === 'failed') {
         // For failed emails, we might want to track this but not change status immediately
         // as it could be a temporary issue. Consider implementing retry logic or failure count.
-        await storage.updateEmailContact(contact.id, { 
-          lastActivity: new Date() 
-        }, tenantId);
-      } else if (activityType === 'clicked') {
         await storage.updateEmailContact(contact.id, { 
           lastActivity: new Date() 
         }, tenantId);
@@ -4484,6 +4518,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             newsletterTitle: newsletter.title,
             to: recipient.email,
             sentAt: new Date().toISOString(),
+            tags: [`newsletter-${newsletter.id}`, 'newsletter', newsletter.title]
           }
         };
 
