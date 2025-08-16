@@ -41,6 +41,7 @@ import * as QRCode from "qrcode";
 import { UAParser } from "ua-parser-js";
 import { createHash, createHmac } from "crypto";
 import { emailService } from "./emailService";
+import { emailRoutes } from "./routes/emailRoutes";
 import { Resend } from 'resend';
 // import { Webhook } from 'svix';
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -4623,6 +4624,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Internal server error" });
     }
   });
+
+  // Mount email routes for enhanced email system monitoring
+  app.use('/api/email', emailRoutes);
 
   const httpServer = createServer(app);
   return httpServer;

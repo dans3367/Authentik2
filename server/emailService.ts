@@ -1,13 +1,40 @@
 import { Resend } from 'resend';
+import { EnhancedEmailService } from './providers/enhancedEmailService';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Initialize enhanced email service
+const enhancedEmailService = new EnhancedEmailService();
+
+// Export enhanced service for use in other modules
+export { enhancedEmailService };
 
 export class EmailService {
   private fromEmail = process.env.FROM_EMAIL || 'dan@zendwise.work';
   private appName = process.env.APP_NAME || 'SaaS Auth App';
   private baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+  private useEnhanced = process.env.USE_ENHANCED_EMAIL !== 'false'; // Default to true
 
   async sendVerificationEmail(email: string, verificationToken: string, firstName?: string) {
+    // Use enhanced email service if enabled, otherwise fallback to legacy
+    if (this.useEnhanced) {
+      try {
+        console.log('[EmailService] Using enhanced email service for verification email');
+        const result = await enhancedEmailService.sendVerificationEmail(email, verificationToken, firstName);
+        
+        if (result.success) {
+          return { id: result.messageId, ...result };
+        } else {
+          console.warn('[EmailService] Enhanced service failed, falling back to legacy service');
+          // Fall through to legacy service
+        }
+      } catch (error) {
+        console.error('[EmailService] Enhanced service error, falling back to legacy service:', error);
+        // Fall through to legacy service
+      }
+    }
+
+    // Legacy service implementation
     const verificationUrl = `${this.baseUrl}/verify-email?token=${verificationToken}`;
     const displayName = firstName ? ` ${firstName}` : '';
 
@@ -18,6 +45,7 @@ export class EmailService {
     console.log('   Copy this URL to your browser to verify the email\n');
 
     try {
+      console.log('[EmailService] Using legacy Resend service for verification email');
       const { data, error } = await resend.emails.send({
         from: this.fromEmail,
         to: [email],
@@ -86,9 +114,29 @@ export class EmailService {
     }
   }
 
-  async sendReviewerApprovalEmail(email: string, approveUrl: string, subject?: string) {
+  async sendReviewerApprovalEmail(email: string, approveUrl: string, subject?: string, emailData?: any) {
+    // Use enhanced email service if enabled, otherwise fallback to legacy
+    if (this.useEnhanced) {
+      try {
+        console.log('[EmailService] Using enhanced email service for approval email');
+        const result = await enhancedEmailService.sendReviewerApprovalEmail(email, approveUrl, subject, emailData);
+        
+        if (result.success) {
+          return { id: result.messageId, ...result };
+        } else {
+          console.warn('[EmailService] Enhanced service failed, falling back to legacy service');
+          // Fall through to legacy service
+        }
+      } catch (error) {
+        console.error('[EmailService] Enhanced service error, falling back to legacy service:', error);
+        // Fall through to legacy service
+      }
+    }
+
+    // Legacy service implementation
     const finalSubject = subject || `Review required: Email campaign`;
     try {
+      console.log('[EmailService] Using legacy Resend service for approval email');
       const { data, error } = await resend.emails.send({
         from: this.fromEmail,
         to: [email],
@@ -147,9 +195,29 @@ export class EmailService {
   }
 
   async sendWelcomeEmail(email: string, firstName?: string) {
+    // Use enhanced email service if enabled, otherwise fallback to legacy
+    if (this.useEnhanced) {
+      try {
+        console.log('[EmailService] Using enhanced email service for welcome email');
+        const result = await enhancedEmailService.sendWelcomeEmail(email, firstName);
+        
+        if (result.success) {
+          return { id: result.messageId, ...result };
+        } else {
+          console.warn('[EmailService] Enhanced service failed, falling back to legacy service');
+          // Fall through to legacy service
+        }
+      } catch (error) {
+        console.error('[EmailService] Enhanced service error, falling back to legacy service:', error);
+        // Fall through to legacy service
+      }
+    }
+
+    // Legacy service implementation
     const displayName = firstName ? ` ${firstName}` : '';
 
     try {
+      console.log('[EmailService] Using legacy Resend service for welcome email');
       const { data, error } = await resend.emails.send({
         from: this.fromEmail,
         to: [email],
@@ -216,6 +284,68 @@ export class EmailService {
     } catch (error) {
       console.error('Email service error:', error);
       throw error;
+    }
+  }
+
+  // Additional methods for the enhanced service integration
+  async getSystemStatus() {
+    if (this.useEnhanced) {
+      return await enhancedEmailService.getStatus();
+    }
+    return {
+      service: 'legacy',
+      provider: 'resend',
+      enabled: !!process.env.RESEND_API_KEY
+    };
+  }
+
+  async getHealthCheck() {
+    if (this.useEnhanced) {
+      return await enhancedEmailService.healthCheck();
+    }
+    return {
+      healthy: !!process.env.RESEND_API_KEY,
+      providers: { resend: !!process.env.RESEND_API_KEY }
+    };
+  }
+
+  async sendCustomEmail(to: string | string[], subject: string, html: string, options: any = {}) {
+    if (this.useEnhanced) {
+      return await enhancedEmailService.sendCustomEmail(to, subject, html, options);
+    }
+    
+    // Legacy implementation
+    const recipients = Array.isArray(to) ? to : [to];
+    try {
+      console.log('[EmailService] Using legacy Resend service for custom email');
+      const { data, error } = await resend.emails.send({
+        from: options.from || this.fromEmail,
+        to: recipients,
+        subject,
+        html,
+        text: options.text
+      });
+
+      if (error) {
+        throw new Error(`Failed to send email: ${error.message}`);
+      }
+
+      return { id: data?.id, success: true };
+    } catch (error) {
+      console.error('Legacy email send error:', error);
+      throw error;
+    }
+  }
+
+  cleanup(olderThanHours?: number) {
+    if (this.useEnhanced) {
+      enhancedEmailService.cleanupOldEmails(olderThanHours);
+    }
+  }
+
+  shutdown() {
+    if (this.useEnhanced) {
+      enhancedEmailService.shutdown();
     }
   }
 }
