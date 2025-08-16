@@ -4276,7 +4276,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Automatically initialize task statuses for the new newsletter
-      await storage.initializeNewsletterTaskStatuses(newsletter.id, req.user.tenantId);
+      await storage.initializeNewsletterTasks(newsletter.id, req.user.tenantId);
 
       res.status(201).json({ newsletter });
     } catch (error: any) {
