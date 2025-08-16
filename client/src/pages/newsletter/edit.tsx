@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useLocation } from "wouter";
+import { useLocation, useParams } from "wouter";
 import { ArrowLeft, Save, Send, Eye, Users, Tag, User, Edit, Server, CheckCircle, XCircle } from "lucide-react";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
@@ -22,9 +22,10 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { createNewsletterSchema, type CreateNewsletterData } from "@shared/schema";
+import { updateNewsletterSchema, type UpdateNewsletterData, type NewsletterWithUser } from "@shared/schema";
 
-export default function NewsletterCreatePage() {
+export default function NewsletterEditPage() {
+  const { id } = useParams();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -36,8 +37,20 @@ export default function NewsletterCreatePage() {
     selectedTagIds: [] as string[],
   });
 
-  const form = useForm<CreateNewsletterData>({
-    resolver: zodResolver(createNewsletterSchema),
+  // Fetch newsletter data
+  const { data: newsletterData, isLoading: isLoadingNewsletter } = useQuery<{ newsletter: NewsletterWithUser }>({
+    queryKey: ['/api/newsletters', id],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/newsletters/${id}`);
+      return response.json();
+    },
+    enabled: !!id,
+  });
+
+  const newsletter = newsletterData?.newsletter;
+
+  const form = useForm<UpdateNewsletterData>({
+    resolver: zodResolver(updateNewsletterSchema),
     defaultValues: {
       title: "",
       subject: "",
@@ -48,6 +61,28 @@ export default function NewsletterCreatePage() {
       selectedTagIds: [],
     },
   });
+
+  // Update form when newsletter data is loaded
+  useEffect(() => {
+    if (newsletter) {
+      form.reset({
+        title: newsletter.title,
+        subject: newsletter.subject,
+        content: newsletter.content,
+        status: newsletter.status as "draft" | "scheduled" | "sent",
+        scheduledAt: newsletter.scheduledAt ? new Date(newsletter.scheduledAt) : undefined,
+        recipientType: newsletter.recipientType as "all" | "selected" | "tags",
+        selectedContactIds: newsletter.selectedContactIds || [],
+        selectedTagIds: newsletter.selectedTagIds || [],
+      });
+      
+      setSegmentationData({
+        recipientType: newsletter.recipientType as 'all' | 'selected' | 'tags',
+        selectedContactIds: newsletter.selectedContactIds || [],
+        selectedTagIds: newsletter.selectedTagIds || [],
+      });
+    }
+  }, [newsletter, form]);
 
   // Query to check Go server health
   const { data: serverHealth, isLoading: healthLoading, error: healthError } = useQuery({
@@ -60,22 +95,24 @@ export default function NewsletterCreatePage() {
     refetchInterval: 10000, // Check health every 10 seconds
   });
 
-  // Create newsletter mutation
-  const createNewsletterMutation = useMutation({
-    mutationFn: (data: CreateNewsletterData) => 
-      apiRequest('POST', '/api/newsletters', data).then(res => res.json()),
+  // Update newsletter mutation
+  const updateNewsletterMutation = useMutation({
+    mutationFn: (data: UpdateNewsletterData) => 
+      apiRequest('PUT', `/api/newsletters/${id}`, data).then(res => res.json()),
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters', id] });
       queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
       toast({
         title: "Success",
-        description: "Newsletter created successfully",
+        description: "Newsletter updated successfully",
       });
+      setLocation('/newsletter');
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to create newsletter",
+        description: error.message || "Failed to update newsletter",
         variant: "destructive",
       });
     },
@@ -84,14 +121,14 @@ export default function NewsletterCreatePage() {
   // Send newsletter mutation
   const sendNewsletterMutation = useMutation({
     mutationFn: async (newsletterId: string) => {
-      console.log('[Newsletter Frontend] Sending newsletter:', newsletterId);
+      console.log('[Newsletter Edit] Sending newsletter:', newsletterId);
       const response = await apiRequest('POST', `/api/newsletters/${newsletterId}/send`);
       const result = await response.json();
-      console.log('[Newsletter Frontend] Send response:', result);
+      console.log('[Newsletter Edit] Send response:', result);
       return result;
     },
     onSuccess: (response, newsletterId) => {
-      console.log('[Newsletter Frontend] Send successful:', response);
+      console.log('[Newsletter Edit] Send successful:', response);
       // Invalidate all newsletter-related queries to refresh the data
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters', newsletterId] });
@@ -104,7 +141,7 @@ export default function NewsletterCreatePage() {
       setLocation('/newsletter');
     },
     onError: (error: any) => {
-      console.error('[Newsletter Frontend] Send failed:', error);
+      console.error('[Newsletter Edit] Send failed:', error);
       toast({
         title: "Failed to Send Newsletter",
         description: error.message || "Failed to send newsletter",
@@ -113,44 +150,12 @@ export default function NewsletterCreatePage() {
     },
   });
 
-  const onSubmit = (data: CreateNewsletterData) => {
+  const onSubmit = (data: UpdateNewsletterData) => {
     const newsletterData = {
       ...data,
       ...segmentationData,
     };
-    createNewsletterMutation.mutate(newsletterData, {
-      onSuccess: () => {
-        setLocation('/newsletter');
-      },
-    });
-  };
-
-  const handleSaveAsDraft = () => {
-    const data = form.getValues();
-    const newsletterData = {
-      ...data,
-      ...segmentationData,
-      status: "draft" as const,
-    };
-    createNewsletterMutation.mutate(newsletterData, {
-      onSuccess: () => {
-        setLocation('/newsletter');
-      },
-    });
-  };
-
-  const handleSchedule = () => {
-    const data = form.getValues();
-    const newsletterData = {
-      ...data,
-      ...segmentationData,
-      status: "scheduled" as const,
-    };
-    createNewsletterMutation.mutate(newsletterData, {
-      onSuccess: () => {
-        setLocation('/newsletter');
-      },
-    });
+    updateNewsletterMutation.mutate(newsletterData);
   };
 
   const handleSendNow = () => {
@@ -184,22 +189,23 @@ export default function NewsletterCreatePage() {
       return;
     }
 
-    // First create the newsletter, then send it
+    // First update the newsletter, then send it
     const newsletterData = {
       ...data,
       ...segmentationData,
-      status: "draft" as const, // Create as draft first
     };
     
-    console.log('[Newsletter Frontend] Creating newsletter with data:', newsletterData);
-    createNewsletterMutation.mutate(newsletterData, {
-      onSuccess: (response) => {
-        console.log('[Newsletter Frontend] Newsletter created:', response);
-        // After creating, send the newsletter
-        sendNewsletterMutation.mutate(response.newsletter.id);
+    console.log('[Newsletter Edit] Updating newsletter before send:', newsletterData);
+    updateNewsletterMutation.mutate(newsletterData, {
+      onSuccess: () => {
+        console.log('[Newsletter Edit] Newsletter updated, now sending...');
+        // After updating, send the newsletter
+        if (id) {
+          sendNewsletterMutation.mutate(id);
+        }
       },
       onError: (error) => {
-        console.error('[Newsletter Frontend] Failed to create newsletter:', error);
+        console.error('[Newsletter Edit] Failed to update newsletter:', error);
       }
     });
   };
@@ -258,6 +264,70 @@ export default function NewsletterCreatePage() {
     }
   };
 
+  if (isLoadingNewsletter) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+        <div className="container mx-auto p-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 rounded-2xl flex items-center justify-center shadow-lg">
+              <div className="animate-spin rounded-full h-8 w-8 border-4 border-white border-t-transparent"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!newsletter) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+        <div className="container mx-auto p-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Newsletter not found</h2>
+              <p className="text-gray-600 dark:text-gray-400 mt-2">The newsletter you're trying to edit doesn't exist.</p>
+              <Button 
+                onClick={() => setLocation('/newsletter')}
+                className="mt-4"
+              >
+                Back to Newsletters
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't allow editing sent newsletters
+  if (newsletter.status === 'sent') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+        <div className="container mx-auto p-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Cannot Edit Sent Newsletter</h2>
+              <p className="text-gray-600 dark:text-gray-400 mt-2">This newsletter has already been sent and cannot be edited.</p>
+              <div className="flex gap-3 mt-4 justify-center">
+                <Button 
+                  onClick={() => setLocation(`/newsletters/${id}`)}
+                  variant="outline"
+                >
+                  View Newsletter
+                </Button>
+                <Button 
+                  onClick={() => setLocation('/newsletter')}
+                >
+                  Back to Newsletters
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
       <div className="container mx-auto p-6 max-w-6xl">
@@ -274,10 +344,10 @@ export default function NewsletterCreatePage() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-              Create Newsletter
+              Edit Newsletter
             </h1>
             <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Design and send your newsletter to engage with subscribers
+              Update your newsletter content and settings
             </p>
           </div>
         </div>
@@ -444,7 +514,7 @@ export default function NewsletterCreatePage() {
                   <Label htmlFor="status">Status</Label>
                   <Select
                     value={form.watch("status")}
-                    onValueChange={(value) => form.setValue("status", value as "draft" | "scheduled")}
+                    onValueChange={(value) => form.setValue("status", value as "draft" | "scheduled" | "sent")}
                   >
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Select status" />
@@ -452,10 +522,7 @@ export default function NewsletterCreatePage() {
                     <SelectContent>
                       <SelectItem value="draft">Draft</SelectItem>
                       <SelectItem value="scheduled">Scheduled</SelectItem>
-                      {/**
-                       * Do not allow selecting "Sent" directly here because it won't queue
-                       * sending jobs. Use the "Send Now" button which creates then triggers send.
-                       */}
+                      {/* Don't allow changing status to "sent" - use Send button instead */}
                     </SelectContent>
                   </Select>
                 </div>
@@ -466,9 +533,12 @@ export default function NewsletterCreatePage() {
                     id="scheduledAt"
                     type="datetime-local"
                     className="mt-1"
+                    value={form.watch("scheduledAt") ? new Date(form.watch("scheduledAt")!).toISOString().slice(0, 16) : ""}
                     onChange={(e) => {
                       if (e.target.value) {
                         form.setValue("scheduledAt", new Date(e.target.value));
+                      } else {
+                        form.setValue("scheduledAt", undefined);
                       }
                     }}
                   />
@@ -528,53 +598,41 @@ export default function NewsletterCreatePage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <Button
-                  type="button"
-                  onClick={handleSaveAsDraft}
+                  type="submit"
                   variant="outline"
                   className="w-full bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/50 border-gray-300 dark:border-gray-600 hover:from-gray-100 hover:to-gray-200 dark:hover:from-gray-700/60 dark:hover:to-gray-600/60 transition-all duration-300"
-                  disabled={createNewsletterMutation.isPending}
+                  disabled={updateNewsletterMutation.isPending}
                 >
                   <Save className="h-4 w-4 mr-2" />
-                  Save as Draft
-                </Button>
-
-                <Button
-                  type="button"
-                  onClick={handleSchedule}
-                  variant="outline"
-                  className="w-full bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/30 border-orange-300 dark:border-orange-600 hover:from-orange-100 hover:to-orange-200 dark:hover:from-orange-800/40 dark:hover:to-orange-700/40 transition-all duration-300"
-                  disabled={createNewsletterMutation.isPending}
-                >
-                  <Send className="h-4 w-4 mr-2" />
-                  Schedule for Later
+                  {updateNewsletterMutation.isPending ? "Saving..." : "Save Changes"}
                 </Button>
 
                 <Button
                   type="button"
                   onClick={handleSendNow}
                   className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg transition-all duration-300"
-                  disabled={createNewsletterMutation.isPending || sendNewsletterMutation.isPending || !serverHealth}
+                  disabled={updateNewsletterMutation.isPending || sendNewsletterMutation.isPending || !serverHealth}
                 >
-                  {createNewsletterMutation.isPending || sendNewsletterMutation.isPending ? (
+                  {updateNewsletterMutation.isPending || sendNewsletterMutation.isPending ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                      {createNewsletterMutation.isPending ? "Creating..." : "Sending..."}
+                      {updateNewsletterMutation.isPending ? "Saving..." : "Sending..."}
                     </>
                   ) : (
                     <>
                       <Send className="h-4 w-4 mr-2" />
-                      Send Now
+                      Save & Send Now
                     </>
                   )}
                 </Button>
 
-                {(createNewsletterMutation.isPending || sendNewsletterMutation.isPending) && (
+                {(updateNewsletterMutation.isPending || sendNewsletterMutation.isPending) && (
                   <div className="flex items-center justify-center p-2">
                     <div className="w-4 h-4 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 rounded-lg flex items-center justify-center mr-2">
                       <div className="animate-spin rounded-full h-2 w-2 border border-white border-t-transparent"></div>
                     </div>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {createNewsletterMutation.isPending ? "Creating newsletter..." : 
+                      {updateNewsletterMutation.isPending ? "Saving newsletter..." : 
                        sendNewsletterMutation.isPending ? "Sending newsletter..." : "Processing..."}
                     </p>
                   </div>

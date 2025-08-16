@@ -321,6 +321,23 @@ export const campaigns = pgTable("campaigns", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Email activity tracking for webhook events
+export const emailActivity = pgTable("email_activity", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  contactId: varchar("contact_id").notNull().references(() => emailContacts.id, { onDelete: 'cascade' }),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'set null' }),
+  newsletterId: varchar("newsletter_id").references(() => newsletters.id, { onDelete: 'set null' }),
+  activityType: text("activity_type").notNull(), // 'sent', 'delivered', 'opened', 'clicked', 'bounced', 'complained', 'unsubscribed'
+  activityData: text("activity_data"), // JSON string with additional event data
+  userAgent: text("user_agent"),
+  ipAddress: text("ip_address"),
+  webhookId: text("webhook_id"), // Resend webhook event ID
+  webhookData: text("webhook_data"), // Full webhook payload for debugging
+  occurredAt: timestamp("occurred_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const tenantRelations = relations(tenants, ({ many }) => ({
   users: many(users),
@@ -337,6 +354,7 @@ export const tenantRelations = relations(tenants, ({ many }) => ({
   contactTagAssignments: many(contactTagAssignments),
   newsletters: many(newsletters),
   campaigns: many(campaigns),
+  emailActivities: many(emailActivity),
 }));
 
 export const userRelations = relations(users, ({ one, many }) => ({
@@ -845,6 +863,7 @@ export const emailContactRelations = relations(emailContacts, ({ one, many }) =>
   }),
   listMemberships: many(contactListMemberships),
   tagAssignments: many(contactTagAssignments),
+  activities: many(emailActivity),
 }));
 
 export const emailListRelations = relations(emailLists, ({ one, many }) => ({
@@ -893,6 +912,25 @@ export const contactTagAssignmentRelations = relations(contactTagAssignments, ({
   }),
 }));
 
+export const emailActivityRelations = relations(emailActivity, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [emailActivity.tenantId],
+    references: [tenants.id],
+  }),
+  contact: one(emailContacts, {
+    fields: [emailActivity.contactId],
+    references: [emailContacts.id],
+  }),
+  campaign: one(campaigns, {
+    fields: [emailActivity.campaignId],
+    references: [campaigns.id],
+  }),
+  newsletter: one(newsletters, {
+    fields: [emailActivity.newsletterId],
+    references: [newsletters.id],
+  }),
+}));
+
 // Email contact schemas
 export const createEmailContactSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -912,6 +950,8 @@ export const updateEmailContactSchema = z.object({
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   status: z.enum(['active', 'unsubscribed', 'bounced', 'pending']).optional(),
+  emailsOpened: z.number().optional(),
+  lastActivity: z.date().optional(),
 });
 
 export const createEmailListSchema = z.object({
@@ -941,10 +981,35 @@ export type CreateContactTagData = z.infer<typeof createContactTagSchema>;
 export type ContactListMembership = typeof contactListMemberships.$inferSelect;
 export type ContactTagAssignment = typeof contactTagAssignments.$inferSelect;
 
+// Email activity types and schemas
+export const createEmailActivitySchema = z.object({
+  contactId: z.string().uuid(),
+  campaignId: z.string().uuid().optional(),
+  newsletterId: z.string().uuid().optional(),
+  activityType: z.enum(['sent', 'delivered', 'opened', 'clicked', 'bounced', 'complained', 'unsubscribed']),
+  activityData: z.string().optional(),
+  userAgent: z.string().optional(),
+  ipAddress: z.string().optional(),
+  webhookId: z.string().optional(),
+  webhookData: z.string().optional(),
+  occurredAt: z.date(),
+});
+
+export const insertEmailActivitySchema = createInsertSchema(emailActivity).omit({
+  id: true,
+  tenantId: true,
+  createdAt: true,
+});
+
+export type EmailActivity = typeof emailActivity.$inferSelect;
+export type InsertEmailActivity = z.infer<typeof insertEmailActivitySchema>;
+export type CreateEmailActivityData = z.infer<typeof createEmailActivitySchema>;
+
 // Extended types for email contacts
 export interface EmailContactWithDetails extends EmailContact {
   tags: ContactTag[];
   lists: EmailList[];
+  activities?: EmailActivity[];
 }
 
 export interface EmailListWithCount extends EmailList {
@@ -975,7 +1040,8 @@ export const createNewsletterSchema = z.object({
   title: z.string().min(1, "Title is required"),
   subject: z.string().min(1, "Subject is required"),
   content: z.string().min(1, "Content is required"),
-  status: z.enum(['draft', 'scheduled', 'sent']).default('draft'),
+  // On create, disallow setting status to "sent"; use the send endpoint instead
+  status: z.enum(['draft', 'scheduled']).default('draft'),
   scheduledAt: z.date().optional(),
   recipientType: z.enum(['all', 'selected', 'tags']).default('all'),
   selectedContactIds: z.array(z.string()).optional(),
@@ -988,9 +1054,11 @@ export const updateNewsletterSchema = z.object({
   content: z.string().min(1, "Content is required").optional(),
   status: z.enum(['draft', 'scheduled', 'sent']).optional(),
   scheduledAt: z.date().optional(),
+  sentAt: z.date().optional(),
   recipientType: z.enum(['all', 'selected', 'tags']).optional(),
   selectedContactIds: z.array(z.string()).optional(),
   selectedTagIds: z.array(z.string()).optional(),
+  recipientCount: z.number().int().nonnegative().optional(),
 });
 
 export const insertNewsletterSchema = createInsertSchema(newsletters).omit({

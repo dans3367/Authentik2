@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Send, Mail, Server, Clock, CheckCircle, XCircle, Zap, BarChart3, Target, ShieldCheck } from "lucide-react";
+import { Send, Mail, Server, Clock, CheckCircle, XCircle, Zap, BarChart3, Target, ShieldCheck, Trash2, AlertTriangle } from "lucide-react";
 import { useLocation } from "wouter";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
@@ -98,6 +98,52 @@ export default function EmailTestPage() {
     staleTime: 60_000,
   });
   const managers = managersData?.managers || [];
+
+  // Mutation to clear temporal workflows
+  const clearTemporalMutation = useMutation({
+    mutationFn: async () => {
+      const token = accessToken;
+      
+      if (!token) {
+        throw new Error('No authentication token available. Please make sure you are logged in.');
+      }
+      
+      console.log('🧹 [Cleanup] Starting temporal workflow cleanup');
+      
+      const response = await fetch('https://tengine.zendwise.work/api/temporal/clear-workflows', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error('❌ [Cleanup] Request failed:', error);
+        throw new Error(`Failed to clear workflows: ${error}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ [Cleanup] Request successful:', result);
+      return result;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Temporal Cleanup Completed",
+        description: `Successfully cleared ${data.clearedWorkflows || 0} workflows from Temporal`,
+      });
+      // Refresh tracking entries
+      queryClient.invalidateQueries({ queryKey: ['/go-server-tracking'] });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Cleanup Failed",
+        description: error.message,
+      });
+    },
+  });
 
   // Mutation to send email campaign to Go server
   const sendCampaignMutation = useMutation({
@@ -396,6 +442,75 @@ export default function EmailTestPage() {
           </Button>
         </div>
       </div>
+
+      {/* Temporal Cleanup Section */}
+      <Card className="shadow-lg border-l-4 border-l-orange-500">
+        <CardHeader className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/20 dark:to-red-950/20">
+          <CardTitle className="flex items-center gap-3 text-lg">
+            <div className="p-2 bg-orange-100 dark:bg-orange-900 rounded-lg">
+              <Trash2 className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+            </div>
+            Temporal Cleanup
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Clear failed or stuck workflows from the Temporal system
+          </p>
+        </CardHeader>
+        <CardContent className="p-6">
+          <div className="space-y-4">
+            <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+                <div>
+                  <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                    Warning: System Cleanup Operation
+                  </h4>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                    This will terminate all running workflows in the Temporal system, including old failed workflows 
+                    that are causing errors. Only use this in development environments or when experiencing workflow issues.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border">
+              <div>
+                <h4 className="text-sm font-semibold">Clear Failed Workflows</h4>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Terminates stuck "EmailProcessingWorkflow" and other problematic workflows
+                </p>
+              </div>
+              <Button
+                onClick={() => clearTemporalMutation.mutate()}
+                disabled={clearTemporalMutation.isPending || !serverHealth}
+                variant="destructive"
+                className="gap-2"
+              >
+                {clearTemporalMutation.isPending ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                    Clearing...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" />
+                    Clear Workflows
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {!serverHealth && (
+              <div className="flex items-center justify-center gap-2 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <XCircle className="h-4 w-4 text-red-600" />
+                <p className="text-sm text-red-700 dark:text-red-300">
+                  Go server must be online to perform cleanup operations
+                </p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-8 xl:grid-cols-3">
         {/* Campaign Composer - Larger card */}

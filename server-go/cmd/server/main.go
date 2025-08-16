@@ -85,6 +85,9 @@ func main() {
 	apiRouter.HandleFunc("/email-tracking/{id}", apiHandler.UpdateEmailTracking).Methods("PUT")
 	apiRouter.HandleFunc("/email-tracking/{id}", apiHandler.DeleteEmailTracking).Methods("DELETE")
 
+	// Temporal cleanup endpoint
+	apiRouter.HandleFunc("/temporal/clear-workflows", apiHandler.ClearTemporalWorkflows).Methods("POST")
+
 	// Setup server
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%s", config.Server.Host, config.Server.Port),
@@ -169,7 +172,7 @@ func loadConfigFromEnv() *Config {
 			Namespace string `yaml:"namespace"`
 			TaskQueue string `yaml:"task_queue"`
 		}{
-			HostPort:  getEnvOrDefault("TEMPORAL_HOST", "172.72.0.9:7233"),
+			HostPort:  getEnvOrDefault("TEMPORAL_HOST", "172.18.0.4:7233"),
 			Namespace: getEnvOrDefault("TEMPORAL_NAMESPACE", "default"),
 			TaskQueue: getEnvOrDefault("TEMPORAL_TASK_QUEUE", "email-task-queue"),
 		},

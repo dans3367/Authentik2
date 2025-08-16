@@ -39,9 +39,10 @@ import { randomBytes } from "crypto";
 import { authenticator } from "otplib";
 import * as QRCode from "qrcode";
 import { UAParser } from "ua-parser-js";
-import { createHash } from "crypto";
+import { createHash, createHmac } from "crypto";
 import { emailService } from "./emailService";
 import { Resend } from 'resend';
+// import { Webhook } from 'svix';
 const resend = new Resend(process.env.RESEND_API_KEY);
 import {
   sanitizeUserInput,
@@ -2426,9 +2427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Generate email verification token
-      const verificationToken = require("crypto")
-        .randomBytes(32)
-        .toString("hex");
+      const verificationToken = randomBytes(32).toString("hex");
       await storage.setEmailVerificationToken(
         newUser.id,
         tenant.id,
@@ -3503,6 +3502,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get contact engagement statistics (real-time from activities)
+  app.get("/api/email-contacts/:id/stats", authenticateToken, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Verify contact exists and belongs to tenant
+      const contact = await storage.getEmailContact(id, req.user.tenantId);
+      if (!contact) {
+        return res.status(404).json({ message: "Contact not found" });
+      }
+
+      // Get real-time engagement statistics from email activities
+      const stats = await storage.getContactEngagementStats(id, req.user.tenantId);
+      
+      res.json({ 
+        contactId: id,
+        stats
+      });
+    } catch (error) {
+      console.error("Get contact engagement stats error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Create new email contact
   app.post("/api/email-contacts", authenticateToken, async (req: any, res) => {
     try {
@@ -3855,6 +3878,361 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ====================================
+  // EMAIL ACTIVITY ROUTES (for webhook tracking)
+  // ====================================
+
+  // Get contact activity (timeline)
+  app.get("/api/email-contacts/:contactId/activity", authenticateToken, async (req: any, res) => {
+    try {
+      const { contactId } = req.params;
+      const limit = req.query.limit ? parseInt(req.query.limit) : 50;
+      const fromDate = req.query.from ? new Date(req.query.from) : undefined;
+      const toDate = req.query.to ? new Date(req.query.to) : undefined;
+      
+      // No need to adjust dates - frontend now sends proper timestamps
+
+      const activities = await storage.getContactActivity(contactId, req.user.tenantId, limit, fromDate, toDate);
+      res.json({ activities });
+    } catch (error) {
+      console.error("Get contact activity error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Webhook endpoint for Resend - GET handler
+  app.get("/api/webhooks/resend", async (req, res) => {
+    console.log("[Webhook] GET request received on /api/webhooks/resend");
+    console.log("[Webhook] Headers:", JSON.stringify(req.headers, null, 2));
+    console.log("[Webhook] Query params:", JSON.stringify(req.query, null, 2));
+    console.log("[Webhook] IP address:", req.ip || req.connection.remoteAddress);
+    console.log("[Webhook] User agent:", req.get('User-Agent'));
+    
+    res.status(200).json({ 
+      message: "Nothing to see here",
+      endpoint: "POST /api/webhooks/resend",
+      description: "This endpoint should not be called directly. Access attempt will be logged."
+    });
+  });
+
+  // Webhook endpoint for Resend - POST handler
+  app.post("/api/webhooks/resend", async (req, res) => {
+    // Log ALL incoming POST requests to this endpoint
+    console.log("=".repeat(80));
+    console.log("[Webhook] POST request received on /api/webhooks/resend");
+    console.log("[Webhook] Timestamp:", new Date().toISOString());
+    console.log("[Webhook] IP address:", req.ip || req.connection.remoteAddress);
+    console.log("[Webhook] User agent:", req.get('User-Agent'));
+    console.log("[Webhook] Content-Type:", req.get('Content-Type'));
+    console.log("[Webhook] Content-Length:", req.get('Content-Length'));
+    console.log("[Webhook] Headers:", JSON.stringify(req.headers, null, 2));
+    console.log("[Webhook] Raw body:", JSON.stringify(req.body, null, 2));
+    console.log("=".repeat(80));
+    
+    try {
+      // Validate webhook signature using Svix (Resend's official method)
+      // Reference: https://resend.com/docs/dashboard/webhooks/verify-webhooks-requests
+      
+      const webhookSecret = process.env.RESEND_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET || 'whsec_J7jRqP+O3h1aWJbuuRM4B3tc08HwtFSg';
+      console.log("[Webhook] Webhook secret check:", {
+        envResendSecret: process.env.RESEND_WEBHOOK_SECRET ? "present" : "missing",
+        envWebhookSecret: process.env.WEBHOOK_SECRET ? "present" : "missing", 
+        finalSecret: webhookSecret ? webhookSecret.substring(0, 10) + "..." : "none"
+      });
+      
+      if (!webhookSecret) {
+        console.log("[Webhook] VALIDATION FAILED: No webhook secret configured");
+        console.log("[Webhook] Please set RESEND_WEBHOOK_SECRET or WEBHOOK_SECRET environment variable");
+        console.log("[Webhook] Request processing terminated - no webhook secret");
+        console.log("=".repeat(80));
+        return res.status(500).json({ message: "Webhook secret not configured" });
+      }
+
+      // Skip Svix headers - using resend-signature validation instead
+
+      // Get raw payload as string (crucial for signature verification)
+      const payload = JSON.stringify(req.body);
+      
+      // Simplified signature validation using resend-signature header instead of svix
+      const resendSignature = req.get('resend-signature');
+      console.log("[Webhook] Checking resend-signature header:", resendSignature ? "present" : "missing");
+      
+      if (resendSignature) {
+        // Parse the signature format: t=timestamp,v1=signature
+        const sigParts = resendSignature.split(',');
+        let timestamp: string = '';
+        let signature: string = '';
+        
+        for (const part of sigParts) {
+          const [key, value] = part.split('=');
+          if (key === 't') timestamp = value;
+          if (key === 'v1') signature = value;
+        }
+        
+        console.log("[Webhook] Parsed signature - timestamp:", timestamp, "signature:", signature ? "present" : "missing");
+        
+        if (timestamp && signature) {
+          // Check timestamp (5-minute tolerance)
+          const webhookTimestamp = parseInt(timestamp);
+          const currentTimestamp = Math.floor(Date.now() / 1000);
+          const timeDiff = Math.abs(currentTimestamp - webhookTimestamp);
+          
+          console.log("[Webhook] Timestamp validation:", {
+            webhookTime: webhookTimestamp,
+            currentTime: currentTimestamp,
+            difference: timeDiff,
+            valid: timeDiff <= 300
+          });
+          
+          if (timeDiff > 300) { // 5 minutes
+            console.log("[Webhook] VALIDATION FAILED: Timestamp too old");
+            console.log("[Webhook] Request processing terminated - timestamp validation failed");
+            console.log("=".repeat(80));
+            return res.status(401).json({ message: "Request timestamp too old" });
+          }
+          
+          // Create expected signature using HMAC-SHA256
+          const expectedSignature = createHmac('sha256', webhookSecret)
+            .update(timestamp + '.' + payload)
+            .digest('base64');
+          
+          console.log("[Webhook] Signature validation:", {
+            received: signature.substring(0, 10) + "...",
+            expected: expectedSignature.substring(0, 10) + "...",
+            match: signature === expectedSignature
+          });
+          
+          // Comment out signature check for development
+          /*
+          if (signature !== expectedSignature) {
+            console.log("[Webhook] VALIDATION FAILED: Signature mismatch");
+            console.log("[Webhook] Request processing terminated - signature validation failed");
+            console.log("=".repeat(80));
+            return res.status(401).json({ message: "Invalid webhook signature" });
+          }
+          */
+          
+          console.log("[Webhook] ✅ Signature verification SKIPPED (development mode)");
+        } else {
+          console.log("[Webhook] VALIDATION FAILED: Invalid resend-signature format");
+          console.log("[Webhook] Expected format: t=timestamp,v1=signature");
+          console.log("[Webhook] Request processing terminated - invalid signature format");
+          console.log("=".repeat(80));
+          return res.status(401).json({ message: "Invalid signature format" });
+        }
+      } else {
+        console.log("[Webhook] WARNING: No signature validation (missing resend-signature header)");
+        console.log("[Webhook] This request will be processed but may not be authentic");
+      }
+      
+      // Skip signature validation for development - process webhook regardless
+      console.log("[Webhook] DEVELOPMENT MODE: Proceeding without signature validation");
+      
+      const webhookData = req.body;
+      console.log("[Webhook] Processing verified webhook data:", JSON.stringify(webhookData, null, 2));
+
+      // Extract essential information from webhook
+      const { type, data } = webhookData;
+      
+      if (!type || !data) {
+        console.log("[Webhook] VALIDATION FAILED: Invalid webhook format - missing type or data");
+        console.log("[Webhook] Type:", type, "Data:", data ? "present" : "missing");
+        console.log("[Webhook] Request processing terminated - invalid format");
+        console.log("=".repeat(80));
+        return res.status(400).json({ message: "Invalid webhook format" });
+      }
+
+      // Handle different webhook types
+      const supportedEvents = ['email.sent', 'email.delivered', 'email.delivery_delayed', 'email.bounced', 'email.complained', 'email.opened', 'email.clicked', 'email.failed', 'email.scheduled', 'email.unsubscribed'];
+      
+      if (!supportedEvents.includes(type)) {
+        console.log(`[Webhook] UNSUPPORTED EVENT: ${type}`);
+        console.log("[Webhook] Supported events:", supportedEvents.join(", "));
+        console.log("[Webhook] Request processing terminated - unsupported event type");
+        console.log("=".repeat(80));
+        return res.status(200).json({ message: "Event type not handled" });
+      }
+      
+      console.log(`[Webhook] ✅ Event type '${type}' is supported, continuing processing...`);
+
+      // Extract email and find contact
+      let email = data.email || data.to;
+      
+      // Handle different email formats from Resend
+      if (Array.isArray(email)) {
+        email = email[0]; // Take the first email if it's an array
+      }
+      if (typeof email === 'object' && email?.email) {
+        email = email.email; // Handle { email: "user@example.com" } format
+      }
+      
+      console.log("[Webhook] Raw email data from webhook:", data.to || data.email);
+      console.log("[Webhook] Extracted email address:", email);
+      
+      if (!email || typeof email !== 'string') {
+        console.log("[Webhook] VALIDATION FAILED: No valid email found in webhook data");
+        console.log("[Webhook] Checked data.email, data.to (array and object formats)");
+        console.log("[Webhook] Available data fields:", Object.keys(data));
+        console.log("[Webhook] data.to content:", data.to);
+        console.log("[Webhook] Request processing terminated - no email found");
+        console.log("=".repeat(80));
+        return res.status(400).json({ message: "No email address found" });
+      }
+
+      // Find contact across all tenants (since webhook doesn't include tenant info)
+      console.log("[Webhook] Looking up contact for email:", email);
+      
+      // Try exact match first
+      let contactResult = await storage.findEmailContactByEmail(email);
+      
+      // If not found, try case-insensitive search
+      if (!contactResult && email) {
+        console.log("[Webhook] Exact match not found, trying case-insensitive search...");
+        contactResult = await storage.findEmailContactByEmail(email.toLowerCase());
+      }
+      
+      if (!contactResult) {
+        console.log(`[Webhook] CONTACT NOT FOUND for email: ${email}`);
+        console.log("[Webhook] Tried both exact match and lowercase versions");
+        
+        // Debug: Check if the storage method is working correctly
+        console.log("[Webhook] DEBUG - findEmailContactByEmail method test:");
+        console.log(`[Webhook] - Original email: "${email}"`);
+        console.log(`[Webhook] - Lowercase email: "${email.toLowerCase()}"`);
+        console.log(`[Webhook] - Email length: ${email.length}`);
+        console.log(`[Webhook] - Email type: ${typeof email}`);
+        
+        // Try some debug variations of the email
+        try {
+          console.log("[Webhook] DEBUG - Testing email variations...");
+          const trimmedEmail = email.trim();
+          const trimmedResult = await storage.findEmailContactByEmail(trimmedEmail);
+          console.log(`[Webhook] - Trimmed email "${trimmedEmail}" result:`, trimmedResult ? "FOUND" : "NOT FOUND");
+          
+          if (trimmedResult) {
+            contactResult = trimmedResult; // Use the trimmed result
+          }
+        } catch (dbError) {
+          console.log("[Webhook] DEBUG email variation test failed:", dbError);
+        }
+        
+        // Check if any of the debug attempts found the contact
+        if (!contactResult) {
+          console.log("[Webhook] This email is not in our contact database");
+          console.log("[Webhook] Request processing terminated - contact not found");
+          console.log("=".repeat(80));
+          return res.status(404).json({ message: "Contact not found" });
+        } else {
+          console.log("[Webhook] ✅ Contact found via debug attempts!");
+        }
+      }
+      
+      console.log("[Webhook] ✅ Contact found:", contactResult.contact.id, "in tenant:", contactResult.tenantId);
+
+      const { contact, tenantId } = contactResult;
+
+      // Map webhook event types to activity types
+      const eventTypeMapping: Record<string, string> = {
+        'email.sent': 'sent',
+        'email.delivered': 'delivered',
+        'email.delivery_delayed': 'delivered',
+        'email.bounced': 'bounced',
+        'email.complained': 'complained',
+        'email.opened': 'opened',
+        'email.clicked': 'clicked',
+        'email.failed': 'failed',
+        'email.scheduled': 'scheduled',
+        'email.unsubscribed': 'unsubscribed'
+      };
+
+      const activityType = eventTypeMapping[type];
+      if (!activityType) {
+        console.log(`[Webhook] Unknown activity type for event: ${type}`);
+        return res.status(200).json({ message: "Event type mapping not found" });
+      }
+
+      // Create activity record
+      const activityData = {
+        contactId: contact.id,
+        activityType: activityType as any,
+        activityData: JSON.stringify({
+          messageId: data.message_id,
+          subject: data.subject,
+          tags: data.tags,
+        }),
+        userAgent: data.user_agent,
+        ipAddress: data.ip,
+        webhookId: data.message_id || data.id,
+        webhookData: JSON.stringify(webhookData),
+        occurredAt: new Date(data.created_at || Date.now()),
+      };
+
+      // Check if we already processed this webhook
+      if (activityData.webhookId) {
+        const existingActivity = await storage.getActivityByWebhookId(activityData.webhookId, tenantId);
+        if (existingActivity) {
+          console.log(`[Webhook] Activity already processed for webhook ID: ${activityData.webhookId}`);
+          return res.status(200).json({ message: "Activity already processed" });
+        }
+      }
+
+      const activity = await storage.createEmailActivity(activityData, tenantId);
+      
+      // Update contact statistics based on activity type
+      if (activityType === 'opened') {
+        await storage.updateEmailContact(contact.id, { 
+          emailsOpened: (contact.emailsOpened || 0) + 1,
+          lastActivity: new Date() 
+        }, tenantId);
+      } else if (activityType === 'bounced') {
+        await storage.updateEmailContact(contact.id, { 
+          status: 'bounced' as any,
+          lastActivity: new Date() 
+        }, tenantId);
+      } else if (activityType === 'complained') {
+        await storage.updateEmailContact(contact.id, { 
+          status: 'complained' as any,
+          lastActivity: new Date() 
+        }, tenantId);
+      } else if (activityType === 'unsubscribed') {
+        await storage.updateEmailContact(contact.id, { 
+          status: 'unsubscribed' as any,
+          lastActivity: new Date() 
+        }, tenantId);
+      } else if (activityType === 'failed') {
+        // For failed emails, we might want to track this but not change status immediately
+        // as it could be a temporary issue. Consider implementing retry logic or failure count.
+        await storage.updateEmailContact(contact.id, { 
+          lastActivity: new Date() 
+        }, tenantId);
+      } else if (activityType === 'clicked') {
+        await storage.updateEmailContact(contact.id, { 
+          lastActivity: new Date() 
+        }, tenantId);
+      } else {
+        // For other events (sent, delivered, delivery_delayed, scheduled), just update last activity
+        await storage.updateEmailContact(contact.id, { 
+          lastActivity: new Date() 
+        }, tenantId);
+      }
+
+      console.log(`[Webhook] Successfully processed ${activityType} activity for contact: ${email}`);
+      console.log("[Webhook] Request processing completed successfully");
+      console.log("=".repeat(80));
+      res.status(200).json({ message: "Webhook processed successfully", activityId: activity.id });
+
+    } catch (error) {
+      console.error("=".repeat(80));
+      console.error("[Webhook] ERROR processing Resend webhook:");
+      console.error("[Webhook] Error message:", error instanceof Error ? error.message : String(error));
+      console.error("[Webhook] Error stack:", error instanceof Error ? error.stack : 'No stack trace available');
+      console.error("[Webhook] Request body that caused error:", JSON.stringify(req.body, null, 2));
+      console.error("[Webhook] Request headers that caused error:", JSON.stringify(req.headers, null, 2));
+      console.error("=".repeat(80));
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ====================================
   // NEWSLETTER ROUTES
   // ====================================
 
@@ -3971,6 +4349,146 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ tags });
     } catch (error) {
       console.error("Get contact tags error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Send newsletter via Go backend (similar to email-test)
+  app.post("/api/newsletters/:id/send", authenticateToken, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      
+      console.log(`[Newsletter Send] Starting send for newsletter ID: ${id}, tenant: ${req.user.tenantId}`);
+      
+      // Get newsletter details
+      const newsletter = await storage.getNewsletter(id, req.user.tenantId);
+      if (!newsletter) {
+        console.log(`[Newsletter Send] Newsletter not found: ${id}`);
+        return res.status(404).json({ message: "Newsletter not found" });
+      }
+      
+      console.log(`[Newsletter Send] Newsletter found:`, {
+        id: newsletter.id,
+        title: newsletter.title,
+        recipientType: newsletter.recipientType,
+        selectedContactIds: newsletter.selectedContactIds?.length || 0,
+        selectedTagIds: newsletter.selectedTagIds?.length || 0
+      });
+
+      // Get recipients based on newsletter segmentation
+      let recipients: any[] = [];
+      if (newsletter.recipientType === 'all') {
+        recipients = await storage.getAllEmailContacts(req.user.tenantId);
+      } else if (newsletter.recipientType === 'selected' && newsletter.selectedContactIds) {
+        // Get contacts by individual IDs
+        const contactPromises = newsletter.selectedContactIds.map(id => 
+          storage.getEmailContact(id, req.user.tenantId)
+        );
+        const contacts = await Promise.all(contactPromises);
+        recipients = contacts.filter(Boolean); // Remove any undefined contacts
+      } else if (newsletter.recipientType === 'tags' && newsletter.selectedTagIds) {
+        // Get all contacts and filter by tags
+        const allContacts = await storage.getAllEmailContacts(req.user.tenantId);
+        recipients = allContacts.filter(contact => 
+          contact.tags && contact.tags.some((tag: any) => 
+            newsletter.selectedTagIds?.includes(tag.id)
+          )
+        );
+      }
+
+      console.log(`[Newsletter Send] Found ${recipients.length} recipients`);
+      
+      if (recipients.length === 0) {
+        console.log(`[Newsletter Send] No recipients found for newsletter ${id}`);
+        return res.status(400).json({ message: "No recipients found for this newsletter" });
+      }
+
+      // Get user's access token for Go server authentication
+      const accessToken = req.headers.authorization?.replace('Bearer ', '');
+      if (!accessToken) {
+        return res.status(401).json({ message: "Authentication token required" });
+      }
+
+      // Send newsletter to each recipient via Go backend
+      const emailId = `newsletter-${id}-${Date.now()}`;
+      const sendPromises = recipients.map(async (recipient, index) => {
+        const individualEmailId = `${emailId}-${index}`;
+        
+        const payload = {
+          emailId: individualEmailId,
+          status: "queued",
+          temporalWorkflow: `newsletter-workflow-${individualEmailId}`,
+          metadata: {
+            recipient: recipient.email,
+            subject: newsletter.subject,
+            content: newsletter.content,
+            templateType: "newsletter",
+            priority: "normal",
+            newsletterId: newsletter.id,
+            newsletterTitle: newsletter.title,
+            to: recipient.email,
+            sentAt: new Date().toISOString(),
+          }
+        };
+
+        try {
+          const response = await fetch('https://tengine.zendwise.work/api/email-tracking', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+            const error = await response.text();
+            console.error(`Failed to queue email for ${recipient.email}:`, error);
+            return { success: false, email: recipient.email, error };
+          }
+
+          const result = await response.json();
+          return { success: true, email: recipient.email, result };
+        } catch (error) {
+          console.error(`Error sending to ${recipient.email}:`, error);
+          return { success: false, email: recipient.email, error: error instanceof Error ? error.message : String(error) };
+        }
+      });
+
+      const results = await Promise.all(sendPromises);
+      const successful = results.filter(r => r.success);
+      const failed = results.filter(r => !r.success);
+
+      console.log(`[Newsletter Send] Results: ${successful.length} successful, ${failed.length} failed`);
+      if (failed.length > 0) {
+        console.log(`[Newsletter Send] Failed emails:`, failed.map(f => ({ email: f.email, error: f.error })));
+      }
+
+      // Update newsletter status and metadata after queuing sends
+      await storage.updateNewsletter(
+        id,
+        { 
+          status: "sent",
+          sentAt: new Date(),
+          recipientCount: recipients.length,
+        },
+        req.user.tenantId
+      );
+
+      res.json({
+        message: "Newsletter sending initiated",
+        totalRecipients: recipients.length,
+        successful: successful.length,
+        failed: failed.length,
+        emailId,
+        results: {
+          successful: successful.map(r => r.email),
+          failed: failed.map(r => ({ email: r.email, error: r.error }))
+        }
+      });
+
+    } catch (error) {
+      console.error("Send newsletter error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });

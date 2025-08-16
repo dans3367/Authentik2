@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import EmailActivityTimeline from "@/components/EmailActivityTimeline";
 import { 
   ArrowLeft,
   Mail, 
@@ -77,10 +78,24 @@ export default function ViewContact() {
     enabled: !!id,
   });
 
+  // Fetch real-time engagement statistics
+  const { data: statsResponse, isLoading: statsLoading } = useQuery({
+    queryKey: ['/api/email-contacts', id, 'stats'],
+    queryFn: async () => {
+      const apiResponse = await apiRequest('GET', `/api/email-contacts/${id}/stats`);
+      const data = await apiResponse.json();
+      console.log('API response for contact stats:', data);
+      return data;
+    },
+    enabled: !!id,
+  });
+
   // Extract contact from response - the API might return { contact: ... } or just the contact directly
   const contact: Contact | undefined = response?.contact || response;
+  const engagementStats = statsResponse?.stats;
   
   console.log('Processed contact data:', contact);
+  console.log('Engagement stats:', engagementStats);
 
   // Delete contact mutation
   const deleteContactMutation = useMutation({
@@ -91,6 +106,7 @@ export default function ViewContact() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/email-contacts'] });
       queryClient.invalidateQueries({ queryKey: ['/api/email-contacts-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/email-contacts', id, 'stats'] });
       toast({
         title: "Success",
         description: "Contact deleted successfully",
@@ -290,36 +306,108 @@ export default function ViewContact() {
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="w-5 h-5" />
                 Engagement Statistics
+                {statsLoading && (
+                  <div className="ml-2 animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <div className="flex items-center justify-center gap-2 mb-2">
-                    <Send className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Emails Sent</span>
-                  </div>
-                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{contact.emailsSent}</p>
+              {statsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Loading real-time stats...</span>
                 </div>
-                
-                <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <div className="flex items-center justify-center gap-2 mb-2">
-                    <Eye className="w-5 h-5 text-green-600 dark:text-green-400" />
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Emails Opened</span>
+              ) : engagementStats ? (
+                <div className="space-y-6">
+                  {/* Primary Stats */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <div className="flex items-center justify-center gap-2 mb-2">
+                        <Send className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Emails Sent</span>
+                      </div>
+                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{engagementStats.emailsSent}</p>
+                    </div>
+                    
+                    <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                      <div className="flex items-center justify-center gap-2 mb-2">
+                        <Eye className="w-5 h-5 text-green-600 dark:text-green-400" />
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Emails Opened</span>
+                      </div>
+                      <p className="text-2xl font-bold text-green-600 dark:text-green-400">{engagementStats.emailsOpened}</p>
+                    </div>
+                    
+                    <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                      <div className="flex items-center justify-center gap-2 mb-2">
+                        <TrendingUp className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Open Rate</span>
+                      </div>
+                      <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                        {engagementStats.openRate}%
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">{contact.emailsOpened}</p>
+
+                  {/* Additional Stats */}
+                  {(engagementStats.emailsClicked > 0 || engagementStats.emailsBounced > 0) && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {engagementStats.emailsClicked > 0 && (
+                        <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                          <div className="flex items-center justify-center gap-2 mb-2">
+                            <Mail className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Emails Clicked</span>
+                          </div>
+                          <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{engagementStats.emailsClicked}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            {engagementStats.clickRate}% click rate
+                          </p>
+                        </div>
+                      )}
+                      
+                      {engagementStats.emailsBounced > 0 && (
+                        <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                          <div className="flex items-center justify-center gap-2 mb-2">
+                            <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Emails Bounced</span>
+                          </div>
+                          <p className="text-2xl font-bold text-red-600 dark:text-red-400">{engagementStats.emailsBounced}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            {engagementStats.bounceRate}% bounce rate
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                
-                <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                  <div className="flex items-center justify-center gap-2 mb-2">
-                    <TrendingUp className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Open Rate</span>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <Send className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Emails Sent</span>
+                    </div>
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{contact.emailsSent || 0}</p>
                   </div>
-                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                    {getEngagementRate(contact.emailsSent, contact.emailsOpened)}%
-                  </p>
+                  
+                  <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <Eye className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Emails Opened</span>
+                    </div>
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">{contact.emailsOpened || 0}</p>
+                  </div>
+                  
+                  <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <TrendingUp className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Open Rate</span>
+                    </div>
+                    <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                      {getEngagementRate(contact.emailsSent || 0, contact.emailsOpened || 0)}%
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 
@@ -380,6 +468,9 @@ export default function ViewContact() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Email Activity Timeline */}
+          <EmailActivityTimeline contactId={contact.id} />
         </div>
 
         {/* Sidebar */}

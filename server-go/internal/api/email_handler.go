@@ -669,6 +669,78 @@ func (eh *EmailHandler) monitorWorkflow(workflowRun temporalclient.WorkflowRun, 
 	logger.Info("Workflow monitoring completed", "final_status", entry.Status)
 }
 
+// ClearTemporalWorkflows terminates all running workflows and clears tracking entries
+func (eh *EmailHandler) ClearTemporalWorkflows(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value("userID").(string)
+	tenantID := r.Context().Value("tenantID").(string)
+	logger := eh.logger.WithContext(r.Context())
+
+	logger.Info("Starting temporal workflow cleanup operation",
+		"user_id", userID,
+		"tenant_id", tenantID)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	clearedWorkflows := 0
+	clearedEntries := 0
+
+	// First, attempt to terminate all workflows for this user/tenant
+	for entryID, entry := range eh.trackingStore {
+		if entry.UserID == userID && entry.TenantID == tenantID {
+			if entry.TemporalWorkflow != "" {
+				// Try to terminate the workflow
+				if eh.temporalClient != nil {
+					client := eh.temporalClient.GetClient()
+					err := client.TerminateWorkflow(ctx, entry.TemporalWorkflow, "", "Manual cleanup operation")
+					if err != nil {
+						logger.Warn("Failed to terminate workflow",
+							"workflow_id", entry.TemporalWorkflow,
+							"email_id", entry.EmailID,
+							"error", err)
+					} else {
+						logger.Info("Terminated workflow",
+							"workflow_id", entry.TemporalWorkflow,
+							"email_id", entry.EmailID)
+						clearedWorkflows++
+					}
+				}
+			}
+
+			// Remove the tracking entry
+			delete(eh.trackingStore, entryID)
+			clearedEntries++
+		}
+	}
+
+	// Also clear any orphaned workflows with failed statuses
+	for entryID, entry := range eh.trackingStore {
+		if entry.UserID == userID && entry.TenantID == tenantID {
+			if entry.Status == "failed" || entry.Status == "workflow_failed" {
+				delete(eh.trackingStore, entryID)
+				clearedEntries++
+			}
+		}
+	}
+
+	logger.Info("Temporal cleanup completed",
+		"user_id", userID,
+		"tenant_id", tenantID,
+		"cleared_workflows", clearedWorkflows,
+		"cleared_entries", clearedEntries)
+
+	response := map[string]interface{}{
+		"message":          "Temporal cleanup completed successfully",
+		"clearedWorkflows": clearedWorkflows,
+		"clearedEntries":   clearedEntries,
+		"timestamp":        time.Now().UTC().Format(time.RFC3339),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
 func generateID() string {
 	return fmt.Sprintf("%d", time.Now().UnixNano())
 }

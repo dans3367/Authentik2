@@ -16,6 +16,7 @@ import {
   contactTagAssignments,
   newsletters,
   campaigns,
+  emailActivity,
   type User, 
   type InsertUser, 
   type RefreshToken, 
@@ -71,10 +72,13 @@ import {
   type Campaign,
   type InsertCampaign,
   type CreateCampaignData,
-  type UpdateCampaignData
+  type UpdateCampaignData,
+  type EmailActivity,
+  type InsertEmailActivity,
+  type CreateEmailActivityData
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gt, lt, desc, ne, or, ilike, count, sql, inArray } from "drizzle-orm";
+import { eq, and, gt, lt, gte, lte, desc, ne, or, ilike, count, sql, inArray } from "drizzle-orm";
 
 export interface DeviceInfo {
   deviceId?: string;
@@ -253,6 +257,13 @@ export interface IStorage {
     draftCampaigns: number;
     completedCampaigns: number;
   }>;
+
+  // Email activity operations for webhook tracking
+  createEmailActivity(activityData: CreateEmailActivityData, tenantId: string): Promise<EmailActivity>;
+  getEmailActivity(id: string, tenantId: string): Promise<EmailActivity | undefined>;
+  getContactActivity(contactId: string, tenantId: string, limit?: number): Promise<EmailActivity[]>;
+  getActivityByWebhookId(webhookId: string, tenantId: string): Promise<EmailActivity | undefined>;
+  findEmailContactByEmail(email: string): Promise<{ contact: EmailContact; tenantId: string } | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1748,17 +1759,29 @@ export class DatabaseStorage implements IStorage {
       .from(emailLists)
       .where(eq(emailLists.tenantId, tenantId));
 
-    // Calculate average engagement rate
-    const [engagementResult] = await db
-      .select({
-        totalSent: sql<number>`COALESCE(SUM(${emailContacts.emailsSent}), 0)`,
-        totalOpened: sql<number>`COALESCE(SUM(${emailContacts.emailsOpened}), 0)`,
-      })
-      .from(emailContacts)
-      .where(eq(emailContacts.tenantId, tenantId));
+    // Calculate average engagement rate from actual email activities
+    const [sentActivitiesResult] = await db
+      .select({ count: count() })
+      .from(emailActivity)
+      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
+      .where(and(
+        eq(emailContacts.tenantId, tenantId),
+        eq(emailActivity.activityType, 'sent')
+      ));
 
-    const averageEngagementRate = engagementResult.totalSent > 0 
-      ? Math.round((engagementResult.totalOpened / engagementResult.totalSent) * 100) 
+    const [openedActivitiesResult] = await db
+      .select({ count: count() })
+      .from(emailActivity)
+      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
+      .where(and(
+        eq(emailContacts.tenantId, tenantId),
+        eq(emailActivity.activityType, 'opened')
+      ));
+
+    const totalSent = sentActivitiesResult.count;
+    const totalOpened = openedActivitiesResult.count;
+    const averageEngagementRate = totalSent > 0 
+      ? Math.round((totalOpened / totalSent) * 100) 
       : 0;
 
     return {
@@ -1769,6 +1792,94 @@ export class DatabaseStorage implements IStorage {
       pendingContacts: pendingResult.count,
       totalLists: listsResult.count,
       averageEngagementRate,
+    };
+  }
+
+  async getContactEngagementStats(contactId: string, tenantId: string): Promise<{
+    emailsSent: number;
+    emailsOpened: number;
+    emailsClicked: number;
+    emailsBounced: number;
+    emailsDelivered: number;
+    openRate: number;
+    clickRate: number;
+    bounceRate: number;
+  }> {
+    // Get sent emails count
+    const [sentResult] = await db
+      .select({ count: count() })
+      .from(emailActivity)
+      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
+      .where(and(
+        eq(emailActivity.contactId, contactId),
+        eq(emailContacts.tenantId, tenantId),
+        eq(emailActivity.activityType, 'sent')
+      ));
+
+    // Get opened emails count
+    const [openedResult] = await db
+      .select({ count: count() })
+      .from(emailActivity)
+      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
+      .where(and(
+        eq(emailActivity.contactId, contactId),
+        eq(emailContacts.tenantId, tenantId),
+        eq(emailActivity.activityType, 'opened')
+      ));
+
+    // Get clicked emails count
+    const [clickedResult] = await db
+      .select({ count: count() })
+      .from(emailActivity)
+      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
+      .where(and(
+        eq(emailActivity.contactId, contactId),
+        eq(emailContacts.tenantId, tenantId),
+        eq(emailActivity.activityType, 'clicked')
+      ));
+
+    // Get bounced emails count
+    const [bouncedResult] = await db
+      .select({ count: count() })
+      .from(emailActivity)
+      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
+      .where(and(
+        eq(emailActivity.contactId, contactId),
+        eq(emailContacts.tenantId, tenantId),
+        eq(emailActivity.activityType, 'bounced')
+      ));
+
+    // Get delivered emails count
+    const [deliveredResult] = await db
+      .select({ count: count() })
+      .from(emailActivity)
+      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
+      .where(and(
+        eq(emailActivity.contactId, contactId),
+        eq(emailContacts.tenantId, tenantId),
+        eq(emailActivity.activityType, 'delivered')
+      ));
+
+    const emailsSent = sentResult.count;
+    const emailsOpened = openedResult.count;
+    const emailsClicked = clickedResult.count;
+    const emailsBounced = bouncedResult.count;
+    const emailsDelivered = deliveredResult.count;
+
+    // Calculate rates
+    const openRate = emailsSent > 0 ? Math.round((emailsOpened / emailsSent) * 100) : 0;
+    const clickRate = emailsSent > 0 ? Math.round((emailsClicked / emailsSent) * 100) : 0;
+    const bounceRate = emailsSent > 0 ? Math.round((emailsBounced / emailsSent) * 100) : 0;
+
+    return {
+      emailsSent,
+      emailsOpened,
+      emailsClicked,
+      emailsBounced,
+      emailsDelivered,
+      openRate,
+      clickRate,
+      bounceRate,
     };
   }
 
@@ -1980,6 +2091,82 @@ export class DatabaseStorage implements IStorage {
       activeCampaigns: activeResult.count,
       draftCampaigns: draftResult.count,
       completedCampaigns: completedResult.count,
+    };
+  }
+
+  // Email activity operations for webhook tracking
+  async createEmailActivity(activityData: CreateEmailActivityData, tenantId: string): Promise<EmailActivity> {
+    const [activity] = await db
+      .insert(emailActivity)
+      .values({
+        ...activityData,
+        tenantId,
+      })
+      .returning();
+    return activity;
+  }
+
+  async getEmailActivity(id: string, tenantId: string): Promise<EmailActivity | undefined> {
+    const [activity] = await db
+      .select()
+      .from(emailActivity)
+      .where(and(eq(emailActivity.id, id), eq(emailActivity.tenantId, tenantId)));
+    return activity;
+  }
+
+  async getContactActivity(contactId: string, tenantId: string, limit?: number, fromDate?: Date, toDate?: Date): Promise<EmailActivity[]> {
+    const whereConditions = [
+      eq(emailActivity.contactId, contactId),
+      eq(emailActivity.tenantId, tenantId)
+    ];
+    
+    if (fromDate) {
+      whereConditions.push(gte(emailActivity.occurredAt, fromDate));
+    }
+    
+    if (toDate) {
+      whereConditions.push(lte(emailActivity.occurredAt, toDate));
+    }
+    
+    const query = db
+      .select()
+      .from(emailActivity)
+      .where(and(...whereConditions))
+      .orderBy(desc(emailActivity.occurredAt));
+    
+    if (limit) {
+      query.limit(limit);
+    }
+    
+    return await query;
+  }
+
+  async getActivityByWebhookId(webhookId: string, tenantId: string): Promise<EmailActivity | undefined> {
+    const [activity] = await db
+      .select()
+      .from(emailActivity)
+      .where(and(
+        eq(emailActivity.webhookId, webhookId),
+        eq(emailActivity.tenantId, tenantId)
+      ));
+    return activity;
+  }
+
+  async findEmailContactByEmail(email: string): Promise<{ contact: EmailContact; tenantId: string } | undefined> {
+    const [result] = await db
+      .select({
+        contact: emailContacts,
+        tenantId: emailContacts.tenantId,
+      })
+      .from(emailContacts)
+      .where(eq(emailContacts.email, email))
+      .limit(1);
+    
+    if (!result) return undefined;
+    
+    return {
+      contact: result.contact,
+      tenantId: result.tenantId,
     };
   }
 

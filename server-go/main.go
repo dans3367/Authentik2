@@ -84,7 +84,7 @@ func main() {
 }
 
 func (s *Server) initTemporal() error {
-	temporalHost := getEnvOrDefault("TEMPORAL_HOST", "172.72.0.9:7233")
+	temporalHost := getEnvOrDefault("TEMPORAL_HOST", "172.18.0.4:7233")
 	maxRetries := 5
 	retryDelay := 2 * time.Second
 
