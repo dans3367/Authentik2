@@ -288,6 +288,25 @@ export const newsletters = pgTable("newsletters", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Newsletter task status for tracking processing stages
+export const newsletterTaskStatus = pgTable("newsletter_task_status", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  newsletterId: varchar("newsletter_id").notNull().references(() => newsletters.id, { onDelete: 'cascade' }),
+  taskType: text("task_type").notNull(), // 'validation', 'processing', 'sending', 'analytics'
+  taskName: text("task_name").notNull(),
+  status: text("status").notNull().default('pending'), // 'pending', 'running', 'completed', 'failed'
+  progress: integer("progress").default(0), // 0-100
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  duration: integer("duration"), // Duration in milliseconds
+  details: text("details"), // Additional status information
+  errorMessage: text("error_message"), // Error details if failed
+  metadata: text("metadata"), // JSON string for additional data
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Campaigns table for campaign management
 export const campaigns = pgTable("campaigns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1024,7 +1043,7 @@ export interface ContactFilters {
 }
 
 // Newsletter relations
-export const newsletterRelations = relations(newsletters, ({ one }) => ({
+export const newsletterRelations = relations(newsletters, ({ one, many }) => ({
   tenant: one(tenants, {
     fields: [newsletters.tenantId],
     references: [tenants.id],
@@ -1032,6 +1051,18 @@ export const newsletterRelations = relations(newsletters, ({ one }) => ({
   user: one(users, {
     fields: [newsletters.userId],
     references: [users.id],
+  }),
+  taskStatuses: many(newsletterTaskStatus),
+}));
+
+export const newsletterTaskStatusRelations = relations(newsletterTaskStatus, ({ one }) => ({
+  newsletter: one(newsletters, {
+    fields: [newsletterTaskStatus.newsletterId],
+    references: [newsletters.id],
+  }),
+  tenant: one(tenants, {
+    fields: [newsletterTaskStatus.tenantId],
+    references: [tenants.id],
   }),
 }));
 
@@ -1074,6 +1105,42 @@ export type Newsletter = typeof newsletters.$inferSelect;
 export type InsertNewsletter = z.infer<typeof insertNewsletterSchema>;
 export type CreateNewsletterData = z.infer<typeof createNewsletterSchema>;
 export type UpdateNewsletterData = z.infer<typeof updateNewsletterSchema>;
+
+// Newsletter Task Status schemas
+export const createNewsletterTaskStatusSchema = z.object({
+  taskType: z.enum(['validation', 'processing', 'sending', 'analytics']),
+  taskName: z.string().min(1, "Task name is required"),
+  status: z.enum(['pending', 'running', 'completed', 'failed']).default('pending'),
+  progress: z.number().int().min(0).max(100).default(0),
+  details: z.string().optional(),
+  errorMessage: z.string().optional(),
+  metadata: z.string().optional(),
+});
+
+export const updateNewsletterTaskStatusSchema = z.object({
+  status: z.enum(['pending', 'running', 'completed', 'failed']).optional(),
+  progress: z.number().int().min(0).max(100).optional(),
+  startedAt: z.date().optional(),
+  completedAt: z.date().optional(),
+  duration: z.number().int().nonnegative().optional(),
+  details: z.string().optional(),
+  errorMessage: z.string().optional(),
+  metadata: z.string().optional(),
+});
+
+export const insertNewsletterTaskStatusSchema = createInsertSchema(newsletterTaskStatus).omit({
+  id: true,
+  tenantId: true,
+  newsletterId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Newsletter Task Status types
+export type NewsletterTaskStatus = typeof newsletterTaskStatus.$inferSelect;
+export type InsertNewsletterTaskStatus = z.infer<typeof insertNewsletterTaskStatusSchema>;
+export type CreateNewsletterTaskStatusData = z.infer<typeof createNewsletterTaskStatusSchema>;
+export type UpdateNewsletterTaskStatusData = z.infer<typeof updateNewsletterTaskStatusSchema>;
 
 // Campaign relations
 export const campaignRelations = relations(campaigns, ({ one }) => ({

@@ -1,5 +1,5 @@
 import { useParams, useLocation, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { 
   ArrowLeft,
@@ -31,24 +31,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format, formatDistanceToNow } from "date-fns";
-import type { NewsletterWithUser } from "@shared/schema";
+import type { NewsletterWithUser, NewsletterTaskStatus } from "@shared/schema";
 
-// Temporal status data - integrates with Go Temporal worker system
-// Available workflows: EmailWorkflow, ScheduledEmailWorkflow, ReviewerApprovalEmailWorkflow
-interface TaskStatus {
-  id: string;
-  type: 'validation' | 'processing' | 'sending' | 'analytics';
-  name: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  progress?: number;
-  startedAt?: Date;
-  completedAt?: Date;
-  duration?: number;
-  details?: string;
-  error?: string;
-}
+// Using real task status data from backend via NewsletterTaskStatus type
 
 interface TimelineEvent {
   id: string;
@@ -78,50 +65,33 @@ export default function NewsletterViewPage() {
 
   const newsletter = newsletterData?.newsletter;
 
-  // Mock task status data - in real implementation this would be fetched from temporal/backend
-  const mockTaskStatuses: TaskStatus[] = [
-    {
-      id: '1',
-      type: 'validation',
-      name: 'Content Validation',
-      status: newsletter?.status === 'draft' ? 'completed' : 'completed',
-      progress: 100,
-      startedAt: newsletter?.createdAt ? new Date(newsletter.createdAt) : new Date(),
-      completedAt: newsletter?.createdAt ? new Date(Date.now() - 2000) : new Date(),
-      duration: 2000,
-      details: 'Content structure and HTML validated successfully'
+  // Fetch task status data
+  const { data: taskStatusData, isLoading: isTaskStatusLoading } = useQuery<{ taskStatuses: NewsletterTaskStatus[] }>({
+    queryKey: ['/api/newsletters', id, 'task-status'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/newsletters/${id}/task-status`);
+      return response.json();
     },
-    {
-      id: '2',
-      type: 'processing',
-      name: 'Template Processing',
-      status: newsletter?.status === 'draft' ? 'completed' : newsletter?.status === 'scheduled' ? 'running' : 'completed',
-      progress: newsletter?.status === 'scheduled' ? 65 : 100,
-      startedAt: newsletter?.updatedAt ? new Date(newsletter.updatedAt) : new Date(),
-      completedAt: newsletter?.status === 'sent' ? new Date(Date.now() - 5000) : undefined,
-      duration: newsletter?.status === 'sent' ? 5000 : undefined,
-      details: newsletter?.status === 'scheduled' ? 'Processing email template and recipient list...' : 'Template processing completed'
+    enabled: !!id,
+  });
+
+  // Initialize tasks if they don't exist
+  const initializeTasksMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', `/api/newsletters/${id}/initialize-tasks`);
+      return response.json();
     },
-    {
-      id: '3',
-      type: 'sending',
-      name: 'Email Delivery',
-      status: newsletter?.status === 'sent' ? 'completed' : newsletter?.status === 'scheduled' ? 'pending' : 'pending',
-      progress: newsletter?.status === 'sent' ? 100 : 0,
-      startedAt: newsletter?.sentAt ? new Date(newsletter.sentAt) : undefined,
-      completedAt: newsletter?.sentAt ? new Date(newsletter.sentAt) : undefined,
-      duration: newsletter?.sentAt ? 8000 : undefined,
-      details: newsletter?.status === 'sent' ? `Delivered to ${newsletter.recipientCount} recipients` : 'Waiting for scheduled send time'
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters', id, 'task-status'] });
     },
-    {
-      id: '4',
-      type: 'analytics',
-      name: 'Analytics Collection',
-      status: newsletter?.status === 'sent' ? 'running' : 'pending',
-      progress: newsletter?.status === 'sent' ? 45 : 0,
-      details: newsletter?.status === 'sent' ? 'Collecting engagement metrics...' : 'Will start after email delivery'
-    }
-  ];
+  });
+
+  const taskStatuses = taskStatusData?.taskStatuses || [];
+
+  // Initialize tasks if no task statuses exist
+  if (newsletter && taskStatuses.length === 0 && !isTaskStatusLoading && !initializeTasksMutation.isPending) {
+    initializeTasksMutation.mutate();
+  }
 
   // Mock timeline events
   const mockTimelineEvents: TimelineEvent[] = [
@@ -184,7 +154,7 @@ export default function NewsletterViewPage() {
     );
   };
 
-  const getTaskStatusIcon = (status: TaskStatus['status']) => {
+  const getTaskStatusIcon = (status: NewsletterTaskStatus['status']) => {
     switch (status) {
       case 'completed':
         return <CheckCircle className="h-4 w-4 text-green-500" />;
@@ -598,14 +568,14 @@ export default function NewsletterViewPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                {mockTaskStatuses.map((task) => (
+                {taskStatuses.map((task: NewsletterTaskStatus) => (
                   <div key={task.id} className="space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         {getTaskStatusIcon(task.status)}
                         <div>
                           <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                            {task.name}
+                            {task.taskName}
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-400">
                             {task.details}
@@ -630,20 +600,20 @@ export default function NewsletterViewPage() {
                       <Progress value={task.progress} className="h-2" />
                     )}
                     
-                    {task.error && (
+                    {task.errorMessage && (
                       <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                         <p className="text-sm text-red-800 dark:text-red-200">
-                          {task.error}
+                          {task.errorMessage}
                         </p>
                       </div>
                     )}
                     
                     <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                       {task.startedAt && (
-                        <span>Started: {format(task.startedAt, 'HH:mm:ss')}</span>
+                        <span>Started: {format(new Date(task.startedAt), 'HH:mm:ss')}</span>
                       )}
                       {task.completedAt && (
-                        <span>Completed: {format(task.completedAt, 'HH:mm:ss')}</span>
+                        <span>Completed: {format(new Date(task.completedAt), 'HH:mm:ss')}</span>
                       )}
                     </div>
                   </div>

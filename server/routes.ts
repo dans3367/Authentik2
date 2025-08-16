@@ -4275,6 +4275,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.user.tenantId
       );
 
+      // Automatically initialize task statuses for the new newsletter
+      await storage.initializeNewsletterTaskStatuses(newsletter.id, req.user.tenantId);
+
       res.status(201).json({ newsletter });
     } catch (error: any) {
       if (error.name === "ZodError") {
@@ -4339,6 +4342,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(stats);
     } catch (error) {
       console.error("Get newsletter stats error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Newsletter task status routes
+  app.get("/api/newsletters/:id/task-status", authenticateToken, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const taskStatuses = await storage.getNewsletterTaskStatuses(id, req.user.tenantId);
+      res.json({ taskStatuses });
+    } catch (error) {
+      console.error("Get newsletter task status error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/newsletters/:id/task-status", authenticateToken, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const taskData = req.body;
+      const taskStatus = await storage.createNewsletterTaskStatus(id, taskData, req.user.tenantId);
+      res.status(201).json({ taskStatus });
+    } catch (error) {
+      console.error("Create newsletter task status error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.put("/api/newsletters/:newsletterId/task-status/:taskId", authenticateToken, async (req: any, res) => {
+    try {
+      const { taskId } = req.params;
+      const updates = req.body;
+      const taskStatus = await storage.updateNewsletterTaskStatus(taskId, updates, req.user.tenantId);
+      
+      if (!taskStatus) {
+        return res.status(404).json({ message: "Task status not found" });
+      }
+      
+      res.json({ taskStatus });
+    } catch (error) {
+      console.error("Update newsletter task status error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/newsletters/:id/initialize-tasks", authenticateToken, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const taskStatuses = await storage.initializeNewsletterTasks(id, req.user.tenantId);
+      res.json({ taskStatuses });
+    } catch (error) {
+      console.error("Initialize newsletter tasks error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
