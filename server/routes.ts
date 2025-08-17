@@ -4180,13 +4180,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Extract newsletter ID from email tags for newsletter engagement tracking
       let newsletterId: string | undefined;
-      if (data.tags && Array.isArray(data.tags)) {
+      
+      // Debug: Log the entire webhook data structure to understand what we're receiving
+      console.log(`[Webhook] Looking for newsletter ID in tags:`, JSON.stringify(data.tags, null, 2));
+      
+      // Check for tags in different possible locations
+      const tagsArray = data.tags || data.metadata?.tags || [];
+      
+      if (Array.isArray(tagsArray)) {
         // Look for newsletter ID in tags
-        for (const tag of data.tags) {
+        for (const tag of tagsArray) {
           if (typeof tag === 'string' && tag.startsWith('newsletter-')) {
             newsletterId = tag.replace('newsletter-', '');
+            console.log(`[Webhook] Found newsletter ID in tags: ${newsletterId}`);
             break;
           }
+        }
+      }
+      
+      // Also check if newsletter ID is directly in metadata
+      if (!newsletterId && data.metadata?.newsletterId) {
+        newsletterId = data.metadata.newsletterId;
+        console.log(`[Webhook] Found newsletter ID in metadata: ${newsletterId}`);
+      }
+      
+      // Also check message subject for newsletter tracking
+      if (!newsletterId && data.subject) {
+        const subjectMatch = data.subject.match(/\[Newsletter:([a-f0-9-]+)\]/);
+        if (subjectMatch) {
+          newsletterId = subjectMatch[1];
+          console.log(`[Webhook] Found newsletter ID in subject: ${newsletterId}`);
         }
       }
       
@@ -4510,7 +4533,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           temporalWorkflow: `newsletter-workflow-${individualEmailId}`,
           metadata: {
             recipient: recipient.email,
-            subject: newsletter.subject,
+            // Include newsletter ID in subject for tracking
+            subject: `${newsletter.subject} [Newsletter:${newsletter.id}]`,
             content: newsletter.content,
             templateType: "newsletter",
             priority: "normal",

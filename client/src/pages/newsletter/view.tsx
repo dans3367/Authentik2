@@ -53,7 +53,7 @@ export default function NewsletterViewPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("overview");
 
-  // Fetch newsletter data
+  // Fetch newsletter data with auto-refresh every 10 seconds for sent newsletters
   const { data: newsletterData, isLoading } = useQuery<{ newsletter: NewsletterWithUser }>({
     queryKey: ['/api/newsletters', id],
     queryFn: async () => {
@@ -61,6 +61,10 @@ export default function NewsletterViewPage() {
       return response.json();
     },
     enabled: !!id,
+    refetchInterval: (data) => {
+      // Auto-refresh every 10 seconds if newsletter is sent to get latest engagement metrics
+      return data?.newsletter?.status === 'sent' ? 10000 : false;
+    },
   });
 
   const newsletter = newsletterData?.newsletter;
