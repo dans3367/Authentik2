@@ -28,13 +28,7 @@ async function sendWebhook(eventType, email, newsletterId, groupUUID, additional
       to: email,
       from: 'newsletter@example.com',
       subject: `Test Newsletter [Newsletter:${newsletterId}]`,
-      tags: [`newsletter-${newsletterId}`, 'newsletter', 'test', `group-${groupUUID}`],
-      metadata: {
-        newsletterId: newsletterId,
-        groupUUID: groupUUID,
-        templateType: 'newsletter',
-        ...additionalData.metadata
-      },
+      tags: [`newsletter-${newsletterId}`, 'newsletter', 'test', `groupUUID-${groupUUID}`],
       ...additionalData
     }
   };

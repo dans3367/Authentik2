@@ -4189,46 +4189,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         subject: data.subject
       });
       
-      // Priority 1: Look for groupUUID in metadata (most reliable method)
-      if (data.metadata?.groupUUID) {
-        groupUUID = data.metadata.groupUUID;
-        console.log(`[Webhook] Found groupUUID in metadata: ${groupUUID}`);
-        
-        // If we have groupUUID, also get newsletter ID from metadata
-        if (data.metadata.newsletterId) {
-          newsletterId = data.metadata.newsletterId;
-          console.log(`[Webhook] Found newsletter ID in metadata: ${newsletterId}`);
-        }
-      }
-      
-      // Priority 2: Check for tags in different possible locations
-      const tagsArray = data.tags || data.metadata?.tags || [];
+      // Priority 1: Look for groupUUID in tags (Resend includes tags but not metadata in webhooks)
+      const tagsArray = data.tags || [];
       
       if (Array.isArray(tagsArray)) {
         // Look for groupUUID in tags
-        if (!groupUUID) {
-          for (const tag of tagsArray) {
-            if (typeof tag === 'string' && tag.startsWith('group-')) {
-              groupUUID = tag.replace('group-', '');
-              console.log(`[Webhook] Found groupUUID in tags: ${groupUUID}`);
-              break;
-            }
+        for (const tag of tagsArray) {
+          if (typeof tag === 'string' && tag.startsWith('groupUUID-')) {
+            groupUUID = tag.replace('groupUUID-', '');
+            console.log(`[Webhook] Found groupUUID in tags: ${groupUUID}`);
+            break;
           }
         }
         
         // Look for newsletter ID in tags
-        if (!newsletterId) {
-          for (const tag of tagsArray) {
-            if (typeof tag === 'string' && tag.startsWith('newsletter-')) {
-              newsletterId = tag.replace('newsletter-', '');
-              console.log(`[Webhook] Found newsletter ID in tags: ${newsletterId}`);
-              break;
-            }
+        for (const tag of tagsArray) {
+          if (typeof tag === 'string' && tag.startsWith('newsletter-')) {
+            newsletterId = tag.replace('newsletter-', '');
+            console.log(`[Webhook] Found newsletter ID in tags: ${newsletterId}`);
+            break;
           }
         }
       }
       
-      // Priority 3: Check message subject for newsletter tracking (fallback method)
+      // Priority 2: Check message subject for newsletter tracking (fallback method)
       if (!newsletterId && data.subject) {
         const subjectMatch = data.subject.match(/\[Newsletter:([a-f0-9-]+)\]/);
         if (subjectMatch) {
@@ -4572,10 +4556,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             priority: "normal",
             newsletterId: newsletter.id,
             newsletterTitle: newsletter.title,
-            groupUUID: groupUUID, // UUID to group all emails in this newsletter batch
             to: recipient.email,
             sentAt: new Date().toISOString(),
-            tags: [`newsletter-${newsletter.id}`, 'newsletter', newsletter.title, `group-${groupUUID}`]
+            // Use tags for groupUUID tracking since metadata is not included in webhook responses
+            tags: [`newsletter-${newsletter.id}`, 'newsletter', newsletter.title, `groupUUID-${groupUUID}`]
           }
         };
 
