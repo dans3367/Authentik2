@@ -35,7 +35,7 @@ import {
   type ContactFilters,
 } from "@shared/schema";
 import Stripe from "stripe";
-import { randomBytes } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import { authenticator } from "otplib";
 import * as QRCode from "qrcode";
 import { UAParser } from "ua-parser-js";
@@ -4535,7 +4535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Send newsletter to each recipient via Go backend
       // Generate a unique group UUID for this newsletter batch
-      const groupUUID = crypto.randomUUID();
+      const groupUUID = randomUUID();
       const emailId = `newsletter-${id}-${Date.now()}`;
       
       console.log(`[Newsletter Send] Generated groupUUID: ${groupUUID} for newsletter ${id}`);
