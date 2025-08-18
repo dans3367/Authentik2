@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // Test script to simulate newsletter webhook events from Resend
-// This tests the newsletter engagement tracking (opens, clicks)
+// This tests the newsletter engagement tracking (opens, clicks) with UUID-based group tracking
 
 const crypto = require('crypto');
 
@@ -18,7 +18,7 @@ function generateSignature(payload, secret) {
 }
 
 // Helper function to send webhook
-async function sendWebhook(eventType, email, newsletterId, additionalData = {}) {
+async function sendWebhook(eventType, email, newsletterId, groupUUID, additionalData = {}) {
   const payload = {
     type: eventType,
     created_at: new Date().toISOString(),
@@ -28,7 +28,13 @@ async function sendWebhook(eventType, email, newsletterId, additionalData = {}) 
       to: email,
       from: 'newsletter@example.com',
       subject: `Test Newsletter [Newsletter:${newsletterId}]`,
-      tags: [`newsletter-${newsletterId}`, 'newsletter', 'test'],
+      tags: [`newsletter-${newsletterId}`, 'newsletter', 'test', `group-${groupUUID}`],
+      metadata: {
+        newsletterId: newsletterId,
+        groupUUID: groupUUID,
+        templateType: 'newsletter',
+        ...additionalData.metadata
+      },
       ...additionalData
     }
   };
@@ -56,7 +62,7 @@ async function sendWebhook(eventType, email, newsletterId, additionalData = {}) 
 
 // Main test function
 async function testNewsletterEngagement() {
-  console.log('🚀 Testing Newsletter Webhook Engagement Tracking\n');
+  console.log('🚀 Testing Newsletter Webhook Engagement Tracking with GroupUUID\n');
   
   // Get newsletter ID from command line or use a default
   const newsletterId = process.argv[2];
@@ -68,6 +74,9 @@ async function testNewsletterEngagement() {
     process.exit(1);
   }
   
+  // Generate a unique groupUUID for this test batch (simulating real newsletter batch)
+  const groupUUID = crypto.randomUUID();
+  
   const testEmails = [
     'subscriber1@example.com',
     'subscriber2@example.com',
@@ -77,25 +86,26 @@ async function testNewsletterEngagement() {
   ];
   
   console.log(`📧 Testing newsletter: ${newsletterId}`);
+  console.log(`🔗 Generated groupUUID: ${groupUUID}`);
   console.log(`📬 Testing with ${testEmails.length} test emails\n`);
   
   // Step 1: Simulate email sent events
   console.log('1️⃣ Simulating email sent events...');
   for (const email of testEmails) {
-    await sendWebhook('email.sent', email, newsletterId);
+    await sendWebhook('email.sent', email, newsletterId, groupUUID);
     await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
   }
   
   console.log('\n2️⃣ Simulating email delivered events...');
   for (const email of testEmails) {
-    await sendWebhook('email.delivered', email, newsletterId);
+    await sendWebhook('email.delivered', email, newsletterId, groupUUID);
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   
   console.log('\n3️⃣ Simulating email opened events (60% open rate)...');
   const openedEmails = testEmails.slice(0, 3); // 3 out of 5 = 60%
   for (const email of openedEmails) {
-    await sendWebhook('email.opened', email, newsletterId, {
+    await sendWebhook('email.opened', email, newsletterId, groupUUID, {
       user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       ip: '192.168.1.1'
     });
@@ -105,7 +115,7 @@ async function testNewsletterEngagement() {
   console.log('\n4️⃣ Simulating email clicked events (33% CTR)...');
   const clickedEmails = openedEmails.slice(0, 1); // 1 out of 3 opened = 33%
   for (const email of clickedEmails) {
-    await sendWebhook('email.clicked', email, newsletterId, {
+    await sendWebhook('email.clicked', email, newsletterId, groupUUID, {
       user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       ip: '192.168.1.1',
       url: 'https://example.com/newsletter-link'
@@ -114,7 +124,7 @@ async function testNewsletterEngagement() {
   }
   
   console.log('\n5️⃣ Simulating bounced email...');
-  await sendWebhook('email.bounced', 'bounced@example.com', newsletterId, {
+  await sendWebhook('email.bounced', 'bounced@example.com', newsletterId, groupUUID, {
     bounce_type: 'hard'
   });
   
@@ -123,7 +133,9 @@ async function testNewsletterEngagement() {
   console.log('- Recipients: 5');
   console.log('- Opens: 3 (60% open rate)');
   console.log('- Clicks: 1 (33% CTR)');
+  console.log(`\n🔗 Newsletter batch tracked with groupUUID: ${groupUUID}`);
   console.log('\n📌 Check your newsletter view page to see updated engagement metrics!');
+  console.log('📝 Check server logs for groupUUID tracking confirmation.');
 }
 
 // Run the test

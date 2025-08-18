@@ -4178,33 +4178,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const activity = await storage.createEmailActivity(activityData, tenantId);
       
-      // Extract newsletter ID from email tags for newsletter engagement tracking
+      // Extract newsletter tracking information from email metadata and tags
       let newsletterId: string | undefined;
+      let groupUUID: string | undefined;
       
       // Debug: Log the entire webhook data structure to understand what we're receiving
-      console.log(`[Webhook] Looking for newsletter ID in tags:`, JSON.stringify(data.tags, null, 2));
+      console.log(`[Webhook] Processing webhook data:`, {
+        tags: data.tags,
+        metadata: data.metadata,
+        subject: data.subject
+      });
       
-      // Check for tags in different possible locations
+      // Priority 1: Look for groupUUID in metadata (most reliable method)
+      if (data.metadata?.groupUUID) {
+        groupUUID = data.metadata.groupUUID;
+        console.log(`[Webhook] Found groupUUID in metadata: ${groupUUID}`);
+        
+        // If we have groupUUID, also get newsletter ID from metadata
+        if (data.metadata.newsletterId) {
+          newsletterId = data.metadata.newsletterId;
+          console.log(`[Webhook] Found newsletter ID in metadata: ${newsletterId}`);
+        }
+      }
+      
+      // Priority 2: Check for tags in different possible locations
       const tagsArray = data.tags || data.metadata?.tags || [];
       
       if (Array.isArray(tagsArray)) {
+        // Look for groupUUID in tags
+        if (!groupUUID) {
+          for (const tag of tagsArray) {
+            if (typeof tag === 'string' && tag.startsWith('group-')) {
+              groupUUID = tag.replace('group-', '');
+              console.log(`[Webhook] Found groupUUID in tags: ${groupUUID}`);
+              break;
+            }
+          }
+        }
+        
         // Look for newsletter ID in tags
-        for (const tag of tagsArray) {
-          if (typeof tag === 'string' && tag.startsWith('newsletter-')) {
-            newsletterId = tag.replace('newsletter-', '');
-            console.log(`[Webhook] Found newsletter ID in tags: ${newsletterId}`);
-            break;
+        if (!newsletterId) {
+          for (const tag of tagsArray) {
+            if (typeof tag === 'string' && tag.startsWith('newsletter-')) {
+              newsletterId = tag.replace('newsletter-', '');
+              console.log(`[Webhook] Found newsletter ID in tags: ${newsletterId}`);
+              break;
+            }
           }
         }
       }
       
-      // Also check if newsletter ID is directly in metadata
-      if (!newsletterId && data.metadata?.newsletterId) {
-        newsletterId = data.metadata.newsletterId;
-        console.log(`[Webhook] Found newsletter ID in metadata: ${newsletterId}`);
-      }
-      
-      // Also check message subject for newsletter tracking
+      // Priority 3: Check message subject for newsletter tracking (fallback method)
       if (!newsletterId && data.subject) {
         const subjectMatch = data.subject.match(/\[Newsletter:([a-f0-9-]+)\]/);
         if (subjectMatch) {
@@ -4227,6 +4251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await storage.updateNewsletter(newsletterId, {
               openCount: (newsletter.openCount || 0) + 1
             }, tenantId);
+            console.log(`[Webhook] Newsletter engagement tracking - groupUUID: ${groupUUID}, newsletterId: ${newsletterId}`);
             console.log(`[Webhook] Updated newsletter ${newsletterId} openCount to ${(newsletter.openCount || 0) + 1}`);
           }
         }
@@ -4242,6 +4267,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await storage.updateNewsletter(newsletterId, {
               clickCount: (newsletter.clickCount || 0) + 1
             }, tenantId);
+            console.log(`[Webhook] Newsletter engagement tracking - groupUUID: ${groupUUID}, newsletterId: ${newsletterId}`);
             console.log(`[Webhook] Updated newsletter ${newsletterId} clickCount to ${(newsletter.clickCount || 0) + 1}`);
           }
         }
@@ -4274,6 +4300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(`[Webhook] Successfully processed ${activityType} activity for contact: ${email}`);
+      console.log(`[Webhook] Tracking method used: ${groupUUID ? 'GroupUUID-based' : newsletterId ? 'Newsletter ID fallback' : 'No newsletter tracking'}`);
       console.log("[Webhook] Request processing completed successfully");
       console.log("=".repeat(80));
       res.status(200).json({ message: "Webhook processed successfully", activityId: activity.id });
@@ -4523,7 +4550,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Send newsletter to each recipient via Go backend
+      // Generate a unique group UUID for this newsletter batch
+      const groupUUID = crypto.randomUUID();
       const emailId = `newsletter-${id}-${Date.now()}`;
+      
+      console.log(`[Newsletter Send] Generated groupUUID: ${groupUUID} for newsletter ${id}`);
+      
       const sendPromises = recipients.map(async (recipient, index) => {
         const individualEmailId = `${emailId}-${index}`;
         
@@ -4540,9 +4572,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             priority: "normal",
             newsletterId: newsletter.id,
             newsletterTitle: newsletter.title,
+            groupUUID: groupUUID, // UUID to group all emails in this newsletter batch
             to: recipient.email,
             sentAt: new Date().toISOString(),
-            tags: [`newsletter-${newsletter.id}`, 'newsletter', newsletter.title]
+            tags: [`newsletter-${newsletter.id}`, 'newsletter', newsletter.title, `group-${groupUUID}`]
           }
         };
 

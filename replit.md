@@ -171,5 +171,27 @@ The Email Activity Timeline provides comprehensive webhook-based email event tra
   - `/api/email/send/batch` - Batch email processing
   - `/api/email/providers` - Provider information
 
-*Last Updated: August 16, 2025*
+### UUID-Based Newsletter Group Tracking (August 18, 2025)
+- **GroupUUID Implementation**: Enhanced newsletter email tracking with unique group identifiers for each newsletter batch
+- **Improved Webhook Processing**: 
+  - Priority-based tracking system: groupUUID (primary) → newsletter ID (fallback) → subject parsing (last resort)
+  - Comprehensive metadata extraction from Resend webhooks including groupUUID and newsletter ID
+  - Enhanced debugging and logging for webhook processing with tracking method identification
+- **Email Metadata Enhancement**: 
+  - All newsletter emails now include groupUUID in both metadata and tags sent to Resend
+  - Crypto.randomUUID() generation for unique batch identification per newsletter submission
+  - Backward compatibility with existing newsletter ID tracking methods
+- **Real-time Engagement Updates**: 
+  - Auto-refresh functionality (10-second intervals) for sent newsletters in view page
+  - Live engagement metrics updates (opens, clicks, recipient counts) via webhook processing
+- **Testing Framework**: 
+  - Updated webhook test script with groupUUID simulation capability
+  - Comprehensive test scenarios including sent, delivered, opened, clicked, and bounced events
+  - Realistic engagement simulation (60% open rate, 33% CTR) for testing newsletter performance tracking
+- **Enhanced Logging**: 
+  - Detailed webhook processing logs showing groupUUID vs fallback tracking method usage
+  - Newsletter engagement tracking confirmation with groupUUID and newsletter ID correlation
+  - Improved debugging capabilities for webhook data structure analysis
+
+*Last Updated: August 18, 2025*
 ```
