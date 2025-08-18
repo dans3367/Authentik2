@@ -4482,6 +4482,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       
+      // Validate newsletter ID
+      if (!id || typeof id !== 'string') {
+        return res.status(400).json({ message: "Valid newsletter ID is required" });
+      }
+      
       console.log(`[Newsletter Send] Starting send for newsletter ID: ${id}, tenant: ${req.user.tenantId}`);
       
       // Get newsletter details
@@ -4491,46 +4496,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Newsletter not found" });
       }
       
+      // Validate newsletter content
+      if (!newsletter.subject || !newsletter.content) {
+        console.log(`[Newsletter Send] Newsletter missing required content: ${id}`);
+        return res.status(400).json({ message: "Newsletter must have subject and content" });
+      }
+      
+      if (newsletter.status === 'sent') {
+        console.log(`[Newsletter Send] Newsletter already sent: ${id}`);
+        return res.status(400).json({ message: "Newsletter has already been sent" });
+      }
+      
       console.log(`[Newsletter Send] Newsletter found:`, {
         id: newsletter.id,
         title: newsletter.title,
         recipientType: newsletter.recipientType,
-        selectedContactIds: newsletter.selectedContactIds?.length || 0,
-        selectedTagIds: newsletter.selectedTagIds?.length || 0
+        selectedContactIds: Array.isArray(newsletter.selectedContactIds) ? newsletter.selectedContactIds.length : 0,
+        selectedTagIds: Array.isArray(newsletter.selectedTagIds) ? newsletter.selectedTagIds.length : 0
       });
 
       // Get recipients based on newsletter segmentation
       let recipients: any[] = [];
-      if (newsletter.recipientType === 'all') {
-        recipients = await storage.getAllEmailContacts(req.user.tenantId);
-      } else if (newsletter.recipientType === 'selected' && newsletter.selectedContactIds) {
-        // Get contacts by individual IDs
-        const contactPromises = newsletter.selectedContactIds.map(id => 
-          storage.getEmailContact(id, req.user.tenantId)
-        );
-        const contacts = await Promise.all(contactPromises);
-        recipients = contacts.filter(Boolean); // Remove any undefined contacts
-      } else if (newsletter.recipientType === 'tags' && newsletter.selectedTagIds) {
-        // Get all contacts and filter by tags
-        const allContacts = await storage.getAllEmailContacts(req.user.tenantId);
-        recipients = allContacts.filter(contact => 
-          contact.tags && contact.tags.some((tag: any) => 
-            newsletter.selectedTagIds?.includes(tag.id)
-          )
-        );
+      
+      try {
+        if (newsletter.recipientType === 'all') {
+          recipients = await storage.getAllEmailContacts(req.user.tenantId);
+        } else if (newsletter.recipientType === 'selected' && Array.isArray(newsletter.selectedContactIds) && newsletter.selectedContactIds.length > 0) {
+          // Get contacts by individual IDs with error handling
+          const contactPromises = newsletter.selectedContactIds.map(async contactId => {
+            try {
+              return await storage.getEmailContact(contactId, req.user.tenantId);
+            } catch (err) {
+              console.warn(`[Newsletter Send] Failed to get contact ${contactId}:`, err);
+              return null;
+            }
+          });
+          const contacts = await Promise.all(contactPromises);
+          recipients = contacts.filter(Boolean); // Remove any null/undefined contacts
+        } else if (newsletter.recipientType === 'tags' && Array.isArray(newsletter.selectedTagIds) && newsletter.selectedTagIds.length > 0) {
+          // Get all contacts and filter by tags
+          const allContacts = await storage.getAllEmailContacts(req.user.tenantId);
+          recipients = allContacts.filter(contact => 
+            contact.tags && Array.isArray(contact.tags) && contact.tags.some((tag: any) => 
+              newsletter.selectedTagIds?.includes(tag.id)
+            )
+          );
+        }
+      } catch (recipientError) {
+        console.error(`[Newsletter Send] Error fetching recipients for newsletter ${id}:`, recipientError);
+        return res.status(500).json({ 
+          message: "Failed to fetch recipients", 
+          error: recipientError instanceof Error ? recipientError.message : "Unknown error" 
+        });
       }
 
       console.log(`[Newsletter Send] Found ${recipients.length} recipients`);
       
       if (recipients.length === 0) {
         console.log(`[Newsletter Send] No recipients found for newsletter ${id}`);
-        return res.status(400).json({ message: "No recipients found for this newsletter" });
+        return res.status(400).json({ 
+          message: "No recipients found for this newsletter",
+          details: `Recipient type: ${newsletter.recipientType}, Selected contacts: ${Array.isArray(newsletter.selectedContactIds) ? newsletter.selectedContactIds.length : 0}, Selected tags: ${Array.isArray(newsletter.selectedTagIds) ? newsletter.selectedTagIds.length : 0}`
+        });
+      }
+
+      // Validate recipients have valid email addresses
+      const validRecipients = recipients.filter(r => r && r.email && typeof r.email === 'string' && r.email.includes('@'));
+      if (validRecipients.length === 0) {
+        console.log(`[Newsletter Send] No valid email addresses found for newsletter ${id}`);
+        return res.status(400).json({ message: "No valid email addresses found in recipients" });
+      }
+
+      if (validRecipients.length !== recipients.length) {
+        console.warn(`[Newsletter Send] ${recipients.length - validRecipients.length} recipients had invalid email addresses`);
       }
 
       // Get user's access token for Go server authentication
       const accessToken = req.headers.authorization?.replace('Bearer ', '');
       if (!accessToken) {
         return res.status(401).json({ message: "Authentication token required" });
+      }
+
+      // Check Go server availability
+      const GO_SERVER_URL = process.env.GO_SERVER_URL || 'https://tengine.zendwise.work';
+      let goServerAvailable = false;
+      
+      try {
+        const healthResponse = await fetch(`${GO_SERVER_URL}/health`, { 
+          method: 'GET',
+          timeout: 5000 
+        });
+        goServerAvailable = healthResponse.ok;
+      } catch (healthError) {
+        console.warn(`[Newsletter Send] Go server health check failed:`, healthError);
+      }
+
+      if (!goServerAvailable) {
+        console.error(`[Newsletter Send] Go server not available at ${GO_SERVER_URL}`);
+        return res.status(503).json({ 
+          message: "Email service temporarily unavailable", 
+          details: "Go server is not responding"
+        });
       }
 
       // Send newsletter to each recipient via Go backend
@@ -4540,7 +4606,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[Newsletter Send] Generated groupUUID: ${groupUUID} for newsletter ${id}`);
       
-      const sendPromises = recipients.map(async (recipient, index) => {
+      const sendPromises = validRecipients.map(async (recipient, index) => {
         const individualEmailId = `${emailId}-${index}`;
         
         const payload = {
@@ -4564,32 +4630,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
 
         try {
-          const response = await fetch('https://tengine.zendwise.work/api/email-tracking', {
+          const response = await fetch(`${GO_SERVER_URL}/api/email-tracking`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${accessToken}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify(payload),
+            timeout: 10000 // 10 second timeout per request
           });
 
           if (!response.ok) {
-            const error = await response.text();
-            console.error(`Failed to queue email for ${recipient.email}:`, error);
-            return { success: false, email: recipient.email, error };
+            const errorText = await response.text();
+            console.error(`Failed to queue email for ${recipient.email}:`, errorText);
+            return { success: false, email: recipient.email, error: `HTTP ${response.status}: ${errorText}` };
           }
 
           const result = await response.json();
           return { success: true, email: recipient.email, result };
         } catch (error) {
           console.error(`Error sending to ${recipient.email}:`, error);
-          return { success: false, email: recipient.email, error: error instanceof Error ? error.message : String(error) };
+          return { 
+            success: false, 
+            email: recipient.email, 
+            error: error instanceof Error ? error.message : String(error) 
+          };
         }
       });
 
-      const results = await Promise.all(sendPromises);
-      const successful = results.filter(r => r.success);
-      const failed = results.filter(r => !r.success);
+      // Process results with better error handling
+      let successful: any[] = [];
+      let failed: any[] = [];
+      
+      try {
+        const results = await Promise.allSettled(sendPromises);
+        
+        results.forEach((result, index) => {
+          if (result.status === 'fulfilled') {
+            if (result.value.success) {
+              successful.push(result.value);
+            } else {
+              failed.push(result.value);
+            }
+          } else {
+            // Handle rejected promise
+            const recipient = validRecipients[index];
+            failed.push({
+              success: false,
+              email: recipient?.email || 'unknown',
+              error: result.reason instanceof Error ? result.reason.message : String(result.reason)
+            });
+          }
+        });
+      } catch (resultsError) {
+        console.error(`[Newsletter Send] Error processing results:`, resultsError);
+        return res.status(500).json({ 
+          message: "Failed to process email sending results",
+          error: resultsError instanceof Error ? resultsError.message : "Unknown error"
+        });
+      }
 
       console.log(`[Newsletter Send] Results: ${successful.length} successful, ${failed.length} failed`);
       if (failed.length > 0) {
@@ -4597,19 +4696,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update newsletter status and metadata after queuing sends
-      await storage.updateNewsletter(
-        id,
-        { 
-          status: "sent",
-          sentAt: new Date(),
-          recipientCount: recipients.length,
-        },
-        req.user.tenantId
-      );
+      try {
+        await storage.updateNewsletter(
+          id,
+          { 
+            status: "sent",
+            sentAt: new Date(),
+            recipientCount: validRecipients.length,
+          },
+          req.user.tenantId
+        );
+      } catch (updateError) {
+        console.error(`[Newsletter Send] Failed to update newsletter status:`, updateError);
+        // Continue with response even if update fails - emails were sent
+      }
 
       res.json({
         message: "Newsletter sending initiated",
-        totalRecipients: recipients.length,
+        totalRecipients: validRecipients.length,
         successful: successful.length,
         failed: failed.length,
         emailId,
@@ -4621,7 +4725,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     } catch (error) {
       console.error("Send newsletter error:", error);
-      res.status(500).json({ message: "Internal server error" });
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      
+      console.error("Send newsletter error stack:", errorStack);
+      
+      res.status(500).json({ 
+        message: "Internal server error",
+        error: process.env.NODE_ENV === 'development' ? errorMessage : undefined,
+        details: process.env.NODE_ENV === 'development' ? errorStack : undefined
+      });
     }
   });
 
