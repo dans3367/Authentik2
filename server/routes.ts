@@ -3916,7 +3916,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Helper functions for webhook processing
-  async function updateEmailTrackingEntry(trackingEntry: any, webhookType: string, webhookData: any, goServerUrl: string, accessToken: string, resendId: string) {
+  async function updateEmailTrackingEntry(trackingEntry: any, webhookType: string, webhookData: any, goServerUrl: string, accessToken: string, resendId: string, tenantId?: string) {
     const statusMapping: Record<string, string> = {
       'email.sent': 'sent',
       'email.delivered': 'delivered', 
@@ -3969,7 +3969,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // If this is a newsletter email, also update newsletter statistics
       if (trackingEntry.metadata?.newsletterId && (webhookType === 'email.opened' || webhookType === 'email.clicked')) {
-        await updateNewsletterStats(trackingEntry.metadata.newsletterId, webhookType, trackingEntry.tenantId);
+        const effectiveTenantId = tenantId || trackingEntry.tenantId;
+        if (effectiveTenantId) {
+          console.log(`[Webhook] Updating newsletter stats for newsletter ${trackingEntry.metadata.newsletterId}, event: ${webhookType}, tenant: ${effectiveTenantId}`);
+          await updateNewsletterStats(trackingEntry.metadata.newsletterId, webhookType, effectiveTenantId);
+        } else {
+          console.error(`[Webhook] Cannot update newsletter stats - no tenant ID available`);
+        }
       }
       
     } else {
@@ -4081,25 +4087,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   async function updateNewsletterStats(newsletterId: string, webhookType: string, tenantId: string) {
     try {
+      console.log(`[Webhook] Attempting to update newsletter stats:`, { newsletterId, webhookType, tenantId });
+      
       if (webhookType === 'email.opened') {
+        console.log(`[Webhook] Processing email open event for newsletter ${newsletterId}`);
         const newsletter = await storage.getNewsletter(newsletterId, tenantId);
         if (newsletter) {
-          await storage.updateNewsletter(newsletterId, {
-            openCount: (newsletter.openCount || 0) + 1
+          const newOpenCount = (newsletter.openCount || 0) + 1;
+          console.log(`[Webhook] Found newsletter, updating openCount from ${newsletter.openCount || 0} to ${newOpenCount}`);
+          
+          const updatedNewsletter = await storage.updateNewsletter(newsletterId, {
+            openCount: newOpenCount
           }, tenantId);
-          console.log(`[Webhook] Updated newsletter ${newsletterId} openCount to ${(newsletter.openCount || 0) + 1}`);
+          
+          if (updatedNewsletter) {
+            console.log(`[Webhook] ✅ Successfully updated newsletter ${newsletterId} openCount to ${newOpenCount}`);
+          } else {
+            console.error(`[Webhook] ❌ Failed to update newsletter ${newsletterId} - update returned null/undefined`);
+          }
+        } else {
+          console.error(`[Webhook] ❌ Newsletter ${newsletterId} not found in tenant ${tenantId}`);
         }
       } else if (webhookType === 'email.clicked') {
+        console.log(`[Webhook] Processing email click event for newsletter ${newsletterId}`);
         const newsletter = await storage.getNewsletter(newsletterId, tenantId);
         if (newsletter) {
-          await storage.updateNewsletter(newsletterId, {
-            clickCount: (newsletter.clickCount || 0) + 1
+          const newClickCount = (newsletter.clickCount || 0) + 1;
+          console.log(`[Webhook] Found newsletter, updating clickCount from ${newsletter.clickCount || 0} to ${newClickCount}`);
+          
+          const updatedNewsletter = await storage.updateNewsletter(newsletterId, {
+            clickCount: newClickCount
           }, tenantId);
-          console.log(`[Webhook] Updated newsletter ${newsletterId} clickCount to ${(newsletter.clickCount || 0) + 1}`);
+          
+          if (updatedNewsletter) {
+            console.log(`[Webhook] ✅ Successfully updated newsletter ${newsletterId} clickCount to ${newClickCount}`);
+          } else {
+            console.error(`[Webhook] ❌ Failed to update newsletter ${newsletterId} - update returned null/undefined`);
+          }
+        } else {
+          console.error(`[Webhook] ❌ Newsletter ${newsletterId} not found in tenant ${tenantId}`);
         }
+      } else {
+        console.log(`[Webhook] Ignoring webhook event ${webhookType} - not relevant for newsletter stats`);
       }
     } catch (error) {
       console.error(`[Webhook] Error updating newsletter stats for ${newsletterId}:`, error);
+      console.error(`[Webhook] Error context:`, { newsletterId, webhookType, tenantId });
     }
   }
 
@@ -4365,7 +4398,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const trackingEntry = await trackingResponse.json();
             console.log(`[Webhook] Found email tracking entry: ${trackingEntry.id} for ResendID: ${resendId}`);
             
-            await updateEmailTrackingEntry(trackingEntry, type, data, GO_SERVER_URL, accessToken, resendId);
+            await updateEmailTrackingEntry(trackingEntry, type, data, GO_SERVER_URL, accessToken, resendId, tenantId);
             
           } else if (trackingResponse.status === 404) {
             console.log(`[Webhook] No email tracking entry found for ResendID: ${resendId}`);
@@ -4374,7 +4407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const alternativeEntry = await findEmailTrackingByAlternativeMethods(resendId, email, data, GO_SERVER_URL, accessToken);
             if (alternativeEntry) {
               console.log(`[Webhook] Found email tracking entry via alternative lookup: ${alternativeEntry.id}`);
-              await updateEmailTrackingEntry(alternativeEntry, type, data, GO_SERVER_URL, accessToken, resendId);
+              await updateEmailTrackingEntry(alternativeEntry, type, data, GO_SERVER_URL, accessToken, resendId, tenantId);
             } else {
               console.log(`[Webhook] No email tracking entry found via alternative methods for ResendID: ${resendId}`);
               // Store webhook for later processing when tracking entry becomes available
@@ -4387,7 +4420,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const alternativeEntry = await findEmailTrackingByAlternativeMethods(resendId, email, data, GO_SERVER_URL, accessToken);
             if (alternativeEntry) {
               console.log(`[Webhook] Found email tracking entry via alternative lookup after error: ${alternativeEntry.id}`);
-              await updateEmailTrackingEntry(alternativeEntry, type, data, GO_SERVER_URL, accessToken, resendId);
+              await updateEmailTrackingEntry(alternativeEntry, type, data, GO_SERVER_URL, accessToken, resendId, tenantId);
             }
           }
           
@@ -4495,33 +4528,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastActivity: new Date() 
         }, tenantId);
         
-        // Update newsletter open count if this is a newsletter email
-        if (newsletterId) {
-          const newsletter = await storage.getNewsletter(newsletterId, tenantId);
-          if (newsletter) {
-            await storage.updateNewsletter(newsletterId, {
-              openCount: (newsletter.openCount || 0) + 1
-            }, tenantId);
-            console.log(`[Webhook] Newsletter engagement tracking - groupUUID: ${groupUUID}, newsletterId: ${newsletterId}`);
-            console.log(`[Webhook] Updated newsletter ${newsletterId} openCount to ${(newsletter.openCount || 0) + 1}`);
-          }
-        }
+        // Newsletter open tracking is handled by the email tracking system update above
+        console.log(`[Webhook] Newsletter open tracking delegated to email tracking system - newsletterId: ${newsletterId}, groupUUID: ${groupUUID}`);
       } else if (activityType === 'clicked') {
         await storage.updateEmailContact(contact.id, { 
           lastActivity: new Date() 
         }, tenantId);
         
-        // Update newsletter click count if this is a newsletter email
-        if (newsletterId) {
-          const newsletter = await storage.getNewsletter(newsletterId, tenantId);
-          if (newsletter) {
-            await storage.updateNewsletter(newsletterId, {
-              clickCount: (newsletter.clickCount || 0) + 1
-            }, tenantId);
-            console.log(`[Webhook] Newsletter engagement tracking - groupUUID: ${groupUUID}, newsletterId: ${newsletterId}`);
-            console.log(`[Webhook] Updated newsletter ${newsletterId} clickCount to ${(newsletter.clickCount || 0) + 1}`);
-          }
-        }
+        // Newsletter click tracking is handled by the email tracking system update above
+        console.log(`[Webhook] Newsletter click tracking delegated to email tracking system - newsletterId: ${newsletterId}, groupUUID: ${groupUUID}`);
       } else if (activityType === 'bounced') {
         await storage.updateEmailContact(contact.id, { 
           status: 'bounced' as any,
@@ -5139,6 +5154,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Mount email routes for enhanced email system monitoring
   app.use('/api/email', emailRoutes);
+
+  // Debug endpoint to check newsletter tracking status
+  app.get("/api/debug/newsletter/:newsletterId/tracking", authenticateToken, async (req: any, res) => {
+    try {
+      const { newsletterId } = req.params;
+      const tenantId = req.user.tenantId;
+      
+      console.log(`[Debug] Checking tracking for newsletter ${newsletterId} in tenant ${tenantId}`);
+      
+      // Get the newsletter details
+      const newsletter = await storage.getNewsletter(newsletterId, tenantId);
+      if (!newsletter) {
+        return res.status(404).json({ error: "Newsletter not found" });
+      }
+      
+      // Try to get tracking entries from Go server
+      const GO_SERVER_URL = process.env.GO_EMAIL_SERVER_URL || 'http://localhost:8095';
+      const accessToken = req.headers.authorization?.replace('Bearer ', '');
+      
+      try {
+        const trackingResponse = await fetch(`${GO_SERVER_URL}/api/email-tracking`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (trackingResponse.ok) {
+          const trackingData = await trackingResponse.json();
+          const entries = trackingData.entries || [];
+          
+          // Find entries related to this newsletter
+          const newsletterEntries = entries.filter((entry: any) => 
+            entry.metadata?.newsletterId === newsletterId
+          );
+          
+          const debugInfo = {
+            newsletter: {
+              id: newsletter.id,
+              title: newsletter.title,
+              openCount: newsletter.openCount,
+              clickCount: newsletter.clickCount,
+              recipientCount: newsletter.recipientCount,
+              status: newsletter.status
+            },
+            tracking: {
+              totalEntries: entries.length,
+              newsletterEntries: newsletterEntries.length,
+              entries: newsletterEntries.map((entry: any) => ({
+                id: entry.id,
+                emailId: entry.emailId,
+                status: entry.status,
+                hasResendId: !!entry.metadata?.resendId,
+                resendId: entry.metadata?.resendId,
+                newsletterId: entry.metadata?.newsletterId,
+                recipient: entry.metadata?.recipient,
+                webhookHistory: entry.metadata?.webhookHistory?.length || 0
+              }))
+            }
+          };
+          
+          res.json(debugInfo);
+        } else {
+          res.status(500).json({ error: "Failed to fetch tracking data", status: trackingResponse.status });
+        }
+      } catch (error) {
+        console.error("[Debug] Error connecting to tracking service:", error);
+        res.status(500).json({ error: "Error connecting to tracking service" });
+      }
+      
+    } catch (error) {
+      console.error("Debug newsletter tracking error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;
