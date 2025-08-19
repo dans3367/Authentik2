@@ -1,8 +1,8 @@
 import { config } from "dotenv";
 config(); // Load environment variables
 
-import { db } from "./server/db";
-import { users, tenants } from "./shared/schema";
+import { db } from "../server/db";
+import { users, tenants } from "../shared/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
