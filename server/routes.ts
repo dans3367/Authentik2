@@ -3917,7 +3917,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Helper functions for webhook processing
   async function updateEmailTrackingEntry(trackingEntry: any, webhookType: string, webhookData: any, goServerUrl: string, accessToken: string, resendId: string) {
-    const statusMapping = {
+    const statusMapping: Record<string, string> = {
       'email.sent': 'sent',
       'email.delivered': 'delivered', 
       'email.delivery_delayed': 'delayed',
@@ -3961,8 +3961,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(updatePayload),
-      timeout: 5000
+      body: JSON.stringify(updatePayload)
     });
     
     if (updateResponse.ok) {
@@ -3988,8 +3987,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
-        },
-        timeout: 5000
+        }
       });
       
       if (allTrackingResponse.ok) {
@@ -4017,8 +4015,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   'Authorization': `Bearer ${accessToken}`,
                   'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(updatePayload),
-                timeout: 5000
+                body: JSON.stringify(updatePayload)
               });
               
               if (updateResponse.ok) {
@@ -4061,8 +4058,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             headers: {
               'Authorization': `Bearer ${accessToken}`,
               'Content-Type': 'application/json',
-            },
-            timeout: 5000
+            }
           });
           
           if (trackingResponse.ok) {
@@ -4362,8 +4358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             headers: {
               'Authorization': `Bearer ${accessToken}`,
               'Content-Type': 'application/json',
-            },
-            timeout: 5000
+            }
           });
           
           if (trackingResponse.ok) {
@@ -4452,25 +4447,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         subject: data.subject
       });
       
-      // Priority 1: Look for groupUUID in tags (Resend includes tags but not metadata in webhooks)
+      // Priority 1: Look for groupUUID and newsletter ID in tags
+      // Resend returns tags as key-value objects, not strings
       const tagsArray = data.tags || [];
       
       if (Array.isArray(tagsArray)) {
-        // Look for groupUUID in tags
+        // Tags can be either strings (old format) or objects (new format from Resend)
         for (const tag of tagsArray) {
-          if (typeof tag === 'string' && tag.startsWith('groupUUID-')) {
-            groupUUID = tag.replace('groupUUID-', '');
-            console.log(`[Webhook] Found groupUUID in tags: ${groupUUID}`);
-            break;
-          }
-        }
-        
-        // Look for newsletter ID in tags
-        for (const tag of tagsArray) {
-          if (typeof tag === 'string' && tag.startsWith('newsletter-')) {
-            newsletterId = tag.replace('newsletter-', '');
-            console.log(`[Webhook] Found newsletter ID in tags: ${newsletterId}`);
-            break;
+          // Handle object format (what Resend actually returns)
+          if (typeof tag === 'object' && tag !== null) {
+            if (tag.name === 'groupUUID' && tag.value) {
+              groupUUID = tag.value;
+              console.log(`[Webhook] Found groupUUID in tags (object format): ${groupUUID}`);
+            }
+            if (tag.name === 'newsletter_id' && tag.value) {
+              newsletterId = tag.value.replace('newsletter-', '');
+              console.log(`[Webhook] Found newsletter ID in tags (object format): ${newsletterId}`);
+            }
+          } 
+          // Handle string format (fallback for backwards compatibility)
+          else if (typeof tag === 'string') {
+            if (tag.startsWith('groupUUID-')) {
+              groupUUID = tag.replace('groupUUID-', '');
+              console.log(`[Webhook] Found groupUUID in tags (string format): ${groupUUID}`);
+            }
+            if (tag.startsWith('newsletter-')) {
+              newsletterId = tag.replace('newsletter-', '');
+              console.log(`[Webhook] Found newsletter ID in tags (string format): ${newsletterId}`);
+            }
           }
         }
       }
@@ -4846,8 +4850,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       try {
         const healthResponse = await fetch(`${GO_SERVER_URL}/health`, { 
-          method: 'GET',
-          timeout: 5000 
+          method: 'GET'
         });
         goServerAvailable = healthResponse.ok;
       } catch (healthError) {
@@ -4901,8 +4904,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               'Authorization': `Bearer ${accessToken}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify(payload),
-            timeout: 10000 // 10 second timeout per request
+            body: JSON.stringify(payload)
           });
 
           if (!response.ok) {
