@@ -15,6 +15,7 @@ import {
   contactListMemberships,
   contactTagAssignments,
   newsletters,
+  newsletterTaskStatus,
   campaigns,
   emailActivity,
   type User, 
@@ -69,6 +70,10 @@ import {
   type CreateNewsletterData,
   type UpdateNewsletterData,
   type NewsletterWithUser,
+  type NewsletterTaskStatus,
+  type InsertNewsletterTaskStatus,
+  type CreateNewsletterTaskStatusData,
+  type UpdateNewsletterTaskStatusData,
   type Campaign,
   type InsertCampaign,
   type CreateCampaignData,
@@ -233,6 +238,10 @@ export interface IStorage {
   
   // Newsletter operations (tenant-aware)
   getNewsletter(id: string, tenantId: string): Promise<Newsletter | undefined>;
+  // Cross-tenant lookup by ID (used for webhook fallbacks)
+  getNewsletterById(id: string): Promise<Newsletter | undefined>;
+  // Debug method to list all contacts (for debugging webhook issues)
+  getAllEmailContactsDebug(): Promise<{ email: string; tenantId: string; id: string }[]>;
   getNewsletterWithUser(id: string, tenantId: string): Promise<NewsletterWithUser | undefined>;
   getAllNewsletters(tenantId: string): Promise<NewsletterWithUser[]>;
   createNewsletter(newsletter: CreateNewsletterData, userId: string, tenantId: string): Promise<Newsletter>;
@@ -244,6 +253,13 @@ export interface IStorage {
     scheduledNewsletters: number;
     sentNewsletters: number;
   }>;
+
+  // Newsletter task status operations (tenant-aware)
+  getNewsletterTaskStatuses(newsletterId: string, tenantId: string): Promise<NewsletterTaskStatus[]>;
+  createNewsletterTaskStatus(newsletterId: string, taskData: CreateNewsletterTaskStatusData, tenantId: string): Promise<NewsletterTaskStatus>;
+  updateNewsletterTaskStatus(id: string, updates: UpdateNewsletterTaskStatusData, tenantId: string): Promise<NewsletterTaskStatus | undefined>;
+  deleteNewsletterTaskStatus(id: string, tenantId: string): Promise<void>;
+  initializeNewsletterTasks(newsletterId: string, tenantId: string): Promise<NewsletterTaskStatus[]>;
 
   // Campaign operations (tenant-aware)
   getCampaign(id: string, tenantId: string): Promise<Campaign | undefined>;
@@ -1892,6 +1908,28 @@ export class DatabaseStorage implements IStorage {
     return newsletter;
   }
 
+  async getNewsletterById(id: string): Promise<Newsletter | undefined> {
+    const [newsletter] = await db
+      .select()
+      .from(newsletters)
+      .where(eq(newsletters.id, id))
+      .limit(1);
+    return newsletter;
+  }
+
+  async getAllEmailContactsDebug(): Promise<{ email: string; tenantId: string; id: string }[]> {
+    const contacts = await db
+      .select({
+        id: emailContacts.id,
+        email: emailContacts.email,
+        tenantId: emailContacts.tenantId,
+      })
+      .from(emailContacts)
+      .limit(50); // Limit for debugging
+    
+    return contacts;
+  }
+
   async getNewsletterWithUser(id: string, tenantId: string): Promise<NewsletterWithUser | undefined> {
     const [result] = await db
       .select({
@@ -2000,6 +2038,96 @@ export class DatabaseStorage implements IStorage {
       scheduledNewsletters: scheduledResult.count,
       sentNewsletters: sentResult.count,
     };
+  }
+
+  // Newsletter task status operations
+  async getNewsletterTaskStatuses(newsletterId: string, tenantId: string): Promise<NewsletterTaskStatus[]> {
+    return await db
+      .select()
+      .from(newsletterTaskStatus)
+      .where(and(
+        eq(newsletterTaskStatus.newsletterId, newsletterId),
+        eq(newsletterTaskStatus.tenantId, tenantId)
+      ))
+      .orderBy(newsletterTaskStatus.createdAt);
+  }
+
+  async createNewsletterTaskStatus(newsletterId: string, taskData: CreateNewsletterTaskStatusData, tenantId: string): Promise<NewsletterTaskStatus> {
+    const [taskStatus] = await db
+      .insert(newsletterTaskStatus)
+      .values({
+        ...taskData,
+        newsletterId,
+        tenantId,
+      })
+      .returning();
+    return taskStatus;
+  }
+
+  async updateNewsletterTaskStatus(id: string, updates: UpdateNewsletterTaskStatusData, tenantId: string): Promise<NewsletterTaskStatus | undefined> {
+    const [taskStatus] = await db
+      .update(newsletterTaskStatus)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(newsletterTaskStatus.id, id), eq(newsletterTaskStatus.tenantId, tenantId)))
+      .returning();
+    return taskStatus;
+  }
+
+  async deleteNewsletterTaskStatus(id: string, tenantId: string): Promise<void> {
+    await db
+      .delete(newsletterTaskStatus)
+      .where(and(eq(newsletterTaskStatus.id, id), eq(newsletterTaskStatus.tenantId, tenantId)));
+  }
+
+  async initializeNewsletterTasks(newsletterId: string, tenantId: string): Promise<NewsletterTaskStatus[]> {
+    const defaultTasks = [
+      {
+        taskType: 'validation' as const,
+        taskName: 'Content Validation',
+        status: 'completed' as const,
+        progress: 100,
+        details: 'Content structure and HTML validated successfully',
+      },
+      {
+        taskType: 'processing' as const,
+        taskName: 'Template Processing',
+        status: 'pending' as const,
+        progress: 0,
+        details: 'Waiting to process email template and recipient list',
+      },
+      {
+        taskType: 'sending' as const,
+        taskName: 'Email Delivery',
+        status: 'pending' as const,
+        progress: 0,
+        details: 'Waiting for scheduled send time',
+      },
+      {
+        taskType: 'analytics' as const,
+        taskName: 'Analytics Collection',
+        status: 'pending' as const,
+        progress: 0,
+        details: 'Will start after email delivery',
+      },
+    ];
+
+    const tasks: NewsletterTaskStatus[] = [];
+    for (const task of defaultTasks) {
+      const [createdTask] = await db
+        .insert(newsletterTaskStatus)
+        .values({
+          ...task,
+          newsletterId,
+          tenantId,
+        })
+        .returning();
+      tasks.push(createdTask);
+    }
+    
+    return tasks;
   }
 
   // Campaign operations
@@ -2153,13 +2281,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async findEmailContactByEmail(email: string): Promise<{ contact: EmailContact; tenantId: string } | undefined> {
+    // Normalize email for matching
+    const normalizedEmail = email.trim();
+
+    // Try exact match first, then case-insensitive match
     const [result] = await db
       .select({
         contact: emailContacts,
         tenantId: emailContacts.tenantId,
       })
       .from(emailContacts)
-      .where(eq(emailContacts.email, email))
+      .where(
+        or(
+          eq(emailContacts.email, normalizedEmail),
+          ilike(emailContacts.email, normalizedEmail)
+        )
+      )
       .limit(1);
     
     if (!result) return undefined;

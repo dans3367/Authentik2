@@ -4,7 +4,7 @@ import { eq, and } from "drizzle-orm";
 
 async function updateUserToOwner() {
   try {
-    console.log("🔧 Updating test@example.com to Owner role...");
+    console.log("🔧 Updating dan@zendwise.com to Owner role...");
 
     // First, get the default tenant
     const [defaultTenant] = await db
@@ -24,11 +24,11 @@ async function updateUserToOwner() {
     const [user] = await db
       .select()
       .from(users)
-      .where(and(eq(users.email, "test@example.com"), eq(users.tenantId, defaultTenant.id)))
+      .where(and(eq(users.email, "dan@zendwise.com"), eq(users.tenantId, defaultTenant.id)))
       .limit(1);
 
     if (!user) {
-      console.error("❌ User test@example.com not found in default tenant");
+      console.error("❌ User dan@zendwise.com not found in default tenant");
       return;
     }
 
@@ -45,7 +45,7 @@ async function updateUserToOwner() {
       .returning();
 
     if (updatedUser) {
-      console.log("✅ Successfully updated test@example.com to Owner role");
+      console.log("✅ Successfully updated dan@zendwise.com to Owner role");
       console.log("📊 Updated user details:", {
         id: updatedUser.id,
         email: updatedUser.email,

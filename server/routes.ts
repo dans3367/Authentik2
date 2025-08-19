@@ -35,12 +35,13 @@ import {
   type ContactFilters,
 } from "@shared/schema";
 import Stripe from "stripe";
-import { randomBytes } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import { authenticator } from "otplib";
 import * as QRCode from "qrcode";
 import { UAParser } from "ua-parser-js";
 import { createHash, createHmac } from "crypto";
 import { emailService } from "./emailService";
+import { emailRoutes } from "./routes/emailRoutes";
 import { Resend } from 'resend';
 // import { Webhook } from 'svix';
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -3342,7 +3343,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Find test user
-      const user = await storage.getUserByEmail("test@example.com", tenant.id);
+      const user = await storage.getUserByEmail("dan@zendwise.com", tenant.id);
       if (!user) {
         return res.status(404).json({ message: "Test user not found" });
       }
@@ -3914,6 +3915,313 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Test endpoint to simulate a Resend webhook (for development only)
+  if (process.env.NODE_ENV === 'development') {
+    app.post("/api/test/webhook-open", authenticateToken, async (req: any, res) => {
+      try {
+        const { newsletterId, contactEmail } = req.body;
+        
+        if (!newsletterId || !contactEmail) {
+          return res.status(400).json({ message: "newsletterId and contactEmail are required" });
+        }
+
+        console.log(`[Test Webhook] Simulating email open for newsletter ${newsletterId}, contact ${contactEmail}`);
+        
+        // Get the newsletter to verify it exists
+        const newsletter = await storage.getNewsletter(newsletterId, req.user.tenantId);
+        if (!newsletter) {
+          return res.status(404).json({ message: "Newsletter not found" });
+        }
+
+        // Simulate a Resend webhook payload for email.opened event
+        const simulatedWebhookPayload = {
+          type: 'email.opened',
+          data: {
+            id: `test-resend-id-${Date.now()}`,
+            to: [{ email: contactEmail }],
+            subject: newsletter.subject,
+            tags: [
+              { name: 'newsletter_id', value: `newsletter-${newsletterId}` },
+              { name: 'groupUUID', value: `test-group-${Date.now()}` },
+              { name: 'type', value: 'newsletter' }
+            ],
+            user_agent: 'Test Browser',
+            ip: '127.0.0.1'
+          }
+        };
+
+        // Process the simulated webhook through the same logic
+        // Find contact by email
+        const allContacts = await storage.getAllEmailContacts(req.user.tenantId);
+        const contact = allContacts.find(c => c.email === contactEmail);
+        if (!contact) {
+          return res.status(404).json({ message: "Contact not found" });
+        }
+
+        // Update contact open count
+        await storage.updateEmailContact(contact.id, { 
+          emailsOpened: (contact.emailsOpened || 0) + 1,
+          lastActivity: new Date() 
+        }, req.user.tenantId);
+
+        // Update newsletter open count
+        const oldOpenCount = newsletter.openCount || 0;
+        await updateNewsletterStats(newsletterId, 'email.opened', req.user.tenantId);
+        
+        // Get updated newsletter to verify the change
+        const updatedNewsletter = await storage.getNewsletter(newsletterId, req.user.tenantId);
+        
+        res.json({
+          message: "Test webhook processed successfully",
+          newsletterId,
+          contactEmail,
+          previousOpenCount: oldOpenCount,
+          newOpenCount: updatedNewsletter?.openCount || 0,
+          webhookPayload: simulatedWebhookPayload
+        });
+      } catch (error) {
+        console.error("[Test Webhook] Error:", error);
+        res.status(500).json({ message: "Test webhook failed", error: error instanceof Error ? error.message : String(error) });
+      }
+    });
+  }
+
+  // Helper functions for webhook processing
+  async function updateEmailTrackingEntry(trackingEntry: any, webhookType: string, webhookData: any, goServerUrl: string, accessToken: string, resendId: string, tenantId?: string) {
+    const statusMapping: Record<string, string> = {
+      'email.sent': 'sent',
+      'email.delivered': 'delivered', 
+      'email.delivery_delayed': 'delayed',
+      'email.bounced': 'bounced',
+      'email.complained': 'complained',
+      'email.failed': 'failed',
+      'email.opened': 'opened',
+      'email.clicked': 'clicked',
+      'email.unsubscribed': 'unsubscribed'
+    };
+    
+    const newStatus = statusMapping[webhookType] || trackingEntry.status;
+    
+    // Update the tracking entry with new status and webhook data
+    const updatePayload = {
+      status: newStatus,
+      metadata: {
+        ...trackingEntry.metadata,
+        lastWebhookEvent: webhookType,
+        lastWebhookAt: new Date().toISOString(),
+        webhookHistory: [
+          ...(trackingEntry.metadata?.webhookHistory || []),
+          {
+            event: webhookType,
+            timestamp: new Date().toISOString(),
+            data: {
+              messageId: webhookData.message_id,
+              subject: webhookData.subject,
+              userAgent: webhookData.user_agent,
+              ipAddress: webhookData.ip,
+              resendId: resendId
+            }
+          }
+        ].slice(-10) // Keep only last 10 webhook events
+      }
+    };
+    
+    const updateResponse = await fetch(`${goServerUrl}/api/email-tracking/${trackingEntry.id}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updatePayload)
+    });
+    
+    if (updateResponse.ok) {
+      console.log(`[Webhook] Successfully updated email tracking status to '${newStatus}' for ResendID: ${resendId}`);
+      
+      // If this is a newsletter email, also update newsletter statistics
+      if (trackingEntry.metadata?.newsletterId && (webhookType === 'email.opened' || webhookType === 'email.clicked')) {
+        const effectiveTenantId = tenantId || trackingEntry.tenantId;
+        if (effectiveTenantId) {
+          console.log(`[Webhook] Updating newsletter stats for newsletter ${trackingEntry.metadata.newsletterId}, event: ${webhookType}, tenant: ${effectiveTenantId}`);
+          await updateNewsletterStats(trackingEntry.metadata.newsletterId, webhookType, effectiveTenantId);
+        } else {
+          console.error(`[Webhook] Cannot update newsletter stats - no tenant ID available`);
+        }
+      }
+      
+    } else {
+      console.error(`[Webhook] Failed to update email tracking status: ${updateResponse.status}`);
+    }
+  }
+
+  async function findEmailTrackingByAlternativeMethods(resendId: string, email: string, webhookData: any, goServerUrl: string, accessToken: string) {
+    try {
+      // Method 1: Search all tracking entries for matching email and recent timestamp
+      console.log(`[Webhook] Attempting alternative lookup for ResendID: ${resendId}, email: ${email}`);
+      
+      const allTrackingResponse = await fetch(`${goServerUrl}/api/email-tracking`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (allTrackingResponse.ok) {
+        const allTrackingData = await allTrackingResponse.json();
+        const entries = allTrackingData.entries || [];
+        
+        // Look for entries with matching recipient email and recent timestamp (within last 10 minutes)
+        const recentCutoff = Date.now() - (10 * 60 * 1000); // 10 minutes ago
+        
+        for (const entry of entries) {
+          // Check if this entry matches the email and is recent
+          if (entry.metadata?.recipient === email || entry.metadata?.to === email) {
+            const entryTimestamp = new Date(entry.timestamp).getTime();
+            if (entryTimestamp >= recentCutoff) {
+              console.log(`[Webhook] Found potential match via email/timestamp: ${entry.id}`);
+              
+              // Update the entry with the ResendID using the dedicated endpoint
+              const updatePayload = {
+                resendId: resendId
+              };
+              
+              const updateResponse = await fetch(`${goServerUrl}/api/email-tracking/${entry.id}/resend-id`, {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(updatePayload)
+              });
+              
+              if (updateResponse.ok) {
+                console.log(`[Webhook] Successfully updated entry ${entry.id} with ResendID: ${resendId}`);
+                const updatedEntry = await updateResponse.json();
+                return updatedEntry;
+              }
+            }
+          }
+        }
+      }
+      
+      console.log(`[Webhook] No alternative matches found for ResendID: ${resendId}`);
+      return null;
+      
+    } catch (error) {
+      console.error(`[Webhook] Error in alternative lookup for ResendID ${resendId}:`, error);
+      return null;
+    }
+  }
+
+  async function scheduleWebhookRetry(resendId: string, webhookType: string, webhookData: any, email: string) {
+    try {
+      // Store webhook data for retry processing later
+      // This could be implemented with a queue system, database, or in-memory store
+      // For now, we'll use a simple setTimeout to retry after 30 seconds
+      
+      console.log(`[Webhook] Scheduling retry for ResendID: ${resendId} in 30 seconds`);
+      
+      setTimeout(async () => {
+        console.log(`[Webhook] Retrying webhook processing for ResendID: ${resendId}`);
+        
+        try {
+          const GO_SERVER_URL = process.env.GO_SERVER_URL || process.env.GO_EMAIL_SERVER_URL || 'https://tengine.zendwise.work';
+          const accessToken = process.env.EMAIL_TRACKING_TOKEN || process.env.JWT_SECRET || 'Cvgii9bYKF1HtfD8TODRyZFTmFP4vu70oR59YrjGVpS2fXzQ41O3UPRaR8u9uAqNhwK5ZxZPbX5rAOlMrqe8ag==';
+          
+          // Try ResendID lookup again
+          const trackingResponse = await fetch(`${GO_SERVER_URL}/api/email-tracking/resend/${resendId}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            }
+          });
+          
+          if (trackingResponse.ok) {
+            const trackingEntry = await trackingResponse.json();
+            console.log(`[Webhook] Retry found email tracking entry: ${trackingEntry.id} for ResendID: ${resendId}`);
+            await updateEmailTrackingEntry(trackingEntry, webhookType, webhookData, GO_SERVER_URL, accessToken, resendId);
+          } else {
+            console.log(`[Webhook] Retry still unable to find tracking entry for ResendID: ${resendId}`);
+          }
+          
+        } catch (retryError) {
+          console.error(`[Webhook] Error in retry processing for ResendID ${resendId}:`, retryError);
+        }
+      }, 30000); // Retry after 30 seconds
+      
+    } catch (error) {
+      console.error(`[Webhook] Error scheduling webhook retry for ResendID ${resendId}:`, error);
+    }
+  }
+
+  async function updateNewsletterStats(newsletterId: string, webhookType: string, tenantId: string) {
+    try {
+      console.log(`[Webhook] Attempting to update newsletter stats:`, { newsletterId, webhookType, tenantId });
+
+      // Helper to perform the update for a resolved tenant/newsletter
+      const performUpdate = async (resolvedTenantId: string) => {
+        if (webhookType === 'email.opened') {
+          console.log(`[Webhook] Processing email open event for newsletter ${newsletterId}`);
+          const newsletter = await storage.getNewsletter(newsletterId, resolvedTenantId);
+          if (newsletter) {
+            const newOpenCount = (newsletter.openCount || 0) + 1;
+            console.log(`[Webhook] Found newsletter, updating openCount from ${newsletter.openCount || 0} to ${newOpenCount}`);
+
+            const updatedNewsletter = await storage.updateNewsletter(newsletterId, { openCount: newOpenCount }, resolvedTenantId);
+            if (updatedNewsletter) {
+              console.log(`[Webhook] ✅ Updated newsletter ${newsletterId} openCount to ${newOpenCount} (tenant: ${resolvedTenantId})`);
+            } else {
+              console.error(`[Webhook] ❌ Failed to update newsletter ${newsletterId} - update returned null/undefined (tenant: ${resolvedTenantId})`);
+            }
+          } else {
+            console.error(`[Webhook] ❌ Newsletter ${newsletterId} not found in tenant ${resolvedTenantId}`);
+          }
+        } else if (webhookType === 'email.clicked') {
+          console.log(`[Webhook] Processing email click event for newsletter ${newsletterId}`);
+          const newsletter = await storage.getNewsletter(newsletterId, resolvedTenantId);
+          if (newsletter) {
+            const newClickCount = (newsletter.clickCount || 0) + 1;
+            console.log(`[Webhook] Found newsletter, updating clickCount from ${newsletter.clickCount || 0} to ${newClickCount}`);
+
+            const updatedNewsletter = await storage.updateNewsletter(newsletterId, { clickCount: newClickCount }, resolvedTenantId);
+            if (updatedNewsletter) {
+              console.log(`[Webhook] ✅ Updated newsletter ${newsletterId} clickCount to ${newClickCount} (tenant: ${resolvedTenantId})`);
+            } else {
+              console.error(`[Webhook] ❌ Failed to update newsletter ${newsletterId} - update returned null/undefined (tenant: ${resolvedTenantId})`);
+            }
+          } else {
+            console.error(`[Webhook] ❌ Newsletter ${newsletterId} not found in tenant ${resolvedTenantId}`);
+          }
+        } else {
+          console.log(`[Webhook] Ignoring webhook event ${webhookType} - not relevant for newsletter stats`);
+        }
+      };
+
+      // First try with provided tenantId
+      const existsInTenant = await storage.getNewsletter(newsletterId, tenantId);
+      if (existsInTenant) {
+        await performUpdate(tenantId);
+        return;
+      }
+
+      // Fallback: resolve the correct tenant for this newsletter ID across tenants
+      console.warn(`[Webhook] Newsletter ${newsletterId} not found in provided tenant ${tenantId}. Attempting cross-tenant lookup.`);
+      const crossTenantNewsletter = await storage.getNewsletterById(newsletterId);
+      if (crossTenantNewsletter) {
+        console.warn(`[Webhook] Resolved newsletter tenant as ${crossTenantNewsletter.tenantId}. Proceeding with update.`);
+        await performUpdate(crossTenantNewsletter.tenantId);
+        return;
+      }
+
+      console.error(`[Webhook] ❌ Newsletter ${newsletterId} not found in any tenant`);
+    } catch (error) {
+      console.error(`[Webhook] Error updating newsletter stats for ${newsletterId}:`, error);
+      console.error(`[Webhook] Error context:`, { newsletterId, webhookType, tenantId });
+    }
+  }
+
   // Webhook endpoint for Resend - POST handler
   app.post("/api/webhooks/resend", async (req, res) => {
     // Log ALL incoming POST requests to this endpoint
@@ -4081,49 +4389,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Find contact across all tenants (since webhook doesn't include tenant info)
       console.log("[Webhook] Looking up contact for email:", email);
       
-      // Try exact match first
-      let contactResult = await storage.findEmailContactByEmail(email);
-      
-      // If not found, try case-insensitive search
-      if (!contactResult && email) {
-        console.log("[Webhook] Exact match not found, trying case-insensitive search...");
-        contactResult = await storage.findEmailContactByEmail(email.toLowerCase());
+      // Debug: Show all contacts in the database for comparison
+      try {
+        console.log("[Webhook] DEBUG - Fetching all contacts for comparison...");
+        // This is a debug query - in production, you'd want to limit this
+        const allContacts = await storage.getAllEmailContactsDebug();
+        console.log(`[Webhook] DEBUG - Found ${allContacts.length} total contacts in database:`);
+        allContacts.slice(0, 10).forEach((contact, i) => {
+          console.log(`[Webhook] DEBUG - ${i + 1}. "${contact.email}" (tenant: ${contact.tenantId})`);
+        });
+        
+        if (allContacts.length === 0) {
+          console.log("[Webhook] DEBUG - NO CONTACTS IN DATABASE! This explains why webhook is failing.");
+          console.log("[Webhook] SOLUTION: You need to add email contacts to the system before sending newsletters.");
+          console.log("=".repeat(80));
+          return res.status(404).json({ 
+            message: "Contact not found", 
+            debug: "No contacts exist in database. Add contacts before sending newsletters." 
+          });
+        }
+      } catch (debugError) {
+        console.log("[Webhook] DEBUG query failed:", debugError);
       }
+      
+      // Try to find the contact
+      let contactResult = await storage.findEmailContactByEmail(email);
       
       if (!contactResult) {
         console.log(`[Webhook] CONTACT NOT FOUND for email: ${email}`);
-        console.log("[Webhook] Tried both exact match and lowercase versions");
+        console.log("[Webhook] Available emails in database (first 10):");
         
-        // Debug: Check if the storage method is working correctly
-        console.log("[Webhook] DEBUG - findEmailContactByEmail method test:");
-        console.log(`[Webhook] - Original email: "${email}"`);
-        console.log(`[Webhook] - Lowercase email: "${email.toLowerCase()}"`);
-        console.log(`[Webhook] - Email length: ${email.length}`);
-        console.log(`[Webhook] - Email type: ${typeof email}`);
-        
-        // Try some debug variations of the email
+        // Show what emails are actually in the database
         try {
-          console.log("[Webhook] DEBUG - Testing email variations...");
-          const trimmedEmail = email.trim();
-          const trimmedResult = await storage.findEmailContactByEmail(trimmedEmail);
-          console.log(`[Webhook] - Trimmed email "${trimmedEmail}" result:`, trimmedResult ? "FOUND" : "NOT FOUND");
-          
-          if (trimmedResult) {
-            contactResult = trimmedResult; // Use the trimmed result
-          }
-        } catch (dbError) {
-          console.log("[Webhook] DEBUG email variation test failed:", dbError);
+          const allContacts = await storage.getAllEmailContactsDebug();
+          const emailList = allContacts.slice(0, 10).map(c => c.email);
+          emailList.forEach((dbEmail, i) => {
+            const matches = dbEmail.toLowerCase() === email.toLowerCase();
+            console.log(`[Webhook] - ${i + 1}. "${dbEmail}" ${matches ? '← MATCH!' : ''}`);
+          });
+        } catch (err) {
+          console.log("[Webhook] Could not fetch contact list for comparison");
         }
         
-        // Check if any of the debug attempts found the contact
-        if (!contactResult) {
-          console.log("[Webhook] This email is not in our contact database");
-          console.log("[Webhook] Request processing terminated - contact not found");
-          console.log("=".repeat(80));
-          return res.status(404).json({ message: "Contact not found" });
-        } else {
-          console.log("[Webhook] ✅ Contact found via debug attempts!");
-        }
+        console.log("[Webhook] Request processing terminated - contact not found");
+        console.log("=".repeat(80));
+        return res.status(404).json({ 
+          message: "Contact not found",
+          debug: `Email '${email}' is not in the contacts database. Add this contact first.`
+        });
       }
       
       console.log("[Webhook] ✅ Contact found:", contactResult.contact.id, "in tenant:", contactResult.tenantId);
@@ -4150,6 +4463,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(200).json({ message: "Event type mapping not found" });
       }
 
+      // Extract ResendID for tracking email status updates
+      const resendId = data.id || data.message_id;
+      console.log(`[Webhook] Extracted ResendID: ${resendId}`);
+      
+      // Update email tracking status if ResendID is available
+      if (resendId) {
+        try {
+          // Try to update the Go email tracking system
+          const GO_SERVER_URL = process.env.GO_SERVER_URL || process.env.GO_EMAIL_SERVER_URL || 'https://tengine.zendwise.work';
+          const accessToken = process.env.EMAIL_TRACKING_TOKEN || process.env.JWT_SECRET || 'Cvgii9bYKF1HtfD8TODRyZFTmFP4vu70oR59YrjGVpS2fXzQ41O3UPRaR8u9uAqNhwK5ZxZPbX5rAOlMrqe8ag==';
+          
+          console.log(`[Webhook] Looking up email tracking by ResendID: ${resendId}`);
+          
+          // Lookup email tracking entry by ResendID
+          const trackingResponse = await fetch(`${GO_SERVER_URL}/api/email-tracking/resend/${resendId}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            }
+          });
+          
+          if (trackingResponse.ok) {
+            const trackingEntry = await trackingResponse.json();
+            console.log(`[Webhook] Found email tracking entry: ${trackingEntry.id} for ResendID: ${resendId}`);
+            
+            await updateEmailTrackingEntry(trackingEntry, type, data, GO_SERVER_URL, accessToken, resendId, tenantId);
+            
+          } else if (trackingResponse.status === 404) {
+            console.log(`[Webhook] No email tracking entry found for ResendID: ${resendId}`);
+            
+            // Try alternative lookup methods for newsletter emails
+            const alternativeEntry = await findEmailTrackingByAlternativeMethods(resendId, email, data, GO_SERVER_URL, accessToken);
+            if (alternativeEntry) {
+              console.log(`[Webhook] Found email tracking entry via alternative lookup: ${alternativeEntry.id}`);
+              await updateEmailTrackingEntry(alternativeEntry, type, data, GO_SERVER_URL, accessToken, resendId, tenantId);
+            } else {
+              console.log(`[Webhook] No email tracking entry found via alternative methods for ResendID: ${resendId}`);
+              // Store webhook for later processing when tracking entry becomes available
+              await scheduleWebhookRetry(resendId, type, data, email);
+            }
+            
+          } else {
+            console.error(`[Webhook] Failed to lookup email tracking: ${trackingResponse.status}`);
+            // Also try alternative lookup for non-404 errors as ResendID index might not be ready
+            const alternativeEntry = await findEmailTrackingByAlternativeMethods(resendId, email, data, GO_SERVER_URL, accessToken);
+            if (alternativeEntry) {
+              console.log(`[Webhook] Found email tracking entry via alternative lookup after error: ${alternativeEntry.id}`);
+              await updateEmailTrackingEntry(alternativeEntry, type, data, GO_SERVER_URL, accessToken, resendId, tenantId);
+            }
+          }
+          
+        } catch (error) {
+          console.error(`[Webhook] Error updating email tracking for ResendID ${resendId}:`, error);
+          
+          // Log additional context for debugging newsletter tracking issues
+          console.error(`[Webhook] Error context:`, {
+            resendId,
+            email,
+            webhookType: type,
+            contactId: contact?.id,
+            tenantId,
+            timestamp: new Date().toISOString(),
+            tags: data.tags,
+            subject: data.subject
+          });
+        }
+      }
+
       // Create activity record
       const activityData = {
         contactId: contact.id,
@@ -4158,6 +4540,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           messageId: data.message_id,
           subject: data.subject,
           tags: data.tags,
+          resendId: resendId, // Include ResendID in activity data
         }),
         userAgent: data.user_agent,
         ipAddress: data.ip,
@@ -4177,12 +4560,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const activity = await storage.createEmailActivity(activityData, tenantId);
       
+      // Extract newsletter tracking information from email metadata and tags
+      let newsletterId: string | undefined;
+      let groupUUID: string | undefined;
+      
+      // Debug: Log the entire webhook data structure to understand what we're receiving
+      console.log(`[Webhook] Processing webhook data:`, {
+        tags: data.tags,
+        tagsType: Array.isArray(data.tags) ? 'array' : typeof data.tags,
+        firstTagType: data.tags && data.tags[0] ? typeof data.tags[0] : 'no tags',
+        firstTag: data.tags && data.tags[0] ? JSON.stringify(data.tags[0]) : 'no tags',
+        metadata: data.metadata,
+        subject: data.subject
+      });
+      
+      // Priority 1: Look for groupUUID and newsletter ID in tags
+      // Resend can send tags as either an array OR a direct object
+      const tags = data.tags || [];
+      
+      console.log(`[Webhook] Tags type: ${Array.isArray(tags) ? 'array' : typeof tags}`);
+      console.log(`[Webhook] Tags content:`, JSON.stringify(tags, null, 2));
+      
+      // Handle direct object format (what Resend actually sends)
+      if (typeof tags === 'object' && !Array.isArray(tags) && tags !== null) {
+        console.log(`[Webhook] Processing tags as direct object`);
+        
+        // Direct object access - much simpler!
+        if (tags.groupUUID) {
+          groupUUID = tags.groupUUID;
+          console.log(`[Webhook] Found groupUUID in tags (direct object): ${groupUUID}`);
+        }
+        
+        if (tags.newsletter_id) {
+          // Remove 'newsletter-' prefix if present
+          newsletterId = tags.newsletter_id.replace('newsletter-', '');
+          console.log(`[Webhook] Found newsletter ID in tags (direct object): ${newsletterId}`);
+        }
+      }
+      // Handle array format (fallback for different webhook formats)
+      else if (Array.isArray(tags)) {
+        console.log(`[Webhook] Processing tags as array`);
+        
+        for (const tag of tags) {
+          // Handle object format within array
+          if (typeof tag === 'object' && tag !== null) {
+            const tagValue = tag.value || tag.name || '';
+            const tagName = tag.name || '';
+            
+            // Check for groupUUID
+            if (tagName === 'groupUUID' && tag.value) {
+              groupUUID = tag.value;
+              console.log(`[Webhook] Found groupUUID in array (object format, name field): ${groupUUID}`);
+            } else if (tagValue.startsWith('groupUUID-')) {
+              groupUUID = tagValue.replace('groupUUID-', '');
+              console.log(`[Webhook] Found groupUUID in array (object format, value field): ${groupUUID}`);
+            }
+            
+            // Check for newsletter ID
+            if (tagName === 'newsletter_id' && tag.value) {
+              newsletterId = tag.value.replace('newsletter-', '');
+              console.log(`[Webhook] Found newsletter ID in array (object format, name field): ${newsletterId}`);
+            } else if (tagValue.startsWith('newsletter-')) {
+              newsletterId = tagValue.replace('newsletter-', '');
+              console.log(`[Webhook] Found newsletter ID in array (object format, value field): ${newsletterId}`);
+            }
+          } 
+          // Handle string format within array
+          else if (typeof tag === 'string') {
+            if (tag.startsWith('groupUUID-')) {
+              groupUUID = tag.replace('groupUUID-', '');
+              console.log(`[Webhook] Found groupUUID in array (string format): ${groupUUID}`);
+            }
+            if (tag.startsWith('newsletter-')) {
+              newsletterId = tag.replace('newsletter-', '');
+              console.log(`[Webhook] Found newsletter ID in array (string format): ${newsletterId}`);
+            }
+          }
+        }
+      }
+      
+      // Priority 2: Check message subject for newsletter tracking (fallback method)
+      if (!newsletterId && data.subject) {
+        const subjectMatch = data.subject.match(/\[Newsletter:([a-f0-9-]+)\]/);
+        if (subjectMatch) {
+          newsletterId = subjectMatch[1];
+          console.log(`[Webhook] Found newsletter ID in subject: ${newsletterId}`);
+        }
+      }
+      
       // Update contact statistics based on activity type
       if (activityType === 'opened') {
         await storage.updateEmailContact(contact.id, { 
           emailsOpened: (contact.emailsOpened || 0) + 1,
           lastActivity: new Date() 
         }, tenantId);
+        
+        // Update newsletter open count if this is a newsletter email
+        if (newsletterId) {
+          console.log(`[Webhook] Updating newsletter open count - newsletterId: ${newsletterId}, tenantId: ${tenantId}`);
+          await updateNewsletterStats(newsletterId, 'email.opened', tenantId);
+        } else {
+          console.log(`[Webhook] No newsletter ID found for open event - groupUUID: ${groupUUID}`);
+        }
+      } else if (activityType === 'clicked') {
+        await storage.updateEmailContact(contact.id, { 
+          lastActivity: new Date() 
+        }, tenantId);
+        
+        // Update newsletter click count if this is a newsletter email
+        if (newsletterId) {
+          console.log(`[Webhook] Updating newsletter click count - newsletterId: ${newsletterId}, tenantId: ${tenantId}`);
+          await updateNewsletterStats(newsletterId, 'email.clicked', tenantId);
+        } else {
+          console.log(`[Webhook] No newsletter ID found for click event - groupUUID: ${groupUUID}`);
+        }
       } else if (activityType === 'bounced') {
         await storage.updateEmailContact(contact.id, { 
           status: 'bounced' as any,
@@ -4204,10 +4695,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateEmailContact(contact.id, { 
           lastActivity: new Date() 
         }, tenantId);
-      } else if (activityType === 'clicked') {
-        await storage.updateEmailContact(contact.id, { 
-          lastActivity: new Date() 
-        }, tenantId);
       } else {
         // For other events (sent, delivered, delivery_delayed, scheduled), just update last activity
         await storage.updateEmailContact(contact.id, { 
@@ -4216,6 +4703,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(`[Webhook] Successfully processed ${activityType} activity for contact: ${email}`);
+      console.log(`[Webhook] Tracking method used: ${groupUUID ? 'GroupUUID-based' : newsletterId ? 'Newsletter ID fallback' : 'No newsletter tracking'}`);
       console.log("[Webhook] Request processing completed successfully");
       console.log("=".repeat(80));
       res.status(200).json({ message: "Webhook processed successfully", activityId: activity.id });
@@ -4273,6 +4761,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.user.id,
         req.user.tenantId
       );
+
+      // Automatically initialize task statuses for the new newsletter
+      await storage.initializeNewsletterTasks(newsletter.id, req.user.tenantId);
 
       res.status(201).json({ newsletter });
     } catch (error: any) {
@@ -4342,6 +4833,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Newsletter task status routes
+  app.get("/api/newsletters/:id/task-status", authenticateToken, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const taskStatuses = await storage.getNewsletterTaskStatuses(id, req.user.tenantId);
+      res.json({ taskStatuses });
+    } catch (error) {
+      console.error("Get newsletter task status error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/newsletters/:id/task-status", authenticateToken, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const taskData = req.body;
+      const taskStatus = await storage.createNewsletterTaskStatus(id, taskData, req.user.tenantId);
+      res.status(201).json({ taskStatus });
+    } catch (error) {
+      console.error("Create newsletter task status error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.put("/api/newsletters/:newsletterId/task-status/:taskId", authenticateToken, async (req: any, res) => {
+    try {
+      const { taskId } = req.params;
+      const updates = req.body;
+      const taskStatus = await storage.updateNewsletterTaskStatus(taskId, updates, req.user.tenantId);
+      
+      if (!taskStatus) {
+        return res.status(404).json({ message: "Task status not found" });
+      }
+      
+      res.json({ taskStatus });
+    } catch (error) {
+      console.error("Update newsletter task status error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/newsletters/:id/initialize-tasks", authenticateToken, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const taskStatuses = await storage.initializeNewsletterTasks(id, req.user.tenantId);
+      res.json({ taskStatuses });
+    } catch (error) {
+      console.error("Initialize newsletter tasks error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Get all contact tags for newsletter segmentation
   app.get("/api/contact-tags", authenticateToken, async (req: any, res) => {
     try {
@@ -4358,6 +4901,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       
+      // Validate newsletter ID
+      if (!id || typeof id !== 'string') {
+        return res.status(400).json({ message: "Valid newsletter ID is required" });
+      }
+      
       console.log(`[Newsletter Send] Starting send for newsletter ID: ${id}, tenant: ${req.user.tenantId}`);
       
       // Get newsletter details
@@ -4367,40 +4915,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Newsletter not found" });
       }
       
+      // Validate newsletter content
+      if (!newsletter.subject || !newsletter.content) {
+        console.log(`[Newsletter Send] Newsletter missing required content: ${id}`);
+        return res.status(400).json({ message: "Newsletter must have subject and content" });
+      }
+      
+      if (newsletter.status === 'sent') {
+        console.log(`[Newsletter Send] Newsletter already sent: ${id}`);
+        return res.status(400).json({ message: "Newsletter has already been sent" });
+      }
+      
       console.log(`[Newsletter Send] Newsletter found:`, {
         id: newsletter.id,
         title: newsletter.title,
         recipientType: newsletter.recipientType,
-        selectedContactIds: newsletter.selectedContactIds?.length || 0,
-        selectedTagIds: newsletter.selectedTagIds?.length || 0
+        selectedContactIds: Array.isArray(newsletter.selectedContactIds) ? newsletter.selectedContactIds.length : 0,
+        selectedTagIds: Array.isArray(newsletter.selectedTagIds) ? newsletter.selectedTagIds.length : 0
       });
 
       // Get recipients based on newsletter segmentation
       let recipients: any[] = [];
-      if (newsletter.recipientType === 'all') {
-        recipients = await storage.getAllEmailContacts(req.user.tenantId);
-      } else if (newsletter.recipientType === 'selected' && newsletter.selectedContactIds) {
-        // Get contacts by individual IDs
-        const contactPromises = newsletter.selectedContactIds.map(id => 
-          storage.getEmailContact(id, req.user.tenantId)
-        );
-        const contacts = await Promise.all(contactPromises);
-        recipients = contacts.filter(Boolean); // Remove any undefined contacts
-      } else if (newsletter.recipientType === 'tags' && newsletter.selectedTagIds) {
-        // Get all contacts and filter by tags
-        const allContacts = await storage.getAllEmailContacts(req.user.tenantId);
-        recipients = allContacts.filter(contact => 
-          contact.tags && contact.tags.some((tag: any) => 
-            newsletter.selectedTagIds?.includes(tag.id)
-          )
-        );
+      
+      try {
+        if (newsletter.recipientType === 'all') {
+          recipients = await storage.getAllEmailContacts(req.user.tenantId);
+        } else if (newsletter.recipientType === 'selected' && Array.isArray(newsletter.selectedContactIds) && newsletter.selectedContactIds.length > 0) {
+          // Get contacts by individual IDs with error handling
+          const contactPromises = newsletter.selectedContactIds.map(async contactId => {
+            try {
+              return await storage.getEmailContact(contactId, req.user.tenantId);
+            } catch (err) {
+              console.warn(`[Newsletter Send] Failed to get contact ${contactId}:`, err);
+              return null;
+            }
+          });
+          const contacts = await Promise.all(contactPromises);
+          recipients = contacts.filter(Boolean); // Remove any null/undefined contacts
+        } else if (newsletter.recipientType === 'tags' && Array.isArray(newsletter.selectedTagIds) && newsletter.selectedTagIds.length > 0) {
+          // Get all contacts and filter by tags
+          const allContacts = await storage.getAllEmailContacts(req.user.tenantId);
+          recipients = allContacts.filter(contact => 
+            contact.tags && Array.isArray(contact.tags) && contact.tags.some((tag: any) => 
+              newsletter.selectedTagIds?.includes(tag.id)
+            )
+          );
+        }
+      } catch (recipientError) {
+        console.error(`[Newsletter Send] Error fetching recipients for newsletter ${id}:`, recipientError);
+        return res.status(500).json({ 
+          message: "Failed to fetch recipients", 
+          error: recipientError instanceof Error ? recipientError.message : "Unknown error" 
+        });
       }
 
       console.log(`[Newsletter Send] Found ${recipients.length} recipients`);
-      
+
+      // CRITICAL FIX: Ensure all recipients exist as email contacts
+      // This is essential for webhook processing to work correctly
       if (recipients.length === 0) {
         console.log(`[Newsletter Send] No recipients found for newsletter ${id}`);
-        return res.status(400).json({ message: "No recipients found for this newsletter" });
+        
+        // Helpful error message with solution
+        let suggestion = "";
+        if (newsletter.recipientType === 'all') {
+          suggestion = "Create email contacts first using the Email Contacts page.";
+        } else if (newsletter.recipientType === 'selected') {
+          suggestion = "Ensure the selected contact IDs exist and are valid.";
+        } else if (newsletter.recipientType === 'tags') {
+          suggestion = "Ensure contacts with the selected tags exist.";
+        }
+        
+        return res.status(400).json({ 
+          message: "No recipients found for this newsletter",
+          solution: suggestion,
+          details: `Recipient type: ${newsletter.recipientType}, Selected contacts: ${Array.isArray(newsletter.selectedContactIds) ? newsletter.selectedContactIds.length : 0}, Selected tags: ${Array.isArray(newsletter.selectedTagIds) ? newsletter.selectedTagIds.length : 0}`
+        });
+      }
+
+
+
+      // Validate recipients have valid email addresses
+      const validRecipients = recipients.filter(r => r && r.email && typeof r.email === 'string' && r.email.includes('@'));
+      if (validRecipients.length === 0) {
+        console.log(`[Newsletter Send] No valid email addresses found for newsletter ${id}`);
+        return res.status(400).json({ message: "No valid email addresses found in recipients" });
+      }
+
+      if (validRecipients.length !== recipients.length) {
+        console.warn(`[Newsletter Send] ${recipients.length - validRecipients.length} recipients had invalid email addresses`);
       }
 
       // Get user's access token for Go server authentication
@@ -4409,9 +5012,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Authentication token required" });
       }
 
+      // Check Go server availability
+      const GO_SERVER_URL = process.env.GO_SERVER_URL || 'https://tengine.zendwise.work';
+      let goServerAvailable = false;
+      
+      try {
+        const healthResponse = await fetch(`${GO_SERVER_URL}/health`, { 
+          method: 'GET'
+        });
+        goServerAvailable = healthResponse.ok;
+      } catch (healthError) {
+        console.warn(`[Newsletter Send] Go server health check failed:`, healthError);
+      }
+
+      if (!goServerAvailable) {
+        console.error(`[Newsletter Send] Go server not available at ${GO_SERVER_URL}`);
+        return res.status(503).json({ 
+          message: "Email service temporarily unavailable", 
+          details: "Go server is not responding"
+        });
+      }
+
       // Send newsletter to each recipient via Go backend
+      // Generate a unique group UUID for this newsletter batch
+      const groupUUID = randomUUID();
       const emailId = `newsletter-${id}-${Date.now()}`;
-      const sendPromises = recipients.map(async (recipient, index) => {
+      
+      console.log(`[Newsletter Send] Generated groupUUID: ${groupUUID} for newsletter ${id}`);
+      
+      const sendPromises = validRecipients.map(async (recipient, index) => {
         const individualEmailId = `${emailId}-${index}`;
         
         const payload = {
@@ -4420,6 +5049,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           temporalWorkflow: `newsletter-workflow-${individualEmailId}`,
           metadata: {
             recipient: recipient.email,
+            // Use clean subject line without tracking IDs
             subject: newsletter.subject,
             content: newsletter.content,
             templateType: "newsletter",
@@ -4428,36 +5058,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
             newsletterTitle: newsletter.title,
             to: recipient.email,
             sentAt: new Date().toISOString(),
+            // Use tags for groupUUID tracking since metadata is not included in webhook responses
+            tags: [`newsletter-${newsletter.id}`, 'newsletter', newsletter.title, `groupUUID-${groupUUID}`]
           }
         };
+        
+        console.log(`[Newsletter Send] Queuing email ${index + 1}/${validRecipients.length}: ${recipient.email} (emailId: ${individualEmailId})`);
 
         try {
-          const response = await fetch('https://tengine.zendwise.work/api/email-tracking', {
+          const response = await fetch(`${GO_SERVER_URL}/api/email-tracking`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${accessToken}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify(payload),
+            body: JSON.stringify(payload)
           });
 
           if (!response.ok) {
-            const error = await response.text();
-            console.error(`Failed to queue email for ${recipient.email}:`, error);
-            return { success: false, email: recipient.email, error };
+            const errorText = await response.text();
+            console.error(`Failed to queue email for ${recipient.email}:`, errorText);
+            return { success: false, email: recipient.email, error: `HTTP ${response.status}: ${errorText}` };
           }
 
           const result = await response.json();
+          console.log(`[Newsletter Send] Successfully queued email for ${recipient.email}: ${result.id || 'unknown'}`);
           return { success: true, email: recipient.email, result };
         } catch (error) {
           console.error(`Error sending to ${recipient.email}:`, error);
-          return { success: false, email: recipient.email, error: error instanceof Error ? error.message : String(error) };
+          return { 
+            success: false, 
+            email: recipient.email, 
+            error: error instanceof Error ? error.message : String(error) 
+          };
         }
       });
 
-      const results = await Promise.all(sendPromises);
-      const successful = results.filter(r => r.success);
-      const failed = results.filter(r => !r.success);
+      // Process results with better error handling
+      let successful: any[] = [];
+      let failed: any[] = [];
+      
+      try {
+        const results = await Promise.allSettled(sendPromises);
+        
+        results.forEach((result, index) => {
+          if (result.status === 'fulfilled') {
+            if (result.value.success) {
+              successful.push(result.value);
+            } else {
+              failed.push(result.value);
+            }
+          } else {
+            // Handle rejected promise
+            const recipient = validRecipients[index];
+            failed.push({
+              success: false,
+              email: recipient?.email || 'unknown',
+              error: result.reason instanceof Error ? result.reason.message : String(result.reason)
+            });
+          }
+        });
+      } catch (resultsError) {
+        console.error(`[Newsletter Send] Error processing results:`, resultsError);
+        return res.status(500).json({ 
+          message: "Failed to process email sending results",
+          error: resultsError instanceof Error ? resultsError.message : "Unknown error"
+        });
+      }
 
       console.log(`[Newsletter Send] Results: ${successful.length} successful, ${failed.length} failed`);
       if (failed.length > 0) {
@@ -4465,19 +5132,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update newsletter status and metadata after queuing sends
-      await storage.updateNewsletter(
-        id,
-        { 
-          status: "sent",
-          sentAt: new Date(),
-          recipientCount: recipients.length,
-        },
-        req.user.tenantId
-      );
+      try {
+        await storage.updateNewsletter(
+          id,
+          { 
+            status: "sent",
+            sentAt: new Date(),
+            recipientCount: validRecipients.length,
+          },
+          req.user.tenantId
+        );
+      } catch (updateError) {
+        console.error(`[Newsletter Send] Failed to update newsletter status:`, updateError);
+        // Continue with response even if update fails - emails were sent
+      }
 
       res.json({
         message: "Newsletter sending initiated",
-        totalRecipients: recipients.length,
+        totalRecipients: validRecipients.length,
         successful: successful.length,
         failed: failed.length,
         emailId,
@@ -4489,7 +5161,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     } catch (error) {
       console.error("Send newsletter error:", error);
-      res.status(500).json({ message: "Internal server error" });
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      
+      console.error("Send newsletter error stack:", errorStack);
+      
+      res.status(500).json({ 
+        message: "Internal server error",
+        error: process.env.NODE_ENV === 'development' ? errorMessage : undefined,
+        details: process.env.NODE_ENV === 'development' ? errorStack : undefined
+      });
     }
   });
 
@@ -4621,6 +5302,251 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get managers error:", error);
       res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Mount email routes for enhanced email system monitoring
+  app.use('/api/email', emailRoutes);
+
+  // Debug endpoint to check newsletter tracking status
+  app.get("/api/debug/newsletter/:newsletterId/tracking", authenticateToken, async (req: any, res) => {
+    try {
+      const { newsletterId } = req.params;
+      const tenantId = req.user.tenantId;
+      
+      console.log(`[Debug] Checking tracking for newsletter ${newsletterId} in tenant ${tenantId}`);
+      
+      // Get the newsletter details
+      const newsletter = await storage.getNewsletter(newsletterId, tenantId);
+      if (!newsletter) {
+        return res.status(404).json({ error: "Newsletter not found" });
+      }
+      
+      // Try to get tracking entries from Go server
+      const GO_SERVER_URL = process.env.GO_SERVER_URL || process.env.GO_EMAIL_SERVER_URL || 'https://tengine.zendwise.work';
+      const accessToken = req.headers.authorization?.replace('Bearer ', '');
+      
+      try {
+        const trackingResponse = await fetch(`${GO_SERVER_URL}/api/email-tracking`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (trackingResponse.ok) {
+          const trackingData = await trackingResponse.json();
+          const entries = trackingData.entries || [];
+          
+          // Find entries related to this newsletter
+          const newsletterEntries = entries.filter((entry: any) => 
+            entry.metadata?.newsletterId === newsletterId
+          );
+          
+          const debugInfo = {
+            newsletter: {
+              id: newsletter.id,
+              title: newsletter.title,
+              openCount: newsletter.openCount,
+              clickCount: newsletter.clickCount,
+              recipientCount: newsletter.recipientCount,
+              status: newsletter.status
+            },
+            tracking: {
+              totalEntries: entries.length,
+              newsletterEntries: newsletterEntries.length,
+              entries: newsletterEntries.map((entry: any) => ({
+                id: entry.id,
+                emailId: entry.emailId,
+                status: entry.status,
+                hasResendId: !!entry.metadata?.resendId,
+                resendId: entry.metadata?.resendId,
+                newsletterId: entry.metadata?.newsletterId,
+                recipient: entry.metadata?.recipient,
+                webhookHistory: entry.metadata?.webhookHistory?.length || 0
+              }))
+            }
+          };
+          
+          res.json(debugInfo);
+        } else {
+          res.status(500).json({ error: "Failed to fetch tracking data", status: trackingResponse.status });
+        }
+      } catch (error) {
+        console.error("[Debug] Error connecting to tracking service:", error);
+        res.status(500).json({ error: "Error connecting to tracking service" });
+      }
+      
+    } catch (error) {
+      console.error("Debug newsletter tracking error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Enhanced debug endpoint for webhook processing
+  app.post("/api/debug/webhook-flow/:newsletterId", authenticateToken, async (req: any, res) => {
+    try {
+      const { newsletterId } = req.params;
+      const { contactEmail } = req.body;
+      const tenantId = req.user.tenantId;
+      
+      if (!contactEmail) {
+        return res.status(400).json({ error: "contactEmail is required" });
+      }
+      
+      console.log(`[Debug Webhook] Starting debug flow for newsletter ${newsletterId}, contact ${contactEmail}`);
+      
+      const debugResult = {
+        steps: [],
+        newsletter: null,
+        contact: null,
+        webhookProcessing: null,
+        finalCounts: null
+      };
+      
+      // Step 1: Find newsletter
+      debugResult.steps.push("Step 1: Looking up newsletter");
+      const newsletter = await storage.getNewsletter(newsletterId, tenantId);
+      if (!newsletter) {
+        debugResult.steps.push("❌ Newsletter not found");
+        return res.status(404).json({ error: "Newsletter not found", debug: debugResult });
+      }
+      debugResult.newsletter = {
+        id: newsletter.id,
+        title: newsletter.title,
+        openCount: newsletter.openCount || 0,
+        clickCount: newsletter.clickCount || 0
+      };
+      debugResult.steps.push("✅ Newsletter found");
+      
+      // Step 2: Find contact
+      debugResult.steps.push("Step 2: Looking up contact");
+      const contactResult = await storage.findEmailContactByEmail(contactEmail);
+      if (!contactResult) {
+        debugResult.steps.push("❌ Contact not found");
+        return res.status(404).json({ error: "Contact not found", debug: debugResult });
+      }
+      debugResult.contact = {
+        id: contactResult.contact.id,
+        email: contactResult.contact.email,
+        tenantId: contactResult.tenantId,
+        emailsOpened: contactResult.contact.emailsOpened || 0
+      };
+      debugResult.steps.push("✅ Contact found");
+      
+      // Step 3: Simulate webhook processing
+      debugResult.steps.push("Step 3: Simulating webhook processing");
+      
+      // Create test tags like the actual system would
+      const testTags = [
+        `newsletter-${newsletterId}`,
+        'newsletter',
+        newsletter.title,
+        { name: 'groupUUID', value: `debug-group-${Date.now()}` },
+        { name: 'newsletter_id', value: `newsletter-${newsletterId}` }
+      ];
+      
+      debugResult.webhookProcessing = {
+        tags: testTags,
+        extractedNewsletterIds: [],
+        tagProcessing: []
+      };
+      
+      // Test tag extraction logic from the actual webhook
+      let extractedNewsletterId = null;
+      for (const tag of testTags) {
+        if (typeof tag === 'object' && tag !== null) {
+          const tagValue = tag.value || tag.name || '';
+          const tagName = tag.name || '';
+          
+          if (tagName === 'newsletter_id' && tag.value) {
+            extractedNewsletterId = tag.value.replace('newsletter-', '');
+            debugResult.webhookProcessing.tagProcessing.push(`✅ Found newsletter ID in object tag (name field): ${extractedNewsletterId}`);
+          } else if (tagValue.startsWith('newsletter-')) {
+            extractedNewsletterId = tagValue.replace('newsletter-', '');
+            debugResult.webhookProcessing.tagProcessing.push(`✅ Found newsletter ID in object tag (value field): ${extractedNewsletterId}`);
+          }
+        } else if (typeof tag === 'string') {
+          if (tag.startsWith('newsletter-')) {
+            extractedNewsletterId = tag.replace('newsletter-', '');
+            debugResult.webhookProcessing.tagProcessing.push(`✅ Found newsletter ID in string tag: ${extractedNewsletterId}`);
+          }
+        }
+      }
+      
+      debugResult.webhookProcessing.extractedNewsletterIds.push(extractedNewsletterId);
+      
+      if (!extractedNewsletterId) {
+        debugResult.steps.push("❌ Could not extract newsletter ID from tags");
+        return res.json({ error: "Newsletter ID extraction failed", debug: debugResult });
+      }
+      
+      if (extractedNewsletterId !== newsletterId) {
+        debugResult.steps.push(`❌ Extracted newsletter ID (${extractedNewsletterId}) doesn't match expected (${newsletterId})`);
+        return res.json({ error: "Newsletter ID mismatch", debug: debugResult });
+      }
+      
+      debugResult.steps.push("✅ Newsletter ID extraction successful");
+      
+      // Step 4: Test database update
+      debugResult.steps.push("Step 4: Testing database update");
+      
+      const originalOpenCount = newsletter.openCount || 0;
+      const newOpenCount = originalOpenCount + 1;
+      
+      try {
+        const updatedNewsletter = await storage.updateNewsletter(newsletterId, {
+          openCount: newOpenCount
+        }, tenantId);
+        
+        if (updatedNewsletter) {
+          debugResult.steps.push(`✅ Newsletter updated successfully: openCount ${originalOpenCount} → ${newOpenCount}`);
+          debugResult.finalCounts = {
+            original: originalOpenCount,
+            updated: newOpenCount,
+            success: true
+          };
+        } else {
+          debugResult.steps.push("❌ Newsletter update returned null/undefined");
+          debugResult.finalCounts = { success: false, reason: "Update returned null" };
+        }
+      } catch (updateError) {
+        debugResult.steps.push(`❌ Newsletter update failed: ${updateError.message}`);
+        debugResult.finalCounts = { success: false, reason: updateError.message };
+      }
+      
+      // Step 5: Create activity record
+      debugResult.steps.push("Step 5: Creating activity record");
+      
+      try {
+        const activityData = {
+          contactId: contactResult.contact.id,
+          activityType: 'opened' as any,
+          activityData: JSON.stringify({
+            newsletterId: newsletterId,
+            subject: newsletter.subject,
+            tags: testTags,
+            debug: true
+          }),
+          userAgent: 'Debug-Agent/1.0',
+          ipAddress: '127.0.0.1',
+          webhookId: `debug-webhook-${Date.now()}`,
+          webhookData: JSON.stringify({ type: 'email.opened', debug: true }),
+          occurredAt: new Date(),
+        };
+        
+        const activity = await storage.createEmailActivity(activityData, contactResult.tenantId);
+        debugResult.steps.push(`✅ Activity record created: ${activity.id}`);
+      } catch (activityError) {
+        debugResult.steps.push(`❌ Activity creation failed: ${activityError.message}`);
+      }
+      
+      res.json({ message: "Debug flow completed", debug: debugResult });
+      
+    } catch (error) {
+      console.error("Debug webhook flow error:", error);
+      res.status(500).json({ error: "Internal server error", message: error.message });
     }
   });
 

@@ -134,5 +134,65 @@ The Email Activity Timeline provides comprehensive webhook-based email event tra
 - **Visual Indicators**: "Filtered" badge and highlighted button state when date filters are active
 - **Technical Implementation**: Complete TypeScript compatibility with proper activity type mapping and error handling
 
-*Last Updated: August 13, 2025*
+### Multi-Provider Email System with Advanced Rate Limiting (August 16, 2025)
+- **Multi-Provider Architecture**: Implemented comprehensive email provider management system supporting multiple email services
+- **Advanced Rate Limiting**: 
+  - Token bucket rate limiter for precise request control (2 requests/second for Resend)
+  - Sliding window rate limiter alternative for more granular control
+  - Automatic rate limit detection and queue management
+- **Intelligent Retry Logic**: 
+  - 429 error handling with 5-second delay and retry
+  - Maximum 5 retries per email, then hourly retry schedule
+  - Exponential backoff with jitter for non-rate-limit errors
+  - Provider failover for high availability
+- **Email Queue System**: 
+  - In-memory queue with automatic processing
+  - Batch email support with configurable delays
+  - Queue status monitoring and statistics
+  - Automatic cleanup of old email records
+- **Provider Management**: 
+  - Priority-based provider selection
+  - Health checks and status monitoring
+  - Dynamic provider configuration and registration
+  - Resend provider optimized for specific rate limits
+- **Monitoring and Observability**: 
+  - Real-time email system status endpoints
+  - Queue monitoring and statistics
+  - Provider health checks and performance metrics
+  - Comprehensive logging and error tracking
+- **Backward Compatibility**: 
+  - Enhanced service with legacy fallback
+  - Configurable via environment variables
+  - Seamless integration with existing email workflows
+- **API Endpoints**: 
+  - `/api/email/status` - System status and health
+  - `/api/email/queue/status` - Queue monitoring
+  - `/api/email/send` - Custom email sending
+  - `/api/email/send/batch` - Batch email processing
+  - `/api/email/providers` - Provider information
+
+### UUID-Based Newsletter Group Tracking (August 18, 2025)
+- **GroupUUID Implementation**: Enhanced newsletter email tracking with unique group identifiers for each newsletter batch
+- **Improved Webhook Processing**: 
+  - Priority-based tracking system: groupUUID tags (primary) → newsletter ID (fallback) → subject parsing (last resort)
+  - Tags-based extraction from Resend webhooks since metadata is not included in webhook responses
+  - Enhanced debugging and logging for webhook processing with tracking method identification
+- **Email Tags Enhancement**: 
+  - All newsletter emails now include `groupUUID-{uuid}` as a tag sent to Resend
+  - Crypto.randomUUID() generation for unique batch identification per newsletter submission
+  - Utilizes Resend's tags feature which are always included in webhook payloads
+  - Backward compatibility with existing newsletter ID tracking methods
+- **Real-time Engagement Updates**: 
+  - Auto-refresh functionality (10-second intervals) for sent newsletters in view page
+  - Live engagement metrics updates (opens, clicks, recipient counts) via webhook processing
+- **Testing Framework**: 
+  - Updated webhook test script with groupUUID simulation capability
+  - Comprehensive test scenarios including sent, delivered, opened, clicked, and bounced events
+  - Realistic engagement simulation (60% open rate, 33% CTR) for testing newsletter performance tracking
+- **Enhanced Logging**: 
+  - Detailed webhook processing logs showing groupUUID vs fallback tracking method usage
+  - Newsletter engagement tracking confirmation with groupUUID and newsletter ID correlation
+  - Improved debugging capabilities for webhook data structure analysis
+
+*Last Updated: August 18, 2025*
 ```

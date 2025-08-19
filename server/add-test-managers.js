@@ -9,7 +9,7 @@ async function addTestManagers() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: 'test@example.com',
+        email: 'dan@zendwise.com',
         password: 'password123'
       })
     });

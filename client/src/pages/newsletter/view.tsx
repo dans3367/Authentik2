@@ -1,5 +1,5 @@
 import { useParams, useLocation, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { 
   ArrowLeft,
@@ -31,24 +31,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format, formatDistanceToNow } from "date-fns";
-import type { NewsletterWithUser } from "@shared/schema";
+import type { NewsletterWithUser, NewsletterTaskStatus } from "@shared/schema";
 
-// Temporal status data - integrates with Go Temporal worker system
-// Available workflows: EmailWorkflow, ScheduledEmailWorkflow, ReviewerApprovalEmailWorkflow
-interface TaskStatus {
-  id: string;
-  type: 'validation' | 'processing' | 'sending' | 'analytics';
-  name: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  progress?: number;
-  startedAt?: Date;
-  completedAt?: Date;
-  duration?: number;
-  details?: string;
-  error?: string;
-}
+// Using real task status data from backend via NewsletterTaskStatus type
 
 interface TimelineEvent {
   id: string;
@@ -66,7 +53,7 @@ export default function NewsletterViewPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("overview");
 
-  // Fetch newsletter data
+  // Fetch newsletter data with auto-refresh every 10 seconds for sent newsletters
   const { data: newsletterData, isLoading } = useQuery<{ newsletter: NewsletterWithUser }>({
     queryKey: ['/api/newsletters', id],
     queryFn: async () => {
@@ -74,54 +61,41 @@ export default function NewsletterViewPage() {
       return response.json();
     },
     enabled: !!id,
+    refetchInterval: (data) => {
+      // Auto-refresh every 10 seconds if newsletter is sent to get latest engagement metrics
+      return data?.newsletter?.status === 'sent' ? 10000 : false;
+    },
   });
 
   const newsletter = newsletterData?.newsletter;
 
-  // Mock task status data - in real implementation this would be fetched from temporal/backend
-  const mockTaskStatuses: TaskStatus[] = [
-    {
-      id: '1',
-      type: 'validation',
-      name: 'Content Validation',
-      status: newsletter?.status === 'draft' ? 'completed' : 'completed',
-      progress: 100,
-      startedAt: newsletter?.createdAt ? new Date(newsletter.createdAt) : new Date(),
-      completedAt: newsletter?.createdAt ? new Date(Date.now() - 2000) : new Date(),
-      duration: 2000,
-      details: 'Content structure and HTML validated successfully'
+  // Fetch task status data
+  const { data: taskStatusData, isLoading: isTaskStatusLoading } = useQuery<{ taskStatuses: NewsletterTaskStatus[] }>({
+    queryKey: ['/api/newsletters', id, 'task-status'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/newsletters/${id}/task-status`);
+      return response.json();
     },
-    {
-      id: '2',
-      type: 'processing',
-      name: 'Template Processing',
-      status: newsletter?.status === 'draft' ? 'completed' : newsletter?.status === 'scheduled' ? 'running' : 'completed',
-      progress: newsletter?.status === 'scheduled' ? 65 : 100,
-      startedAt: newsletter?.updatedAt ? new Date(newsletter.updatedAt) : new Date(),
-      completedAt: newsletter?.status === 'sent' ? new Date(Date.now() - 5000) : undefined,
-      duration: newsletter?.status === 'sent' ? 5000 : undefined,
-      details: newsletter?.status === 'scheduled' ? 'Processing email template and recipient list...' : 'Template processing completed'
+    enabled: !!id,
+  });
+
+  // Initialize tasks if they don't exist
+  const initializeTasksMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', `/api/newsletters/${id}/initialize-tasks`);
+      return response.json();
     },
-    {
-      id: '3',
-      type: 'sending',
-      name: 'Email Delivery',
-      status: newsletter?.status === 'sent' ? 'completed' : newsletter?.status === 'scheduled' ? 'pending' : 'pending',
-      progress: newsletter?.status === 'sent' ? 100 : 0,
-      startedAt: newsletter?.sentAt ? new Date(newsletter.sentAt) : undefined,
-      completedAt: newsletter?.sentAt ? new Date(newsletter.sentAt) : undefined,
-      duration: newsletter?.sentAt ? 8000 : undefined,
-      details: newsletter?.status === 'sent' ? `Delivered to ${newsletter.recipientCount} recipients` : 'Waiting for scheduled send time'
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters', id, 'task-status'] });
     },
-    {
-      id: '4',
-      type: 'analytics',
-      name: 'Analytics Collection',
-      status: newsletter?.status === 'sent' ? 'running' : 'pending',
-      progress: newsletter?.status === 'sent' ? 45 : 0,
-      details: newsletter?.status === 'sent' ? 'Collecting engagement metrics...' : 'Will start after email delivery'
-    }
-  ];
+  });
+
+  const taskStatuses = taskStatusData?.taskStatuses || [];
+
+  // Initialize tasks if no task statuses exist
+  if (newsletter && taskStatuses.length === 0 && !isTaskStatusLoading && !initializeTasksMutation.isPending) {
+    initializeTasksMutation.mutate();
+  }
 
   // Mock timeline events
   const mockTimelineEvents: TimelineEvent[] = [
@@ -184,7 +158,7 @@ export default function NewsletterViewPage() {
     );
   };
 
-  const getTaskStatusIcon = (status: TaskStatus['status']) => {
+  const getTaskStatusIcon = (status: NewsletterTaskStatus['status']) => {
     switch (status) {
       case 'completed':
         return <CheckCircle className="h-4 w-4 text-green-500" />;
@@ -224,6 +198,73 @@ export default function NewsletterViewPage() {
         return 'bg-red-500';
       default:
         return 'bg-blue-500';
+    }
+  };
+
+  // Helper functions for the new 3-step task status workflow
+  const getTaskStepStatus = (stepKey: 'validation' | 'delivery' | 'analytics') => {
+    if (!newsletter) return 'pending';
+    
+    switch (stepKey) {
+      case 'validation':
+        // Content validation completes immediately for sent newsletters, or runs for scheduled
+        if (newsletter.status === 'sent') return 'completed';
+        if (newsletter.status === 'scheduled') return 'running';
+        return 'pending';
+        
+      case 'delivery':
+        // Email delivery is completed if newsletter is sent
+        if (newsletter.status === 'sent') return 'completed';
+        if (newsletter.status === 'scheduled') return 'pending';
+        return 'pending';
+        
+      case 'analytics':
+        if (!newsletter.sentAt) return 'pending';
+        
+        // Check if 24 hours have passed since sending
+        const sentTime = new Date(newsletter.sentAt);
+        const now = new Date();
+        const hoursSinceSent = (now.getTime() - sentTime.getTime()) / (1000 * 60 * 60);
+        
+        if (hoursSinceSent >= 24) return 'completed';
+        if (newsletter.status === 'sent') return 'running';
+        return 'pending';
+        
+      default:
+        return 'pending';
+    }
+  };
+
+  const getCurrentTaskStep = () => {
+    if (!newsletter) return 1;
+    
+    if (newsletter.status === 'draft') return 1;
+    if (newsletter.status === 'scheduled') return 1;
+    if (newsletter.status === 'sent') {
+      // Check analytics completion
+      if (getTaskStepStatus('analytics') === 'completed') return 4; // All done
+      return 3; // Analytics in progress
+    }
+    return 1;
+  };
+
+  const getAnalyticsTimeRemaining = () => {
+    if (!newsletter?.sentAt) return 'N/A';
+    
+    const sentTime = new Date(newsletter.sentAt);
+    const completionTime = new Date(sentTime.getTime() + (24 * 60 * 60 * 1000)); // 24 hours later
+    const now = new Date();
+    
+    if (now >= completionTime) return 'Complete';
+    
+    const msRemaining = completionTime.getTime() - now.getTime();
+    const hoursRemaining = Math.floor(msRemaining / (1000 * 60 * 60));
+    const minutesRemaining = Math.floor((msRemaining % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (hoursRemaining > 0) {
+      return `${hoursRemaining}h ${minutesRemaining}m`;
+    } else {
+      return `${minutesRemaining}m`;
     }
   };
 
@@ -590,64 +631,179 @@ export default function NewsletterViewPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <RefreshCw className="h-5 w-5" />
-                Processing Status
+                Newsletter Processing Status
               </CardTitle>
               <CardDescription>
-                Real-time status of newsletter processing tasks
+                Track the progress of your newsletter through the delivery pipeline
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-6">
-                {mockTaskStatuses.map((task) => (
-                  <div key={task.id} className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {getTaskStatusIcon(task.status)}
-                        <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                            {task.name}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {task.details}
-                          </p>
+              {/* Progress Steps Indicator */}
+              <div className="mb-8">
+                <div className="flex items-center justify-between">
+                  {[
+                    { step: 1, title: 'Content Validation', key: 'validation', icon: CheckCircle, description: 'Validating content and checking for issues' },
+                    { step: 2, title: 'Email Delivery', key: 'delivery', icon: Send, description: 'Sending emails to recipients' },
+                    { step: 3, title: 'Analytics Collection', key: 'analytics', icon: BarChart3, description: 'Collecting engagement data (completed 24hrs after start)' }
+                  ].map((item, index) => {
+                    const isCompleted = getTaskStepStatus(item.key) === 'completed';
+                    const isActive = getTaskStepStatus(item.key) === 'running';
+                    const isPending = getTaskStepStatus(item.key) === 'pending';
+                    const Icon = item.icon;
+                    
+                    return (
+                      <div key={item.key} className="flex items-center">
+                        {index > 0 && (
+                          <div className="w-8 h-0.5 bg-gray-200 dark:bg-gray-700 mr-4">
+                            <div 
+                              className={`h-full transition-all duration-300 ${
+                                isCompleted || getCurrentTaskStep() > item.step ? 'bg-green-500 w-full' : 'bg-transparent w-0'
+                              }`}
+                            />
+                          </div>
+                        )}
+                        <div className="flex flex-col items-center text-center min-w-0">
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-medium transition-colors mb-2 ${
+                            isCompleted
+                              ? 'bg-green-500 text-white'
+                              : isActive
+                              ? 'bg-blue-500 text-white'
+                              : isPending
+                              ? 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                              : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
+                          }`}>
+                            {isCompleted ? (
+                              <CheckCircle className="w-6 h-6" />
+                            ) : isActive ? (
+                              <RefreshCw className="w-5 h-5 animate-spin" />
+                            ) : (
+                              <Icon className="w-5 h-5" />
+                            )}
+                          </div>
+                          <div className="max-w-[120px]">
+                            <p className={`text-sm font-medium mb-1 ${
+                              isActive
+                                ? 'text-gray-900 dark:text-gray-100'
+                                : 'text-gray-600 dark:text-gray-400'
+                            }`}>
+                              {item.title}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-500 leading-tight">
+                              {item.description}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          {task.status === 'running' ? `${task.progress}%` : 
-                           task.status === 'completed' ? 'Done' :
-                           task.status === 'failed' ? 'Failed' : 'Pending'}
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Detailed Status Cards */}
+              <div className="space-y-4">
+                {/* Content Validation */}
+                <div className="border rounded-lg p-4 bg-gray-50/50 dark:bg-gray-800/30">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      {getTaskStepStatus('validation') === 'completed' ? (
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                      ) : getTaskStepStatus('validation') === 'running' ? (
+                        <RefreshCw className="h-5 w-5 text-blue-500 animate-spin" />
+                      ) : (
+                        <Clock className="h-5 w-5 text-gray-400" />
+                      )}
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          Content Validation
+                        </h4>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Checking content quality, links, and compliance
                         </p>
-                        {task.duration && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {(task.duration / 1000).toFixed(1)}s
-                          </p>
-                        )}
                       </div>
                     </div>
-                    
-                    {task.status === 'running' && task.progress && (
-                      <Progress value={task.progress} className="h-2" />
-                    )}
-                    
-                    {task.error && (
-                      <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                        <p className="text-sm text-red-800 dark:text-red-200">
-                          {task.error}
-                        </p>
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                      {task.startedAt && (
-                        <span>Started: {format(task.startedAt, 'HH:mm:ss')}</span>
-                      )}
-                      {task.completedAt && (
-                        <span>Completed: {format(task.completedAt, 'HH:mm:ss')}</span>
-                      )}
-                    </div>
+                    <Badge variant={
+                      getTaskStepStatus('validation') === 'completed' ? 'default' :
+                      getTaskStepStatus('validation') === 'running' ? 'secondary' : 'outline'
+                    }>
+                      {getTaskStepStatus('validation') === 'completed' ? 'Completed' :
+                       getTaskStepStatus('validation') === 'running' ? 'In Progress' : 'Pending'}
+                    </Badge>
                   </div>
-                ))}
+                  {getTaskStepStatus('validation') === 'running' && (
+                    <Progress value={75} className="h-2" />
+                  )}
+                </div>
+
+                {/* Email Delivery */}
+                <div className="border rounded-lg p-4 bg-gray-50/50 dark:bg-gray-800/30">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      {getTaskStepStatus('delivery') === 'completed' ? (
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                      ) : getTaskStepStatus('delivery') === 'running' ? (
+                        <RefreshCw className="h-5 w-5 text-blue-500 animate-spin" />
+                      ) : (
+                        <Clock className="h-5 w-5 text-gray-400" />
+                      )}
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          Email Delivery
+                        </h4>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Sending newsletter to {newsletter.recipientCount || 0} recipients
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant={
+                      getTaskStepStatus('delivery') === 'completed' ? 'default' :
+                      getTaskStepStatus('delivery') === 'running' ? 'secondary' : 'outline'
+                    }>
+                      {getTaskStepStatus('delivery') === 'completed' ? 'Completed' :
+                       getTaskStepStatus('delivery') === 'running' ? 'In Progress' : 'Pending'}
+                    </Badge>
+                  </div>
+                  {getTaskStepStatus('delivery') === 'running' && (
+                    <Progress value={45} className="h-2" />
+                  )}
+                </div>
+
+                {/* Analytics Collection */}
+                <div className="border rounded-lg p-4 bg-gray-50/50 dark:bg-gray-800/30">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      {getTaskStepStatus('analytics') === 'completed' ? (
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                      ) : getTaskStepStatus('analytics') === 'running' ? (
+                        <RefreshCw className="h-5 w-5 text-blue-500 animate-spin" />
+                      ) : (
+                        <Clock className="h-5 w-5 text-gray-400" />
+                      )}
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          Analytics Collection
+                        </h4>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Gathering engagement data - completes 24 hours after sending
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant={
+                      getTaskStepStatus('analytics') === 'completed' ? 'default' :
+                      getTaskStepStatus('analytics') === 'running' ? 'secondary' : 'outline'
+                    }>
+                      {getTaskStepStatus('analytics') === 'completed' ? 'Completed' :
+                       getTaskStepStatus('analytics') === 'running' ? 'Collecting Data' : 'Pending'}
+                    </Badge>
+                  </div>
+                  {getTaskStepStatus('analytics') === 'running' && (
+                    <div className="space-y-2">
+                      <Progress value={65} className="h-2" />
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {newsletter.sentAt && `Time remaining: ${getAnalyticsTimeRemaining()}`}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
