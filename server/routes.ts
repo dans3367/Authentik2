@@ -4126,7 +4126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[Webhook] Retrying webhook processing for ResendID: ${resendId}`);
         
         try {
-          const GO_SERVER_URL = process.env.GO_EMAIL_SERVER_URL || 'http://localhost:8095';
+          const GO_SERVER_URL = process.env.GO_SERVER_URL || process.env.GO_EMAIL_SERVER_URL || 'https://tengine.zendwise.work';
           const accessToken = process.env.EMAIL_TRACKING_TOKEN || process.env.JWT_SECRET || 'Cvgii9bYKF1HtfD8TODRyZFTmFP4vu70oR59YrjGVpS2fXzQ41O3UPRaR8u9uAqNhwK5ZxZPbX5rAOlMrqe8ag==';
           
           // Try ResendID lookup again
@@ -4159,48 +4159,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
   async function updateNewsletterStats(newsletterId: string, webhookType: string, tenantId: string) {
     try {
       console.log(`[Webhook] Attempting to update newsletter stats:`, { newsletterId, webhookType, tenantId });
-      
-      if (webhookType === 'email.opened') {
-        console.log(`[Webhook] Processing email open event for newsletter ${newsletterId}`);
-        const newsletter = await storage.getNewsletter(newsletterId, tenantId);
-        if (newsletter) {
-          const newOpenCount = (newsletter.openCount || 0) + 1;
-          console.log(`[Webhook] Found newsletter, updating openCount from ${newsletter.openCount || 0} to ${newOpenCount}`);
-          
-          const updatedNewsletter = await storage.updateNewsletter(newsletterId, {
-            openCount: newOpenCount
-          }, tenantId);
-          
-          if (updatedNewsletter) {
-            console.log(`[Webhook] ✅ Successfully updated newsletter ${newsletterId} openCount to ${newOpenCount}`);
+
+      // Helper to perform the update for a resolved tenant/newsletter
+      const performUpdate = async (resolvedTenantId: string) => {
+        if (webhookType === 'email.opened') {
+          console.log(`[Webhook] Processing email open event for newsletter ${newsletterId}`);
+          const newsletter = await storage.getNewsletter(newsletterId, resolvedTenantId);
+          if (newsletter) {
+            const newOpenCount = (newsletter.openCount || 0) + 1;
+            console.log(`[Webhook] Found newsletter, updating openCount from ${newsletter.openCount || 0} to ${newOpenCount}`);
+
+            const updatedNewsletter = await storage.updateNewsletter(newsletterId, { openCount: newOpenCount }, resolvedTenantId);
+            if (updatedNewsletter) {
+              console.log(`[Webhook] ✅ Updated newsletter ${newsletterId} openCount to ${newOpenCount} (tenant: ${resolvedTenantId})`);
+            } else {
+              console.error(`[Webhook] ❌ Failed to update newsletter ${newsletterId} - update returned null/undefined (tenant: ${resolvedTenantId})`);
+            }
           } else {
-            console.error(`[Webhook] ❌ Failed to update newsletter ${newsletterId} - update returned null/undefined`);
+            console.error(`[Webhook] ❌ Newsletter ${newsletterId} not found in tenant ${resolvedTenantId}`);
+          }
+        } else if (webhookType === 'email.clicked') {
+          console.log(`[Webhook] Processing email click event for newsletter ${newsletterId}`);
+          const newsletter = await storage.getNewsletter(newsletterId, resolvedTenantId);
+          if (newsletter) {
+            const newClickCount = (newsletter.clickCount || 0) + 1;
+            console.log(`[Webhook] Found newsletter, updating clickCount from ${newsletter.clickCount || 0} to ${newClickCount}`);
+
+            const updatedNewsletter = await storage.updateNewsletter(newsletterId, { clickCount: newClickCount }, resolvedTenantId);
+            if (updatedNewsletter) {
+              console.log(`[Webhook] ✅ Updated newsletter ${newsletterId} clickCount to ${newClickCount} (tenant: ${resolvedTenantId})`);
+            } else {
+              console.error(`[Webhook] ❌ Failed to update newsletter ${newsletterId} - update returned null/undefined (tenant: ${resolvedTenantId})`);
+            }
+          } else {
+            console.error(`[Webhook] ❌ Newsletter ${newsletterId} not found in tenant ${resolvedTenantId}`);
           }
         } else {
-          console.error(`[Webhook] ❌ Newsletter ${newsletterId} not found in tenant ${tenantId}`);
+          console.log(`[Webhook] Ignoring webhook event ${webhookType} - not relevant for newsletter stats`);
         }
-      } else if (webhookType === 'email.clicked') {
-        console.log(`[Webhook] Processing email click event for newsletter ${newsletterId}`);
-        const newsletter = await storage.getNewsletter(newsletterId, tenantId);
-        if (newsletter) {
-          const newClickCount = (newsletter.clickCount || 0) + 1;
-          console.log(`[Webhook] Found newsletter, updating clickCount from ${newsletter.clickCount || 0} to ${newClickCount}`);
-          
-          const updatedNewsletter = await storage.updateNewsletter(newsletterId, {
-            clickCount: newClickCount
-          }, tenantId);
-          
-          if (updatedNewsletter) {
-            console.log(`[Webhook] ✅ Successfully updated newsletter ${newsletterId} clickCount to ${newClickCount}`);
-          } else {
-            console.error(`[Webhook] ❌ Failed to update newsletter ${newsletterId} - update returned null/undefined`);
-          }
-        } else {
-          console.error(`[Webhook] ❌ Newsletter ${newsletterId} not found in tenant ${tenantId}`);
-        }
-      } else {
-        console.log(`[Webhook] Ignoring webhook event ${webhookType} - not relevant for newsletter stats`);
+      };
+
+      // First try with provided tenantId
+      const existsInTenant = await storage.getNewsletter(newsletterId, tenantId);
+      if (existsInTenant) {
+        await performUpdate(tenantId);
+        return;
       }
+
+      // Fallback: resolve the correct tenant for this newsletter ID across tenants
+      console.warn(`[Webhook] Newsletter ${newsletterId} not found in provided tenant ${tenantId}. Attempting cross-tenant lookup.`);
+      const crossTenantNewsletter = await storage.getNewsletterById(newsletterId);
+      if (crossTenantNewsletter) {
+        console.warn(`[Webhook] Resolved newsletter tenant as ${crossTenantNewsletter.tenantId}. Proceeding with update.`);
+        await performUpdate(crossTenantNewsletter.tenantId);
+        return;
+      }
+
+      console.error(`[Webhook] ❌ Newsletter ${newsletterId} not found in any tenant`);
     } catch (error) {
       console.error(`[Webhook] Error updating newsletter stats for ${newsletterId}:`, error);
       console.error(`[Webhook] Error context:`, { newsletterId, webhookType, tenantId });
@@ -4374,49 +4389,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Find contact across all tenants (since webhook doesn't include tenant info)
       console.log("[Webhook] Looking up contact for email:", email);
       
-      // Try exact match first
-      let contactResult = await storage.findEmailContactByEmail(email);
-      
-      // If not found, try case-insensitive search
-      if (!contactResult && email) {
-        console.log("[Webhook] Exact match not found, trying case-insensitive search...");
-        contactResult = await storage.findEmailContactByEmail(email.toLowerCase());
+      // Debug: Show all contacts in the database for comparison
+      try {
+        console.log("[Webhook] DEBUG - Fetching all contacts for comparison...");
+        // This is a debug query - in production, you'd want to limit this
+        const allContacts = await storage.getAllEmailContactsDebug();
+        console.log(`[Webhook] DEBUG - Found ${allContacts.length} total contacts in database:`);
+        allContacts.slice(0, 10).forEach((contact, i) => {
+          console.log(`[Webhook] DEBUG - ${i + 1}. "${contact.email}" (tenant: ${contact.tenantId})`);
+        });
+        
+        if (allContacts.length === 0) {
+          console.log("[Webhook] DEBUG - NO CONTACTS IN DATABASE! This explains why webhook is failing.");
+          console.log("[Webhook] SOLUTION: You need to add email contacts to the system before sending newsletters.");
+          console.log("=".repeat(80));
+          return res.status(404).json({ 
+            message: "Contact not found", 
+            debug: "No contacts exist in database. Add contacts before sending newsletters." 
+          });
+        }
+      } catch (debugError) {
+        console.log("[Webhook] DEBUG query failed:", debugError);
       }
+      
+      // Try to find the contact
+      let contactResult = await storage.findEmailContactByEmail(email);
       
       if (!contactResult) {
         console.log(`[Webhook] CONTACT NOT FOUND for email: ${email}`);
-        console.log("[Webhook] Tried both exact match and lowercase versions");
+        console.log("[Webhook] Available emails in database (first 10):");
         
-        // Debug: Check if the storage method is working correctly
-        console.log("[Webhook] DEBUG - findEmailContactByEmail method test:");
-        console.log(`[Webhook] - Original email: "${email}"`);
-        console.log(`[Webhook] - Lowercase email: "${email.toLowerCase()}"`);
-        console.log(`[Webhook] - Email length: ${email.length}`);
-        console.log(`[Webhook] - Email type: ${typeof email}`);
-        
-        // Try some debug variations of the email
+        // Show what emails are actually in the database
         try {
-          console.log("[Webhook] DEBUG - Testing email variations...");
-          const trimmedEmail = email.trim();
-          const trimmedResult = await storage.findEmailContactByEmail(trimmedEmail);
-          console.log(`[Webhook] - Trimmed email "${trimmedEmail}" result:`, trimmedResult ? "FOUND" : "NOT FOUND");
-          
-          if (trimmedResult) {
-            contactResult = trimmedResult; // Use the trimmed result
-          }
-        } catch (dbError) {
-          console.log("[Webhook] DEBUG email variation test failed:", dbError);
+          const allContacts = await storage.getAllEmailContactsDebug();
+          const emailList = allContacts.slice(0, 10).map(c => c.email);
+          emailList.forEach((dbEmail, i) => {
+            const matches = dbEmail.toLowerCase() === email.toLowerCase();
+            console.log(`[Webhook] - ${i + 1}. "${dbEmail}" ${matches ? '← MATCH!' : ''}`);
+          });
+        } catch (err) {
+          console.log("[Webhook] Could not fetch contact list for comparison");
         }
         
-        // Check if any of the debug attempts found the contact
-        if (!contactResult) {
-          console.log("[Webhook] This email is not in our contact database");
-          console.log("[Webhook] Request processing terminated - contact not found");
-          console.log("=".repeat(80));
-          return res.status(404).json({ message: "Contact not found" });
-        } else {
-          console.log("[Webhook] ✅ Contact found via debug attempts!");
-        }
+        console.log("[Webhook] Request processing terminated - contact not found");
+        console.log("=".repeat(80));
+        return res.status(404).json({ 
+          message: "Contact not found",
+          debug: `Email '${email}' is not in the contacts database. Add this contact first.`
+        });
       }
       
       console.log("[Webhook] ✅ Contact found:", contactResult.contact.id, "in tenant:", contactResult.tenantId);
@@ -4451,7 +4471,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (resendId) {
         try {
           // Try to update the Go email tracking system
-          const GO_SERVER_URL = process.env.GO_EMAIL_SERVER_URL || 'http://localhost:8095';
+          const GO_SERVER_URL = process.env.GO_SERVER_URL || process.env.GO_EMAIL_SERVER_URL || 'https://tengine.zendwise.work';
           const accessToken = process.env.EMAIL_TRACKING_TOKEN || process.env.JWT_SECRET || 'Cvgii9bYKF1HtfD8TODRyZFTmFP4vu70oR59YrjGVpS2fXzQ41O3UPRaR8u9uAqNhwK5ZxZPbX5rAOlMrqe8ag==';
           
           console.log(`[Webhook] Looking up email tracking by ResendID: ${resendId}`);
@@ -4555,46 +4575,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Priority 1: Look for groupUUID and newsletter ID in tags
-      // Resend returns tags as key-value objects, not strings
-      const tagsArray = data.tags || [];
+      // Resend can send tags as either an array OR a direct object
+      const tags = data.tags || [];
       
-      if (Array.isArray(tagsArray)) {
-        // Tags can be either strings (old format) or objects (new format from Resend)
-        for (const tag of tagsArray) {
-          // Handle object format (what Resend actually returns)
+      console.log(`[Webhook] Tags type: ${Array.isArray(tags) ? 'array' : typeof tags}`);
+      console.log(`[Webhook] Tags content:`, JSON.stringify(tags, null, 2));
+      
+      // Handle direct object format (what Resend actually sends)
+      if (typeof tags === 'object' && !Array.isArray(tags) && tags !== null) {
+        console.log(`[Webhook] Processing tags as direct object`);
+        
+        // Direct object access - much simpler!
+        if (tags.groupUUID) {
+          groupUUID = tags.groupUUID;
+          console.log(`[Webhook] Found groupUUID in tags (direct object): ${groupUUID}`);
+        }
+        
+        if (tags.newsletter_id) {
+          // Remove 'newsletter-' prefix if present
+          newsletterId = tags.newsletter_id.replace('newsletter-', '');
+          console.log(`[Webhook] Found newsletter ID in tags (direct object): ${newsletterId}`);
+        }
+      }
+      // Handle array format (fallback for different webhook formats)
+      else if (Array.isArray(tags)) {
+        console.log(`[Webhook] Processing tags as array`);
+        
+        for (const tag of tags) {
+          // Handle object format within array
           if (typeof tag === 'object' && tag !== null) {
-            // Resend returns tags as objects with various formats
-            // Check the tag name or value for patterns
             const tagValue = tag.value || tag.name || '';
             const tagName = tag.name || '';
             
             // Check for groupUUID
             if (tagName === 'groupUUID' && tag.value) {
               groupUUID = tag.value;
-              console.log(`[Webhook] Found groupUUID in tags (object format, name field): ${groupUUID}`);
+              console.log(`[Webhook] Found groupUUID in array (object format, name field): ${groupUUID}`);
             } else if (tagValue.startsWith('groupUUID-')) {
               groupUUID = tagValue.replace('groupUUID-', '');
-              console.log(`[Webhook] Found groupUUID in tags (object format, value field): ${groupUUID}`);
+              console.log(`[Webhook] Found groupUUID in array (object format, value field): ${groupUUID}`);
             }
             
             // Check for newsletter ID
             if (tagName === 'newsletter_id' && tag.value) {
               newsletterId = tag.value.replace('newsletter-', '');
-              console.log(`[Webhook] Found newsletter ID in tags (object format, name field): ${newsletterId}`);
+              console.log(`[Webhook] Found newsletter ID in array (object format, name field): ${newsletterId}`);
             } else if (tagValue.startsWith('newsletter-')) {
               newsletterId = tagValue.replace('newsletter-', '');
-              console.log(`[Webhook] Found newsletter ID in tags (object format, value field): ${newsletterId}`);
+              console.log(`[Webhook] Found newsletter ID in array (object format, value field): ${newsletterId}`);
             }
           } 
-          // Handle string format (when tags come as plain strings)
+          // Handle string format within array
           else if (typeof tag === 'string') {
             if (tag.startsWith('groupUUID-')) {
               groupUUID = tag.replace('groupUUID-', '');
-              console.log(`[Webhook] Found groupUUID in tags (string format): ${groupUUID}`);
+              console.log(`[Webhook] Found groupUUID in array (string format): ${groupUUID}`);
             }
             if (tag.startsWith('newsletter-')) {
               newsletterId = tag.replace('newsletter-', '');
-              console.log(`[Webhook] Found newsletter ID in tags (string format): ${newsletterId}`);
+              console.log(`[Webhook] Found newsletter ID in array (string format): ${newsletterId}`);
             }
           }
         }
@@ -4931,14 +4970,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(`[Newsletter Send] Found ${recipients.length} recipients`);
-      
+
+      // CRITICAL FIX: Ensure all recipients exist as email contacts
+      // This is essential for webhook processing to work correctly
       if (recipients.length === 0) {
         console.log(`[Newsletter Send] No recipients found for newsletter ${id}`);
+        
+        // Helpful error message with solution
+        let suggestion = "";
+        if (newsletter.recipientType === 'all') {
+          suggestion = "Create email contacts first using the Email Contacts page.";
+        } else if (newsletter.recipientType === 'selected') {
+          suggestion = "Ensure the selected contact IDs exist and are valid.";
+        } else if (newsletter.recipientType === 'tags') {
+          suggestion = "Ensure contacts with the selected tags exist.";
+        }
+        
         return res.status(400).json({ 
           message: "No recipients found for this newsletter",
+          solution: suggestion,
           details: `Recipient type: ${newsletter.recipientType}, Selected contacts: ${Array.isArray(newsletter.selectedContactIds) ? newsletter.selectedContactIds.length : 0}, Selected tags: ${Array.isArray(newsletter.selectedTagIds) ? newsletter.selectedTagIds.length : 0}`
         });
       }
+
+
 
       // Validate recipients have valid email addresses
       const validRecipients = recipients.filter(r => r && r.email && typeof r.email === 'string' && r.email.includes('@'));
@@ -5268,7 +5323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Try to get tracking entries from Go server
-      const GO_SERVER_URL = process.env.GO_EMAIL_SERVER_URL || 'http://localhost:8095';
+      const GO_SERVER_URL = process.env.GO_SERVER_URL || process.env.GO_EMAIL_SERVER_URL || 'https://tengine.zendwise.work';
       const accessToken = req.headers.authorization?.replace('Bearer ', '');
       
       try {
@@ -5326,6 +5381,172 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Debug newsletter tracking error:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Enhanced debug endpoint for webhook processing
+  app.post("/api/debug/webhook-flow/:newsletterId", authenticateToken, async (req: any, res) => {
+    try {
+      const { newsletterId } = req.params;
+      const { contactEmail } = req.body;
+      const tenantId = req.user.tenantId;
+      
+      if (!contactEmail) {
+        return res.status(400).json({ error: "contactEmail is required" });
+      }
+      
+      console.log(`[Debug Webhook] Starting debug flow for newsletter ${newsletterId}, contact ${contactEmail}`);
+      
+      const debugResult = {
+        steps: [],
+        newsletter: null,
+        contact: null,
+        webhookProcessing: null,
+        finalCounts: null
+      };
+      
+      // Step 1: Find newsletter
+      debugResult.steps.push("Step 1: Looking up newsletter");
+      const newsletter = await storage.getNewsletter(newsletterId, tenantId);
+      if (!newsletter) {
+        debugResult.steps.push("❌ Newsletter not found");
+        return res.status(404).json({ error: "Newsletter not found", debug: debugResult });
+      }
+      debugResult.newsletter = {
+        id: newsletter.id,
+        title: newsletter.title,
+        openCount: newsletter.openCount || 0,
+        clickCount: newsletter.clickCount || 0
+      };
+      debugResult.steps.push("✅ Newsletter found");
+      
+      // Step 2: Find contact
+      debugResult.steps.push("Step 2: Looking up contact");
+      const contactResult = await storage.findEmailContactByEmail(contactEmail);
+      if (!contactResult) {
+        debugResult.steps.push("❌ Contact not found");
+        return res.status(404).json({ error: "Contact not found", debug: debugResult });
+      }
+      debugResult.contact = {
+        id: contactResult.contact.id,
+        email: contactResult.contact.email,
+        tenantId: contactResult.tenantId,
+        emailsOpened: contactResult.contact.emailsOpened || 0
+      };
+      debugResult.steps.push("✅ Contact found");
+      
+      // Step 3: Simulate webhook processing
+      debugResult.steps.push("Step 3: Simulating webhook processing");
+      
+      // Create test tags like the actual system would
+      const testTags = [
+        `newsletter-${newsletterId}`,
+        'newsletter',
+        newsletter.title,
+        { name: 'groupUUID', value: `debug-group-${Date.now()}` },
+        { name: 'newsletter_id', value: `newsletter-${newsletterId}` }
+      ];
+      
+      debugResult.webhookProcessing = {
+        tags: testTags,
+        extractedNewsletterIds: [],
+        tagProcessing: []
+      };
+      
+      // Test tag extraction logic from the actual webhook
+      let extractedNewsletterId = null;
+      for (const tag of testTags) {
+        if (typeof tag === 'object' && tag !== null) {
+          const tagValue = tag.value || tag.name || '';
+          const tagName = tag.name || '';
+          
+          if (tagName === 'newsletter_id' && tag.value) {
+            extractedNewsletterId = tag.value.replace('newsletter-', '');
+            debugResult.webhookProcessing.tagProcessing.push(`✅ Found newsletter ID in object tag (name field): ${extractedNewsletterId}`);
+          } else if (tagValue.startsWith('newsletter-')) {
+            extractedNewsletterId = tagValue.replace('newsletter-', '');
+            debugResult.webhookProcessing.tagProcessing.push(`✅ Found newsletter ID in object tag (value field): ${extractedNewsletterId}`);
+          }
+        } else if (typeof tag === 'string') {
+          if (tag.startsWith('newsletter-')) {
+            extractedNewsletterId = tag.replace('newsletter-', '');
+            debugResult.webhookProcessing.tagProcessing.push(`✅ Found newsletter ID in string tag: ${extractedNewsletterId}`);
+          }
+        }
+      }
+      
+      debugResult.webhookProcessing.extractedNewsletterIds.push(extractedNewsletterId);
+      
+      if (!extractedNewsletterId) {
+        debugResult.steps.push("❌ Could not extract newsletter ID from tags");
+        return res.json({ error: "Newsletter ID extraction failed", debug: debugResult });
+      }
+      
+      if (extractedNewsletterId !== newsletterId) {
+        debugResult.steps.push(`❌ Extracted newsletter ID (${extractedNewsletterId}) doesn't match expected (${newsletterId})`);
+        return res.json({ error: "Newsletter ID mismatch", debug: debugResult });
+      }
+      
+      debugResult.steps.push("✅ Newsletter ID extraction successful");
+      
+      // Step 4: Test database update
+      debugResult.steps.push("Step 4: Testing database update");
+      
+      const originalOpenCount = newsletter.openCount || 0;
+      const newOpenCount = originalOpenCount + 1;
+      
+      try {
+        const updatedNewsletter = await storage.updateNewsletter(newsletterId, {
+          openCount: newOpenCount
+        }, tenantId);
+        
+        if (updatedNewsletter) {
+          debugResult.steps.push(`✅ Newsletter updated successfully: openCount ${originalOpenCount} → ${newOpenCount}`);
+          debugResult.finalCounts = {
+            original: originalOpenCount,
+            updated: newOpenCount,
+            success: true
+          };
+        } else {
+          debugResult.steps.push("❌ Newsletter update returned null/undefined");
+          debugResult.finalCounts = { success: false, reason: "Update returned null" };
+        }
+      } catch (updateError) {
+        debugResult.steps.push(`❌ Newsletter update failed: ${updateError.message}`);
+        debugResult.finalCounts = { success: false, reason: updateError.message };
+      }
+      
+      // Step 5: Create activity record
+      debugResult.steps.push("Step 5: Creating activity record");
+      
+      try {
+        const activityData = {
+          contactId: contactResult.contact.id,
+          activityType: 'opened' as any,
+          activityData: JSON.stringify({
+            newsletterId: newsletterId,
+            subject: newsletter.subject,
+            tags: testTags,
+            debug: true
+          }),
+          userAgent: 'Debug-Agent/1.0',
+          ipAddress: '127.0.0.1',
+          webhookId: `debug-webhook-${Date.now()}`,
+          webhookData: JSON.stringify({ type: 'email.opened', debug: true }),
+          occurredAt: new Date(),
+        };
+        
+        const activity = await storage.createEmailActivity(activityData, contactResult.tenantId);
+        debugResult.steps.push(`✅ Activity record created: ${activity.id}`);
+      } catch (activityError) {
+        debugResult.steps.push(`❌ Activity creation failed: ${activityError.message}`);
+      }
+      
+      res.json({ message: "Debug flow completed", debug: debugResult });
+      
+    } catch (error) {
+      console.error("Debug webhook flow error:", error);
+      res.status(500).json({ error: "Internal server error", message: error.message });
     }
   });
 

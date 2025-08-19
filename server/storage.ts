@@ -238,6 +238,10 @@ export interface IStorage {
   
   // Newsletter operations (tenant-aware)
   getNewsletter(id: string, tenantId: string): Promise<Newsletter | undefined>;
+  // Cross-tenant lookup by ID (used for webhook fallbacks)
+  getNewsletterById(id: string): Promise<Newsletter | undefined>;
+  // Debug method to list all contacts (for debugging webhook issues)
+  getAllEmailContactsDebug(): Promise<{ email: string; tenantId: string; id: string }[]>;
   getNewsletterWithUser(id: string, tenantId: string): Promise<NewsletterWithUser | undefined>;
   getAllNewsletters(tenantId: string): Promise<NewsletterWithUser[]>;
   createNewsletter(newsletter: CreateNewsletterData, userId: string, tenantId: string): Promise<Newsletter>;
@@ -1904,6 +1908,28 @@ export class DatabaseStorage implements IStorage {
     return newsletter;
   }
 
+  async getNewsletterById(id: string): Promise<Newsletter | undefined> {
+    const [newsletter] = await db
+      .select()
+      .from(newsletters)
+      .where(eq(newsletters.id, id))
+      .limit(1);
+    return newsletter;
+  }
+
+  async getAllEmailContactsDebug(): Promise<{ email: string; tenantId: string; id: string }[]> {
+    const contacts = await db
+      .select({
+        id: emailContacts.id,
+        email: emailContacts.email,
+        tenantId: emailContacts.tenantId,
+      })
+      .from(emailContacts)
+      .limit(50); // Limit for debugging
+    
+    return contacts;
+  }
+
   async getNewsletterWithUser(id: string, tenantId: string): Promise<NewsletterWithUser | undefined> {
     const [result] = await db
       .select({
@@ -2255,13 +2281,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async findEmailContactByEmail(email: string): Promise<{ contact: EmailContact; tenantId: string } | undefined> {
+    // Normalize email for matching
+    const normalizedEmail = email.trim();
+
+    // Try exact match first, then case-insensitive match
     const [result] = await db
       .select({
         contact: emailContacts,
         tenantId: emailContacts.tenantId,
       })
       .from(emailContacts)
-      .where(eq(emailContacts.email, email))
+      .where(
+        or(
+          eq(emailContacts.email, normalizedEmail),
+          ilike(emailContacts.email, normalizedEmail)
+        )
+      )
       .limit(1);
     
     if (!result) return undefined;
