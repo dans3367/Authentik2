@@ -1,6 +1,6 @@
 # Temporal Email Worker System
 
-A comprehensive Temporal Go SDK worker system for handling email campaigns with Resend integration. This system provides reliable email sending with automatic retries, workflow orchestration, and real-time tracking.
+A comprehensive Temporal Go SDK worker system for handling email campaigns with Resend and Postmark integration. This system provides reliable email sending with automatic retries, workflow orchestration, and real-time tracking.
 
 ## Architecture
 
@@ -9,7 +9,9 @@ server-go/
 ├── cmd/
 │   ├── server/               # HTTP/REST API server
 │   │   └── main.go
-│   └── worker/               # Temporal worker service
+│   ├── worker/               # Resend Temporal worker service
+│   │   └── main.go
+│   └── postmark-worker/      # Postmark Temporal worker service
 │       └── main.go
 │
 ├── internal/
@@ -38,7 +40,8 @@ server-go/
 ## Features
 
 - **Temporal Workflow Orchestration**: Reliable email processing with workflow management
-- **Resend Integration**: Professional email sending via Resend API
+- **Dual Email Provider Support**: Professional email sending via Resend API and Postmark API
+- **Separate Worker Processes**: Independent workers for Resend and Postmark with different task queues
 - **Automatic Retries**: 5 retry attempts with 1-minute intervals on failure
 - **Real-time Tracking**: Track email status from queued to sent/failed
 - **JWT Authentication**: Secure API endpoints with JWT middleware
