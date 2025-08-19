@@ -43,7 +43,7 @@ export default function EmailTestPage() {
   const [, setLocation] = useLocation();
   const accessToken = useSelector((state: RootState) => state.auth.accessToken);
   const [campaignData, setCampaignData] = useState<EmailCampaignData>({
-    recipient: "test@example.com",
+    recipient: "dan@zendwise.com",
     subject: "Test Email Campaign",
     content: "This is a test email sent through the Go backend and Temporal workflow system.",
     templateType: "marketing",

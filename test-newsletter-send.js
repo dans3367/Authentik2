@@ -11,7 +11,7 @@ async function testNewsletterSend() {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      email: 'test@example.com',
+      email: 'dan@zendwise.com',
       password: 'password123'
     })
   });
@@ -32,12 +32,12 @@ async function testNewsletterSend() {
     status: "queued",
     temporalWorkflow: `test-workflow-${Date.now()}`,
     metadata: {
-      recipient: "test@example.com",
+      recipient: "dan@zendwise.com",
       subject: "Test Newsletter",
       content: "This is a test",
       templateType: "newsletter",
       priority: "normal",
-      to: "test@example.com",
+      to: "dan@zendwise.com",
       sentAt: new Date().toISOString(),
     }
   };

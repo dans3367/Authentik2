@@ -7,7 +7,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 API_URL="http://localhost:5000/api"
-EMAIL="test@example.com"
+EMAIL="dan@zendwise.com"
 PASSWORD="Test123!"
 
 echo -e "${YELLOW}Starting Token Validation Test${NC}"

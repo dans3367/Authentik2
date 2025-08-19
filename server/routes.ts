@@ -3343,7 +3343,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Find test user
-      const user = await storage.getUserByEmail("test@example.com", tenant.id);
+      const user = await storage.getUserByEmail("dan@zendwise.com", tenant.id);
       if (!user) {
         return res.status(404).json({ message: "Test user not found" });
       }

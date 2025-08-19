@@ -5,7 +5,7 @@ const webhookSecret = 'whsec_J7jRqP+O3h1aWJbuuRM4B3tc08HwtFSg';
 const testPayload = JSON.stringify({
   type: 'email.sent',
   data: {
-    email: 'test@example.com',
+    email: 'dan@zendwise.com',
     message_id: 'test-id-123'
   }
 });

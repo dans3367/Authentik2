@@ -9,7 +9,7 @@ const GO_SERVER = 'https://tengine.zendwise.work';
 
 // Test user credentials - you'll need to update these with actual user data
 const TEST_USER = {
-  email: 'test@example.com',
+  email: 'dan@zendwise.com',
   password: 'password123'
 };
 

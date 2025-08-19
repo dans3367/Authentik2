@@ -180,7 +180,7 @@ When creating newsletters:
 Use the debug endpoint to test:
 ```bash
 POST /api/debug/webhook-flow/:newsletterId
-Body: { "contactEmail": "test@example.com" }
+Body: { "contactEmail": "dan@zendwise.com" }
 ```
 
 This will show you exactly where the process is failing.
