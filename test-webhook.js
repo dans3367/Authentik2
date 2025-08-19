@@ -1,9 +1,58 @@
 #!/usr/bin/env node
 
 // Test script to verify newsletter email tracking is working
-// Run this script after logging in to test the webhook processing
+// This simulates the exact webhook format that Resend sends
 
 const BASE_URL = 'http://localhost:5000';
+
+async function simulateResendWebhook(newsletterId, contactEmail) {
+  console.log('\n=== Simulating Resend Webhook (Direct) ===\n');
+  
+  // Create a realistic Resend webhook payload
+  const webhookPayload = {
+    type: 'email.opened',
+    data: {
+      id: `re_${Date.now()}_test`,
+      to: [{ email: contactEmail }],
+      subject: 'Test Newsletter Subject',
+      // This is how Resend actually sends tags back - as objects
+      tags: [
+        { name: 'newsletter_id', value: `newsletter-${newsletterId}` },
+        { name: 'groupUUID', value: `test-group-${Date.now()}` },
+        { name: 'type', value: 'newsletter' }
+      ],
+      user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      ip: '192.168.1.1'
+    }
+  };
+  
+  console.log('Sending webhook payload:');
+  console.log(JSON.stringify(webhookPayload, null, 2));
+  
+  try {
+    // Generate a fake webhook signature (for testing only)
+    const timestamp = Math.floor(Date.now() / 1000);
+    const signature = 'test_signature_' + timestamp;
+    
+    const response = await fetch(`${BASE_URL}/api/webhooks/resend`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'resend-signature': `t=${timestamp},v1=${signature}`
+      },
+      body: JSON.stringify(webhookPayload)
+    });
+    
+    const responseText = await response.text();
+    console.log(`\nWebhook response status: ${response.status}`);
+    console.log(`Response: ${responseText}`);
+    
+    return response.ok;
+  } catch (error) {
+    console.error('Failed to send webhook:', error.message);
+    return false;
+  }
+}
 
 async function testWebhookProcessing(authToken, newsletterId, contactEmail) {
   console.log('\n=== Testing Newsletter Email Open Tracking ===\n');
@@ -23,32 +72,43 @@ async function testWebhookProcessing(authToken, newsletterId, contactEmail) {
     
     const newsletterDataBefore = await newsletterBefore.json();
     console.log(`   Current open count: ${newsletterDataBefore.openCount || 0}`);
+    console.log(`   Current click count: ${newsletterDataBefore.clickCount || 0}`);
     
-    // 2. Simulate an email open via the test endpoint
-    console.log('\n2. Simulating email open webhook...');
-    const testResponse = await fetch(`${BASE_URL}/api/test/webhook-open`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${authToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        newsletterId,
-        contactEmail
-      })
-    });
+    // 2. Simulate the Resend webhook directly
+    console.log('\n2. Simulating Resend webhook...');
+    const webhookSuccess = await simulateResendWebhook(newsletterId, contactEmail);
     
-    if (!testResponse.ok) {
-      const error = await testResponse.text();
-      throw new Error(`Test webhook failed: ${error}`);
+    if (!webhookSuccess) {
+      console.log('\n⚠️  Webhook simulation failed, trying test endpoint instead...');
+      
+      // Fallback to test endpoint
+      const testResponse = await fetch(`${BASE_URL}/api/test/webhook-open`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          newsletterId,
+          contactEmail
+        })
+      });
+      
+      if (!testResponse.ok) {
+        const error = await testResponse.text();
+        throw new Error(`Test endpoint also failed: ${error}`);
+      }
+      
+      const testResult = await testResponse.json();
+      console.log(`   Test endpoint result: ${JSON.stringify(testResult)}`);
     }
     
-    const testResult = await testResponse.json();
-    console.log(`   Previous open count: ${testResult.previousOpenCount}`);
-    console.log(`   New open count: ${testResult.newOpenCount}`);
+    // 3. Wait a moment for processing
+    console.log('\n3. Waiting for processing...');
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
-    // 3. Verify the newsletter stats were updated
-    console.log('\n3. Fetching updated newsletter stats...');
+    // 4. Verify the newsletter stats were updated
+    console.log('\n4. Fetching updated newsletter stats...');
     const newsletterAfter = await fetch(`${BASE_URL}/api/newsletters/${newsletterId}`, {
       headers: {
         'Authorization': `Bearer ${authToken}`
@@ -61,8 +121,9 @@ async function testWebhookProcessing(authToken, newsletterId, contactEmail) {
     
     const newsletterDataAfter = await newsletterAfter.json();
     console.log(`   Updated open count: ${newsletterDataAfter.openCount || 0}`);
+    console.log(`   Updated click count: ${newsletterDataAfter.clickCount || 0}`);
     
-    // 4. Check if the update worked
+    // 5. Check if the update worked
     const openCountIncreased = (newsletterDataAfter.openCount || 0) > (newsletterDataBefore.openCount || 0);
     
     if (openCountIncreased) {
@@ -71,6 +132,7 @@ async function testWebhookProcessing(authToken, newsletterId, contactEmail) {
     } else {
       console.log('\n❌ FAILED: Newsletter open count did not increase');
       console.log('   This indicates the webhook processing might not be working correctly');
+      console.log('   Check the server logs for [Webhook] messages to debug');
     }
     
     return openCountIncreased;

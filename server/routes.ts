@@ -4547,6 +4547,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Debug: Log the entire webhook data structure to understand what we're receiving
       console.log(`[Webhook] Processing webhook data:`, {
         tags: data.tags,
+        tagsType: Array.isArray(data.tags) ? 'array' : typeof data.tags,
+        firstTagType: data.tags && data.tags[0] ? typeof data.tags[0] : 'no tags',
+        firstTag: data.tags && data.tags[0] ? JSON.stringify(data.tags[0]) : 'no tags',
         metadata: data.metadata,
         subject: data.subject
       });
@@ -4560,16 +4563,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const tag of tagsArray) {
           // Handle object format (what Resend actually returns)
           if (typeof tag === 'object' && tag !== null) {
-            if (tag.name === 'groupUUID' && tag.value) {
+            // Resend returns tags as objects with various formats
+            // Check the tag name or value for patterns
+            const tagValue = tag.value || tag.name || '';
+            const tagName = tag.name || '';
+            
+            // Check for groupUUID
+            if (tagName === 'groupUUID' && tag.value) {
               groupUUID = tag.value;
-              console.log(`[Webhook] Found groupUUID in tags (object format): ${groupUUID}`);
+              console.log(`[Webhook] Found groupUUID in tags (object format, name field): ${groupUUID}`);
+            } else if (tagValue.startsWith('groupUUID-')) {
+              groupUUID = tagValue.replace('groupUUID-', '');
+              console.log(`[Webhook] Found groupUUID in tags (object format, value field): ${groupUUID}`);
             }
-            if (tag.name === 'newsletter_id' && tag.value) {
+            
+            // Check for newsletter ID
+            if (tagName === 'newsletter_id' && tag.value) {
               newsletterId = tag.value.replace('newsletter-', '');
-              console.log(`[Webhook] Found newsletter ID in tags (object format): ${newsletterId}`);
+              console.log(`[Webhook] Found newsletter ID in tags (object format, name field): ${newsletterId}`);
+            } else if (tagValue.startsWith('newsletter-')) {
+              newsletterId = tagValue.replace('newsletter-', '');
+              console.log(`[Webhook] Found newsletter ID in tags (object format, value field): ${newsletterId}`);
             }
           } 
-          // Handle string format (fallback for backwards compatibility)
+          // Handle string format (when tags come as plain strings)
           else if (typeof tag === 'string') {
             if (tag.startsWith('groupUUID-')) {
               groupUUID = tag.replace('groupUUID-', '');
