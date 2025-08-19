@@ -421,12 +421,28 @@ func (s *Server) startEmailWorkflow(entry EmailTrackingEntry) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	workflowOptions := client.StartWorkflowOptions{
-		ID:        entry.TemporalWorkflow,
-		TaskQueue: "email-task-queue",
+	// Determine task queue and workflow based on provider
+	taskQueue := "email-task-queue"     // Default to Resend
+	workflowName := "EmailWorkflow"     // Default workflow
+
+	// Check if Postmark provider is specified in metadata
+	if entry.Metadata != nil {
+		if provider, ok := entry.Metadata["emailProvider"].(string); ok {
+			if provider == "postmark" {
+				taskQueue = "postmark-email-task-queue"
+				workflowName = "PostmarkEmailWorkflow"
+				log.Printf("📮 Routing to Postmark workflow: %s", entry.EmailID)
+			}
+		}
 	}
 
-	workflowRun, err := s.temporalClient.ExecuteWorkflow(ctx, workflowOptions, "EmailWorkflow", entry)
+	workflowOptions := client.StartWorkflowOptions{
+		ID:        entry.TemporalWorkflow,
+		TaskQueue: taskQueue,
+	}
+
+	log.Printf("🔄 Starting workflow: %s on task queue: %s", workflowName, taskQueue)
+	workflowRun, err := s.temporalClient.ExecuteWorkflow(ctx, workflowOptions, workflowName, entry)
 	if err != nil {
 		log.Printf("❌ Failed to start workflow for email %s: %v", entry.EmailID, err)
 		// Update entry status to failed

@@ -516,9 +516,32 @@ func (eh *EmailHandler) GetResendIdIndexStatus(w http.ResponseWriter, r *http.Re
 	})
 }
 
+// determineProviderRouting returns the task queue and workflow type based on email provider
+func (eh *EmailHandler) determineProviderRouting(entry EmailTrackingEntry) (taskQueue string, workflowType string) {
+	// Default to Resend
+	taskQueue = eh.taskQueue
+	workflowType = "resend"
+
+	// Check if Postmark provider is specified in metadata
+	if entry.Metadata != nil {
+		if provider, ok := entry.Metadata["emailProvider"].(string); ok {
+			if provider == "postmark" {
+				taskQueue = "postmark-email-task-queue"
+				workflowType = "postmark"
+			}
+		}
+	}
+
+	return taskQueue, workflowType
+}
+
 func (eh *EmailHandler) startEmailWorkflow(entry EmailTrackingEntry) {
 	logger := eh.logger.WithEmail(entry.EmailID)
 	logger.Info("Starting Temporal email workflow")
+
+	// Determine provider routing
+	taskQueue, workflowType := eh.determineProviderRouting(entry)
+	logger.Info("Routing workflow", "provider", workflowType, "task_queue", taskQueue)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -537,7 +560,21 @@ func (eh *EmailHandler) startEmailWorkflow(entry EmailTrackingEntry) {
 
 	workflowID := fmt.Sprintf("email-workflow-%s", entry.EmailID)
 
-	workflowRun, err := eh.temporalClient.StartEmailWorkflow(ctx, workflowID, eh.taskQueue, emailData)
+	// Use appropriate workflow method based on provider
+	var workflowRun temporalclient.WorkflowRun
+	var err error
+	
+	if workflowType == "postmark" {
+		// Start Postmark workflow
+		workflowOptions := temporalclient.StartWorkflowOptions{
+			ID:        workflowID,
+			TaskQueue: taskQueue,
+		}
+		workflowRun, err = eh.temporalClient.GetClient().ExecuteWorkflow(ctx, workflowOptions, "PostmarkEmailWorkflow", emailData)
+	} else {
+		// Start Resend workflow
+		workflowRun, err = eh.temporalClient.StartEmailWorkflow(ctx, workflowID, taskQueue, emailData)
+	}
 	if err != nil {
 		logger.Error("Failed to start email workflow", "error", err)
 		// Update entry status to failed
@@ -569,6 +606,10 @@ func (eh *EmailHandler) startEmailWorkflow(entry EmailTrackingEntry) {
 
 func (eh *EmailHandler) scheduleEmailWorkflow(entry EmailTrackingEntry) {
 	logger := eh.logger.WithEmail(entry.EmailID)
+
+	// Determine provider routing
+	taskQueue, workflowType := eh.determineProviderRouting(entry)
+	logger.Info("Routing scheduled workflow", "provider", workflowType, "task_queue", taskQueue)
 
 	// Detailed logging for debugging
 	now := time.Now().UTC()
@@ -606,7 +647,21 @@ func (eh *EmailHandler) scheduleEmailWorkflow(entry EmailTrackingEntry) {
 
 	workflowID := fmt.Sprintf("scheduled-email-workflow-%s", entry.EmailID)
 
-	workflowRun, err := eh.temporalClient.StartScheduledEmailWorkflow(ctx, workflowID, eh.taskQueue, *entry.ScheduledAt, emailData)
+	// Use appropriate workflow method based on provider
+	var workflowRun temporalclient.WorkflowRun
+	var err error
+	
+	if workflowType == "postmark" {
+		// Start Postmark scheduled workflow
+		workflowOptions := temporalclient.StartWorkflowOptions{
+			ID:        workflowID,
+			TaskQueue: taskQueue,
+		}
+		workflowRun, err = eh.temporalClient.GetClient().ExecuteWorkflow(ctx, workflowOptions, "PostmarkScheduledEmailWorkflow", *entry.ScheduledAt, emailData)
+	} else {
+		// Start Resend scheduled workflow
+		workflowRun, err = eh.temporalClient.StartScheduledEmailWorkflow(ctx, workflowID, taskQueue, *entry.ScheduledAt, emailData)
+	}
 	if err != nil {
 		logger.Error("Failed to start scheduled email workflow", "error", err)
 		// Update entry status to failed
@@ -641,6 +696,10 @@ func (eh *EmailHandler) startReviewerApprovalWorkflow(entry EmailTrackingEntry) 
 	logger := eh.logger.WithEmail(entry.EmailID)
 	logger.Info("Starting reviewer approval Temporal workflow")
 
+	// Determine provider routing
+	taskQueue, workflowType := eh.determineProviderRouting(entry)
+	logger.Info("Routing reviewer approval workflow", "provider", workflowType, "task_queue", taskQueue)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -657,7 +716,21 @@ func (eh *EmailHandler) startReviewerApprovalWorkflow(entry EmailTrackingEntry) 
 
 	workflowID := fmt.Sprintf("reviewer-email-workflow-%s", entry.EmailID)
 
-	workflowRun, err := eh.temporalClient.StartReviewerApprovalEmailWorkflow(ctx, workflowID, eh.taskQueue, emailData)
+	// Use appropriate workflow method based on provider
+	var workflowRun temporalclient.WorkflowRun
+	var err error
+	
+	if workflowType == "postmark" {
+		// Start Postmark reviewer approval workflow
+		workflowOptions := temporalclient.StartWorkflowOptions{
+			ID:        workflowID,
+			TaskQueue: taskQueue,
+		}
+		workflowRun, err = eh.temporalClient.GetClient().ExecuteWorkflow(ctx, workflowOptions, "PostmarkReviewerApprovalEmailWorkflow", emailData)
+	} else {
+		// Start Resend reviewer approval workflow
+		workflowRun, err = eh.temporalClient.StartReviewerApprovalEmailWorkflow(ctx, workflowID, taskQueue, emailData)
+	}
 	if err != nil {
 		logger.Error("Failed to start reviewer approval workflow", "error", err)
 		entry.Status = "workflow_failed"
