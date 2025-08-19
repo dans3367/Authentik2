@@ -3915,6 +3915,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Test endpoint to simulate a Resend webhook (for development only)
+  if (process.env.NODE_ENV === 'development') {
+    app.post("/api/test/webhook-open", authenticateToken, async (req: any, res) => {
+      try {
+        const { newsletterId, contactEmail } = req.body;
+        
+        if (!newsletterId || !contactEmail) {
+          return res.status(400).json({ message: "newsletterId and contactEmail are required" });
+        }
+
+        console.log(`[Test Webhook] Simulating email open for newsletter ${newsletterId}, contact ${contactEmail}`);
+        
+        // Get the newsletter to verify it exists
+        const newsletter = await storage.getNewsletter(newsletterId, req.user.tenantId);
+        if (!newsletter) {
+          return res.status(404).json({ message: "Newsletter not found" });
+        }
+
+        // Simulate a Resend webhook payload for email.opened event
+        const simulatedWebhookPayload = {
+          type: 'email.opened',
+          data: {
+            id: `test-resend-id-${Date.now()}`,
+            to: [{ email: contactEmail }],
+            subject: newsletter.subject,
+            tags: [
+              { name: 'newsletter_id', value: `newsletter-${newsletterId}` },
+              { name: 'groupUUID', value: `test-group-${Date.now()}` },
+              { name: 'type', value: 'newsletter' }
+            ],
+            user_agent: 'Test Browser',
+            ip: '127.0.0.1'
+          }
+        };
+
+        // Process the simulated webhook through the same logic
+        // Find contact by email
+        const allContacts = await storage.getAllEmailContacts(req.user.tenantId);
+        const contact = allContacts.find(c => c.email === contactEmail);
+        if (!contact) {
+          return res.status(404).json({ message: "Contact not found" });
+        }
+
+        // Update contact open count
+        await storage.updateEmailContact(contact.id, { 
+          emailsOpened: (contact.emailsOpened || 0) + 1,
+          lastActivity: new Date() 
+        }, req.user.tenantId);
+
+        // Update newsletter open count
+        const oldOpenCount = newsletter.openCount || 0;
+        await updateNewsletterStats(newsletterId, 'email.opened', req.user.tenantId);
+        
+        // Get updated newsletter to verify the change
+        const updatedNewsletter = await storage.getNewsletter(newsletterId, req.user.tenantId);
+        
+        res.json({
+          message: "Test webhook processed successfully",
+          newsletterId,
+          contactEmail,
+          previousOpenCount: oldOpenCount,
+          newOpenCount: updatedNewsletter?.openCount || 0,
+          webhookPayload: simulatedWebhookPayload
+        });
+      } catch (error) {
+        console.error("[Test Webhook] Error:", error);
+        res.status(500).json({ message: "Test webhook failed", error: error instanceof Error ? error.message : String(error) });
+      }
+    });
+  }
+
   // Helper functions for webhook processing
   async function updateEmailTrackingEntry(trackingEntry: any, webhookType: string, webhookData: any, goServerUrl: string, accessToken: string, resendId: string, tenantId?: string) {
     const statusMapping: Record<string, string> = {
@@ -4528,15 +4599,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastActivity: new Date() 
         }, tenantId);
         
-        // Newsletter open tracking is handled by the email tracking system update above
-        console.log(`[Webhook] Newsletter open tracking delegated to email tracking system - newsletterId: ${newsletterId}, groupUUID: ${groupUUID}`);
+        // Update newsletter open count if this is a newsletter email
+        if (newsletterId) {
+          console.log(`[Webhook] Updating newsletter open count - newsletterId: ${newsletterId}, tenantId: ${tenantId}`);
+          await updateNewsletterStats(newsletterId, 'email.opened', tenantId);
+        } else {
+          console.log(`[Webhook] No newsletter ID found for open event - groupUUID: ${groupUUID}`);
+        }
       } else if (activityType === 'clicked') {
         await storage.updateEmailContact(contact.id, { 
           lastActivity: new Date() 
         }, tenantId);
         
-        // Newsletter click tracking is handled by the email tracking system update above
-        console.log(`[Webhook] Newsletter click tracking delegated to email tracking system - newsletterId: ${newsletterId}, groupUUID: ${groupUUID}`);
+        // Update newsletter click count if this is a newsletter email
+        if (newsletterId) {
+          console.log(`[Webhook] Updating newsletter click count - newsletterId: ${newsletterId}, tenantId: ${tenantId}`);
+          await updateNewsletterStats(newsletterId, 'email.clicked', tenantId);
+        } else {
+          console.log(`[Webhook] No newsletter ID found for click event - groupUUID: ${groupUUID}`);
+        }
       } else if (activityType === 'bounced') {
         await storage.updateEmailContact(contact.id, { 
           status: 'bounced' as any,
