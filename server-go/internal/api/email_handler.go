@@ -26,6 +26,8 @@ type EmailHandler struct {
 	logger         *logger.Logger
 	// In-memory store for demo purposes - in production use a database
 	trackingStore map[string]EmailTrackingEntry
+	// Reverse index from ResendID to tracking entry ID for efficient lookup
+	resendIdIndex map[string]string
 	// Store for used approval tokens to prevent reuse
 	usedTokens map[string]time.Time
 }
@@ -65,6 +67,7 @@ func NewEmailHandler(temporalClient *client.TemporalClient, taskQueue string, jw
 		jwtSecret:      jwtSecret,
 		logger:         log,
 		trackingStore:  make(map[string]EmailTrackingEntry),
+		resendIdIndex:  make(map[string]string),
 		usedTokens:     make(map[string]time.Time),
 	}
 }
@@ -343,6 +346,174 @@ func (eh *EmailHandler) DeleteEmailTracking(w http.ResponseWriter, r *http.Reque
 	eh.logger.Info("Deleted email tracking entry", "entry_id", id)
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// GetEmailTrackingByResendID retrieves email tracking entry by ResendID
+func (eh *EmailHandler) GetEmailTrackingByResendID(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value("userID").(string)
+	tenantID := r.Context().Value("tenantID").(string)
+
+	vars := mux.Vars(r)
+	resendID := vars["resendId"]
+
+	// Lookup tracking entry ID by ResendID
+	trackingEntryID, exists := eh.resendIdIndex[resendID]
+	if !exists {
+		http.Error(w, "Email not found by ResendID", http.StatusNotFound)
+		return
+	}
+
+	// Get the actual tracking entry
+	entry, exists := eh.trackingStore[trackingEntryID]
+	if !exists {
+		// This should not happen, but handle gracefully
+		http.Error(w, "Tracking entry inconsistency", http.StatusInternalServerError)
+		eh.logger.Error("ResendID index points to non-existent tracking entry",
+			"resend_id", resendID, "tracking_id", trackingEntryID)
+		return
+	}
+
+	// Verify user access
+	if entry.UserID != userID || entry.TenantID != tenantID {
+		http.Error(w, "Access denied", http.StatusForbidden)
+		return
+	}
+
+	eh.logger.Info("Retrieved email tracking by ResendID", "resend_id", resendID, "tracking_id", trackingEntryID)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(entry)
+}
+
+// UpdateEmailTrackingResendID allows manual updates of ResendID for existing tracking entries
+// This is useful for webhook processing when ResendID is discovered later
+func (eh *EmailHandler) UpdateEmailTrackingResendID(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value("userID").(string)
+	tenantID := r.Context().Value("tenantID").(string)
+
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	entry, exists := eh.trackingStore[id]
+	if !exists {
+		http.Error(w, "Entry not found", http.StatusNotFound)
+		return
+	}
+
+	if entry.UserID != userID || entry.TenantID != tenantID {
+		http.Error(w, "Access denied", http.StatusForbidden)
+		return
+	}
+
+	var req struct {
+		ResendID string `json:"resendId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+		return
+	}
+
+	if req.ResendID == "" {
+		http.Error(w, "resendId is required", http.StatusBadRequest)
+		return
+	}
+
+	// Update the tracking entry with ResendID
+	if entry.Metadata == nil {
+		entry.Metadata = make(map[string]interface{})
+	}
+	entry.Metadata["resendId"] = req.ResendID
+	entry.Metadata["resendIdUpdatedViaWebhook"] = true
+	entry.Metadata["resendIdUpdatedAt"] = time.Now().UTC().Format(time.RFC3339)
+	entry.Timestamp = time.Now().UTC()
+
+	// Update the ResendID index
+	eh.resendIdIndex[req.ResendID] = entry.ID
+
+	// Store the updated entry
+	eh.trackingStore[id] = entry
+
+	eh.logger.Info("Updated ResendID for email tracking entry",
+		"entry_id", id,
+		"resend_id", req.ResendID,
+		"updated_via", "webhook")
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(entry)
+}
+
+// CleanupResendIdIndex removes orphaned entries from the ResendID index
+func (eh *EmailHandler) CleanupResendIdIndex(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value("userID").(string)
+	tenantID := r.Context().Value("tenantID").(string)
+
+	cleaned := 0
+	orphaned := []string{}
+
+	// Check each ResendID index entry
+	for resendId, trackingId := range eh.resendIdIndex {
+		if entry, exists := eh.trackingStore[trackingId]; !exists {
+			// Entry doesn't exist, remove from index
+			delete(eh.resendIdIndex, resendId)
+			orphaned = append(orphaned, resendId)
+			cleaned++
+		} else if entry.UserID != userID || entry.TenantID != tenantID {
+			// Entry belongs to different user/tenant, skip
+			continue
+		}
+	}
+
+	eh.logger.Info("ResendID index cleanup completed",
+		"cleaned_entries", cleaned,
+		"user_id", userID,
+		"tenant_id", tenantID)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":             "ResendID index cleanup completed",
+		"cleaned_entries":     cleaned,
+		"orphaned_resend_ids": orphaned,
+	})
+}
+
+// GetResendIdIndexStatus provides debug information about the ResendID index
+func (eh *EmailHandler) GetResendIdIndexStatus(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value("userID").(string)
+	tenantID := r.Context().Value("tenantID").(string)
+
+	userIndexEntries := make(map[string]string)
+	totalEntries := len(eh.resendIdIndex)
+	userTrackingEntries := 0
+
+	// Count user's tracking entries
+	for _, entry := range eh.trackingStore {
+		if entry.UserID == userID && entry.TenantID == tenantID {
+			userTrackingEntries++
+		}
+	}
+
+	// Get user's ResendID index entries
+	for resendId, trackingId := range eh.resendIdIndex {
+		if entry, exists := eh.trackingStore[trackingId]; exists {
+			if entry.UserID == userID && entry.TenantID == tenantID {
+				userIndexEntries[resendId] = trackingId
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"total_resend_index_entries": totalEntries,
+		"user_resend_index_entries":  len(userIndexEntries),
+		"user_tracking_entries":      userTrackingEntries,
+		"index_coverage_pct": func() float64 {
+			if userTrackingEntries == 0 {
+				return 0
+			}
+			return float64(len(userIndexEntries)) / float64(userTrackingEntries) * 100
+		}(),
+		"user_index_entries": userIndexEntries,
+	})
 }
 
 func (eh *EmailHandler) startEmailWorkflow(entry EmailTrackingEntry) {
@@ -661,6 +832,28 @@ func (eh *EmailHandler) monitorWorkflow(workflowRun temporalclient.WorkflowRun, 
 		entry.Metadata["workflowResult"] = result
 		entry.Metadata["workflowStatus"] = "completed"
 		entry.Metadata["resendId"] = result.ResendID
+
+		// Add resend UUID to tags for internal tracking
+		if result.ResendID != "" {
+			// Update the reverse index for efficient ResendID lookup
+			eh.resendIdIndex[result.ResendID] = entry.ID
+			logger.Info("Updated ResendID index for tracking", "resend_id", result.ResendID, "tracking_id", entry.ID)
+
+			if tagsInterface, exists := entry.Metadata["tags"]; exists {
+				if tagsSlice, ok := tagsInterface.([]interface{}); ok {
+					// Add resend UUID to existing tags
+					updatedTags := make([]interface{}, len(tagsSlice)+1)
+					copy(updatedTags, tagsSlice)
+					updatedTags[len(tagsSlice)] = fmt.Sprintf("resendUUID-%s", result.ResendID)
+					entry.Metadata["tags"] = updatedTags
+					logger.Info("Added resend UUID to tags for internal tracking", "resend_id", result.ResendID)
+				}
+			} else {
+				// Create tags array with resend UUID if none existed
+				entry.Metadata["tags"] = []interface{}{fmt.Sprintf("resendUUID-%s", result.ResendID)}
+				logger.Info("Created tags with resend UUID for internal tracking", "resend_id", result.ResendID)
+			}
+		}
 	}
 
 	entry.Timestamp = time.Now().UTC()

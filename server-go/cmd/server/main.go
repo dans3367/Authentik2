@@ -85,6 +85,16 @@ func main() {
 	apiRouter.HandleFunc("/email-tracking/{id}", apiHandler.UpdateEmailTracking).Methods("PUT")
 	apiRouter.HandleFunc("/email-tracking/{id}", apiHandler.DeleteEmailTracking).Methods("DELETE")
 
+	// Lookup email tracking by ResendID
+	apiRouter.HandleFunc("/email-tracking/resend/{resendId}", apiHandler.GetEmailTrackingByResendID).Methods("GET")
+
+	// Update ResendID for existing tracking entry
+	apiRouter.HandleFunc("/email-tracking/{id}/resend-id", apiHandler.UpdateEmailTrackingResendID).Methods("PUT")
+
+	// Debug and maintenance endpoints
+	apiRouter.HandleFunc("/email-tracking/debug/resend-index-status", apiHandler.GetResendIdIndexStatus).Methods("GET")
+	apiRouter.HandleFunc("/email-tracking/debug/cleanup-resend-index", apiHandler.CleanupResendIdIndex).Methods("POST")
+
 	// Temporal cleanup endpoint
 	apiRouter.HandleFunc("/temporal/clear-workflows", apiHandler.ClearTemporalWorkflows).Methods("POST")
 

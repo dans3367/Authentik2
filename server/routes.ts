@@ -3915,6 +3915,198 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Helper functions for webhook processing
+  async function updateEmailTrackingEntry(trackingEntry: any, webhookType: string, webhookData: any, goServerUrl: string, accessToken: string, resendId: string) {
+    const statusMapping = {
+      'email.sent': 'sent',
+      'email.delivered': 'delivered', 
+      'email.delivery_delayed': 'delayed',
+      'email.bounced': 'bounced',
+      'email.complained': 'complained',
+      'email.failed': 'failed',
+      'email.opened': 'opened',
+      'email.clicked': 'clicked',
+      'email.unsubscribed': 'unsubscribed'
+    };
+    
+    const newStatus = statusMapping[webhookType] || trackingEntry.status;
+    
+    // Update the tracking entry with new status and webhook data
+    const updatePayload = {
+      status: newStatus,
+      metadata: {
+        ...trackingEntry.metadata,
+        lastWebhookEvent: webhookType,
+        lastWebhookAt: new Date().toISOString(),
+        webhookHistory: [
+          ...(trackingEntry.metadata?.webhookHistory || []),
+          {
+            event: webhookType,
+            timestamp: new Date().toISOString(),
+            data: {
+              messageId: webhookData.message_id,
+              subject: webhookData.subject,
+              userAgent: webhookData.user_agent,
+              ipAddress: webhookData.ip,
+              resendId: resendId
+            }
+          }
+        ].slice(-10) // Keep only last 10 webhook events
+      }
+    };
+    
+    const updateResponse = await fetch(`${goServerUrl}/api/email-tracking/${trackingEntry.id}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updatePayload),
+      timeout: 5000
+    });
+    
+    if (updateResponse.ok) {
+      console.log(`[Webhook] Successfully updated email tracking status to '${newStatus}' for ResendID: ${resendId}`);
+      
+      // If this is a newsletter email, also update newsletter statistics
+      if (trackingEntry.metadata?.newsletterId && (webhookType === 'email.opened' || webhookType === 'email.clicked')) {
+        await updateNewsletterStats(trackingEntry.metadata.newsletterId, webhookType, trackingEntry.tenantId);
+      }
+      
+    } else {
+      console.error(`[Webhook] Failed to update email tracking status: ${updateResponse.status}`);
+    }
+  }
+
+  async function findEmailTrackingByAlternativeMethods(resendId: string, email: string, webhookData: any, goServerUrl: string, accessToken: string) {
+    try {
+      // Method 1: Search all tracking entries for matching email and recent timestamp
+      console.log(`[Webhook] Attempting alternative lookup for ResendID: ${resendId}, email: ${email}`);
+      
+      const allTrackingResponse = await fetch(`${goServerUrl}/api/email-tracking`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 5000
+      });
+      
+      if (allTrackingResponse.ok) {
+        const allTrackingData = await allTrackingResponse.json();
+        const entries = allTrackingData.entries || [];
+        
+        // Look for entries with matching recipient email and recent timestamp (within last 10 minutes)
+        const recentCutoff = Date.now() - (10 * 60 * 1000); // 10 minutes ago
+        
+        for (const entry of entries) {
+          // Check if this entry matches the email and is recent
+          if (entry.metadata?.recipient === email || entry.metadata?.to === email) {
+            const entryTimestamp = new Date(entry.timestamp).getTime();
+            if (entryTimestamp >= recentCutoff) {
+              console.log(`[Webhook] Found potential match via email/timestamp: ${entry.id}`);
+              
+              // Update the entry with the ResendID using the dedicated endpoint
+              const updatePayload = {
+                resendId: resendId
+              };
+              
+              const updateResponse = await fetch(`${goServerUrl}/api/email-tracking/${entry.id}/resend-id`, {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(updatePayload),
+                timeout: 5000
+              });
+              
+              if (updateResponse.ok) {
+                console.log(`[Webhook] Successfully updated entry ${entry.id} with ResendID: ${resendId}`);
+                const updatedEntry = await updateResponse.json();
+                return updatedEntry;
+              }
+            }
+          }
+        }
+      }
+      
+      console.log(`[Webhook] No alternative matches found for ResendID: ${resendId}`);
+      return null;
+      
+    } catch (error) {
+      console.error(`[Webhook] Error in alternative lookup for ResendID ${resendId}:`, error);
+      return null;
+    }
+  }
+
+  async function scheduleWebhookRetry(resendId: string, webhookType: string, webhookData: any, email: string) {
+    try {
+      // Store webhook data for retry processing later
+      // This could be implemented with a queue system, database, or in-memory store
+      // For now, we'll use a simple setTimeout to retry after 30 seconds
+      
+      console.log(`[Webhook] Scheduling retry for ResendID: ${resendId} in 30 seconds`);
+      
+      setTimeout(async () => {
+        console.log(`[Webhook] Retrying webhook processing for ResendID: ${resendId}`);
+        
+        try {
+          const GO_SERVER_URL = process.env.GO_EMAIL_SERVER_URL || 'http://localhost:8095';
+          const accessToken = process.env.EMAIL_TRACKING_TOKEN || process.env.JWT_SECRET || 'Cvgii9bYKF1HtfD8TODRyZFTmFP4vu70oR59YrjGVpS2fXzQ41O3UPRaR8u9uAqNhwK5ZxZPbX5rAOlMrqe8ag==';
+          
+          // Try ResendID lookup again
+          const trackingResponse = await fetch(`${GO_SERVER_URL}/api/email-tracking/resend/${resendId}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            timeout: 5000
+          });
+          
+          if (trackingResponse.ok) {
+            const trackingEntry = await trackingResponse.json();
+            console.log(`[Webhook] Retry found email tracking entry: ${trackingEntry.id} for ResendID: ${resendId}`);
+            await updateEmailTrackingEntry(trackingEntry, webhookType, webhookData, GO_SERVER_URL, accessToken, resendId);
+          } else {
+            console.log(`[Webhook] Retry still unable to find tracking entry for ResendID: ${resendId}`);
+          }
+          
+        } catch (retryError) {
+          console.error(`[Webhook] Error in retry processing for ResendID ${resendId}:`, retryError);
+        }
+      }, 30000); // Retry after 30 seconds
+      
+    } catch (error) {
+      console.error(`[Webhook] Error scheduling webhook retry for ResendID ${resendId}:`, error);
+    }
+  }
+
+  async function updateNewsletterStats(newsletterId: string, webhookType: string, tenantId: string) {
+    try {
+      if (webhookType === 'email.opened') {
+        const newsletter = await storage.getNewsletter(newsletterId, tenantId);
+        if (newsletter) {
+          await storage.updateNewsletter(newsletterId, {
+            openCount: (newsletter.openCount || 0) + 1
+          }, tenantId);
+          console.log(`[Webhook] Updated newsletter ${newsletterId} openCount to ${(newsletter.openCount || 0) + 1}`);
+        }
+      } else if (webhookType === 'email.clicked') {
+        const newsletter = await storage.getNewsletter(newsletterId, tenantId);
+        if (newsletter) {
+          await storage.updateNewsletter(newsletterId, {
+            clickCount: (newsletter.clickCount || 0) + 1
+          }, tenantId);
+          console.log(`[Webhook] Updated newsletter ${newsletterId} clickCount to ${(newsletter.clickCount || 0) + 1}`);
+        }
+      }
+    } catch (error) {
+      console.error(`[Webhook] Error updating newsletter stats for ${newsletterId}:`, error);
+    }
+  }
+
   // Webhook endpoint for Resend - POST handler
   app.post("/api/webhooks/resend", async (req, res) => {
     // Log ALL incoming POST requests to this endpoint
@@ -4151,6 +4343,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(200).json({ message: "Event type mapping not found" });
       }
 
+      // Extract ResendID for tracking email status updates
+      const resendId = data.id || data.message_id;
+      console.log(`[Webhook] Extracted ResendID: ${resendId}`);
+      
+      // Update email tracking status if ResendID is available
+      if (resendId) {
+        try {
+          // Try to update the Go email tracking system
+          const GO_SERVER_URL = process.env.GO_EMAIL_SERVER_URL || 'http://localhost:8095';
+          const accessToken = process.env.EMAIL_TRACKING_TOKEN || process.env.JWT_SECRET || 'Cvgii9bYKF1HtfD8TODRyZFTmFP4vu70oR59YrjGVpS2fXzQ41O3UPRaR8u9uAqNhwK5ZxZPbX5rAOlMrqe8ag==';
+          
+          console.log(`[Webhook] Looking up email tracking by ResendID: ${resendId}`);
+          
+          // Lookup email tracking entry by ResendID
+          const trackingResponse = await fetch(`${GO_SERVER_URL}/api/email-tracking/resend/${resendId}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            timeout: 5000
+          });
+          
+          if (trackingResponse.ok) {
+            const trackingEntry = await trackingResponse.json();
+            console.log(`[Webhook] Found email tracking entry: ${trackingEntry.id} for ResendID: ${resendId}`);
+            
+            await updateEmailTrackingEntry(trackingEntry, type, data, GO_SERVER_URL, accessToken, resendId);
+            
+          } else if (trackingResponse.status === 404) {
+            console.log(`[Webhook] No email tracking entry found for ResendID: ${resendId}`);
+            
+            // Try alternative lookup methods for newsletter emails
+            const alternativeEntry = await findEmailTrackingByAlternativeMethods(resendId, email, data, GO_SERVER_URL, accessToken);
+            if (alternativeEntry) {
+              console.log(`[Webhook] Found email tracking entry via alternative lookup: ${alternativeEntry.id}`);
+              await updateEmailTrackingEntry(alternativeEntry, type, data, GO_SERVER_URL, accessToken, resendId);
+            } else {
+              console.log(`[Webhook] No email tracking entry found via alternative methods for ResendID: ${resendId}`);
+              // Store webhook for later processing when tracking entry becomes available
+              await scheduleWebhookRetry(resendId, type, data, email);
+            }
+            
+          } else {
+            console.error(`[Webhook] Failed to lookup email tracking: ${trackingResponse.status}`);
+            // Also try alternative lookup for non-404 errors as ResendID index might not be ready
+            const alternativeEntry = await findEmailTrackingByAlternativeMethods(resendId, email, data, GO_SERVER_URL, accessToken);
+            if (alternativeEntry) {
+              console.log(`[Webhook] Found email tracking entry via alternative lookup after error: ${alternativeEntry.id}`);
+              await updateEmailTrackingEntry(alternativeEntry, type, data, GO_SERVER_URL, accessToken, resendId);
+            }
+          }
+          
+        } catch (error) {
+          console.error(`[Webhook] Error updating email tracking for ResendID ${resendId}:`, error);
+          
+          // Log additional context for debugging newsletter tracking issues
+          console.error(`[Webhook] Error context:`, {
+            resendId,
+            email,
+            webhookType: type,
+            contactId: contact?.id,
+            tenantId,
+            timestamp: new Date().toISOString(),
+            tags: data.tags,
+            subject: data.subject
+          });
+        }
+      }
+
       // Create activity record
       const activityData = {
         contactId: contact.id,
@@ -4159,6 +4421,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           messageId: data.message_id,
           subject: data.subject,
           tags: data.tags,
+          resendId: resendId, // Include ResendID in activity data
         }),
         userAgent: data.user_agent,
         ipAddress: data.ip,
@@ -4615,8 +4878,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           temporalWorkflow: `newsletter-workflow-${individualEmailId}`,
           metadata: {
             recipient: recipient.email,
-            // Include newsletter ID in subject for tracking
-            subject: `${newsletter.subject} [Newsletter:${newsletter.id}]`,
+            // Use clean subject line without tracking IDs
+            subject: newsletter.subject,
             content: newsletter.content,
             templateType: "newsletter",
             priority: "normal",
@@ -4628,6 +4891,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             tags: [`newsletter-${newsletter.id}`, 'newsletter', newsletter.title, `groupUUID-${groupUUID}`]
           }
         };
+        
+        console.log(`[Newsletter Send] Queuing email ${index + 1}/${validRecipients.length}: ${recipient.email} (emailId: ${individualEmailId})`);
 
         try {
           const response = await fetch(`${GO_SERVER_URL}/api/email-tracking`, {
@@ -4647,6 +4912,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           const result = await response.json();
+          console.log(`[Newsletter Send] Successfully queued email for ${recipient.email}: ${result.id || 'unknown'}`);
           return { success: true, email: recipient.email, result };
         } catch (error) {
           console.error(`Error sending to ${recipient.email}:`, error);
