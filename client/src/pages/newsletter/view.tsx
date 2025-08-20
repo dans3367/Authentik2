@@ -1,4 +1,4 @@
-import { useParams, useLocation, Link } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { 
@@ -75,13 +75,13 @@ export default function NewsletterViewPage() {
       return response.json();
     },
     enabled: !!id,
-    refetchInterval: (data) => {
+    refetchInterval: (query) => {
       // Auto-refresh every 10 seconds if newsletter is sent to get latest engagement metrics
-      return data?.newsletter?.status === 'sent' ? 10000 : false;
+      return query.state.data?.newsletter?.status === 'sent' ? 10000 : false;
     },
   });
 
-  const newsletter = newsletterData?.newsletter;
+  const newsletter = (newsletterData as { newsletter: NewsletterWithUser } | undefined)?.newsletter;
 
   // Fetch task status data
   const { data: taskStatusData, isLoading: isTaskStatusLoading } = useQuery<{ taskStatuses: NewsletterTaskStatus[] }>({
@@ -701,11 +701,11 @@ export default function NewsletterViewPage() {
               {/* Progress Steps Indicator */}
               <div className="mb-8">
                 <div className="flex items-center justify-between">
-                  {[
-                    { step: 1, title: 'Content Validation', key: 'validation', icon: CheckCircle, description: 'Validating content and checking for issues' },
-                    { step: 2, title: 'Email Delivery', key: 'delivery', icon: Send, description: 'Sending emails to recipients' },
-                    { step: 3, title: 'Analytics Collection', key: 'analytics', icon: BarChart3, description: 'Collecting engagement data (completed 24hrs after start)' }
-                  ].map((item, index) => {
+                  {([
+                    { step: 1, title: 'Content Validation', key: 'validation' as const, icon: CheckCircle, description: 'Validating content and checking for issues' },
+                    { step: 2, title: 'Email Delivery', key: 'delivery' as const, icon: Send, description: 'Sending emails to recipients' },
+                    { step: 3, title: 'Analytics Collection', key: 'analytics' as const, icon: BarChart3, description: 'Collecting engagement data (completed 24hrs after start)' }
+                  ] as const).map((item, index) => {
                     const isCompleted = getTaskStepStatus(item.key) === 'completed';
                     const isActive = getTaskStepStatus(item.key) === 'running';
                     const isPending = getTaskStepStatus(item.key) === 'pending';

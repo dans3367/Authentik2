@@ -45,7 +45,7 @@ import { createHash, createHmac } from "crypto";
 import { emailService } from "./emailService";
 import { emailRoutes } from "./routes/emailRoutes";
 import { Resend } from 'resend';
-// import { Webhook } from 'svix';
+
 const resend = new Resend(process.env.RESEND_API_KEY);
 import {
   sanitizeUserInput,
@@ -932,29 +932,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Refresh token endpoint
   app.post("/api/auth/refresh", async (req, res) => {
     try {
-      console.log("🔄 [Server] Refresh token request received");
-      console.log("🔄 [Server] Cookies:", req.cookies);
-      console.log("🔄 [Server] Headers:", req.headers);
+      // Processing refresh token request
 
       const refreshToken = req.cookies.refreshToken;
 
       if (!refreshToken) {
-        console.log("🔄 [Server] No refresh token found in cookies");
         return res.status(401).json({ message: "Refresh token required" });
       }
-
-      console.log("🔄 [Server] Refresh token found, verifying...");
 
       // Verify refresh token
       let decoded: any;
       try {
         decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET) as any;
-        console.log("🔄 [Server] Token decoded successfully:", {
-          userId: decoded.userId,
-          tenantId: decoded.tenantId,
-        });
       } catch (jwtError) {
-        console.log("🔄 [Server] JWT verification failed:", jwtError);
         // Clear invalid cookie
         res.clearCookie("refreshToken", {
           httpOnly: true,
@@ -4391,50 +4381,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Find contact across all tenants (since webhook doesn't include tenant info)
       console.log("[Webhook] Looking up contact for email:", email);
       
-      // Debug: Show all contacts in the database for comparison
+      // Check if any contacts exist in the database
       try {
-        console.log("[Webhook] DEBUG - Fetching all contacts for comparison...");
-        // This is a debug query - in production, you'd want to limit this
         const allContacts = await storage.getAllEmailContactsDebug();
-        console.log(`[Webhook] DEBUG - Found ${allContacts.length} total contacts in database:`);
-        allContacts.slice(0, 10).forEach((contact, i) => {
-          console.log(`[Webhook] DEBUG - ${i + 1}. "${contact.email}" (tenant: ${contact.tenantId})`);
-        });
-        
         if (allContacts.length === 0) {
-          console.log("[Webhook] DEBUG - NO CONTACTS IN DATABASE! This explains why webhook is failing.");
-          console.log("[Webhook] SOLUTION: You need to add email contacts to the system before sending newsletters.");
-          console.log("=".repeat(80));
           return res.status(404).json({ 
             message: "Contact not found", 
             debug: "No contacts exist in database. Add contacts before sending newsletters." 
           });
         }
       } catch (debugError) {
-        console.log("[Webhook] DEBUG query failed:", debugError);
+        console.error("[Webhook] Error checking contact database:", debugError);
       }
       
       // Try to find the contact
       let contactResult = await storage.findEmailContactByEmail(email);
       
       if (!contactResult) {
-        console.log(`[Webhook] CONTACT NOT FOUND for email: ${email}`);
-        console.log("[Webhook] Available emails in database (first 10):");
-        
-        // Show what emails are actually in the database
-        try {
-          const allContacts = await storage.getAllEmailContactsDebug();
-          const emailList = allContacts.slice(0, 10).map(c => c.email);
-          emailList.forEach((dbEmail, i) => {
-            const matches = dbEmail.toLowerCase() === email.toLowerCase();
-            console.log(`[Webhook] - ${i + 1}. "${dbEmail}" ${matches ? '← MATCH!' : ''}`);
-          });
-        } catch (err) {
-          console.log("[Webhook] Could not fetch contact list for comparison");
-        }
-        
-        console.log("[Webhook] Request processing terminated - contact not found");
-        console.log("=".repeat(80));
         return res.status(404).json({ 
           message: "Contact not found",
           debug: `Email '${email}' is not in the contacts database. Add this contact first.`
@@ -5621,7 +5584,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[Debug Webhook] Starting debug flow for newsletter ${newsletterId}, contact ${contactEmail}`);
       
-      const debugResult = {
+      const debugResult: {
+        steps: string[];
+        newsletter: any;
+        contact: any;
+        webhookProcessing: any;
+        finalCounts: any;
+      } = {
         steps: [],
         newsletter: null,
         contact: null,
@@ -5736,8 +5705,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           debugResult.finalCounts = { success: false, reason: "Update returned null" };
         }
       } catch (updateError) {
-        debugResult.steps.push(`❌ Newsletter update failed: ${updateError.message}`);
-        debugResult.finalCounts = { success: false, reason: updateError.message };
+        const errorMessage = updateError instanceof Error ? updateError.message : String(updateError);
+        debugResult.steps.push(`❌ Newsletter update failed: ${errorMessage}`);
+        debugResult.finalCounts = { success: false, reason: errorMessage };
       }
       
       // Step 5: Create activity record
@@ -5763,14 +5733,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const activity = await storage.createEmailActivity(activityData, contactResult.tenantId);
         debugResult.steps.push(`✅ Activity record created: ${activity.id}`);
       } catch (activityError) {
-        debugResult.steps.push(`❌ Activity creation failed: ${activityError.message}`);
+        const errorMessage = activityError instanceof Error ? activityError.message : String(activityError);
+        debugResult.steps.push(`❌ Activity creation failed: ${errorMessage}`);
       }
       
       res.json({ message: "Debug flow completed", debug: debugResult });
       
     } catch (error) {
       console.error("Debug webhook flow error:", error);
-      res.status(500).json({ error: "Internal server error", message: error.message });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: "Internal server error", message: errorMessage });
     }
   });
 
