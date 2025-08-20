@@ -23,7 +23,10 @@ import {
   Activity,
   BarChart3,
   List,
-  ExternalLink
+  ExternalLink,
+  History,
+  Loader2,
+  X
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,6 +36,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format, formatDistanceToNow } from "date-fns";
 import type { NewsletterWithUser, NewsletterTaskStatus } from "@shared/schema";
@@ -54,6 +64,8 @@ export default function NewsletterViewPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("overview");
+  const [trajectoryModalOpen, setTrajectoryModalOpen] = useState(false);
+  const [selectedTrajectory, setSelectedTrajectory] = useState<any>(null);
 
   // Fetch newsletter data with auto-refresh every 10 seconds for sent newsletters
   const { data: newsletterData, isLoading } = useQuery<{ newsletter: NewsletterWithUser }>({
@@ -115,6 +127,25 @@ export default function NewsletterViewPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters', id, 'task-status'] });
+    },
+  });
+
+  // Fetch email trajectory from Resend
+  const fetchTrajectoryMutation = useMutation({
+    mutationFn: async (resendId: string) => {
+      const response = await apiRequest('GET', `/api/emails/${resendId}/trajectory`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setSelectedTrajectory(data.trajectory);
+      setTrajectoryModalOpen(true);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to fetch email trajectory",
+        variant: "destructive",
+      });
     },
   });
 
@@ -1015,15 +1046,45 @@ export default function NewsletterViewPage() {
                               <Badge className={getStatusColor(email.status)}>
                                 {email.status.charAt(0).toUpperCase() + email.status.slice(1)}
                               </Badge>
-                              {email.resendId && (
+                              <div className="flex items-center gap-1">
+                                {/* Always show History button, with visual feedback for mock data */}
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => window.open(`https://resend.com/emails/${email.resendId}`, '_blank')}
+                                  onClick={() => {
+                                    if (email.resendId) {
+                                      fetchTrajectoryMutation.mutate(email.resendId);
+                                    } else {
+                                      toast({
+                                        title: "No Resend ID Available",
+                                        description: "This email doesn't have tracking data from Resend yet. This usually happens when emails are still being processed or if they weren't sent through Resend.",
+                                        variant: "destructive",
+                                      });
+                                    }
+                                  }}
+                                  disabled={fetchTrajectoryMutation.isPending || !email.resendId}
+                                  title={email.resendId ? "Fetch Email Trajectory from Resend" : "No Resend tracking data available"}
+                                  className={!email.resendId ? "opacity-50 cursor-not-allowed" : ""}
                                 >
-                                  <ExternalLink className="h-3 w-3" />
+                                  {fetchTrajectoryMutation.isPending ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <History className="h-3 w-3" />
+                                  )}
                                 </Button>
-                              )}
+                                
+                                {email.resendId && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => window.open(`https://resend.com/emails/${email.resendId}`, '_blank')}
+                                    title="View in Resend Dashboard"
+                                  >
+                                    <ExternalLink className="h-3 w-3" />
+                                  </Button>
+                                )}
+
+                              </div>
                             </div>
                           </div>
                           
@@ -1098,6 +1159,156 @@ export default function NewsletterViewPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Email Trajectory Modal */}
+      <Dialog open={trajectoryModalOpen} onOpenChange={setTrajectoryModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Email Trajectory History
+            </DialogTitle>
+            <DialogDescription>
+              Detailed tracking information from Resend for this email
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedTrajectory && (
+            <div className="space-y-6">
+              {/* Email Overview */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Email Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">From</p>
+                      <p className="text-sm">{selectedTrajectory.from}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">To</p>
+                      <p className="text-sm">{selectedTrajectory.to}</p>
+                    </div>
+                    <div className="md:col-span-2">
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Subject</p>
+                      <p className="text-sm">{selectedTrajectory.subject}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Status</p>
+                      <Badge className="mt-1">
+                        {selectedTrajectory.status || 'Unknown'}
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Created At</p>
+                      <p className="text-sm">
+                        {selectedTrajectory.createdAt ? 
+                          format(new Date(selectedTrajectory.createdAt), 'PPP p') : 
+                          'Unknown'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Event Timeline */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Event Timeline</CardTitle>
+                  <CardDescription>
+                    Chronological events for this email from Resend
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {selectedTrajectory.events && selectedTrajectory.events.length > 0 ? (
+                    <div className="space-y-4">
+                      {selectedTrajectory.events.map((event: any, index: number) => (
+                        <div key={index} className="flex items-start gap-3 pb-4 border-b last:border-b-0">
+                          <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                            {event.type === 'sent' && <Send className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
+                            {event.type === 'delivered' && <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />}
+                            {event.type === 'opened' && <Eye className="h-4 w-4 text-purple-600 dark:text-purple-400" />}
+                            {event.type === 'clicked' && <MousePointer className="h-4 w-4 text-orange-600 dark:text-orange-400" />}
+                            {event.type === 'bounced' && <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />}
+                            {!['sent', 'delivered', 'opened', 'clicked', 'bounced'].includes(event.type) && 
+                              <Activity className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                            }
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <p className="font-medium text-gray-900 dark:text-gray-100 capitalize">
+                                {event.type.replace('_', ' ')}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {event.timestamp ? 
+                                  formatDistanceToNow(new Date(event.timestamp), { addSuffix: true }) : 
+                                  'Unknown time'
+                                }
+                              </p>
+                            </div>
+                            {event.description && (
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                {event.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-center text-gray-500 dark:text-gray-400 py-4">
+                      No event timeline available
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Additional Metadata */}
+              {selectedTrajectory.metadata && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Additional Information</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      {selectedTrajectory.metadata.reply_to && (
+                        <div>
+                          <p className="font-medium text-gray-600 dark:text-gray-400">Reply To</p>
+                          <p>{selectedTrajectory.metadata.reply_to}</p>
+                        </div>
+                      )}
+                      {selectedTrajectory.metadata.cc && (
+                        <div>
+                          <p className="font-medium text-gray-600 dark:text-gray-400">CC</p>
+                          <p>{Array.isArray(selectedTrajectory.metadata.cc) ? 
+                            selectedTrajectory.metadata.cc.join(', ') : 
+                            selectedTrajectory.metadata.cc}
+                          </p>
+                        </div>
+                      )}
+                      {selectedTrajectory.metadata.bcc && (
+                        <div>
+                          <p className="font-medium text-gray-600 dark:text-gray-400">BCC</p>
+                          <p>{Array.isArray(selectedTrajectory.metadata.bcc) ? 
+                            selectedTrajectory.metadata.bcc.join(', ') : 
+                            selectedTrajectory.metadata.bcc}
+                          </p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-medium text-gray-600 dark:text-gray-400">Email ID</p>
+                        <p className="font-mono text-xs">{selectedTrajectory.emailId}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -4852,8 +4852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newsletterIdWithPrefix = `newsletter-${id}`;
       
       try {
-        console.log('Fetching email activities for newsletter:', id, 'tenant:', tenantId);
-        console.log('Newsletter ID with prefix:', newsletterIdWithPrefix);
+
         
         // Get all email activities for this newsletter from PostgreSQL
         const emailActivities = await db.execute(sql`
@@ -4862,6 +4861,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ea.contact_id,
             ea.activity_type,
             ea.activity_data,
+            ea.webhook_data,
             ea.occurred_at,
             ec.email,
             ec.first_name,
@@ -4872,8 +4872,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             AND ea.activity_data::jsonb -> 'tags' ->> 'newsletter_id' = ${newsletterIdWithPrefix}
           ORDER BY ea.contact_id, ea.occurred_at
         `);
-        
-        console.log('Query executed successfully. Rows found:', emailActivities.rows?.length || 0);
+
         
         // Group activities by contact to create detailed stats per email
         const contactActivities = new Map();
@@ -4892,15 +4891,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
               bounces: 0,
               complaints: 0,
               status: 'sent',
-              lastActivity: null
+              lastActivity: null,
+              resendId: null // Add resendId to track
             });
           }
           
           const contact = contactActivities.get(contactId);
+          
+          // Extract resend ID from webhook_data if available
+          if (activity.webhook_data && !contact.resendId) {
+            try {
+              const webhookData = JSON.parse(activity.webhook_data);
+              if (webhookData?.data?.email_id) {
+                contact.resendId = webhookData.data.email_id;
+              }
+            } catch (e) {
+              console.warn('Failed to parse webhook_data for activity:', activity.id);
+            }
+          }
+          
           contact.activities.push({
             type: activity.activity_type,
             timestamp: activity.occurred_at,
-            data: JSON.parse(activity.activity_data)
+            data: JSON.parse(activity.activity_data || '{}'),
+            webhookData: activity.webhook_data ? JSON.parse(activity.webhook_data) : null
           });
           
           // Count activity types
@@ -4932,21 +4946,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         // Convert to array format expected by frontend
-        const detailedStats = Array.from(contactActivities.values()).map((contact: any) => ({
-          emailId: contact.contactId,
-          recipient: contact.email,
-          recipientName: contact.firstName && contact.lastName ? 
-            `${contact.firstName} ${contact.lastName}` : contact.email,
-          status: contact.status,
-          opens: contact.opens,
-          clicks: contact.clicks,
-          bounces: contact.bounces,
-          complaints: contact.complaints,
-          lastActivity: contact.lastActivity,
-          events: contact.activities.sort((a: any, b: any) => 
-            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-          )
-        }));
+        const detailedStats = Array.from(contactActivities.values()).map((contact: any) => {
+          return {
+            emailId: contact.contactId,
+            resendId: contact.resendId, // Use the real resend ID extracted from webhook_data
+            recipient: contact.email,
+            recipientName: contact.firstName && contact.lastName ? 
+              `${contact.firstName} ${contact.lastName}` : contact.email,
+            status: contact.status,
+            opens: contact.opens,
+            clicks: contact.clicks,
+            bounces: contact.bounces,
+            complaints: contact.complaints,
+            lastActivity: contact.lastActivity,
+            events: contact.activities.sort((a: any, b: any) => 
+              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+            )
+          };
+        });
+        
+
         
         res.json({ 
           newsletter: {
@@ -4965,6 +4984,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
     } catch (error) {
       console.error("Get newsletter detailed stats error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get email trajectory from Resend API
+  app.get("/api/emails/:resendId/trajectory", authenticateToken, async (req: any, res) => {
+    try {
+      const { resendId } = req.params;
+      
+      if (!resendId) {
+        return res.status(400).json({ message: "Resend ID is required" });
+      }
+
+
+
+      if (!process.env.RESEND_API_KEY) {
+        return res.status(500).json({ message: "Resend API key not configured" });
+      }
+
+      // Fetch email details from Resend API
+      const { data, error } = await resend.emails.get(resendId);
+      
+      if (error) {
+        console.error("Resend API error:", error);
+        return res.status(404).json({ 
+          message: "Email not found or error fetching from Resend", 
+          error: error.message 
+        });
+      }
+
+      // Transform the Resend data into a more readable format
+      const trajectory = {
+        emailId: data.id,
+        from: data.from,
+        to: data.to,
+        subject: data.subject,
+        status: data.last_event,
+        createdAt: data.created_at,
+        lastEvent: data.last_event,
+        // Resend doesn't provide full event history in the get email endpoint
+        // The last_event field shows the most recent status
+        events: [
+          {
+            type: 'sent',
+            timestamp: data.created_at,
+            description: 'Email was sent via Resend'
+          },
+          ...(data.last_event && data.last_event !== 'sent' ? [{
+            type: data.last_event,
+            timestamp: data.created_at, // Resend doesn't provide event timestamps in this endpoint
+            description: `Email ${data.last_event}`
+          }] : [])
+        ],
+        metadata: {
+          html: data.html || null,
+          text: data.text || null,
+          reply_to: data.reply_to || null,
+          cc: data.cc || null,
+          bcc: data.bcc || null
+        }
+      };
+
+      res.json({
+        success: true,
+        trajectory
+      });
+
+    } catch (error) {
+      console.error("Get email trajectory error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
