@@ -21,7 +21,9 @@ import {
   Tag,
   Settings,
   Activity,
-  BarChart3
+  BarChart3,
+  List,
+  ExternalLink
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -77,6 +79,32 @@ export default function NewsletterViewPage() {
       return response.json();
     },
     enabled: !!id,
+  });
+
+  // Fetch detailed email stats
+  const { data: detailedStatsData, isLoading: isDetailedStatsLoading } = useQuery<{
+    newsletter: { id: string; title: string; status: string };
+    totalEmails: number;
+    emails: Array<{
+      emailId: string;
+      resendId?: string;
+      recipient: string;
+      status: string;
+      opens: number;
+      clicks: number;
+      bounces: number;
+      complaints: number;
+      lastActivity?: string;
+      events: Array<{ type: string; timestamp: string; data?: any }>;
+    }>;
+  }>({
+    queryKey: ['/api/newsletters', id, 'detailed-stats'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/newsletters/${id}/detailed-stats`);
+      return response.json();
+    },
+    enabled: !!id && newsletter?.status === 'sent',
+    refetchInterval: 30000, // Refresh every 30 seconds for sent newsletters
   });
 
   // Initialize tasks if they don't exist
@@ -453,11 +481,12 @@ export default function NewsletterViewPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="content">Content</TabsTrigger>
           <TabsTrigger value="status">Task Status</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="detailed-stats">Detailed Stats</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -903,6 +932,170 @@ export default function NewsletterViewPage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="detailed-stats" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <List className="h-5 w-5" />
+                Detailed Email Statistics
+              </CardTitle>
+              <CardDescription>
+                Individual email delivery status and engagement metrics for each recipient
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {newsletter?.status !== 'sent' ? (
+                <div className="text-center py-8">
+                  <Mail className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                    Newsletter Not Sent Yet
+                  </h3>
+                  <p className="text-gray-500 dark:text-gray-400">
+                    Detailed email statistics will be available after the newsletter is sent.
+                  </p>
+                </div>
+              ) : isDetailedStatsLoading ? (
+                <div className="space-y-4">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="flex items-center space-x-4 p-4 border rounded-lg">
+                      <Skeleton className="h-10 w-10 rounded-full" />
+                      <div className="space-y-2 flex-1">
+                        <Skeleton className="h-4 w-[250px]" />
+                        <Skeleton className="h-4 w-[200px]" />
+                      </div>
+                      <Skeleton className="h-6 w-16" />
+                    </div>
+                  ))}
+                </div>
+              ) : detailedStatsData?.emails?.length ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Showing {detailedStatsData.emails.length} of {detailedStatsData.totalEmails} emails
+                    </p>
+                    <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {detailedStatsData.emails.map((email, index) => {
+                      const getStatusColor = (status: string) => {
+                        switch (status) {
+                          case 'clicked': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
+                          case 'opened': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+                          case 'bounced': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+                          case 'complained': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
+                          default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+                        }
+                      };
+                      
+                      return (
+                        <div key={email.emailId || index} className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                                <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900 dark:text-gray-100">
+                                  {email.recipient}
+                                </p>
+                                {email.resendId && (
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    ID: {email.resendId}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge className={getStatusColor(email.status)}>
+                                {email.status.charAt(0).toUpperCase() + email.status.slice(1)}
+                              </Badge>
+                              {email.resendId && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => window.open(`https://resend.com/emails/${email.resendId}`, '_blank')}
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+                            <div className="text-center p-2 bg-green-50 dark:bg-green-900/20 rounded">
+                              <p className="text-lg font-semibold text-green-600 dark:text-green-400">{email.opens}</p>
+                              <p className="text-xs text-green-600 dark:text-green-400">Opens</p>
+                            </div>
+                            <div className="text-center p-2 bg-purple-50 dark:bg-purple-900/20 rounded">
+                              <p className="text-lg font-semibold text-purple-600 dark:text-purple-400">{email.clicks}</p>
+                              <p className="text-xs text-purple-600 dark:text-purple-400">Clicks</p>
+                            </div>
+                            <div className="text-center p-2 bg-red-50 dark:bg-red-900/20 rounded">
+                              <p className="text-lg font-semibold text-red-600 dark:text-red-400">{email.bounces}</p>
+                              <p className="text-xs text-red-600 dark:text-red-400">Bounces</p>
+                            </div>
+                            <div className="text-center p-2 bg-orange-50 dark:bg-orange-900/20 rounded">
+                              <p className="text-lg font-semibold text-orange-600 dark:text-orange-400">{email.complaints}</p>
+                              <p className="text-xs text-orange-600 dark:text-orange-400">Complaints</p>
+                            </div>
+                          </div>
+                          
+                          {email.lastActivity && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                              Last activity: {formatDistanceToNow(new Date(email.lastActivity + 'Z'), { addSuffix: true })}
+                            </p>
+                          )}
+                          
+                          {email.events?.length > 0 && (
+                            <details className="mt-3">
+                              <summary className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:text-gray-900 dark:hover:text-gray-100">
+                                View Activity Timeline ({email.events.length} events)
+                              </summary>
+                              <div className="mt-2 space-y-2 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+                                {email.events.map((event, eventIndex) => (
+                                  <div key={eventIndex} className="text-xs">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                                        {event.type.replace('email.', '').charAt(0).toUpperCase() + event.type.replace('email.', '').slice(1)}
+                                      </span>
+                                      <span className="text-gray-500 dark:text-gray-400">
+                                        {formatDistanceToNow(new Date(event.timestamp + 'Z'), { addSuffix: true })}
+                                      </span>
+                                    </div>
+                                    {event.data && (
+                                      <pre className="text-xs text-gray-600 dark:text-gray-400 mt-1 whitespace-pre-wrap">
+                                        {JSON.stringify(event.data, null, 2)}
+                                      </pre>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </details>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                    No Email Data Available
+                  </h3>
+                  <p className="text-gray-500 dark:text-gray-400">
+                    Email tracking data is not yet available. This may take a few minutes after sending.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

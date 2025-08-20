@@ -4,6 +4,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import { storage } from "./storage";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import cookieParser from "cookie-parser";
@@ -4829,6 +4831,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(stats);
     } catch (error) {
       console.error("Get newsletter stats error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get detailed email stats for a specific newsletter
+  app.get("/api/newsletters/:id/detailed-stats", authenticateToken, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const tenantId = req.user.tenantId;
+      
+      // Get the newsletter details
+      const newsletter = await storage.getNewsletter(id, tenantId);
+      if (!newsletter) {
+        return res.status(404).json({ message: "Newsletter not found" });
+      }
+      
+      // Get email activities from PostgreSQL database
+      // The newsletter ID is stored in activity_data JSON field with 'newsletter-' prefix
+      const newsletterIdWithPrefix = `newsletter-${id}`;
+      
+      try {
+        console.log('Fetching email activities for newsletter:', id, 'tenant:', tenantId);
+        console.log('Newsletter ID with prefix:', newsletterIdWithPrefix);
+        
+        // Get all email activities for this newsletter from PostgreSQL
+        const emailActivities = await db.execute(sql`
+          SELECT 
+            ea.id,
+            ea.contact_id,
+            ea.activity_type,
+            ea.activity_data,
+            ea.occurred_at,
+            ec.email,
+            ec.first_name,
+            ec.last_name
+          FROM email_activity ea
+          LEFT JOIN email_contacts ec ON ea.contact_id = ec.id
+          WHERE ea.tenant_id = ${tenantId}
+            AND ea.activity_data::jsonb -> 'tags' ->> 'newsletter_id' = ${newsletterIdWithPrefix}
+          ORDER BY ea.contact_id, ea.occurred_at
+        `);
+        
+        console.log('Query executed successfully. Rows found:', emailActivities.rows?.length || 0);
+        
+        // Group activities by contact to create detailed stats per email
+        const contactActivities = new Map();
+        
+        emailActivities.rows.forEach((activity: any) => {
+          const contactId = activity.contact_id;
+          if (!contactActivities.has(contactId)) {
+            contactActivities.set(contactId, {
+              contactId,
+              email: activity.email,
+              firstName: activity.first_name,
+              lastName: activity.last_name,
+              activities: [],
+              opens: 0,
+              clicks: 0,
+              bounces: 0,
+              complaints: 0,
+              status: 'sent',
+              lastActivity: null
+            });
+          }
+          
+          const contact = contactActivities.get(contactId);
+          contact.activities.push({
+            type: activity.activity_type,
+            timestamp: activity.occurred_at,
+            data: JSON.parse(activity.activity_data)
+          });
+          
+          // Count activity types
+          switch (activity.activity_type) {
+            case 'opened':
+              contact.opens++;
+              break;
+            case 'clicked':
+              contact.clicks++;
+              break;
+            case 'bounced':
+              contact.bounces++;
+              break;
+            case 'complained':
+              contact.complaints++;
+              break;
+          }
+          
+          // Update status based on priority: bounced > complained > clicked > opened > sent
+          if (contact.bounces > 0) contact.status = 'bounced';
+          else if (contact.complaints > 0) contact.status = 'complained';
+          else if (contact.clicks > 0) contact.status = 'clicked';
+          else if (contact.opens > 0) contact.status = 'opened';
+          
+          // Update last activity timestamp
+          if (!contact.lastActivity || new Date(activity.occurred_at) > new Date(contact.lastActivity)) {
+            contact.lastActivity = activity.occurred_at;
+          }
+        });
+        
+        // Convert to array format expected by frontend
+        const detailedStats = Array.from(contactActivities.values()).map((contact: any) => ({
+          emailId: contact.contactId,
+          recipient: contact.email,
+          recipientName: contact.firstName && contact.lastName ? 
+            `${contact.firstName} ${contact.lastName}` : contact.email,
+          status: contact.status,
+          opens: contact.opens,
+          clicks: contact.clicks,
+          bounces: contact.bounces,
+          complaints: contact.complaints,
+          lastActivity: contact.lastActivity,
+          events: contact.activities.sort((a: any, b: any) => 
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          )
+        }));
+        
+        res.json({ 
+          newsletter: {
+            id: newsletter.id,
+            title: newsletter.title,
+            status: newsletter.status
+          },
+          totalEmails: detailedStats.length,
+          emails: detailedStats
+        });
+        
+      } catch (error) {
+        console.error("Error fetching email activities from database:", error);
+        res.status(500).json({ message: "Error fetching email tracking data" });
+      }
+      
+    } catch (error) {
+      console.error("Get newsletter detailed stats error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
