@@ -283,6 +283,7 @@ export const newsletters = pgTable("newsletters", {
   selectedTagIds: text("selected_tag_ids").array(), // Array of tag IDs
   recipientCount: integer("recipient_count").default(0),
   openCount: integer("open_count").default(0),
+  uniqueOpenCount: integer("unique_open_count").default(0),
   clickCount: integer("click_count").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
