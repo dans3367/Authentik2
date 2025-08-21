@@ -283,6 +283,7 @@ export const newsletters = pgTable("newsletters", {
   selectedTagIds: text("selected_tag_ids").array(), // Array of tag IDs
   recipientCount: integer("recipient_count").default(0),
   openCount: integer("open_count").default(0),
+  uniqueOpenCount: integer("unique_open_count").default(0),
   clickCount: integer("click_count").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -1091,6 +1092,7 @@ export const updateNewsletterSchema = z.object({
   selectedTagIds: z.array(z.string()).optional(),
   recipientCount: z.number().int().nonnegative().optional(),
   openCount: z.number().int().nonnegative().optional(),
+  uniqueOpenCount: z.number().int().nonnegative().optional(),
   clickCount: z.number().int().nonnegative().optional(),
 });
 
@@ -1214,4 +1216,7 @@ export type UpdateCampaignData = z.infer<typeof updateCampaignSchema>;
 
 export interface NewsletterWithUser extends Newsletter {
   user: User;
+  // API transformation fields for unique/total opens
+  opens?: number; // Unique opens (primary metric)
+  totalOpens?: number; // Total opens (includes repeats)
 }

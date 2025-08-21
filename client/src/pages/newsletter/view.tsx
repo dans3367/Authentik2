@@ -81,7 +81,7 @@ export default function NewsletterViewPage() {
     },
   });
 
-  const newsletter = (newsletterData as { newsletter: NewsletterWithUser } | undefined)?.newsletter;
+  const newsletter = (newsletterData as { newsletter: NewsletterWithUser & { opens?: number; totalOpens?: number } } | undefined)?.newsletter;
 
   // Fetch task status data
   const { data: taskStatusData, isLoading: isTaskStatusLoading } = useQuery<{ taskStatuses: NewsletterTaskStatus[] }>({
@@ -182,11 +182,11 @@ export default function NewsletterViewPage() {
       timestamp: new Date(newsletter.sentAt),
       status: 'success' as const
     }] : []),
-    ...(newsletter?.openCount && newsletter.openCount > 0 ? [{
+    ...((newsletter?.opens && newsletter.opens > 0) || (newsletter?.totalOpens && newsletter.totalOpens > 0) ? [{
       id: '4',
       type: 'opened' as const,
-      title: 'First Opens Detected',
-      description: `${newsletter.openCount} total opens so far`,
+      title: 'Email Opens Detected',
+      description: `${newsletter.opens || 0} unique opens, ${newsletter.totalOpens || 0} total opens`,
       timestamp: new Date(Date.now() - Math.random() * 86400000),
       status: 'success' as const
     }] : []),
@@ -372,12 +372,14 @@ export default function NewsletterViewPage() {
     );
   }
 
-  const engagementRate = (newsletter.recipientCount || 0) > 0 
-    ? (((newsletter.openCount || 0) / (newsletter.recipientCount || 1)) * 100).toFixed(1)
+  // Use unique opens for engagement rate calculations (opens = unique opens from API)
+  const uniqueOpenRate = (newsletter.recipientCount || 0) > 0 
+    ? (((newsletter.opens || 0) / (newsletter.recipientCount || 1)) * 100).toFixed(1)
     : '0';
 
-  const clickThroughRate = (newsletter.openCount || 0) > 0 
-    ? (((newsletter.clickCount || 0) / (newsletter.openCount || 1)) * 100).toFixed(1)
+  // Calculate click-through rate based on unique opens
+  const clickThroughRate = (newsletter.opens || 0) > 0 
+    ? (((newsletter.clickCount || 0) / (newsletter.opens || 1)) * 100).toFixed(1)
     : '0';
 
   return (
@@ -451,13 +453,13 @@ export default function NewsletterViewPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-green-600 dark:text-green-400">
-                  Opens
+                  Unique Opens
                 </p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-                  {newsletter.openCount}
+                  {newsletter.opens || 0}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {engagementRate}% rate
+                  {uniqueOpenRate}% unique rate
                 </p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
@@ -496,10 +498,10 @@ export default function NewsletterViewPage() {
                   Performance
                 </p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-                  {(newsletter.openCount || 0) > 0 ? 'Good' : 'Pending'}
+                  {(newsletter.opens || 0) > 0 ? 'Good' : 'Pending'}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Overall rating
+                  Based on unique opens
                 </p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
@@ -881,10 +883,10 @@ export default function NewsletterViewPage() {
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Open Rate</span>
-                    <span className="text-sm font-bold">{engagementRate}%</span>
+                    <span className="text-sm font-medium">Unique Open Rate</span>
+                    <span className="text-sm font-bold">{uniqueOpenRate}%</span>
                   </div>
-                  <Progress value={parseFloat(engagementRate)} className="h-2" />
+                  <Progress value={parseFloat(uniqueOpenRate)} className="h-2" />
                   
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Click-through Rate</span>
@@ -895,10 +897,13 @@ export default function NewsletterViewPage() {
                   <div className="pt-4 border-t">
                     <div className="grid grid-cols-2 gap-4 text-center">
                       <div>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                          {newsletter.openCount}
+                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                          {newsletter.opens || 0}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Total Opens</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Unique Opens</p>
+                        <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+                          ({newsletter.totalOpens || 0} total)
+                        </p>
                       </div>
                       <div>
                         <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -918,12 +923,12 @@ export default function NewsletterViewPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {newsletter.openCount === 0 && newsletter.status === 'sent' && (
+                  {(newsletter.opens === 0 || !newsletter.opens) && newsletter.status === 'sent' && (
                     <div className="flex items-start gap-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                       <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5" />
                       <div>
                         <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                          No opens yet
+                          No unique opens yet
                         </p>
                         <p className="text-xs text-yellow-700 dark:text-yellow-300">
                           It may take time for recipients to open emails
@@ -932,15 +937,15 @@ export default function NewsletterViewPage() {
                     </div>
                   )}
                   
-                  {parseFloat(engagementRate) > 25 && (
+                  {parseFloat(uniqueOpenRate) > 25 && (
                     <div className="flex items-start gap-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                       <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5" />
                       <div>
                         <p className="text-sm font-medium text-green-800 dark:text-green-200">
-                          Great engagement!
+                          Excellent unique engagement!
                         </p>
                         <p className="text-xs text-green-700 dark:text-green-300">
-                          Your open rate is above industry average
+                          Your unique open rate is above industry average ({uniqueOpenRate}%)
                         </p>
                       </div>
                     </div>
@@ -973,7 +978,7 @@ export default function NewsletterViewPage() {
                 Detailed Email Statistics
               </CardTitle>
               <CardDescription>
-                Individual email delivery status and engagement metrics for each recipient
+                Individual email delivery status and complete engagement activity for each recipient (includes all opens, clicks, etc.)
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1003,9 +1008,14 @@ export default function NewsletterViewPage() {
               ) : detailedStatsData?.emails?.length ? (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between mb-4">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Showing {detailedStatsData.emails.length} of {detailedStatsData.totalEmails} emails
-                    </p>
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Showing {detailedStatsData.emails.length} of {detailedStatsData.totalEmails} emails
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                        * Numbers below show total activity per recipient (including repeat opens/clicks)
+                      </p>
+                    </div>
                     <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Refresh
@@ -1091,7 +1101,7 @@ export default function NewsletterViewPage() {
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
                             <div className="text-center p-2 bg-green-50 dark:bg-green-900/20 rounded">
                               <p className="text-lg font-semibold text-green-600 dark:text-green-400">{email.opens}</p>
-                              <p className="text-xs text-green-600 dark:text-green-400">Opens</p>
+                              <p className="text-xs text-green-600 dark:text-green-400">Total Opens</p>
                             </div>
                             <div className="text-center p-2 bg-purple-50 dark:bg-purple-900/20 rounded">
                               <p className="text-lg font-semibold text-purple-600 dark:text-purple-400">{email.clicks}</p>

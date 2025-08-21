@@ -78,7 +78,7 @@ export default function NewsletterPage() {
     },
   });
 
-  const newsletters: NewsletterWithUser[] = (newslettersData as any)?.newsletters || [];
+  const newsletters: (NewsletterWithUser & { opens?: number; totalOpens?: number })[] = (newslettersData as any)?.newsletters || [];
   const stats = (statsData as any) || {
     totalNewsletters: 0,
     draftNewsletters: 0,
@@ -296,7 +296,7 @@ export default function NewsletterPage() {
                         
                         <div className="flex items-center gap-2">
                           <Eye className="h-4 w-4 text-green-500 dark:text-green-400" />
-                          {newsletter.openCount} opens
+                          {newsletter.opens || 0} unique opens
                         </div>
                         
                         <div className="flex items-center gap-2">

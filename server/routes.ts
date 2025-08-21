@@ -3958,7 +3958,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Update newsletter open count
         const oldOpenCount = newsletter.openCount || 0;
-        await updateNewsletterStats(newsletterId, 'email.opened', req.user.tenantId);
+        await updateNewsletterStats(newsletterId, 'email.opened', req.user.tenantId, contact.id);
         
         // Get updated newsletter to verify the change
         const updatedNewsletter = await storage.getNewsletter(newsletterId, req.user.tenantId);
@@ -4035,6 +4035,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const effectiveTenantId = tenantId || trackingEntry.tenantId;
         if (effectiveTenantId) {
           console.log(`[Webhook] Updating newsletter stats for newsletter ${trackingEntry.metadata.newsletterId}, event: ${webhookType}, tenant: ${effectiveTenantId}`);
+          // Note: No emailId available in this context as it's from Go tracking system
           await updateNewsletterStats(trackingEntry.metadata.newsletterId, webhookType, effectiveTenantId);
         } else {
           console.error(`[Webhook] Cannot update newsletter stats - no tenant ID available`);
@@ -4148,9 +4149,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }
 
-  async function updateNewsletterStats(newsletterId: string, webhookType: string, tenantId: string) {
+  async function updateNewsletterStats(newsletterId: string, webhookType: string, tenantId: string, contactId?: string) {
     try {
-      console.log(`[Webhook] Attempting to update newsletter stats:`, { newsletterId, webhookType, tenantId });
+      console.log(`[Webhook] Attempting to update newsletter stats:`, { newsletterId, webhookType, tenantId, contactId });
 
       // Helper to perform the update for a resolved tenant/newsletter
       const performUpdate = async (resolvedTenantId: string) => {
@@ -4158,12 +4159,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`[Webhook] Processing email open event for newsletter ${newsletterId}`);
           const newsletter = await storage.getNewsletter(newsletterId, resolvedTenantId);
           if (newsletter) {
+            // Always increment total opens
             const newOpenCount = (newsletter.openCount || 0) + 1;
-            console.log(`[Webhook] Found newsletter, updating openCount from ${newsletter.openCount || 0} to ${newOpenCount}`);
+            let newUniqueOpenCount = newsletter.uniqueOpenCount || 0;
+            
+            // Check if this is a unique open (only for newsletter emails with contactId)
+            let isUniqueOpen = false;
+            if (contactId) {
+              const hasBeenOpened = await storage.hasContactOpenedNewsletter(contactId, newsletterId, resolvedTenantId);
+              isUniqueOpen = !hasBeenOpened;
+              if (isUniqueOpen) {
+                newUniqueOpenCount = newUniqueOpenCount + 1;
+              }
+            }
 
-            const updatedNewsletter = await storage.updateNewsletter(newsletterId, { openCount: newOpenCount }, resolvedTenantId);
+            console.log(`[Webhook] Found newsletter, updating openCount from ${newsletter.openCount || 0} to ${newOpenCount}, uniqueOpenCount from ${newsletter.uniqueOpenCount || 0} to ${newUniqueOpenCount}, isUniqueOpen: ${isUniqueOpen}`);
+
+            const updatedNewsletter = await storage.updateNewsletter(newsletterId, { 
+              openCount: newOpenCount,
+              uniqueOpenCount: newUniqueOpenCount 
+            } as any, resolvedTenantId);
+            
             if (updatedNewsletter) {
-              console.log(`[Webhook] ✅ Updated newsletter ${newsletterId} openCount to ${newOpenCount} (tenant: ${resolvedTenantId})`);
+              console.log(`[Webhook] ✅ Updated newsletter ${newsletterId} openCount to ${newOpenCount}, uniqueOpenCount to ${newUniqueOpenCount} (tenant: ${resolvedTenantId})`);
             } else {
               console.error(`[Webhook] ❌ Failed to update newsletter ${newsletterId} - update returned null/undefined (tenant: ${resolvedTenantId})`);
             }
@@ -4210,7 +4228,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error(`[Webhook] ❌ Newsletter ${newsletterId} not found in any tenant`);
     } catch (error) {
       console.error(`[Webhook] Error updating newsletter stats for ${newsletterId}:`, error);
-      console.error(`[Webhook] Error context:`, { newsletterId, webhookType, tenantId });
+      console.error(`[Webhook] Error context:`, { newsletterId, webhookType, tenantId, contactId });
     }
   }
 
@@ -4497,7 +4515,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Extract unique email ID for deduplication (Resend email ID)
+      // Extract unique email ID for tracking
       const emailId = data.email_id || data.message_id || data.id;
 
       // Create activity record
@@ -4507,7 +4525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         newsletterId: undefined as string | undefined, // Will be set later based on extracted newsletter info
         activityType: activityType as any,
         activityData: JSON.stringify({
-          emailId: emailId, // Store the unique email ID for deduplication
+          emailId: emailId, // Store email ID for unique tracking
           messageId: data.message_id,
           subject: data.subject,
           tags: data.tags,
@@ -4526,15 +4544,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (existingActivity) {
           console.log(`[Webhook] Activity already processed for webhook ID: ${activityData.webhookId}`);
           return res.status(200).json({ message: "Activity already processed" });
-        }
-      }
-
-      // Additional deduplication check for email opens to prevent multiple opens per email ID
-      if (activityData.activityType === 'opened' && emailId) {
-        const existingOpen = await storage.getExistingEmailOpenByEmailId(emailId, tenantId);
-        if (existingOpen) {
-          console.log(`[Webhook] Email ID ${emailId} already marked as opened - duplicate prevented`);
-          return res.status(200).json({ message: "Email already marked as opened - duplicate prevented" });
         }
       }
 
@@ -4640,8 +4649,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Update newsletter open count if this is a newsletter email
         if (newsletterId) {
-          console.log(`[Webhook] Updating newsletter open count - newsletterId: ${newsletterId}, tenantId: ${tenantId}`);
-          await updateNewsletterStats(newsletterId, 'email.opened', tenantId);
+          console.log(`[Webhook] Updating newsletter open count - newsletterId: ${newsletterId}, tenantId: ${tenantId}, contactId: ${contact.id}`);
+          await updateNewsletterStats(newsletterId, 'email.opened', tenantId, contact.id);
         } else {
           console.log(`[Webhook] No newsletter ID found for open event - groupUUID: ${groupUUID}`);
         }
@@ -4652,8 +4661,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Update newsletter click count if this is a newsletter email
         if (newsletterId) {
-          console.log(`[Webhook] Updating newsletter click count - newsletterId: ${newsletterId}, tenantId: ${tenantId}`);
-          await updateNewsletterStats(newsletterId, 'email.clicked', tenantId);
+          console.log(`[Webhook] Updating newsletter click count - newsletterId: ${newsletterId}, tenantId: ${tenantId}, contactId: ${contact.id}`);
+          await updateNewsletterStats(newsletterId, 'email.clicked', tenantId, contact.id);
         } else {
           console.log(`[Webhook] No newsletter ID found for click event - groupUUID: ${groupUUID}`);
         }
@@ -4787,7 +4796,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         activityData: JSON.stringify({
           provider: 'postmark',
           recordType: RecordType,
-          emailId: MessageID, // Store the unique email ID for deduplication
+          emailId: MessageID, // Store email ID for unique tracking
           messageId: MessageID,
           metadata: Metadata
         }),
@@ -4807,15 +4816,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Additional deduplication check for email opens to prevent multiple opens per email ID
-      if (activityData.activityType === 'opened' && MessageID) {
-        const existingOpen = await storage.getExistingEmailOpenByEmailId(MessageID, tenantId);
-        if (existingOpen) {
-          console.log(`[Postmark Webhook] Email ID ${MessageID} already marked as opened - duplicate prevented`);
-          return res.status(200).json({ message: "Email already marked as opened - duplicate prevented" });
-        }
-      }
-
       // Create email activity record
       const activity = await storage.createEmailActivity(activityData, tenantId);
       
@@ -4825,8 +4825,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (newsletterId && (RecordType === 'Open' || RecordType === 'Click')) {
         try {
           const webhookType = RecordType === 'Open' ? 'email.opened' : 'email.clicked';
-          console.log(`[Postmark Webhook] Updating newsletter stats for newsletter ${newsletterId}, event: ${webhookType}, tenant: ${tenantId}`);
-          await updateNewsletterStats(newsletterId, webhookType, tenantId);
+          console.log(`[Postmark Webhook] Updating newsletter stats for newsletter ${newsletterId}, event: ${webhookType}, tenant: ${tenantId}, contactId: ${contact.id}`);
+          await updateNewsletterStats(newsletterId, webhookType, tenantId, contact.id);
         } catch (statsError) {
           console.error(`[Postmark Webhook] Error updating newsletter stats:`, statsError);
         }
@@ -4856,7 +4856,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/newsletters", authenticateToken, async (req: any, res) => {
     try {
       const newsletters = await storage.getAllNewsletters(req.user.tenantId);
-      res.json({ newsletters });
+      
+      // Transform newsletters to use uniqueOpenCount as primary opens metric
+      const transformedNewsletters = newsletters.map(newsletter => ({
+        ...newsletter,
+        opens: newsletter.uniqueOpenCount || 0, // Primary opens metric (unique opens)
+        totalOpens: newsletter.openCount || 0,  // Total opens (includes repeat opens)
+        // Keep the original fields for backwards compatibility
+        openCount: newsletter.openCount || 0,
+        uniqueOpenCount: newsletter.uniqueOpenCount || 0
+      }));
+      
+      res.json({ newsletters: transformedNewsletters });
     } catch (error) {
       console.error("Get newsletters error:", error);
       res.status(500).json({ message: "Internal server error" });
@@ -4873,7 +4884,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Newsletter not found" });
       }
 
-      res.json({ newsletter });
+      // Transform newsletter to use uniqueOpenCount as primary opens metric
+      const transformedNewsletter = {
+        ...newsletter,
+        opens: newsletter.uniqueOpenCount || 0, // Primary opens metric (unique opens)
+        totalOpens: newsletter.openCount || 0,  // Total opens (includes repeat opens)
+        // Keep the original fields for backwards compatibility
+        openCount: newsletter.openCount || 0,
+        uniqueOpenCount: newsletter.uniqueOpenCount || 0
+      };
+
+      res.json({ newsletter: transformedNewsletter });
     } catch (error) {
       console.error("Get newsletter error:", error);
       res.status(500).json({ message: "Internal server error" });
@@ -4893,7 +4914,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Automatically initialize task statuses for the new newsletter
       await storage.initializeNewsletterTasks(newsletter.id, req.user.tenantId);
 
-      res.status(201).json({ newsletter });
+      // Transform newsletter to use uniqueOpenCount as primary opens metric
+      const transformedNewsletter = {
+        ...newsletter,
+        opens: newsletter.uniqueOpenCount || 0, // Primary opens metric (unique opens)
+        totalOpens: newsletter.openCount || 0,  // Total opens (includes repeat opens)
+        // Keep the original fields for backwards compatibility
+        openCount: newsletter.openCount || 0,
+        uniqueOpenCount: newsletter.uniqueOpenCount || 0
+      };
+
+      res.status(201).json({ newsletter: transformedNewsletter });
     } catch (error: any) {
       if (error.name === "ZodError") {
         return res.status(400).json({ 
@@ -4918,7 +4949,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Newsletter not found" });
       }
 
-      res.json({ newsletter });
+      // Transform newsletter to use uniqueOpenCount as primary opens metric
+      const transformedNewsletter = {
+        ...newsletter,
+        opens: newsletter.uniqueOpenCount || 0, // Primary opens metric (unique opens)
+        totalOpens: newsletter.openCount || 0,  // Total opens (includes repeat opens)
+        // Keep the original fields for backwards compatibility
+        openCount: newsletter.openCount || 0,
+        uniqueOpenCount: newsletter.uniqueOpenCount || 0
+      };
+
+      res.json({ newsletter: transformedNewsletter });
     } catch (error: any) {
       if (error.name === "ZodError") {
         return res.status(400).json({ 
