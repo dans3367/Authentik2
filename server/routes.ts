@@ -4497,11 +4497,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Extract unique email ID for deduplication (Resend email ID)
+      const emailId = data.email_id || data.message_id || data.id;
+
       // Create activity record
       const activityData = {
         contactId: contact.id,
+        campaignId: undefined as string | undefined,
+        newsletterId: undefined as string | undefined, // Will be set later based on extracted newsletter info
         activityType: activityType as any,
         activityData: JSON.stringify({
+          emailId: emailId, // Store the unique email ID for deduplication
           messageId: data.message_id,
           subject: data.subject,
           tags: data.tags,
@@ -4520,6 +4526,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (existingActivity) {
           console.log(`[Webhook] Activity already processed for webhook ID: ${activityData.webhookId}`);
           return res.status(200).json({ message: "Activity already processed" });
+        }
+      }
+
+      // Additional deduplication check for email opens to prevent multiple opens per email ID
+      if (activityData.activityType === 'opened' && emailId) {
+        const existingOpen = await storage.getExistingEmailOpenByEmailId(emailId, tenantId);
+        if (existingOpen) {
+          console.log(`[Webhook] Email ID ${emailId} already marked as opened - duplicate prevented`);
+          return res.status(200).json({ message: "Email already marked as opened - duplicate prevented" });
         }
       }
 
@@ -4613,6 +4628,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Update activity data with extracted newsletter ID
+      activityData.newsletterId = newsletterId;
+      
       // Update contact statistics based on activity type
       if (activityType === 'opened') {
         await storage.updateEmailContact(contact.id, { 
@@ -4680,6 +4698,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("[Webhook] Error stack:", error instanceof Error ? error.stack : 'No stack trace available');
       console.error("[Webhook] Request body that caused error:", JSON.stringify(req.body, null, 2));
       console.error("[Webhook] Request headers that caused error:", JSON.stringify(req.headers, null, 2));
+      console.error("=".repeat(80));
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Webhook endpoint for Postmark - POST handler
+  app.post("/api/webhooks/postmark", async (req, res) => {
+    console.log("=".repeat(80));
+    console.log("[Postmark Webhook] POST request received on /api/webhooks/postmark");
+    console.log("[Postmark Webhook] Timestamp:", new Date().toISOString());
+    console.log("[Postmark Webhook] Headers:", JSON.stringify(req.headers, null, 2));
+    console.log("[Postmark Webhook] Raw body:", JSON.stringify(req.body, null, 2));
+    console.log("=".repeat(80));
+    
+    try {
+      const webhookData = req.body;
+      
+      // Postmark webhook format validation
+      if (!webhookData.RecordType || !webhookData.Email) {
+        console.log("[Postmark Webhook] VALIDATION FAILED: Invalid webhook format - missing RecordType or Email");
+        return res.status(400).json({ message: "Invalid Postmark webhook format" });
+      }
+
+      const { RecordType, Email, MessageID, Metadata, Recipient } = webhookData;
+      
+      // Handle different Postmark event types
+      const supportedEvents = ['Open', 'Click', 'Delivery', 'Bounce', 'SpamComplaint'];
+      
+      if (!supportedEvents.includes(RecordType)) {
+        console.log(`[Postmark Webhook] UNSUPPORTED EVENT: ${RecordType}`);
+        return res.status(200).json({ message: "Event type not handled" });
+      }
+      
+      console.log(`[Postmark Webhook] ✅ Event type '${RecordType}' is supported, continuing processing...`);
+
+      // Extract email address
+      const email = Recipient || Email;
+      
+      if (!email || typeof email !== 'string') {
+        console.log("[Postmark Webhook] VALIDATION FAILED: No valid email found in webhook data");
+        return res.status(400).json({ message: "No email address found" });
+      }
+
+      // Find contact across all tenants
+      console.log("[Postmark Webhook] Looking up contact for email:", email);
+      
+      let contactResult = await storage.findEmailContactByEmail(email);
+      
+      if (!contactResult) {
+        return res.status(404).json({ 
+          message: "Contact not found",
+          debug: `Email '${email}' is not in the contacts database. Add this contact first.`
+        });
+      }
+      
+      console.log("[Postmark Webhook] ✅ Contact found:", contactResult.contact.id, "in tenant:", contactResult.tenantId);
+
+      const { contact, tenantId } = contactResult;
+
+      // Map Postmark event types to activity types
+      const eventTypeMapping: Record<string, 'sent' | 'delivered' | 'bounced' | 'complained' | 'opened' | 'clicked' | 'unsubscribed'> = {
+        'Open': 'opened',
+        'Click': 'clicked',
+        'Delivery': 'delivered',
+        'Bounce': 'bounced',
+        'SpamComplaint': 'complained'
+      };
+
+      const activityType = eventTypeMapping[RecordType];
+      
+      // Extract newsletter ID from metadata if available
+      let newsletterId: string | undefined;
+      if (Metadata && typeof Metadata === 'object') {
+        newsletterId = Metadata.newsletterId || Metadata.newsletter_id;
+        // Remove 'newsletter-' prefix if present
+        if (newsletterId && newsletterId.startsWith('newsletter-')) {
+          newsletterId = newsletterId.replace('newsletter-', '');
+        }
+      }
+
+      // Create activity data
+      const activityData = {
+        contactId: contact.id,
+        campaignId: undefined as string | undefined,
+        newsletterId: newsletterId,
+        activityType,
+        activityData: JSON.stringify({
+          provider: 'postmark',
+          recordType: RecordType,
+          emailId: MessageID, // Store the unique email ID for deduplication
+          messageId: MessageID,
+          metadata: Metadata
+        }),
+        userAgent: webhookData.UserAgent || undefined,
+        ipAddress: webhookData.OriginalLink ? undefined : webhookData.Client?.Name || undefined,
+        webhookId: MessageID + '_' + RecordType + '_' + Date.now(), // Create unique webhook ID
+        webhookData: JSON.stringify(webhookData),
+        occurredAt: new Date(webhookData.ReceivedAt || Date.now()),
+      };
+
+      // Check if we already processed this webhook (basic deduplication)
+      if (activityData.webhookId) {
+        const existingActivity = await storage.getActivityByWebhookId(activityData.webhookId, tenantId);
+        if (existingActivity) {
+          console.log(`[Postmark Webhook] Activity already processed for webhook ID: ${activityData.webhookId}`);
+          return res.status(200).json({ message: "Activity already processed" });
+        }
+      }
+
+      // Additional deduplication check for email opens to prevent multiple opens per email ID
+      if (activityData.activityType === 'opened' && MessageID) {
+        const existingOpen = await storage.getExistingEmailOpenByEmailId(MessageID, tenantId);
+        if (existingOpen) {
+          console.log(`[Postmark Webhook] Email ID ${MessageID} already marked as opened - duplicate prevented`);
+          return res.status(200).json({ message: "Email already marked as opened - duplicate prevented" });
+        }
+      }
+
+      // Create email activity record
+      const activity = await storage.createEmailActivity(activityData, tenantId);
+      
+      console.log(`[Postmark Webhook] ✅ Successfully processed ${RecordType} event for ${email}`);
+      
+      // Update newsletter stats if applicable
+      if (newsletterId && (RecordType === 'Open' || RecordType === 'Click')) {
+        try {
+          const webhookType = RecordType === 'Open' ? 'email.opened' : 'email.clicked';
+          console.log(`[Postmark Webhook] Updating newsletter stats for newsletter ${newsletterId}, event: ${webhookType}, tenant: ${tenantId}`);
+          await updateNewsletterStats(newsletterId, webhookType, tenantId);
+        } catch (statsError) {
+          console.error(`[Postmark Webhook] Error updating newsletter stats:`, statsError);
+        }
+      }
+
+      res.status(200).json({ 
+        message: "Postmark webhook processed successfully",
+        activityId: activity.id,
+        eventType: RecordType
+      });
+
+    } catch (error: any) {
+      console.error("[Postmark Webhook] ERROR processing Postmark webhook:");
+      console.error("[Postmark Webhook] Error message:", error instanceof Error ? error.message : String(error));
+      console.error("[Postmark Webhook] Error stack:", error instanceof Error ? error.stack : 'No stack trace available');
+      console.error("[Postmark Webhook] Request body that caused error:", JSON.stringify(req.body, null, 2));
       console.error("=".repeat(80));
       res.status(500).json({ message: "Internal server error" });
     }

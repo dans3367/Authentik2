@@ -280,6 +280,8 @@ export interface IStorage {
   getContactActivity(contactId: string, tenantId: string, limit?: number): Promise<EmailActivity[]>;
   getActivityByWebhookId(webhookId: string, tenantId: string): Promise<EmailActivity | undefined>;
   findEmailContactByEmail(email: string): Promise<{ contact: EmailContact; tenantId: string } | undefined>;
+  // Check for existing email opens to prevent duplicates by email ID
+  getExistingEmailOpenByEmailId(emailId: string, tenantId: string): Promise<EmailActivity | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2277,6 +2279,20 @@ export class DatabaseStorage implements IStorage {
         eq(emailActivity.webhookId, webhookId),
         eq(emailActivity.tenantId, tenantId)
       ));
+    return activity;
+  }
+
+  async getExistingEmailOpenByEmailId(emailId: string, tenantId: string): Promise<EmailActivity | undefined> {
+    const [activity] = await db
+      .select()
+      .from(emailActivity)
+      .where(and(
+        eq(emailActivity.activityType, 'opened'),
+        eq(emailActivity.tenantId, tenantId),
+        sql`JSON_EXTRACT(${emailActivity.activityData}, '$.emailId') = ${emailId} OR JSON_EXTRACT(${emailActivity.activityData}, '$.messageId') = ${emailId}`
+      ))
+      .limit(1);
+    
     return activity;
   }
 
