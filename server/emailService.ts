@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 import { EnhancedEmailService } from './providers/enhancedEmailService';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY || 'dummy-key-for-development');
 
 // Initialize enhanced email service
 const enhancedEmailService = new EnhancedEmailService();

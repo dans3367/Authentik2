@@ -7,7 +7,7 @@ export class ResendProvider extends EmailProvider {
 
   constructor(config: ProviderConfig) {
     super(config);
-    this.client = new Resend(config.credentials.apiKey);
+    this.client = new Resend(config.credentials.apiKey || 'dummy-key-for-development');
   }
 
   protected createRateLimiter(): RateLimiter {

@@ -44,7 +44,7 @@ import { emailService } from "./emailService";
 import { emailRoutes } from "./routes/emailRoutes";
 import { Resend } from 'resend';
 // import { Webhook } from 'svix';
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY || 'dummy-key-for-development');
 import {
   sanitizeUserInput,
   sanitizeEmail,
@@ -66,9 +66,9 @@ const REFRESH_TOKEN_SECRET =
 
 // Initialize Stripe
 if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error("Missing required Stripe secret: STRIPE_SECRET_KEY");
+  console.warn("Warning: STRIPE_SECRET_KEY not found, Stripe features will be disabled");
 }
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
 
 // Utility function to extract device information from request
 function getDeviceInfo(req: any): {

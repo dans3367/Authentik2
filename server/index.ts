@@ -2,6 +2,7 @@
 import "./config";
 
 import express, { type Request, Response, NextFunction } from "express";
+import type { Server } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeDatabase } from "./init-db";
@@ -14,6 +15,9 @@ import {
 } from "./middleware/security";
 
 const app = express();
+
+// Trust proxy for Replit environment
+app.set('trust proxy', true);
 
 // Security middleware
 app.use(helmetMiddleware);
