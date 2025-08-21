@@ -4,6 +4,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import { storage } from "./storage";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import cookieParser from "cookie-parser";
@@ -43,8 +45,8 @@ import { createHash, createHmac } from "crypto";
 import { emailService } from "./emailService";
 import { emailRoutes } from "./routes/emailRoutes";
 import { Resend } from 'resend';
-// import { Webhook } from 'svix';
-const resend = new Resend(process.env.RESEND_API_KEY || 'dummy-key-for-development');
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 import {
   sanitizeUserInput,
   sanitizeEmail,
@@ -930,29 +932,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Refresh token endpoint
   app.post("/api/auth/refresh", async (req, res) => {
     try {
-      console.log("🔄 [Server] Refresh token request received");
-      console.log("🔄 [Server] Cookies:", req.cookies);
-      console.log("🔄 [Server] Headers:", req.headers);
+      // Processing refresh token request
 
       const refreshToken = req.cookies.refreshToken;
 
       if (!refreshToken) {
-        console.log("🔄 [Server] No refresh token found in cookies");
         return res.status(401).json({ message: "Refresh token required" });
       }
-
-      console.log("🔄 [Server] Refresh token found, verifying...");
 
       // Verify refresh token
       let decoded: any;
       try {
         decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET) as any;
-        console.log("🔄 [Server] Token decoded successfully:", {
-          userId: decoded.userId,
-          tenantId: decoded.tenantId,
-        });
       } catch (jwtError) {
-        console.log("🔄 [Server] JWT verification failed:", jwtError);
         // Clear invalid cookie
         res.clearCookie("refreshToken", {
           httpOnly: true,
@@ -3966,7 +3958,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Update newsletter open count
         const oldOpenCount = newsletter.openCount || 0;
-        await updateNewsletterStats(newsletterId, 'email.opened', req.user.tenantId);
+        await updateNewsletterStats(newsletterId, 'email.opened', req.user.tenantId, contact.id);
         
         // Get updated newsletter to verify the change
         const updatedNewsletter = await storage.getNewsletter(newsletterId, req.user.tenantId);
@@ -4043,6 +4035,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const effectiveTenantId = tenantId || trackingEntry.tenantId;
         if (effectiveTenantId) {
           console.log(`[Webhook] Updating newsletter stats for newsletter ${trackingEntry.metadata.newsletterId}, event: ${webhookType}, tenant: ${effectiveTenantId}`);
+          // Note: No emailId available in this context as it's from Go tracking system
           await updateNewsletterStats(trackingEntry.metadata.newsletterId, webhookType, effectiveTenantId);
         } else {
           console.error(`[Webhook] Cannot update newsletter stats - no tenant ID available`);
@@ -4156,9 +4149,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }
 
-  async function updateNewsletterStats(newsletterId: string, webhookType: string, tenantId: string) {
+  async function updateNewsletterStats(newsletterId: string, webhookType: string, tenantId: string, contactId?: string) {
     try {
-      console.log(`[Webhook] Attempting to update newsletter stats:`, { newsletterId, webhookType, tenantId });
+      console.log(`[Webhook] Attempting to update newsletter stats:`, { newsletterId, webhookType, tenantId, contactId });
 
       // Helper to perform the update for a resolved tenant/newsletter
       const performUpdate = async (resolvedTenantId: string) => {
@@ -4166,12 +4159,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`[Webhook] Processing email open event for newsletter ${newsletterId}`);
           const newsletter = await storage.getNewsletter(newsletterId, resolvedTenantId);
           if (newsletter) {
+            // Always increment total opens
             const newOpenCount = (newsletter.openCount || 0) + 1;
-            console.log(`[Webhook] Found newsletter, updating openCount from ${newsletter.openCount || 0} to ${newOpenCount}`);
+            let newUniqueOpenCount = newsletter.uniqueOpenCount || 0;
+            
+            // Check if this is a unique open (only for newsletter emails with contactId)
+            let isUniqueOpen = false;
+            if (contactId) {
+              const hasBeenOpened = await storage.hasContactOpenedNewsletter(contactId, newsletterId, resolvedTenantId);
+              isUniqueOpen = !hasBeenOpened;
+              if (isUniqueOpen) {
+                newUniqueOpenCount = newUniqueOpenCount + 1;
+              }
+            }
 
-            const updatedNewsletter = await storage.updateNewsletter(newsletterId, { openCount: newOpenCount }, resolvedTenantId);
+            console.log(`[Webhook] Found newsletter, updating openCount from ${newsletter.openCount || 0} to ${newOpenCount}, uniqueOpenCount from ${newsletter.uniqueOpenCount || 0} to ${newUniqueOpenCount}, isUniqueOpen: ${isUniqueOpen}`);
+
+            const updatedNewsletter = await storage.updateNewsletter(newsletterId, { 
+              openCount: newOpenCount,
+              uniqueOpenCount: newUniqueOpenCount 
+            } as any, resolvedTenantId);
+            
             if (updatedNewsletter) {
-              console.log(`[Webhook] ✅ Updated newsletter ${newsletterId} openCount to ${newOpenCount} (tenant: ${resolvedTenantId})`);
+              console.log(`[Webhook] ✅ Updated newsletter ${newsletterId} openCount to ${newOpenCount}, uniqueOpenCount to ${newUniqueOpenCount} (tenant: ${resolvedTenantId})`);
             } else {
               console.error(`[Webhook] ❌ Failed to update newsletter ${newsletterId} - update returned null/undefined (tenant: ${resolvedTenantId})`);
             }
@@ -4218,7 +4228,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error(`[Webhook] ❌ Newsletter ${newsletterId} not found in any tenant`);
     } catch (error) {
       console.error(`[Webhook] Error updating newsletter stats for ${newsletterId}:`, error);
-      console.error(`[Webhook] Error context:`, { newsletterId, webhookType, tenantId });
+      console.error(`[Webhook] Error context:`, { newsletterId, webhookType, tenantId, contactId });
     }
   }
 
@@ -4389,50 +4399,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Find contact across all tenants (since webhook doesn't include tenant info)
       console.log("[Webhook] Looking up contact for email:", email);
       
-      // Debug: Show all contacts in the database for comparison
+      // Check if any contacts exist in the database
       try {
-        console.log("[Webhook] DEBUG - Fetching all contacts for comparison...");
-        // This is a debug query - in production, you'd want to limit this
         const allContacts = await storage.getAllEmailContactsDebug();
-        console.log(`[Webhook] DEBUG - Found ${allContacts.length} total contacts in database:`);
-        allContacts.slice(0, 10).forEach((contact, i) => {
-          console.log(`[Webhook] DEBUG - ${i + 1}. "${contact.email}" (tenant: ${contact.tenantId})`);
-        });
-        
         if (allContacts.length === 0) {
-          console.log("[Webhook] DEBUG - NO CONTACTS IN DATABASE! This explains why webhook is failing.");
-          console.log("[Webhook] SOLUTION: You need to add email contacts to the system before sending newsletters.");
-          console.log("=".repeat(80));
           return res.status(404).json({ 
             message: "Contact not found", 
             debug: "No contacts exist in database. Add contacts before sending newsletters." 
           });
         }
       } catch (debugError) {
-        console.log("[Webhook] DEBUG query failed:", debugError);
+        console.error("[Webhook] Error checking contact database:", debugError);
       }
       
       // Try to find the contact
       let contactResult = await storage.findEmailContactByEmail(email);
       
       if (!contactResult) {
-        console.log(`[Webhook] CONTACT NOT FOUND for email: ${email}`);
-        console.log("[Webhook] Available emails in database (first 10):");
-        
-        // Show what emails are actually in the database
-        try {
-          const allContacts = await storage.getAllEmailContactsDebug();
-          const emailList = allContacts.slice(0, 10).map(c => c.email);
-          emailList.forEach((dbEmail, i) => {
-            const matches = dbEmail.toLowerCase() === email.toLowerCase();
-            console.log(`[Webhook] - ${i + 1}. "${dbEmail}" ${matches ? '← MATCH!' : ''}`);
-          });
-        } catch (err) {
-          console.log("[Webhook] Could not fetch contact list for comparison");
-        }
-        
-        console.log("[Webhook] Request processing terminated - contact not found");
-        console.log("=".repeat(80));
         return res.status(404).json({ 
           message: "Contact not found",
           debug: `Email '${email}' is not in the contacts database. Add this contact first.`
@@ -4532,11 +4515,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Extract unique email ID for tracking
+      const emailId = data.email_id || data.message_id || data.id;
+
       // Create activity record
       const activityData = {
         contactId: contact.id,
+        campaignId: undefined as string | undefined,
+        newsletterId: undefined as string | undefined, // Will be set later based on extracted newsletter info
         activityType: activityType as any,
         activityData: JSON.stringify({
+          emailId: emailId, // Store email ID for unique tracking
           messageId: data.message_id,
           subject: data.subject,
           tags: data.tags,
@@ -4558,9 +4547,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const activity = await storage.createEmailActivity(activityData, tenantId);
-      
-      // Extract newsletter tracking information from email metadata and tags
+      // IMPORTANT: Extract newsletter tracking information BEFORE creating activity
+      // This ensures unique open tracking works correctly
       let newsletterId: string | undefined;
       let groupUUID: string | undefined;
       
@@ -4648,7 +4636,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Update contact statistics based on activity type
+      // Update activity data with extracted newsletter ID
+      activityData.newsletterId = newsletterId;
+      
+      // IMPORTANT: Update newsletter stats BEFORE creating activity record
+      // This ensures unique open tracking works correctly
+      
+      // Update contact statistics and newsletter stats based on activity type
       if (activityType === 'opened') {
         await storage.updateEmailContact(contact.id, { 
           emailsOpened: (contact.emailsOpened || 0) + 1,
@@ -4657,8 +4651,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Update newsletter open count if this is a newsletter email
         if (newsletterId) {
-          console.log(`[Webhook] Updating newsletter open count - newsletterId: ${newsletterId}, tenantId: ${tenantId}`);
-          await updateNewsletterStats(newsletterId, 'email.opened', tenantId);
+          console.log(`[Webhook] Updating newsletter open count BEFORE creating activity - newsletterId: ${newsletterId}, tenantId: ${tenantId}, contactId: ${contact.id}`);
+          await updateNewsletterStats(newsletterId, 'email.opened', tenantId, contact.id);
         } else {
           console.log(`[Webhook] No newsletter ID found for open event - groupUUID: ${groupUUID}`);
         }
@@ -4669,8 +4663,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Update newsletter click count if this is a newsletter email
         if (newsletterId) {
-          console.log(`[Webhook] Updating newsletter click count - newsletterId: ${newsletterId}, tenantId: ${tenantId}`);
-          await updateNewsletterStats(newsletterId, 'email.clicked', tenantId);
+          console.log(`[Webhook] Updating newsletter click count BEFORE creating activity - newsletterId: ${newsletterId}, tenantId: ${tenantId}, contactId: ${contact.id}`);
+          await updateNewsletterStats(newsletterId, 'email.clicked', tenantId, contact.id);
         } else {
           console.log(`[Webhook] No newsletter ID found for click event - groupUUID: ${groupUUID}`);
         }
@@ -4702,7 +4696,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }, tenantId);
       }
 
+      // NOW create the activity record AFTER all stats updates are complete
+      // This ensures unique open tracking works correctly
+      const activity = await storage.createEmailActivity(activityData, tenantId);
+
       console.log(`[Webhook] Successfully processed ${activityType} activity for contact: ${email}`);
+      console.log(`[Webhook] Activity created with ID: ${activity.id}`);
       console.log(`[Webhook] Tracking method used: ${groupUUID ? 'GroupUUID-based' : newsletterId ? 'Newsletter ID fallback' : 'No newsletter tracking'}`);
       console.log("[Webhook] Request processing completed successfully");
       console.log("=".repeat(80));
@@ -4720,6 +4719,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Webhook endpoint for Postmark - POST handler
+  app.post("/api/webhooks/postmark", async (req, res) => {
+    console.log("=".repeat(80));
+    console.log("[Postmark Webhook] POST request received on /api/webhooks/postmark");
+    console.log("[Postmark Webhook] Timestamp:", new Date().toISOString());
+    console.log("[Postmark Webhook] Headers:", JSON.stringify(req.headers, null, 2));
+    console.log("[Postmark Webhook] Raw body:", JSON.stringify(req.body, null, 2));
+    console.log("=".repeat(80));
+    
+    try {
+      const webhookData = req.body;
+      
+      // Postmark webhook format validation
+      if (!webhookData.RecordType || !webhookData.Email) {
+        console.log("[Postmark Webhook] VALIDATION FAILED: Invalid webhook format - missing RecordType or Email");
+        return res.status(400).json({ message: "Invalid Postmark webhook format" });
+      }
+
+      const { RecordType, Email, MessageID, Metadata, Recipient } = webhookData;
+      
+      // Handle different Postmark event types
+      const supportedEvents = ['Open', 'Click', 'Delivery', 'Bounce', 'SpamComplaint'];
+      
+      if (!supportedEvents.includes(RecordType)) {
+        console.log(`[Postmark Webhook] UNSUPPORTED EVENT: ${RecordType}`);
+        return res.status(200).json({ message: "Event type not handled" });
+      }
+      
+      console.log(`[Postmark Webhook] ✅ Event type '${RecordType}' is supported, continuing processing...`);
+
+      // Extract email address
+      const email = Recipient || Email;
+      
+      if (!email || typeof email !== 'string') {
+        console.log("[Postmark Webhook] VALIDATION FAILED: No valid email found in webhook data");
+        return res.status(400).json({ message: "No email address found" });
+      }
+
+      // Find contact across all tenants
+      console.log("[Postmark Webhook] Looking up contact for email:", email);
+      
+      let contactResult = await storage.findEmailContactByEmail(email);
+      
+      if (!contactResult) {
+        return res.status(404).json({ 
+          message: "Contact not found",
+          debug: `Email '${email}' is not in the contacts database. Add this contact first.`
+        });
+      }
+      
+      console.log("[Postmark Webhook] ✅ Contact found:", contactResult.contact.id, "in tenant:", contactResult.tenantId);
+
+      const { contact, tenantId } = contactResult;
+
+      // Map Postmark event types to activity types
+      const eventTypeMapping: Record<string, 'sent' | 'delivered' | 'bounced' | 'complained' | 'opened' | 'clicked' | 'unsubscribed'> = {
+        'Open': 'opened',
+        'Click': 'clicked',
+        'Delivery': 'delivered',
+        'Bounce': 'bounced',
+        'SpamComplaint': 'complained'
+      };
+
+      const activityType = eventTypeMapping[RecordType];
+      
+      // Extract newsletter ID from metadata if available
+      let newsletterId: string | undefined;
+      if (Metadata && typeof Metadata === 'object') {
+        newsletterId = Metadata.newsletterId || Metadata.newsletter_id;
+        // Remove 'newsletter-' prefix if present
+        if (newsletterId && newsletterId.startsWith('newsletter-')) {
+          newsletterId = newsletterId.replace('newsletter-', '');
+        }
+      }
+
+      // Create activity data
+      const activityData = {
+        contactId: contact.id,
+        campaignId: undefined as string | undefined,
+        newsletterId: newsletterId,
+        activityType,
+        activityData: JSON.stringify({
+          provider: 'postmark',
+          recordType: RecordType,
+          emailId: MessageID, // Store email ID for unique tracking
+          messageId: MessageID,
+          metadata: Metadata
+        }),
+        userAgent: webhookData.UserAgent || undefined,
+        ipAddress: webhookData.OriginalLink ? undefined : webhookData.Client?.Name || undefined,
+        webhookId: MessageID + '_' + RecordType + '_' + Date.now(), // Create unique webhook ID
+        webhookData: JSON.stringify(webhookData),
+        occurredAt: new Date(webhookData.ReceivedAt || Date.now()),
+      };
+
+      // Check if we already processed this webhook (basic deduplication)
+      if (activityData.webhookId) {
+        const existingActivity = await storage.getActivityByWebhookId(activityData.webhookId, tenantId);
+        if (existingActivity) {
+          console.log(`[Postmark Webhook] Activity already processed for webhook ID: ${activityData.webhookId}`);
+          return res.status(200).json({ message: "Activity already processed" });
+        }
+      }
+
+      // Create email activity record
+      const activity = await storage.createEmailActivity(activityData, tenantId);
+      
+      console.log(`[Postmark Webhook] ✅ Successfully processed ${RecordType} event for ${email}`);
+      
+      // Update newsletter stats if applicable
+      if (newsletterId && (RecordType === 'Open' || RecordType === 'Click')) {
+        try {
+          const webhookType = RecordType === 'Open' ? 'email.opened' : 'email.clicked';
+          console.log(`[Postmark Webhook] Updating newsletter stats for newsletter ${newsletterId}, event: ${webhookType}, tenant: ${tenantId}, contactId: ${contact.id}`);
+          await updateNewsletterStats(newsletterId, webhookType, tenantId, contact.id);
+        } catch (statsError) {
+          console.error(`[Postmark Webhook] Error updating newsletter stats:`, statsError);
+        }
+      }
+
+      res.status(200).json({ 
+        message: "Postmark webhook processed successfully",
+        activityId: activity.id,
+        eventType: RecordType
+      });
+
+    } catch (error: any) {
+      console.error("[Postmark Webhook] ERROR processing Postmark webhook:");
+      console.error("[Postmark Webhook] Error message:", error instanceof Error ? error.message : String(error));
+      console.error("[Postmark Webhook] Error stack:", error instanceof Error ? error.stack : 'No stack trace available');
+      console.error("[Postmark Webhook] Request body that caused error:", JSON.stringify(req.body, null, 2));
+      console.error("=".repeat(80));
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // ====================================
   // NEWSLETTER ROUTES
   // ====================================
@@ -4728,7 +4863,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/newsletters", authenticateToken, async (req: any, res) => {
     try {
       const newsletters = await storage.getAllNewsletters(req.user.tenantId);
-      res.json({ newsletters });
+      
+      // Transform newsletters to use uniqueOpenCount as primary opens metric
+      const transformedNewsletters = newsletters.map(newsletter => ({
+        ...newsletter,
+        opens: newsletter.uniqueOpenCount || 0, // Primary opens metric (unique opens)
+        totalOpens: newsletter.openCount || 0,  // Total opens (includes repeat opens)
+        // Keep the original fields for backwards compatibility
+        openCount: newsletter.openCount || 0,
+        uniqueOpenCount: newsletter.uniqueOpenCount || 0
+      }));
+      
+      res.json({ newsletters: transformedNewsletters });
     } catch (error) {
       console.error("Get newsletters error:", error);
       res.status(500).json({ message: "Internal server error" });
@@ -4745,7 +4891,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Newsletter not found" });
       }
 
-      res.json({ newsletter });
+      // Transform newsletter to use uniqueOpenCount as primary opens metric
+      const transformedNewsletter = {
+        ...newsletter,
+        opens: newsletter.uniqueOpenCount || 0, // Primary opens metric (unique opens)
+        totalOpens: newsletter.openCount || 0,  // Total opens (includes repeat opens)
+        // Keep the original fields for backwards compatibility
+        openCount: newsletter.openCount || 0,
+        uniqueOpenCount: newsletter.uniqueOpenCount || 0
+      };
+
+      res.json({ newsletter: transformedNewsletter });
     } catch (error) {
       console.error("Get newsletter error:", error);
       res.status(500).json({ message: "Internal server error" });
@@ -4765,7 +4921,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Automatically initialize task statuses for the new newsletter
       await storage.initializeNewsletterTasks(newsletter.id, req.user.tenantId);
 
-      res.status(201).json({ newsletter });
+      // Transform newsletter to use uniqueOpenCount as primary opens metric
+      const transformedNewsletter = {
+        ...newsletter,
+        opens: newsletter.uniqueOpenCount || 0, // Primary opens metric (unique opens)
+        totalOpens: newsletter.openCount || 0,  // Total opens (includes repeat opens)
+        // Keep the original fields for backwards compatibility
+        openCount: newsletter.openCount || 0,
+        uniqueOpenCount: newsletter.uniqueOpenCount || 0
+      };
+
+      res.status(201).json({ newsletter: transformedNewsletter });
     } catch (error: any) {
       if (error.name === "ZodError") {
         return res.status(400).json({ 
@@ -4790,7 +4956,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Newsletter not found" });
       }
 
-      res.json({ newsletter });
+      // Transform newsletter to use uniqueOpenCount as primary opens metric
+      const transformedNewsletter = {
+        ...newsletter,
+        opens: newsletter.uniqueOpenCount || 0, // Primary opens metric (unique opens)
+        totalOpens: newsletter.openCount || 0,  // Total opens (includes repeat opens)
+        // Keep the original fields for backwards compatibility
+        openCount: newsletter.openCount || 0,
+        uniqueOpenCount: newsletter.uniqueOpenCount || 0
+      };
+
+      res.json({ newsletter: transformedNewsletter });
     } catch (error: any) {
       if (error.name === "ZodError") {
         return res.status(400).json({ 
@@ -4829,6 +5005,228 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(stats);
     } catch (error) {
       console.error("Get newsletter stats error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get detailed email stats for a specific newsletter
+  app.get("/api/newsletters/:id/detailed-stats", authenticateToken, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const tenantId = req.user.tenantId;
+      
+      // Get the newsletter details
+      const newsletter = await storage.getNewsletter(id, tenantId);
+      if (!newsletter) {
+        return res.status(404).json({ message: "Newsletter not found" });
+      }
+      
+      // Get email activities from PostgreSQL database
+      // The newsletter ID is stored in activity_data JSON field with 'newsletter-' prefix
+      const newsletterIdWithPrefix = `newsletter-${id}`;
+      
+      try {
+
+        
+        // Get all email activities for this newsletter from PostgreSQL
+        const emailActivities = await db.execute(sql`
+          SELECT 
+            ea.id,
+            ea.contact_id,
+            ea.activity_type,
+            ea.activity_data,
+            ea.webhook_data,
+            ea.occurred_at,
+            ec.email,
+            ec.first_name,
+            ec.last_name
+          FROM email_activity ea
+          LEFT JOIN email_contacts ec ON ea.contact_id = ec.id
+          WHERE ea.tenant_id = ${tenantId}
+            AND ea.activity_data::jsonb -> 'tags' ->> 'newsletter_id' = ${newsletterIdWithPrefix}
+          ORDER BY ea.contact_id, ea.occurred_at
+        `);
+
+        
+        // Group activities by contact to create detailed stats per email
+        const contactActivities = new Map();
+        
+        emailActivities.rows.forEach((activity: any) => {
+          const contactId = activity.contact_id;
+          if (!contactActivities.has(contactId)) {
+            contactActivities.set(contactId, {
+              contactId,
+              email: activity.email,
+              firstName: activity.first_name,
+              lastName: activity.last_name,
+              activities: [],
+              opens: 0,
+              clicks: 0,
+              bounces: 0,
+              complaints: 0,
+              status: 'sent',
+              lastActivity: null,
+              resendId: null // Add resendId to track
+            });
+          }
+          
+          const contact = contactActivities.get(contactId);
+          
+          // Extract resend ID from webhook_data if available
+          if (activity.webhook_data && !contact.resendId) {
+            try {
+              const webhookData = JSON.parse(activity.webhook_data);
+              if (webhookData?.data?.email_id) {
+                contact.resendId = webhookData.data.email_id;
+              }
+            } catch (e) {
+              console.warn('Failed to parse webhook_data for activity:', activity.id);
+            }
+          }
+          
+          contact.activities.push({
+            type: activity.activity_type,
+            timestamp: activity.occurred_at,
+            data: JSON.parse(activity.activity_data || '{}'),
+            webhookData: activity.webhook_data ? JSON.parse(activity.webhook_data) : null
+          });
+          
+          // Count activity types
+          switch (activity.activity_type) {
+            case 'opened':
+              contact.opens++;
+              break;
+            case 'clicked':
+              contact.clicks++;
+              break;
+            case 'bounced':
+              contact.bounces++;
+              break;
+            case 'complained':
+              contact.complaints++;
+              break;
+          }
+          
+          // Update status based on priority: bounced > complained > clicked > opened > sent
+          if (contact.bounces > 0) contact.status = 'bounced';
+          else if (contact.complaints > 0) contact.status = 'complained';
+          else if (contact.clicks > 0) contact.status = 'clicked';
+          else if (contact.opens > 0) contact.status = 'opened';
+          
+          // Update last activity timestamp
+          if (!contact.lastActivity || new Date(activity.occurred_at) > new Date(contact.lastActivity)) {
+            contact.lastActivity = activity.occurred_at;
+          }
+        });
+        
+        // Convert to array format expected by frontend
+        const detailedStats = Array.from(contactActivities.values()).map((contact: any) => {
+          return {
+            emailId: contact.contactId,
+            resendId: contact.resendId, // Use the real resend ID extracted from webhook_data
+            recipient: contact.email,
+            recipientName: contact.firstName && contact.lastName ? 
+              `${contact.firstName} ${contact.lastName}` : contact.email,
+            status: contact.status,
+            opens: contact.opens,
+            clicks: contact.clicks,
+            bounces: contact.bounces,
+            complaints: contact.complaints,
+            lastActivity: contact.lastActivity,
+            events: contact.activities.sort((a: any, b: any) => 
+              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+            )
+          };
+        });
+        
+
+        
+        res.json({ 
+          newsletter: {
+            id: newsletter.id,
+            title: newsletter.title,
+            status: newsletter.status
+          },
+          totalEmails: detailedStats.length,
+          emails: detailedStats
+        });
+        
+      } catch (error) {
+        console.error("Error fetching email activities from database:", error);
+        res.status(500).json({ message: "Error fetching email tracking data" });
+      }
+      
+    } catch (error) {
+      console.error("Get newsletter detailed stats error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get email trajectory from Resend API
+  app.get("/api/emails/:resendId/trajectory", authenticateToken, async (req: any, res) => {
+    try {
+      const { resendId } = req.params;
+      
+      if (!resendId) {
+        return res.status(400).json({ message: "Resend ID is required" });
+      }
+
+
+
+      if (!process.env.RESEND_API_KEY) {
+        return res.status(500).json({ message: "Resend API key not configured" });
+      }
+
+      // Fetch email details from Resend API
+      const { data, error } = await resend.emails.get(resendId);
+      
+      if (error) {
+        console.error("Resend API error:", error);
+        return res.status(404).json({ 
+          message: "Email not found or error fetching from Resend", 
+          error: error.message 
+        });
+      }
+
+      // Transform the Resend data into a more readable format
+      const trajectory = {
+        emailId: data.id,
+        from: data.from,
+        to: data.to,
+        subject: data.subject,
+        status: data.last_event,
+        createdAt: data.created_at,
+        lastEvent: data.last_event,
+        // Resend doesn't provide full event history in the get email endpoint
+        // The last_event field shows the most recent status
+        events: [
+          {
+            type: 'sent',
+            timestamp: data.created_at,
+            description: 'Email was sent via Resend'
+          },
+          ...(data.last_event && data.last_event !== 'sent' ? [{
+            type: data.last_event,
+            timestamp: data.created_at, // Resend doesn't provide event timestamps in this endpoint
+            description: `Email ${data.last_event}`
+          }] : [])
+        ],
+        metadata: {
+          html: data.html || null,
+          text: data.text || null,
+          reply_to: data.reply_to || null,
+          cc: data.cc || null,
+          bcc: data.bcc || null
+        }
+      };
+
+      res.json({
+        success: true,
+        trajectory
+      });
+
+    } catch (error) {
+      console.error("Get email trajectory error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -5397,7 +5795,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[Debug Webhook] Starting debug flow for newsletter ${newsletterId}, contact ${contactEmail}`);
       
-      const debugResult = {
+      const debugResult: {
+        steps: string[];
+        newsletter: any;
+        contact: any;
+        webhookProcessing: any;
+        finalCounts: any;
+      } = {
         steps: [],
         newsletter: null,
         contact: null,
@@ -5512,8 +5916,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           debugResult.finalCounts = { success: false, reason: "Update returned null" };
         }
       } catch (updateError) {
-        debugResult.steps.push(`❌ Newsletter update failed: ${updateError.message}`);
-        debugResult.finalCounts = { success: false, reason: updateError.message };
+        const errorMessage = updateError instanceof Error ? updateError.message : String(updateError);
+        debugResult.steps.push(`❌ Newsletter update failed: ${errorMessage}`);
+        debugResult.finalCounts = { success: false, reason: errorMessage };
       }
       
       // Step 5: Create activity record
@@ -5539,14 +5944,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const activity = await storage.createEmailActivity(activityData, contactResult.tenantId);
         debugResult.steps.push(`✅ Activity record created: ${activity.id}`);
       } catch (activityError) {
-        debugResult.steps.push(`❌ Activity creation failed: ${activityError.message}`);
+        const errorMessage = activityError instanceof Error ? activityError.message : String(activityError);
+        debugResult.steps.push(`❌ Activity creation failed: ${errorMessage}`);
       }
       
       res.json({ message: "Debug flow completed", debug: debugResult });
       
     } catch (error) {
       console.error("Debug webhook flow error:", error);
-      res.status(500).json({ error: "Internal server error", message: error.message });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: "Internal server error", message: errorMessage });
     }
   });
 

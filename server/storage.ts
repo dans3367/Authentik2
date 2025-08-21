@@ -280,6 +280,8 @@ export interface IStorage {
   getContactActivity(contactId: string, tenantId: string, limit?: number): Promise<EmailActivity[]>;
   getActivityByWebhookId(webhookId: string, tenantId: string): Promise<EmailActivity | undefined>;
   findEmailContactByEmail(email: string): Promise<{ contact: EmailContact; tenantId: string } | undefined>;
+  // Check if contact has already opened this newsletter (unique opens tracking)
+  hasContactOpenedNewsletter(contactId: string, newsletterId: string, tenantId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2278,6 +2280,21 @@ export class DatabaseStorage implements IStorage {
         eq(emailActivity.tenantId, tenantId)
       ));
     return activity;
+  }
+
+  async hasContactOpenedNewsletter(contactId: string, newsletterId: string, tenantId: string): Promise<boolean> {
+    const [activity] = await db
+      .select()
+      .from(emailActivity)
+      .where(and(
+        eq(emailActivity.activityType, 'opened'),
+        eq(emailActivity.contactId, contactId),
+        eq(emailActivity.newsletterId, newsletterId),
+        eq(emailActivity.tenantId, tenantId)
+      ))
+      .limit(1);
+    
+    return !!activity;
   }
 
   async findEmailContactByEmail(email: string): Promise<{ contact: EmailContact; tenantId: string } | undefined> {

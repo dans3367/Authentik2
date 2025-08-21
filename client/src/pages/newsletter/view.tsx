@@ -1,4 +1,4 @@
-import { useParams, useLocation, Link } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { 
@@ -21,7 +21,12 @@ import {
   Tag,
   Settings,
   Activity,
-  BarChart3
+  BarChart3,
+  List,
+  ExternalLink,
+  History,
+  Loader2,
+  X
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,6 +36,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format, formatDistanceToNow } from "date-fns";
 import type { NewsletterWithUser, NewsletterTaskStatus } from "@shared/schema";
@@ -52,6 +64,8 @@ export default function NewsletterViewPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("overview");
+  const [trajectoryModalOpen, setTrajectoryModalOpen] = useState(false);
+  const [selectedTrajectory, setSelectedTrajectory] = useState<any>(null);
 
   // Fetch newsletter data with auto-refresh every 10 seconds for sent newsletters
   const { data: newsletterData, isLoading } = useQuery<{ newsletter: NewsletterWithUser }>({
@@ -61,13 +75,13 @@ export default function NewsletterViewPage() {
       return response.json();
     },
     enabled: !!id,
-    refetchInterval: (data) => {
+    refetchInterval: (query) => {
       // Auto-refresh every 10 seconds if newsletter is sent to get latest engagement metrics
-      return data?.newsletter?.status === 'sent' ? 10000 : false;
+      return query.state.data?.newsletter?.status === 'sent' ? 10000 : false;
     },
   });
 
-  const newsletter = newsletterData?.newsletter;
+  const newsletter = (newsletterData as { newsletter: NewsletterWithUser & { opens?: number; totalOpens?: number } } | undefined)?.newsletter;
 
   // Fetch task status data
   const { data: taskStatusData, isLoading: isTaskStatusLoading } = useQuery<{ taskStatuses: NewsletterTaskStatus[] }>({
@@ -79,6 +93,32 @@ export default function NewsletterViewPage() {
     enabled: !!id,
   });
 
+  // Fetch detailed email stats
+  const { data: detailedStatsData, isLoading: isDetailedStatsLoading } = useQuery<{
+    newsletter: { id: string; title: string; status: string };
+    totalEmails: number;
+    emails: Array<{
+      emailId: string;
+      resendId?: string;
+      recipient: string;
+      status: string;
+      opens: number;
+      clicks: number;
+      bounces: number;
+      complaints: number;
+      lastActivity?: string;
+      events: Array<{ type: string; timestamp: string; data?: any }>;
+    }>;
+  }>({
+    queryKey: ['/api/newsletters', id, 'detailed-stats'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/newsletters/${id}/detailed-stats`);
+      return response.json();
+    },
+    enabled: !!id && newsletter?.status === 'sent',
+    refetchInterval: 30000, // Refresh every 30 seconds for sent newsletters
+  });
+
   // Initialize tasks if they don't exist
   const initializeTasksMutation = useMutation({
     mutationFn: async () => {
@@ -87,6 +127,25 @@ export default function NewsletterViewPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters', id, 'task-status'] });
+    },
+  });
+
+  // Fetch email trajectory from Resend
+  const fetchTrajectoryMutation = useMutation({
+    mutationFn: async (resendId: string) => {
+      const response = await apiRequest('GET', `/api/emails/${resendId}/trajectory`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setSelectedTrajectory(data.trajectory);
+      setTrajectoryModalOpen(true);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to fetch email trajectory",
+        variant: "destructive",
+      });
     },
   });
 
@@ -123,11 +182,11 @@ export default function NewsletterViewPage() {
       timestamp: new Date(newsletter.sentAt),
       status: 'success' as const
     }] : []),
-    ...(newsletter?.openCount && newsletter.openCount > 0 ? [{
+    ...((newsletter?.opens && newsletter.opens > 0) || (newsletter?.totalOpens && newsletter.totalOpens > 0) ? [{
       id: '4',
       type: 'opened' as const,
-      title: 'First Opens Detected',
-      description: `${newsletter.openCount} total opens so far`,
+      title: 'Email Opens Detected',
+      description: `${newsletter.opens || 0} unique opens, ${newsletter.totalOpens || 0} total opens`,
       timestamp: new Date(Date.now() - Math.random() * 86400000),
       status: 'success' as const
     }] : []),
@@ -313,12 +372,14 @@ export default function NewsletterViewPage() {
     );
   }
 
-  const engagementRate = (newsletter.recipientCount || 0) > 0 
-    ? (((newsletter.openCount || 0) / (newsletter.recipientCount || 1)) * 100).toFixed(1)
+  // Use unique opens for engagement rate calculations (opens = unique opens from API)
+  const uniqueOpenRate = (newsletter.recipientCount || 0) > 0 
+    ? (((newsletter.opens || 0) / (newsletter.recipientCount || 1)) * 100).toFixed(1)
     : '0';
 
-  const clickThroughRate = (newsletter.openCount || 0) > 0 
-    ? (((newsletter.clickCount || 0) / (newsletter.openCount || 1)) * 100).toFixed(1)
+  // Calculate click-through rate based on unique opens
+  const clickThroughRate = (newsletter.opens || 0) > 0 
+    ? (((newsletter.clickCount || 0) / (newsletter.opens || 1)) * 100).toFixed(1)
     : '0';
 
   return (
@@ -392,13 +453,13 @@ export default function NewsletterViewPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-green-600 dark:text-green-400">
-                  Opens
+                  Unique Opens
                 </p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-                  {newsletter.openCount}
+                  {newsletter.opens || 0}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {engagementRate}% rate
+                  {uniqueOpenRate}% unique rate
                 </p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
@@ -437,10 +498,10 @@ export default function NewsletterViewPage() {
                   Performance
                 </p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-                  {(newsletter.openCount || 0) > 0 ? 'Good' : 'Pending'}
+                  {(newsletter.opens || 0) > 0 ? 'Good' : 'Pending'}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Overall rating
+                  Based on unique opens
                 </p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
@@ -453,11 +514,12 @@ export default function NewsletterViewPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="content">Content</TabsTrigger>
           <TabsTrigger value="status">Task Status</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="detailed-stats">Detailed Stats</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -641,11 +703,11 @@ export default function NewsletterViewPage() {
               {/* Progress Steps Indicator */}
               <div className="mb-8">
                 <div className="flex items-center justify-between">
-                  {[
-                    { step: 1, title: 'Content Validation', key: 'validation', icon: CheckCircle, description: 'Validating content and checking for issues' },
-                    { step: 2, title: 'Email Delivery', key: 'delivery', icon: Send, description: 'Sending emails to recipients' },
-                    { step: 3, title: 'Analytics Collection', key: 'analytics', icon: BarChart3, description: 'Collecting engagement data (completed 24hrs after start)' }
-                  ].map((item, index) => {
+                  {([
+                    { step: 1, title: 'Content Validation', key: 'validation' as const, icon: CheckCircle, description: 'Validating content and checking for issues' },
+                    { step: 2, title: 'Email Delivery', key: 'delivery' as const, icon: Send, description: 'Sending emails to recipients' },
+                    { step: 3, title: 'Analytics Collection', key: 'analytics' as const, icon: BarChart3, description: 'Collecting engagement data (completed 24hrs after start)' }
+                  ] as const).map((item, index) => {
                     const isCompleted = getTaskStepStatus(item.key) === 'completed';
                     const isActive = getTaskStepStatus(item.key) === 'running';
                     const isPending = getTaskStepStatus(item.key) === 'pending';
@@ -821,10 +883,10 @@ export default function NewsletterViewPage() {
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Open Rate</span>
-                    <span className="text-sm font-bold">{engagementRate}%</span>
+                    <span className="text-sm font-medium">Unique Open Rate</span>
+                    <span className="text-sm font-bold">{uniqueOpenRate}%</span>
                   </div>
-                  <Progress value={parseFloat(engagementRate)} className="h-2" />
+                  <Progress value={parseFloat(uniqueOpenRate)} className="h-2" />
                   
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Click-through Rate</span>
@@ -835,10 +897,13 @@ export default function NewsletterViewPage() {
                   <div className="pt-4 border-t">
                     <div className="grid grid-cols-2 gap-4 text-center">
                       <div>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                          {newsletter.openCount}
+                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                          {newsletter.opens || 0}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Total Opens</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Unique Opens</p>
+                        <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+                          ({newsletter.totalOpens || 0} total)
+                        </p>
                       </div>
                       <div>
                         <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -858,12 +923,12 @@ export default function NewsletterViewPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {newsletter.openCount === 0 && newsletter.status === 'sent' && (
+                  {(newsletter.opens === 0 || !newsletter.opens) && newsletter.status === 'sent' && (
                     <div className="flex items-start gap-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                       <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5" />
                       <div>
                         <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                          No opens yet
+                          No unique opens yet
                         </p>
                         <p className="text-xs text-yellow-700 dark:text-yellow-300">
                           It may take time for recipients to open emails
@@ -872,15 +937,15 @@ export default function NewsletterViewPage() {
                     </div>
                   )}
                   
-                  {parseFloat(engagementRate) > 25 && (
+                  {parseFloat(uniqueOpenRate) > 25 && (
                     <div className="flex items-start gap-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                       <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5" />
                       <div>
                         <p className="text-sm font-medium text-green-800 dark:text-green-200">
-                          Great engagement!
+                          Excellent unique engagement!
                         </p>
                         <p className="text-xs text-green-700 dark:text-green-300">
-                          Your open rate is above industry average
+                          Your unique open rate is above industry average ({uniqueOpenRate}%)
                         </p>
                       </div>
                     </div>
@@ -904,7 +969,356 @@ export default function NewsletterViewPage() {
             </Card>
           </div>
         </TabsContent>
+
+        <TabsContent value="detailed-stats" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <List className="h-5 w-5" />
+                Detailed Email Statistics
+              </CardTitle>
+              <CardDescription>
+                Individual email delivery status and complete engagement activity for each recipient (includes all opens, clicks, etc.)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {newsletter?.status !== 'sent' ? (
+                <div className="text-center py-8">
+                  <Mail className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                    Newsletter Not Sent Yet
+                  </h3>
+                  <p className="text-gray-500 dark:text-gray-400">
+                    Detailed email statistics will be available after the newsletter is sent.
+                  </p>
+                </div>
+              ) : isDetailedStatsLoading ? (
+                <div className="space-y-4">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="flex items-center space-x-4 p-4 border rounded-lg">
+                      <Skeleton className="h-10 w-10 rounded-full" />
+                      <div className="space-y-2 flex-1">
+                        <Skeleton className="h-4 w-[250px]" />
+                        <Skeleton className="h-4 w-[200px]" />
+                      </div>
+                      <Skeleton className="h-6 w-16" />
+                    </div>
+                  ))}
+                </div>
+              ) : detailedStatsData?.emails?.length ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Showing {detailedStatsData.emails.length} of {detailedStatsData.totalEmails} emails
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                        * Numbers below show total activity per recipient (including repeat opens/clicks)
+                      </p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {detailedStatsData.emails.map((email, index) => {
+                      const getStatusColor = (status: string) => {
+                        switch (status) {
+                          case 'clicked': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
+                          case 'opened': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+                          case 'bounced': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+                          case 'complained': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
+                          default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+                        }
+                      };
+                      
+                      return (
+                        <div key={email.emailId || index} className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                                <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900 dark:text-gray-100">
+                                  {email.recipient}
+                                </p>
+                                {email.resendId && (
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    ID: {email.resendId}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge className={getStatusColor(email.status)}>
+                                {email.status.charAt(0).toUpperCase() + email.status.slice(1)}
+                              </Badge>
+                              <div className="flex items-center gap-1">
+                                {/* Always show History button, with visual feedback for mock data */}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    if (email.resendId) {
+                                      fetchTrajectoryMutation.mutate(email.resendId);
+                                    } else {
+                                      toast({
+                                        title: "No Resend ID Available",
+                                        description: "This email doesn't have tracking data from Resend yet. This usually happens when emails are still being processed or if they weren't sent through Resend.",
+                                        variant: "destructive",
+                                      });
+                                    }
+                                  }}
+                                  disabled={fetchTrajectoryMutation.isPending || !email.resendId}
+                                  title={email.resendId ? "Fetch Email Trajectory from Resend" : "No Resend tracking data available"}
+                                  className={!email.resendId ? "opacity-50 cursor-not-allowed" : ""}
+                                >
+                                  {fetchTrajectoryMutation.isPending ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <History className="h-3 w-3" />
+                                  )}
+                                </Button>
+                                
+                                {email.resendId && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => window.open(`https://resend.com/emails/${email.resendId}`, '_blank')}
+                                    title="View in Resend Dashboard"
+                                  >
+                                    <ExternalLink className="h-3 w-3" />
+                                  </Button>
+                                )}
+
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+                            <div className="text-center p-2 bg-green-50 dark:bg-green-900/20 rounded">
+                              <p className="text-lg font-semibold text-green-600 dark:text-green-400">{email.opens}</p>
+                              <p className="text-xs text-green-600 dark:text-green-400">Total Opens</p>
+                            </div>
+                            <div className="text-center p-2 bg-purple-50 dark:bg-purple-900/20 rounded">
+                              <p className="text-lg font-semibold text-purple-600 dark:text-purple-400">{email.clicks}</p>
+                              <p className="text-xs text-purple-600 dark:text-purple-400">Clicks</p>
+                            </div>
+                            <div className="text-center p-2 bg-red-50 dark:bg-red-900/20 rounded">
+                              <p className="text-lg font-semibold text-red-600 dark:text-red-400">{email.bounces}</p>
+                              <p className="text-xs text-red-600 dark:text-red-400">Bounces</p>
+                            </div>
+                            <div className="text-center p-2 bg-orange-50 dark:bg-orange-900/20 rounded">
+                              <p className="text-lg font-semibold text-orange-600 dark:text-orange-400">{email.complaints}</p>
+                              <p className="text-xs text-orange-600 dark:text-orange-400">Complaints</p>
+                            </div>
+                          </div>
+                          
+                          {email.lastActivity && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                              Last activity: {formatDistanceToNow(new Date(email.lastActivity + 'Z'), { addSuffix: true })}
+                            </p>
+                          )}
+                          
+                          {email.events?.length > 0 && (
+                            <details className="mt-3">
+                              <summary className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:text-gray-900 dark:hover:text-gray-100">
+                                View Activity Timeline ({email.events.length} events)
+                              </summary>
+                              <div className="mt-2 space-y-2 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+                                {email.events.map((event, eventIndex) => (
+                                  <div key={eventIndex} className="text-xs">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                                        {event.type.replace('email.', '').charAt(0).toUpperCase() + event.type.replace('email.', '').slice(1)}
+                                      </span>
+                                      <span className="text-gray-500 dark:text-gray-400">
+                                        {formatDistanceToNow(new Date(event.timestamp + 'Z'), { addSuffix: true })}
+                                      </span>
+                                    </div>
+                                    {event.data && (
+                                      <pre className="text-xs text-gray-600 dark:text-gray-400 mt-1 whitespace-pre-wrap">
+                                        {JSON.stringify(event.data, null, 2)}
+                                      </pre>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </details>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                    No Email Data Available
+                  </h3>
+                  <p className="text-gray-500 dark:text-gray-400">
+                    Email tracking data is not yet available. This may take a few minutes after sending.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {/* Email Trajectory Modal */}
+      <Dialog open={trajectoryModalOpen} onOpenChange={setTrajectoryModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Email Trajectory History
+            </DialogTitle>
+            <DialogDescription>
+              Detailed tracking information from Resend for this email
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedTrajectory && (
+            <div className="space-y-6">
+              {/* Email Overview */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Email Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">From</p>
+                      <p className="text-sm">{selectedTrajectory.from}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">To</p>
+                      <p className="text-sm">{selectedTrajectory.to}</p>
+                    </div>
+                    <div className="md:col-span-2">
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Subject</p>
+                      <p className="text-sm">{selectedTrajectory.subject}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Status</p>
+                      <Badge className="mt-1">
+                        {selectedTrajectory.status || 'Unknown'}
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Created At</p>
+                      <p className="text-sm">
+                        {selectedTrajectory.createdAt ? 
+                          format(new Date(selectedTrajectory.createdAt), 'PPP p') : 
+                          'Unknown'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Event Timeline */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Event Timeline</CardTitle>
+                  <CardDescription>
+                    Chronological events for this email from Resend
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {selectedTrajectory.events && selectedTrajectory.events.length > 0 ? (
+                    <div className="space-y-4">
+                      {selectedTrajectory.events.map((event: any, index: number) => (
+                        <div key={index} className="flex items-start gap-3 pb-4 border-b last:border-b-0">
+                          <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                            {event.type === 'sent' && <Send className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
+                            {event.type === 'delivered' && <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />}
+                            {event.type === 'opened' && <Eye className="h-4 w-4 text-purple-600 dark:text-purple-400" />}
+                            {event.type === 'clicked' && <MousePointer className="h-4 w-4 text-orange-600 dark:text-orange-400" />}
+                            {event.type === 'bounced' && <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />}
+                            {!['sent', 'delivered', 'opened', 'clicked', 'bounced'].includes(event.type) && 
+                              <Activity className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                            }
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <p className="font-medium text-gray-900 dark:text-gray-100 capitalize">
+                                {event.type.replace('_', ' ')}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {event.timestamp ? 
+                                  formatDistanceToNow(new Date(event.timestamp), { addSuffix: true }) : 
+                                  'Unknown time'
+                                }
+                              </p>
+                            </div>
+                            {event.description && (
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                {event.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-center text-gray-500 dark:text-gray-400 py-4">
+                      No event timeline available
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Additional Metadata */}
+              {selectedTrajectory.metadata && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Additional Information</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      {selectedTrajectory.metadata.reply_to && (
+                        <div>
+                          <p className="font-medium text-gray-600 dark:text-gray-400">Reply To</p>
+                          <p>{selectedTrajectory.metadata.reply_to}</p>
+                        </div>
+                      )}
+                      {selectedTrajectory.metadata.cc && (
+                        <div>
+                          <p className="font-medium text-gray-600 dark:text-gray-400">CC</p>
+                          <p>{Array.isArray(selectedTrajectory.metadata.cc) ? 
+                            selectedTrajectory.metadata.cc.join(', ') : 
+                            selectedTrajectory.metadata.cc}
+                          </p>
+                        </div>
+                      )}
+                      {selectedTrajectory.metadata.bcc && (
+                        <div>
+                          <p className="font-medium text-gray-600 dark:text-gray-400">BCC</p>
+                          <p>{Array.isArray(selectedTrajectory.metadata.bcc) ? 
+                            selectedTrajectory.metadata.bcc.join(', ') : 
+                            selectedTrajectory.metadata.bcc}
+                          </p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-medium text-gray-600 dark:text-gray-400">Email ID</p>
+                        <p className="font-mono text-xs">{selectedTrajectory.emailId}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -46,7 +46,7 @@ export default function NewsletterPage() {
   const [location, setLocation] = useLocation();
 
   // Fetch newsletters
-  const { data: newslettersData, isLoading } = useQuery({
+  const { data: newslettersData, isLoading, error } = useQuery({
     queryKey: ['/api/newsletters'],
   });
 
@@ -78,7 +78,7 @@ export default function NewsletterPage() {
     },
   });
 
-  const newsletters: NewsletterWithUser[] = (newslettersData as any)?.newsletters || [];
+  const newsletters: (NewsletterWithUser & { opens?: number; totalOpens?: number })[] = (newslettersData as any)?.newsletters || [];
   const stats = (statsData as any) || {
     totalNewsletters: 0,
     draftNewsletters: 0,
@@ -234,7 +234,21 @@ export default function NewsletterPage() {
         </div>
 
         {/* Newsletters List */}
-        {newsletters.length === 0 ? (
+        {isLoading ? (
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+            <CardContent className="p-12 text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                <Mail className="h-10 w-10 text-white animate-pulse" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                Loading newsletters...
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                Please wait while we fetch your newsletters.
+              </p>
+            </CardContent>
+          </Card>
+        ) : newsletters.length === 0 ? (
           <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
             <CardContent className="p-12 text-center">
               <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
@@ -282,7 +296,7 @@ export default function NewsletterPage() {
                         
                         <div className="flex items-center gap-2">
                           <Eye className="h-4 w-4 text-green-500 dark:text-green-400" />
-                          {newsletter.openCount} opens
+                          {newsletter.opens || 0} unique opens
                         </div>
                         
                         <div className="flex items-center gap-2">

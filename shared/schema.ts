@@ -1092,6 +1092,7 @@ export const updateNewsletterSchema = z.object({
   selectedTagIds: z.array(z.string()).optional(),
   recipientCount: z.number().int().nonnegative().optional(),
   openCount: z.number().int().nonnegative().optional(),
+  uniqueOpenCount: z.number().int().nonnegative().optional(),
   clickCount: z.number().int().nonnegative().optional(),
 });
 
@@ -1215,4 +1216,7 @@ export type UpdateCampaignData = z.infer<typeof updateCampaignSchema>;
 
 export interface NewsletterWithUser extends Newsletter {
   user: User;
+  // API transformation fields for unique/total opens
+  opens?: number; // Unique opens (primary metric)
+  totalOpens?: number; // Total opens (includes repeats)
 }
