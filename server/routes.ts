@@ -4547,9 +4547,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const activity = await storage.createEmailActivity(activityData, tenantId);
-      
-      // Extract newsletter tracking information from email metadata and tags
+      // IMPORTANT: Extract newsletter tracking information BEFORE creating activity
+      // This ensures unique open tracking works correctly
       let newsletterId: string | undefined;
       let groupUUID: string | undefined;
       
@@ -4640,7 +4639,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update activity data with extracted newsletter ID
       activityData.newsletterId = newsletterId;
       
-      // Update contact statistics based on activity type
+      // IMPORTANT: Update newsletter stats BEFORE creating activity record
+      // This ensures unique open tracking works correctly
+      
+      // Update contact statistics and newsletter stats based on activity type
       if (activityType === 'opened') {
         await storage.updateEmailContact(contact.id, { 
           emailsOpened: (contact.emailsOpened || 0) + 1,
@@ -4649,7 +4651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Update newsletter open count if this is a newsletter email
         if (newsletterId) {
-          console.log(`[Webhook] Updating newsletter open count - newsletterId: ${newsletterId}, tenantId: ${tenantId}, contactId: ${contact.id}`);
+          console.log(`[Webhook] Updating newsletter open count BEFORE creating activity - newsletterId: ${newsletterId}, tenantId: ${tenantId}, contactId: ${contact.id}`);
           await updateNewsletterStats(newsletterId, 'email.opened', tenantId, contact.id);
         } else {
           console.log(`[Webhook] No newsletter ID found for open event - groupUUID: ${groupUUID}`);
@@ -4661,7 +4663,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Update newsletter click count if this is a newsletter email
         if (newsletterId) {
-          console.log(`[Webhook] Updating newsletter click count - newsletterId: ${newsletterId}, tenantId: ${tenantId}, contactId: ${contact.id}`);
+          console.log(`[Webhook] Updating newsletter click count BEFORE creating activity - newsletterId: ${newsletterId}, tenantId: ${tenantId}, contactId: ${contact.id}`);
           await updateNewsletterStats(newsletterId, 'email.clicked', tenantId, contact.id);
         } else {
           console.log(`[Webhook] No newsletter ID found for click event - groupUUID: ${groupUUID}`);
@@ -4694,7 +4696,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }, tenantId);
       }
 
+      // NOW create the activity record AFTER all stats updates are complete
+      // This ensures unique open tracking works correctly
+      const activity = await storage.createEmailActivity(activityData, tenantId);
+
       console.log(`[Webhook] Successfully processed ${activityType} activity for contact: ${email}`);
+      console.log(`[Webhook] Activity created with ID: ${activity.id}`);
       console.log(`[Webhook] Tracking method used: ${groupUUID ? 'GroupUUID-based' : newsletterId ? 'Newsletter ID fallback' : 'No newsletter tracking'}`);
       console.log("[Webhook] Request processing completed successfully");
       console.log("=".repeat(80));
