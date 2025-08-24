@@ -3,7 +3,7 @@ server:
   host: "0.0.0.0"
 
 temporal:
-  host_port: "172.18.0.4:7233"
+  host_port: "172.19.0.4:7233"
   namespace: "default"
   task_queue: "email-task-queue"
 

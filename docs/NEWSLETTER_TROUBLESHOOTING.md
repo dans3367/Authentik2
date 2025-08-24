@@ -40,7 +40,7 @@ The newsletter system requires **email contacts** to exist in the database befor
 
 ### 1. Check Go Server Health
 ```bash
-curl https://tengine.zendwise.work/health
+curl https://tenginew.zendwise.work/health
 ```
 
 Should return:

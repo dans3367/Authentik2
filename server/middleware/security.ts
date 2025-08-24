@@ -17,8 +17,8 @@ export const helmetMiddleware = helmet({
       connectSrc: [
         "'self'",
         "https://api.stripe.com",
-        "https://tengine.zendwise.work",
-        "https://tengine.zendwise.work/*",
+        "https://tenginew.zendwise.work",
+        "https://tenginew.zendwise.work/*",
         "https://*.zendwise.work",
         "https://*.zendwise.work/*",
         "ws:",

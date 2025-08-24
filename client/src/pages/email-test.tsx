@@ -59,7 +59,7 @@ export default function EmailTestPage() {
   const { data: serverHealth, isLoading: healthLoading, error: healthError } = useQuery({
     queryKey: ['/go-server-health'],
     queryFn: async () => {
-      const response = await fetch('https://tengine.zendwise.work/health');
+      const response = await fetch('https://tenginew.zendwise.work/health');
       if (!response.ok) throw new Error('Go server not available');
       return response.json();
     },
@@ -75,7 +75,7 @@ export default function EmailTestPage() {
         return { entries: [], count: 0 };
       }
       
-      const response = await fetch('https://tengine.zendwise.work/api/email-tracking', {
+      const response = await fetch('https://tenginew.zendwise.work/api/email-tracking', {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
@@ -110,7 +110,7 @@ export default function EmailTestPage() {
       
       console.log('🧹 [Cleanup] Starting temporal workflow cleanup');
       
-      const response = await fetch('https://tengine.zendwise.work/api/temporal/clear-workflows', {
+      const response = await fetch('https://tenginew.zendwise.work/api/temporal/clear-workflows', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -270,7 +270,7 @@ export default function EmailTestPage() {
       };
 
       console.log('🚀 [Campaign] Sending request to Go server:', {
-        url: 'https://tengine.zendwise.work/api/email-tracking',
+        url: 'https://tenginew.zendwise.work/api/email-tracking',
         tokenLength: token.length,
         emailId: emailId,
         payload: payload,
@@ -278,7 +278,7 @@ export default function EmailTestPage() {
         scheduledAt: campaignData.scheduledAt
       });
 
-      const response = await fetch('https://tengine.zendwise.work/api/email-tracking', {
+      const response = await fetch('https://tenginew.zendwise.work/api/email-tracking', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -799,7 +799,7 @@ export default function EmailTestPage() {
                   Go server is offline or unreachable
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Make sure the server is accessible at https://tengine.zendwise.work
+                  Make sure the server is accessible at https://tenginew.zendwise.work
                 </p>
               </div>
             ) : serverHealth ? (

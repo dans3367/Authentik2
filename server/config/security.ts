@@ -112,7 +112,7 @@ export const securityConfig = {
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https://api.stripe.com", "https://tengine.zendwise.work", "https://tengine.zendwise.work/api/*", "https://tengine.zendwise.work/health"],
+      connectSrc: ["'self'", "https://api.stripe.com", "https://tenginew.zendwise.work", "https://tenginew.zendwise.work/api/*", "https://tenginew.zendwise.work/health"],
       frameSrc: ["'self'", "https://js.stripe.com", "https://hooks.stripe.com"],
     },
   },

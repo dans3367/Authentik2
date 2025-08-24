@@ -5,7 +5,7 @@ server:
   host: "0.0.0.0"
   
 temporal:
-  host: "172.18.0.4:7233"
+  host: "172.19.0.4:7233"
   namespace: "default"
   retry_attempts: 5
   retry_delay: "2s"
@@ -22,7 +22,7 @@ security:
       - "http://localhost:5000"                 # Local development (main app)
       - "https://app.zendwise.work"             # Production main app
       - "https://zendwise.work"                 # Production main domain
-      - "https://tengine.zendwise.work"         # Go server subdomain
+      - "https://tenginew.zendwise.work"         # Go server subdomain
       - "https://authentik.zendwise.work"       # Authentik subdomain
       - "https://637573c3-49ca-4c2a-a66f-8a199454d465-00-1y6orip6wcu6p.janeway.replit.dev" # Replit development domain
     allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]

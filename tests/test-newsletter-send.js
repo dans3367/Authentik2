@@ -45,7 +45,7 @@ async function testNewsletterSend() {
   console.log('Payload:', JSON.stringify(testPayload, null, 2));
   
   try {
-    const goServerResponse = await fetch('https://tengine.zendwise.work/api/email-tracking', {
+    const goServerResponse = await fetch('https://tenginew.zendwise.work/api/email-tracking', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,

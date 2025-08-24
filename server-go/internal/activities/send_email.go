@@ -258,7 +258,7 @@ func (ea *EmailActivity) SendApprovalEmail(ctx context.Context, emailData EmailD
 
 	base := ea.approveBase
 	if base == "" {
-		base = "https://tengine.zendwise.work"
+		base = "https://tenginew.zendwise.work"
 	}
 	approveURL := fmt.Sprintf("%s/approve-email?token=%s", base, url.QueryEscape(signed))
 
@@ -349,7 +349,7 @@ func (ea *EmailActivity) SendReviewerNotificationEmail(ctx context.Context, emai
 
 	base := ea.approveBase
 	if base == "" {
-		base = "https://tengine.zendwise.work"
+		base = "https://tenginew.zendwise.work"
 	}
 	approveURL := fmt.Sprintf("%s/approve-email?token=%s", base, url.QueryEscape(signed))
 

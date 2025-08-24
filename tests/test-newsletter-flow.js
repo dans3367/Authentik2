@@ -5,7 +5,7 @@ const fetch = require('node-fetch');
 
 const JWT_SECRET = 'Cvgii9bYKF1HtfD8TODRyZFTmFP4vu70oR59YrjGVpS2fXzQ41O3UPRaR8u9uAqNhwK5ZxZPbX5rAOlMrqe8ag==';
 const API_BASE = 'http://localhost:4000/api';
-const GO_SERVER = 'https://tengine.zendwise.work';
+const GO_SERVER = 'https://tenginew.zendwise.work';
 
 // Test user credentials - you'll need to update these with actual user data
 const TEST_USER = {

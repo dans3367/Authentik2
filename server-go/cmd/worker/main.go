@@ -72,7 +72,7 @@ func main() {
 		config.Email.ResendAPIKey,
 		config.Email.FromEmail,
 		config.JWT.Secret,
-		firstNonEmpty(config.Approvals.ApproveBaseURL, os.Getenv("GO_EMAIL_SERVER_BASE_URL"), "https://tengine.zendwise.work"),
+		firstNonEmpty(config.Approvals.ApproveBaseURL, os.Getenv("GO_EMAIL_SERVER_BASE_URL"), "https://tenginew.zendwise.work"),
 		log,
 	)
 
@@ -167,7 +167,7 @@ func loadConfigFromEnv() *Config {
 			Namespace string `yaml:"namespace"`
 			TaskQueue string `yaml:"task_queue"`
 		}{
-			HostPort:  getEnvOrDefault("TEMPORAL_HOST", "172.18.0.4:7233"),
+			HostPort:  getEnvOrDefault("TEMPORAL_HOST", "172.19.0.47233"),
 			Namespace: getEnvOrDefault("TEMPORAL_NAMESPACE", "default"),
 			TaskQueue: getEnvOrDefault("TEMPORAL_TASK_QUEUE", "email-task-queue"),
 		},
@@ -190,7 +190,7 @@ func loadConfigFromEnv() *Config {
 		Approvals: struct {
 			ApproveBaseURL string `yaml:"approve_base_url"`
 		}{
-			ApproveBaseURL: getEnvOrDefault("GO_EMAIL_SERVER_BASE_URL", "https://tengine.zendwise.work"),
+			ApproveBaseURL: getEnvOrDefault("GO_EMAIL_SERVER_BASE_URL", "https://tenginew.zendwise.work"),
 		},
 		Logging: struct {
 			Level  string `yaml:"level"`

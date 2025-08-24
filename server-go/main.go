@@ -84,7 +84,7 @@ func main() {
 }
 
 func (s *Server) initTemporal() error {
-	temporalHost := getEnvOrDefault("TEMPORAL_HOST", "172.18.0.4:7233")
+	temporalHost := getEnvOrDefault("TEMPORAL_HOST", "172.19.0.4:7233")
 	maxRetries := 5
 	retryDelay := 2 * time.Second
 
@@ -371,7 +371,7 @@ func enableCORS(next http.Handler) http.Handler {
 			"http://localhost:5000",           // Local development (main app)
 			"https://app.zendwise.work",       // Production main app
 			"https://zendwise.work",           // Production main domain
-			"https://tengine.zendwise.work",   // Go server subdomain
+			"https://tenginew.zendwise.work",  // Go server subdomain
 			"https://authentik.zendwise.work", // Authentik subdomain if exists
 			"https://637573c3-49ca-4c2a-a66f-8a199454d465-00-1y6orip6wcu6p.janeway.replit.dev", // Replit development domain
 		}
@@ -422,8 +422,8 @@ func (s *Server) startEmailWorkflow(entry EmailTrackingEntry) {
 	defer cancel()
 
 	// Determine task queue and workflow based on provider
-	taskQueue := "email-task-queue"     // Default to Resend
-	workflowName := "EmailWorkflow"     // Default workflow
+	taskQueue := "email-task-queue" // Default to Resend
+	workflowName := "EmailWorkflow" // Default workflow
 
 	// Check if Postmark provider is specified in metadata
 	if entry.Metadata != nil {

@@ -88,7 +88,7 @@ export default function NewsletterEditPage() {
   const { data: serverHealth, isLoading: healthLoading, error: healthError } = useQuery({
     queryKey: ['/go-server-health'],
     queryFn: async () => {
-      const response = await fetch('https://tengine.zendwise.work/health');
+      const response = await fetch('https://tenginew.zendwise.work/health');
       if (!response.ok) throw new Error('Go server not available');
       return response.json();
     },

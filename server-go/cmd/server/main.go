@@ -182,7 +182,7 @@ func loadConfigFromEnv() *Config {
 			Namespace string `yaml:"namespace"`
 			TaskQueue string `yaml:"task_queue"`
 		}{
-			HostPort:  getEnvOrDefault("TEMPORAL_HOST", "172.18.0.4:7233"),
+			HostPort:  getEnvOrDefault("TEMPORAL_HOST", "172.19.0.4:7233"),
 			Namespace: getEnvOrDefault("TEMPORAL_NAMESPACE", "default"),
 			TaskQueue: getEnvOrDefault("TEMPORAL_TASK_QUEUE", "email-task-queue"),
 		},
@@ -211,7 +211,7 @@ func enableCORS(next http.Handler) http.Handler {
 			"http://localhost:5000",           // Local development (main app)
 			"https://app.zendwise.work",       // Production main app
 			"https://zendwise.work",           // Production main domain
-			"https://tengine.zendwise.work",   // Go server subdomain
+			"https://tenginew.zendwise.work",  // Go server subdomain
 			"https://authentik.zendwise.work", // Authentik subdomain if exists
 			"https://637573c3-49ca-4c2a-a66f-8a199454d465-00-1y6orip6wcu6p.janeway.replit.dev", // Replit development domain
 		}
