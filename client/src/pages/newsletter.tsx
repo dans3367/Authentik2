@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { 
@@ -64,14 +64,20 @@ export default function NewsletterPage() {
   const queryClient = useQueryClient();
   const [location, setLocation] = useLocation();
 
-  // Fetch newsletters
-  const { data: newslettersData, isLoading, error } = useQuery({
+  // Fetch newsletters with fresh data on each page load
+  const { data: newslettersData, isLoading, error, refetch } = useQuery({
     queryKey: ['/api/newsletters'],
+    staleTime: 0, // Always consider data stale to ensure fresh fetches
+    refetchOnMount: 'always', // Always refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window regains focus
   });
 
-  // Fetch newsletter stats
-  const { data: statsData } = useQuery({
+  // Fetch newsletter stats with fresh data on each page load
+  const { data: statsData, refetch: refetchStats } = useQuery({
     queryKey: ['/api/newsletter-stats'],
+    staleTime: 0, // Always consider data stale to ensure fresh fetches
+    refetchOnMount: 'always', // Always refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window regains focus
   });
 
   // Delete newsletter mutation
@@ -128,6 +134,12 @@ export default function NewsletterPage() {
       deleteNewsletterMutation.mutate(newsletterToDelete);
     }
   };
+
+  // Force refresh data when component mounts or location changes
+  useEffect(() => {
+    refetch();
+    refetchStats();
+  }, [location, refetch, refetchStats]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
