@@ -43,8 +43,8 @@ export default function EmailActivityTimelineModal({
   });
 
   const resolvedContactId = contactId || contactData?.id;
-  const displayName = contactName || contactData?.firstName && contactData?.lastName 
-    ? `${contactData.firstName} ${contactData.lastName}`.trim()
+  const displayName = contactName || (contactData?.firstName && contactData?.lastName) 
+    ? `${contactData?.firstName} ${contactData?.lastName}`.trim()
     : contactEmail || contactData?.email || 'Contact';
 
   const handleOpenModal = () => {
