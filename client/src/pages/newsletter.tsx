@@ -228,24 +228,24 @@ export default function NewsletterPage() {
       <div className="min-h-screen bg-background">
         <div className="container mx-auto p-6 space-y-8">
         {/* Header */}
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-4 sm:gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-2">
-            <h1 className="text-4xl font-bold tracking-tight">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">
               Email Newsletters
             </h1>
-            <p className="text-muted-foreground text-lg">
+            <p className="text-muted-foreground text-sm sm:text-base lg:text-lg">
               Create and manage email campaigns to engage your subscribers
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button 
                   variant="outline"
                   size="sm"
-                  className="h-9 px-3"
+                  className="h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm"
                 >
-                  <Filter className="h-4 w-4 mr-2" />
+                  <Filter className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   Filter
                 </Button>
               </TooltipTrigger>
@@ -256,9 +256,9 @@ export default function NewsletterPage() {
             <Button 
               onClick={() => setLocation('/newsletter/create')} 
               size="sm"
-              className="h-9 px-4 shadow-sm"
+              className="h-8 sm:h-9 px-3 sm:px-4 shadow-sm text-xs sm:text-sm"
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               Create Newsletter
             </Button>
           </div>

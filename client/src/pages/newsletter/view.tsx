@@ -475,150 +475,152 @@ export default function NewsletterViewPage() {
     : '0';
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3 sm:gap-4">
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={() => navigate('/newsletter')}
-            className="hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0 mt-1"
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 mb-2">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 truncate">
                 {newsletter.title}
               </h1>
               {getStatusBadge(newsletter.status)}
             </div>
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 break-words">
               Subject: {newsletter.subject}
             </p>
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {newsletter.status === 'draft' && (
             <Button 
               onClick={() => navigate(`/newsletters/${newsletter.id}/edit`)}
               variant="outline"
+              size="sm"
+              className="w-full sm:w-auto"
             >
               <Edit className="h-4 w-4 mr-2" />
-              Edit
+              <span className="sm:inline">Edit</span>
             </Button>
           )}
-          <Button onClick={() => window.print()} variant="outline">
+          <Button onClick={() => window.print()} variant="outline" size="sm" className="w-full sm:w-auto">
             <Settings className="h-4 w-4 mr-2" />
-            Options
+            <span className="sm:inline">Options</span>
           </Button>
         </div>
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-3 sm:p-4 lg:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                <p className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400">
                   Recipients
                 </p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100">
                   {(newsletter.recipientCount || 0).toLocaleString()}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   Total sent to
                 </p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                <Users className="text-white w-6 h-6" />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                <Users className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-3 sm:p-4 lg:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-green-600 dark:text-green-400">
+                <p className="text-xs sm:text-sm font-medium text-green-600 dark:text-green-400">
                   Unique Opens
                 </p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100">
                   {newsletter.opens || 0}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   {uniqueOpenRate}% unique rate
                 </p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
-                <Eye className="text-white w-6 h-6" />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+                <Eye className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-3 sm:p-4 lg:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-purple-600 dark:text-purple-400">
+                <p className="text-xs sm:text-sm font-medium text-purple-600 dark:text-purple-400">
                   Clicks
                 </p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100">
                   {newsletter.clickCount}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   {clickThroughRate}% CTR
                 </p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <MousePointer className="text-white w-6 h-6" />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+                <MousePointer className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-3 sm:p-4 lg:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-red-600 dark:text-red-400">
+                <p className="text-xs sm:text-sm font-medium text-red-600 dark:text-red-400">
                   Bounces
                 </p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100">
                   {detailedStatsData?.emails?.reduce((total, email) => total + (email.bounces || 0), 0) || 0}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   Total delivery failures
                 </p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center">
-                <AlertTriangle className="text-white w-6 h-6" />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center">
+                <AlertTriangle className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-3 sm:p-4 lg:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-orange-600 dark:text-orange-400">
+                <p className="text-xs sm:text-sm font-medium text-orange-600 dark:text-orange-400">
                   Complaints
                 </p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100">
                   {detailedStatsData?.emails?.reduce((total, email) => total + (email.complaints || 0), 0) || 0}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   Spam reports received
                 </p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
-                <XCircle className="text-white w-6 h-6" />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
+                <XCircle className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
               </div>
             </div>
           </CardContent>
@@ -626,17 +628,19 @@ export default function NewsletterViewPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="content">Content</TabsTrigger>
-          <TabsTrigger value="status">Task Status</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="detailed-stats">Detailed Stats</TabsTrigger>
-        </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+        <div className="overflow-x-auto">
+          <TabsList className="grid w-full grid-cols-5 min-w-max">
+            <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
+            <TabsTrigger value="content" className="text-xs sm:text-sm">Content</TabsTrigger>
+            <TabsTrigger value="status" className="text-xs sm:text-sm">Task Status</TabsTrigger>
+            <TabsTrigger value="analytics" className="text-xs sm:text-sm">Analytics</TabsTrigger>
+            <TabsTrigger value="detailed-stats" className="text-xs sm:text-sm">Detailed Stats</TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
+        <TabsContent value="overview" className="space-y-4 sm:space-y-6">
+          <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
             {/* Newsletter Details */}
             <Card>
               <CardHeader>
@@ -646,7 +650,7 @@ export default function NewsletterViewPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div>
                     <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Created</p>
                     <p className="text-sm text-gray-900 dark:text-gray-100">
@@ -984,8 +988,8 @@ export default function NewsletterViewPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
+        <TabsContent value="analytics" className="space-y-4 sm:space-y-6">
+          <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1008,7 +1012,7 @@ export default function NewsletterViewPage() {
                   <Progress value={parseFloat(clickThroughRate)} className="h-2" />
                   
                   <div className="pt-4 border-t">
-                    <div className="grid grid-cols-2 gap-4 text-center">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-center">
                       <div>
                         <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                           {newsletter.opens || 0}
@@ -1083,7 +1087,7 @@ export default function NewsletterViewPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="detailed-stats" className="space-y-6">
+        <TabsContent value="detailed-stats" className="space-y-4 sm:space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1129,13 +1133,13 @@ export default function NewsletterViewPage() {
                         * Numbers below show total activity per recipient (including repeat opens/clicks)
                       </p>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+                    <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="w-full sm:w-auto">
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Refresh
                     </Button>
                   </div>
                   
-                  <div className="space-y-3">
+                  <div className="space-y-3 sm:space-y-4">
                     {detailedStatsData.emails.map((email, index) => {
                       const getStatusColor = (status: string) => {
                         switch (status) {
@@ -1232,7 +1236,7 @@ export default function NewsletterViewPage() {
                             </div>
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-4 mb-3">
+                          <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-3">
                             <div className="text-center p-2 bg-green-50 dark:bg-green-900/20 rounded">
                               <p className="text-lg font-semibold text-green-600 dark:text-green-400">{email.opens}</p>
                               <p className="text-xs text-green-600 dark:text-green-400">Total Opens</p>
@@ -1288,7 +1292,7 @@ export default function NewsletterViewPage() {
 
       {/* Email Trajectory Modal */}
       <Dialog open={trajectoryModalOpen} onOpenChange={setTrajectoryModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-2xl h-[85vh] sm:h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <History className="h-5 w-5" />
@@ -1312,7 +1316,7 @@ export default function NewsletterViewPage() {
                   <CardTitle className="text-lg">Email Details</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-3 sm:gap-4">
                     <div>
                       <p className="text-sm font-medium text-gray-600 dark:text-gray-400">From</p>
                       <p className="text-sm">{selectedTrajectory.from}</p>
@@ -1354,7 +1358,7 @@ export default function NewsletterViewPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
                       <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                         <div className="flex items-center justify-center w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full mx-auto mb-2">
                           <Activity className="h-4 w-4 text-blue-600 dark:text-blue-400" />
