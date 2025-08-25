@@ -35,6 +35,7 @@ import {
   createShopSchema,
   updateShopSchema,
   type ContactFilters,
+  type BouncedEmailFilters,
 } from "@shared/schema";
 import Stripe from "stripe";
 import { randomBytes, randomUUID } from "crypto";
