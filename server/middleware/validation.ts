@@ -85,7 +85,7 @@ export const createUserValidation = [
   nameValidation("firstName"),
   nameValidation("lastName"),
   body("role")
-    .isIn(["Owner", "Administrator", "Manager", "Employee"])
+    .isIn(["Administrator", "Manager", "Employee"])
     .withMessage("Invalid role"),
 ];
 
@@ -96,7 +96,7 @@ export const updateUserValidation = [
   nameValidation("lastName").optional(),
   body("role")
     .optional()
-    .isIn(["Owner", "Administrator", "Manager", "Employee"]),
+    .isIn(["Administrator", "Manager", "Employee"]),
 ];
 
 // Form validations
