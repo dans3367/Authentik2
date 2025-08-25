@@ -145,8 +145,8 @@ export default function NewsletterPage() {
   if (isLoading) {
     return (
       <TooltipProvider>
-        <div className="min-h-screen bg-background">
-          <div className="container mx-auto p-6 space-y-8">
+        <div className="w-full">
+          <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8">
             {/* Header Skeleton */}
             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div className="space-y-3">
@@ -160,7 +160,7 @@ export default function NewsletterPage() {
             </div>
 
             {/* Search Bar Skeleton */}
-            <Card className="p-6">
+            <Card className="p-4 sm:p-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <Skeleton className="h-10 w-full max-w-sm" />
                 <div className="flex items-center gap-2">
@@ -173,7 +173,7 @@ export default function NewsletterPage() {
             </Card>
 
             {/* Stats Cards Skeleton */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
               {Array.from({ length: 4 }).map((_, i) => (
                 <Card key={i}>
                   <CardContent className="p-6">
@@ -225,10 +225,10 @@ export default function NewsletterPage() {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-background">
-        <div className="container mx-auto p-6 space-y-8">
+      <div className="w-full">
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8">
         {/* Header */}
-        <div className="flex flex-col gap-4 sm:gap-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
           <div className="space-y-2">
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">
               Email Newsletters
@@ -237,7 +237,7 @@ export default function NewsletterPage() {
               Create and manage email campaigns to engage your subscribers
             </p>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap lg:flex-nowrap lg:justify-end">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button 
@@ -265,7 +265,7 @@ export default function NewsletterPage() {
         </div>
 
         {/* Search Bar */}
-        <Card className="p-6">
+        <Card className="p-4 sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -287,8 +287,8 @@ export default function NewsletterPage() {
               )}
             </div>
             <Separator orientation="vertical" className="hidden sm:block h-6" />
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-medium text-muted-foreground">Filter:</span>
+            <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap">
+              <span className="text-sm font-medium text-muted-foreground hidden sm:inline">Filter:</span>
               <Button
                 variant={statusFilter === "all" ? "default" : "outline"}
                 size="sm"
@@ -326,7 +326,7 @@ export default function NewsletterPage() {
         </Card>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
           <Card className="group transition-all duration-200 hover:shadow-lg hover:shadow-primary/5 border-border/50 hover:border-primary/20">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -464,48 +464,50 @@ export default function NewsletterPage() {
           <div className="space-y-4">
             {filteredNewsletters.map((newsletter) => (
               <Card key={newsletter.id} className="group cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 border-border/50 hover:border-primary/20 hover:bg-accent/5">
-                <CardContent className="p-6">
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0 space-y-4">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                        <h3 className="text-lg font-semibold truncate group-hover:text-primary transition-colors duration-200">
+                    <div className="flex-1 min-w-0 space-y-3 sm:space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+                        <h3 className="text-lg font-semibold truncate group-hover:text-primary transition-colors duration-200 sm:flex-1">
                           {newsletter.title}
                         </h3>
-                        {getStatusBadge(newsletter.status)}
+                        <div className="sm:flex-shrink-0">
+                          {getStatusBadge(newsletter.status)}
+                        </div>
                       </div>
                       
                       <p className="text-muted-foreground/90 line-clamp-2 leading-relaxed text-sm">
                         {newsletter.subject}
                       </p>
                       
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 text-sm text-muted-foreground/80">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-sm text-muted-foreground/80">
                         <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground/60" />
-                          <span className="font-medium">{format(new Date(newsletter.createdAt || new Date()), 'MMM d, yyyy')}</span>
+                          <Calendar className="h-4 w-4 text-muted-foreground/60 flex-shrink-0" />
+                          <span className="font-medium truncate">{format(new Date(newsletter.createdAt || new Date()), 'MMM d, yyyy')}</span>
                         </div>
                         
                         <div className="flex items-center gap-2">
-                          <TrendingUp className="h-4 w-4 text-emerald-500" />
+                          <TrendingUp className="h-4 w-4 text-emerald-500 flex-shrink-0" />
                           <span className="font-medium">{newsletter.opens || 0} opens</span>
                         </div>
                         
                         <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 text-blue-500" />
+                          <Users className="h-4 w-4 text-blue-500 flex-shrink-0" />
                           <span className="font-medium">{newsletter.recipientCount} recipients</span>
                         </div>
                         
-                        <div className="flex items-center gap-3 pt-1 sm:pt-0">
-                          <Avatar className="h-6 w-6 ring-2 ring-background shadow-sm">
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6 ring-2 ring-background shadow-sm flex-shrink-0">
                             <AvatarFallback className="text-xs font-semibold bg-gradient-to-br from-primary/10 to-primary/5 text-primary">
                               {newsletter.user.firstName?.[0]}{newsletter.user.lastName?.[0]}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="text-sm font-medium">by {newsletter.user.firstName} {newsletter.user.lastName}</span>
+                          <span className="text-sm font-medium truncate">by {newsletter.user.firstName} {newsletter.user.lastName}</span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1 lg:ml-6 self-start lg:self-center">
+                    <div className="flex items-center gap-1 lg:ml-6 self-start lg:self-start pt-2 lg:pt-0">
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button 
