@@ -518,7 +518,7 @@ export default function NewsletterViewPage() {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-6">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -586,18 +586,39 @@ export default function NewsletterViewPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-orange-600 dark:text-orange-400">
-                  Performance
+                <p className="text-sm font-medium text-red-600 dark:text-red-400">
+                  Bounces
                 </p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-                  {(newsletter.opens || 0) > 0 ? 'Good' : 'Pending'}
+                  {detailedStatsData?.emails?.reduce((total, email) => total + (email.bounces || 0), 0) || 0}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Based on unique opens
+                  Total delivery failures
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center">
+                <AlertTriangle className="text-white w-6 h-6" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-orange-600 dark:text-orange-400">
+                  Complaints
+                </p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                  {detailedStatsData?.emails?.reduce((total, email) => total + (email.complaints || 0), 0) || 0}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Spam reports received
                 </p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
-                <TrendingUp className="text-white w-6 h-6" />
+                <XCircle className="text-white w-6 h-6" />
               </div>
             </div>
           </CardContent>
@@ -1211,7 +1232,7 @@ export default function NewsletterViewPage() {
                             </div>
                           </div>
                           
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+                          <div className="grid grid-cols-2 gap-4 mb-3">
                             <div className="text-center p-2 bg-green-50 dark:bg-green-900/20 rounded">
                               <p className="text-lg font-semibold text-green-600 dark:text-green-400">{email.opens}</p>
                               <p className="text-xs text-green-600 dark:text-green-400">Total Opens</p>
@@ -1219,14 +1240,6 @@ export default function NewsletterViewPage() {
                             <div className="text-center p-2 bg-purple-50 dark:bg-purple-900/20 rounded">
                               <p className="text-lg font-semibold text-purple-600 dark:text-purple-400">{email.clicks}</p>
                               <p className="text-xs text-purple-600 dark:text-purple-400">Clicks</p>
-                            </div>
-                            <div className="text-center p-2 bg-red-50 dark:bg-red-900/20 rounded">
-                              <p className="text-lg font-semibold text-red-600 dark:text-red-400">{email.bounces}</p>
-                              <p className="text-xs text-red-600 dark:text-red-400">Bounces</p>
-                            </div>
-                            <div className="text-center p-2 bg-orange-50 dark:bg-orange-900/20 rounded">
-                              <p className="text-lg font-semibold text-orange-600 dark:text-orange-400">{email.complaints}</p>
-                              <p className="text-xs text-orange-600 dark:text-orange-400">Complaints</p>
                             </div>
                           </div>
                           
