@@ -358,6 +358,31 @@ export const emailActivity = pgTable("email_activity", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Universal bounced emails list - prevents sending to any email that has ever bounced
+export const bouncedEmails = pgTable("bounced_emails", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(), // The bounced email address
+  bounceType: text("bounce_type").notNull().default('hard'), // 'hard', 'soft', 'complaint'
+  bounceReason: text("bounce_reason"), // Detailed reason for the bounce
+  bounceSubType: text("bounce_sub_type"), // More specific bounce classification
+  firstBouncedAt: timestamp("first_bounced_at").notNull(), // When this email first bounced
+  lastBouncedAt: timestamp("last_bounced_at").notNull(), // Most recent bounce
+  bounceCount: integer("bounce_count").default(1), // Number of times this email has bounced
+  // Source information
+  sourceTenantId: varchar("source_tenant_id").references(() => tenants.id), // Tenant where first bounce occurred
+  sourceNewsletterId: varchar("source_newsletter_id").references(() => newsletters.id), // Newsletter that caused first bounce
+  sourceCampaignId: varchar("source_campaign_id").references(() => campaigns.id), // Campaign that caused first bounce
+  // Webhook information
+  webhookId: text("webhook_id"), // Resend webhook event ID that triggered this
+  webhookData: text("webhook_data"), // Full webhook payload for debugging
+  // Status tracking
+  isActive: boolean("is_active").default(true), // Whether this bounce is still active
+  suppressionReason: text("suppression_reason"), // Why this email is suppressed
+  lastAttemptedAt: timestamp("last_attempted_at"), // Last time we tried to send to this email
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const tenantRelations = relations(tenants, ({ many }) => ({
   users: many(users),
@@ -375,6 +400,7 @@ export const tenantRelations = relations(tenants, ({ many }) => ({
   newsletters: many(newsletters),
   campaigns: many(campaigns),
   emailActivities: many(emailActivity),
+  bouncedEmails: many(bouncedEmails),
 }));
 
 export const userRelations = relations(users, ({ one, many }) => ({
@@ -951,6 +977,21 @@ export const emailActivityRelations = relations(emailActivity, ({ one }) => ({
   }),
 }));
 
+export const bouncedEmailRelations = relations(bouncedEmails, ({ one }) => ({
+  sourceTenant: one(tenants, {
+    fields: [bouncedEmails.sourceTenantId],
+    references: [tenants.id],
+  }),
+  sourceNewsletter: one(newsletters, {
+    fields: [bouncedEmails.sourceNewsletterId],
+    references: [newsletters.id],
+  }),
+  sourceCampaign: one(campaigns, {
+    fields: [bouncedEmails.sourceCampaignId],
+    references: [campaigns.id],
+  }),
+}));
+
 // Email contact schemas
 export const createEmailContactSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -1219,4 +1260,59 @@ export interface NewsletterWithUser extends Newsletter {
   // API transformation fields for unique/total opens
   opens?: number; // Unique opens (primary metric)
   totalOpens?: number; // Total opens (includes repeats)
+}
+
+// Bounced emails schemas
+export const createBouncedEmailSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  bounceType: z.enum(['hard', 'soft', 'complaint']).default('hard'),
+  bounceReason: z.string().optional(),
+  bounceSubType: z.string().optional(),
+  firstBouncedAt: z.date(),
+  lastBouncedAt: z.date(),
+  bounceCount: z.number().int().positive().default(1),
+  sourceTenantId: z.string().uuid().optional(),
+  sourceNewsletterId: z.string().uuid().optional(),
+  sourceCampaignId: z.string().uuid().optional(),
+  webhookId: z.string().optional(),
+  webhookData: z.string().optional(),
+  suppressionReason: z.string().optional(),
+  lastAttemptedAt: z.date().optional(),
+});
+
+export const updateBouncedEmailSchema = z.object({
+  bounceType: z.enum(['hard', 'soft', 'complaint']).optional(),
+  bounceReason: z.string().optional(),
+  bounceSubType: z.string().optional(),
+  lastBouncedAt: z.date().optional(),
+  bounceCount: z.number().int().positive().optional(),
+  isActive: z.boolean().optional(),
+  suppressionReason: z.string().optional(),
+  lastAttemptedAt: z.date().optional(),
+});
+
+export const insertBouncedEmailSchema = createInsertSchema(bouncedEmails).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Bounced emails types
+export type BouncedEmail = typeof bouncedEmails.$inferSelect;
+export type InsertBouncedEmail = z.infer<typeof insertBouncedEmailSchema>;
+export type CreateBouncedEmailData = z.infer<typeof createBouncedEmailSchema>;
+export type UpdateBouncedEmailData = z.infer<typeof updateBouncedEmailSchema>;
+
+// Extended types for bounced emails with relations
+export interface BouncedEmailWithDetails extends BouncedEmail {
+  sourceTenant?: Tenant;
+  sourceNewsletter?: Newsletter;
+  sourceCampaign?: Campaign;
+}
+
+export interface BouncedEmailFilters {
+  search?: string;
+  bounceType?: 'hard' | 'soft' | 'complaint' | 'all';
+  isActive?: boolean;
+  tenantId?: string;
 }

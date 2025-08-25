@@ -15,6 +15,7 @@ import {
   MousePointer,
   CheckCircle,
   AlertCircle,
+  AlertTriangle,
   XCircle,
   RefreshCw,
   Newspaper,
@@ -130,24 +131,114 @@ export default function NewsletterViewPage() {
     },
   });
 
-  // Fetch email trajectory from Resend
-  const fetchTrajectoryMutation = useMutation({
-    mutationFn: async (resendId: string) => {
-      const response = await apiRequest('GET', `/api/emails/${resendId}/trajectory`);
-      return response.json();
-    },
-    onSuccess: (data) => {
-      setSelectedTrajectory(data.trajectory);
-      setTrajectoryModalOpen(true);
-    },
-    onError: (error: any) => {
+  // Open trajectory modal using detailed stats data
+  const openTrajectoryModal = (resendId: string) => {
+    if (!detailedStatsData?.emails) {
       toast({
         title: "Error",
-        description: error.message || "Failed to fetch email trajectory",
+        description: "Email data not available. Please wait for the data to load.",
         variant: "destructive",
       });
-    },
-  });
+      return;
+    }
+
+    // Find the email with matching resendId from detailed stats
+    const emailData = detailedStatsData.emails.find(email => email.resendId === resendId);
+    
+    if (!emailData) {
+      toast({
+        title: "Error",
+        description: "Email tracking data not found.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Transform the detailed stats data into trajectory format
+    const trajectory = {
+      emailId: resendId,
+      from: newsletter?.user?.email || 'Unknown',
+      to: emailData.recipient,
+      subject: newsletter?.subject || 'Unknown',
+      status: emailData.status,
+      createdAt: newsletter?.sentAt || newsletter?.createdAt,
+      totalEvents: (emailData.events?.length || 0) + 1, // +1 for the sent event
+      totalOpens: emailData.opens || 0,
+      totalClicks: emailData.clicks || 0,
+      events: [
+        // Always include a sent event first
+        {
+          type: 'sent',
+          timestamp: newsletter?.sentAt || newsletter?.createdAt,
+          description: `Email sent to ${emailData.recipient}`,
+          email: emailData.recipient,
+          source: 'system'
+        },
+        // Add all tracked events from the database
+        ...(emailData.events?.map((event: any, index: number) => ({
+          type: event.type,
+          timestamp: event.timestamp,
+          description: getEventDescription(event.type, emailData.recipient, event.data),
+          email: emailData.recipient,
+          userAgent: event.data?.userAgent,
+          ipAddress: event.data?.ipAddress,
+          activityData: event.data,
+          webhookData: event.webhookData,
+          source: 'database'
+        })) || [])
+      ].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
+      metadata: {
+        recipient: emailData.recipient,
+        opens: emailData.opens,
+        clicks: emailData.clicks,
+        bounces: emailData.bounces,
+        complaints: emailData.complaints
+      }
+    };
+
+    setSelectedTrajectory(trajectory);
+    setTrajectoryModalOpen(true);
+  };
+
+  // Helper function to create descriptive event descriptions
+  const getEventDescription = (type: string, email: string, data: any) => {
+    switch (type) {
+      case 'sent':
+        return `Email sent to ${email}`;
+      case 'delivered':
+        return `Email delivered to ${email}`;
+      case 'opened':
+        let description = `Email opened by ${email}`;
+        if (data?.userAgent) {
+          const ua = data.userAgent;
+          if (ua.includes('iPhone') || ua.includes('iPad')) {
+            description += ' on iOS device';
+          } else if (ua.includes('Android')) {
+            description += ' on Android device';
+          } else if (ua.includes('Windows')) {
+            description += ' on Windows';
+          } else if (ua.includes('Mac')) {
+            description += ' on Mac';
+          }
+        }
+        if (data?.ipAddress) {
+          description += ` (IP: ${data.ipAddress})`;
+        }
+        return description;
+      case 'clicked':
+        let clickDesc = `Link clicked by ${email}`;
+        if (data?.url) {
+          clickDesc += ` - ${data.url}`;
+        }
+        return clickDesc;
+      case 'bounced':
+        return `Email bounced for ${email}`;
+      case 'complained':
+        return `Spam complaint from ${email}`;
+      default:
+        return `Email ${type} for ${email}`;
+    }
+  };
 
   const taskStatuses = taskStatusData?.taskStatuses || [];
 
@@ -1063,24 +1154,20 @@ export default function NewsletterViewPage() {
                                   size="sm"
                                   onClick={() => {
                                     if (email.resendId) {
-                                      fetchTrajectoryMutation.mutate(email.resendId);
+                                      openTrajectoryModal(email.resendId);
                                     } else {
                                       toast({
-                                        title: "No Resend ID Available",
-                                        description: "This email doesn't have tracking data from Resend yet. This usually happens when emails are still being processed or if they weren't sent through Resend.",
+                                        title: "No Tracking Data Available",
+                                        description: "This email doesn't have activity tracking data yet. This usually happens when emails are still being processed.",
                                         variant: "destructive",
                                       });
                                     }
                                   }}
-                                  disabled={fetchTrajectoryMutation.isPending || !email.resendId}
-                                  title={email.resendId ? "Fetch Email Trajectory from Resend" : "No Resend tracking data available"}
+                                  disabled={!email.resendId}
+                                  title={email.resendId ? "View Email Activity Timeline" : "No activity tracking data available"}
                                   className={!email.resendId ? "opacity-50 cursor-not-allowed" : ""}
                                 >
-                                  {fetchTrajectoryMutation.isPending ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                  ) : (
-                                    <History className="h-3 w-3" />
-                                  )}
+                                  <History className="h-3 w-3" />
                                 </Button>
                                 
                                 {email.resendId && (
@@ -1177,9 +1264,14 @@ export default function NewsletterViewPage() {
             <DialogTitle className="flex items-center gap-2">
               <History className="h-5 w-5" />
               Email Trajectory History
+              {selectedTrajectory && selectedTrajectory.totalEvents > 1 && (
+                <Badge variant="secondary" className="ml-2">
+                  {selectedTrajectory.totalEvents} Events
+                </Badge>
+              )}
             </DialogTitle>
             <DialogDescription>
-              Detailed tracking information from Resend for this email
+              Complete tracking timeline showing every interaction with this specific email
             </DialogDescription>
           </DialogHeader>
           
@@ -1223,52 +1315,177 @@ export default function NewsletterViewPage() {
                 </CardContent>
               </Card>
 
+              {/* Engagement Summary */}
+              {selectedTrajectory.totalEvents > 1 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Engagement Summary</CardTitle>
+                    <CardDescription>
+                      Quick overview of recipient engagement with this email
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <div className="flex items-center justify-center w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full mx-auto mb-2">
+                          <Activity className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{selectedTrajectory.totalEvents}</p>
+                        <p className="text-sm text-blue-600 dark:text-blue-400">Total Events</p>
+                      </div>
+                      
+                      <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                        <div className="flex items-center justify-center w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-full mx-auto mb-2">
+                          <Eye className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                        </div>
+                        <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{selectedTrajectory.totalOpens || 0}</p>
+                        <p className="text-sm text-purple-600 dark:text-purple-400">Opens</p>
+                      </div>
+                      
+                      <div className="text-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                        <div className="flex items-center justify-center w-8 h-8 bg-orange-100 dark:bg-orange-900 rounded-full mx-auto mb-2">
+                          <MousePointer className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                        </div>
+                        <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{selectedTrajectory.totalClicks || 0}</p>
+                        <p className="text-sm text-orange-600 dark:text-orange-400">Clicks</p>
+                      </div>
+                      
+                      <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                        <div className="flex items-center justify-center w-8 h-8 bg-green-100 dark:bg-green-900 rounded-full mx-auto mb-2">
+                          <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        </div>
+                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                          {selectedTrajectory.totalOpens > 0 ? 
+                            Math.round((selectedTrajectory.totalClicks / selectedTrajectory.totalOpens) * 100) : 
+                            0
+                          }%
+                        </p>
+                        <p className="text-sm text-green-600 dark:text-green-400">Click Rate</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Event Timeline */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Event Timeline</CardTitle>
+                  <CardTitle className="text-lg flex items-center justify-between">
+                    <span>Event Timeline</span>
+                    <div className="flex gap-2 text-sm">
+                      {selectedTrajectory.totalOpens > 0 && (
+                        <Badge variant="secondary" className="gap-1">
+                          <Eye className="h-3 w-3" />
+                          {selectedTrajectory.totalOpens} {selectedTrajectory.totalOpens === 1 ? 'Open' : 'Opens'}
+                        </Badge>
+                      )}
+                      {selectedTrajectory.totalClicks > 0 && (
+                        <Badge variant="secondary" className="gap-1">
+                          <MousePointer className="h-3 w-3" />
+                          {selectedTrajectory.totalClicks} {selectedTrajectory.totalClicks === 1 ? 'Click' : 'Clicks'}
+                        </Badge>
+                      )}
+                    </div>
+                  </CardTitle>
                   <CardDescription>
-                    Chronological events for this email from Resend
+                    Detailed chronological events showing each interaction with this email
+                    {selectedTrajectory.totalOpens > 1 && (
+                      <span className="text-purple-600 dark:text-purple-400 ml-1">
+                        • {selectedTrajectory.totalOpens} individual open events tracked
+                      </span>
+                    )}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {selectedTrajectory.events && selectedTrajectory.events.length > 0 ? (
-                    <div className="space-y-4">
+                    <div className="space-y-4 max-h-96 overflow-y-auto">
                       {selectedTrajectory.events.map((event: any, index: number) => (
-                        <div key={index} className="flex items-start gap-3 pb-4 border-b last:border-b-0">
-                          <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                        <div key={`${event.type}-${index}`} className="flex items-start gap-3 pb-4 border-b last:border-b-0">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            event.type === 'sent' ? 'bg-blue-100 dark:bg-blue-900' :
+                            event.type === 'delivered' ? 'bg-green-100 dark:bg-green-900' :
+                            event.type === 'opened' ? 'bg-purple-100 dark:bg-purple-900' :
+                            event.type === 'clicked' ? 'bg-orange-100 dark:bg-orange-900' :
+                            event.type === 'bounced' ? 'bg-red-100 dark:bg-red-900' :
+                            event.type === 'complained' ? 'bg-yellow-100 dark:bg-yellow-900' :
+                            'bg-gray-100 dark:bg-gray-800'
+                          }`}>
                             {event.type === 'sent' && <Send className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
                             {event.type === 'delivered' && <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />}
                             {event.type === 'opened' && <Eye className="h-4 w-4 text-purple-600 dark:text-purple-400" />}
                             {event.type === 'clicked' && <MousePointer className="h-4 w-4 text-orange-600 dark:text-orange-400" />}
                             {event.type === 'bounced' && <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />}
-                            {!['sent', 'delivered', 'opened', 'clicked', 'bounced'].includes(event.type) && 
+                            {event.type === 'complained' && <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />}
+                            {!['sent', 'delivered', 'opened', 'clicked', 'bounced', 'complained'].includes(event.type) && 
                               <Activity className="h-4 w-4 text-gray-600 dark:text-gray-400" />
                             }
                           </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <p className="font-medium text-gray-900 dark:text-gray-100 capitalize">
-                                {event.type.replace('_', ' ')}
-                              </p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">
-                                {event.timestamp ? 
-                                  formatDistanceToNow(new Date(event.timestamp), { addSuffix: true }) : 
-                                  'Unknown time'
-                                }
-                              </p>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <p className="font-medium text-gray-900 dark:text-gray-100 capitalize">
+                                    {event.type.replace('_', ' ')}
+                                  </p>
+                                  {event.source === 'database' && (
+                                    <Badge variant="outline" className="text-xs">
+                                      Tracked
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 break-words">
+                                  {event.description}
+                                </p>
+                                
+                                {/* Additional technical details for opens and clicks */}
+                                {(event.type === 'opened' || event.type === 'clicked') && (event.userAgent || event.ipAddress) && (
+                                  <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                                    {event.ipAddress && (
+                                      <div className="flex items-center gap-1">
+                                        <span className="font-medium">IP:</span>
+                                        <span className="font-mono">{event.ipAddress}</span>
+                                      </div>
+                                    )}
+                                    {event.userAgent && (
+                                      <div className="flex items-start gap-1">
+                                        <span className="font-medium flex-shrink-0">Device:</span>
+                                        <span className="break-all text-xs">{event.userAgent}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Click URL details */}
+                                {event.type === 'clicked' && event.activityData?.url && (
+                                  <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                    <div className="flex items-start gap-1">
+                                      <span className="font-medium flex-shrink-0">URL:</span>
+                                      <span className="break-all text-blue-600 dark:text-blue-400">{event.activityData.url}</span>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-shrink-0 text-right ml-4">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                  {event.timestamp ? 
+                                    formatDistanceToNow(new Date(event.timestamp + 'Z'), { addSuffix: true }) : 
+                                    'Unknown time'
+                                  }
+                                </p>
+                                <p className="text-xs text-gray-400 dark:text-gray-500">
+                                  {event.timestamp ? 
+                                    format(new Date(event.timestamp + 'Z'), 'MMM d, h:mm a') : 
+                                    ''
+                                  }
+                                </p>
+                              </div>
                             </div>
-                            {event.description && (
-                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                {event.description}
-                              </p>
-                            )}
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-center text-gray-500 dark:text-gray-400 py-4">
+                    <p className="text-center text-gray-500 dark:text-gray-400 py-8">
                       No event timeline available
                     </p>
                   )}
