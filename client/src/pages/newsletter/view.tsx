@@ -735,11 +735,11 @@ export default function NewsletterViewPage() {
                               : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
                           }`}>
                             {isCompleted ? (
-                              <CheckCircle className="w-6 h-6" />
+                              <CheckCircle className="w-6 h-6" strokeWidth={1.5} />
                             ) : isActive ? (
-                              <RefreshCw className="w-5 h-5 animate-spin" />
+                              <RefreshCw className="w-5 h-5 animate-spin" strokeWidth={1.5} />
                             ) : (
-                              <Icon className="w-5 h-5" />
+                              <Icon className="w-5 h-5" strokeWidth={1.5} />
                             )}
                           </div>
                           <div className="max-w-[120px]">
