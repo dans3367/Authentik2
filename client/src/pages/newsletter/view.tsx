@@ -475,52 +475,55 @@ export default function NewsletterViewPage() {
     : '0';
 
   return (
-    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3 sm:gap-4">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => navigate('/newsletter')}
-            className="hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0 mt-1"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 mb-2">
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 truncate">
-                {newsletter.title}
-              </h1>
-              {getStatusBadge(newsletter.status)}
+    <div className="w-full">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8">
+        {/* Header */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
+          <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => navigate('/newsletter')}
+              className="hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0 mt-1"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 mb-2">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 truncate sm:flex-1">
+                  {newsletter.title}
+                </h1>
+                <div className="sm:flex-shrink-0">
+                  {getStatusBadge(newsletter.status)}
+                </div>
+              </div>
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 break-words">
+                Subject: {newsletter.subject}
+              </p>
             </div>
-            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 break-words">
-              Subject: {newsletter.subject}
-            </p>
+          </div>
+          
+          <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap lg:justify-end">
+            {newsletter.status === 'draft' && (
+              <Button 
+                onClick={() => navigate(`/newsletters/${newsletter.id}/edit`)}
+                variant="outline"
+                size="sm"
+                className="w-full sm:w-auto"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                <span className="sm:inline">Edit</span>
+              </Button>
+            )}
+            <Button onClick={() => window.print()} variant="outline" size="sm" className="w-full sm:w-auto">
+              <Settings className="h-4 w-4 mr-2" />
+              <span className="sm:inline">Options</span>
+            </Button>
           </div>
         </div>
-        
-        <div className="flex items-center gap-2 flex-wrap">
-          {newsletter.status === 'draft' && (
-            <Button 
-              onClick={() => navigate(`/newsletters/${newsletter.id}/edit`)}
-              variant="outline"
-              size="sm"
-              className="w-full sm:w-auto"
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              <span className="sm:inline">Edit</span>
-            </Button>
-          )}
-          <Button onClick={() => window.print()} variant="outline" size="sm" className="w-full sm:w-auto">
-            <Settings className="h-4 w-4 mr-2" />
-            <span className="sm:inline">Options</span>
-          </Button>
-        </div>
-      </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
+        {/* Key Metrics */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 lg:gap-6">
         <Card>
           <CardContent className="p-3 sm:p-4 lg:p-6">
             <div className="flex items-center justify-between">
@@ -627,20 +630,20 @@ export default function NewsletterViewPage() {
         </Card>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-        <div className="overflow-x-auto">
-          <TabsList className="grid w-full grid-cols-5 min-w-max">
-            <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
-            <TabsTrigger value="content" className="text-xs sm:text-sm">Content</TabsTrigger>
-            <TabsTrigger value="status" className="text-xs sm:text-sm">Task Status</TabsTrigger>
-            <TabsTrigger value="analytics" className="text-xs sm:text-sm">Analytics</TabsTrigger>
-            <TabsTrigger value="detailed-stats" className="text-xs sm:text-sm">Detailed Stats</TabsTrigger>
-          </TabsList>
-        </div>
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 lg:space-y-8">
+          <div className="overflow-x-auto">
+            <TabsList className="grid w-full grid-cols-5 min-w-max">
+              <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
+              <TabsTrigger value="content" className="text-xs sm:text-sm">Content</TabsTrigger>
+              <TabsTrigger value="status" className="text-xs sm:text-sm">Task Status</TabsTrigger>
+              <TabsTrigger value="analytics" className="text-xs sm:text-sm">Analytics</TabsTrigger>
+              <TabsTrigger value="detailed-stats" className="text-xs sm:text-sm">Detailed Stats</TabsTrigger>
+            </TabsList>
+          </div>
 
-        <TabsContent value="overview" className="space-y-4 sm:space-y-6">
-          <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
+        <TabsContent value="overview" className="space-y-6 lg:space-y-8">
+          <div className="grid gap-4 lg:gap-6 md:grid-cols-2">
             {/* Newsletter Details */}
             <Card>
               <CardHeader>
@@ -650,7 +653,7 @@ export default function NewsletterViewPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4">
                   <div>
                     <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Created</p>
                     <p className="text-sm text-gray-900 dark:text-gray-100">
@@ -988,8 +991,8 @@ export default function NewsletterViewPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-4 sm:space-y-6">
-          <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
+        <TabsContent value="analytics" className="space-y-6 lg:space-y-8">
+          <div className="grid gap-4 lg:gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1012,7 +1015,7 @@ export default function NewsletterViewPage() {
                   <Progress value={parseFloat(clickThroughRate)} className="h-2" />
                   
                   <div className="pt-4 border-t">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-center">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4 text-center">
                       <div>
                         <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                           {newsletter.opens || 0}
@@ -1087,7 +1090,7 @@ export default function NewsletterViewPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="detailed-stats" className="space-y-4 sm:space-y-6">
+        <TabsContent value="detailed-stats" className="space-y-6 lg:space-y-8">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1139,7 +1142,7 @@ export default function NewsletterViewPage() {
                     </Button>
                   </div>
                   
-                  <div className="space-y-3 sm:space-y-4">
+                  <div className="space-y-3 lg:space-y-4">
                     {detailedStatsData.emails.map((email, index) => {
                       const getStatusColor = (status: string) => {
                         switch (status) {
@@ -1236,7 +1239,7 @@ export default function NewsletterViewPage() {
                             </div>
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-3">
+                          <div className="grid grid-cols-2 gap-2 lg:gap-4 mb-3">
                             <div className="text-center p-2 bg-green-50 dark:bg-green-900/20 rounded">
                               <p className="text-lg font-semibold text-green-600 dark:text-green-400">{email.opens}</p>
                               <p className="text-xs text-green-600 dark:text-green-400">Total Opens</p>
@@ -1569,6 +1572,7 @@ export default function NewsletterViewPage() {
           )}
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }
