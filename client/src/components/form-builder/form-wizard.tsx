@@ -67,7 +67,7 @@ export function FormWizard({ editMode = false, formData: existingFormData }: For
     checkStorageState
   } = useFormWizard(editMode ? existingFormData : undefined);
 
-  const canProceedToStyle = wizardState.formData.elements.length > 0;
+  const canProceedToStyle = wizardState.formData.elements.some(element => element.type === 'email-input');
   const canProceedToPreview = wizardState.selectedTheme !== null;
 
   const handleSave = async () => {
@@ -333,7 +333,7 @@ export function FormWizard({ editMode = false, formData: existingFormData }: For
               <div className="text-sm text-slate-600 dark:text-slate-400">
                 {canProceedToStyle ? 
                   `${wizardState.formData.elements.length} element${wizardState.formData.elements.length !== 1 ? 's' : ''} added` :
-                  'Add at least one form element to continue'
+                  'Add at least one Email component to continue'
                 }
               </div>
             )}
