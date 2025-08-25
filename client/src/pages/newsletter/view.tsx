@@ -1256,22 +1256,6 @@ export default function NewsletterViewPage() {
                             </p>
                           )}
                           
-                          {email.events?.length > 0 && (
-                            <div className="mt-3">
-                              <EmailActivityTimelineModal
-                                contactEmail={email.recipient}
-                                trigger={
-                                  <Button
-                                    variant="link"
-                                    size="sm"
-                                    className="h-auto p-0 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
-                                  >
-                                    View Activity Timeline ({email.events.length} events)
-                                  </Button>
-                                }
-                              />
-                            </div>
-                          )}
                         </div>
                       );
                     })}
