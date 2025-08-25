@@ -3,7 +3,7 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useLocation } from "wouter";
-import { ArrowLeft, Save, Send, Eye, Users, Tag, User, Edit, Server, CheckCircle, XCircle } from "lucide-react";
+import { ArrowLeft, Save, Send, Eye, Users, Tag, User, Edit, Server, CheckCircle, XCircle, Loader2, Clock } from "lucide-react";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
 import { CustomerSegmentationModal } from "@/components/CustomerSegmentationModal";
@@ -13,6 +13,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -22,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { cn } from "@/lib/utils";
 import { createNewsletterSchema, type CreateNewsletterData } from "@shared/schema";
 
 export default function NewsletterCreatePage() {
@@ -259,103 +267,120 @@ export default function NewsletterCreatePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
-      <div className="container mx-auto p-6 max-w-6xl">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setLocation('/newsletter')}
-            className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Newsletters
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-              Create Newsletter
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Design and send your newsletter to engage with subscribers
-            </p>
+    <TooltipProvider>
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto p-6 max-w-6xl space-y-8">
+          {/* Header */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setLocation('/newsletter')}
+                  className="self-start"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back to Newsletters
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Return to newsletter list</p>
+              </TooltipContent>
+            </Tooltip>
+            <div className="space-y-2">
+              <h1 className="text-4xl font-bold tracking-tight">
+                Create Newsletter
+              </h1>
+              <p className="text-muted-foreground text-lg">
+                Design and send your newsletter to engage with subscribers
+              </p>
+            </div>
           </div>
-        </div>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Newsletter Details Card */}
-            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300">
+            <Card className="group transition-all duration-200 hover:shadow-lg hover:shadow-primary/5 border-border/50 hover:border-primary/20">
               <CardHeader>
-                <CardTitle className="text-gray-900 dark:text-gray-100 flex items-center">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 rounded-lg flex items-center justify-center mr-3">
-                    <Eye className="h-4 w-4 text-white" />
+                <CardTitle className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <Edit className="h-5 w-5 text-primary" />
                   </div>
-                  Newsletter Details
+                  <span className="text-xl font-semibold tracking-tight">Newsletter Details</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="title">Newsletter Title</Label>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="title" className="text-sm font-medium">Newsletter Title</Label>
                   <Input
                     id="title"
-                    placeholder="Enter newsletter title..."
+                    placeholder="Enter an engaging newsletter title..."
                     {...form.register("title")}
-                    className="mt-1"
+                    className="h-11"
                   />
                   {form.formState.errors.title && (
-                    <p className="text-sm text-red-600 mt-1">
+                    <p className="text-sm text-destructive flex items-center gap-1">
+                      <XCircle className="h-3 w-3" />
                       {form.formState.errors.title.message}
                     </p>
                   )}
                 </div>
 
-                <div>
-                  <Label htmlFor="subject">Email Subject Line</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="subject" className="text-sm font-medium">Email Subject Line</Label>
                   <Input
                     id="subject"
-                    placeholder="Enter email subject line..."
+                    placeholder="Write a compelling subject line..."
                     {...form.register("subject")}
-                    className="mt-1"
+                    className="h-11"
                   />
                   {form.formState.errors.subject && (
-                    <p className="text-sm text-red-600 mt-1">
+                    <p className="text-sm text-destructive flex items-center gap-1">
+                      <XCircle className="h-3 w-3" />
                       {form.formState.errors.subject.message}
                     </p>
                   )}
+                  <p className="text-xs text-muted-foreground">
+                    This will appear as the email subject in your recipients' inboxes
+                  </p>
                 </div>
               </CardContent>
             </Card>
 
             {/* Content Card */}
-            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300">
+            <Card className="group transition-all duration-200 hover:shadow-lg hover:shadow-emerald-500/5 border-border/50 hover:border-emerald-200/30">
               <CardHeader>
-                <CardTitle className="text-gray-900 dark:text-gray-100 flex items-center">
-                  <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 dark:from-green-400 dark:to-green-500 rounded-lg flex items-center justify-center mr-3">
-                    <Edit className="h-4 w-4 text-white" />
+                <CardTitle className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-950/30 dark:to-emerald-950/10 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <Edit className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                   </div>
-                  Newsletter Content
+                  <span className="text-xl font-semibold tracking-tight">Newsletter Content</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div>
-                  <Label htmlFor="content">Newsletter Content</Label>
+                <div className="space-y-3">
+                  <Label htmlFor="content" className="text-sm font-medium">Newsletter Content</Label>
                   <Textarea
                     id="content"
                     placeholder="Write your newsletter content here..."
                     {...form.register("content")}
-                    className="mt-1 min-h-[400px]"
+                    className="min-h-[400px] resize-none"
                   />
                   {form.formState.errors.content && (
-                    <p className="text-sm text-red-600 mt-1">
+                    <p className="text-sm text-destructive flex items-center gap-1">
+                      <XCircle className="h-3 w-3" />
                       {form.formState.errors.content.message}
                     </p>
                   )}
-                  <p className="text-sm text-gray-500 mt-2">
-                    You can use HTML tags for formatting your newsletter content.
-                  </p>
+                  <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border border-border/50">
+                    <Edit className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      You can use HTML tags for rich formatting in your newsletter content.
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -364,65 +389,85 @@ export default function NewsletterCreatePage() {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Preview Card */}
-            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-purple-200/50 dark:border-purple-700/30 hover:shadow-lg transition-all duration-300">
+            <Card className="group transition-all duration-200 hover:shadow-lg hover:shadow-purple-500/5 border-border/50 hover:border-purple-200/30">
               <CardHeader>
-                <CardTitle className="text-gray-900 dark:text-gray-100 flex items-center">
-                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 dark:from-purple-400 dark:to-purple-500 rounded-lg flex items-center justify-center mr-3">
-                    <Eye className="h-4 w-4 text-white" />
+                <CardTitle className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-100 to-purple-50 dark:from-purple-950/30 dark:to-purple-950/10 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <Eye className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                   </div>
-                  Preview
+                  <span className="text-lg font-semibold tracking-tight">Live Preview</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 border border-gray-200/50 dark:border-gray-600/50 rounded-lg bg-gray-50/70 dark:bg-gray-800/70 backdrop-blur-sm">
-                  <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                    Subject: {form.watch("subject") || "Your subject line will appear here"}
+              <CardContent>
+                <div className="p-4 border border-border/50 rounded-lg bg-muted/30 space-y-3">
+                  <div className="space-y-1">
+                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Email Subject
+                    </div>
+                    <div className="text-sm font-medium line-clamp-2">
+                      {form.watch("subject") || "Your subject line will appear here"}
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400 max-h-32 overflow-y-auto">
-                    {form.watch("content") || "Your newsletter content will appear here..."}
+                  <Separator />
+                  <div className="space-y-1">
+                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Content Preview
+                    </div>
+                    <div className="text-sm text-muted-foreground max-h-32 overflow-y-auto leading-relaxed">
+                      {form.watch("content") || "Your newsletter content will appear here as you type..."}
+                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             {/* Customer Segmentation Card */}
-            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-blue-200/50 dark:border-blue-700/30 hover:shadow-lg transition-all duration-300">
+            <Card className="group transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/5 border-border/50 hover:border-blue-200/30">
               <CardHeader>
-                <CardTitle className="text-gray-900 dark:text-gray-100 flex items-center">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 rounded-lg flex items-center justify-center mr-3">
-                    <Users className="h-4 w-4 text-white" />
+                <CardTitle className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-100 to-blue-50 dark:from-blue-950/30 dark:to-blue-950/10 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                   </div>
-                  Recipients
+                  <span className="text-lg font-semibold tracking-tight">Recipients</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <Label className="text-gray-900 dark:text-gray-100">Target Audience</Label>
-                  <div 
-                    className="mt-2 p-3 border border-gray-200/50 dark:border-gray-600/50 rounded-lg bg-gray-50/70 dark:bg-gray-800/70 backdrop-blur-sm cursor-pointer hover:bg-gray-100/70 dark:hover:bg-gray-700/70 transition-colors duration-200"
-                    onClick={() => setIsSegmentationModalOpen(true)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {(() => {
-                          const summary = getSegmentationSummary();
-                          const IconComponent = summary.icon;
-                          return (
-                            <>
-                              <IconComponent className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                {summary.text}
-                              </span>
-                            </>
-                          );
-                        })()}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Target Audience</Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div 
+                        className="p-4 border border-border/50 rounded-lg bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors group"
+                        onClick={() => setIsSegmentationModalOpen(true)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            {(() => {
+                              const summary = getSegmentationSummary();
+                              const IconComponent = summary.icon;
+                              return (
+                                <>
+                                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                                    <IconComponent className="h-4 w-4 text-primary" />
+                                  </div>
+                                  <span className="text-sm font-medium">
+                                    {summary.text}
+                                  </span>
+                                </>
+                              );
+                            })()}
+                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            Edit
+                          </Badge>
+                        </div>
                       </div>
-                      <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700">
-                        Click to modify
-                      </Badge>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Click to modify recipient selection</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <p className="text-xs text-muted-foreground">
                     Choose who will receive this newsletter
                   </p>
                 </div>
@@ -430,150 +475,181 @@ export default function NewsletterCreatePage() {
             </Card>
 
             {/* Settings Card */}
-            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-orange-200/50 dark:border-orange-700/30 hover:shadow-lg transition-all duration-300">
+            <Card className="group transition-all duration-200 hover:shadow-lg hover:shadow-orange-500/5 border-border/50 hover:border-orange-200/30">
               <CardHeader>
-                <CardTitle className="text-gray-900 dark:text-gray-100 flex items-center">
-                  <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 dark:from-orange-400 dark:to-orange-500 rounded-lg flex items-center justify-center mr-3">
-                    <Save className="h-4 w-4 text-white" />
+                <CardTitle className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-orange-100 to-orange-50 dark:from-orange-950/30 dark:to-orange-950/10 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <Save className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                   </div>
-                  Settings
+                  <span className="text-lg font-semibold tracking-tight">Settings</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="status">Status</Label>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="status" className="text-sm font-medium">Status</Label>
                   <Select
                     value={form.watch("status")}
                     onValueChange={(value) => form.setValue("status", value as "draft" | "scheduled")}
                   >
-                    <SelectTrigger className="mt-1">
+                    <SelectTrigger className="h-11">
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="draft">Draft</SelectItem>
                       <SelectItem value="scheduled">Scheduled</SelectItem>
-                      {/**
-                       * Do not allow selecting "Sent" directly here because it won't queue
-                       * sending jobs. Use the "Send Now" button which creates then triggers send.
-                       */}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Use "Send Now" button to send immediately
+                  </p>
                 </div>
 
-                <div>
-                  <Label htmlFor="scheduledAt">Schedule Date (Optional)</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="scheduledAt" className="text-sm font-medium">Schedule Date (Optional)</Label>
                   <Input
                     id="scheduledAt"
                     type="datetime-local"
-                    className="mt-1"
+                    className="h-11"
                     onChange={(e) => {
                       if (e.target.value) {
                         form.setValue("scheduledAt", new Date(e.target.value));
                       }
                     }}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Set a future date and time for scheduled sending
+                  </p>
                 </div>
               </CardContent>
             </Card>
 
             {/* Server Status */}
-            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300">
+            <Card className="group transition-all duration-200 hover:shadow-lg hover:shadow-gray-500/5 border-border/50 hover:border-gray-200/30">
               <CardHeader>
-                <CardTitle className="text-gray-900 dark:text-gray-100 flex items-center">
-                  <div className="w-8 h-8 bg-gradient-to-br from-gray-500 to-gray-600 dark:from-gray-400 dark:to-gray-500 rounded-lg flex items-center justify-center mr-3">
-                    <Server className="h-4 w-4 text-white" />
+                <CardTitle className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-950/30 dark:to-gray-950/10 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <Server className="h-5 w-5 text-gray-600 dark:text-gray-400" />
                   </div>
-                  Email Server
+                  <span className="text-lg font-semibold tracking-tight">Email Server</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between p-3 bg-gray-50/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-lg">
-                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Go Server:</span>
+                <div className="flex items-center justify-between p-4 border border-border/50 rounded-lg bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-background flex items-center justify-center">
+                      <Server className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <span className="text-sm font-medium">Go Server Status</span>
+                  </div>
                   {healthLoading ? (
-                    <Badge variant="outline" className="gap-1">
-                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600" />
+                    <Badge variant="outline" className="gap-2">
+                      <Loader2 className="h-3 w-3 animate-spin" />
                       Checking...
                     </Badge>
                   ) : healthError ? (
-                    <Badge variant="destructive" className="gap-1">
+                    <Badge variant="destructive" className="gap-2">
                       <XCircle className="h-3 w-3" />
                       Offline
                     </Badge>
                   ) : serverHealth ? (
-                    <Badge variant="default" className="bg-green-600 gap-1">
+                    <Badge className="bg-emerald-600 hover:bg-emerald-700 gap-2">
                       <CheckCircle className="h-3 w-3" />
                       Online
                     </Badge>
                   ) : (
-                    <Badge variant="outline">Unknown</Badge>
+                    <Badge variant="secondary">Unknown</Badge>
                   )}
                 </div>
                 {!serverHealth && (
-                  <p className="text-xs text-red-600 dark:text-red-400 mt-2">
-                    Server must be online to send newsletters
-                  </p>
+                  <div className="flex items-center gap-2 p-3 mt-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                    <XCircle className="h-4 w-4 text-destructive" />
+                    <p className="text-sm text-destructive">
+                      Server must be online to send newsletters
+                    </p>
+                  </div>
                 )}
               </CardContent>
             </Card>
 
             {/* Action Buttons */}
-            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-green-200/50 dark:border-green-700/30 hover:shadow-lg transition-all duration-300">
+            <Card className="group transition-all duration-200 hover:shadow-lg hover:shadow-green-500/5 border-border/50 hover:border-green-200/30">
               <CardHeader>
-                <CardTitle className="text-gray-900 dark:text-gray-100 flex items-center">
-                  <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 dark:from-green-400 dark:to-green-500 rounded-lg flex items-center justify-center mr-3">
-                    <Send className="h-4 w-4 text-white" />
+                <CardTitle className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-green-100 to-green-50 dark:from-green-950/30 dark:to-green-950/10 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <Send className="h-5 w-5 text-green-600 dark:text-green-400" />
                   </div>
-                  Actions
+                  <span className="text-lg font-semibold tracking-tight">Actions</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <Button
-                  type="button"
-                  onClick={handleSaveAsDraft}
-                  variant="outline"
-                  className="w-full bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/50 border-gray-300 dark:border-gray-600 hover:from-gray-100 hover:to-gray-200 dark:hover:from-gray-700/60 dark:hover:to-gray-600/60 transition-all duration-300"
-                  disabled={createNewsletterMutation.isPending}
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Save as Draft
-                </Button>
+              <CardContent className="space-y-4">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      onClick={handleSaveAsDraft}
+                      variant="outline"
+                      className="w-full h-11"
+                      disabled={createNewsletterMutation.isPending}
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      Save as Draft
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Save newsletter without sending</p>
+                  </TooltipContent>
+                </Tooltip>
 
-                <Button
-                  type="button"
-                  onClick={handleSchedule}
-                  variant="outline"
-                  className="w-full bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/30 border-orange-300 dark:border-orange-600 hover:from-orange-100 hover:to-orange-200 dark:hover:from-orange-800/40 dark:hover:to-orange-700/40 transition-all duration-300"
-                  disabled={createNewsletterMutation.isPending}
-                >
-                  <Send className="h-4 w-4 mr-2" />
-                  Schedule for Later
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      onClick={handleSchedule}
+                      variant="outline"
+                      className="w-full h-11 border-orange-200 text-orange-700 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-300 dark:hover:bg-orange-950/20"
+                      disabled={createNewsletterMutation.isPending}
+                    >
+                      <Clock className="h-4 w-4 mr-2" />
+                      Schedule for Later
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Schedule newsletter for future sending</p>
+                  </TooltipContent>
+                </Tooltip>
 
-                <Button
-                  type="button"
-                  onClick={handleSendNow}
-                  className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg transition-all duration-300"
-                  disabled={createNewsletterMutation.isPending || sendNewsletterMutation.isPending || !serverHealth}
-                >
-                  {createNewsletterMutation.isPending || sendNewsletterMutation.isPending ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                      {createNewsletterMutation.isPending ? "Creating..." : "Sending..."}
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Send Now
-                    </>
-                  )}
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      onClick={handleSendNow}
+                      className="w-full h-11 shadow-lg"
+                      disabled={createNewsletterMutation.isPending || sendNewsletterMutation.isPending || !serverHealth}
+                    >
+                      {createNewsletterMutation.isPending || sendNewsletterMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          {createNewsletterMutation.isPending ? "Creating..." : "Sending..."}
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4 mr-2" />
+                          Send Now
+                        </>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Send newsletter immediately to recipients</p>
+                  </TooltipContent>
+                </Tooltip>
 
                 {(createNewsletterMutation.isPending || sendNewsletterMutation.isPending) && (
-                  <div className="flex items-center justify-center p-2">
-                    <div className="w-4 h-4 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 rounded-lg flex items-center justify-center mr-2">
-                      <div className="animate-spin rounded-full h-2 w-2 border border-white border-t-transparent"></div>
+                  <div className="flex items-center justify-center gap-3 p-4 bg-muted/50 border border-border/50 rounded-lg">
+                    <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
                     </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm font-medium">
                       {createNewsletterMutation.isPending ? "Creating newsletter..." : 
                        sendNewsletterMutation.isPending ? "Sending newsletter..." : "Processing..."}
                     </p>
@@ -581,9 +657,11 @@ export default function NewsletterCreatePage() {
                 )}
 
                 {!serverHealth && (
-                  <div className="flex items-center justify-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                    <XCircle className="h-4 w-4 text-amber-600" />
-                    <p className="text-sm text-amber-700 dark:text-amber-300">
+                  <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                    <div className="h-8 w-8 rounded-lg bg-amber-100 dark:bg-amber-950/30 flex items-center justify-center">
+                      <XCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
                       Go server must be online to send newsletters
                     </p>
                   </div>
@@ -594,16 +672,17 @@ export default function NewsletterCreatePage() {
         </div>
       </form>
 
-        {/* Customer Segmentation Modal */}
-        <CustomerSegmentationModal
-          isOpen={isSegmentationModalOpen}
-          onClose={() => setIsSegmentationModalOpen(false)}
-          recipientType={segmentationData.recipientType}
-          selectedContactIds={segmentationData.selectedContactIds}
-          selectedTagIds={segmentationData.selectedTagIds}
-          onSave={handleSegmentationSave}
-        />
+          {/* Customer Segmentation Modal */}
+          <CustomerSegmentationModal
+            isOpen={isSegmentationModalOpen}
+            onClose={() => setIsSegmentationModalOpen(false)}
+            recipientType={segmentationData.recipientType}
+            selectedContactIds={segmentationData.selectedContactIds}
+            selectedTagIds={segmentationData.selectedTagIds}
+            onSave={handleSegmentationSave}
+          />
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }
