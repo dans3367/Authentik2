@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format, formatDistanceToNow } from "date-fns";
+import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
 import type { NewsletterWithUser, NewsletterTaskStatus } from "@shared/schema";
 
 // Using real task status data from backend via NewsletterTaskStatus type
@@ -1148,28 +1149,53 @@ export default function NewsletterViewPage() {
                                 {email.status.charAt(0).toUpperCase() + email.status.slice(1)}
                               </Badge>
                               <div className="flex items-center gap-1">
-                                {/* Always show History button, with visual feedback for mock data */}
+                                {/* History button opens Activity Timeline Modal */}
+                                <EmailActivityTimelineModal
+                                  contactEmail={email.recipient}
+                                  trigger={
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      title="View Email Activity Timeline"
+                                    >
+                                      <History className="h-3 w-3" />
+                                    </Button>
+                                  }
+                                />
+                                
+                                {/* User button navigates to contact profile page */}
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => {
-                                    if (email.resendId) {
-                                      openTrajectoryModal(email.resendId);
-                                    } else {
+                                  onClick={async () => {
+                                    try {
+                                      // Find contact by email
+                                      const response = await apiRequest('GET', `/api/email-contacts?search=${encodeURIComponent(email.recipient)}&limit=1`);
+                                      const data = await response.json();
+                                      
+                                      if (data.contacts && data.contacts.length > 0) {
+                                        const contact = data.contacts[0];
+                                        navigate(`/email-contacts/view/${contact.id}`);
+                                      } else {
+                                        toast({
+                                          title: "Contact Not Found",
+                                          description: "This email address was not found in your contacts list.",
+                                          variant: "destructive",
+                                        });
+                                      }
+                                    } catch (error) {
                                       toast({
-                                        title: "No Tracking Data Available",
-                                        description: "This email doesn't have activity tracking data yet. This usually happens when emails are still being processed.",
+                                        title: "Error",
+                                        description: "Failed to find contact information.",
                                         variant: "destructive",
                                       });
                                     }
                                   }}
-                                  disabled={!email.resendId}
-                                  title={email.resendId ? "View Email Activity Timeline" : "No activity tracking data available"}
-                                  className={!email.resendId ? "opacity-50 cursor-not-allowed" : ""}
+                                  title="View Contact Profile Page"
                                 >
-                                  <History className="h-3 w-3" />
+                                  <User className="h-3 w-3" />
                                 </Button>
-                                
+
                                 {email.resendId && (
                                   <Button
                                     variant="ghost"
@@ -1211,30 +1237,20 @@ export default function NewsletterViewPage() {
                           )}
                           
                           {email.events?.length > 0 && (
-                            <details className="mt-3">
-                              <summary className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:text-gray-900 dark:hover:text-gray-100">
-                                View Activity Timeline ({email.events.length} events)
-                              </summary>
-                              <div className="mt-2 space-y-2 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
-                                {email.events.map((event, eventIndex) => (
-                                  <div key={eventIndex} className="text-xs">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-medium text-gray-900 dark:text-gray-100">
-                                        {event.type.replace('email.', '').charAt(0).toUpperCase() + event.type.replace('email.', '').slice(1)}
-                                      </span>
-                                      <span className="text-gray-500 dark:text-gray-400">
-                                        {formatDistanceToNow(new Date(event.timestamp + 'Z'), { addSuffix: true })}
-                                      </span>
-                                    </div>
-                                    {event.data && (
-                                      <pre className="text-xs text-gray-600 dark:text-gray-400 mt-1 whitespace-pre-wrap">
-                                        {JSON.stringify(event.data, null, 2)}
-                                      </pre>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            </details>
+                            <div className="mt-3">
+                              <EmailActivityTimelineModal
+                                contactEmail={email.recipient}
+                                trigger={
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="h-auto p-0 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
+                                  >
+                                    View Activity Timeline ({email.events.length} events)
+                                  </Button>
+                                }
+                              />
+                            </div>
                           )}
                         </div>
                       );

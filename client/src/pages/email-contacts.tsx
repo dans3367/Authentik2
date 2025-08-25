@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ContactSearch } from "@/components/ContactSearch";
+import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
 import { 
   Users, 
   Plus, 
@@ -629,10 +630,17 @@ export default function EmailContacts() {
                               <Mail className="w-4 h-4 mr-2" />
                               Send Email
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Calendar className="w-4 h-4 mr-2" />
-                              View Activity
-                            </DropdownMenuItem>
+                            <EmailActivityTimelineModal
+                              contactId={contact.id}
+                              contactEmail={contact.email}
+                              contactName={`${contact.firstName || ''} ${contact.lastName || ''}`.trim() || undefined}
+                              trigger={
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                  <Calendar className="w-4 h-4 mr-2" />
+                                  View Activity Timeline
+                                </DropdownMenuItem>
+                              }
+                            />
                             <DropdownMenuSeparator />
                             <DropdownMenuItem 
                               className="text-red-600"

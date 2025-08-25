@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import EmailActivityTimeline from "@/components/EmailActivityTimeline";
+import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
 import { 
   ArrowLeft,
   Mail, 
@@ -70,12 +71,23 @@ export default function ViewContact() {
   const { data: response, isLoading, error } = useQuery({
     queryKey: ['/api/email-contacts', id],
     queryFn: async () => {
+      console.log(`Fetching contact with ID: ${id}`);
       const apiResponse = await apiRequest('GET', `/api/email-contacts/${id}`);
+      
+      if (!apiResponse.ok) {
+        console.error('API response not ok:', apiResponse.status, apiResponse.statusText);
+        throw new Error(`Failed to fetch contact: ${apiResponse.status} ${apiResponse.statusText}`);
+      }
+      
       const data = await apiResponse.json();
       console.log('API response for contact:', data);
       return data;
     },
     enabled: !!id,
+    retry: (failureCount, error) => {
+      console.log('Query retry attempt:', failureCount, error);
+      return failureCount < 3;
+    },
   });
 
   // Fetch real-time engagement statistics
@@ -90,8 +102,8 @@ export default function ViewContact() {
     enabled: !!id,
   });
 
-  // Extract contact from response - the API might return { contact: ... } or just the contact directly
-  const contact: Contact | undefined = response?.contact || response;
+  // Extract contact from response - the API returns { contact: ... }
+  const contact: Contact | undefined = response?.contact;
   const engagementStats = statsResponse?.stats;
   
   console.log('Processed contact data:', contact);
@@ -191,6 +203,19 @@ export default function ViewContact() {
     return contact.email?.split('@')[0] || 'Unknown Contact';
   };
 
+  // Debug logging
+  console.log('ViewContact render:', { 
+    id, 
+    isLoading, 
+    error, 
+    contact, 
+    response,
+    hasEmail: contact?.email,
+    contactEmail: contact?.email,
+    responseData: response,
+    statsData: statsResponse
+  });
+
   if (isLoading) {
     return (
       <div className="max-w-6xl mx-auto p-4">
@@ -202,13 +227,59 @@ export default function ViewContact() {
     );
   }
 
-  if (error || !contact || !contact.email) {
+  if (error) {
+    console.error('Contact fetch error:', error);
+    return (
+      <div className="max-w-6xl mx-auto p-4">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Error Loading Contact</h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            There was an error loading the contact: {error.message || 'Unknown error'}
+          </p>
+          <Button 
+            onClick={() => setLocation('/email-contacts')} 
+            variant="outline"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Contacts
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!contact) {
+    console.log('Contact not found:', { contact, response, responseExists: !!response });
     return (
       <div className="max-w-6xl mx-auto p-4">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Contact Not Found</h1>
           <p className="text-gray-600 dark:text-gray-400 mb-4">
             The contact you're looking for doesn't exist or you don't have permission to view it.
+          </p>
+          <p className="text-sm text-gray-500 mb-4">
+            Contact ID: {id}
+          </p>
+          <Button 
+            onClick={() => setLocation('/email-contacts')} 
+            variant="outline"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Contacts
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!contact.email) {
+    console.log('Contact missing email:', { contact });
+    return (
+      <div className="max-w-6xl mx-auto p-4">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Invalid Contact Data</h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            This contact has missing or invalid email data.
           </p>
           <Button 
             onClick={() => setLocation('/email-contacts')} 
@@ -470,7 +541,9 @@ export default function ViewContact() {
           </div>
 
           {/* Email Activity Timeline */}
-          <EmailActivityTimeline contactId={contact.id} />
+          <div data-component="email-activity-timeline">
+            <EmailActivityTimeline contactId={contact.id} />
+          </div>
         </div>
 
         {/* Sidebar */}
@@ -563,10 +636,17 @@ export default function ViewContact() {
                 <Mail className="w-4 h-4 mr-2" />
                 Send Email
               </Button>
-              <Button variant="outline" className="w-full justify-start">
-                <Calendar className="w-4 h-4 mr-2" />
-                View Activity Log
-              </Button>
+              <EmailActivityTimelineModal
+                contactId={contact.id}
+                contactEmail={contact.email}
+                contactName={`${contact.firstName || ''} ${contact.lastName || ''}`.trim() || undefined}
+                trigger={
+                  <Button variant="outline" className="w-full justify-start">
+                    <Calendar className="w-4 h-4 mr-2" />
+                    View Activity Timeline
+                  </Button>
+                }
+              />
               <Button variant="outline" className="w-full justify-start">
                 <Tag className="w-4 h-4 mr-2" />
                 Manage Tags
