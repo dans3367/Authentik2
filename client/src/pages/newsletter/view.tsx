@@ -303,7 +303,7 @@ export default function NewsletterViewPage() {
     const Icon = config.icon;
     return (
       <Badge variant={config.variant} className="flex items-center gap-1">
-        <Icon className="h-3 w-3" />
+        <Icon className="h-3 w-3" strokeWidth={1.5} />
         {config.label}
       </Badge>
     );
@@ -312,30 +312,30 @@ export default function NewsletterViewPage() {
   const getTaskStatusIcon = (status: NewsletterTaskStatus['status']) => {
     switch (status) {
       case 'completed':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
+        return <CheckCircle className="h-4 w-4 text-green-500" strokeWidth={1.5} />;
       case 'running':
-        return <RefreshCw className="h-4 w-4 text-blue-500 animate-spin" />;
+        return <RefreshCw className="h-4 w-4 text-blue-500 animate-spin" strokeWidth={1.5} />;
       case 'failed':
-        return <XCircle className="h-4 w-4 text-red-500" />;
+        return <XCircle className="h-4 w-4 text-red-500" strokeWidth={1.5} />;
       default:
-        return <Clock className="h-4 w-4 text-gray-400" />;
+        return <Clock className="h-4 w-4 text-gray-400" strokeWidth={1.5} />;
     }
   };
 
   const getTimelineIcon = (type: TimelineEvent['type']) => {
     switch (type) {
       case 'created':
-        return <Newspaper className="h-4 w-4" />;
+        return <Newspaper className="h-4 w-4" strokeWidth={1.5} />;
       case 'scheduled':
-        return <Calendar className="h-4 w-4" />;
+        return <Calendar className="h-4 w-4" strokeWidth={1.5} />;
       case 'sent':
-        return <Send className="h-4 w-4" />;
+        return <Send className="h-4 w-4" strokeWidth={1.5} />;
       case 'opened':
-        return <Eye className="h-4 w-4" />;
+        return <Eye className="h-4 w-4" strokeWidth={1.5} />;
       case 'clicked':
-        return <MousePointer className="h-4 w-4" />;
+        return <MousePointer className="h-4 w-4" strokeWidth={1.5} />;
       default:
-        return <Activity className="h-4 w-4" />;
+        return <Activity className="h-4 w-4" strokeWidth={1.5} />;
     }
   };
 
@@ -453,7 +453,7 @@ export default function NewsletterViewPage() {
     return (
       <div className="p-6">
         <div className="text-center py-8">
-          <Newspaper className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+          <Newspaper className="mx-auto h-12 w-12 text-muted-foreground mb-4" strokeWidth={1.5} />
           <h2 className="text-2xl font-semibold mb-2">Newsletter not found</h2>
           <p className="text-muted-foreground mb-4">The newsletter you're looking for doesn't exist.</p>
           <Button onClick={() => navigate('/newsletter')}>
@@ -486,7 +486,7 @@ export default function NewsletterViewPage() {
               onClick={() => navigate('/newsletter')}
               className="hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0 mt-1"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
             </Button>
             <div className="min-w-0 flex-1">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 mb-2">
@@ -511,12 +511,12 @@ export default function NewsletterViewPage() {
                 size="sm"
                 className="w-full sm:w-auto"
               >
-                <Edit className="h-4 w-4 mr-2" />
+                <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
                 <span className="sm:inline">Edit</span>
               </Button>
             )}
             <Button onClick={() => window.print()} variant="outline" size="sm" className="w-full sm:w-auto">
-              <Settings className="h-4 w-4 mr-2" />
+              <Settings className="h-4 w-4 mr-2" strokeWidth={1.5} />
               <span className="sm:inline">Options</span>
             </Button>
           </div>
@@ -539,7 +539,7 @@ export default function NewsletterViewPage() {
                 </p>
               </div>
               <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                <Users className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
+                <Users className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
               </div>
             </div>
           </CardContent>
@@ -560,7 +560,7 @@ export default function NewsletterViewPage() {
                 </p>
               </div>
               <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
-                <Eye className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
+                <Eye className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
               </div>
             </div>
           </CardContent>
@@ -581,7 +581,7 @@ export default function NewsletterViewPage() {
                 </p>
               </div>
               <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <MousePointer className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
+                <MousePointer className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
               </div>
             </div>
           </CardContent>
@@ -602,7 +602,7 @@ export default function NewsletterViewPage() {
                 </p>
               </div>
               <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center">
-                <AlertTriangle className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
+                <AlertTriangle className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
               </div>
             </div>
           </CardContent>
@@ -623,7 +623,7 @@ export default function NewsletterViewPage() {
                 </p>
               </div>
               <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
-                <XCircle className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
+                <XCircle className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
               </div>
             </div>
           </CardContent>
@@ -996,7 +996,7 @@ export default function NewsletterViewPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
+                  <BarChart3 className="h-5 w-5" strokeWidth={1.5} />
                   Engagement Metrics
                 </CardTitle>
               </CardHeader>
@@ -1045,7 +1045,7 @@ export default function NewsletterViewPage() {
                 <div className="space-y-4">
                   {(newsletter.opens === 0 || !newsletter.opens) && newsletter.status === 'sent' && (
                     <div className="flex items-start gap-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                      <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                      <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5" strokeWidth={1.5} />
                       <div>
                         <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
                           No unique opens yet
@@ -1059,7 +1059,7 @@ export default function NewsletterViewPage() {
                   
                   {parseFloat(uniqueOpenRate) > 25 && (
                     <div className="flex items-start gap-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                      <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5" />
+                      <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5" strokeWidth={1.5} />
                       <div>
                         <p className="text-sm font-medium text-green-800 dark:text-green-200">
                           Excellent unique engagement!
@@ -1073,7 +1073,7 @@ export default function NewsletterViewPage() {
                   
                   {newsletter.status === 'draft' && (
                     <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                      <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+                      <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" strokeWidth={1.5} />
                       <div>
                         <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
                           Ready to send
@@ -1094,7 +1094,7 @@ export default function NewsletterViewPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <List className="h-5 w-5" />
+                <List className="h-5 w-5" strokeWidth={1.5} />
                 Detailed Email Statistics
               </CardTitle>
               <CardDescription>
@@ -1104,7 +1104,7 @@ export default function NewsletterViewPage() {
             <CardContent>
               {newsletter?.status !== 'sent' ? (
                 <div className="text-center py-8">
-                  <Mail className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <Mail className="h-12 w-12 text-gray-400 mx-auto mb-4" strokeWidth={1.5} />
                   <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
                     Newsletter Not Sent Yet
                   </h3>
@@ -1137,7 +1137,7 @@ export default function NewsletterViewPage() {
                       </p>
                     </div>
                     <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="w-full sm:w-auto">
-                      <RefreshCw className="h-4 w-4 mr-2" />
+                      <RefreshCw className="h-4 w-4 mr-2" strokeWidth={1.5} />
                       Refresh
                     </Button>
                   </div>
@@ -1159,7 +1159,7 @@ export default function NewsletterViewPage() {
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                                <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" strokeWidth={1.5} />
                               </div>
                               <div>
                                 <p className="font-medium text-gray-900 dark:text-gray-100">
@@ -1186,7 +1186,7 @@ export default function NewsletterViewPage() {
                                       size="sm"
                                       title="View Email Activity Timeline"
                                     >
-                                      <History className="h-3 w-3" />
+                                      <History className="h-3 w-3" strokeWidth={1.5} />
                                     </Button>
                                   }
                                 />
@@ -1221,7 +1221,7 @@ export default function NewsletterViewPage() {
                                   }}
                                   title="View Contact Profile Page"
                                 >
-                                  <User className="h-3 w-3" />
+                                  <User className="h-3 w-3" strokeWidth={1.5} />
                                 </Button>
 
                                 {email.resendId && (
@@ -1231,7 +1231,7 @@ export default function NewsletterViewPage() {
                                     onClick={() => window.open(`https://resend.com/emails/${email.resendId}`, '_blank')}
                                     title="View in Resend Dashboard"
                                   >
-                                    <ExternalLink className="h-3 w-3" />
+                                    <ExternalLink className="h-3 w-3" strokeWidth={1.5} />
                                   </Button>
                                 )}
 
@@ -1263,7 +1263,7 @@ export default function NewsletterViewPage() {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" strokeWidth={1.5} />
                   <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
                     No Email Data Available
                   </h3>
@@ -1282,7 +1282,7 @@ export default function NewsletterViewPage() {
         <DialogContent className="w-[95vw] max-w-2xl h-[85vh] sm:h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <History className="h-5 w-5" />
+              <History className="h-5 w-5" strokeWidth={1.5} />
               Email Trajectory History
               {selectedTrajectory && selectedTrajectory.totalEvents > 1 && (
                 <Badge variant="secondary" className="ml-2">
@@ -1348,7 +1348,7 @@ export default function NewsletterViewPage() {
                     <div className="grid grid-cols-2 gap-3 sm:gap-4">
                       <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                         <div className="flex items-center justify-center w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full mx-auto mb-2">
-                          <Activity className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                          <Activity className="h-4 w-4 text-blue-600 dark:text-blue-400" strokeWidth={1.5} />
                         </div>
                         <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{selectedTrajectory.totalEvents}</p>
                         <p className="text-sm text-blue-600 dark:text-blue-400">Total Events</p>
@@ -1356,7 +1356,7 @@ export default function NewsletterViewPage() {
                       
                       <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                         <div className="flex items-center justify-center w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-full mx-auto mb-2">
-                          <Eye className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                          <Eye className="h-4 w-4 text-purple-600 dark:text-purple-400" strokeWidth={1.5} />
                         </div>
                         <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{selectedTrajectory.totalOpens || 0}</p>
                         <p className="text-sm text-purple-600 dark:text-purple-400">Opens</p>
@@ -1364,7 +1364,7 @@ export default function NewsletterViewPage() {
                       
                       <div className="text-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                         <div className="flex items-center justify-center w-8 h-8 bg-orange-100 dark:bg-orange-900 rounded-full mx-auto mb-2">
-                          <MousePointer className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                          <MousePointer className="h-4 w-4 text-orange-600 dark:text-orange-400" strokeWidth={1.5} />
                         </div>
                         <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{selectedTrajectory.totalClicks || 0}</p>
                         <p className="text-sm text-orange-600 dark:text-orange-400">Clicks</p>
@@ -1372,7 +1372,7 @@ export default function NewsletterViewPage() {
                       
                       <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                         <div className="flex items-center justify-center w-8 h-8 bg-green-100 dark:bg-green-900 rounded-full mx-auto mb-2">
-                          <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+                          <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" strokeWidth={1.5} />
                         </div>
                         <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                           {selectedTrajectory.totalOpens > 0 ? 
@@ -1395,13 +1395,13 @@ export default function NewsletterViewPage() {
                     <div className="flex gap-2 text-sm">
                       {selectedTrajectory.totalOpens > 0 && (
                         <Badge variant="secondary" className="gap-1">
-                          <Eye className="h-3 w-3" />
+                          <Eye className="h-3 w-3" strokeWidth={1.5} />
                           {selectedTrajectory.totalOpens} {selectedTrajectory.totalOpens === 1 ? 'Open' : 'Opens'}
                         </Badge>
                       )}
                       {selectedTrajectory.totalClicks > 0 && (
                         <Badge variant="secondary" className="gap-1">
-                          <MousePointer className="h-3 w-3" />
+                          <MousePointer className="h-3 w-3" strokeWidth={1.5} />
                           {selectedTrajectory.totalClicks} {selectedTrajectory.totalClicks === 1 ? 'Click' : 'Clicks'}
                         </Badge>
                       )}
