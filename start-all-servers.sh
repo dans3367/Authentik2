@@ -17,7 +17,7 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 # Start main application server
-echo "🚀 Starting main application server on port 5000..."
+echo "🚀 Starting main application server on port 3500..."
 NODE_ENV=development tsx server/index.ts &
 MAIN_PID=$!
 
@@ -43,7 +43,7 @@ cd ..
 echo ""
 echo "✅ All servers started successfully!"
 echo "============================================="
-echo "📊 Main Application:     http://localhost:5000"
+echo "📊 Main Application:     http://localhost:3500"
 echo "🔗 Form Server API:      http://localhost:3001/api"
 echo "📝 Form Server Frontend: http://localhost:3002"
 echo ""

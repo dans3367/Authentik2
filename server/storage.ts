@@ -1418,15 +1418,21 @@ export class DatabaseStorage implements IStorage {
       .where(and(...conditions))
       .orderBy(desc(emailContacts.createdAt));
 
-    // Add tags and lists for each contact
+    // Add tags, lists, and real-time engagement stats for each contact
     const contactsWithDetails = await Promise.all(
       contacts.map(async (contact) => {
         const tags = await this.getContactTags(contact.id, tenantId);
         const lists = await this.getContactLists(contact.id, tenantId);
+        
+        // Get real-time engagement statistics
+        const engagementStats = await this.getContactEngagementStats(contact.id, tenantId);
+        
         return {
           ...contact,
           tags,
           lists,
+          emailsSent: engagementStats.emailsSent,
+          emailsOpened: engagementStats.emailsOpened,
         };
       })
     );

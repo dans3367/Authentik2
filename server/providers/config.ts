@@ -166,7 +166,7 @@ export class EmailProviderConfig {
     return {
       fromEmail: process.env.FROM_EMAIL || 'noreply@zendwise.work',
       appName: process.env.APP_NAME || 'SaaS Auth App',
-      baseUrl: process.env.BASE_URL || 'http://localhost:5000',
+      baseUrl: process.env.BASE_URL || 'http://webx.zendwise.work',
       enableQueue: process.env.EMAIL_ENABLE_QUEUE === 'true',
       queueProcessingInterval: parseInt(process.env.EMAIL_QUEUE_PROCESSING_INTERVAL || '1000'),
       cleanupInterval: parseInt(process.env.EMAIL_CLEANUP_INTERVAL || '3600000'), // 1 hour

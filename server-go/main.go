@@ -74,7 +74,7 @@ func main() {
 	api.HandleFunc("/email-tracking/{id}", server.updateEmailTracking).Methods("PUT")
 	api.HandleFunc("/email-tracking/{id}", server.deleteEmailTracking).Methods("DELETE")
 
-	port := getEnvOrDefault("PORT", "8095")
+	port := getEnvOrDefault("PORT", "3501")
 	log.Printf("Starting Go server on port %s", port)
 	log.Printf("Temporal server connection: ✅ Connected")
 
@@ -84,7 +84,7 @@ func main() {
 }
 
 func (s *Server) initTemporal() error {
-	temporalHost := getEnvOrDefault("TEMPORAL_HOST", "172.18.0.4:7233")
+	temporalHost := getEnvOrDefault("TEMPORAL_HOST", "127.0.0.1:7233")
 	maxRetries := 5
 	retryDelay := 2 * time.Second
 
@@ -368,10 +368,10 @@ func enableCORS(next http.Handler) http.Handler {
 		// Define allowed origins
 		allowedOrigins := []string{
 			"http://localhost:5173",           // Local development (Vite)
-			"http://localhost:5000",           // Local development (main app)
+			"http://localhost:3500",           // Local development (main app)
 			"https://app.zendwise.work",       // Production main app
 			"https://zendwise.work",           // Production main domain
-			"https://tengine.zendwise.work",   // Go server subdomain
+			"https://tenginex.zendwise.work",   // Go server subdomain
 			"https://authentik.zendwise.work", // Authentik subdomain if exists
 			"https://637573c3-49ca-4c2a-a66f-8a199454d465-00-1y6orip6wcu6p.janeway.replit.dev", // Replit development domain
 		}

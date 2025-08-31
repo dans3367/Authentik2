@@ -62,7 +62,7 @@ func main() {
 	api.HandleFunc("/email-tracking/{id}", server.updateEmailTracking).Methods("PUT")
 	api.HandleFunc("/email-tracking/{id}", server.deleteEmailTracking).Methods("DELETE")
 
-	port := getEnvOrDefault("PORT", "8095")
+	port := getEnvOrDefault("PORT", "3501")
 	log.Printf("🚀 Email Tracking Go Server starting on port %s", port)
 	log.Printf("⚠️  Running in NO-TEMPORAL mode for testing")
 	log.Printf("✅ Ready to accept requests")

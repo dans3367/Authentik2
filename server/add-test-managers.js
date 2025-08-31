@@ -1,6 +1,6 @@
 // Simple script to add test managers via the API
 async function addTestManagers() {
-  const baseUrl = 'http://127.0.0.1:4000';
+  const baseUrl = 'http://127.0.0.1:3504';
   
   try {
     // First, login to get a token

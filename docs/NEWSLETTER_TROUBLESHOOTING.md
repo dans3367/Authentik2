@@ -8,7 +8,7 @@ The newsletter system requires **email contacts** to exist in the database befor
 ## ✅ Solution: Create Email Contacts First
 
 ### Step 1: Navigate to Email Contacts
-1. Go to your application at http://localhost:4000 (or your deployed URL)
+1. Go to your application at http://localhost:3504 (or your deployed URL)
 2. Login with your credentials
 3. Navigate to **Email Marketing** → **Contacts** in the sidebar
 
@@ -40,7 +40,7 @@ The newsletter system requires **email contacts** to exist in the database befor
 
 ### 1. Check Go Server Health
 ```bash
-curl https://tengine.zendwise.work/health
+curl https://tenginex.zendwise.work/health
 ```
 
 Should return:
@@ -106,7 +106,7 @@ Should return:
 ### Debug Webhook Processing
 Check the webhook endpoint manually:
 ```bash
-curl -X POST http://localhost:4000/api/webhooks/resend \
+curl -X POST http://localhost:3504/api/webhooks/resend \
   -H "Content-Type: application/json" \
   -H "resend-signature: test" \
   -d '{"type":"email.opened","data":{"email":"dan@zendwise.com"}}'
@@ -186,7 +186,7 @@ The newsletter system is designed to work reliably when all components are prope
 ## 🐛 Debugging Checklist ✅ UPDATED
 
 - [x] Email contacts exist in the system ✅ **CRITICAL**
-- [x] Go server is running (port 8095) ✅
+- [x] Go server is running (port 3501) ✅
 - [x] Temporal worker is running ✅
 - [x] User is properly authenticated ✅
 - [x] Newsletter has valid recipient configuration ✅

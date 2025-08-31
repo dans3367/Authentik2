@@ -5,7 +5,7 @@ async function testNewsletterSend() {
   
   // First, let's login to get an access token
   console.log('1. Logging in to get access token...');
-  const loginResponse = await fetch('http://127.0.0.1:4000/api/auth/login', {
+  const loginResponse = await fetch('http://127.0.0.1:3504/api/auth/login', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -45,7 +45,7 @@ async function testNewsletterSend() {
   console.log('Payload:', JSON.stringify(testPayload, null, 2));
   
   try {
-    const goServerResponse = await fetch('https://tengine.zendwise.work/api/email-tracking', {
+    const goServerResponse = await fetch('https://tenginex.zendwise.work/api/email-tracking', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -69,7 +69,7 @@ async function testNewsletterSend() {
   
   // Now test the newsletter send endpoint
   console.log('3. Creating a test newsletter...');
-  const createNewsletterResponse = await fetch('http://127.0.0.1:4000/api/newsletters', {
+  const createNewsletterResponse = await fetch('http://127.0.0.1:3504/api/newsletters', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
@@ -94,7 +94,7 @@ async function testNewsletterSend() {
   
   // Test sending the newsletter
   console.log('4. Testing newsletter send endpoint...');
-  const sendResponse = await fetch(`http://127.0.0.1:4000/api/newsletters/${newsletter.id}/send`, {
+  const sendResponse = await fetch(`http://127.0.0.1:3504/api/newsletters/${newsletter.id}/send`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,

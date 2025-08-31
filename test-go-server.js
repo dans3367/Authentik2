@@ -35,7 +35,7 @@ async function testGoServerAuth() {
     console.log('Generated JWT token');
     
     // Test the Go server endpoint
-    const response = await fetch('http://localhost:8095/api/email-tracking', {
+    const response = await fetch('http://localhost:3501/api/email-tracking', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,

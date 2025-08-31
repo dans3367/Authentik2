@@ -4,8 +4,8 @@ const jwt = require('jsonwebtoken');
 const fetch = require('node-fetch');
 
 const JWT_SECRET = 'Cvgii9bYKF1HtfD8TODRyZFTmFP4vu70oR59YrjGVpS2fXzQ41O3UPRaR8u9uAqNhwK5ZxZPbX5rAOlMrqe8ag==';
-const API_BASE = 'http://localhost:4000/api';
-const GO_SERVER = 'https://tengine.zendwise.work';
+const API_BASE = 'http://localhost:3504/api';
+const GO_SERVER = 'https://tenginex.zendwise.work';
 
 // Test user credentials - you'll need to update these with actual user data
 const TEST_USER = {
@@ -31,7 +31,7 @@ async function testNewsletterFlow() {
     if (!loginResponse.ok) {
       console.log('❌ Login failed:', await loginResponse.text());
       console.log('\n📝 Note: You need to have a valid user account.');
-      console.log('   Create one via the UI at http://localhost:4000/register');
+      console.log('   Create one via the UI at http://localhost:3504/register');
       return;
     }
     

@@ -260,7 +260,7 @@ func (pea *PostmarkEmailActivity) SendPostmarkApprovalEmail(ctx context.Context,
 
 	base := pea.approveBase
 	if base == "" {
-		base = "https://tengine.zendwise.work"
+		base = "https://tenginex.zendwise.work"
 	}
 	approveURL := fmt.Sprintf("%s/approve-email?token=%s", base, url.QueryEscape(signed))
 
@@ -365,7 +365,7 @@ func (pea *PostmarkEmailActivity) SendPostmarkReviewerNotificationEmail(ctx cont
 
 	base := pea.approveBase
 	if base == "" {
-		base = "https://tengine.zendwise.work"
+		base = "https://tenginex.zendwise.work"
 	}
 	approveURL := fmt.Sprintf("%s/approve-email?token=%s", base, url.QueryEscape(signed))
 

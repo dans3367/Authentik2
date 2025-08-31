@@ -174,7 +174,7 @@ func loadConfigFromEnv() *Config {
 			Port string `yaml:"port"`
 			Host string `yaml:"host"`
 		}{
-			Port: getEnvOrDefault("PORT", "8095"),
+			Port: getEnvOrDefault("PORT", "3501"),
 			Host: getEnvOrDefault("HOST", "0.0.0.0"),
 		},
 		Temporal: struct {
@@ -182,7 +182,7 @@ func loadConfigFromEnv() *Config {
 			Namespace string `yaml:"namespace"`
 			TaskQueue string `yaml:"task_queue"`
 		}{
-			HostPort:  getEnvOrDefault("TEMPORAL_HOST", "172.18.0.4:7233"),
+			HostPort:  getEnvOrDefault("TEMPORAL_HOST", "127.0.0.1:7233"),
 			Namespace: getEnvOrDefault("TEMPORAL_NAMESPACE", "default"),
 			TaskQueue: getEnvOrDefault("TEMPORAL_TASK_QUEUE", "email-task-queue"),
 		},
@@ -208,10 +208,10 @@ func enableCORS(next http.Handler) http.Handler {
 		// Define allowed origins
 		allowedOrigins := []string{
 			"http://localhost:5173",           // Local development (Vite)
-			"http://localhost:5000",           // Local development (main app)
+			"http://localhost:3500",           // Local development (main app)
 			"https://app.zendwise.work",       // Production main app
 			"https://zendwise.work",           // Production main domain
-			"https://tengine.zendwise.work",   // Go server subdomain
+			"https://tenginex.zendwise.work",   // Go server subdomain
 			"https://authentik.zendwise.work", // Authentik subdomain if exists
 			"https://637573c3-49ca-4c2a-a66f-8a199454d465-00-1y6orip6wcu6p.janeway.replit.dev", // Replit development domain
 		}

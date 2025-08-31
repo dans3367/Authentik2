@@ -1,7 +1,7 @@
 // Fix the dan@zendwise.com user for testing
 
 async function fixUser() {
-  const baseUrl = 'http://127.0.0.1:4000';
+  const baseUrl = 'http://127.0.0.1:3504';
   
   try {
     console.log('🔧 Fixing dan@zendwise.com user...');

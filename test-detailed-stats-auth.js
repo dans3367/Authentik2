@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-const SERVER_URL = 'http://127.0.0.1:4000';
+const SERVER_URL = 'http://127.0.0.1:3504';
 const NEWSLETTER_ID = '04cea272-c163-4f2a-9356-e6ab79fb8f32';
 
 // User data from database

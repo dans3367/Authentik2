@@ -39,7 +39,7 @@ async function testDetailedStats() {
     
     // Test the detailed-stats endpoint
     const newsletterId = '04cea272-c163-4f2a-9356-e6ab79fb8f32';
-    const response = await fetch(`http://localhost:4000/api/newsletters/${newsletterId}/detailed-stats`, {
+    const response = await fetch(`http://localhost:3504/api/newsletters/${newsletterId}/detailed-stats`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,

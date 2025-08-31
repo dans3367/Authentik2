@@ -3,7 +3,7 @@ server:
   host: "0.0.0.0"
 
 temporal:
-  host_port: "172.18.0.4:7233"
+  host_port: "100.125.36.104:7233"
   namespace: "default"
   task_queue: "postmark-email-task-queue"
 
@@ -17,7 +17,7 @@ jwt:
   secret: "Cvgii9bYKF1HtfD8TODRyZFTmFP4vu70oR59YrjGVpS2fXzQ41O3UPRaR8u9uAqNhwK5ZxZPbX5rAOlMrqe8ag=="
 
 approvals:
-  approve_base_url: "https://tengine.zendwise.work"
+  approve_base_url: "https://tenginex.zendwise.work"
 
 logging:
   level: "info"

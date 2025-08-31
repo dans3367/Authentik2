@@ -859,7 +859,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { expiresIn: "7d" },
       );
 
-      const approveUrl = `${process.env.GO_EMAIL_SERVER_BASE_URL || "https://tengine.zendwise.work"}/approve-email?token=${encodeURIComponent(token)}`;
+      const approveUrl = `${process.env.GO_EMAIL_SERVER_BASE_URL || "https://tenginex.zendwise.work"}/approve-email?token=${encodeURIComponent(token)}`;
 
       // Send email to reviewer
       const approvalSubject = subject ? `Review required: ${subject}` : "Review required: Email campaign";
@@ -3417,7 +3417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("🔍 [Dev] Testing verification with token:", token);
 
       // Test the verification endpoint
-      const verificationResponse = await fetch(`http://localhost:5000/api/auth/verify-email?token=${token}`, {
+      const verificationResponse = await fetch(`http://localhost:3500/api/auth/verify-email?token=${token}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -4119,7 +4119,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[Webhook] Retrying webhook processing for ResendID: ${resendId}`);
         
         try {
-          const GO_SERVER_URL = process.env.GO_SERVER_URL || process.env.GO_EMAIL_SERVER_URL || 'https://tengine.zendwise.work';
+          const GO_SERVER_URL = process.env.GO_SERVER_URL || process.env.GO_EMAIL_SERVER_URL || 'https://tenginex.zendwise.work';
           const accessToken = process.env.EMAIL_TRACKING_TOKEN || process.env.JWT_SECRET || 'Cvgii9bYKF1HtfD8TODRyZFTmFP4vu70oR59YrjGVpS2fXzQ41O3UPRaR8u9uAqNhwK5ZxZPbX5rAOlMrqe8ag==';
           
           // Try ResendID lookup again
@@ -4454,7 +4454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (resendId) {
         try {
           // Try to update the Go email tracking system
-          const GO_SERVER_URL = process.env.GO_SERVER_URL || process.env.GO_EMAIL_SERVER_URL || 'https://tengine.zendwise.work';
+          const GO_SERVER_URL = process.env.GO_SERVER_URL || process.env.GO_EMAIL_SERVER_URL || 'https://tenginex.zendwise.work';
           const accessToken = process.env.EMAIL_TRACKING_TOKEN || process.env.JWT_SECRET || 'Cvgii9bYKF1HtfD8TODRyZFTmFP4vu70oR59YrjGVpS2fXzQ41O3UPRaR8u9uAqNhwK5ZxZPbX5rAOlMrqe8ag==';
           
           console.log(`[Webhook] Looking up email tracking by ResendID: ${resendId}`);
@@ -5411,7 +5411,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check Go server availability
-      const GO_SERVER_URL = process.env.GO_SERVER_URL || 'https://tengine.zendwise.work';
+      const GO_SERVER_URL = process.env.GO_SERVER_URL || 'https://tenginex.zendwise.work';
       let goServerAvailable = false;
       
       try {
@@ -5721,7 +5721,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Try to get tracking entries from Go server
-      const GO_SERVER_URL = process.env.GO_SERVER_URL || process.env.GO_EMAIL_SERVER_URL || 'https://tengine.zendwise.work';
+      const GO_SERVER_URL = process.env.GO_SERVER_URL || process.env.GO_EMAIL_SERVER_URL || 'https://tenginex.zendwise.work';
       const accessToken = req.headers.authorization?.replace('Bearer ', '');
       
       try {
