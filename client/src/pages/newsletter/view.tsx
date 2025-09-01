@@ -15,6 +15,7 @@ import {
   MousePointer,
   CheckCircle,
   AlertCircle,
+  AlertTriangle,
   XCircle,
   RefreshCw,
   Newspaper,
@@ -414,40 +415,14 @@ export default function NewsletterViewPage() {
               onClick={() => navigate(`/newsletters/${newsletter.id}/edit`)}
               variant="outline"
             >
-              <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
+              <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
+              Edit
             </Button>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 mb-2">
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 truncate sm:flex-1">
-                  {newsletter.title}
-                </h1>
-                <div className="sm:flex-shrink-0">
-                  {getStatusBadge(newsletter.status)}
-                </div>
-              </div>
-              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 break-words">
-                Subject: {newsletter.subject}
-              </p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap lg:justify-end">
-            {newsletter.status === 'draft' && (
-              <Button 
-                onClick={() => navigate(`/newsletters/${newsletter.id}/edit`)}
-                variant="outline"
-                size="sm"
-                className="w-full sm:w-auto"
-              >
-                <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                <span className="sm:inline">Edit</span>
-              </Button>
-            )}
-            <Button onClick={() => window.print()} variant="outline" size="sm" className="w-full sm:w-auto">
-              <Settings className="h-4 w-4 mr-2" strokeWidth={1.5} />
-              <span className="sm:inline">Options</span>
-            </Button>
-          </div>
+          )}
+          <Button onClick={() => window.print()} variant="outline" size="sm" className="w-full sm:w-auto">
+            <Settings className="h-4 w-4 mr-2" strokeWidth={1.5} />
+            <span className="sm:inline">Options</span>
+          </Button>
         </div>
       </div>
 

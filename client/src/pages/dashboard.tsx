@@ -176,14 +176,14 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
-      <div className="max-w-6xl mx-auto p-6 space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:bg-gradient-to-br dark:from-slate-800 dark:via-slate-700 dark:to-slate-800">
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* Page Header with Free Trial Panel */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-                Dashboard
+                Statistics
               </h1>
               <p className="text-gray-600 dark:text-gray-400 mt-1">
                 Welcome back, {user.firstName} {user.lastName}
@@ -220,222 +220,175 @@ export default function Dashboard() {
           </Card>
         )}
 
-        {/* Stats Grid */}
+        {/* Stats Grid - Modern Card Layout */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-blue-200/50 dark:border-blue-700/30 hover:shadow-lg transition-all duration-300">
+          {/* Website Traffic - Yellow Card */}
+          <Card className="bg-yellow-400 dark:bg-yellow-400 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300 relative overflow-hidden">
             <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                    Emails Sent
-                  </p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-                    {emailStats.totalSent.toLocaleString()}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Last 30 days
-                  </p>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-black">Website traffic</h3>
+                  <Button size="sm" variant="ghost" className="text-black hover:bg-black/10 text-xs">
+                    More
+                  </Button>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <Send className="text-white w-6 h-6" />
+                <div className="space-y-2">
+                  <div className="text-4xl font-bold text-black">12k</div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span className="text-black">Social Media</span>
+                      </div>
+                      <span className="text-black font-medium">78%</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-yellow-600 rounded-full"></div>
+                        <span className="text-black">Organic Search</span>
+                      </div>
+                      <span className="text-black font-medium">22%</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-green-200/50 dark:border-green-700/30 hover:shadow-lg transition-all duration-300">
+          {/* Full Report - Dark Card */}
+          <Card className="bg-slate-800 dark:bg-slate-900 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
             <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-green-600 dark:text-green-400">
-                    Open Rate
-                  </p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-                    {emailStats.avgOpenRate}%
-                  </p>
-                  <p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center">
-                    <TrendingUp className="w-3 h-3 mr-1" />
-                    3.2% vs last month
-                  </p>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-white">Full Report</h3>
+                  <div className="text-sm text-gray-400">/ 2023</div>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 dark:from-green-400 dark:to-green-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <Eye className="text-white w-6 h-6" />
+                <div className="flex items-center justify-center h-32">
+                  <div className="w-24 h-24 border-4 border-gray-600 rounded-full flex items-center justify-center relative">
+                    <div className="absolute inset-0 border-4 border-blue-500 rounded-full" style={{clipPath: 'polygon(0 0, 50% 0, 50% 100%, 0 100%)'}}></div>
+                    <TrendingUp className="w-8 h-8 text-white" />
+                  </div>
+                </div>
+                <Button className="w-full bg-slate-700 hover:bg-slate-600 text-white border-0 rounded-2xl">
+                  <FileText className="w-4 h-4 mr-2" />
+                  Download Report
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Bounce Rate - Light Card */}
+          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-black">Bounce Rate</h3>
+                  <TrendingUp className="w-5 h-5 text-black" />
+                </div>
+                <div className="flex items-center justify-center space-x-2 py-4">
+                  <div className="flex space-x-1">
+                    <div className="w-8 h-8 bg-gray-300 rounded-lg flex items-center justify-center text-black text-sm font-medium">2</div>
+                    <div className="w-8 h-8 bg-yellow-400 rounded-lg flex items-center justify-center text-black text-sm font-medium">3</div>
+                    <div className="w-8 h-8 bg-gray-300 rounded-lg flex items-center justify-center text-black text-sm font-medium">4</div>
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-4xl font-bold text-black">23%</div>
+                  <div className="text-sm text-gray-600 flex items-center justify-center gap-1">
+                    <span className="text-red-500">-10%</span>
+                    <span>Since last day</span>
+                  </div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-orange-200/50 dark:border-orange-700/30 hover:shadow-lg transition-all duration-300">
+          {/* Open Rate - Light Card */}
+          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
             <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-orange-600 dark:text-orange-400">
-                    Click Rate
-                  </p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-                    {emailStats.avgClickRate}%
-                  </p>
-                  <p className="text-xs text-red-600 dark:text-red-400 mt-1 flex items-center">
-                    <span>↓</span>
-                    <span className="ml-1">1.8% vs last month</span>
-                  </p>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-black">Customer Churn Rate</h3>
+                  <div className="bg-purple-500 rounded-full px-3 py-1 text-xs text-white font-medium">12.3%</div>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 dark:from-orange-400 dark:to-orange-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <MousePointer className="text-white w-6 h-6" />
+                <div className="h-20 flex items-end justify-center space-x-1">
+                  {[40, 60, 20, 80, 45, 90, 30, 70].map((height, index) => (
+                    <div
+                      key={index}
+                      className={`w-6 rounded-t-lg ${index === 5 ? 'bg-yellow-400' : 'bg-gray-400'}`}
+                      style={{ height: `${height}%` }}
+                    ></div>
+                  ))}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-purple-200/50 dark:border-purple-700/30 hover:shadow-lg transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-purple-600 dark:text-purple-400">
-                    Active Campaigns
-                  </p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-                    7
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    2 scheduled
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 dark:from-purple-400 dark:to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <Mail className="text-white w-6 h-6" />
+                <div className="flex items-center justify-between text-xs text-gray-600">
+                  <span>20-100</span>
+                  <span>100-200</span>
+                  <span>200-300</span>
+                  <span>+500</span>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Quick Actions */}
-        <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300">
-          <CardHeader>
-            <CardTitle className="text-gray-900 dark:text-gray-100">Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Button 
-                variant="outline" 
-                size="lg"
-                className="h-24 flex flex-col items-center justify-center bg-white/50 dark:bg-gray-700/50 hover:bg-blue-50 dark:hover:bg-blue-900/30 border-gray-200/50 dark:border-gray-600/50 transition-all duration-300" 
-                onClick={() => setLocation('/email-compose')}
-              >
-                <Mail className="h-6 w-6 mb-2 text-blue-600 dark:text-blue-400" />
-                <span className="text-gray-900 dark:text-gray-100">Create Campaign</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                size="lg"
-                className="h-24 flex flex-col items-center justify-center bg-white/50 dark:bg-gray-700/50 hover:bg-green-50 dark:hover:bg-green-900/30 border-gray-200/50 dark:border-gray-600/50 transition-all duration-300" 
-                onClick={() => setLocation('/email-templates')}
-              >
-                <FileText className="h-6 w-6 mb-2 text-green-600 dark:text-green-400" />
-                <span className="text-gray-900 dark:text-gray-100">Design Template</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                size="lg"
-                className="h-24 flex flex-col items-center justify-center bg-white/50 dark:bg-gray-700/50 hover:bg-purple-50 dark:hover:bg-purple-900/30 border-gray-200/50 dark:border-gray-600/50 transition-all duration-300" 
-                onClick={() => setLocation('/email-contacts')}
-              >
-                <Users className="h-6 w-6 mb-2 text-purple-600 dark:text-purple-400" />
-                <span className="text-gray-900 dark:text-gray-100">Import Contacts</span>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Token Management Section */}
-        <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-green-200/50 dark:border-green-700/30 hover:shadow-lg transition-all duration-300">
-          <CardHeader>
-            <CardTitle className="flex items-center text-gray-900 dark:text-gray-100">
-              <Shield className="mr-2 h-5 w-5 text-green-600 dark:text-green-400" />
-              Token Management
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between rounded-lg border border-gray-200/50 dark:border-gray-600/50 bg-white/50 dark:bg-gray-700/50 p-4">
-              <div className="flex items-center space-x-3">
-                <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
+        {/* Secondary Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* ROI - Dark Card with Chart */}
+          <Card className="bg-slate-800 dark:bg-slate-900 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-yellow-400" />
+                    <h3 className="text-lg font-semibold text-white">ROI</h3>
+                  </div>
+                  <Button size="sm" variant="ghost" className="text-gray-400 hover:bg-white/10 text-xs">
+                    Details
+                  </Button>
+                </div>
                 <div>
-                  <p className="font-medium text-gray-900 dark:text-gray-100">Access Token</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Expires in {tokenExpiry}</p>
+                  <div className="text-4xl font-bold text-white">283%</div>
+                  <div className="text-sm text-gray-400 mt-1">Return On Investment</div>
+                </div>
+                <div className="h-20 flex items-end">
+                  <svg viewBox="0 0 200 60" className="w-full h-full">
+                    <path 
+                      d="M0,50 Q50,30 100,35 T200,20" 
+                      stroke="#eab308" 
+                      strokeWidth="3" 
+                      fill="none"
+                      className="drop-shadow-sm"
+                    />
+                    <circle cx="180" cy="25" r="4" fill="#eab308" />
+                  </svg>
                 </div>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleRefreshToken}
-                className="bg-white/50 dark:bg-gray-700/50 hover:bg-green-50 dark:hover:bg-green-900/30 border-gray-200/50 dark:border-gray-600/50"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-gray-200/50 dark:border-gray-600/50 bg-white/50 dark:bg-gray-700/50 p-4">
-              <div className="flex items-center space-x-3">
-                <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></div>
-                <div>
-                  <p className="font-medium text-gray-900 dark:text-gray-100">Refresh Token</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Expires in {refreshTokenExpiry}</p>
-                </div>
-              </div>
-              <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
-                <Shield className="h-3 w-3 mr-1" />
-                Secure
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* User Info Section */}
-        <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-blue-200/50 dark:border-blue-700/30 hover:shadow-lg transition-all duration-300">
-          <CardHeader>
-            <CardTitle className="flex items-center text-gray-900 dark:text-gray-100">
-              <User className="mr-2 h-5 w-5 text-blue-600 dark:text-blue-400" />
-              Account Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center">
-                  <Mail className="h-4 w-4 mr-2 text-blue-500 dark:text-blue-400" />
-                  Email
-                </label>
-                <div className="rounded-lg border border-gray-200/50 dark:border-gray-600/50 bg-white/50 dark:bg-gray-700/50 p-3 text-sm text-gray-900 dark:text-gray-100">{user.email}</div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center">
-                  <User className="h-4 w-4 mr-2 text-green-500 dark:text-green-400" />
-                  Full Name
-                </label>
-                <div className="rounded-lg border border-gray-200/50 dark:border-gray-600/50 bg-white/50 dark:bg-gray-700/50 p-3 text-sm text-gray-900 dark:text-gray-100">{user.firstName} {user.lastName}</div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center">
-                  <Clock className="h-4 w-4 mr-2 text-orange-500 dark:text-orange-400" />
-                  User ID
-                </label>
-                <div className="rounded-lg border border-gray-200/50 dark:border-gray-600/50 bg-white/50 dark:bg-gray-700/50 p-3 text-sm font-mono break-all text-gray-900 dark:text-gray-100">{user.id}</div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center">
-                  <Shield className="h-4 w-4 mr-2 text-purple-500 dark:text-purple-400" />
-                  Account Status
-                </label>
-                <div className="pt-1">
-                  <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
-                    <div className="h-2 w-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                    Active
-                  </Badge>
+          {/* API Requests - Light Card */}
+          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-black">API Requests</h3>
+                  <Settings className="w-5 h-5 text-black" />
                 </div>
+                <div className="text-center py-8">
+                  <img 
+                    src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIHJ4PSIyMCIgZmlsbD0iIzM3NDE1MSIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+V2ViIFNjb3JlPC90ZXh0Pjx0ZXh0IHg9IjUwIiB5PSIzNSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC13ZWlnaHQ9ImJvbGQiPkFJPC90ZXh0Pjwvc3ZnPg=="
+                    alt="API Demo" 
+                    className="w-24 h-24 mx-auto rounded-2xl"
+                  />
+                </div>
+                <Button className="w-full bg-yellow-400 hover:bg-yellow-500 text-black border-0 rounded-2xl font-semibold">
+                  Web Score with AI
+                </Button>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
+
       </div>
       </div>
     );
