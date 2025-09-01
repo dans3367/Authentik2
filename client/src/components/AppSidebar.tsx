@@ -145,10 +145,10 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+        <SidebarGroup className="mt-6">
+          <SidebarGroupLabel className="mb-4">Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-3">
               {navigation.map((item) => {
                 const isActive =
                   location === item.href ||
@@ -157,7 +157,7 @@ export function AppSidebar() {
 
                 return (
                   <SidebarMenuItem key={item.name}>
-                    <SidebarMenuButton asChild isActive={isActive}>
+                    <SidebarMenuButton asChild isActive={isActive} className="py-3">
                       <Link href={item.href}>
                         <Icon className="h-5 w-5" />
                         <span>{item.name}</span>
