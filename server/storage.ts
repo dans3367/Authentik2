@@ -18,6 +18,7 @@ import {
   newsletterTaskStatus,
   campaigns,
   emailActivity,
+  bouncedEmails,
   type User, 
   type InsertUser, 
   type RefreshToken, 
@@ -80,7 +81,13 @@ import {
   type UpdateCampaignData,
   type EmailActivity,
   type InsertEmailActivity,
-  type CreateEmailActivityData
+  type CreateEmailActivityData,
+  type BouncedEmail,
+  type InsertBouncedEmail,
+  type CreateBouncedEmailData,
+  type UpdateBouncedEmailData,
+  type BouncedEmailWithDetails,
+  type BouncedEmailFilters
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gt, lt, gte, lte, desc, ne, or, ilike, count, sql, inArray } from "drizzle-orm";
@@ -282,6 +289,18 @@ export interface IStorage {
   findEmailContactByEmail(email: string): Promise<{ contact: EmailContact; tenantId: string } | undefined>;
   // Check if contact has already opened this newsletter (unique opens tracking)
   hasContactOpenedNewsletter(contactId: string, newsletterId: string, tenantId: string): Promise<boolean>;
+
+  // Universal bounced emails operations (not tenant-specific)
+  addBouncedEmail(bouncedEmailData: CreateBouncedEmailData): Promise<BouncedEmail>;
+  updateBouncedEmail(email: string, updates: UpdateBouncedEmailData): Promise<BouncedEmail | undefined>;
+  getBouncedEmail(email: string): Promise<BouncedEmail | undefined>;
+  isEmailBounced(email: string): Promise<boolean>;
+  getAllBouncedEmails(filters?: BouncedEmailFilters): Promise<BouncedEmail[]>;
+  removeBouncedEmail(email: string): Promise<void>;
+  // Get emails that should be excluded from sending
+  getBouncedEmailAddresses(): Promise<string[]>;
+  // Increment bounce count for an existing bounced email
+  incrementBounceCount(email: string, lastBouncedAt: Date, bounceReason?: string): Promise<BouncedEmail | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2328,6 +2347,136 @@ export class DatabaseStorage implements IStorage {
       contact: result.contact,
       tenantId: result.tenantId,
     };
+  }
+
+  // Universal bounced emails operations (not tenant-specific)
+  async addBouncedEmail(bouncedEmailData: CreateBouncedEmailData): Promise<BouncedEmail> {
+    const normalizedEmail = bouncedEmailData.email.toLowerCase().trim();
+    
+    // Check if email already exists in bounced list
+    const existing = await this.getBouncedEmail(normalizedEmail);
+    if (existing) {
+      // Update existing record with new bounce information
+      return this.incrementBounceCount(
+        normalizedEmail, 
+        bouncedEmailData.lastBouncedAt, 
+        bouncedEmailData.bounceReason
+      ) || existing;
+    }
+
+    const [bouncedEmail] = await db
+      .insert(bouncedEmails)
+      .values({
+        ...bouncedEmailData,
+        email: normalizedEmail,
+      })
+      .returning();
+    return bouncedEmail;
+  }
+
+  async updateBouncedEmail(email: string, updates: UpdateBouncedEmailData): Promise<BouncedEmail | undefined> {
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    const [updated] = await db
+      .update(bouncedEmails)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(bouncedEmails.email, normalizedEmail))
+      .returning();
+    
+    return updated;
+  }
+
+  async getBouncedEmail(email: string): Promise<BouncedEmail | undefined> {
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    const [bouncedEmail] = await db
+      .select()
+      .from(bouncedEmails)
+      .where(eq(bouncedEmails.email, normalizedEmail))
+      .limit(1);
+    
+    return bouncedEmail;
+  }
+
+  async isEmailBounced(email: string): Promise<boolean> {
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    const [result] = await db
+      .select({ id: bouncedEmails.id })
+      .from(bouncedEmails)
+      .where(and(
+        eq(bouncedEmails.email, normalizedEmail),
+        eq(bouncedEmails.isActive, true)
+      ))
+      .limit(1);
+    
+    return !!result;
+  }
+
+  async getAllBouncedEmails(filters?: BouncedEmailFilters): Promise<BouncedEmail[]> {
+    let query = db.select().from(bouncedEmails);
+    
+    const conditions = [];
+    
+    if (filters?.search) {
+      conditions.push(ilike(bouncedEmails.email, `%${filters.search}%`));
+    }
+    
+    if (filters?.bounceType && filters.bounceType !== 'all') {
+      conditions.push(eq(bouncedEmails.bounceType, filters.bounceType));
+    }
+    
+    if (filters?.isActive !== undefined) {
+      conditions.push(eq(bouncedEmails.isActive, filters.isActive));
+    }
+    
+    if (filters?.tenantId) {
+      conditions.push(eq(bouncedEmails.sourceTenantId, filters.tenantId));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+    
+    const results = await query.orderBy(desc(bouncedEmails.lastBouncedAt));
+    return results;
+  }
+
+  async removeBouncedEmail(email: string): Promise<void> {
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    await db
+      .delete(bouncedEmails)
+      .where(eq(bouncedEmails.email, normalizedEmail));
+  }
+
+  async getBouncedEmailAddresses(): Promise<string[]> {
+    const results = await db
+      .select({ email: bouncedEmails.email })
+      .from(bouncedEmails)
+      .where(eq(bouncedEmails.isActive, true));
+    
+    return results.map(result => result.email);
+  }
+
+  async incrementBounceCount(email: string, lastBouncedAt: Date, bounceReason?: string): Promise<BouncedEmail | undefined> {
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    const [updated] = await db
+      .update(bouncedEmails)
+      .set({
+        bounceCount: sql`${bouncedEmails.bounceCount} + 1`,
+        lastBouncedAt,
+        bounceReason: bounceReason || bouncedEmails.bounceReason,
+        updatedAt: new Date(),
+      })
+      .where(eq(bouncedEmails.email, normalizedEmail))
+      .returning();
+    
+    return updated;
   }
 
 }

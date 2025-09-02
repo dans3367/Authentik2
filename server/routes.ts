@@ -3701,6 +3701,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bounced Emails API Routes
+  
+  // Get all bounced emails (Admin only - cross-tenant)
+  app.get("/api/bounced-emails", authenticateToken, async (req: any, res) => {
+    try {
+      // Check if user has admin permissions
+      if (!['Owner', 'Administrator'].includes(req.user.role)) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const filters: BouncedEmailFilters = {
+        search: req.query.search as string,
+        bounceType: req.query.bounceType as 'hard' | 'soft' | 'complaint' | 'all',
+        isActive: req.query.isActive === 'true' ? true : req.query.isActive === 'false' ? false : undefined,
+        tenantId: req.query.tenantId as string,
+      };
+
+      const bouncedEmails = await storage.getAllBouncedEmails(filters);
+      res.json({ bouncedEmails });
+    } catch (error) {
+      console.error("Get bounced emails error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Check if email is bounced
+  app.get("/api/bounced-emails/check/:email", authenticateToken, async (req: any, res) => {
+    try {
+      const { email } = req.params;
+      const isBounced = await storage.isEmailBounced(email);
+      const bouncedEmail = isBounced ? await storage.getBouncedEmail(email) : null;
+      
+      res.json({ 
+        email,
+        isBounced,
+        bouncedEmail
+      });
+    } catch (error) {
+      console.error("Check bounced email error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Remove email from bounced list (Admin only)
+  app.delete("/api/bounced-emails/:email", authenticateToken, async (req: any, res) => {
+    try {
+      // Check if user has admin permissions
+      if (!['Owner', 'Administrator'].includes(req.user.role)) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const { email } = req.params;
+      await storage.removeBouncedEmail(email);
+      
+      res.json({ message: "Email removed from bounced list successfully" });
+    } catch (error) {
+      console.error("Remove bounced email error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Manually add email to bounced list (Admin only)
+  app.post("/api/bounced-emails", authenticateToken, async (req: any, res) => {
+    try {
+      // Check if user has admin permissions
+      if (!['Owner', 'Administrator'].includes(req.user.role)) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const bouncedEmailData = {
+        email: req.body.email,
+        bounceType: req.body.bounceType || 'hard',
+        bounceReason: req.body.bounceReason || 'Manually added',
+        bounceSubType: req.body.bounceSubType,
+        firstBouncedAt: new Date(),
+        lastBouncedAt: new Date(),
+        bounceCount: 1,
+        sourceTenantId: req.user.tenantId,
+        suppressionReason: req.body.suppressionReason || 'Manually added to bounced list',
+        lastAttemptedAt: new Date(),
+      };
+
+      const bouncedEmail = await storage.addBouncedEmail(bouncedEmailData);
+      res.status(201).json({ 
+        message: "Email added to bounced list successfully",
+        bouncedEmail
+      });
+    } catch (error) {
+      console.error("Add bounced email error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get bounced email statistics
+  app.get("/api/bounced-emails/stats", authenticateToken, async (req: any, res) => {
+    try {
+      // Check if user has admin permissions
+      if (!['Owner', 'Administrator'].includes(req.user.role)) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const allBounced = await storage.getAllBouncedEmails();
+      const stats = {
+        totalBounced: allBounced.length,
+        activeBounced: allBounced.filter(b => b.isActive).length,
+        inactiveBounced: allBounced.filter(b => !b.isActive).length,
+        hardBounces: allBounced.filter(b => b.bounceType === 'hard').length,
+        softBounces: allBounced.filter(b => b.bounceType === 'soft').length,
+        complaints: allBounced.filter(b => b.bounceType === 'complaint').length,
+        byTenant: allBounced.reduce((acc, b) => {
+          if (b.sourceTenantId) {
+            acc[b.sourceTenantId] = (acc[b.sourceTenantId] || 0) + 1;
+          }
+          return acc;
+        }, {} as Record<string, number>)
+      };
+
+      res.json({ stats });
+    } catch (error) {
+      console.error("Get bounced email stats error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Contact Tags API Routes
   
   // Get all contact tags
@@ -4673,11 +4797,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: 'bounced' as any,
           lastActivity: new Date() 
         }, tenantId);
+        
+        // Add email to universal bounced list
+        try {
+          console.log(`[Webhook] Adding ${email} to universal bounced list`);
+          await storage.addBouncedEmail({
+            email: email,
+            bounceType: 'hard', // Default to hard bounce
+            bounceReason: data.reason || 'Email bounced',
+            bounceSubType: data.bounceSubType || undefined,
+            firstBouncedAt: new Date(),
+            lastBouncedAt: new Date(),
+            bounceCount: 1,
+            sourceTenantId: tenantId,
+            sourceNewsletterId: newsletterId,
+            sourceCampaignId: undefined,
+            webhookId: data.id || data.event_id,
+            webhookData: JSON.stringify(data),
+            suppressionReason: `Bounce detected: ${data.reason || 'Email bounced'}`,
+            lastAttemptedAt: new Date(),
+          });
+          console.log(`[Webhook] ✅ Successfully added ${email} to universal bounced list`);
+        } catch (bounceError) {
+          console.error(`[Webhook] Failed to add ${email} to bounced list:`, bounceError);
+        }
       } else if (activityType === 'complained') {
         await storage.updateEmailContact(contact.id, { 
           status: 'complained' as any,
           lastActivity: new Date() 
         }, tenantId);
+        
+        // Add email to universal bounced list (complaints are suppressions too)
+        try {
+          console.log(`[Webhook] Adding ${email} to universal bounced list for spam complaint`);
+          await storage.addBouncedEmail({
+            email: email,
+            bounceType: 'complaint',
+            bounceReason: 'Spam complaint received',
+            bounceSubType: 'spam-complaint',
+            firstBouncedAt: new Date(),
+            lastBouncedAt: new Date(),
+            bounceCount: 1,
+            sourceTenantId: tenantId,
+            sourceNewsletterId: newsletterId,
+            sourceCampaignId: undefined,
+            webhookId: data.id || data.event_id,
+            webhookData: JSON.stringify(data),
+            suppressionReason: 'Spam complaint received from recipient',
+            lastAttemptedAt: new Date(),
+          });
+          console.log(`[Webhook] ✅ Successfully added ${email} to universal bounced list for spam complaint`);
+        } catch (bounceError) {
+          console.error(`[Webhook] Failed to add ${email} to bounced list for spam complaint:`, bounceError);
+        }
       } else if (activityType === 'unsubscribed') {
         await storage.updateEmailContact(contact.id, { 
           status: 'unsubscribed' as any,
@@ -5162,7 +5334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get email trajectory from Resend API
+  // Get email trajectory from Resend API and our database
   app.get("/api/emails/:resendId/trajectory", authenticateToken, async (req: any, res) => {
     try {
       const { resendId } = req.params;
@@ -5170,8 +5342,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!resendId) {
         return res.status(400).json({ message: "Resend ID is required" });
       }
-
-
 
       if (!process.env.RESEND_API_KEY) {
         return res.status(500).json({ message: "Resend API key not configured" });
@@ -5188,6 +5358,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Fetch all email activities from our database for this resendId
+      console.log(`[Trajectory] Fetching activities for resendId: ${resendId}`);
+      
+      const emailActivities = await db.execute(sql`
+        SELECT 
+          ea.id,
+          ea.contact_id,
+          ea.activity_type,
+          ea.activity_data,
+          ea.webhook_data,
+          ea.occurred_at,
+          ea.user_agent,
+          ea.ip_address,
+          ec.email,
+          ec.first_name,
+          ec.last_name
+        FROM email_activity ea
+        LEFT JOIN email_contacts ec ON ea.contact_id = ec.id
+        WHERE ea.webhook_data::jsonb -> 'data' ->> 'email_id' = ${resendId}
+           OR ea.activity_data::jsonb ->> 'email_id' = ${resendId}
+           OR ea.webhook_data::text LIKE ${`%${resendId}%`}
+        ORDER BY ea.occurred_at ASC
+      `);
+
+      console.log(`[Trajectory] Found ${emailActivities.rows?.length || 0} activities for resendId: ${resendId}`);
+
+      // Transform database activities into events
+      const activities = emailActivities.rows || [];
+      const databaseEvents = activities.map((activity: any) => {
+        let parsedActivityData: any = {};
+        let parsedWebhookData: any = {};
+        
+        try {
+          if (activity.activity_data) {
+            parsedActivityData = JSON.parse(activity.activity_data);
+          }
+        } catch (e) {
+          console.warn('[Trajectory] Failed to parse activity_data:', e);
+        }
+        
+        try {
+          if (activity.webhook_data) {
+            parsedWebhookData = JSON.parse(activity.webhook_data);
+          }
+        } catch (e) {
+          console.warn('[Trajectory] Failed to parse webhook_data:', e);
+        }
+
+        // Create a more detailed description based on activity type
+        let description = `Email ${activity.activity_type}`;
+        if (activity.activity_type === 'opened') {
+          description = `Email opened by ${activity.email || 'recipient'}`;
+          if (activity.user_agent) {
+            const ua = activity.user_agent;
+            if (ua.includes('iPhone') || ua.includes('iPad')) {
+              description += ' on iOS device';
+            } else if (ua.includes('Android')) {
+              description += ' on Android device';
+            } else if (ua.includes('Windows')) {
+              description += ' on Windows';
+            } else if (ua.includes('Mac')) {
+              description += ' on Mac';
+            }
+          }
+          if (activity.ip_address) {
+            description += ` (IP: ${activity.ip_address})`;
+          }
+        } else if (activity.activity_type === 'clicked') {
+          description = `Link clicked by ${activity.email || 'recipient'}`;
+          if (parsedActivityData.url) {
+            description += ` - ${parsedActivityData.url}`;
+          }
+        } else if (activity.activity_type === 'bounced') {
+          description = `Email bounced for ${activity.email || 'recipient'}`;
+          if (parsedWebhookData.bounce && parsedWebhookData.bounce.error_code) {
+            description += ` (${parsedWebhookData.bounce.error_code})`;
+          }
+        } else if (activity.activity_type === 'delivered') {
+          description = `Email delivered to ${activity.email || 'recipient'}`;
+        } else if (activity.activity_type === 'complained') {
+          description = `Spam complaint from ${activity.email || 'recipient'}`;
+        }
+
+        return {
+          type: activity.activity_type,
+          timestamp: activity.occurred_at,
+          description,
+          email: activity.email,
+          userAgent: activity.user_agent,
+          ipAddress: activity.ip_address,
+          activityData: parsedActivityData,
+          webhookData: parsedWebhookData
+        };
+      });
+
+      // Combine Resend basic info with database events
+      const allEvents = [
+        {
+          type: 'sent',
+          timestamp: data.created_at,
+          description: 'Email was sent via Resend',
+          source: 'resend'
+        },
+        ...databaseEvents.map(event => ({ ...event, source: 'database' }))
+      ];
+
+      // Sort all events by timestamp
+      allEvents.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
       // Transform the Resend data into a more readable format
       const trajectory = {
         emailId: data.id,
@@ -5197,20 +5476,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: data.last_event,
         createdAt: data.created_at,
         lastEvent: data.last_event,
-        // Resend doesn't provide full event history in the get email endpoint
-        // The last_event field shows the most recent status
-        events: [
-          {
-            type: 'sent',
-            timestamp: data.created_at,
-            description: 'Email was sent via Resend'
-          },
-          ...(data.last_event && data.last_event !== 'sent' ? [{
-            type: data.last_event,
-            timestamp: data.created_at, // Resend doesn't provide event timestamps in this endpoint
-            description: `Email ${data.last_event}`
-          }] : [])
-        ],
+        totalEvents: allEvents.length,
+        totalOpens: databaseEvents.filter(e => e.type === 'opened').length,
+        totalClicks: databaseEvents.filter(e => e.type === 'clicked').length,
+        events: allEvents,
         metadata: {
           html: data.html || null,
           text: data.text || null,
@@ -5219,6 +5488,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           bcc: data.bcc || null
         }
       };
+
+      console.log(`[Trajectory] Returning trajectory with ${allEvents.length} events (${databaseEvents.filter(e => e.type === 'opened').length} opens)`);
 
       res.json({
         success: true,
@@ -5404,6 +5675,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.warn(`[Newsletter Send] ${recipients.length - validRecipients.length} recipients had invalid email addresses`);
       }
 
+      // Filter out bounced emails
+      console.log(`[Newsletter Send] Checking for bounced emails among ${validRecipients.length} recipients`);
+      const bouncedEmails = await storage.getBouncedEmailAddresses();
+      const bouncedEmailSet = new Set(bouncedEmails.map(email => email.toLowerCase()));
+      
+      const nonBouncedRecipients = validRecipients.filter(r => {
+        const emailLower = r.email.toLowerCase();
+        const isBounced = bouncedEmailSet.has(emailLower);
+        if (isBounced) {
+          console.log(`[Newsletter Send] Excluding bounced email: ${r.email}`);
+        }
+        return !isBounced;
+      });
+
+      const bouncedCount = validRecipients.length - nonBouncedRecipients.length;
+      if (bouncedCount > 0) {
+        console.log(`[Newsletter Send] Excluded ${bouncedCount} bounced email(s) from newsletter ${id}`);
+      }
+
+      if (nonBouncedRecipients.length === 0) {
+        console.log(`[Newsletter Send] No deliverable recipients after filtering bounced emails for newsletter ${id}`);
+        return res.status(400).json({ 
+          message: "No deliverable recipients found", 
+          details: `All ${validRecipients.length} recipient(s) have bounced emails and cannot receive newsletters`
+        });
+      }
+
+      // Use non-bounced recipients for sending
+      const finalRecipients = nonBouncedRecipients;
+
       // Get user's access token for Go server authentication
       const accessToken = req.headers.authorization?.replace('Bearer ', '');
       if (!accessToken) {
@@ -5438,7 +5739,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[Newsletter Send] Generated groupUUID: ${groupUUID} for newsletter ${id}`);
       
-      const sendPromises = validRecipients.map(async (recipient, index) => {
+      const sendPromises = finalRecipients.map(async (recipient, index) => {
         const individualEmailId = `${emailId}-${index}`;
         
         const payload = {
@@ -5461,7 +5762,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         };
         
-        console.log(`[Newsletter Send] Queuing email ${index + 1}/${validRecipients.length}: ${recipient.email} (emailId: ${individualEmailId})`);
+        console.log(`[Newsletter Send] Queuing email ${index + 1}/${finalRecipients.length}: ${recipient.email} (emailId: ${individualEmailId})`);
 
         try {
           const response = await fetch(`${GO_SERVER_URL}/api/email-tracking`, {
@@ -5508,7 +5809,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           } else {
             // Handle rejected promise
-            const recipient = validRecipients[index];
+            const recipient = finalRecipients[index];
             failed.push({
               success: false,
               email: recipient?.email || 'unknown',
@@ -5536,7 +5837,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           { 
             status: "sent",
             sentAt: new Date(),
-            recipientCount: validRecipients.length,
+            recipientCount: finalRecipients.length,
           },
           req.user.tenantId
         );
@@ -5547,7 +5848,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         message: "Newsletter sending initiated",
-        totalRecipients: validRecipients.length,
+        totalRecipients: finalRecipients.length,
         successful: successful.length,
         failed: failed.length,
         emailId,
