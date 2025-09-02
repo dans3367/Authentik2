@@ -372,6 +372,10 @@ export default function NewsletterPage() {
                 <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-secondary to-secondary/80 flex items-center justify-center group-hover:scale-105 transition-transform">
                   <Edit className="h-6 w-6 text-secondary-foreground" />
                 </div>
+                <Button className="w-full bg-slate-700 hover:bg-slate-600 text-white border-0 rounded-2xl">
+                  <Edit className="w-4 h-4 mr-2" />
+                  View Drafts ({stats.draftNewsletters})
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -389,6 +393,13 @@ export default function NewsletterPage() {
                 </div>
                 <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-orange-100 to-orange-50 dark:from-orange-950/30 dark:to-orange-950/10 flex items-center justify-center group-hover:scale-105 transition-transform">
                   <Clock className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div className="text-center">
+                  <div className="text-4xl font-bold text-black">{stats.scheduledNewsletters}</div>
+                  <div className="text-sm text-gray-600 flex items-center justify-center gap-1">
+                    <span className="text-green-500">+5%</span>
+                    <span>Ready to send</span>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -408,6 +419,26 @@ export default function NewsletterPage() {
                 <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-green-100 to-green-50 dark:from-green-950/30 dark:to-green-950/10 flex items-center justify-center group-hover:scale-105 transition-transform">
                   <Send className="h-6 w-6 text-green-600 dark:text-green-400" />
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Campaign Management - Light Card */}
+          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-black">Campaign Management</h3>
+                  <Mail className="w-5 h-5 text-black" />
+                </div>
+                <div className="text-center py-8">
+                  <div className="w-24 h-24 bg-slate-800 rounded-2xl flex items-center justify-center mx-auto">
+                    <Send className="w-12 h-12 text-white" />
+                  </div>
+                </div>
+                <Button className="w-full bg-yellow-400 hover:bg-yellow-500 text-black border-0 rounded-2xl font-semibold">
+                  Campaign Analytics Dashboard
+                </Button>
               </div>
             </CardContent>
           </Card>

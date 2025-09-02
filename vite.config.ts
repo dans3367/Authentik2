@@ -80,11 +80,19 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
+    port: 5173,
     cors: true,
     hmr: {
       host: '0.0.0.0',
       // Let Vite automatically determine the client port
       // This works better with proxies and tunnels
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false,
+      }
     },
     fs: {
       strict: true,
