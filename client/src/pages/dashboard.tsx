@@ -220,6 +220,130 @@ export default function Dashboard() {
           </Card>
         )}
 
+        {/* Token Information Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+          {/* Access Token Status */}
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-blue-200/50 dark:border-blue-700/30 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center text-gray-900 dark:text-gray-100">
+                <Shield className="mr-2 h-5 w-5 text-blue-600 dark:text-blue-400" />
+                Access Token
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {tokenExpiry}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Time until expiry
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleRefreshToken}
+                  className="w-full"
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Refresh Token
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Refresh Token Status */}
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-green-200/50 dark:border-green-700/30 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center text-gray-900 dark:text-gray-100">
+                <Clock className="mr-2 h-5 w-5 text-green-600 dark:text-green-400" />
+                Refresh Token
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {refreshTokenExpiry}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Time until expiry
+                </div>
+                <Badge variant={refreshTokenExpiry === "Expired" ? "destructive" : "secondary"} className="w-full justify-center">
+                  {refreshTokenExpiry === "Expired" ? "Expired" : 
+                   refreshTokenExpiry === "Invalid Token" ? "Invalid" :
+                   refreshTokenExpiry === "No Token" ? "Missing" :
+                   refreshTokenExpiry === "Network Error" ? "Error" : "Active"}
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Active Sessions */}
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-purple-200/50 dark:border-purple-700/30 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center text-gray-900 dark:text-gray-100">
+                <Users className="mr-2 h-5 w-5 text-purple-600 dark:text-purple-400" />
+                Active Sessions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {sessionCount}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Current sessions
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setLocation('/sessions')}
+                  className="w-full"
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  Manage Sessions
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Actions */}
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-red-200/50 dark:border-red-700/30 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center text-gray-900 dark:text-gray-100">
+                <Settings className="mr-2 h-5 w-5 text-red-600 dark:text-red-400" />
+                Quick Actions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Account management
+                </div>
+                <div className="space-y-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setLocation('/profile')}
+                    className="w-full"
+                  >
+                    <User className="mr-2 h-4 w-4" />
+                    Profile Settings
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={handleLogout}
+                    className="w-full"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign Out
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Stats Grid - Modern Card Layout */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
           {/* Website Traffic - Yellow Card */}
