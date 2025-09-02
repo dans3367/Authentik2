@@ -7,7 +7,38 @@ import { Request, Response, NextFunction } from "express";
 
 // Configure Helmet for security headers
 export const helmetMiddleware = helmet({
-  contentSecurityPolicy: {
+  contentSecurityPolicy: process.env.NODE_ENV === 'development' ? {
+    // More permissive CSP for development to allow external access
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:", "http:"],
+      connectSrc: [
+        "'self'",
+        "https://api.stripe.com",
+        "https://tenginex.zendwise.work",
+        "https://tenginex.zendwise.work/*",
+        "https://*.zendwise.work",
+        "https://*.zendwise.work/*",
+        "ws:",
+        "wss:",
+        "http:",
+        "https:",
+        "http://*:*",
+        "https://*:*",
+        "http://localhost:*",
+        "https://localhost:*",
+        "https://*.replit.dev",
+        "https://*.repl.co"
+      ],
+      frameSrc: ["'self'", "https://js.stripe.com", "https://hooks.stripe.com"],
+      // Explicitly disable upgrade-insecure-requests in development
+      upgradeInsecureRequests: null,
+    },
+  } : {
+    // Production CSP with stricter rules
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
@@ -29,9 +60,12 @@ export const helmetMiddleware = helmet({
         "https://*.repl.co"
       ],
       frameSrc: ["'self'", "https://js.stripe.com", "https://hooks.stripe.com"],
+      upgradeInsecureRequests: [],
     },
   },
   crossOriginEmbedderPolicy: false,
+  // Disable HSTS in development to prevent HTTPS enforcement
+  hsts: process.env.NODE_ENV === 'production',
 });
 
 // Rate limiting configurations
