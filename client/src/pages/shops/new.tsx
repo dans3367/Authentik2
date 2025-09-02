@@ -222,314 +222,341 @@ export default function NewShopPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate('/shops')}
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Add New Shop</h1>
-          <p className="text-muted-foreground">Create a new shop location</p>
-        </div>
-      </div>
-
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Basic Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Basic Information</CardTitle>
-            <CardDescription>General details about the shop</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="name">Shop Name *</Label>
-                <Input
-                  id="name"
-                  {...register('name')}
-                  placeholder="Enter shop name"
-                />
-                {errors.name && (
-                  <p className="text-sm text-destructive">{errors.name.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
-                <Select 
-                  value={watch('category')} 
-                  onValueChange={(value) => setValue('category', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SHOP_CATEGORIES.map(category => (
-                      <SelectItem key={category.value} value={category.value}>
-                        {category.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-6">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/shops')}
+                data-testid="button-back-shops"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">Add New Shop</h1>
+                <p className="text-muted-foreground">Create a new shop location</p>
               </div>
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                {...register('description')}
-                placeholder="Enter shop description"
-                rows={3}
-              />
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select 
-                  value={watch('status')} 
-                  onValueChange={(value) => setValue('status', value as any)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                    <SelectItem value="maintenance">Maintenance</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="managerId">Manager</Label>
-                <Select 
-                  value={watch('managerId') || undefined}
-                  onValueChange={(value) => setValue('managerId', value)}
-                  disabled={managersLoading}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={managersLoading ? "Loading..." : "Select manager"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {managersLoading ? (
-                      <SelectItem value="loading" disabled>
-                        Loading managers...
-                      </SelectItem>
-                    ) : managersError ? (
-                      <SelectItem value="error" disabled>
-                        Error loading managers
-                      </SelectItem>
-                    ) : managersData?.managers && managersData.managers.length > 0 ? (
-                      managersData.managers.map(manager => (
-                        <SelectItem key={manager.id} value={manager.id}>
-                          {manager.firstName || manager.lastName 
-                            ? `${manager.firstName || ''} ${manager.lastName || ''}`.trim() 
-                            : 'No name'} ({manager.email})
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="no-managers" disabled>
-                        No managers available
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-                {managersError && (
-                  <p className="text-sm text-destructive">
-                    Failed to load managers. Please try refreshing the page.
-                  </p>
-                )}
-                {!managersLoading && !managersError && managersData?.managers && managersData.managers.length === 0 && (
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            {/* Basic Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Basic Information</CardTitle>
+                <CardDescription>General details about the shop</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      No managers found. Only users with "Manager" or "Owner" role can be assigned to shops.
-                    </p>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm"
-                      onClick={createTestManagers}
+                    <Label htmlFor="name">Shop Name *</Label>
+                    <Input
+                      id="name"
+                      {...register('name')}
+                      placeholder="Enter shop name"
+                      data-testid="input-shop-name"
+                    />
+                    {errors.name && (
+                      <p className="text-sm text-destructive">{errors.name.message}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Category</Label>
+                    <Select 
+                      value={watch('category')} 
+                      onValueChange={(value) => setValue('category', value)}
                     >
-                      Create Test Managers
+                      <SelectTrigger data-testid="select-category">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SHOP_CATEGORIES.map(category => (
+                          <SelectItem key={category.value} value={category.value}>
+                            {category.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    {...register('description')}
+                    placeholder="Enter shop description"
+                    rows={3}
+                    data-testid="textarea-description"
+                  />
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="status">Status</Label>
+                    <Select 
+                      value={watch('status')} 
+                      onValueChange={(value) => setValue('status', value as any)}
+                    >
+                      <SelectTrigger data-testid="select-status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                        <SelectItem value="maintenance">Maintenance</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="managerId">Manager</Label>
+                    <Select 
+                      value={watch('managerId') || undefined}
+                      onValueChange={(value) => setValue('managerId', value)}
+                      disabled={managersLoading}
+                    >
+                      <SelectTrigger data-testid="select-manager">
+                        <SelectValue placeholder={managersLoading ? "Loading..." : "Select manager"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {managersLoading ? (
+                          <SelectItem value="loading" disabled>
+                            Loading managers...
+                          </SelectItem>
+                        ) : managersError ? (
+                          <SelectItem value="error" disabled>
+                            Error loading managers
+                          </SelectItem>
+                        ) : managersData?.managers && managersData.managers.length > 0 ? (
+                          managersData.managers.map(manager => (
+                            <SelectItem key={manager.id} value={manager.id}>
+                              {manager.firstName || manager.lastName 
+                                ? `${manager.firstName || ''} ${manager.lastName || ''}`.trim() 
+                                : 'No name'} ({manager.email})
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-managers" disabled>
+                            No managers available
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {managersError && (
+                      <p className="text-sm text-destructive">
+                        Failed to load managers. Please try refreshing the page.
+                      </p>
+                    )}
+                    {!managersLoading && !managersError && managersData?.managers && managersData.managers.length === 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm text-muted-foreground">
+                          No managers found. Only users with "Manager" or "Owner" role can be assigned to shops.
+                        </p>
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm"
+                          onClick={createTestManagers}
+                          data-testid="button-create-test-managers"
+                        >
+                          Create Test Managers
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Location Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Location Details</CardTitle>
+                <CardDescription>Physical location and address information</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="address">Street Address</Label>
+                  <Input
+                    id="address"
+                    {...register('address')}
+                    placeholder="123 Main Street"
+                    data-testid="input-address"
+                  />
+                  {errors.address && (
+                    <p className="text-sm text-destructive">{errors.address.message}</p>
+                  )}
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="city">City</Label>
+                    <Input
+                      id="city"
+                      {...register('city')}
+                      placeholder="New York"
+                      data-testid="input-city"
+                    />
+                    {errors.city && (
+                      <p className="text-sm text-destructive">{errors.city.message}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="state">State/Province</Label>
+                    <Input
+                      id="state"
+                      {...register('state')}
+                      placeholder="NY"
+                      data-testid="input-state"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="zipCode">ZIP/Postal Code</Label>
+                    <Input
+                      id="zipCode"
+                      {...register('zipCode')}
+                      placeholder="10001"
+                      data-testid="input-zip"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="country">Country</Label>
+                  <Input
+                    id="country"
+                    {...register('country')}
+                    placeholder="United States"
+                    data-testid="input-country"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Contact Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Contact Information</CardTitle>
+                <CardDescription>How customers can reach this shop</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone Number *</Label>
+                    <Input
+                      id="phone"
+                      {...register('phone')}
+                      placeholder="(555) 123-4567"
+                      data-testid="input-phone"
+                    />
+                    {errors.phone && (
+                      <p className="text-sm text-destructive">{errors.phone.message}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email Address *</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      {...register('email')}
+                      placeholder="shop@example.com"
+                      data-testid="input-email"
+                    />
+                    {errors.email && (
+                      <p className="text-sm text-destructive">{errors.email.message}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="website">Website</Label>
+                  <Input
+                    id="website"
+                    {...register('website')}
+                    placeholder="https://example.com"
+                    data-testid="input-website"
+                  />
+                  {errors.website && (
+                    <p className="text-sm text-destructive">{errors.website.message}</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Tags */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Tags</CardTitle>
+                <CardDescription>Add tags to help categorize this shop</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex gap-2">
+                    <Input
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      placeholder="Add a tag..."
+                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
+                      data-testid="input-tag"
+                    />
+                    <Button type="button" onClick={handleAddTag} variant="secondary" data-testid="button-add-tag">
+                      <Tag className="h-4 w-4 mr-2" />
+                      Add
                     </Button>
                   </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                  {tags.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {tags.map(tag => (
+                        <Badge 
+                          key={tag} 
+                          variant="secondary"
+                          className="cursor-pointer"
+                          onClick={() => handleRemoveTag(tag)}
+                          data-testid={`tag-${tag}`}
+                        >
+                          {tag} ×
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* Location Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Location Details</CardTitle>
-            <CardDescription>Physical location and address information</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="address">Street Address</Label>
-              <Input
-                id="address"
-                {...register('address')}
-                placeholder="123 Main Street"
-              />
-              {errors.address && (
-                <p className="text-sm text-destructive">{errors.address.message}</p>
-              )}
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="city">City</Label>
-                <Input
-                  id="city"
-                  {...register('city')}
-                  placeholder="New York"
-                />
-                {errors.city && (
-                  <p className="text-sm text-destructive">{errors.city.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="state">State/Province</Label>
-                <Input
-                  id="state"
-                  {...register('state')}
-                  placeholder="NY"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="zipCode">ZIP/Postal Code</Label>
-                <Input
-                  id="zipCode"
-                  {...register('zipCode')}
-                  placeholder="10001"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="country">Country</Label>
-              <Input
-                id="country"
-                {...register('country')}
-                placeholder="United States"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Contact Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Contact Information</CardTitle>
-            <CardDescription>How customers can reach this shop</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number *</Label>
-                <Input
-                  id="phone"
-                  {...register('phone')}
-                  placeholder="(555) 123-4567"
-                />
-                {errors.phone && (
-                  <p className="text-sm text-destructive">{errors.phone.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  {...register('email')}
-                  placeholder="shop@example.com"
-                />
-                {errors.email && (
-                  <p className="text-sm text-destructive">{errors.email.message}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="website">Website</Label>
-              <Input
-                id="website"
-                {...register('website')}
-                placeholder="https://example.com"
-              />
-              {errors.website && (
-                <p className="text-sm text-destructive">{errors.website.message}</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Tags */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Tags</CardTitle>
-            <CardDescription>Add tags to help categorize this shop</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex gap-2">
-                <Input
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  placeholder="Add a tag..."
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
-                />
-                <Button type="button" onClick={handleAddTag} variant="secondary">
-                  <Tag className="h-4 w-4 mr-2" />
-                  Add
+            {/* Actions */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-6">
+              <div className="flex flex-col sm:flex-row gap-4 sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate('/shops')}
+                  className="w-full sm:w-auto"
+                  data-testid="button-cancel"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="w-full sm:w-auto"
+                  data-testid="button-submit"
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  Create Shop
                 </Button>
               </div>
-              {tags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {tags.map(tag => (
-                    <Badge 
-                      key={tag} 
-                      variant="secondary"
-                      className="cursor-pointer"
-                      onClick={() => handleRemoveTag(tag)}
-                    >
-                      {tag} ×
-                    </Badge>
-                  ))}
-                </div>
-              )}
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Actions */}
-        <div className="flex gap-4 justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate('/shops')}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            <Save className="mr-2 h-4 w-4" />
-            Create Shop
-          </Button>
+          </form>
         </div>
-      </form>
       </div>
     </div>
   );

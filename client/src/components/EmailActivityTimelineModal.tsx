@@ -1,41 +1,70 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
-import EmailActivityTimeline from "./EmailActivityTimeline";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import EmailActivityTimeline from "@/components/EmailActivityTimeline";
+import { Calendar, User, AlertCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface EmailActivityTimelineModalProps {
-  contactEmail: string;
+  contactId?: string;
+  contactEmail?: string;
+  contactName?: string;
   trigger: React.ReactNode;
 }
 
-export function EmailActivityTimelineModal({ contactEmail, trigger }: EmailActivityTimelineModalProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export default function EmailActivityTimelineModal({ 
+  contactId, 
+  contactEmail, 
+  contactName,
+  trigger 
+}: EmailActivityTimelineModalProps) {
+  const [open, setOpen] = useState(false);
+  const { toast } = useToast();
 
-  // Find the contact ID by email when modal is opened
-  const { data: contactData, isLoading: isContactLoading } = useQuery({
-    queryKey: ['/api/email-contacts', 'by-email', contactEmail],
+  // If we only have email, look up the contact
+  const { data: contactData, isLoading: isLookingUpContact, error: contactError } = useQuery({
+    queryKey: ['contact-lookup', contactEmail],
     queryFn: async () => {
+      if (!contactEmail) return null;
       const response = await apiRequest('GET', `/api/email-contacts?search=${encodeURIComponent(contactEmail)}&limit=1`);
-      return response.json();
+      const data = await response.json();
+      return data.contacts && data.contacts.length > 0 ? data.contacts[0] : null;
     },
-    enabled: isOpen && !!contactEmail,
+    enabled: open && !contactId && !!contactEmail,
   });
 
-  const contact = contactData?.contacts?.[0];
+  const resolvedContactId = contactId || contactData?.id;
+  const displayName = contactName || (contactData?.firstName && contactData?.lastName) 
+    ? `${contactData?.firstName} ${contactData?.lastName}`.trim()
+    : contactEmail || contactData?.email || 'Contact';
+
+  const handleOpenModal = () => {
+    setOpen(true);
+    // If we have neither contactId nor contactEmail, show error
+    if (!contactId && !contactEmail) {
+      toast({
+        title: "Error",
+        description: "Cannot open activity timeline - contact information is missing.",
+        variant: "destructive",
+      });
+      setOpen(false);
+    }
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <div onClick={handleOpenModal}>
         {trigger}
-      </DialogTrigger>
+      </div>
       <DialogContent className="w-[95vw] max-w-4xl h-[90vh] sm:h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
@@ -80,13 +109,11 @@ export function EmailActivityTimelineModal({ contactEmail, trigger }: EmailActiv
                 }
               </p>
             </div>
-          ) : (
-            <EmailActivityTimeline contactId={contact?.id} />
-          )}
+          ) : resolvedContactId ? (
+            <EmailActivityTimeline contactId={resolvedContactId} limit={100} />
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>
   );
 }
-
-export default EmailActivityTimelineModal;

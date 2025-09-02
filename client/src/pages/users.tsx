@@ -17,7 +17,7 @@ import { Users as UsersIcon, Plus, Search, Filter, Edit, Trash2, Shield, UserChe
 import { formatDistanceToNow, format } from "date-fns";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createUserSchema, updateUserSchema, userRoles, type User, type CreateUserData, type UpdateUserData, type UserRole } from "@shared/schema";
+import { createUserSchema, updateUserSchema, userRoles, nonOwnerRoles, type User, type CreateUserData, type UpdateUserData, type UserRole } from "@shared/schema";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { DataTable, DataTableColumnHeader, DataTableRowActions } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
@@ -673,7 +673,7 @@ export default function UsersPage() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {userRoles.map((role) => (
+                              {nonOwnerRoles.map((role) => (
                                 <SelectItem key={role} value={role}>
                                   {role}
                                 </SelectItem>
@@ -921,7 +921,7 @@ export default function UsersPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {userRoles.map((role) => (
+                          {nonOwnerRoles.map((role) => (
                             <SelectItem key={role} value={role}>
                               {role}
                             </SelectItem>

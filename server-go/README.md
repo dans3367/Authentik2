@@ -58,7 +58,7 @@ server:
   host: "0.0.0.0"
 
 temporal:
-  host_port: "xxxx:7233"
+  host_port: "172.19.0.4:7233"
   namespace: "default"
   task_queue: "email-task-queue"
 
@@ -79,7 +79,7 @@ logging:
 ### Environment Variables (Override config file)
 ```bash
 CONFIG_FILE=config/config.yaml
-TEMPORAL_HOST=127.0.0.1:7233
+TEMPORAL_HOST=172.19.0.4:7233
 TEMPORAL_NAMESPACE=default
 TEMPORAL_TASK_QUEUE=email-task-queue
 RESEND_API_KEY=re_f27r7h2s_BYXi6aNpimSCfCLwMeec686Q
@@ -203,7 +203,7 @@ The system provides comprehensive logging with structured JSON format:
 
 ### Prerequisites
 - Go 1.21+
-- Temporal server running on 172.21.0.4:7233
+- Temporal server running on 172.19.0.4:7233
 - Resend API key
 
 ### Building

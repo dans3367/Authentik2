@@ -85,6 +85,7 @@ func main() {
 
 func (s *Server) initTemporal() error {
 	temporalHost := getEnvOrDefault("TEMPORAL_HOST", "127.0.0.1:7233")
+	temporalHost := getEnvOrDefault("TEMPORAL_HOST", "127.0.0.1:7233")
 	maxRetries := 5
 	retryDelay := 2 * time.Second
 
@@ -422,8 +423,8 @@ func (s *Server) startEmailWorkflow(entry EmailTrackingEntry) {
 	defer cancel()
 
 	// Determine task queue and workflow based on provider
-	taskQueue := "email-task-queue"     // Default to Resend
-	workflowName := "EmailWorkflow"     // Default workflow
+	taskQueue := "email-task-queue" // Default to Resend
+	workflowName := "EmailWorkflow" // Default workflow
 
 	// Check if Postmark provider is specified in metadata
 	if entry.Metadata != nil {

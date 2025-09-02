@@ -1404,10 +1404,42 @@ export class DatabaseStorage implements IStorage {
     const tags = await this.getContactTags(id, tenantId);
     const lists = await this.getContactLists(id, tenantId);
 
+    // Get real-time engagement statistics
+    const [sentResult] = await db
+      .select({ count: count() })
+      .from(emailActivity)
+      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
+      .where(and(
+        eq(emailActivity.contactId, id),
+        eq(emailContacts.tenantId, tenantId),
+        eq(emailActivity.activityType, 'sent')
+      ));
+
+    const [openedResult] = await db
+      .select({ 
+        count: sql<number>`COUNT(DISTINCT CASE 
+          WHEN ${emailActivity.campaignId} IS NOT NULL THEN ${emailActivity.campaignId}
+          WHEN ${emailActivity.newsletterId} IS NOT NULL THEN ${emailActivity.newsletterId}
+          ELSE ${emailActivity.id}
+        END)` 
+      })
+      .from(emailActivity)
+      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
+      .where(and(
+        eq(emailActivity.contactId, id),
+        eq(emailContacts.tenantId, tenantId),
+        eq(emailActivity.activityType, 'opened')
+      ));
+
+    const emailsSent = sentResult.count;
+    const emailsOpened = openedResult.count;
+
     return {
       ...contact,
       tags,
       lists,
+      emailsSent,    // Override with real-time data
+      emailsOpened,  // Override with real-time data
     };
   }
 
@@ -1437,21 +1469,63 @@ export class DatabaseStorage implements IStorage {
       .where(and(...conditions))
       .orderBy(desc(emailContacts.createdAt));
 
-    // Add tags, lists, and real-time engagement stats for each contact
+    // Get engagement statistics for all contacts in bulk
+    const contactIds = contacts.map(c => c.id);
+    
+    // Get sent email counts for all contacts
+    const sentCounts = contactIds.length > 0 ? await db
+      .select({ 
+        contactId: emailActivity.contactId, 
+        count: count() 
+      })
+      .from(emailActivity)
+      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
+      .where(and(
+        inArray(emailActivity.contactId, contactIds),
+        eq(emailContacts.tenantId, tenantId),
+        eq(emailActivity.activityType, 'sent')
+      ))
+      .groupBy(emailActivity.contactId) : [];
+
+    // Get unique opened email counts for all contacts (count distinct emails opened, not total opens)
+    const openedCounts = contactIds.length > 0 ? await db
+      .select({ 
+        contactId: emailActivity.contactId, 
+        count: sql<number>`COUNT(DISTINCT CASE 
+          WHEN ${emailActivity.campaignId} IS NOT NULL THEN ${emailActivity.campaignId}
+          WHEN ${emailActivity.newsletterId} IS NOT NULL THEN ${emailActivity.newsletterId}
+          ELSE ${emailActivity.id}
+        END)` 
+      })
+      .from(emailActivity)
+      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
+      .where(and(
+        inArray(emailActivity.contactId, contactIds),
+        eq(emailContacts.tenantId, tenantId),
+        eq(emailActivity.activityType, 'opened')
+      ))
+      .groupBy(emailActivity.contactId) : [];
+
+    // Create lookup maps for performance
+    const sentCountMap = new Map(sentCounts.map(s => [s.contactId, s.count]));
+    const openedCountMap = new Map(openedCounts.map(o => [o.contactId, o.count]));
+
+    // Add tags and lists for each contact
     const contactsWithDetails = await Promise.all(
       contacts.map(async (contact) => {
         const tags = await this.getContactTags(contact.id, tenantId);
         const lists = await this.getContactLists(contact.id, tenantId);
         
-        // Get real-time engagement statistics
-        const engagementStats = await this.getContactEngagementStats(contact.id, tenantId);
+        // Get real-time engagement data if available, otherwise use cached values
+        const emailsSent = sentCountMap.get(contact.id) ?? contact.emailsSent ?? 0;
+        const emailsOpened = openedCountMap.get(contact.id) ?? contact.emailsOpened ?? 0;
         
         return {
           ...contact,
           tags,
           lists,
-          emailsSent: engagementStats.emailsSent,
-          emailsOpened: engagementStats.emailsOpened,
+          emailsSent,    // Use real-time data with fallback to cached
+          emailsOpened,  // Use real-time data with fallback to cached
         };
       })
     );
@@ -1813,7 +1887,13 @@ export class DatabaseStorage implements IStorage {
       ));
 
     const [openedActivitiesResult] = await db
-      .select({ count: count() })
+      .select({ 
+        count: sql<number>`COUNT(DISTINCT CASE 
+          WHEN ${emailActivity.campaignId} IS NOT NULL THEN CONCAT(${emailActivity.contactId}, '-', ${emailActivity.campaignId})
+          WHEN ${emailActivity.newsletterId} IS NOT NULL THEN CONCAT(${emailActivity.contactId}, '-', ${emailActivity.newsletterId})
+          ELSE CONCAT(${emailActivity.contactId}, '-', ${emailActivity.id})
+        END)` 
+      })
       .from(emailActivity)
       .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
       .where(and(
@@ -1859,9 +1939,15 @@ export class DatabaseStorage implements IStorage {
         eq(emailActivity.activityType, 'sent')
       ));
 
-    // Get opened emails count
+    // Get unique opened emails count (count distinct emails opened, not total opens)
     const [openedResult] = await db
-      .select({ count: count() })
+      .select({ 
+        count: sql<number>`COUNT(DISTINCT CASE 
+          WHEN ${emailActivity.campaignId} IS NOT NULL THEN ${emailActivity.campaignId}
+          WHEN ${emailActivity.newsletterId} IS NOT NULL THEN ${emailActivity.newsletterId}
+          ELSE ${emailActivity.id}
+        END)` 
+      })
       .from(emailActivity)
       .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
       .where(and(

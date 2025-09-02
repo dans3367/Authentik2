@@ -610,8 +610,9 @@ export const createDeviceSessionSchema = z.object({
   location: z.string().optional(),
 });
 
-// User management schemas - excludes Owner role from regular user creation
+// User management schemas - excludes Owner role from regular user creation/editing
 const nonOwnerRoles = ['Administrator', 'Manager', 'Employee'] as const;
+export { nonOwnerRoles };
 export const createUserSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   firstName: z.string().min(1, "First name is required"),
@@ -632,7 +633,7 @@ export const updateUserSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Please enter a valid email address"),
-  role: z.enum(userRoles),
+  role: z.enum(nonOwnerRoles),
   isActive: z.boolean(),
 });
 

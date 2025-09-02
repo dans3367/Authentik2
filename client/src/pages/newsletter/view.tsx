@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format, formatDistanceToNow } from "date-fns";
+import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
 import type { NewsletterWithUser, NewsletterTaskStatus } from "@shared/schema";
 import { EmailActivityTimelineModal } from "@/components/EmailActivityTimelineModal";
 
@@ -475,52 +476,55 @@ export default function NewsletterViewPage() {
     : '0';
 
   return (
-    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3 sm:gap-4">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => navigate('/newsletter')}
-            className="hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0 mt-1"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 mb-2">
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 truncate">
-                {newsletter.title}
-              </h1>
-              {getStatusBadge(newsletter.status)}
+    <div className="w-full">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8">
+        {/* Header */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
+          <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => navigate('/newsletter')}
+              className="hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0 mt-1"
+            >
+              <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
+            </Button>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 mb-2">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 truncate sm:flex-1">
+                  {newsletter.title}
+                </h1>
+                <div className="sm:flex-shrink-0">
+                  {getStatusBadge(newsletter.status)}
+                </div>
+              </div>
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 break-words">
+                Subject: {newsletter.subject}
+              </p>
             </div>
-            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 break-words">
-              Subject: {newsletter.subject}
-            </p>
+          </div>
+          
+          <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap lg:justify-end">
+            {newsletter.status === 'draft' && (
+              <Button 
+                onClick={() => navigate(`/newsletters/${newsletter.id}/edit`)}
+                variant="outline"
+                size="sm"
+                className="w-full sm:w-auto"
+              >
+                <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                <span className="sm:inline">Edit</span>
+              </Button>
+            )}
+            <Button onClick={() => window.print()} variant="outline" size="sm" className="w-full sm:w-auto">
+              <Settings className="h-4 w-4 mr-2" strokeWidth={1.5} />
+              <span className="sm:inline">Options</span>
+            </Button>
           </div>
         </div>
-        
-        <div className="flex items-center gap-2 flex-wrap">
-          {newsletter.status === 'draft' && (
-            <Button 
-              onClick={() => navigate(`/newsletters/${newsletter.id}/edit`)}
-              variant="outline"
-              size="sm"
-              className="w-full sm:w-auto"
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              <span className="sm:inline">Edit</span>
-            </Button>
-          )}
-          <Button onClick={() => window.print()} variant="outline" size="sm" className="w-full sm:w-auto">
-            <Settings className="h-4 w-4 mr-2" />
-            <span className="sm:inline">Options</span>
-          </Button>
-        </div>
-      </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
+        {/* Key Metrics */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 lg:gap-6">
         <Card>
           <CardContent className="p-3 sm:p-4 lg:p-6">
             <div className="flex items-center justify-between">
@@ -536,7 +540,7 @@ export default function NewsletterViewPage() {
                 </p>
               </div>
               <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                <Users className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
+                <Users className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
               </div>
             </div>
           </CardContent>
@@ -557,7 +561,7 @@ export default function NewsletterViewPage() {
                 </p>
               </div>
               <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
-                <Eye className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
+                <Eye className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
               </div>
             </div>
           </CardContent>
@@ -578,7 +582,7 @@ export default function NewsletterViewPage() {
                 </p>
               </div>
               <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <MousePointer className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
+                <MousePointer className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
               </div>
             </div>
           </CardContent>
@@ -595,11 +599,11 @@ export default function NewsletterViewPage() {
                   {detailedStatsData?.emails?.reduce((total, email) => total + (email.bounces || 0), 0) || 0}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Based on unique opens
+                  Total delivery failures
                 </p>
               </div>
               <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center">
-                <AlertTriangle className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
+                <AlertTriangle className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
               </div>
             </div>
           </CardContent>
@@ -620,27 +624,27 @@ export default function NewsletterViewPage() {
                 </p>
               </div>
               <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
-                <XCircle className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
+                <XCircle className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-        <div className="overflow-x-auto">
-          <TabsList className="grid w-full grid-cols-5 min-w-max">
-            <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
-            <TabsTrigger value="content" className="text-xs sm:text-sm">Content</TabsTrigger>
-            <TabsTrigger value="status" className="text-xs sm:text-sm">Task Status</TabsTrigger>
-            <TabsTrigger value="analytics" className="text-xs sm:text-sm">Analytics</TabsTrigger>
-            <TabsTrigger value="detailed-stats" className="text-xs sm:text-sm">Detailed Stats</TabsTrigger>
-          </TabsList>
-        </div>
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 lg:space-y-8">
+          <div className="overflow-x-auto">
+            <TabsList className="grid w-full grid-cols-5 min-w-max">
+              <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
+              <TabsTrigger value="content" className="text-xs sm:text-sm">Content</TabsTrigger>
+              <TabsTrigger value="status" className="text-xs sm:text-sm">Task Status</TabsTrigger>
+              <TabsTrigger value="analytics" className="text-xs sm:text-sm">Analytics</TabsTrigger>
+              <TabsTrigger value="detailed-stats" className="text-xs sm:text-sm">Detailed Stats</TabsTrigger>
+            </TabsList>
+          </div>
 
-        <TabsContent value="overview" className="space-y-4 sm:space-y-6">
-          <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
+        <TabsContent value="overview" className="space-y-6 lg:space-y-8">
+          <div className="grid gap-4 lg:gap-6 md:grid-cols-2">
             {/* Newsletter Details */}
             <Card>
               <CardHeader>
@@ -650,7 +654,7 @@ export default function NewsletterViewPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4">
                   <div>
                     <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Created</p>
                     <p className="text-sm text-gray-900 dark:text-gray-100">
@@ -988,8 +992,8 @@ export default function NewsletterViewPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-4 sm:space-y-6">
-          <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
+        <TabsContent value="analytics" className="space-y-6 lg:space-y-8">
+          <div className="grid gap-4 lg:gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1012,7 +1016,7 @@ export default function NewsletterViewPage() {
                   <Progress value={parseFloat(clickThroughRate)} className="h-2" />
                   
                   <div className="pt-4 border-t">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-center">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4 text-center">
                       <div>
                         <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                           {newsletter.opens || 0}
@@ -1087,7 +1091,7 @@ export default function NewsletterViewPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="detailed-stats" className="space-y-4 sm:space-y-6">
+        <TabsContent value="detailed-stats" className="space-y-6 lg:space-y-8">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1134,12 +1138,12 @@ export default function NewsletterViewPage() {
                       </p>
                     </div>
                     <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="w-full sm:w-auto">
-                      <RefreshCw className="h-4 w-4 mr-2" />
+                      <RefreshCw className="h-4 w-4 mr-2" strokeWidth={1.5} />
                       Refresh
                     </Button>
                   </div>
                   
-                  <div className="space-y-3 sm:space-y-4">
+                  <div className="space-y-3 lg:space-y-4">
                     {detailedStatsData.emails.map((email, index) => {
                       const getStatusColor = (status: string) => {
                         switch (status) {
@@ -1192,24 +1196,35 @@ export default function NewsletterViewPage() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => {
-                                    if (email.resendId) {
-                                      openTrajectoryModal(email.resendId);
-                                    } else {
+                                  onClick={async () => {
+                                    try {
+                                      // Find contact by email
+                                      const response = await apiRequest('GET', `/api/email-contacts?search=${encodeURIComponent(email.recipient)}&limit=1`);
+                                      const data = await response.json();
+                                      
+                                      if (data.contacts && data.contacts.length > 0) {
+                                        const contact = data.contacts[0];
+                                        navigate(`/email-contacts/view/${contact.id}`);
+                                      } else {
+                                        toast({
+                                          title: "Contact Not Found",
+                                          description: "This email address was not found in your contacts list.",
+                                          variant: "destructive",
+                                        });
+                                      }
+                                    } catch (error) {
                                       toast({
-                                        title: "No Tracking Data Available",
-                                        description: "This email doesn't have activity tracking data yet. This usually happens when emails are still being processed.",
+                                        title: "Error",
+                                        description: "Failed to find contact information.",
                                         variant: "destructive",
                                       });
                                     }
                                   }}
-                                  disabled={!email.resendId}
-                                  title={email.resendId ? "View Email Activity Timeline" : "No activity tracking data available"}
-                                  className={!email.resendId ? "opacity-50 cursor-not-allowed" : ""}
+                                  title="View Contact Profile Page"
                                 >
-                                  <History className="h-3 w-3" />
+                                  <User className="h-3 w-3" strokeWidth={1.5} />
                                 </Button>
-                                
+
                                 {email.resendId && (
                                   <Button
                                     variant="ghost"
@@ -1225,7 +1240,7 @@ export default function NewsletterViewPage() {
                             </div>
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-3">
+                          <div className="grid grid-cols-2 gap-2 lg:gap-4 mb-3">
                             <div className="text-center p-2 bg-green-50 dark:bg-green-900/20 rounded">
                               <p className="text-lg font-semibold text-green-600 dark:text-green-400">{email.opens}</p>
                               <p className="text-xs text-green-600 dark:text-green-400">Total Opens</p>
@@ -1233,14 +1248,6 @@ export default function NewsletterViewPage() {
                             <div className="text-center p-2 bg-purple-50 dark:bg-purple-900/20 rounded">
                               <p className="text-lg font-semibold text-purple-600 dark:text-purple-400">{email.clicks}</p>
                               <p className="text-xs text-purple-600 dark:text-purple-400">Clicks</p>
-                            </div>
-                            <div className="text-center p-2 bg-red-50 dark:bg-red-900/20 rounded">
-                              <p className="text-lg font-semibold text-red-600 dark:text-red-400">{email.bounces}</p>
-                              <p className="text-xs text-red-600 dark:text-red-400">Bounces</p>
-                            </div>
-                            <div className="text-center p-2 bg-orange-50 dark:bg-orange-900/20 rounded">
-                              <p className="text-lg font-semibold text-orange-600 dark:text-orange-400">{email.complaints}</p>
-                              <p className="text-xs text-orange-600 dark:text-orange-400">Complaints</p>
                             </div>
                           </div>
                           
@@ -1250,32 +1257,6 @@ export default function NewsletterViewPage() {
                             </p>
                           )}
                           
-                          {email.events?.length > 0 && (
-                            <details className="mt-3">
-                              <summary className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:text-gray-900 dark:hover:text-gray-100">
-                                View Activity Timeline ({email.events.length} events)
-                              </summary>
-                              <div className="mt-2 space-y-2 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
-                                {email.events.map((event, eventIndex) => (
-                                  <div key={eventIndex} className="text-xs">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-medium text-gray-900 dark:text-gray-100">
-                                        {event.type.replace('email.', '').charAt(0).toUpperCase() + event.type.replace('email.', '').slice(1)}
-                                      </span>
-                                      <span className="text-gray-500 dark:text-gray-400">
-                                        {formatDistanceToNow(new Date(event.timestamp + 'Z'), { addSuffix: true })}
-                                      </span>
-                                    </div>
-                                    {event.data && (
-                                      <pre className="text-xs text-gray-600 dark:text-gray-400 mt-1 whitespace-pre-wrap">
-                                        {JSON.stringify(event.data, null, 2)}
-                                      </pre>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            </details>
-                          )}
                         </div>
                       );
                     })}
@@ -1365,10 +1346,10 @@ export default function NewsletterViewPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
                       <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                         <div className="flex items-center justify-center w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full mx-auto mb-2">
-                          <Activity className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                          <Activity className="h-4 w-4 text-blue-600 dark:text-blue-400" strokeWidth={1.5} />
                         </div>
                         <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{selectedTrajectory.totalEvents}</p>
                         <p className="text-sm text-blue-600 dark:text-blue-400">Total Events</p>
@@ -1376,7 +1357,7 @@ export default function NewsletterViewPage() {
                       
                       <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                         <div className="flex items-center justify-center w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-full mx-auto mb-2">
-                          <Eye className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                          <Eye className="h-4 w-4 text-purple-600 dark:text-purple-400" strokeWidth={1.5} />
                         </div>
                         <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{selectedTrajectory.totalOpens || 0}</p>
                         <p className="text-sm text-purple-600 dark:text-purple-400">Opens</p>
@@ -1384,7 +1365,7 @@ export default function NewsletterViewPage() {
                       
                       <div className="text-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                         <div className="flex items-center justify-center w-8 h-8 bg-orange-100 dark:bg-orange-900 rounded-full mx-auto mb-2">
-                          <MousePointer className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                          <MousePointer className="h-4 w-4 text-orange-600 dark:text-orange-400" strokeWidth={1.5} />
                         </div>
                         <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{selectedTrajectory.totalClicks || 0}</p>
                         <p className="text-sm text-orange-600 dark:text-orange-400">Clicks</p>
@@ -1392,7 +1373,7 @@ export default function NewsletterViewPage() {
                       
                       <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                         <div className="flex items-center justify-center w-8 h-8 bg-green-100 dark:bg-green-900 rounded-full mx-auto mb-2">
-                          <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+                          <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" strokeWidth={1.5} />
                         </div>
                         <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                           {selectedTrajectory.totalOpens > 0 ? 
@@ -1415,13 +1396,13 @@ export default function NewsletterViewPage() {
                     <div className="flex gap-2 text-sm">
                       {selectedTrajectory.totalOpens > 0 && (
                         <Badge variant="secondary" className="gap-1">
-                          <Eye className="h-3 w-3" />
+                          <Eye className="h-3 w-3" strokeWidth={1.5} />
                           {selectedTrajectory.totalOpens} {selectedTrajectory.totalOpens === 1 ? 'Open' : 'Opens'}
                         </Badge>
                       )}
                       {selectedTrajectory.totalClicks > 0 && (
                         <Badge variant="secondary" className="gap-1">
-                          <MousePointer className="h-3 w-3" />
+                          <MousePointer className="h-3 w-3" strokeWidth={1.5} />
                           {selectedTrajectory.totalClicks} {selectedTrajectory.totalClicks === 1 ? 'Click' : 'Clicks'}
                         </Badge>
                       )}
@@ -1576,6 +1557,7 @@ export default function NewsletterViewPage() {
           )}
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }
