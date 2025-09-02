@@ -13,11 +13,15 @@ import {
   FileText,
   MoreHorizontal,
   Filter,
-  TrendingUp
+  TrendingUp,
+  Users,
+  MousePointer,
+  ArrowUpDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/components/ui/data-table";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,6 +44,230 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import type { NewsletterWithUser } from "@shared/schema";
+import type { ColumnDef } from "@tanstack/react-table";
+
+// Status badge helper function
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case 'draft':
+      return <Badge variant="secondary" className="bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">Draft</Badge>;
+    case 'scheduled':
+      return <Badge variant="outline" className="border-blue-500 text-blue-600 dark:text-blue-400">Scheduled</Badge>;
+    case 'sent':
+      return <Badge variant="default" className="bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-300">Sent</Badge>;
+    default:
+      return <Badge variant="secondary">{status}</Badge>;
+  }
+};
+
+// Column definitions for the newsletter table
+const createColumns = (
+  setLocation: (location: string) => void,
+  handleDeleteNewsletter: (id: string) => void
+): ColumnDef<NewsletterWithUser & { opens?: number; totalOpens?: number }>[] => [
+  {
+    accessorKey: "title",
+    header: ({ column }) => {
+      return (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-auto p-0 font-medium hover:bg-transparent"
+        >
+          Title
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      )
+    },
+    cell: ({ row }) => {
+      const newsletter = row.original;
+      return (
+        <div className="space-y-1">
+          <div 
+            className="font-medium text-gray-900 dark:text-gray-100 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
+            onClick={() => setLocation(`/newsletters/${newsletter.id}`)}
+          >
+            {newsletter.title}
+          </div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            {newsletter.subject}
+          </div>
+        </div>
+      );
+    },
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) => getStatusBadge(row.getValue("status")),
+    filterFn: (row, id, value) => {
+      return value.includes(row.getValue(id));
+    },
+  },
+  {
+    accessorKey: "user",
+    header: "Author",
+    cell: ({ row }) => {
+      const user = row.getValue("user") as { firstName: string; lastName: string };
+      return (
+        <div className="flex items-center space-x-2">
+          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-sm font-medium">
+            {user.firstName[0]}{user.lastName[0]}
+          </div>
+          <div className="text-sm text-gray-900 dark:text-gray-100">
+            {user.firstName} {user.lastName}
+          </div>
+        </div>
+      );
+    },
+  },
+  {
+    accessorKey: "recipientCount",
+    header: ({ column }) => {
+      return (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-auto p-0 font-medium hover:bg-transparent"
+        >
+          <Users className="mr-2 h-4 w-4" />
+          Recipients
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      )
+    },
+    cell: ({ row }) => (
+      <div className="text-center font-medium">
+        {row.getValue("recipientCount") || 0}
+      </div>
+    ),
+  },
+  {
+    id: "metrics",
+    header: "Engagement",
+    cell: ({ row }) => {
+      const newsletter = row.original;
+      const openRate = newsletter.recipientCount > 0 
+        ? ((newsletter.opens || 0) / newsletter.recipientCount * 100).toFixed(1)
+        : "0.0";
+      
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center space-x-4 text-sm">
+            <div className="flex items-center space-x-1">
+              <Eye className="h-3 w-3 text-green-500" />
+              <span className="text-gray-900 dark:text-gray-100 font-medium">
+                {newsletter.opens || 0}
+              </span>
+              <span className="text-gray-500 dark:text-gray-400">opens</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <MousePointer className="h-3 w-3 text-blue-500" />
+              <span className="text-gray-900 dark:text-gray-100 font-medium">
+                {newsletter.clickCount || 0}
+              </span>
+              <span className="text-gray-500 dark:text-gray-400">clicks</span>
+            </div>
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            {openRate}% open rate
+          </div>
+        </div>
+      );
+    },
+  },
+  {
+    id: "dates",
+    header: ({ column }) => {
+      return (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-auto p-0 font-medium hover:bg-transparent"
+        >
+          <Calendar className="mr-2 h-4 w-4" />
+          Date
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      )
+    },
+    accessorFn: (row) => row.sentAt || row.scheduledAt || row.createdAt,
+    cell: ({ row }) => {
+      const newsletter = row.original;
+      const status = newsletter.status;
+      
+      if (status === 'sent' && newsletter.sentAt) {
+        return (
+          <div className="space-y-1">
+            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              Sent
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              {format(new Date(newsletter.sentAt), 'MMM d, yyyy HH:mm')}
+            </div>
+          </div>
+        );
+      } else if (status === 'scheduled' && newsletter.scheduledAt) {
+        return (
+          <div className="space-y-1">
+            <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
+              Scheduled
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              {format(new Date(newsletter.scheduledAt), 'MMM d, yyyy HH:mm')}
+            </div>
+          </div>
+        );
+      } else {
+        return (
+          <div className="space-y-1">
+            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              Created
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              {format(new Date(newsletter.createdAt || new Date()), 'MMM d, yyyy HH:mm')}
+            </div>
+          </div>
+        );
+      }
+    },
+  },
+  {
+    id: "actions",
+    header: "",
+    cell: ({ row }) => {
+      const newsletter = row.original;
+      
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setLocation(`/newsletters/${newsletter.id}`)}>
+              <Eye className="h-4 w-4 mr-2" />
+              View
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLocation(`/newsletters/${newsletter.id}/edit`)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              onClick={() => handleDeleteNewsletter(newsletter.id)}
+              className="text-red-600 dark:text-red-400"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+    },
+  },
+];
 
 export default function NewsletterPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -100,18 +328,7 @@ export default function NewsletterPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'draft':
-        return <Badge variant="secondary">Draft</Badge>;
-      case 'scheduled':
-        return <Badge variant="outline">Scheduled</Badge>;
-      case 'sent':
-        return <Badge variant="default">Sent</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
+
 
   if (isLoading) {
     return (
@@ -337,21 +554,7 @@ export default function NewsletterPage() {
         </div>
 
         {/* Newsletters List */}
-        {isLoading ? (
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-3xl">
-            <CardContent className="p-12 text-center">
-              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                <Mail className="h-10 w-10 text-white animate-pulse" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                Loading newsletters...
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                Please wait while we fetch your newsletters.
-              </p>
-            </CardContent>
-          </Card>
-        ) : newsletters.length === 0 ? (
+        {newsletters.length === 0 ? (
           <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-3xl">
             <CardContent className="p-12 text-center">
               <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
@@ -374,75 +577,19 @@ export default function NewsletterPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-4">
-            {newsletters.map((newsletter) => (
-              <Card key={newsletter.id} className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300 rounded-3xl">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-3">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                          {newsletter.title}
-                        </h3>
-                        {getStatusBadge(newsletter.status)}
-                      </div>
-                      
-                      <p className="text-gray-600 dark:text-gray-400 mb-3">
-                        Subject: {newsletter.subject}
-                      </p>
-                      
-                      <div className="flex items-center gap-6 text-sm text-gray-500 dark:text-gray-400">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-                          Created {format(new Date(newsletter.createdAt || new Date()), 'MMM d, yyyy')}
-                        </div>
-                        
-                        <div className="flex items-center gap-2">
-                          <Eye className="h-4 w-4 text-green-500 dark:text-green-400" />
-                          {newsletter.opens || 0} unique opens
-                        </div>
-                        
-                        <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-purple-500 dark:text-purple-400" />
-                          {newsletter.recipientCount} recipients
-                        </div>
-                        
-                        <div className="text-gray-600 dark:text-gray-300">
-                          By {newsletter.user.firstName} {newsletter.user.lastName}
-                        </div>
-                      </div>
-                    </div>
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 rounded-2xl">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-2xl">
-                        <DropdownMenuItem onClick={() => setLocation(`/newsletters/${newsletter.id}`)} className="hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-xl">
-                          <Eye className="h-4 w-4 mr-2 text-blue-500" />
-                          View
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setLocation(`/newsletters/${newsletter.id}/edit`)} className="hover:bg-green-50 dark:hover:bg-green-900/30 rounded-xl">
-                          <Edit className="h-4 w-4 mr-2 text-green-500" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator className="bg-gray-200/50 dark:bg-gray-600/50" />
-                        <DropdownMenuItem 
-                          onClick={() => handleDeleteNewsletter(newsletter.id)}
-                          className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-3xl">
+            <CardContent className="p-6">
+              <DataTable
+                columns={createColumns(setLocation, handleDeleteNewsletter)}
+                data={newsletters}
+                searchKey="title"
+                searchPlaceholder="Search newsletters..."
+                showColumnVisibility={true}
+                showPagination={true}
+                pageSize={10}
+              />
+            </CardContent>
+          </Card>
         )}
 
         {/* Delete Confirmation Dialog */}

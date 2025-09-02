@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Calendar, User, AlertCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +22,7 @@ export function EmailActivityTimelineModal({ contactEmail, trigger }: EmailActiv
   const [isOpen, setIsOpen] = useState(false);
 
   // Find the contact ID by email when modal is opened
-  const { data: contactData, isLoading: isContactLoading } = useQuery({
+  const { data: contactData, isLoading: isContactLoading, error: contactError } = useQuery({
     queryKey: ['/api/email-contacts', 'by-email', contactEmail],
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/email-contacts?search=${encodeURIComponent(contactEmail)}&limit=1`);
@@ -30,6 +32,9 @@ export function EmailActivityTimelineModal({ contactEmail, trigger }: EmailActiv
   });
 
   const contact = contactData?.contacts?.[0];
+  const resolvedContactId = contact?.id;
+  const isLookingUpContact = isContactLoading;
+  const displayName = contact ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email : contactEmail;
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -81,7 +86,7 @@ export function EmailActivityTimelineModal({ contactEmail, trigger }: EmailActiv
               </p>
             </div>
           ) : (
-            <EmailActivityTimeline contactId={contact?.id} />
+            <EmailActivityTimeline contactId={resolvedContactId} />
           )}
         </div>
       </DialogContent>
