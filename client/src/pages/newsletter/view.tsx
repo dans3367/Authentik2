@@ -1,6 +1,6 @@
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   ArrowLeft,
   Mail, 
@@ -96,7 +96,18 @@ export default function NewsletterViewPage() {
   });
 
   // Fetch detailed email stats
-  const { data: detailedStatsData, isLoading: isDetailedStatsLoading } = useQuery<{
+
+  // Debug logging for detailed stats query
+  useEffect(() => {
+    console.log("📊 Detailed stats query state:", {
+      id,
+      newsletterStatus: newsletter?.status,
+      enabled: !!id && newsletter?.status === "sent",
+      hasNewsletter: !!newsletter
+    });
+  }, [id, newsletter?.status]);
+
+  const { data: detailedStatsData, isLoading: isDetailedStatsLoading, error: detailedStatsError } = useQuery<{
     newsletter: { id: string; title: string; status: string };
     totalEmails: number;
     emails: Array<{
@@ -112,13 +123,26 @@ export default function NewsletterViewPage() {
       events: Array<{ type: string; timestamp: string; data?: any }>;
     }>;
   }>({
-    queryKey: ['/api/newsletters', id, 'detailed-stats'],
+    queryKey: ["/api/newsletters", id, "detailed-stats"],
     queryFn: async () => {
-      const response = await apiRequest('GET', `/api/newsletters/${id}/detailed-stats`);
-      return response.json();
+      console.log("📊 Fetching detailed stats for newsletter:", id);
+      const response = await apiRequest("GET", `/api/newsletters/${id}/detailed-stats`);
+      const data = await response.json();
+      console.log("📊 Detailed stats response:", data);
+      return data;
     },
-    enabled: !!id && newsletter?.status === 'sent',
+    enabled: !!id && !!newsletter && newsletter.status === "sent",
     refetchInterval: 30000, // Refresh every 30 seconds for sent newsletters
+    retry: 3,
+    retryDelay: 1000,
+    onError: (error) => {
+      console.error("📊 Detailed stats query error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load detailed email statistics. Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   // Initialize tasks if they don't exist
@@ -1096,6 +1120,16 @@ export default function NewsletterViewPage() {
               </CardTitle>
               <CardDescription>
                 Individual email delivery status and complete engagement activity for each recipient (includes all opens, clicks, etc.)
+                <p className="text-xs text-gray-400 mt-1">
+                  Debug: Query enabled: {!!id && !!newsletter && newsletter.status === "sent" ? "Yes" : "No"}, 
+                  ID: {!!id ? "Yes" : "No"}, 
+                  Newsletter: {!!newsletter ? "Yes" : "No"}, 
+                  Status: {newsletter?.status || "unknown"}, 
+                  Loading: {isDetailedStatsLoading ? "Yes" : "No"}, 
+                  Error: {detailedStatsError ? "Yes" : "No"}, 
+                  Data: {detailedStatsData ? "Yes" : "No"},
+                  EmailsCount: {detailedStatsData?.emails?.length || 0}
+                </p>
               </CardDescription>
             </CardHeader>
             <CardContent>
