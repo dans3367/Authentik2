@@ -35,7 +35,7 @@ export function EmailActivityTimelineModal({ contactEmail, trigger }: EmailActiv
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         {trigger}
-      </div>
+      </DialogTrigger>
       <DialogContent className="w-[95vw] max-w-4xl h-[90vh] sm:h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
@@ -80,6 +80,8 @@ export function EmailActivityTimelineModal({ contactEmail, trigger }: EmailActiv
                 }
               </p>
             </div>
+          ) : (
+            <EmailActivityTimeline contactId={contact?.id} />
           )}
         </div>
       </DialogContent>
