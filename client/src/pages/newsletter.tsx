@@ -128,22 +128,40 @@ export default function NewsletterPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
       <div className="container mx-auto p-6 space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
+        <div className="flex flex-col gap-4 sm:gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-2">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">
               Email Newsletters
             </h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Create and manage your email newsletters to engage with your subscribers
+            <p className="text-muted-foreground text-sm sm:text-base lg:text-lg">
+              Create and manage email campaigns to engage your subscribers
             </p>
           </div>
-          <Button 
-            onClick={() => setLocation('/newsletter/create')} 
-            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg transition-all duration-300"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Create Newsletter
-          </Button>
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  className="h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm"
+                >
+                  <Filter className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  Filter
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Filter newsletters by status</p>
+              </TooltipContent>
+            </Tooltip>
+            <Button 
+              onClick={() => setLocation('/newsletter/create')} 
+              size="sm"
+              className="h-8 sm:h-9 px-3 sm:px-4 shadow-sm text-xs sm:text-sm"
+            >
+              <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              Create Newsletter
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
