@@ -12,20 +12,16 @@ import {
   Clock,
   FileText,
   MoreHorizontal,
-  Search,
   Filter,
-  Users,
   TrendingUp,
-  X,
-  User
+  Users,
+  MousePointer,
+  ArrowUpDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { DataTable } from "@/components/ui/data-table";
 import {
   Tooltip,
   TooltipContent,
@@ -55,6 +51,230 @@ import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { NewsletterWithUser } from "@shared/schema";
+import type { ColumnDef } from "@tanstack/react-table";
+
+// Status badge helper function
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case 'draft':
+      return <Badge variant="secondary" className="bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">Draft</Badge>;
+    case 'scheduled':
+      return <Badge variant="outline" className="border-blue-500 text-blue-600 dark:text-blue-400">Scheduled</Badge>;
+    case 'sent':
+      return <Badge variant="default" className="bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-300">Sent</Badge>;
+    default:
+      return <Badge variant="secondary">{status}</Badge>;
+  }
+};
+
+// Column definitions for the newsletter table
+const createColumns = (
+  setLocation: (location: string) => void,
+  handleDeleteNewsletter: (id: string) => void
+): ColumnDef<NewsletterWithUser & { opens?: number; totalOpens?: number }>[] => [
+  {
+    accessorKey: "title",
+    header: ({ column }) => {
+      return (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-auto p-0 font-medium hover:bg-transparent"
+        >
+          Title
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      )
+    },
+    cell: ({ row }) => {
+      const newsletter = row.original;
+      return (
+        <div className="space-y-1">
+          <div 
+            className="font-medium text-gray-900 dark:text-gray-100 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
+            onClick={() => setLocation(`/newsletters/${newsletter.id}`)}
+          >
+            {newsletter.title}
+          </div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            {newsletter.subject}
+          </div>
+        </div>
+      );
+    },
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) => getStatusBadge(row.getValue("status")),
+    filterFn: (row, id, value) => {
+      return value.includes(row.getValue(id));
+    },
+  },
+  {
+    accessorKey: "user",
+    header: "Author",
+    cell: ({ row }) => {
+      const user = row.getValue("user") as { firstName: string; lastName: string };
+      return (
+        <div className="flex items-center space-x-2">
+          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-sm font-medium">
+            {user.firstName[0]}{user.lastName[0]}
+          </div>
+          <div className="text-sm text-gray-900 dark:text-gray-100">
+            {user.firstName} {user.lastName}
+          </div>
+        </div>
+      );
+    },
+  },
+  {
+    accessorKey: "recipientCount",
+    header: ({ column }) => {
+      return (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-auto p-0 font-medium hover:bg-transparent"
+        >
+          <Users className="mr-2 h-4 w-4" />
+          Recipients
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      )
+    },
+    cell: ({ row }) => (
+      <div className="text-center font-medium">
+        {row.getValue("recipientCount") || 0}
+      </div>
+    ),
+  },
+  {
+    id: "metrics",
+    header: "Engagement",
+    cell: ({ row }) => {
+      const newsletter = row.original;
+      const openRate = newsletter.recipientCount > 0 
+        ? ((newsletter.opens || 0) / newsletter.recipientCount * 100).toFixed(1)
+        : "0.0";
+      
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center space-x-4 text-sm">
+            <div className="flex items-center space-x-1">
+              <Eye className="h-3 w-3 text-green-500" />
+              <span className="text-gray-900 dark:text-gray-100 font-medium">
+                {newsletter.opens || 0}
+              </span>
+              <span className="text-gray-500 dark:text-gray-400">opens</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <MousePointer className="h-3 w-3 text-blue-500" />
+              <span className="text-gray-900 dark:text-gray-100 font-medium">
+                {newsletter.clickCount || 0}
+              </span>
+              <span className="text-gray-500 dark:text-gray-400">clicks</span>
+            </div>
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            {openRate}% open rate
+          </div>
+        </div>
+      );
+    },
+  },
+  {
+    id: "dates",
+    header: ({ column }) => {
+      return (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-auto p-0 font-medium hover:bg-transparent"
+        >
+          <Calendar className="mr-2 h-4 w-4" />
+          Date
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      )
+    },
+    accessorFn: (row) => row.sentAt || row.scheduledAt || row.createdAt,
+    cell: ({ row }) => {
+      const newsletter = row.original;
+      const status = newsletter.status;
+      
+      if (status === 'sent' && newsletter.sentAt) {
+        return (
+          <div className="space-y-1">
+            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              Sent
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              {format(new Date(newsletter.sentAt), 'MMM d, yyyy HH:mm')}
+            </div>
+          </div>
+        );
+      } else if (status === 'scheduled' && newsletter.scheduledAt) {
+        return (
+          <div className="space-y-1">
+            <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
+              Scheduled
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              {format(new Date(newsletter.scheduledAt), 'MMM d, yyyy HH:mm')}
+            </div>
+          </div>
+        );
+      } else {
+        return (
+          <div className="space-y-1">
+            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              Created
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              {format(new Date(newsletter.createdAt || new Date()), 'MMM d, yyyy HH:mm')}
+            </div>
+          </div>
+        );
+      }
+    },
+  },
+  {
+    id: "actions",
+    header: "",
+    cell: ({ row }) => {
+      const newsletter = row.original;
+      
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setLocation(`/newsletters/${newsletter.id}`)}>
+              <Eye className="h-4 w-4 mr-2" />
+              View
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLocation(`/newsletters/${newsletter.id}/edit`)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              onClick={() => handleDeleteNewsletter(newsletter.id)}
+              className="text-red-600 dark:text-red-400"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+    },
+  },
+];
 
 export default function NewsletterPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -136,40 +356,15 @@ export default function NewsletterPage() {
     }
   };
 
-  // Force refresh data when component mounts or location changes
-  useEffect(() => {
-    refetch();
-    refetchStats();
-  }, [location, refetch, refetchStats]);
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'draft':
-        return <Badge variant="secondary" className="font-medium">Draft</Badge>;
-      case 'scheduled':
-        return <Badge variant="warning" className="font-medium">Scheduled</Badge>;
-      case 'sent':
-        return <Badge variant="success" className="font-medium">Sent</Badge>;
-      default:
-        return <Badge variant="outline" className="font-medium">{status}</Badge>;
-    }
-  };
 
   if (isLoading) {
     return (
-      <TooltipProvider>
-        <div className="w-full">
-          <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8">
-            {/* Header Skeleton */}
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-              <div className="space-y-3">
-                <Skeleton className="h-10 w-64" />
-                <Skeleton className="h-5 w-96" />
-              </div>
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-9 w-20" />
-                <Skeleton className="h-9 w-36" />
-              </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:bg-gradient-to-br dark:from-slate-800 dark:via-slate-700 dark:to-slate-800">
+        <div className="container mx-auto p-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 rounded-2xl flex items-center justify-center shadow-lg">
+              <div className="animate-spin rounded-full h-8 w-8 border-4 border-white border-t-transparent"></div>
             </div>
 
             {/* Search Bar Skeleton */}
@@ -237,140 +432,95 @@ export default function NewsletterPage() {
   }
 
   return (
-    <TooltipProvider>
-      <div className="w-full">
-        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:bg-gradient-to-br dark:from-slate-800 dark:via-slate-700 dark:to-slate-800">
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* Header */}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
-          <div className="space-y-2">
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">
-              Email Newsletters
-            </h1>
-            <p className="text-muted-foreground text-sm sm:text-base lg:text-lg">
-              Create and manage email campaigns to engage your subscribers
-            </p>
-          </div>
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap lg:flex-nowrap lg:justify-end">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline"
-                  size="sm"
-                  className="h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm"
-                >
-                  <Filter className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  Filter
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Filter newsletters by status</p>
-              </TooltipContent>
-            </Tooltip>
-            <Button 
-              onClick={() => setLocation('/newsletter/create')} 
-              size="sm"
-              className="h-8 sm:h-9 px-3 sm:px-4 shadow-sm text-xs sm:text-sm"
-            >
-              <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-              Create Newsletter
-            </Button>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
+                Email Newsletters
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                Create and manage email campaigns to engage your subscribers
+              </p>
+            </div>
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    className="h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm"
+                  >
+                    <Filter className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    Filter
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Filter newsletters by status</p>
+                </TooltipContent>
+              </Tooltip>
+              <Button 
+                onClick={() => setLocation('/newsletter/create')} 
+                size="sm"
+                className="h-8 sm:h-9 px-3 sm:px-4 shadow-sm text-xs sm:text-sm"
+              >
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                Create Newsletter
+              </Button>
+            </div>
           </div>
         </div>
 
-        {/* Search Bar */}
-        <Card className="p-4 sm:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search newsletters..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-              {searchQuery && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-                  onClick={() => setSearchQuery("")}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
-            <Separator orientation="vertical" className="hidden sm:block h-6" />
-            <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap">
-              <span className="text-sm font-medium text-muted-foreground hidden sm:inline">Filter:</span>
-              <Button
-                variant={statusFilter === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setStatusFilter("all")}
-                className="h-8 px-3 text-xs"
-              >
-                All
-              </Button>
-              <Button
-                variant={statusFilter === "draft" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setStatusFilter("draft")}
-                className="h-8 px-3 text-xs"
-              >
-                Draft
-              </Button>
-              <Button
-                variant={statusFilter === "scheduled" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setStatusFilter("scheduled")}
-                className="h-8 px-3 text-xs"
-              >
-                Scheduled
-              </Button>
-              <Button
-                variant={statusFilter === "sent" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setStatusFilter("sent")}
-                className="h-8 px-3 text-xs"
-              >
-                Sent
-              </Button>
-            </div>
-          </div>
-        </Card>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-          <Card className="group transition-all duration-200 hover:shadow-lg hover:shadow-primary/5 border-border/50 hover:border-primary/20">
+        {/* Stats Cards - Modern Style like Dashboard */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          {/* Total Newsletters - Yellow Card */}
+          <Card className="bg-yellow-400 dark:bg-yellow-400 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300 relative overflow-hidden">
             <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-muted-foreground/80 group-hover:text-muted-foreground transition-colors">
-                    Total Newsletters
-                  </p>
-                  <p className="text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
-                    {stats.totalNewsletters}
-                  </p>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-black">Total Newsletters</h3>
+                  <Button size="sm" variant="ghost" className="text-black hover:bg-black/10 text-xs">
+                    More
+                  </Button>
                 </div>
-                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <FileText className="h-6 w-6 text-primary" />
+                <div className="space-y-2">
+                  <div className="text-4xl font-bold text-black">{stats.totalNewsletters}</div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span className="text-black">Active Campaigns</span>
+                      </div>
+                      <span className="text-black font-medium">78%</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-yellow-600 rounded-full"></div>
+                        <span className="text-black">Draft Campaigns</span>
+                      </div>
+                      <span className="text-black font-medium">22%</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="group transition-all duration-200 hover:shadow-lg hover:shadow-secondary/5 border-border/50 hover:border-secondary/30">
+          {/* Draft Newsletters - Dark Card */}
+          <Card className="bg-slate-800 dark:bg-slate-900 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
             <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-muted-foreground/80 group-hover:text-muted-foreground transition-colors">
-                    Draft
-                  </p>
-                  <p className="text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
-                    {stats.draftNewsletters}
-                  </p>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-white">Draft Newsletters</h3>
+                  <div className="text-sm text-gray-400">/ {new Date().getFullYear()}</div>
                 </div>
-                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-secondary to-secondary/80 flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <Edit className="h-6 w-6 text-secondary-foreground" />
+                <div className="flex items-center justify-center h-32">
+                  <div className="w-24 h-24 border-4 border-gray-600 rounded-full flex items-center justify-center relative">
+                    <div className="absolute inset-0 border-4 border-blue-500 rounded-full" style={{clipPath: 'polygon(0 0, 50% 0, 50% 100%, 0 100%)'}}></div>
+                    <Edit className="w-8 h-8 text-white" />
+                  </div>
                 </div>
                 <Button className="w-full bg-slate-700 hover:bg-slate-600 text-white border-0 rounded-2xl">
                   <Edit className="w-4 h-4 mr-2" />
@@ -380,19 +530,20 @@ export default function NewsletterPage() {
             </CardContent>
           </Card>
 
-          <Card className="group transition-all duration-200 hover:shadow-lg hover:shadow-orange-500/5 border-border/50 hover:border-orange-200/30">
+          {/* Scheduled Newsletters - Light Card */}
+          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
             <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-muted-foreground/80 group-hover:text-muted-foreground transition-colors">
-                    Scheduled
-                  </p>
-                  <p className="text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
-                    {stats.scheduledNewsletters}
-                  </p>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-black">Scheduled</h3>
+                  <Clock className="w-5 h-5 text-black" />
                 </div>
-                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-orange-100 to-orange-50 dark:from-orange-950/30 dark:to-orange-950/10 flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <Clock className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                <div className="flex items-center justify-center space-x-2 py-4">
+                  <div className="flex space-x-1">
+                    <div className="w-8 h-8 bg-gray-300 rounded-lg flex items-center justify-center text-black text-sm font-medium">S</div>
+                    <div className="w-8 h-8 bg-yellow-400 rounded-lg flex items-center justify-center text-black text-sm font-medium">C</div>
+                    <div className="w-8 h-8 bg-gray-300 rounded-lg flex items-center justify-center text-black text-sm font-medium">H</div>
+                  </div>
                 </div>
                 <div className="text-center">
                   <div className="text-4xl font-bold text-black">{stats.scheduledNewsletters}</div>
@@ -405,19 +556,84 @@ export default function NewsletterPage() {
             </CardContent>
           </Card>
 
-          <Card className="group transition-all duration-200 hover:shadow-lg hover:shadow-green-500/5 border-border/50 hover:border-green-200/30">
+          {/* Sent Newsletters - Light Card with Chart */}
+          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
             <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-muted-foreground/80 group-hover:text-muted-foreground transition-colors">
-                    Sent
-                  </p>
-                  <p className="text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
-                    {stats.sentNewsletters}
-                  </p>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-black">Sent Campaigns</h3>
+                  <div className="bg-green-500 rounded-full px-3 py-1 text-xs text-white font-medium">{stats.sentNewsletters}</div>
                 </div>
-                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-green-100 to-green-50 dark:from-green-950/30 dark:to-green-950/10 flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <Send className="h-6 w-6 text-green-600 dark:text-green-400" />
+                <div className="h-20 flex items-end justify-center space-x-1">
+                  {[40, 60, 20, 80, 45, 90, 30, 70].map((height, index) => (
+                    <div
+                      key={index}
+                      className={`w-6 rounded-t-lg ${index === 5 ? 'bg-yellow-400' : 'bg-gray-400'}`}
+                      style={{ height: `${height}%` }}
+                    ></div>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between text-xs text-gray-600">
+                  <span>Jan</span>
+                  <span>Feb</span>
+                  <span>Mar</span>
+                  <span>Apr</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Campaign Management - Light Card */}
+          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-black">Campaign Management</h3>
+                  <Mail className="w-5 h-5 text-black" />
+                </div>
+                <div className="text-center py-8">
+                  <div className="w-24 h-24 bg-slate-800 rounded-2xl flex items-center justify-center mx-auto">
+                    <Send className="w-12 h-12 text-white" />
+                  </div>
+                </div>
+                <Button className="w-full bg-yellow-400 hover:bg-yellow-500 text-black border-0 rounded-2xl font-semibold">
+                  Campaign Analytics Dashboard
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Secondary Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Open Rate Analytics - Dark Card with Chart */}
+          <Card className="bg-slate-800 dark:bg-slate-900 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-yellow-400" />
+                    <h3 className="text-lg font-semibold text-white">Open Rate Analytics</h3>
+                  </div>
+                  <Button size="sm" variant="ghost" className="text-gray-400 hover:bg-white/10 text-xs">
+                    Details
+                  </Button>
+                </div>
+                <div>
+                  <div className="text-4xl font-bold text-white">58.3%</div>
+                  <div className="text-sm text-gray-400 mt-1">Average Open Rate</div>
+                </div>
+                <div className="h-20 flex items-end">
+                  <svg viewBox="0 0 200 60" className="w-full h-full">
+                    <path 
+                      d="M0,50 Q50,30 100,35 T200,20" 
+                      stroke="#eab308" 
+                      strokeWidth="3" 
+                      fill="none"
+                      className="drop-shadow-sm"
+                    />
+                    <circle cx="180" cy="25" r="4" fill="#eab308" />
+                  </svg>
                 </div>
               </div>
             </CardContent>
@@ -445,22 +661,8 @@ export default function NewsletterPage() {
         </div>
 
         {/* Newsletters List */}
-        {isLoading ? (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Mail className="h-8 w-8 text-primary animate-pulse" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">
-                Loading newsletters...
-              </h3>
-              <p className="text-muted-foreground">
-                Please wait while we fetch your newsletters.
-              </p>
-            </CardContent>
-          </Card>
-        ) : allNewsletters.length === 0 ? (
-          <Card>
+        {newsletters.length === 0 ? (
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-3xl">
             <CardContent className="p-12 text-center">
               <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Mail className="h-10 w-10 text-primary" />
@@ -473,8 +675,7 @@ export default function NewsletterPage() {
               </p>
               <Button 
                 onClick={() => setLocation('/newsletter/create')}
-                size="lg"
-                className="h-11 px-8"
+                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg transition-all duration-300 rounded-2xl"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Create Your First Newsletter
@@ -505,117 +706,24 @@ export default function NewsletterPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-4">
-            {filteredNewsletters.map((newsletter) => (
-              <Card key={newsletter.id} className="group cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 border-border/50 hover:border-primary/20 hover:bg-accent/5">
-                <CardContent className="p-4 sm:p-6">
-                  <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0 space-y-3 sm:space-y-4">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
-                        <h3 className="text-lg font-semibold truncate group-hover:text-primary transition-colors duration-200 sm:flex-1">
-                          {newsletter.title}
-                        </h3>
-                        <div className="sm:flex-shrink-0">
-                          {getStatusBadge(newsletter.status)}
-                        </div>
-                      </div>
-                      
-                      <p className="text-muted-foreground/90 line-clamp-2 leading-relaxed text-sm">
-                        {newsletter.subject}
-                      </p>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-sm text-muted-foreground/80">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground/60 flex-shrink-0" />
-                          <span className="font-medium truncate">{format(new Date(newsletter.createdAt || new Date()), 'MMM d, yyyy')}</span>
-                        </div>
-                        
-                        <div className="flex items-center gap-2">
-                          <TrendingUp className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-                          <span className="font-medium">{newsletter.opens || 0} opens</span>
-                        </div>
-                        
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                          <span className="font-medium">{newsletter.recipientCount} recipients</span>
-                        </div>
-                        
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-6 w-6 ring-2 ring-background shadow-sm flex-shrink-0">
-                            <AvatarFallback className="text-xs font-semibold bg-gradient-to-br from-primary/10 to-primary/5 text-primary">
-                              {newsletter.user.firstName?.[0]}{newsletter.user.lastName?.[0]}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-sm font-medium truncate">by {newsletter.user.firstName} {newsletter.user.lastName}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1 lg:ml-6 self-start lg:self-start pt-2 lg:pt-0">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => setLocation(`/newsletters/${newsletter.id}`)}
-                            className="h-9 w-9 opacity-60 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary transition-all duration-200"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p>View newsletter details</p>
-                        </TooltipContent>
-                      </Tooltip>
-                      <DropdownMenu>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-9 w-9 opacity-60 group-hover:opacity-100 hover:bg-accent hover:text-accent-foreground transition-all duration-200">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                          </TooltipTrigger>
-                          <TooltipContent side="top">
-                            <p>More actions</p>
-                          </TooltipContent>
-                        </Tooltip>
-                        <DropdownMenuContent align="end" className="w-48 shadow-lg border-border/50">
-                          <DropdownMenuItem 
-                            onClick={() => setLocation(`/newsletters/${newsletter.id}`)}
-                            className="cursor-pointer"
-                          >
-                            <Eye className="h-4 w-4 mr-3" />
-                            <span>View Details</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => setLocation(`/newsletters/${newsletter.id}/edit`)}
-                            className="cursor-pointer"
-                          >
-                            <Edit className="h-4 w-4 mr-3" />
-                            <span>Edit Newsletter</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            onClick={() => handleDeleteNewsletter(newsletter.id)}
-                            className="text-destructive focus:text-destructive cursor-pointer"
-                          >
-                            <Trash2 className="h-4 w-4 mr-3" />
-                            <span>Delete</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-3xl">
+            <CardContent className="p-6">
+              <DataTable
+                columns={createColumns(setLocation, handleDeleteNewsletter)}
+                data={newsletters}
+                searchKey="title"
+                searchPlaceholder="Search newsletters..."
+                showColumnVisibility={true}
+                showPagination={true}
+                pageSize={10}
+              />
+            </CardContent>
+          </Card>
         )}
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent>
+          <AlertDialogContent className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-3xl">
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Newsletter</AlertDialogTitle>
               <AlertDialogDescription>
@@ -623,10 +731,12 @@ export default function NewsletterPage() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel className="hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 rounded-2xl">
+                Cancel
+              </AlertDialogCancel>
               <AlertDialogAction
                 onClick={confirmDelete}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white shadow-lg transition-all duration-300 rounded-2xl"
                 disabled={deleteNewsletterMutation.isPending}
               >
                 {deleteNewsletterMutation.isPending ? "Deleting..." : "Delete Newsletter"}
