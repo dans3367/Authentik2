@@ -9,6 +9,7 @@ import type { UserSubscriptionResponse, RefreshTokenInfo } from "@shared/schema"
 import { authManager } from "@/lib/auth";
 import { Shield, Users, Clock, TrendingUp, LogOut, RefreshCw, Settings, CreditCard, Calendar, Mail, Send, Eye, MousePointer, FileText, User } from "lucide-react";
 import { useLocation } from "wouter";
+import { NewsletterCard } from "@/components/ui/newsletter-card";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
@@ -197,6 +198,11 @@ export default function Dashboard() {
               </p>
             </Card>
           )}
+        </div>
+
+        {/* Newsletter Creation Card */}
+        <div className="max-w-xl">
+          <NewsletterCard />
         </div>
       </div>
 
