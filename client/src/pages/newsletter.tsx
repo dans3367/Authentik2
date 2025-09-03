@@ -364,7 +364,7 @@ export default function NewsletterPage() {
     },
   });
 
-  const allNewsletters: (NewsletterWithUser & { opens?: number; totalOpens?: number })[] = (newslettersData as any)?.newsletters || [];
+  const allNewsletters: (NewsletterWithUser & { opens?: number; totalOpens?: number })[] = newsletters;
   
   // Filter newsletters based on search query and status
   const filteredNewsletters = allNewsletters.filter((newsletter) => {
