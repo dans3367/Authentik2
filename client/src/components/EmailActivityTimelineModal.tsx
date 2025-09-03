@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Calendar, User, AlertCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -30,9 +32,9 @@ export default function EmailActivityTimelineModal({
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
-  // If we only have email, look up the contact
-  const { data: contactData, isLoading: isLookingUpContact, error: contactError } = useQuery({
-    queryKey: ['contact-lookup', contactEmail],
+  // Find the contact ID by email when modal is opened
+  const { data: contactData, isLoading: isContactLoading, error: contactError } = useQuery({
+    queryKey: ['/api/email-contacts', 'by-email', contactEmail],
     queryFn: async () => {
       if (!contactEmail) return null;
       const response = await apiRequest('GET', `/api/email-contacts?search=${encodeURIComponent(contactEmail)}&limit=1`);
@@ -42,10 +44,10 @@ export default function EmailActivityTimelineModal({
     enabled: open && !contactId && !!contactEmail,
   });
 
-  const resolvedContactId = contactId || contactData?.id;
-  const displayName = contactName || (contactData?.firstName && contactData?.lastName) 
-    ? `${contactData?.firstName} ${contactData?.lastName}`.trim()
-    : contactEmail || contactData?.email || 'Contact';
+  const contact = contactData?.contacts?.[0];
+  const resolvedContactId = contact?.id;
+  const isLookingUpContact = isContactLoading;
+  const displayName = contact ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email : contactEmail;
 
   const handleOpenModal = () => {
     setOpen(true);
@@ -109,9 +111,9 @@ export default function EmailActivityTimelineModal({
                 }
               </p>
             </div>
-          ) : resolvedContactId ? (
-            <EmailActivityTimeline contactId={resolvedContactId} limit={100} />
-          ) : null}
+          ) : (
+            <EmailActivityTimeline contactId={resolvedContactId} />
+          )}
         </div>
       </DialogContent>
     </Dialog>
