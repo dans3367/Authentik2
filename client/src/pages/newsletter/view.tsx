@@ -48,7 +48,6 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format, formatDistanceToNow } from "date-fns";
 import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
 import type { NewsletterWithUser, NewsletterTaskStatus } from "@shared/schema";
-import { EmailActivityTimelineModal } from "@/components/EmailActivityTimelineModal";
 
 // Using real task status data from backend via NewsletterTaskStatus type
 

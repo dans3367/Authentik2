@@ -750,6 +750,92 @@ export default function ProfilePage() {
 
           {/* Security Tab */}
           <TabsContent value="security">
+            {/* Security Tips Widget */}
+            <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 mb-6">
+              {/* Mobile Header with Illustration */}
+              <div className="flex justify-center p-4 pb-0 sm:hidden">
+                <div className="w-32 h-24 bg-gray-50 dark:bg-gray-700/50 rounded-2xl flex items-center justify-center relative overflow-hidden">
+                  <div className="relative z-10 flex items-center justify-center">
+                    <div className="w-16 h-12 bg-white dark:bg-gray-600 rounded-lg flex items-center justify-center relative">
+                      <Lock className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center">
+                        <div className="w-1.5 h-1.5 bg-yellow-600 rounded-full"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="absolute top-2 right-3 w-2.5 h-2.5 bg-gray-300 dark:bg-gray-500 rounded-full"></div>
+                  <div className="absolute bottom-3 left-3 w-1.5 h-1.5 bg-gray-300 dark:bg-gray-500 rounded-full"></div>
+                  <div className="absolute top-1/2 left-1.5 w-3 h-3 bg-blue-200 dark:bg-blue-800 rounded-full opacity-60"></div>
+                </div>
+              </div>
+
+              <CardContent className="p-4 sm:p-8">
+                <div className="sm:flex sm:items-center sm:justify-between">
+                  <div className="flex-1">
+                    <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
+                      Essential Personal Security Tips for Enhanced
+                      <br className="hidden sm:block" />
+                      <span className="sm:hidden"> </span>Safety
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400 mb-6 text-sm">
+                      Transform your living space beautifully with our Restyle Your Space: Soft Goods Makeover Ideas tutorial
+                    </p>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6 sm:mb-8">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+                          <Check className="w-4 h-4 text-white" />
+                        </div>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Strong Passwords</span>
+                      </div>
+                      
+                      <div className="flex items-center space-x-3">
+                        <div className="w-6 h-6 border-2 border-gray-300 dark:border-gray-600 rounded-full flex items-center justify-center flex-shrink-0">
+                          <div className="w-2 h-2 bg-green-500 rounded-full opacity-60"></div>
+                        </div>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Two-Factor Authentication</span>
+                      </div>
+                      
+                      <div className="flex items-center space-x-3">
+                        <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+                          <Check className="w-4 h-4 text-white" />
+                        </div>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Budget-Friendly</span>
+                      </div>
+                      
+                      <div className="flex items-center space-x-3">
+                        <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+                          <Check className="w-4 h-4 text-white" />
+                        </div>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Fresh Look</span>
+                      </div>
+                    </div>
+                    
+                    <Button variant="link" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 p-0 h-auto font-semibold underline">
+                      Review Security Tips
+                    </Button>
+                  </div>
+                  
+                  {/* Desktop Illustration (hidden on mobile) */}
+                  <div className="hidden sm:flex sm:flex-shrink-0 sm:ml-8">
+                    <div className="w-40 h-32 bg-gray-50 dark:bg-gray-700/50 rounded-2xl flex items-center justify-center relative overflow-hidden">
+                      <div className="relative z-10 flex items-center justify-center">
+                        <div className="w-20 h-16 bg-white dark:bg-gray-600 rounded-lg flex items-center justify-center relative">
+                          <Lock className="w-8 h-8 text-gray-600 dark:text-gray-400" />
+                          <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center">
+                            <div className="w-2 h-2 bg-yellow-600 rounded-full"></div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="absolute top-3 right-4 w-3 h-3 bg-gray-300 dark:bg-gray-500 rounded-full"></div>
+                      <div className="absolute bottom-4 left-4 w-2 h-2 bg-gray-300 dark:bg-gray-500 rounded-full"></div>
+                      <div className="absolute top-1/2 left-2 w-4 h-4 bg-blue-200 dark:bg-blue-800 rounded-full opacity-60"></div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-purple-200/50 dark:border-purple-700/30 shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-3 text-gray-900 dark:text-gray-100">

@@ -22,6 +22,8 @@ export const helmetMiddleware = helmet({
         "https://tenginex.zendwise.work/*",
         "https://*.zendwise.work",
         "https://*.zendwise.work/*",
+        "https://weby.zendwise.work",
+        "https://websy.zendwise.work",
         "ws:",
         "wss:",
         "http:",
@@ -52,6 +54,8 @@ export const helmetMiddleware = helmet({
         "https://tenginex.zendwise.work/*",
         "https://*.zendwise.work",
         "https://*.zendwise.work/*",
+        "https://weby.zendwise.work",
+        "https://websy.zendwise.work",
         "ws:",
         "wss:",
         "http://localhost:*",
@@ -64,6 +68,8 @@ export const helmetMiddleware = helmet({
     },
   },
   crossOriginEmbedderPolicy: false,
+  // Configure Cross-Origin-Opener-Policy for trusted domains
+  crossOriginOpenerPolicy: process.env.NODE_ENV === 'development' ? false : { policy: "same-origin" },
   // Disable HSTS in development to prevent HTTPS enforcement
   hsts: process.env.NODE_ENV === 'production',
 });

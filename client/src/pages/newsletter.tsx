@@ -16,12 +16,15 @@ import {
   TrendingUp,
   Users,
   MousePointer,
-  ArrowUpDown
+  ArrowUpDown,
+  Search,
+  AlertTriangle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
   TooltipContent,
@@ -45,7 +48,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
@@ -154,8 +156,8 @@ const createColumns = (
     header: "Engagement",
     cell: ({ row }) => {
       const newsletter = row.original;
-      const openRate = newsletter.recipientCount > 0 
-        ? ((newsletter.opens || 0) / newsletter.recipientCount * 100).toFixed(1)
+      const openRate = (newsletter.recipientCount || 0) > 0 
+        ? ((newsletter.opens || 0) / (newsletter.recipientCount || 1) * 100).toFixed(1)
         : "0.0";
       
       return (
@@ -288,18 +290,56 @@ export default function NewsletterPage() {
   // Fetch newsletters with fresh data on each page load
   const { data: newslettersData, isLoading, error, refetch } = useQuery({
     queryKey: ['/api/newsletters'],
+    queryFn: async () => {
+      console.log('Fetching newsletters...');
+      const response = await apiRequest('GET', '/api/newsletters');
+      const data = await response.json();
+      console.log('Newsletters data:', data);
+      // The API returns { newsletters: [...] }
+      return data.newsletters || [];
+    },
     staleTime: 0, // Always consider data stale to ensure fresh fetches
     refetchOnMount: 'always', // Always refetch when component mounts
     refetchOnWindowFocus: true, // Refetch when window regains focus
+    retry: 2, // Retry failed requests
   });
 
   // Fetch newsletter stats with fresh data on each page load
   const { data: statsData, refetch: refetchStats } = useQuery({
     queryKey: ['/api/newsletter-stats'],
+    queryFn: async () => {
+      console.log('Fetching newsletter stats...');
+      const response = await apiRequest('GET', '/api/newsletter-stats');
+      const data = await response.json();
+      console.log('Stats data:', data);
+      return data;
+    },
     staleTime: 0, // Always consider data stale to ensure fresh fetches
     refetchOnMount: 'always', // Always refetch when component mounts
     refetchOnWindowFocus: true, // Refetch when window regains focus
+    retry: 2, // Retry failed requests
   });
+
+  // Force refresh data when component mounts or location changes
+  useEffect(() => {
+    // Invalidate cache and refetch fresh data
+    queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
+    refetch();
+    refetchStats();
+  }, [location, refetch, refetchStats, queryClient]);
+
+  // Process the data - newslettersData is already an array from our queryFn
+  const newsletters = newslettersData || [];
+  const stats = statsData || {
+    totalNewsletters: 0,
+    draftNewsletters: 0,
+    scheduledNewsletters: 0,
+    sentNewsletters: 0
+  };
+
+  // Log data for debugging
+  console.log('Processing data:', { newslettersData, statsData, newsletters, stats, isLoading, error });
 
   // Delete newsletter mutation
   const deleteNewsletterMutation = useMutation({
@@ -338,13 +378,6 @@ export default function NewsletterPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const stats = (statsData as any) || {
-    totalNewsletters: 0,
-    draftNewsletters: 0,
-    scheduledNewsletters: 0,
-    sentNewsletters: 0,
-  };
-
   const handleDeleteNewsletter = (id: string) => {
     setNewsletterToDelete(id);
     setShowDeleteDialog(true);
@@ -357,6 +390,38 @@ export default function NewsletterPage() {
   };
 
 
+
+  // Show error state if there's an error
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:bg-gradient-to-br dark:from-slate-800 dark:via-slate-700 dark:to-slate-800">
+        <div className="container mx-auto p-6">
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-red-200/50 dark:border-red-700/30 rounded-3xl">
+            <CardContent className="p-12 text-center">
+              <div className="w-20 h-20 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <AlertTriangle className="h-10 w-10 text-red-600 dark:text-red-400" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2 text-red-800 dark:text-red-300">
+                Error Loading Newsletters
+              </h3>
+              <p className="text-red-600 dark:text-red-400 mb-4">
+                {error instanceof Error ? error.message : 'Failed to load newsletter data'}
+              </p>
+              <Button 
+                onClick={() => {
+                  refetch();
+                  refetchStats();
+                }}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                Try Again
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -427,12 +492,13 @@ export default function NewsletterPage() {
             </div>
           </div>
         </div>
-      </TooltipProvider>
+      </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:bg-gradient-to-br dark:from-slate-800 dark:via-slate-700 dark:to-slate-800">
+    <TooltipProvider>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:bg-gradient-to-br dark:from-slate-800 dark:via-slate-700 dark:to-slate-800">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="space-y-4">
@@ -744,8 +810,8 @@ export default function NewsletterPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-        </div>
       </div>
+    </div>
     </TooltipProvider>
   );
 }

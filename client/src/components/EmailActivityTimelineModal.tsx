@@ -11,9 +11,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import EmailActivityTimeline from "@/components/EmailActivityTimeline";
-import { Calendar, User, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface EmailActivityTimelineModalProps {

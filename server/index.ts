@@ -21,6 +21,51 @@ app.set('trust proxy', true);
 
 // Security middleware
 app.use(helmetMiddleware);
+
+// Custom CORS and security headers for trusted domains
+app.use((req, res, next) => {
+  const origin = req.get('Origin');
+  const host = req.get('Host');
+  
+  // List of trusted domains
+  const trustedDomains = [
+    'weby.zendwise.work',
+    'websy.zendwise.work',
+    'localhost',
+    '127.0.0.1'
+  ];
+  
+  // Check if the origin or host is trusted
+  const isTrustedDomain = trustedDomains.some(domain => 
+    origin?.includes(domain) || host?.includes(domain)
+  );
+  
+  if (isTrustedDomain) {
+    // Set CORS headers for trusted domains
+    res.header('Access-Control-Allow-Origin', origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
+    // Set Cross-Origin-Opener-Policy to allow trusted domains
+    res.header('Cross-Origin-Opener-Policy', 'unsafe-none');
+    res.header('Cross-Origin-Embedder-Policy', 'unsafe-none');
+    
+    // Additional security headers for trusted domains
+    res.header('X-Frame-Options', 'SAMEORIGIN');
+    res.header('X-Content-Type-Options', 'nosniff');
+    res.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+  }
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+    return;
+  }
+  
+  next();
+});
+
 app.use(generalRateLimiter);
 app.use(mongoSanitizer);
 
