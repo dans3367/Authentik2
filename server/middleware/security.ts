@@ -148,9 +148,13 @@ export const sanitizeInput = (input: any): any => {
 
 // Express middleware for input sanitization
 export const sanitizeMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  req.body = sanitizeInput(req.body);
+  // Only sanitize if the body exists
+  if (req.body !== undefined) {
+    req.body = sanitizeInput(req.body);
+  }
   req.query = sanitizeInput(req.query);
   req.params = sanitizeInput(req.params);
+
   next();
 };
 

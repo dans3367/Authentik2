@@ -5,14 +5,10 @@ import {
   Plus, 
   Mail, 
   Calendar, 
-  Eye, 
-  Edit, 
-  Trash2, 
-  Send,
+  Eye,  Send,
   Clock,
   FileText,
   MoreHorizontal,
-  Filter,
   TrendingUp,
   Users,
   MousePointer,
@@ -26,10 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Tooltip,
-  TooltipContent,
   TooltipProvider,
-  TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
@@ -54,7 +47,6 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { NewsletterWithUser } from "@shared/schema";
 import type { ColumnDef } from "@tanstack/react-table";
-
 // Status badge helper function
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -68,7 +60,6 @@ const getStatusBadge = (status: string) => {
       return <Badge variant="secondary">{status}</Badge>;
   }
 };
-
 // Column definitions for the newsletter table
 const createColumns = (
   setLocation: (location: string) => void,
@@ -159,7 +150,6 @@ const createColumns = (
       const openRate = (newsletter.recipientCount || 0) > 0 
         ? ((newsletter.opens || 0) / (newsletter.recipientCount || 1) * 100).toFixed(1)
         : "0.0";
-      
       return (
         <div className="space-y-2">
           <div className="flex items-center space-x-4 text-sm">
@@ -204,7 +194,6 @@ const createColumns = (
     cell: ({ row }) => {
       const newsletter = row.original;
       const status = newsletter.status;
-      
       if (status === 'sent' && newsletter.sentAt) {
         return (
           <div className="space-y-1">
@@ -246,7 +235,6 @@ const createColumns = (
     header: "",
     cell: ({ row }) => {
       const newsletter = row.original;
-      
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -263,30 +251,18 @@ const createColumns = (
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              onClick={() => handleDeleteNewsletter(newsletter.id)}
-              className="text-red-600 dark:text-red-400"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete
-            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       );
     },
   },
 ];
-
 export default function NewsletterPage() {
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [newsletterToDelete, setNewsletterToDelete] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [location, setLocation] = useLocation();
-
   // Fetch newsletters with fresh data on each page load
   const { data: newslettersData, isLoading, error, refetch } = useQuery({
     queryKey: ['/api/newsletters'],
@@ -303,7 +279,6 @@ export default function NewsletterPage() {
     refetchOnWindowFocus: true, // Refetch when window regains focus
     retry: 2, // Retry failed requests
   });
-
   // Fetch newsletter stats with fresh data on each page load
   const { data: statsData, refetch: refetchStats } = useQuery({
     queryKey: ['/api/newsletter-stats'],
@@ -319,7 +294,6 @@ export default function NewsletterPage() {
     refetchOnWindowFocus: true, // Refetch when window regains focus
     retry: 2, // Retry failed requests
   });
-
   // Force refresh data when component mounts or location changes
   useEffect(() => {
     // Invalidate cache and refetch fresh data
@@ -328,7 +302,6 @@ export default function NewsletterPage() {
     refetch();
     refetchStats();
   }, [location, refetch, refetchStats, queryClient]);
-
   // Process the data - newslettersData is already an array from our queryFn
   const newsletters = newslettersData || [];
   const stats = statsData || {
@@ -337,60 +310,17 @@ export default function NewsletterPage() {
     scheduledNewsletters: 0,
     sentNewsletters: 0
   };
-
   // Log data for debugging
-  console.log('Processing data:', { newslettersData, statsData, newsletters, stats, isLoading, error });
-
-  // Delete newsletter mutation
-  const deleteNewsletterMutation = useMutation({
-    mutationFn: (id: string) => 
-      apiRequest('DELETE', `/api/newsletters/${id}`).then(res => res.json()),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
-      toast({
-        title: "Success",
-        description: "Newsletter deleted successfully",
-      });
-      setShowDeleteDialog(false);
-      setNewsletterToDelete(null);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete newsletter",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const allNewsletters: (NewsletterWithUser & { opens?: number; totalOpens?: number })[] = newsletters;
-  
+  console.log('Processing data:', { newslettersData, statsData, newsletters, stats, isLoading, error });  const allNewsletters: (NewsletterWithUser & { opens?: number; totalOpens?: number })[] = newsletters;
   // Filter newsletters based on search query and status
   const filteredNewsletters = allNewsletters.filter((newsletter) => {
     const matchesSearch = searchQuery === "" || 
       newsletter.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       newsletter.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
       `${newsletter.user.firstName} ${newsletter.user.lastName}`.toLowerCase().includes(searchQuery.toLowerCase());
-    
     const matchesStatus = statusFilter === "all" || newsletter.status === statusFilter;
-    
     return matchesSearch && matchesStatus;
   });
-
-  const handleDeleteNewsletter = (id: string) => {
-    setNewsletterToDelete(id);
-    setShowDeleteDialog(true);
-  };
-
-  const confirmDelete = () => {
-    if (newsletterToDelete) {
-      deleteNewsletterMutation.mutate(newsletterToDelete);
-    }
-  };
-
-
-
   // Show error state if there's an error
   if (error) {
     return (
@@ -422,7 +352,6 @@ export default function NewsletterPage() {
       </div>
     );
   }
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:bg-gradient-to-br dark:from-slate-800 dark:via-slate-700 dark:to-slate-800">
@@ -440,7 +369,6 @@ export default function NewsletterPage() {
               </div>
             </div>
           </div>
-
           {/* Stats Cards Skeleton */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -461,7 +389,6 @@ export default function NewsletterPage() {
               </Card>
             ))}
           </div>
-
           {/* Secondary Cards Skeleton */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {Array.from({ length: 2 }).map((_, i) => (
@@ -479,7 +406,6 @@ export default function NewsletterPage() {
               </Card>
             ))}
           </div>
-
           {/* Newsletter List Skeleton */}
           <Card className="rounded-2xl">
             <CardContent className="p-6">
@@ -489,7 +415,6 @@ export default function NewsletterPage() {
                   <Skeleton className="h-10 w-64" />
                   <Skeleton className="h-8 w-24" />
                 </div>
-                
                 {/* Table rows */}
                 <div className="space-y-4">
                   {Array.from({ length: 5 }).map((_, i) => (
@@ -515,7 +440,6 @@ export default function NewsletterPage() {
       </div>
     );
   }
-
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:bg-gradient-to-br dark:from-slate-800 dark:via-slate-700 dark:to-slate-800">
@@ -532,21 +456,6 @@ export default function NewsletterPage() {
               </p>
             </div>
             <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant="outline"
-                    size="sm"
-                    className="h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm"
-                  >
-                    <Filter className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                    Filter
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Filter newsletters by status</p>
-                </TooltipContent>
-              </Tooltip>
               <Button 
                 onClick={() => setLocation('/newsletter/create')} 
                 size="sm"
@@ -558,7 +467,6 @@ export default function NewsletterPage() {
             </div>
           </div>
         </div>
-
         {/* Stats Cards - Modern Style like Dashboard */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
           {/* Total Newsletters - Yellow Card */}
@@ -593,7 +501,6 @@ export default function NewsletterPage() {
               </div>
             </CardContent>
           </Card>
-
           {/* Draft Newsletters - Dark Card */}
           <Card className="bg-slate-800 dark:bg-slate-900 border-0 rounded-2xl  transition-all duration-300">
             <CardContent className="p-6">
@@ -615,7 +522,6 @@ export default function NewsletterPage() {
               </div>
             </CardContent>
           </Card>
-
           {/* Scheduled Newsletters - Light Card */}
           <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-2xl  transition-all duration-300">
             <CardContent className="p-6">
@@ -641,7 +547,6 @@ export default function NewsletterPage() {
               </div>
             </CardContent>
           </Card>
-
           {/* Sent Newsletters - Light Card with Chart */}
           <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-2xl  transition-all duration-300">
             <CardContent className="p-6">
@@ -669,8 +574,6 @@ export default function NewsletterPage() {
             </CardContent>
           </Card>
         </div>
-
-
         {/* Newsletters List */}
         {newsletters.length === 0 ? (
           <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-2xl">
@@ -719,42 +622,169 @@ export default function NewsletterPage() {
         ) : (
           <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-2xl">
             <CardContent className="p-6">
-              <DataTable
-                columns={createColumns(setLocation, handleDeleteNewsletter)}
-                data={newsletters}
-                searchKey="title"
-                searchPlaceholder="Search newsletters..."
-                showColumnVisibility={true}
-                showPagination={true}
-                pageSize={10}
-              />
+              {/* Desktop Table View */}
+              <div className="hidden lg:block">
+                <DataTable
+                  columns={createColumns(setLocation)}
+                  data={newsletters}
+                  searchKey="title"
+                  searchPlaceholder="Search newsletters..."
+                  showColumnVisibility={true}
+                  showPagination={true}
+                  pageSize={10}
+                />
+              </div>
+              {/* Mobile Card View */}
+              <div className="lg:hidden space-y-4">
+                {/* Search Input for Mobile */}
+                <div className="flex items-center space-x-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search newsletters..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                {/* Mobile Cards */}
+                {filteredNewsletters.map((newsletter) => {
+                  const openRate = (newsletter.recipientCount || 0) > 0 
+                    ? ((newsletter.opens || 0) / (newsletter.recipientCount || 1) * 100).toFixed(1)
+                    : "0.0";
+                  return (
+                    <Card key={newsletter.id} className="border border-gray-200 dark:border-gray-700 rounded-xl hover:shadow-md transition-shadow duration-200">
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          {/* Header with Title and Status */}
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <h3 
+                                className="font-semibold text-gray-900 dark:text-gray-100 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 truncate"
+                                onClick={() => setLocation(`/newsletters/${newsletter.id}`)}
+                              >
+                                {newsletter.title}
+                              </h3>
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 overflow-hidden" style={{display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical'}}>
+                                {newsletter.subject}
+                              </p>
+                            </div>
+                            <div className="flex items-center space-x-2 ml-3">
+                              {getStatusBadge(newsletter.status)}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => setLocation(`/newsletters/${newsletter.id}`)}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </div>
+                          {/* Author and Date */}
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center space-x-2">
+                              <div className="h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-medium">
+                                {newsletter.user.firstName[0]}{newsletter.user.lastName[0]}
+                              </div>
+                              <span className="text-gray-600 dark:text-gray-400">
+                                {newsletter.user.firstName} {newsletter.user.lastName}
+                              </span>
+                            </div>
+                            <div className="text-gray-500 dark:text-gray-400">
+                              {newsletter.status === 'sent' && newsletter.sentAt ? (
+                                <div className="text-right">
+                                  <div className="text-xs">Sent</div>
+                                  <div className="text-xs">{format(new Date(newsletter.sentAt), 'MMM d, HH:mm')}</div>
+                                </div>
+                              ) : newsletter.status === 'scheduled' && newsletter.scheduledAt ? (
+                                <div className="text-right">
+                                  <div className="text-xs text-blue-600 dark:text-blue-400">Scheduled</div>
+                                  <div className="text-xs">{format(new Date(newsletter.scheduledAt), 'MMM d, HH:mm')}</div>
+                                </div>
+                              ) : (
+                                <div className="text-right">
+                                  <div className="text-xs">Created</div>
+                                  <div className="text-xs">{format(new Date(newsletter.createdAt || new Date()), 'MMM d, HH:mm')}</div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          {/* Metrics */}
+                          <div className="grid grid-cols-3 gap-4 pt-2 border-t border-gray-100 dark:border-gray-700">
+                            <div className="text-center">
+                              <div className="flex items-center justify-center space-x-1 text-sm">
+                                <Users className="h-3 w-3 text-gray-500" />
+                                <span className="font-medium text-gray-900 dark:text-gray-100">
+                                  {newsletter.recipientCount || 0}
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">Recipients</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="flex items-center justify-center space-x-1 text-sm">
+                                <Eye className="h-3 w-3 text-green-500" />
+                                <span className="font-medium text-gray-900 dark:text-gray-100">
+                                  {newsletter.opens || 0}
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">Opens</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="flex items-center justify-center space-x-1 text-sm">
+                                <MousePointer className="h-3 w-3 text-blue-500" />
+                                <span className="font-medium text-gray-900 dark:text-gray-100">
+                                  {newsletter.clickCount || 0}
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">Clicks</div>
+                            </div>
+                          </div>
+                          {/* Open Rate */}
+                          <div className="text-center text-xs text-gray-500 dark:text-gray-400">
+                            {openRate}% open rate
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+                {/* Mobile Pagination */}
+                {filteredNewsletters.length > 10 && (
+                  <div className="flex items-center justify-center space-x-2 pt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {/* Add pagination logic */}}
+                      disabled={true}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      Page 1 of {Math.ceil(filteredNewsletters.length / 10)}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {/* Add pagination logic */}}
+                      disabled={true}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}
-
         {/* Delete Confirmation Dialog */}
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-2xl">
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Newsletter</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete this newsletter? This action cannot be undone and all associated data will be permanently removed.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel className="hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 rounded-2xl">
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={confirmDelete}
-                className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white  transition-all duration-300 rounded-2xl"
-                disabled={deleteNewsletterMutation.isPending}
-              >
-                {deleteNewsletterMutation.isPending ? "Deleting..." : "Delete Newsletter"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
     </div>
     </TooltipProvider>

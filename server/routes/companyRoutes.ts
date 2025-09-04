@@ -1,0 +1,304 @@
+import { Router } from 'express';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
+import { users, tenants, shops, stores } from '@shared/schema';
+import { authenticateToken, requireRole } from './authRoutes';
+import { createCompanySchema, updateCompanySchema } from '@shared/schema';
+import { sanitizeString } from '../utils/sanitization';
+
+export const companyRoutes = Router();
+
+// Get company information
+companyRoutes.get("/", authenticateToken, async (req: any, res) => {
+  try {
+    const company = await db.query.companies.findFirst({
+      where: sql`${db.companies.id} = ${req.user.tenantId}`,
+    });
+
+    if (!company) {
+      return res.status(404).json({ message: 'Company not found' });
+    }
+
+    res.json(company);
+  } catch (error) {
+    console.error('Get company error:', error);
+    res.status(500).json({ message: 'Failed to get company information' });
+  }
+});
+
+// Create company (for owners)
+companyRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator"]), async (req: any, res) => {
+  try {
+    const validatedData = createCompanySchema.parse(req.body);
+    const { name, description, website, industry } = validatedData;
+
+    const sanitizedName = sanitizeString(name);
+    const sanitizedDescription = description ? sanitizeString(description) : null;
+    const sanitizedWebsite = website ? sanitizeString(website) : null;
+    const sanitizedIndustry = industry ? sanitizeString(industry) : null;
+
+    // Check if company name is already taken
+    const existingCompany = await db.query.companies.findFirst({
+      where: sql`${db.companies.name} = ${sanitizedName}`,
+    });
+
+    if (existingCompany) {
+      return res.status(400).json({ message: 'Company name already exists' });
+    }
+
+    const newCompany = await db.insert(db.companies).values({
+      name: sanitizedName,
+      description: sanitizedDescription,
+      website: sanitizedWebsite,
+      industry: sanitizedIndustry,
+      slug: sanitizedName.toLowerCase().replace(/\s+/g, '-'),
+      ownerId: req.user.userId,
+      createdAt: new Date(),
+    }).returning();
+
+    res.status(201).json(newCompany[0]);
+  } catch (error) {
+    console.error('Create company error:', error);
+    res.status(500).json({ message: 'Failed to create company' });
+  }
+});
+
+// Update company information
+companyRoutes.patch("/", authenticateToken, requireRole(["Owner", "Administrator"]), async (req: any, res) => {
+  try {
+    const validatedData = updateCompanySchema.parse(req.body);
+    const { name, description, website, industry } = validatedData;
+
+    const company = await db.query.companies.findFirst({
+      where: sql`${db.companies.id} = ${req.user.tenantId}`,
+    });
+
+    if (!company) {
+      return res.status(404).json({ message: 'Company not found' });
+    }
+
+    const updateData: any = {
+      updatedAt: new Date(),
+    };
+
+    if (name !== undefined) {
+      const sanitizedName = sanitizeString(name);
+      
+      // Check if new name is already taken by another company
+      const existingCompany = await db.query.companies.findFirst({
+        where: sql`${db.companies.name} = ${sanitizedName} AND ${db.companies.id} != ${req.user.tenantId}`,
+      });
+
+      if (existingCompany) {
+        return res.status(400).json({ message: 'Company name already exists' });
+      }
+
+      updateData.name = sanitizedName;
+      updateData.slug = sanitizedName.toLowerCase().replace(/\s+/g, '-');
+    }
+
+    if (description !== undefined) {
+      updateData.description = description ? sanitizeString(description) : null;
+    }
+
+    if (website !== undefined) {
+      updateData.website = website ? sanitizeString(website) : null;
+    }
+
+    if (industry !== undefined) {
+      updateData.industry = industry ? sanitizeString(industry) : null;
+    }
+
+    const updatedCompany = await db.update(db.companies)
+      .set(updateData)
+      .where(sql`${db.companies.id} = ${req.user.tenantId}`)
+      .returning();
+
+    res.json(updatedCompany[0]);
+  } catch (error) {
+    console.error('Update company error:', error);
+    res.status(500).json({ message: 'Failed to update company information' });
+  }
+});
+
+// Get company statistics
+companyRoutes.get("/stats", authenticateToken, async (req: any, res) => {
+  try {
+    const [
+      userStats,
+      formStats,
+      responseStats,
+    ] = await Promise.all([
+      // User statistics
+      db.select({
+        totalUsers: sql<number>`count(*)`,
+        activeUsers: sql<number>`count(*) filter (where last_login > current_date - interval '30 days')`,
+        newUsers: sql<number>`count(*) filter (where created_at > current_date - interval '30 days')`,
+      }).from(db.users).where(sql`${users.tenantId} = ${req.user.tenantId}`),
+
+      // Form statistics
+      db.select({
+        totalForms: sql<number>`count(*)`,
+        publishedForms: sql<number>`count(*) filter (where published = true)`,
+        draftForms: sql<number>`count(*) filter (where published = false)`,
+        newForms: sql<number>`count(*) filter (where created_at > current_date - interval '30 days')`,
+      }).from(db.forms).where(sql`${db.forms.companyId} = ${req.user.tenantId}`),
+
+      // Response statistics
+      db.select({
+        totalResponses: sql<number>`count(*)`,
+        responsesToday: sql<number>`count(*) filter (where submitted_at >= current_date)`,
+        responsesThisWeek: sql<number>`count(*) filter (where submitted_at >= current_date - interval '7 days')`,
+        responsesThisMonth: sql<number>`count(*) filter (where submitted_at >= current_date - interval '30 days')`,
+      }).from(db.formResponses)
+        .innerJoin(db.forms, sql`${db.forms.id} = ${db.formResponses.formId}`)
+        .where(sql`${db.forms.companyId} = ${req.user.tenantId}`),
+    ]);
+
+    res.json({
+      users: userStats[0],
+      forms: formStats[0],
+      responses: responseStats[0],
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Get company stats error:', error);
+    res.status(500).json({ message: 'Failed to get company statistics' });
+  }
+});
+
+// Get company users
+companyRoutes.get("/users", authenticateToken, async (req: any, res) => {
+  try {
+    const { page = 1, limit = 50, role, search } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+
+    let whereClause = sql`${users.tenantId} = ${req.user.tenantId}`;
+
+    if (role) {
+      whereClause = sql`${whereClause} AND ${users.role} = ${role}`;
+    }
+
+    if (search) {
+      const sanitizedSearch = sanitizeString(search as string);
+      whereClause = sql`${whereClause} AND (
+        ${users.email} ILIKE ${`%${sanitizedSearch}%`} OR
+        ${users.firstName} ILIKE ${`%${sanitizedSearch}%`} OR
+        ${users.lastName} ILIKE ${`%${sanitizedSearch}%`}
+      )`;
+    }
+
+    const users = await db.query.users.findMany({
+      where: whereClause,
+      columns: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        emailVerified: true,
+        twoFactorEnabled: true,
+        lastLogin: true,
+        createdAt: true,
+      },
+      orderBy: sql`${users.createdAt} DESC`,
+      limit: Number(limit),
+      offset,
+    });
+
+    const totalCount = await db.select({
+      count: sql<number>`count(*)`,
+    }).from(db.users).where(whereClause);
+
+    res.json({
+      users,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total: totalCount[0].count,
+        pages: Math.ceil(totalCount[0].count / Number(limit)),
+      },
+    });
+  } catch (error) {
+    console.error('Get company users error:', error);
+    res.status(500).json({ message: 'Failed to get company users' });
+  }
+});
+
+// Update user role within company
+companyRoutes.patch("/users/:userId/role", authenticateToken, requireRole(["Owner", "Administrator"]), async (req: any, res) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.body;
+
+    if (!role || !['Owner', 'Administrator', 'Manager', 'Employee'].includes(role)) {
+      return res.status(400).json({ message: 'Invalid role' });
+    }
+
+    // Check if user exists and belongs to the same company
+    const user = await db.query.users.findFirst({
+      where: sql`${users.id} = ${userId} AND ${users.tenantId} = ${req.user.tenantId}`,
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Prevent non-owners from promoting users to Owner role
+    if (role === 'Owner' && req.user.role !== 'Owner') {
+      return res.status(403).json({ message: 'Only owners can promote users to Owner role' });
+    }
+
+    // Prevent users from demoting themselves
+    if (userId === req.user.userId) {
+      return res.status(400).json({ message: 'Cannot change your own role' });
+    }
+
+    await db.update(users)
+      .set({
+        role,
+        updatedAt: new Date(),
+      })
+      .where(sql`${users.id} = ${userId}`);
+
+    res.json({ message: 'User role updated successfully' });
+  } catch (error) {
+    console.error('Update user role error:', error);
+    res.status(500).json({ message: 'Failed to update user role' });
+  }
+});
+
+// Remove user from company
+companyRoutes.delete("/users/:userId", authenticateToken, requireRole(["Owner", "Administrator"]), async (req: any, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Check if user exists and belongs to the same company
+    const user = await db.query.users.findFirst({
+      where: sql`${users.id} = ${userId} AND ${users.tenantId} = ${req.user.tenantId}`,
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Prevent users from removing themselves
+    if (userId === req.user.userId) {
+      return res.status(400).json({ message: 'Cannot remove yourself from the company' });
+    }
+
+    // Prevent non-owners from removing owners
+    if (user.role === 'Owner' && req.user.role !== 'Owner') {
+      return res.status(403).json({ message: 'Only owners can remove other owners' });
+    }
+
+    // Delete user (this will cascade to related records)
+    await db.delete(users)
+      .where(sql`${users.id} = ${userId}`);
+
+    res.json({ message: 'User removed from company successfully' });
+  } catch (error) {
+    console.error('Remove user error:', error);
+    res.status(500).json({ message: 'Failed to remove user from company' });
+  }
+});
