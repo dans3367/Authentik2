@@ -174,7 +174,7 @@ export default function Forms2() {
       const response = await apiRequest('GET', '/api/forms');
       return response.json();
     },
-    enabled: isAuthenticated && hasInitialized,
+    enabled: hasInitialized, // Only wait for initialization, not authentication check
     staleTime: 30000, // Cache for 30 seconds
   });
 
@@ -239,8 +239,8 @@ export default function Forms2() {
     }
   };
 
-  // Redirect unauthenticated users immediately
-  if (hasInitialized && !isAuthenticated) {
+  // Handle authentication errors after forms query fails (if any)
+  if (hasInitialized && formsError && (formsError.message?.includes('401') || formsError.message?.includes('Authentication failed'))) {
     setLocation('/auth');
     return null;
   }

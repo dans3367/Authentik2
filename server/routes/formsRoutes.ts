@@ -27,7 +27,7 @@ formsRoutes.get("/", authenticateToken, async (req: any, res) => {
       whereClause = sql`${whereClause} AND ${forms.published} = ${published === 'true'}`;
     }
 
-    const forms = await db.query.forms.findMany({
+    const formsList = await db.query.forms.findMany({
       where: whereClause,
       orderBy: sql`${forms.updatedAt} DESC`,
       limit: Number(limit),
@@ -36,10 +36,10 @@ formsRoutes.get("/", authenticateToken, async (req: any, res) => {
 
     const totalCount = await db.select({
       count: sql<number>`count(*)`,
-    }).from(db.forms).where(whereClause);
+    }).from(forms).where(whereClause);
 
     res.json({
-      forms,
+      forms: formsList,
       pagination: {
         page: Number(page),
         limit: Number(limit),

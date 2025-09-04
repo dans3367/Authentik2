@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { db } from '../db';
-import { sql } from 'drizzle-orm';
-import { type UserRole } from '@shared/schema';
+import { sql, eq } from 'drizzle-orm';
+import { type UserRole, sessions } from '@shared/schema';
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key";
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || "your-super-secret-refresh-key";
@@ -120,7 +120,7 @@ export async function verifyRefreshToken(req: Request, res: Response, next: Next
 
     // Find session
     const session = await db.query.sessions.findFirst({
-      where: sql`${db.sessions.refreshToken} = ${refreshToken}`,
+      where: eq(sessions.refreshToken, refreshToken),
       with: {
         user: {
           with: {
