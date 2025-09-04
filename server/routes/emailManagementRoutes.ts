@@ -29,21 +29,35 @@ emailManagementRoutes.get("/email-contacts", authenticateToken, async (req: any,
       whereClause = sql`${whereClause} AND ${emailContacts.status} = ${status}`;
     }
 
-    const contacts = await db.query.emailContacts.findMany({
+    const contactsData = await db.query.emailContacts.findMany({
       where: whereClause,
       with: {
-        tags: {
+        tagAssignments: {
           columns: {
             id: true,
-            name: true,
-            color: true,
+          },
+          with: {
+            tag: {
+              columns: {
+                id: true,
+                name: true,
+                color: true,
+              },
+            },
           },
         },
-        lists: {
+        listMemberships: {
           columns: {
             id: true,
-            name: true,
-            description: true,
+          },
+          with: {
+            list: {
+              columns: {
+                id: true,
+                name: true,
+                description: true,
+              },
+            },
           },
         },
       },
@@ -52,17 +66,17 @@ emailManagementRoutes.get("/email-contacts", authenticateToken, async (req: any,
       offset,
     });
 
-    const totalCount = await db.select({
+    const [totalCountResult] = await db.select({
       count: sql<number>`count(*)`,
-    }).from(db.emailContacts).where(whereClause);
+    }).from(emailContacts).where(whereClause);
 
     res.json({
-      contacts,
+      contacts: contactsData,
       pagination: {
         page: Number(page),
         limit: Number(limit),
-        total: totalCount[0].count,
-        pages: Math.ceil(totalCount[0].count / Number(limit)),
+        total: totalCountResult.count,
+        pages: Math.ceil(totalCountResult.count / Number(limit)),
       },
     });
   } catch (error) {
@@ -79,8 +93,16 @@ emailManagementRoutes.get("/email-contacts/:id", authenticateToken, async (req: 
     const contact = await db.query.emailContacts.findFirst({
       where: sql`${emailContacts.id} = ${id}`,
       with: {
-        tags: true,
-        lists: true,
+        tagAssignments: {
+          with: {
+            tag: true,
+          },
+        },
+        listMemberships: {
+          with: {
+            list: true,
+          },
+        },
       },
     });
 
