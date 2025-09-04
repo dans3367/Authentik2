@@ -10,6 +10,7 @@ import { UAParser } from 'ua-parser-js';
 import { createHash, createHmac } from 'crypto';
 import { emailService } from '../emailService';
 import { Resend } from 'resend';
+import { securityConfig } from '../config/security';
 import {
   users,
   tenants,
@@ -343,8 +344,8 @@ authRoutes.post("/login", async (req, res) => {
     const deviceInfo = getDeviceInfo(req);
 
     // Generate tokens
-    const tokenExpiry = rememberMe ? '30d' : '1d';
-    const refreshTokenExpiry = rememberMe ? '90d' : '7d';
+    const tokenExpiry = rememberMe ? securityConfig.jwt.accessTokenExpiryRememberMe : securityConfig.jwt.accessTokenExpiry;
+    const refreshTokenExpiry = rememberMe ? securityConfig.jwt.refreshTokenExpiryRememberMe : securityConfig.jwt.refreshTokenExpiry;
 
     const accessToken = jwt.sign(
       { 
@@ -375,7 +376,7 @@ authRoutes.post("/login", async (req, res) => {
       userAgent: deviceInfo.userAgent,
       ipAddress: deviceInfo.ipAddress,
       token: refreshToken,
-      expiresAt: new Date(Date.now() + (rememberMe ? 90 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000)),
+      expiresAt: new Date(Date.now() + (rememberMe ? 90 * 24 * 60 * 60 * 1000 : 15 * 60 * 1000)), // 15 minutes for non-remember-me
     });
 
     // Clear rate limit on successful login
@@ -386,14 +387,14 @@ authRoutes.post("/login", async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000,
+      maxAge: rememberMe ? 30 * 24 * 60 * 60 * 1000 : 15 * 60 * 1000, // 15 minutes for non-remember-me
     });
 
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: rememberMe ? 90 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000,
+      maxAge: rememberMe ? 90 * 24 * 60 * 60 * 1000 : 15 * 60 * 1000, // 15 minutes for non-remember-me
     });
 
     res.json({
@@ -576,6 +577,9 @@ authRoutes.post("/refresh", async (req, res) => {
       return res.status(401).json({ message: 'Invalid or expired refresh token' });
     }
 
+    // Determine if this is a remember-me session (based on refresh token expiry)
+    const isRememberMeSession = session.expiresAt.getTime() - Date.now() > 24 * 60 * 60 * 1000; // More than 1 day remaining (remember-me sessions last much longer)
+
     // Generate new access token
     const accessToken = jwt.sign(
       { 
@@ -586,7 +590,7 @@ authRoutes.post("/refresh", async (req, res) => {
         tenantSlug: session.user.tenant?.slug 
       },
       JWT_SECRET,
-      { expiresIn: '1d' }
+      { expiresIn: isRememberMeSession ? securityConfig.jwt.accessTokenExpiryRememberMe : securityConfig.jwt.accessTokenExpiry }
     );
 
     // Set new access token cookie
@@ -594,7 +598,7 @@ authRoutes.post("/refresh", async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 24 * 60 * 60 * 1000,
+      maxAge: isRememberMeSession ? 30 * 24 * 60 * 60 * 1000 : 15 * 60 * 1000, // 15 minutes for non-remember-me
     });
 
     res.json({
@@ -850,7 +854,15 @@ authRoutes.get("/refresh-token-info", async (req, res) => {
     const { refreshToken } = req.cookies;
 
     if (!refreshToken) {
-      return res.json({ hasRefreshToken: false });
+      return res.json({ 
+        hasRefreshToken: false,
+        expiresAt: '',
+        timeLeft: 0,
+        days: 0,
+        hours: 0,
+        minutes: 0,
+        isExpired: true
+      });
     }
 
     try {
@@ -860,10 +872,23 @@ authRoutes.get("/refresh-token-info", async (req, res) => {
       });
 
       if (session && session.expiresAt > new Date()) {
+        const now = new Date();
+        const expiresAt = new Date(session.expiresAt);
+        const timeLeft = expiresAt.getTime() - now.getTime();
+        
+        const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+        
         return res.json({
           hasRefreshToken: true,
           valid: true,
-          expiresAt: session.expiresAt,
+          expiresAt: session.expiresAt.toISOString(),
+          timeLeft: Math.max(0, timeLeft),
+          days: Math.max(0, days),
+          hours: Math.max(0, hours),
+          minutes: Math.max(0, minutes),
+          isExpired: false,
           userId: decoded.userId,
         });
       } else {
@@ -871,6 +896,12 @@ authRoutes.get("/refresh-token-info", async (req, res) => {
           hasRefreshToken: true,
           valid: false,
           reason: 'expired',
+          expiresAt: session?.expiresAt?.toISOString() || '',
+          timeLeft: 0,
+          days: 0,
+          hours: 0,
+          minutes: 0,
+          isExpired: true,
         });
       }
     } catch (error) {
@@ -878,11 +909,25 @@ authRoutes.get("/refresh-token-info", async (req, res) => {
         hasRefreshToken: true,
         valid: false,
         reason: 'invalid',
+        expiresAt: '',
+        timeLeft: 0,
+        days: 0,
+        hours: 0,
+        minutes: 0,
+        isExpired: true,
       });
     }
   } catch (error) {
     console.error('Refresh token info error:', error);
-    res.status(500).json({ message: 'Failed to get refresh token info' });
+    res.status(500).json({ 
+      message: 'Failed to get refresh token info',
+      expiresAt: '',
+      timeLeft: 0,
+      days: 0,
+      hours: 0,
+      minutes: 0,
+      isExpired: true
+    });
   }
 });
 
@@ -1166,21 +1211,30 @@ authRoutes.post("/forgot-password", async (req, res) => {
 // Get user sessions
 authRoutes.get("/sessions", authenticateToken, async (req: any, res) => {
   try {
+    console.log(`🔍 [Sessions API] Fetching sessions for user: ${req.user.userId}`);
+    
     const sessions = await db.query.refreshTokens.findMany({
-      where: sql`${refreshTokens.userId} = ${req.user.userId}`,
+      where: sql`${refreshTokens.userId} = ${req.user.userId} AND ${refreshTokens.expiresAt} > NOW()`,
       orderBy: sql`${refreshTokens.createdAt} DESC`,
     });
 
-    res.json(sessions.map(session => ({
-      id: session.id,
-      deviceId: session.deviceId,
-      deviceName: session.deviceName,
-      userAgent: session.userAgent,
-      ipAddress: session.ipAddress,
-      createdAt: session.createdAt,
-      expiresAt: session.expiresAt,
-      isCurrent: session.token === req.cookies.refreshToken,
-    })));
+    console.log(`📊 [Sessions API] Found ${sessions.length} active sessions`);
+
+    const response = {
+      sessions: sessions.map(session => ({
+        id: session.id,
+        deviceId: session.deviceId,
+        deviceName: session.deviceName,
+        userAgent: session.userAgent,
+        ipAddress: session.ipAddress,
+        createdAt: session.createdAt,
+        expiresAt: session.expiresAt,
+        isCurrent: session.token === req.cookies.refreshToken,
+      }))
+    };
+
+    console.log(`✅ [Sessions API] Returning response:`, JSON.stringify(response, null, 2));
+    res.json(response);
   } catch (error) {
     console.error('Get sessions error:', error);
     res.status(500).json({ message: 'Failed to get sessions' });

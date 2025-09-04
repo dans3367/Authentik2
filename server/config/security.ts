@@ -50,9 +50,10 @@ export const securityConfig = {
 
   // JWT configuration
   jwt: {
-    accessTokenExpiry: "15m",
-    refreshTokenExpiry: "7d",
-    rememberMeExpiry: "30d",
+    accessTokenExpiry: "15m", // 15 minutes for non-remember-me
+    accessTokenExpiryRememberMe: "30d", // 30 days for remember-me
+    refreshTokenExpiry: "15m", // 15 minutes for non-remember-me
+    refreshTokenExpiryRememberMe: "90d", // 90 days for remember-me
   },
 
   // Session management configuration

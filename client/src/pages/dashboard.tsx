@@ -70,18 +70,30 @@ export default function Dashboard() {
       });
       
       if (response.ok) {
-        const data: RefreshTokenInfo = await response.json();
-        if (data.isExpired) {
+        const data: RefreshTokenInfo & { hasRefreshToken?: boolean; valid?: boolean } = await response.json();
+        
+        // Handle the case where no refresh token exists
+        if (data.hasRefreshToken === false) {
+          setRefreshTokenExpiry("No Token");
+          return;
+        }
+        
+        // Handle expired or invalid tokens
+        if (data.isExpired || data.valid === false) {
           setRefreshTokenExpiry("Expired");
+          return;
+        }
+        
+        // Display time remaining
+        const { days, hours, minutes } = data;
+        if (days > 0) {
+          setRefreshTokenExpiry(`${days} day${days !== 1 ? 's' : ''}`);
+        } else if (hours > 0) {
+          setRefreshTokenExpiry(`${hours} hour${hours !== 1 ? 's' : ''}`);
+        } else if (minutes > 0) {
+          setRefreshTokenExpiry(`${minutes} minute${minutes !== 1 ? 's' : ''}`);
         } else {
-          const { days, hours, minutes } = data;
-          if (days > 0) {
-            setRefreshTokenExpiry(`${days} day${days !== 1 ? 's' : ''}`);
-          } else if (hours > 0) {
-            setRefreshTokenExpiry(`${hours} hour${hours !== 1 ? 's' : ''}`);
-          } else {
-            setRefreshTokenExpiry(`${minutes} minute${minutes !== 1 ? 's' : ''}`);
-          }
+          setRefreshTokenExpiry("< 1 minute");
         }
       } else {
         // Handle different error responses
@@ -114,9 +126,17 @@ export default function Dashboard() {
           const timeLeft = expTime - now;
           
           if (timeLeft > 0) {
-            const minutes = Math.floor(timeLeft / 60000);
-            const seconds = Math.floor((timeLeft % 60000) / 1000);
-            setTokenExpiry(`${minutes}m ${seconds}s`);
+            const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+            const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+            
+            if (hours > 0) {
+              setTokenExpiry(`${hours}h ${minutes}m ${seconds}s`);
+            } else if (minutes > 0) {
+              setTokenExpiry(`${minutes}m ${seconds}s`);
+            } else {
+              setTokenExpiry(`${seconds}s`);
+            }
           } else {
             setTokenExpiry("Expired");
           }
