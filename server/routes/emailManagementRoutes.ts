@@ -70,8 +70,24 @@ emailManagementRoutes.get("/email-contacts", authenticateToken, async (req: any,
       count: sql<number>`count(*)`,
     }).from(emailContacts).where(whereClause);
 
+    // Transform the data to match frontend expectations
+    const transformedContacts = contactsData.map(contact => {
+      // Extract and transform the relationship data
+      const tags = contact.tagAssignments?.map(assignment => assignment.tag).filter(Boolean) || [];
+      const lists = contact.listMemberships?.map(membership => membership.list).filter(Boolean) || [];
+      
+      // Remove the backend-specific relationship fields and add frontend-compatible ones
+      const { tagAssignments, listMemberships, ...contactData } = contact;
+      
+      return {
+        ...contactData,
+        tags,
+        lists,
+      };
+    });
+
     res.json({
-      contacts: contactsData,
+      contacts: transformedContacts,
       pagination: {
         page: Number(page),
         limit: Number(limit),
@@ -110,7 +126,18 @@ emailManagementRoutes.get("/email-contacts/:id", authenticateToken, async (req: 
       return res.status(404).json({ message: 'Contact not found' });
     }
 
-    res.json(contact);
+    // Transform the data to match frontend expectations
+    const tags = contact.tagAssignments?.map(assignment => assignment.tag).filter(Boolean) || [];
+    const lists = contact.listMemberships?.map(membership => membership.list).filter(Boolean) || [];
+    
+    const { tagAssignments, listMemberships, ...contactData } = contact;
+    const transformedContact = {
+      ...contactData,
+      tags,
+      lists,
+    };
+
+    res.json(transformedContact);
   } catch (error) {
     console.error('Get email contact error:', error);
     res.status(500).json({ message: 'Failed to get email contact' });
