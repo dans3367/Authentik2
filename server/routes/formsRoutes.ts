@@ -76,10 +76,10 @@ formsRoutes.get("/:id", authenticateToken, async (req: any, res) => {
 // Create new form
 formsRoutes.post("/", authenticateToken, async (req: any, res) => {
   try {
-    const { title, description, schema, settings, theme } = req.body;
+    const { title, description, formData, theme } = req.body;
 
-    if (!title || !schema) {
-      return res.status(400).json({ message: 'Title and schema are required' });
+    if (!title || !formData) {
+      return res.status(400).json({ message: 'Title and formData are required' });
     }
 
     const sanitizedTitle = sanitizeString(title);
@@ -88,13 +88,11 @@ formsRoutes.post("/", authenticateToken, async (req: any, res) => {
     const newForm = await db.insert(forms).values({
       title: sanitizedTitle,
       description: sanitizedDescription,
-      schema: JSON.stringify(schema),
-      settings: settings ? JSON.stringify(settings) : null,
-      theme: theme ? JSON.stringify(theme) : null,
+      formData: JSON.stringify(formData),
+      theme: theme || 'modern',
       tenantId: req.user.tenantId,
-      published: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      userId: req.user.userId,
+      isActive: true,
     }).returning();
 
     res.status(201).json(newForm[0]);
