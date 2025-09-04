@@ -5,13 +5,21 @@ import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMembe
 import { authenticateToken } from './authRoutes';
 import { type ContactFilters, type BouncedEmailFilters } from '@shared/schema';
 import { sanitizeString, sanitizeEmail } from '../utils/sanitization';
+import { storage } from '../storage';
 
 export const emailManagementRoutes = Router();
 
 // Get email contacts
 emailManagementRoutes.get("/email-contacts", authenticateToken, async (req: any, res) => {
   try {
-    const { page = 1, limit = 50, search, tags, lists, status } = req.query;
+    const { page = 1, limit = 50, search, tags, lists, status, statsOnly } = req.query;
+    
+    // If statsOnly is requested, return only statistics
+    if (statsOnly === 'true') {
+      const stats = await storage.getEmailContactStats(req.user.tenantId);
+      return res.json({ stats });
+    }
+    
     const offset = (Number(page) - 1) * Number(limit);
 
     let whereClause = sql`1=1`;
