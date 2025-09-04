@@ -18,6 +18,7 @@ import { campaignRoutes } from "./routes/campaignRoutes";
 import { webhookRoutes } from "./routes/webhookRoutes";
 import { devRoutes } from "./routes/devRoutes";
 import { emailRoutes } from "./routes/emailRoutes";
+import { userRoutes } from "./routes/userRoutes";
 
 // Import middleware
 import { authRateLimiter, apiRateLimiter } from "./middleware/security";
@@ -46,6 +47,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/webhooks", webhookRoutes);
   app.use("/api/dev", devRoutes);
   app.use("/api/email", emailRoutes);
+  app.use("/api/users", userRoutes);
 
   // Legacy routes for backward compatibility (if needed)
   // These can be removed once all clients are updated

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import { users, refreshTokens, tenants } from '@shared/schema';
+import { users, refreshTokens, tenants, companies, forms } from '@shared/schema';
 import { authenticateToken, requireRole } from './authRoutes';
 import { SessionCleanupService } from '../services/sessionCleanup';
 
@@ -162,7 +162,7 @@ adminRoutes.get("/users", authenticateToken, requireRole('Administrator'), async
     const { page = 1, limit = 50, role, emailVerified, search } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
-    let whereClause = sql`1=1`;
+    let whereClause = sql`${users.tenantId} = ${req.user.tenantId}`;
 
     if (role) {
       whereClause = sql`${whereClause} AND ${users.role} = ${role}`;
@@ -180,10 +180,10 @@ adminRoutes.get("/users", authenticateToken, requireRole('Administrator'), async
       )`;
     }
 
-    const users = await db.query.users.findMany({
+    const userResults = await db.query.users.findMany({
       where: whereClause,
       with: {
-        company: {
+        tenant: {
           columns: {
             id: true,
             name: true,
@@ -198,10 +198,10 @@ adminRoutes.get("/users", authenticateToken, requireRole('Administrator'), async
 
     const totalCount = await db.select({
       count: sql<number>`count(*)`,
-    }).from(db.users).where(whereClause);
+    }).from(users).where(whereClause);
 
     res.json({
-      users: users.map(user => ({
+      users: userResults.map(user => ({
         id: user.id,
         email: user.email,
         firstName: user.firstName,
@@ -209,10 +209,10 @@ adminRoutes.get("/users", authenticateToken, requireRole('Administrator'), async
         role: user.role,
         emailVerified: user.emailVerified,
         twoFactorEnabled: user.twoFactorEnabled,
-        companyId: user.companyId,
-        company: user.company,
+        tenantId: user.tenantId,
+        tenant: user.tenant,
         createdAt: user.createdAt,
-        lastLogin: user.lastLogin,
+        lastLogin: user.lastLoginAt,
       })),
       pagination: {
         page: Number(page),
@@ -306,7 +306,7 @@ adminRoutes.get("/stats", authenticateToken, requireRole('Administrator'), async
         verifiedUsers: sql<number>`count(*) filter (where email_verified = true)`,
         unverifiedUsers: sql<number>`count(*) filter (where email_verified = false)`,
         twoFactorUsers: sql<number>`count(*) filter (where two_factor_enabled = true)`,
-      }).from(db.users),
+      }).from(users),
 
       // Session statistics
       db.select({
@@ -318,14 +318,14 @@ adminRoutes.get("/stats", authenticateToken, requireRole('Administrator'), async
       // Company statistics
       db.select({
         totalCompanies: sql<number>`count(*)`,
-      }).from(db.companies),
+      }).from(companies),
 
       // Form statistics
       db.select({
         totalForms: sql<number>`count(*)`,
         publishedForms: sql<number>`count(*) filter (where published = true)`,
         draftForms: sql<number>`count(*) filter (where published = false)`,
-      }).from(db.forms),
+      }).from(forms),
     ]);
 
     res.json({
@@ -415,7 +415,7 @@ adminRoutes.get("/health", authenticateToken, requireRole('Administrator'), asyn
   try {
     const healthChecks = await Promise.allSettled([
       // Database connectivity
-      db.select({ count: sql<number>`count(*)` }).from(db.users),
+      db.select({ count: sql<number>`count(*)` }).from(users),
       
       // Session cleanup service
       Promise.resolve(new SessionCleanupService().getStatus()),
