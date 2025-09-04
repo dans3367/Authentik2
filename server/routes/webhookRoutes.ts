@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import { authenticateToken } from './authRoutes';
+import { authenticateToken } from '../middleware/auth';
 import { createHmac } from 'crypto';
 
 export const webhookRoutes = Router();

@@ -19,8 +19,7 @@ interface FormData {
 }
 
 export default function EditForm() {
-  const { isAuthenticated, isLoading: authLoading } = useReduxAuth();
-  const { hasInitialized } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, isInitialized } = useReduxAuth();
   const [, setLocation] = useLocation();
   const [match, params] = useRoute('/forms/:id/edit');
   const formId = params?.id;
@@ -33,17 +32,17 @@ export default function EditForm() {
       const result = await response.json();
       return result.form as FormData;
     },
-    enabled: isAuthenticated && hasInitialized && !!formId,
+    enabled: isAuthenticated && isInitialized && !!formId,
   });
 
   // Redirect unauthenticated users immediately
-  if (hasInitialized && !isAuthenticated) {
+  if (isInitialized && !isAuthenticated) {
     setLocation('/auth');
     return null;
   }
 
   // Show loading while authentication is being determined
-  if (!hasInitialized || authLoading) {
+  if (!isInitialized || authLoading) {
     return (
       <div className="min-h-screen p-6 flex items-center justify-center">
         <div className="flex items-center justify-center">

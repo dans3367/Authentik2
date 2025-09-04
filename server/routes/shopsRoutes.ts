@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { users, shops } from '@shared/schema';
-import { authenticateToken, requireRole } from './authRoutes';
+import { authenticateToken, requireRole } from '../middleware/auth';
 import { createShopSchema, updateShopSchema, type ShopFilters } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 

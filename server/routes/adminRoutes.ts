@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { users, refreshTokens, tenants, companies, forms } from '@shared/schema';
-import { authenticateToken, requireRole } from './authRoutes';
+import { authenticateToken, requireRole } from '../middleware/auth';
 import { SessionCleanupService } from '../services/sessionCleanup';
 
 export const adminRoutes = Router();

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments } from '@shared/schema';
-import { authenticateToken } from './authRoutes';
+import { authenticateToken } from '../middleware/auth';
 import { type ContactFilters, type BouncedEmailFilters } from '@shared/schema';
 import { sanitizeString, sanitizeEmail } from '../utils/sanitization';
 import { storage } from '../storage';

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, and, like, desc } from 'drizzle-orm';
-import { authenticateToken } from './authRoutes';
+import { authenticateToken } from '../middleware/auth';
 import { createNewsletterSchema, updateNewsletterSchema, newsletters } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 import { emailService } from '../emailService';

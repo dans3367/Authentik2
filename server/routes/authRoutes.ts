@@ -41,6 +41,7 @@ import { authRateLimiter } from '../middleware/security';
 import { avatarUpload, handleUploadError } from '../middleware/upload';
 import { R2_CONFIG, uploadToR2, deleteFromR2 } from '../config/r2';
 import sharp from 'sharp';
+import { authenticateToken, requireRole } from '../middleware/auth';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -81,41 +82,6 @@ function getDeviceInfo(req: any): {
   };
 }
 
-// Middleware to verify JWT token
-function authenticateToken(req: any, res: any, next: any) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ message: 'Access token required' });
-  }
-
-  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
-    if (err) {
-      return res.status(403).json({ message: 'Invalid or expired token' });
-    }
-    req.user = user;
-    next();
-  });
-}
-
-// Middleware to check user permissions
-function requireRole(allowedRoles: UserRole | UserRole[]) {
-  return (req: any, res: any, next: any) => {
-    if (!req.user) {
-      return res.status(401).json({ message: 'Authentication required' });
-    }
-
-    const userRole = req.user.role;
-    const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
-
-    if (!roles.includes(userRole)) {
-      return res.status(403).json({ message: 'Insufficient permissions' });
-    }
-
-    next();
-  };
-}
 
 // Register endpoint - Disabled for multi-tenant system
 // Users should be invited by organization owners

@@ -290,8 +290,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
 
 export default function ProfilePage() {
   const [, setLocation] = useLocation();
-  const { user, isLoading: authLoading, isAuthenticated } = useReduxAuth();
-  const { hasInitialized } = useAuth();
+  const { user, isLoading: authLoading, isAuthenticated, isInitialized } = useReduxAuth();
   const { toast } = useToast();
   
   // All hooks must be called before any conditional returns
@@ -311,7 +310,7 @@ export default function ProfilePage() {
   // Check if user already has a subscription
   const { data: userSubscription, isLoading: subscriptionLoading } = useQuery<UserSubscriptionResponse>({
     queryKey: ['/api/my-subscription'],
-    enabled: hasInitialized && !!user && !authLoading && user?.role === 'Owner',
+    enabled: isInitialized && !!user && !authLoading && user?.role === 'Owner',
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 60 * 1000, // 1 minute
   });

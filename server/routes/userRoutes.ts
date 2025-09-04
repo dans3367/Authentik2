@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateToken, requireRole } from './authRoutes';
+import { authenticateToken, requireRole } from '../middleware/auth';
 import { storage } from '../storage';
 import { db } from '../db';
 import { users, subscriptionPlans } from '@shared/schema';

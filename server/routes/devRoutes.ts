@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { users, tenants } from '@shared/schema';
-import { authenticateToken } from './authRoutes';
+import { authenticateToken } from '../middleware/auth';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 

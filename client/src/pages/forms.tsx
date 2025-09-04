@@ -157,8 +157,7 @@ const getThemePreviewContent = (themeId: string) => {
 };
 
 export default function Forms2() {
-  const { isAuthenticated, isLoading: authLoading } = useReduxAuth();
-  const { hasInitialized } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, isInitialized } = useReduxAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -174,7 +173,7 @@ export default function Forms2() {
       const response = await apiRequest('GET', '/api/forms');
       return response.json();
     },
-    enabled: hasInitialized, // Only wait for initialization, not authentication check
+    enabled: isAuthenticated && isInitialized, // Wait for both authentication and initialization
     staleTime: 30000, // Cache for 30 seconds
   });
 
@@ -240,13 +239,13 @@ export default function Forms2() {
   };
 
   // Handle authentication errors after forms query fails (if any)
-  if (hasInitialized && formsError && (formsError.message?.includes('401') || formsError.message?.includes('Authentication failed'))) {
+  if (isInitialized && formsError && (formsError.message?.includes('401') || formsError.message?.includes('Authentication failed'))) {
     setLocation('/auth');
     return null;
   }
 
   // Show loading while authentication is being determined
-  if (!hasInitialized || authLoading) {
+  if (!isInitialized || authLoading) {
     return (
       <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
         <div className="max-w-7xl mx-auto">
