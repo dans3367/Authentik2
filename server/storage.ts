@@ -90,7 +90,7 @@ import {
   type BouncedEmailFilters
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gt, lt, gte, lte, desc, ne, or, ilike, count, sql, inArray } from "drizzle-orm";
+import { eq, and, gt, lt, gte, lte, desc, ne, or, ilike, count, sql, inArray, not } from "drizzle-orm";
 
 export interface DeviceInfo {
   deviceId?: string;
@@ -146,6 +146,17 @@ export interface IStorage {
   deleteAllUserSessions(userId: string, tenantId: string): Promise<void>;
   deleteOtherUserSessions(userId: string, currentRefreshToken: string, tenantId: string): Promise<void>;
   refreshTokenExists(refreshTokenId: string, tenantId: string): Promise<boolean>;
+  
+  // Advanced session management
+  getSessionStats(): Promise<{
+    totalActiveSessions: number;
+    expiredSessions: number;
+    inactiveSessions: number;
+    sessionsByTenant: { tenantId: string; count: number }[];
+  }>;
+  cleanInactiveSessions(inactivityDays: number): Promise<number>;
+  enforceUserSessionLimit(userId: string, tenantId: string, maxSessions: number): Promise<number>;
+  getAllSessions(tenantId?: string): Promise<RefreshToken[]>;
   
   // Email verification (tenant-aware)
   setEmailVerificationToken(userId: string, tenantId: string, token: string, expiresAt: Date): Promise<void>;
@@ -583,6 +594,145 @@ export class DatabaseStorage implements IStorage {
       ))
       .limit(1);
     return !!token;
+  }
+
+  // Advanced session management methods
+  async getSessionStats(): Promise<{
+    totalActiveSessions: number;
+    expiredSessions: number;
+    inactiveSessions: number;
+    sessionsByTenant: { tenantId: string; count: number }[];
+  }> {
+    const now = new Date();
+    const thirtyDaysAgo = new Date(Date.now() - (30 * 24 * 60 * 60 * 1000));
+
+    // Total active sessions
+    const [totalActiveResult] = await db
+      .select({ count: count(refreshTokens.id) })
+      .from(refreshTokens)
+      .where(eq(refreshTokens.isActive, true));
+
+    // Expired sessions
+    const [expiredResult] = await db
+      .select({ count: count(refreshTokens.id) })
+      .from(refreshTokens)
+      .where(
+        and(
+          eq(refreshTokens.isActive, true),
+          lt(refreshTokens.expiresAt, now)
+        )
+      );
+
+    // Inactive sessions (not used in 30 days)
+    const [inactiveResult] = await db
+      .select({ count: count(refreshTokens.id) })
+      .from(refreshTokens)
+      .where(
+        and(
+          eq(refreshTokens.isActive, true),
+          lt(refreshTokens.lastUsed, thirtyDaysAgo)
+        )
+      );
+
+    // Sessions by tenant
+    const sessionsByTenant = await db
+      .select({
+        tenantId: refreshTokens.tenantId,
+        count: count(refreshTokens.id),
+      })
+      .from(refreshTokens)
+      .where(eq(refreshTokens.isActive, true))
+      .groupBy(refreshTokens.tenantId);
+
+    return {
+      totalActiveSessions: totalActiveResult.count,
+      expiredSessions: expiredResult.count,
+      inactiveSessions: inactiveResult.count,
+      sessionsByTenant,
+    };
+  }
+
+  async cleanInactiveSessions(inactivityDays: number): Promise<number> {
+    const inactivityCutoff = new Date(
+      Date.now() - (inactivityDays * 24 * 60 * 60 * 1000)
+    );
+
+    const result = await db
+      .delete(refreshTokens)
+      .where(
+        and(
+          lt(refreshTokens.lastUsed, inactivityCutoff),
+          eq(refreshTokens.isActive, true)
+        )
+      );
+
+    return result.rowCount || 0;
+  }
+
+  async enforceUserSessionLimit(userId: string, tenantId: string, maxSessions: number): Promise<number> {
+    // Get current session count for user
+    const [sessionCount] = await db
+      .select({ count: count(refreshTokens.id) })
+      .from(refreshTokens)
+      .where(
+        and(
+          eq(refreshTokens.userId, userId),
+          eq(refreshTokens.tenantId, tenantId),
+          eq(refreshTokens.isActive, true),
+          gt(refreshTokens.expiresAt, new Date())
+        )
+      );
+
+    if (sessionCount.count <= maxSessions) {
+      return 0; // No sessions to remove
+    }
+
+    const excessCount = sessionCount.count - maxSessions;
+
+    // Get the oldest sessions to remove
+    const oldestSessions = await db
+      .select({ id: refreshTokens.id })
+      .from(refreshTokens)
+      .where(
+        and(
+          eq(refreshTokens.userId, userId),
+          eq(refreshTokens.tenantId, tenantId),
+          eq(refreshTokens.isActive, true),
+          gt(refreshTokens.expiresAt, new Date())
+        )
+      )
+      .orderBy(refreshTokens.lastUsed)
+      .limit(excessCount);
+
+    if (oldestSessions.length > 0) {
+      const sessionIds = oldestSessions.map(s => s.id);
+      const result = await db
+        .delete(refreshTokens)
+        .where(inArray(refreshTokens.id, sessionIds));
+
+      return result.rowCount || 0;
+    }
+
+    return 0;
+  }
+
+  async getAllSessions(tenantId?: string): Promise<RefreshToken[]> {
+    if (tenantId) {
+      return await db
+        .select()
+        .from(refreshTokens)
+        .where(and(
+          eq(refreshTokens.isActive, true),
+          eq(refreshTokens.tenantId, tenantId)
+        ))
+        .orderBy(desc(refreshTokens.lastUsed));
+    } else {
+      return await db
+        .select()
+        .from(refreshTokens)
+        .where(eq(refreshTokens.isActive, true))
+        .orderBy(desc(refreshTokens.lastUsed));
+    }
   }
 
   // Email verification methods (tenant-aware)

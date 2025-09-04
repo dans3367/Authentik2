@@ -61,6 +61,8 @@ import {
 import { authRateLimiter, apiRateLimiter } from "./middleware/security";
 import { avatarUpload, handleUploadError } from "./middleware/upload";
 import { R2_CONFIG, uploadToR2, deleteFromR2 } from "./config/r2";
+import { securityConfig } from "./config/security.js";
+import { SessionCleanupService } from "./services/sessionCleanup.js";
 import sharp from "sharp";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key";
@@ -232,17 +234,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.use(cookieParser());
 
-  // Clean up expired tokens periodically
-  setInterval(
-    async () => {
-      try {
-        await storage.cleanExpiredTokens();
-      } catch (error) {
-        console.error("Failed to clean expired tokens:", error);
-      }
-    },
-    24 * 60 * 60 * 1000,
-  ); // Once per day
+  // Initialize and start session cleanup service
+  const sessionCleanupService = new SessionCleanupService(storage, {
+    ...securityConfig.sessionManagement,
+  });
+  
+  if (securityConfig.sessionManagement.automaticCleanup) {
+    sessionCleanupService.start();
+    console.log('[SessionManagement] Automatic session cleanup service started');
+  }
+  
+  // Store the service instance for admin endpoints to access cleanup stats
+  (app as any).sessionCleanupService = sessionCleanupService;
 
   // DEPRECATED: Regular registration endpoint - use /api/auth/register-owner instead
   // This endpoint is kept for backward compatibility but should not be used for new registrations
@@ -2063,6 +2066,157 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "All other sessions logged out successfully" });
     } catch (error) {
       console.error("Delete all sessions error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ============================================================================
+  // Session Management Admin Endpoints (require admin role)
+  // ============================================================================
+
+  // Get session statistics (admin only)  
+  app.get("/api/admin/sessions/stats", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
+    try {
+      const stats = await storage.getSessionStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Get session stats error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get cleanup service status and last cleanup stats (admin only)
+  app.get("/api/admin/sessions/cleanup/status", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
+    try {
+      const cleanupService = (app as any).sessionCleanupService;
+      
+      if (!cleanupService) {
+        return res.status(500).json({ message: "Session cleanup service not initialized" });
+      }
+
+      const lastStats = cleanupService.getLastCleanupStats();
+      const isActive = cleanupService.isActive();
+
+      res.json({
+        isActive,
+        lastCleanupStats: lastStats,
+        serviceAvailable: true
+      });
+    } catch (error) {
+      console.error("Get cleanup status error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get all sessions with optional tenant filter (admin only)
+  app.get("/api/admin/sessions", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
+    try {
+      const { tenantId } = req.query;
+      const sessions = await storage.getAllSessions(tenantId as string);
+      
+      const sessionData = sessions.map((session) => ({
+        id: session.id,
+        userId: session.userId,
+        tenantId: session.tenantId,
+        deviceId: session.deviceId,
+        deviceName: session.deviceName || "Unknown Device",
+        ipAddress: session.ipAddress,
+        location: session.location,
+        lastUsed: session.lastUsed,
+        createdAt: session.createdAt,
+        expiresAt: session.expiresAt,
+        isActive: session.isActive,
+        userAgent: session.userAgent,
+      }));
+
+      res.json({ 
+        sessions: sessionData,
+        total: sessionData.length 
+      });
+    } catch (error) {
+      console.error("Get all sessions error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Manual cleanup trigger (admin only)
+  app.post("/api/admin/sessions/cleanup", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
+    try {
+      const { 
+        cleanExpiredTokens = true,
+        cleanInactiveSessions = true,
+        inactivityDays = 30,
+        enforceSessionLimits = false,
+        maxSessionsPerUser = 10
+      } = req.body;
+
+      let totalCleaned = 0;
+      const results: any = {};
+
+      // Clean expired tokens
+      if (cleanExpiredTokens) {
+        await storage.cleanExpiredTokens();
+        results.expiredTokensCleanup = "completed";
+      }
+
+      // Clean inactive sessions  
+      if (cleanInactiveSessions) {
+        const inactiveCount = await storage.cleanInactiveSessions(inactivityDays);
+        results.inactiveSessionsRemoved = inactiveCount;
+        totalCleaned += inactiveCount;
+      }
+
+      // Enforce session limits (if requested)
+      if (enforceSessionLimits) {
+        // This would need to be implemented per user - for now just document it
+        results.sessionLimitsEnforced = "Not implemented in manual cleanup - use automatic service";
+      }
+
+      res.json({
+        message: "Session cleanup completed",
+        totalCleaned,
+        results,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Manual session cleanup error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Delete sessions by criteria (admin only)
+  app.delete("/api/admin/sessions", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
+    try {
+      const { 
+        userId, 
+        tenantId, 
+        olderThanDays,
+        deviceId 
+      } = req.body;
+
+      if (!userId && !tenantId && !olderThanDays && !deviceId) {
+        return res.status(400).json({ 
+          message: "At least one criteria must be provided (userId, tenantId, olderThanDays, or deviceId)" 
+        });
+      }
+
+      let deletedCount = 0;
+
+      if (olderThanDays) {
+        deletedCount = await storage.cleanInactiveSessions(olderThanDays);
+      } else if (userId && tenantId) {
+        await storage.deleteAllUserSessions(userId, tenantId);
+        // We don't get a count back from this method, so estimate
+        deletedCount = 1; // At least one session deleted
+      }
+
+      res.json({
+        message: "Sessions deleted successfully",
+        deletedCount,
+        criteria: { userId, tenantId, olderThanDays, deviceId }
+      });
+    } catch (error) {
+      console.error("Delete sessions by criteria error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });

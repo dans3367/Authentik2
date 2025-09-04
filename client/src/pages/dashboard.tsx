@@ -10,6 +10,7 @@ import { authManager } from "@/lib/auth";
 import { Shield, Users, Clock, TrendingUp, LogOut, RefreshCw, Settings, CreditCard, Calendar, Mail, Send, Eye, MousePointer, FileText, User } from "lucide-react";
 import { useLocation } from "wouter";
 import { NewsletterCard } from "@/components/ui/newsletter-card";
+import { HighlightsCard } from "@/components/ui/highlights-card";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
@@ -177,7 +178,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:bg-gradient-to-br dark:from-slate-800 dark:via-slate-700 dark:to-slate-800">
+    <div className="min-h-screen bg-white dark:bg-slate-800">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* Page Header with Free Trial Panel */}
         <div className="space-y-4">
@@ -203,9 +204,17 @@ export default function Dashboard() {
         {/* Add minimal spacer after the header section */}
         <div className="h-3"></div>
 
-        {/* Newsletter Creation Card */}
-        <div className="max-w-xl">
-          <NewsletterCard />
+        {/* Newsletter Creation and Highlights Cards */}
+        <div className="flex flex-col lg:flex-row gap-6 max-w-7xl w-full">
+          {/* Swift Setup - Wider */}
+          <div className="flex-[2]">
+            <NewsletterCard />
+          </div>
+          
+          {/* Highlights - Narrower */}
+          <div className="flex-[1]">
+            <HighlightsCard />
+          </div>
         </div>
       </div>
 
@@ -352,177 +361,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
-
-        {/* Stats Grid - Modern Card Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-          {/* Website Traffic - Yellow Card */}
-          <Card className="bg-yellow-400 dark:bg-yellow-400 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300 relative overflow-hidden">
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-black">Website traffic</h3>
-                  <Button size="sm" variant="ghost" className="text-black hover:bg-black/10 text-xs">
-                    More
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-4xl font-bold text-black">12k</div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                        <span className="text-black">Social Media</span>
-                      </div>
-                      <span className="text-black font-medium">78%</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-yellow-600 rounded-full"></div>
-                        <span className="text-black">Organic Search</span>
-                      </div>
-                      <span className="text-black font-medium">22%</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Full Report - Dark Card */}
-          <Card className="bg-slate-800 dark:bg-slate-900 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-white">Full Report</h3>
-                  <div className="text-sm text-gray-400">/ 2023</div>
-                </div>
-                <div className="flex items-center justify-center h-32">
-                  <div className="w-24 h-24 border-4 border-gray-600 rounded-full flex items-center justify-center relative">
-                    <div className="absolute inset-0 border-4 border-blue-500 rounded-full" style={{clipPath: 'polygon(0 0, 50% 0, 50% 100%, 0 100%)'}}></div>
-                    <TrendingUp className="w-8 h-8 text-white" />
-                  </div>
-                </div>
-                <Button className="w-full bg-slate-700 hover:bg-slate-600 text-white border-0 rounded-2xl">
-                  <FileText className="w-4 h-4 mr-2" />
-                  Download Report
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Bounce Rate - Light Card */}
-          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-black">Bounce Rate</h3>
-                  <TrendingUp className="w-5 h-5 text-black" />
-                </div>
-                <div className="flex items-center justify-center space-x-2 py-4">
-                  <div className="flex space-x-1">
-                    <div className="w-8 h-8 bg-gray-300 rounded-lg flex items-center justify-center text-black text-sm font-medium">2</div>
-                    <div className="w-8 h-8 bg-yellow-400 rounded-lg flex items-center justify-center text-black text-sm font-medium">3</div>
-                    <div className="w-8 h-8 bg-gray-300 rounded-lg flex items-center justify-center text-black text-sm font-medium">4</div>
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-4xl font-bold text-black">23%</div>
-                  <div className="text-sm text-gray-600 flex items-center justify-center gap-1">
-                    <span className="text-red-500">-10%</span>
-                    <span>Since last day</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Open Rate - Light Card */}
-          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-black">Customer Churn Rate</h3>
-                  <div className="bg-purple-500 rounded-full px-3 py-1 text-xs text-white font-medium">12.3%</div>
-                </div>
-                <div className="h-20 flex items-end justify-center space-x-1">
-                  {[40, 60, 20, 80, 45, 90, 30, 70].map((height, index) => (
-                    <div
-                      key={index}
-                      className={`w-6 rounded-t-lg ${index === 5 ? 'bg-yellow-400' : 'bg-gray-400'}`}
-                      style={{ height: `${height}%` }}
-                    ></div>
-                  ))}
-                </div>
-                <div className="flex items-center justify-between text-xs text-gray-600">
-                  <span>20-100</span>
-                  <span>100-200</span>
-                  <span>200-300</span>
-                  <span>+500</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Secondary Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* ROI - Dark Card with Chart */}
-          <Card className="bg-slate-800 dark:bg-slate-900 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-yellow-400" />
-                    <h3 className="text-lg font-semibold text-white">ROI</h3>
-                  </div>
-                  <Button size="sm" variant="ghost" className="text-gray-400 hover:bg-white/10 text-xs">
-                    Details
-                  </Button>
-                </div>
-                <div>
-                  <div className="text-4xl font-bold text-white">283%</div>
-                  <div className="text-sm text-gray-400 mt-1">Return On Investment</div>
-                </div>
-                <div className="h-20 flex items-end">
-                  <svg viewBox="0 0 200 60" className="w-full h-full">
-                    <path 
-                      d="M0,50 Q50,30 100,35 T200,20" 
-                      stroke="#eab308" 
-                      strokeWidth="3" 
-                      fill="none"
-                      className="drop-shadow-sm"
-                    />
-                    <circle cx="180" cy="25" r="4" fill="#eab308" />
-                  </svg>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* API Requests - Light Card */}
-          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-black">API Requests</h3>
-                  <Settings className="w-5 h-5 text-black" />
-                </div>
-                <div className="text-center py-8">
-                  <img 
-                    src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIHJ4PSIyMCIgZmlsbD0iIzM3NDE1MSIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+V2ViIFNjb3JlPC90ZXh0Pjx0ZXh0IHg9IjUwIiB5PSIzNSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC13ZWlnaHQ9ImJvbGQiPkFJPC90ZXh0Pjwvc3ZnPg=="
-                    alt="API Demo" 
-                    className="w-24 h-24 mx-auto rounded-2xl"
-                  />
-                </div>
-                <Button className="w-full bg-yellow-400 hover:bg-yellow-500 text-black border-0 rounded-2xl font-semibold">
-                  Web Score with AI
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
       </div>
-      </div>
+    </div>
     );
   }

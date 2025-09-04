@@ -55,6 +55,28 @@ export const securityConfig = {
     rememberMeExpiry: "30d",
   },
 
+  // Session management configuration
+  sessionManagement: {
+    // Cleanup intervals
+    cleanupIntervalMinutes: parseInt(process.env.SESSION_CLEANUP_INTERVAL_MINUTES || "60"),
+    
+    // Session limits
+    maxSessionsPerUser: parseInt(process.env.MAX_SESSIONS_PER_USER || "10"),
+    inactivityTimeoutDays: parseInt(process.env.SESSION_INACTIVITY_TIMEOUT_DAYS || "30"),
+    
+    // Cleanup options
+    cleanExpiredTokens: process.env.CLEAN_EXPIRED_TOKENS !== "false",
+    cleanInactiveSessions: process.env.CLEAN_INACTIVE_SESSIONS !== "false", 
+    enforceSessionLimits: process.env.ENFORCE_SESSION_LIMITS !== "false",
+    
+    // Logging
+    enableCleanupLogs: process.env.ENABLE_SESSION_CLEANUP_LOGS !== "false",
+    
+    // Advanced options
+    automaticCleanup: process.env.AUTOMATIC_SESSION_CLEANUP !== "false",
+    cleanupOnStartup: process.env.CLEANUP_ON_STARTUP !== "false",
+  },
+
   // Password policy
   passwordPolicy: {
     minLength: 8,

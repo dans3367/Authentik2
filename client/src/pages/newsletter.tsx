@@ -396,7 +396,7 @@ export default function NewsletterPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:bg-gradient-to-br dark:from-slate-800 dark:via-slate-700 dark:to-slate-800">
         <div className="container mx-auto p-6">
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-red-200/50 dark:border-red-700/30 rounded-3xl">
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-red-200/50 dark:border-red-700/30 rounded-2xl">
             <CardContent className="p-12 text-center">
               <div className="w-20 h-20 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
                 <AlertTriangle className="h-10 w-10 text-red-600 dark:text-red-400" />
@@ -426,71 +426,91 @@ export default function NewsletterPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:bg-gradient-to-br dark:from-slate-800 dark:via-slate-700 dark:to-slate-800">
-        <div className="container mx-auto p-6">
-          <div className="flex items-center justify-center h-64">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 rounded-2xl flex items-center justify-center shadow-lg">
-              <div className="animate-spin rounded-full h-8 w-8 border-4 border-white border-t-transparent"></div>
-            </div>
-
-            {/* Search Bar Skeleton */}
-            <Card className="p-4 sm:p-6">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <Skeleton className="h-10 w-full max-w-sm" />
-                <div className="flex items-center gap-2">
-                  <Skeleton className="h-8 w-12" />
-                  <Skeleton className="h-8 w-16" />
-                  <Skeleton className="h-8 w-20" />
-                  <Skeleton className="h-8 w-14" />
-                </div>
+        <div className="max-w-7xl mx-auto p-6 space-y-6">
+          {/* Header Skeleton */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Skeleton className="h-9 w-64 mb-2" />
+                <Skeleton className="h-5 w-96" />
               </div>
-            </Card>
-
-            {/* Stats Cards Skeleton */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Card key={i}>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-24" />
-                        <Skeleton className="h-8 w-12" />
-                      </div>
-                      <Skeleton className="h-12 w-12 rounded-lg" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {/* Newsletter List Skeleton */}
-            <div className="space-y-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Card key={i}>
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0 space-y-4">
-                        <div className="flex items-center gap-3">
-                          <Skeleton className="h-6 w-48" />
-                          <Skeleton className="h-5 w-16" />
-                        </div>
-                        <Skeleton className="h-4 w-full max-w-md" />
-                        <div className="flex items-center gap-6">
-                          <Skeleton className="h-4 w-20" />
-                          <Skeleton className="h-4 w-16" />
-                          <Skeleton className="h-4 w-24" />
-                          <Skeleton className="h-4 w-32" />
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 ml-6">
-                        <Skeleton className="h-9 w-9" />
-                        <Skeleton className="h-9 w-9" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-9 w-20" />
+                <Skeleton className="h-9 w-32" />
+              </div>
             </div>
           </div>
+
+          {/* Stats Cards Skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i} className="rounded-2xl">
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-6 w-32" />
+                      <Skeleton className="h-8 w-12" />
+                    </div>
+                    <Skeleton className="h-12 w-16" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-3/4" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Secondary Cards Skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <Card key={i} className="rounded-2xl">
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-6 w-40" />
+                      <Skeleton className="h-8 w-16" />
+                    </div>
+                    <Skeleton className="h-12 w-20" />
+                    <Skeleton className="h-20 w-full" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Newsletter List Skeleton */}
+          <Card className="rounded-2xl">
+            <CardContent className="p-6">
+              <div className="space-y-6">
+                {/* Table header */}
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-10 w-64" />
+                  <Skeleton className="h-8 w-24" />
+                </div>
+                
+                {/* Table rows */}
+                <div className="space-y-4">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="flex items-center justify-between p-4 border border-gray-100 dark:border-gray-700 rounded-lg">
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-5 w-48" />
+                        <Skeleton className="h-4 w-64" />
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Skeleton className="h-6 w-16" />
+                        <Skeleton className="h-8 w-8 rounded-full" />
+                        <Skeleton className="h-4 w-12" />
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-8 w-8" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -530,7 +550,7 @@ export default function NewsletterPage() {
               <Button 
                 onClick={() => setLocation('/newsletter/create')} 
                 size="sm"
-                className="h-8 sm:h-9 px-3 sm:px-4 shadow-sm text-xs sm:text-sm"
+                className="h-8 sm:h-9 px-3 sm:px-4  text-xs sm:text-sm"
               >
                 <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                 Create Newsletter
@@ -542,7 +562,7 @@ export default function NewsletterPage() {
         {/* Stats Cards - Modern Style like Dashboard */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
           {/* Total Newsletters - Yellow Card */}
-          <Card className="bg-yellow-400 dark:bg-yellow-400 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300 relative overflow-hidden">
+          <Card className="bg-yellow-400 dark:bg-yellow-400 border-0 rounded-2xl  transition-all duration-300 relative overflow-hidden">
             <CardContent className="p-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -575,7 +595,7 @@ export default function NewsletterPage() {
           </Card>
 
           {/* Draft Newsletters - Dark Card */}
-          <Card className="bg-slate-800 dark:bg-slate-900 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
+          <Card className="bg-slate-800 dark:bg-slate-900 border-0 rounded-2xl  transition-all duration-300">
             <CardContent className="p-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -597,7 +617,7 @@ export default function NewsletterPage() {
           </Card>
 
           {/* Scheduled Newsletters - Light Card */}
-          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
+          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-2xl  transition-all duration-300">
             <CardContent className="p-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -623,7 +643,7 @@ export default function NewsletterPage() {
           </Card>
 
           {/* Sent Newsletters - Light Card with Chart */}
-          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
+          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-2xl  transition-all duration-300">
             <CardContent className="p-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -648,87 +668,12 @@ export default function NewsletterPage() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Campaign Management - Light Card */}
-          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-black">Campaign Management</h3>
-                  <Mail className="w-5 h-5 text-black" />
-                </div>
-                <div className="text-center py-8">
-                  <div className="w-24 h-24 bg-slate-800 rounded-2xl flex items-center justify-center mx-auto">
-                    <Send className="w-12 h-12 text-white" />
-                  </div>
-                </div>
-                <Button className="w-full bg-yellow-400 hover:bg-yellow-500 text-black border-0 rounded-2xl font-semibold">
-                  Campaign Analytics Dashboard
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
-        {/* Secondary Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Open Rate Analytics - Dark Card with Chart */}
-          <Card className="bg-slate-800 dark:bg-slate-900 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-yellow-400" />
-                    <h3 className="text-lg font-semibold text-white">Open Rate Analytics</h3>
-                  </div>
-                  <Button size="sm" variant="ghost" className="text-gray-400 hover:bg-white/10 text-xs">
-                    Details
-                  </Button>
-                </div>
-                <div>
-                  <div className="text-4xl font-bold text-white">58.3%</div>
-                  <div className="text-sm text-gray-400 mt-1">Average Open Rate</div>
-                </div>
-                <div className="h-20 flex items-end">
-                  <svg viewBox="0 0 200 60" className="w-full h-full">
-                    <path 
-                      d="M0,50 Q50,30 100,35 T200,20" 
-                      stroke="#eab308" 
-                      strokeWidth="3" 
-                      fill="none"
-                      className="drop-shadow-sm"
-                    />
-                    <circle cx="180" cy="25" r="4" fill="#eab308" />
-                  </svg>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Campaign Management - Light Card */}
-          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-black">Campaign Management</h3>
-                  <Mail className="w-5 h-5 text-black" />
-                </div>
-                <div className="text-center py-8">
-                  <div className="w-24 h-24 bg-slate-800 rounded-2xl flex items-center justify-center mx-auto">
-                    <Send className="w-12 h-12 text-white" />
-                  </div>
-                </div>
-                <Button className="w-full bg-yellow-400 hover:bg-yellow-500 text-black border-0 rounded-2xl font-semibold">
-                  Campaign Analytics Dashboard
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Newsletters List */}
         {newsletters.length === 0 ? (
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-3xl">
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-2xl">
             <CardContent className="p-12 text-center">
               <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Mail className="h-10 w-10 text-primary" />
@@ -741,7 +686,7 @@ export default function NewsletterPage() {
               </p>
               <Button 
                 onClick={() => setLocation('/newsletter/create')}
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg transition-all duration-300 rounded-2xl"
+                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white  transition-all duration-300 rounded-2xl"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Create Your First Newsletter
@@ -772,7 +717,7 @@ export default function NewsletterPage() {
             </CardContent>
           </Card>
         ) : (
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-3xl">
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-2xl">
             <CardContent className="p-6">
               <DataTable
                 columns={createColumns(setLocation, handleDeleteNewsletter)}
@@ -789,7 +734,7 @@ export default function NewsletterPage() {
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-3xl">
+          <AlertDialogContent className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-2xl">
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Newsletter</AlertDialogTitle>
               <AlertDialogDescription>
@@ -802,7 +747,7 @@ export default function NewsletterPage() {
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={confirmDelete}
-                className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white shadow-lg transition-all duration-300 rounded-2xl"
+                className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white  transition-all duration-300 rounded-2xl"
                 disabled={deleteNewsletterMutation.isPending}
               >
                 {deleteNewsletterMutation.isPending ? "Deleting..." : "Delete Newsletter"}

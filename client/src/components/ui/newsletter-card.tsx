@@ -1,47 +1,42 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import illustrationUrl from "@assets/newsletter-illustration.svg";
-
-// Newsletter illustration component
-const NewsletterIllustration = () => (
-  <img 
-    src={illustrationUrl} 
-    alt="Newsletter Team Illustration" 
-    className="w-32 h-32 mx-auto object-contain"
-  />
-);
+import { useLocation } from "wouter";
+import NewsletterIllustration from "../../../../attached_assets/28.svg";
 
 export function NewsletterCard() {
-  const handleCreateTeam = () => {
-    // Navigate to newsletter creation or team creation page
-    // This can be customized based on your routing needs
-    console.log("Create Team clicked");
+  const [, setLocation] = useLocation();
+  
+  const handleCreateNewsletter = () => {
+    setLocation("/newsletter/create");
   };
 
   return (
-    <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6">
-      <CardContent className="p-0">
-        <div className="text-center space-y-6">
+    <Card className="bg-white dark:bg-gray-800 rounded-xl h-full">
+      <CardContent className="p-8">
+        <div className="text-center space-y-6 flex flex-col justify-center h-full">
           {/* Illustration */}
-          <div className="pt-4">
-            <NewsletterIllustration />
+          <div>
+            <img 
+              src={NewsletterIllustration} 
+              alt="Newsletter Illustration" 
+              className="w-32 h-32 mx-auto"
+            />
           </div>
           
           {/* Title */}
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
-            Create Your First Newsletter
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
+          Let’s Build Your First Newsletter
           </h2>
           
           {/* Description */}
-          <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed px-2">
-            Enhance team formation and management with easy-to-use tools for communication, 
-            task organization, and progress tracking, all in one place.
+          <p className="text-gray-600 dark:text-gray-400 leading-relaxed max-w-md mx-auto">
+          With just a few steps, you can design and send professional newsletters that reach your audience directly in their inbox.
           </p>
           
           {/* Button */}
           <Button
-            onClick={handleCreateTeam}
-            className="bg-black hover:bg-gray-800 text-white px-6 py-3 rounded-xl font-medium transition-colors duration-200"
+            onClick={handleCreateNewsletter}
+            className="bg-black hover:bg-gray-800 text-white px-8 py-3 rounded-lg font-medium transition-colors duration-200 mx-auto"
             size="lg"
           >
             Create Newsletter
