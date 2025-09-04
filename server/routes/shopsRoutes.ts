@@ -33,7 +33,7 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
       whereClause = sql`${whereClause} AND ${shops.managerId} = ${managerId}`;
     }
 
-    const shops = await db.query.shops.findMany({
+    const shopsData = await db.query.shops.findMany({
       where: whereClause,
       with: {
         manager: {
@@ -50,17 +50,17 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
       offset,
     });
 
-    const totalCount = await db.select({
+    const [totalCountResult] = await db.select({
       count: sql<number>`count(*)`,
-    }).from(db.shops).where(whereClause);
+    }).from(shops).where(whereClause);
 
     res.json({
-      shops,
+      shops: shopsData,
       pagination: {
         page: Number(page),
         limit: Number(limit),
-        total: totalCount[0].count,
-        pages: Math.ceil(totalCount[0].count / Number(limit)),
+        total: totalCountResult.count,
+        pages: Math.ceil(totalCountResult.count / Number(limit)),
       },
     });
   } catch (error) {
@@ -131,7 +131,7 @@ shopsRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator", 
       managerId,
       status: status || 'active',
       tenantId: req.user.tenantId,
-      createdAt: new Date(),
+      country: 'United States',
       updatedAt: new Date(),
     }).returning();
 
