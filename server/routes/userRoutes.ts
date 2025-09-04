@@ -98,3 +98,194 @@ userRoutes.get("/limits", authenticateToken, requireRole(['Owner', 'Administrato
     res.status(500).json({ message: 'Failed to get user limits' });
   }
 });
+
+// Update user (full update)
+userRoutes.put("/:userId", authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+  try {
+    const { userId } = req.params;
+    const { firstName, lastName, email, role, isActive } = req.body;
+
+    // Validate input
+    if (!firstName || !lastName || !email || !role) {
+      return res.status(400).json({ message: 'First name, last name, email, and role are required' });
+    }
+
+    if (!['Owner', 'Administrator', 'Manager', 'Employee'].includes(role)) {
+      return res.status(400).json({ message: 'Invalid role' });
+    }
+
+    // Check if user exists and belongs to the same tenant
+    const existingUser = await db.query.users.findFirst({
+      where: and(
+        eq(users.id, userId),
+        eq(users.tenantId, req.user.tenantId)
+      ),
+    });
+
+    if (!existingUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if email is already taken by another user in the same tenant
+    if (email !== existingUser.email) {
+      const emailCheck = await db.query.users.findFirst({
+        where: and(
+          eq(users.email, email),
+          eq(users.tenantId, req.user.tenantId)
+        ),
+      });
+
+      if (emailCheck) {
+        return res.status(400).json({ message: 'Email is already in use' });
+      }
+    }
+
+    // Prevent owner from being demoted if they're the only owner
+    if (existingUser.role === 'Owner' && role !== 'Owner') {
+      const ownerCount = await db.select({
+        count: sql<number>`count(*)`,
+      }).from(users).where(and(
+        eq(users.role, 'Owner'),
+        eq(users.tenantId, req.user.tenantId)
+      ));
+
+      if (ownerCount[0].count <= 1) {
+        return res.status(400).json({ message: 'Cannot demote the only owner' });
+      }
+    }
+
+    // Update user
+    await db.update(users)
+      .set({
+        firstName,
+        lastName,
+        email,
+        role,
+        isActive: isActive ?? true,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(users.id, userId),
+        eq(users.tenantId, req.user.tenantId)
+      ));
+
+    res.json({ message: 'User updated successfully' });
+  } catch (error) {
+    console.error('Update user error:', error);
+    res.status(500).json({ message: 'Failed to update user' });
+  }
+});
+
+// Update user status (active/inactive)
+userRoutes.patch("/:userId/status", authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+  try {
+    const { userId } = req.params;
+    const { isActive } = req.body;
+
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({ message: 'isActive must be a boolean value' });
+    }
+
+    // Check if user exists and belongs to the same tenant
+    const user = await db.query.users.findFirst({
+      where: and(
+        eq(users.id, userId),
+        eq(users.tenantId, req.user.tenantId)
+      ),
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Prevent deactivating the current user
+    if (userId === req.user.userId && !isActive) {
+      return res.status(400).json({ message: 'Cannot deactivate your own account' });
+    }
+
+    // Prevent deactivating the only owner
+    if (user.role === 'Owner' && !isActive) {
+      const ownerCount = await db.select({
+        count: sql<number>`count(*)`,
+      }).from(users).where(and(
+        eq(users.role, 'Owner'),
+        eq(users.tenantId, req.user.tenantId),
+        eq(users.isActive, true)
+      ));
+
+      if (ownerCount[0].count <= 1) {
+        return res.status(400).json({ message: 'Cannot deactivate the only active owner' });
+      }
+    }
+
+    // Update user status
+    await db.update(users)
+      .set({
+        isActive,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(users.id, userId),
+        eq(users.tenantId, req.user.tenantId)
+      ));
+
+    res.json({
+      message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
+      userId,
+      isActive
+    });
+  } catch (error) {
+    console.error('Update user status error:', error);
+    res.status(500).json({ message: 'Failed to update user status' });
+  }
+});
+
+// Delete user
+userRoutes.delete("/:userId", authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Check if user exists and belongs to the same tenant
+    const user = await db.query.users.findFirst({
+      where: and(
+        eq(users.id, userId),
+        eq(users.tenantId, req.user.tenantId)
+      ),
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Prevent deleting the current user
+    if (user.id === req.user.userId) {
+      return res.status(400).json({ message: 'Cannot delete your own account' });
+    }
+
+    // Prevent deleting the only owner
+    if (user.role === 'Owner') {
+      const ownerCount = await db.select({
+        count: sql<number>`count(*)`,
+      }).from(users).where(and(
+        eq(users.role, 'Owner'),
+        eq(users.tenantId, req.user.tenantId)
+      ));
+
+      if (ownerCount[0].count <= 1) {
+        return res.status(400).json({ message: 'Cannot delete the only owner' });
+      }
+    }
+
+    // Delete user (this will cascade to related records)
+    await db.delete(users)
+      .where(and(
+        eq(users.id, userId),
+        eq(users.tenantId, req.user.tenantId)
+      ));
+
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ message: 'Failed to delete user' });
+  }
+});

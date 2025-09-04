@@ -100,7 +100,7 @@ export default function Sessions() {
 
   const logoutAllOtherSessionsMutation = useMutation({
     mutationFn: async () => {
-      const response = await authManager.makeAuthenticatedRequest('DELETE', '/api/auth/sessions');
+      const response = await authManager.makeAuthenticatedRequest('POST', '/api/auth/logout-all');
       if (!response.ok) {
         throw new Error('Failed to logout all other sessions');
       }

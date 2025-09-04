@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Test logout all devices functionality
-API_URL="http://localhost:5000/api"
+API_URL="http://localhost:3001/api"
 
 # First, get the current access token from the browser
 echo "Please provide your current access token from the browser (check Network tab):"
@@ -26,6 +26,11 @@ echo -e "\n3. Testing /api/auth/sessions:"
 curl -s -X GET "${API_URL}/auth/sessions" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -w "\nHTTP Status: %{http_code}\n" | head -50
+
+echo -e "\n4. Testing /api/auth/logout-all endpoint:"
+curl -s -X POST "${API_URL}/auth/logout-all" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -w "\nHTTP Status: %{http_code}\n"
 
 echo -e "\n==============================================="
 echo "Now please click 'Log Out All Other Devices' in the browser"

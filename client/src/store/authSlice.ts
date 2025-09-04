@@ -43,7 +43,7 @@ export const checkAuthStatus = createAsyncThunk(
       const checkData = await checkResponse.json();
       console.log("🔐 [Redux] Auth check result:", checkData);
 
-      if (!checkData.hasAuth) {
+      if (!checkData.authenticated) {
         throw new Error("No valid authentication found");
       }
 
@@ -63,7 +63,8 @@ export const checkAuthStatus = createAsyncThunk(
 
       return {
         user: refreshData.user,
-        accessToken: refreshData.accessToken,
+        // accessToken is now only available in httpOnly cookie for security
+        accessToken: null,
       };
     } catch (error: any) {
       console.log("🔐 [Redux] Auth check failed:", error.message);
@@ -248,11 +249,13 @@ const authSlice = createSlice({
         state.isAuthenticated = true;
         state.isInitialized = true;
         state.error = null;
-        
-        // Also store token in authManager for proper token management system
+
+        // For refresh responses, accessToken is null (only in httpOnly cookie)
+        // The authManager will handle token refresh automatically
         if (action.payload.accessToken) {
           authManager.setAccessToken(action.payload.accessToken);
         }
+        // If no accessToken provided, authManager will handle refresh automatically
       })
       .addCase(checkAuthStatus.rejected, (state, action) => {
         state.isLoading = false;

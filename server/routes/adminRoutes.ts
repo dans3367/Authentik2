@@ -156,6 +156,63 @@ adminRoutes.delete("/sessions", authenticateToken, requireRole('Administrator'),
   }
 });
 
+// Get user statistics
+adminRoutes.get("/users/stats", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
+  try {
+    const userStats = await db.select({
+      totalUsers: sql<number>`count(*)`,
+      activeUsers: sql<number>`count(*) filter (where is_active = true)`,
+      verifiedUsers: sql<number>`count(*) filter (where email_verified = true)`,
+      unverifiedUsers: sql<number>`count(*) filter (where email_verified = false)`,
+    }).from(users).where(sql`${users.tenantId} = ${req.user.tenantId}`);
+
+    const userStatsByRole = await db.select({
+      role: users.role,
+      count: sql<number>`count(*)`,
+    }).from(users).where(sql`${users.tenantId} = ${req.user.tenantId}`).groupBy(users.role);
+
+    res.json({
+      totalUsers: userStats[0].totalUsers,
+      activeUsers: userStats[0].activeUsers,
+      usersByRole: userStatsByRole.reduce((acc, curr) => {
+        acc[curr.role] = curr.count;
+        return acc;
+      }, {} as Record<string, number>),
+      verifiedUsers: userStats[0].verifiedUsers,
+      unverifiedUsers: userStats[0].unverifiedUsers,
+    });
+  } catch (error) {
+    console.error('Get user stats error:', error);
+    res.status(500).json({ message: 'Failed to get user statistics' });
+  }
+});
+
+// Get user limits
+adminRoutes.get("/users/limits", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
+  try {
+    // Get current user count for this tenant
+    const userCount = await db.select({
+      count: sql<number>`count(*)`,
+    }).from(users).where(sql`${users.tenantId} = ${req.user.tenantId}`);
+
+    // For now, we'll use a simple limit system
+    // In a real app, this would come from subscription data
+    const maxUsers = 100; // Default limit
+    const currentUsers = userCount[0].count;
+    const canAddUser = currentUsers < maxUsers;
+
+    res.json({
+      canAddUser,
+      currentUsers,
+      maxUsers,
+      planName: 'Professional', // This would come from subscription data
+    });
+  } catch (error) {
+    console.error('Get user limits error:', error);
+    res.status(500).json({ message: 'Failed to get user limits' });
+  }
+});
+
 // Get user management data
 adminRoutes.get("/users", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
   try {
@@ -227,6 +284,125 @@ adminRoutes.get("/users", authenticateToken, requireRole('Administrator'), async
   }
 });
 
+// Update user (full update)
+adminRoutes.put("/users/:userId", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
+  try {
+    const { userId } = req.params;
+    const { firstName, lastName, email, role, isActive } = req.body;
+
+    // Validate input
+    if (!firstName || !lastName || !email || !role) {
+      return res.status(400).json({ message: 'First name, last name, email, and role are required' });
+    }
+
+    if (!['Owner', 'Administrator', 'Manager', 'Employee'].includes(role)) {
+      return res.status(400).json({ message: 'Invalid role' });
+    }
+
+    // Check if user exists
+    const existingUser = await db.query.users.findFirst({
+      where: sql`${users.id} = ${userId}`,
+    });
+
+    if (!existingUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if email is already taken by another user
+    if (email !== existingUser.email) {
+      const emailCheck = await db.query.users.findFirst({
+        where: sql`${users.email} = ${email}`,
+      });
+
+      if (emailCheck) {
+        return res.status(400).json({ message: 'Email is already in use' });
+      }
+    }
+
+    // Prevent owner from being demoted if they're the only owner
+    if (existingUser.role === 'Owner' && role !== 'Owner') {
+      const ownerCount = await db.select({
+        count: sql<number>`count(*)`,
+      }).from(users).where(sql`${users.role} = 'Owner'`);
+
+      if (ownerCount[0].count <= 1) {
+        return res.status(400).json({ message: 'Cannot demote the only owner' });
+      }
+    }
+
+    // Update user
+    await db.update(users)
+      .set({
+        firstName,
+        lastName,
+        email,
+        role,
+        isActive: isActive ?? true,
+        updatedAt: new Date(),
+      })
+      .where(sql`${users.id} = ${userId}`);
+
+    res.json({ message: 'User updated successfully' });
+  } catch (error) {
+    console.error('Update user error:', error);
+    res.status(500).json({ message: 'Failed to update user' });
+  }
+});
+
+// Update user status (active/inactive)
+adminRoutes.patch("/users/:userId/status", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
+  try {
+    const { userId } = req.params;
+    const { isActive } = req.body;
+
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({ message: 'isActive must be a boolean value' });
+    }
+
+    // Check if user exists
+    const user = await db.query.users.findFirst({
+      where: sql`${users.id} = ${userId}`,
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Prevent deactivating the current user
+    if (userId === req.user.userId && !isActive) {
+      return res.status(400).json({ message: 'Cannot deactivate your own account' });
+    }
+
+    // Prevent deactivating the only owner
+    if (user.role === 'Owner' && !isActive) {
+      const ownerCount = await db.select({
+        count: sql<number>`count(*)`,
+      }).from(users).where(sql`${users.role} = 'Owner' AND ${users.isActive} = true`);
+
+      if (ownerCount[0].count <= 1) {
+        return res.status(400).json({ message: 'Cannot deactivate the only active owner' });
+      }
+    }
+
+    // Update user status
+    await db.update(users)
+      .set({
+        isActive,
+        updatedAt: new Date(),
+      })
+      .where(sql`${users.id} = ${userId}`);
+
+    res.json({
+      message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
+      userId,
+      isActive
+    });
+  } catch (error) {
+    console.error('Update user status error:', error);
+    res.status(500).json({ message: 'Failed to update user status' });
+  }
+});
+
 // Update user role
 adminRoutes.patch("/users/:userId/role", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
   try {
@@ -244,6 +420,17 @@ adminRoutes.patch("/users/:userId/role", authenticateToken, requireRole('Adminis
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Prevent owner from being demoted if they're the only owner
+    if (user.role === 'Owner' && role !== 'Owner') {
+      const ownerCount = await db.select({
+        count: sql<number>`count(*)`,
+      }).from(users).where(sql`${users.role} = 'Owner'`);
+
+      if (ownerCount[0].count <= 1) {
+        return res.status(400).json({ message: 'Cannot demote the only owner' });
+      }
     }
 
     // Update user role

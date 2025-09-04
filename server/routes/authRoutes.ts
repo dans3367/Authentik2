@@ -42,11 +42,11 @@ import { avatarUpload, handleUploadError } from '../middleware/upload';
 import { R2_CONFIG, uploadToR2, deleteFromR2 } from '../config/r2';
 import sharp from 'sharp';
 import { authenticateToken, requireRole } from '../middleware/auth';
+import { logger } from '../utils/logger';
+import { accountLockout } from '../utils/accountLockout';
+import { JWTUtils } from '../config/jwt';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-
-const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key";
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || "your-super-secret-refresh-key";
 
 export const authRoutes = Router();
 
@@ -207,38 +207,11 @@ authRoutes.post("/login", async (req, res) => {
       });
     }
     
-    // Debug validated data structure
-    console.log('Validated data structure:', {
-      hasEmail: 'email' in validatedData,
-      hasPassword: 'password' in validatedData,
-      hasRememberMe: 'rememberMe' in validatedData,
-      keys: Object.keys(validatedData),
-      emailValue: validatedData.email,
-      emailType: typeof validatedData.email
-    });
-
     const { email, password, rememberMe } = validatedData;
-
-    // Debug logging
-    console.log('Validated data:', {
-      email: email,
-      password: password ? '[REDACTED]' : 'undefined',
-      rememberMe: rememberMe,
-      emailType: typeof email,
-      emailUndefined: email === undefined
-    });
 
     // Sanitize inputs
     const sanitizedEmail = sanitizeEmail(email);
     const sanitizedPassword = sanitizePassword(password);
-
-    // Debug sanitized values
-    console.log('Sanitized values:', {
-      sanitizedEmail: sanitizedEmail,
-      sanitizedEmailType: typeof sanitizedEmail,
-      sanitizedPassword: sanitizedPassword ? '[REDACTED]' : 'undefined',
-      sanitizedPasswordType: typeof sanitizedPassword
-    });
 
     // Validate sanitized inputs
     if (!sanitizedEmail) {
@@ -248,28 +221,41 @@ authRoutes.post("/login", async (req, res) => {
       return res.status(400).json({ message: 'Password is required' });
     }
 
-    // Check rate limiting
+    // Get client IP for rate limiting and lockout tracking
     const clientIP = getClientIP(req);
+
+    // Check account lockout status first
+    const lockoutStatus = accountLockout.isLocked(sanitizedEmail);
+    if (lockoutStatus.locked) {
+      logger.security('LOGIN_ATTEMPT_BLOCKED', {
+        email: sanitizedEmail,
+        ip: clientIP,
+        reason: lockoutStatus.reason,
+        remainingTime: lockoutStatus.remainingTime,
+        timestamp: new Date().toISOString()
+      });
+
+      const remainingMinutes = Math.ceil((lockoutStatus.remainingTime || 0) / 60000);
+      return res.status(429).json({
+        message: `Account temporarily locked due to too many failed attempts. Try again in ${remainingMinutes} minutes.`,
+        retryAfter: remainingMinutes * 60
+      });
+    }
+
+    // Check IP-based rate limiting
     if (!(await checkRateLimit(`login:${clientIP}`, 50, 15 * 60 * 1000))) {
+      logger.rateLimitHit('login', clientIP);
       return res.status(429).json({ message: 'Too many login attempts' });
     }
 
-    // Debug database objects
-    console.log('Database objects:', {
-      hasDb: !!db,
-      hasDbQuery: !!db.query,
-      hasDbQueryUsers: !!db.query.users,
-      hasUsersTable: !!users,
-      sanitizedEmail: sanitizedEmail
-    });
-
-    // Test database connection
-    try {
-      await db.execute(sql`SELECT 1`);
-      console.log('Database connection test: SUCCESS');
-    } catch (connError) {
-      console.error('Database connection test: FAILED', connError);
-      return res.status(500).json({ message: 'Database connection failed' });
+    // Test database connection (only in development)
+    if (process.env.NODE_ENV === 'development') {
+      try {
+        await db.execute(sql`SELECT 1`);
+      } catch (connError) {
+        console.error('Database connection test: FAILED', connError);
+        return res.status(500).json({ message: 'Database connection failed' });
+      }
     }
 
     // Find user
@@ -282,28 +268,52 @@ authRoutes.post("/login", async (req, res) => {
         },
       });
     } catch (dbError) {
-      console.error('Database query error:', dbError);
-      console.error('Database error details:', {
-        name: dbError instanceof Error ? dbError.name : 'Unknown',
-        message: dbError instanceof Error ? dbError.message : String(dbError),
-        stack: dbError instanceof Error ? dbError.stack : undefined
-      });
+      logger.error('Database query error during login', dbError as Error, { ip: clientIP });
       return res.status(500).json({ message: 'Database error during login' });
     }
 
-    if (!user) {
+    // TIMING ATTACK PROTECTION: Always perform password verification
+    // even for non-existent users to prevent timing-based user enumeration
+    const dummyHash = '$2b$12$dummy.hash.for.timing.attack.prevention.only';
+    const passwordToCheck = user ? user.password : dummyHash;
+    const isValidPassword = await bcrypt.compare(sanitizedPassword, passwordToCheck);
+
+    // Check authentication (both user exists AND password is valid)
+    if (!user || !isValidPassword) {
+      // Record failed attempt for account lockout
+      const lockoutResult = accountLockout.recordFailedAttempt(sanitizedEmail, clientIP);
+
+      // Handle progressive delays
+      if (lockoutResult.shouldDelay && lockoutResult.delayMs) {
+        // Add delay before responding
+        await new Promise(resolve => setTimeout(resolve, lockoutResult.delayMs));
+      }
+
+      // Handle temporary lockouts
+      if (lockoutResult.locked) {
+        return res.status(429).json({
+          message: 'Account temporarily locked due to too many failed attempts. Please try again later.',
+          retryAfter: 900 // 15 minutes
+        });
+      }
+
+      // Log authentication failure
+      logger.authFailure(
+        user ? 'invalid_password' : 'user_not_found',
+        clientIP,
+        sanitizedEmail,
+        req.get('User-Agent')
+      );
+
+      // Clear rate limit on failed authentication
+      await clearRateLimit(`login:${clientIP}`);
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     // Check if email is verified
     if (!user.emailVerified) {
+      logger.authFailure('email_not_verified', clientIP, sanitizedEmail, req.get('User-Agent'));
       return res.status(401).json({ message: 'Please verify your email before logging in' });
-    }
-
-    // Verify password
-    const isValidPassword = await bcrypt.compare(sanitizedPassword, user.password);
-    if (!isValidPassword) {
-      return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     // Get device info
@@ -313,22 +323,20 @@ authRoutes.post("/login", async (req, res) => {
     const tokenExpiry = rememberMe ? securityConfig.jwt.accessTokenExpiryRememberMe : securityConfig.jwt.accessTokenExpiry;
     const refreshTokenExpiry = rememberMe ? securityConfig.jwt.refreshTokenExpiryRememberMe : securityConfig.jwt.refreshTokenExpiry;
 
-    const accessToken = jwt.sign(
-      { 
-        userId: user.id, 
-        email: user.email, 
+    const accessToken = JWTUtils.generateAccessToken(
+      {
+        userId: user.id,
+        email: user.email,
         role: user.role,
         tenantId: user.tenantId,
-        tenantSlug: user.tenant?.slug 
+        tenantSlug: user.tenant?.slug
       },
-      JWT_SECRET,
-      { expiresIn: tokenExpiry }
+      tokenExpiry
     );
 
-    const refreshToken = jwt.sign(
+    const refreshToken = JWTUtils.generateRefreshToken(
       { userId: user.id, type: 'refresh' },
-      REFRESH_TOKEN_SECRET,
-      { expiresIn: refreshTokenExpiry }
+      refreshTokenExpiry
     );
 
     // Store session
@@ -347,6 +355,12 @@ authRoutes.post("/login", async (req, res) => {
 
     // Clear rate limit on successful login
     await clearRateLimit(`login:${clientIP}`);
+
+    // Reset account lockout on successful login
+    accountLockout.recordSuccessfulLogin(sanitizedEmail, clientIP);
+
+    // Log successful authentication
+    logger.authSuccess(user.id, clientIP, deviceInfo.userAgent);
 
     // Set secure cookies
     res.cookie('accessToken', accessToken, {
@@ -381,13 +395,9 @@ authRoutes.post("/login", async (req, res) => {
       accessToken,
     });
   } catch (error) {
-    console.error('Login error:', error);
-    console.error('Error details:', {
-      name: error instanceof Error ? error.name : 'Unknown',
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      reqBody: req.body,
-      reqBodyType: typeof req.body
+    logger.error('Login endpoint error', error as Error, {
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
     });
     res.status(500).json({ message: 'Login failed' });
   }
@@ -517,13 +527,18 @@ authRoutes.post("/refresh", async (req, res) => {
     const { refreshToken } = req.cookies;
 
     if (!refreshToken) {
+      logger.security('REFRESH_TOKEN_MISSING', { ip: req.ip });
       return res.status(401).json({ message: 'Refresh token required' });
     }
 
     // Verify refresh token
-    const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET) as any;
-    
+    const decoded = JWTUtils.verifyRefreshToken(refreshToken);
+
     if (decoded.type !== 'refresh') {
+      logger.security('INVALID_REFRESH_TOKEN_TYPE', {
+        ip: req.ip,
+        tokenType: decoded.type
+      });
       return res.status(401).json({ message: 'Invalid refresh token' });
     }
 
@@ -540,39 +555,65 @@ authRoutes.post("/refresh", async (req, res) => {
     });
 
     if (!session || session.expiresAt < new Date()) {
+      logger.security('EXPIRED_REFRESH_TOKEN', {
+        ip: req.ip,
+        userId: decoded.userId,
+        hasSession: !!session
+      });
       return res.status(401).json({ message: 'Invalid or expired refresh token' });
     }
 
     // Determine if this is a remember-me session (based on refresh token expiry)
-    const isRememberMeSession = session.expiresAt.getTime() - Date.now() > 24 * 60 * 60 * 1000; // More than 1 day remaining (remember-me sessions last much longer)
+    const isRememberMeSession = session.expiresAt.getTime() - Date.now() > 24 * 60 * 60 * 1000;
 
     // Generate new access token
-    const accessToken = jwt.sign(
-      { 
-        userId: session.user.id, 
-        email: session.user.email, 
+    const accessToken = JWTUtils.generateAccessToken(
+      {
+        userId: session.user.id,
+        email: session.user.email,
         role: session.user.role,
         tenantId: session.user.tenantId,
-        tenantSlug: session.user.tenant?.slug 
+        tenantSlug: session.user.tenant?.slug
       },
-      JWT_SECRET,
-      { expiresIn: isRememberMeSession ? securityConfig.jwt.accessTokenExpiryRememberMe : securityConfig.jwt.accessTokenExpiry }
+      isRememberMeSession ? securityConfig.jwt.accessTokenExpiryRememberMe : securityConfig.jwt.accessTokenExpiry
     );
 
-    // Set new access token cookie
+    // Set new access token cookie (DO NOT return in JSON for security)
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: isRememberMeSession ? 30 * 24 * 60 * 60 * 1000 : 15 * 60 * 1000, // 15 minutes for non-remember-me
+      maxAge: isRememberMeSession ? 30 * 24 * 60 * 60 * 1000 : 15 * 60 * 1000,
     });
 
+    logger.security('TOKEN_REFRESH_SUCCESS', {
+      userId: session.user.id,
+      ip: req.ip,
+      isRememberMeSession
+    });
+
+    // Return user information (frontend expects this)
     res.json({
       message: 'Token refreshed successfully',
-      accessToken,
+      user: {
+        id: session.user.id,
+        email: session.user.email,
+        firstName: session.user.firstName,
+        lastName: session.user.lastName,
+        role: session.user.role,
+        tenantId: session.user.tenantId,
+        tenantSlug: session.user.tenant?.slug,
+        emailVerified: session.user.emailVerified,
+        twoFactorEnabled: session.user.twoFactorEnabled,
+        theme: session.user.theme,
+        avatarUrl: session.user.avatarUrl,
+      },
     });
   } catch (error) {
-    console.error('Token refresh error:', error);
+    logger.error('Token refresh error', error as Error, {
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
+    });
     res.status(401).json({ message: 'Token refresh failed' });
   }
 });
@@ -611,9 +652,9 @@ authRoutes.get("/check", async (req, res) => {
     // Try to verify access token first
     if (accessToken) {
       try {
-        const decoded = jwt.verify(accessToken, JWT_SECRET) as any;
-        return res.json({ 
-          authenticated: true, 
+        const decoded = JWTUtils.verifyAccessToken(accessToken);
+        return res.json({
+          authenticated: true,
           user: {
             userId: decoded.userId,
             email: decoded.email,
@@ -630,7 +671,7 @@ authRoutes.get("/check", async (req, res) => {
     // Try to refresh using refresh token
     if (refreshToken) {
       try {
-        const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET) as any;
+        const decoded = JWTUtils.verifyRefreshToken(refreshToken);
         
         if (decoded.type === 'refresh') {
           const session = await db.query.refreshTokens.findFirst({
@@ -748,8 +789,8 @@ authRoutes.post("/restore-session", async (req, res) => {
     }
 
     // Verify refresh token
-    const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET) as any;
-    
+    const decoded = JWTUtils.verifyRefreshToken(refreshToken);
+
     if (decoded.type !== 'refresh') {
       return res.status(401).json({ message: 'Invalid refresh token' });
     }
@@ -832,7 +873,7 @@ authRoutes.get("/refresh-token-info", async (req, res) => {
     }
 
     try {
-      const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET) as any;
+      const decoded = JWTUtils.verifyRefreshToken(refreshToken);
       const session = await db.query.refreshTokens.findFirst({
         where: sql`${refreshTokens.token} = ${refreshToken}`,
       });
@@ -1177,14 +1218,10 @@ authRoutes.post("/forgot-password", async (req, res) => {
 // Get user sessions
 authRoutes.get("/sessions", authenticateToken, async (req: any, res) => {
   try {
-    console.log(`🔍 [Sessions API] Fetching sessions for user: ${req.user.userId}`);
-    
     const sessions = await db.query.refreshTokens.findMany({
       where: sql`${refreshTokens.userId} = ${req.user.userId} AND ${refreshTokens.expiresAt} > NOW()`,
       orderBy: sql`${refreshTokens.createdAt} DESC`,
     });
-
-    console.log(`📊 [Sessions API] Found ${sessions.length} active sessions`);
 
     const response = {
       sessions: sessions.map(session => ({
@@ -1199,7 +1236,6 @@ authRoutes.get("/sessions", authenticateToken, async (req: any, res) => {
       }))
     };
 
-    console.log(`✅ [Sessions API] Returning response:`, JSON.stringify(response, null, 2));
     res.json(response);
   } catch (error) {
     console.error('Get sessions error:', error);
@@ -1247,6 +1283,34 @@ authRoutes.post("/logout-all", authenticateToken, async (req: any, res) => {
   } catch (error) {
     console.error('Logout all error:', error);
     res.status(500).json({ message: 'Failed to logout all sessions' });
+  }
+});
+
+// Check account lockout status
+authRoutes.post("/check-lockout", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const sanitizedEmail = sanitizeEmail(email);
+    if (!sanitizedEmail) {
+      return res.status(400).json({ message: 'Valid email is required' });
+    }
+
+    const lockoutStatus = accountLockout.isLocked(sanitizedEmail);
+
+    res.json({
+      locked: lockoutStatus.locked,
+      remainingTime: lockoutStatus.remainingTime,
+      reason: lockoutStatus.reason,
+      retryAfter: lockoutStatus.remainingTime ? Math.ceil(lockoutStatus.remainingTime / 1000) : undefined
+    });
+  } catch (error) {
+    logger.error('Check lockout error', error as Error, { ip: req.ip });
+    res.status(500).json({ message: 'Failed to check lockout status' });
   }
 });
 

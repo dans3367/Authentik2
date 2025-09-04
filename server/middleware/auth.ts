@@ -1,11 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
 import { db } from '../db';
 import { sql, eq } from 'drizzle-orm';
 import { type UserRole, refreshTokens } from '@shared/schema';
-
-const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key";
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || "your-super-secret-refresh-key";
+import { JWTUtils } from '../config/jwt';
 
 // Extend Request interface to include user
 declare global {
@@ -31,13 +28,13 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
     return res.status(401).json({ message: 'Access token required' });
   }
 
-  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
-    if (err) {
-      return res.status(403).json({ message: 'Invalid or expired token' });
-    }
+  try {
+    const user = JWTUtils.verifyAccessToken(token);
     req.user = user;
     next();
-  });
+  } catch (err) {
+    return res.status(403).json({ message: 'Invalid or expired token' });
+  }
 }
 
 // Middleware to check user permissions
@@ -112,8 +109,8 @@ export async function verifyRefreshToken(req: Request, res: Response, next: Next
     }
 
     // Verify refresh token
-    const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET) as any;
-    
+    const decoded = JWTUtils.verifyRefreshToken(refreshToken);
+
     if (decoded.type !== 'refresh') {
       return res.status(401).json({ message: 'Invalid refresh token' });
     }

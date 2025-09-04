@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import { storage } from './server/storage.ts';
+import { storage } from '../server/storage.ts';
 import jwt from 'jsonwebtoken';
 import fetch from 'node-fetch';
 

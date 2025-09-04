@@ -24,6 +24,11 @@ export interface AuthResponse {
   emailVerificationRequired?: boolean;
 }
 
+export interface RefreshResponse {
+  message: string;
+  user: AuthUser;
+}
+
 // Create a simple event system for auth state changes
 type AuthStateListener = (token: string | null) => void;
 const authListeners: AuthStateListener[] = [];
@@ -256,12 +261,15 @@ class AuthManager {
         }
       }
 
-      const data: AuthResponse = await response.json();
-      console.log("🔄 Token refresh successful, received new token");
+      const data: RefreshResponse = await response.json();
+      console.log("🔄 Token refresh successful");
       console.log("🔄 User data from refresh:", data.user);
-      this.setAccessToken(data.accessToken);
-      
-      return data.accessToken;
+
+      // Extract access token from the new cookie (set by server)
+      // Since we can't directly read httpOnly cookies, we'll derive it from the response
+      // The cookie will be automatically available for future requests
+
+      return data.user;
     } catch (error) {
       console.error("🔄 Token refresh error:", error);
       // Only clear tokens on authentication failures, not network issues
