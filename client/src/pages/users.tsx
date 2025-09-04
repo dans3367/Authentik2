@@ -362,7 +362,7 @@ export default function UsersPage() {
       firstName: user.firstName || "",
       lastName: user.lastName || "",
       email: user.email,
-      role: user.role as UserRole,
+      role: user.role === 'Owner' ? 'Administrator' : user.role as 'Administrator' | 'Manager' | 'Employee',
       isActive: user.isActive ?? true,
     });
     setIsEditDialogOpen(true);

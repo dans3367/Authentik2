@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { authenticateToken, requireRole } from './authRoutes';
 import { storage } from '../storage';
+import { db } from '../db';
+import { users, subscriptionPlans } from '@shared/schema';
+import { sql, eq, and, count } from 'drizzle-orm';
 
 export const userRoutes = Router();
 
@@ -44,5 +47,54 @@ userRoutes.post("/", authenticateToken, requireRole(['Owner', 'Administrator']),
   } catch (error) {
     console.error('Create user error:', error);
     res.status(500).json({ message: 'Failed to create user' });
+  }
+});
+
+// Get user statistics
+userRoutes.get("/stats", authenticateToken, requireRole(['Owner', 'Administrator', 'Manager']), async (req: any, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+
+    // Get user statistics with role breakdown
+    const stats = await db
+      .select({
+        totalUsers: sql<number>`count(*)::int`,
+        activeUsers: sql<number>`count(*) filter (where ${users.isActive} = true)::int`,
+        inactiveUsers: sql<number>`count(*) filter (where ${users.isActive} = false)::int`,
+        ownerCount: sql<number>`count(*) filter (where ${users.role} = 'Owner')::int`,
+        adminCount: sql<number>`count(*) filter (where ${users.role} = 'Administrator')::int`,
+        managerCount: sql<number>`count(*) filter (where ${users.role} = 'Manager')::int`,
+        employeeCount: sql<number>`count(*) filter (where ${users.role} = 'Employee')::int`,
+      })
+      .from(users)
+      .where(eq(users.tenantId, tenantId));
+
+    const result = stats[0];
+    
+    res.json({
+      totalUsers: result.totalUsers,
+      activeUsers: result.activeUsers,
+      inactiveUsers: result.inactiveUsers,
+      usersByRole: {
+        Owner: result.ownerCount,
+        Administrator: result.adminCount,
+        Manager: result.managerCount,
+        Employee: result.employeeCount,
+      }
+    });
+  } catch (error) {
+    console.error('Get user stats error:', error);
+    res.status(500).json({ message: 'Failed to get user statistics' });
+  }
+});
+
+// Get user limits and plan information
+userRoutes.get("/limits", authenticateToken, requireRole(['Owner', 'Administrator', 'Manager']), async (req: any, res) => {
+  try {
+    const limits = await storage.checkUserLimits(req.user.tenantId);
+    res.json(limits);
+  } catch (error) {
+    console.error('Get user limits error:', error);
+    res.status(500).json({ message: 'Failed to get user limits' });
   }
 });
