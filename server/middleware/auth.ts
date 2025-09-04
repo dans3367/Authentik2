@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { db } from '../db';
 import { sql, eq } from 'drizzle-orm';
-import { type UserRole, sessions } from '@shared/schema';
+import { type UserRole, refreshTokens } from '@shared/schema';
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key";
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || "your-super-secret-refresh-key";
@@ -15,8 +15,8 @@ declare global {
         userId: string;
         email: string;
         role: UserRole;
-        companyId: string;
-        companySlug?: string;
+        tenantId: string;
+        tenantSlug?: string;
       };
     }
   }
@@ -118,28 +118,28 @@ export async function verifyRefreshToken(req: Request, res: Response, next: Next
       return res.status(401).json({ message: 'Invalid refresh token' });
     }
 
-    // Find session
-    const session = await db.query.sessions.findFirst({
-      where: eq(sessions.refreshToken, refreshToken),
+    // Find refresh token
+    const refreshTokenRecord = await db.query.refreshTokens.findFirst({
+      where: eq(refreshTokens.token, refreshToken),
       with: {
         user: {
           with: {
-            company: true,
+            tenant: true,
           },
         },
       },
     });
 
-    if (!session || session.expiresAt < new Date()) {
+    if (!refreshTokenRecord || refreshTokenRecord.expiresAt < new Date()) {
       return res.status(401).json({ message: 'Invalid or expired session' });
     }
 
     req.user = {
-      userId: session.user.id,
-      email: session.user.email,
-      role: session.user.role,
-      companyId: session.user.companyId,
-      companySlug: session.user.company?.slug,
+      userId: refreshTokenRecord.user.id,
+      email: refreshTokenRecord.user.email,
+      role: refreshTokenRecord.user.role,
+      tenantId: refreshTokenRecord.user.tenantId,
+      tenantSlug: refreshTokenRecord.user.tenant?.slug,
     };
 
     next();
