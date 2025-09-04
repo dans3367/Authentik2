@@ -184,7 +184,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-                Statistics
+                Dashboard
               </h1>
               <p className="text-gray-600 dark:text-gray-400 mt-1">
                 Welcome back, {user.firstName} {user.lastName}
@@ -199,6 +199,9 @@ export default function Dashboard() {
             </Card>
           )}
         </div>
+        
+        {/* Add minimal spacer after the header section */}
+        <div className="h-3"></div>
 
         {/* Newsletter Creation Card */}
         <div className="max-w-xl">

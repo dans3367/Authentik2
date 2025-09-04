@@ -19,7 +19,7 @@ export function NewsletterCard() {
   };
 
   return (
-    <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-3xl shadow-lg hover:shadow-xl transition-all duration-300 p-6">
+    <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6">
       <CardContent className="p-0">
         <div className="text-center space-y-6">
           {/* Illustration */}
@@ -29,7 +29,7 @@ export function NewsletterCard() {
           
           {/* Title */}
           <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
-            CREATE YOUR FIRST NEWSLETTER
+            Create Your First Newsletter
           </h2>
           
           {/* Description */}
