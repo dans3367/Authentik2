@@ -14,7 +14,8 @@ import {
   MousePointer,
   ArrowUpDown,
   Search,
-  AlertTriangle
+  AlertTriangle,
+  Edit
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -625,7 +626,7 @@ export default function NewsletterPage() {
               {/* Desktop Table View */}
               <div className="hidden lg:block">
                 <DataTable
-                  columns={createColumns(setLocation)}
+                  columns={createColumns(setLocation, () => {})}
                   data={newsletters}
                   searchKey="title"
                   searchPlaceholder="Search newsletters..."
@@ -692,10 +693,10 @@ export default function NewsletterPage() {
                           <div className="flex items-center justify-between text-sm">
                             <div className="flex items-center space-x-2">
                               <div className="h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-medium">
-                                {newsletter.user.firstName[0]}{newsletter.user.lastName[0]}
+                                {newsletter.user.firstName?.[0] || 'U'}{newsletter.user.lastName?.[0] || 'U'}
                               </div>
                               <span className="text-gray-600 dark:text-gray-400">
-                                {newsletter.user.firstName} {newsletter.user.lastName}
+                                {newsletter.user.firstName || 'Unknown'} {newsletter.user.lastName || 'User'}
                               </span>
                             </div>
                             <div className="text-gray-500 dark:text-gray-400">
