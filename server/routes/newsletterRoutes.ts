@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { sql } from 'drizzle-orm';
+import { sql, eq, and, like, desc } from 'drizzle-orm';
 import { authenticateToken } from './authRoutes';
-import { createNewsletterSchema, updateNewsletterSchema } from '@shared/schema';
+import { createNewsletterSchema, updateNewsletterSchema, newsletters } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 import { emailService } from '../emailService';
 
@@ -19,28 +19,31 @@ newsletterRoutes.get("/", authenticateToken, async (req: any, res) => {
     if (search) {
       const sanitizedSearch = sanitizeString(search as string);
       whereClause = sql`${whereClause} AND (
-        ${db.newsletters.subject} ILIKE ${`%${sanitizedSearch}%`} OR
-        ${db.newsletters.name} ILIKE ${`%${sanitizedSearch}%`}
+        ${newsletters.subject} ILIKE ${`%${sanitizedSearch}%`} OR
+        ${newsletters.title} ILIKE ${`%${sanitizedSearch}%`}
       )`;
     }
 
     if (status) {
-      whereClause = sql`${whereClause} AND ${db.newsletters.status} = ${status}`;
+      whereClause = sql`${whereClause} AND ${newsletters.status} = ${status}`;
     }
 
-    const newsletters = await db.query.newsletters.findMany({
+    const allNewsletters = await db.query.newsletters.findMany({
       where: whereClause,
-      orderBy: sql`${db.newsletters.createdAt} DESC`,
+      orderBy: desc(newsletters.createdAt),
       limit: Number(limit),
       offset,
+      with: {
+        user: true
+      }
     });
 
     const totalCount = await db.select({
       count: sql<number>`count(*)`,
-    }).from(db.newsletters).where(whereClause);
+    }).from(newsletters).where(whereClause);
 
     res.json({
-      newsletters,
+      newsletters: allNewsletters,
       pagination: {
         page: Number(page),
         limit: Number(limit),
@@ -60,7 +63,10 @@ newsletterRoutes.get("/:id", authenticateToken, async (req: any, res) => {
     const { id } = req.params;
 
     const newsletter = await db.query.newsletters.findFirst({
-      where: sql`${db.newsletters.id} = ${id}`,
+      where: eq(newsletters.id, id),
+      with: {
+        user: true
+      }
     });
 
     if (!newsletter) {
@@ -78,16 +84,17 @@ newsletterRoutes.get("/:id", authenticateToken, async (req: any, res) => {
 newsletterRoutes.post("/", authenticateToken, async (req: any, res) => {
   try {
     const validatedData = createNewsletterSchema.parse(req.body);
-    const { name, subject, content, listId, scheduledAt, status } = validatedData;
+    const { title, subject, content, scheduledAt, status } = validatedData;
 
-    const sanitizedName = sanitizeString(name);
+    const sanitizedTitle = sanitizeString(title);
     const sanitizedSubject = sanitizeString(subject);
 
-    const newNewsletter = await db.insert(db.newsletters).values({
-      name: sanitizedName,
+    const newNewsletter = await db.insert(newsletters).values({
+      tenantId: req.user.tenantId,
+      userId: req.user.userId,
+      title: sanitizedTitle,
       subject: sanitizedSubject,
       content,
-      listId,
       scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
       status: status || 'draft',
       createdAt: new Date(),
@@ -106,10 +113,13 @@ newsletterRoutes.put("/:id", authenticateToken, async (req: any, res) => {
   try {
     const { id } = req.params;
     const validatedData = updateNewsletterSchema.parse(req.body);
-    const { name, subject, content, listId, scheduledAt, status } = validatedData;
+    const { title, subject, content, scheduledAt, status } = validatedData;
 
     const newsletter = await db.query.newsletters.findFirst({
-      where: sql`${db.newsletters.id} = ${id}`,
+      where: eq(newsletters.id, id),
+      with: {
+        user: true
+      }
     });
 
     if (!newsletter) {
@@ -120,8 +130,8 @@ newsletterRoutes.put("/:id", authenticateToken, async (req: any, res) => {
       updatedAt: new Date(),
     };
 
-    if (name !== undefined) {
-      updateData.name = sanitizeString(name);
+    if (title !== undefined) {
+      updateData.title = sanitizeString(title);
     }
 
     if (subject !== undefined) {
@@ -132,9 +142,6 @@ newsletterRoutes.put("/:id", authenticateToken, async (req: any, res) => {
       updateData.content = content;
     }
 
-    if (listId !== undefined) {
-      updateData.listId = listId;
-    }
 
     if (scheduledAt !== undefined) {
       updateData.scheduledAt = scheduledAt ? new Date(scheduledAt) : null;
@@ -144,9 +151,9 @@ newsletterRoutes.put("/:id", authenticateToken, async (req: any, res) => {
       updateData.status = status;
     }
 
-    const updatedNewsletter = await db.update(db.newsletters)
+    const updatedNewsletter = await db.update(newsletters)
       .set(updateData)
-      .where(sql`${db.newsletters.id} = ${id}`)
+      .where(eq(newsletters.id, id))
       .returning();
 
     res.json(updatedNewsletter[0]);
@@ -162,7 +169,10 @@ newsletterRoutes.delete("/:id", authenticateToken, async (req: any, res) => {
     const { id } = req.params;
 
     const newsletter = await db.query.newsletters.findFirst({
-      where: sql`${db.newsletters.id} = ${id}`,
+      where: eq(newsletters.id, id),
+      with: {
+        user: true
+      }
     });
 
     if (!newsletter) {
@@ -170,8 +180,8 @@ newsletterRoutes.delete("/:id", authenticateToken, async (req: any, res) => {
     }
 
     // Delete newsletter
-    await db.delete(db.newsletters)
-      .where(sql`${db.newsletters.id} = ${id}`);
+    await db.delete(newsletters)
+      .where(eq(newsletters.id, id));
 
     res.json({ message: 'Newsletter deleted successfully' });
   } catch (error) {
@@ -189,7 +199,7 @@ newsletterRoutes.get("/newsletter-stats", authenticateToken, async (req: any, re
       scheduledNewsletters: sql<number>`count(*) filter (where status = 'scheduled')`,
       sentNewsletters: sql<number>`count(*) filter (where status = 'sent')`,
       newslettersThisMonth: sql<number>`count(*) filter (where created_at >= current_date - interval '30 days')`,
-    }).from(db.newsletters);
+    }).from(newsletters);
 
     res.json(stats[0]);
   } catch (error) {
@@ -204,7 +214,10 @@ newsletterRoutes.get("/:id/detailed-stats", authenticateToken, async (req: any, 
     const { id } = req.params;
 
     const newsletter = await db.query.newsletters.findFirst({
-      where: sql`${db.newsletters.id} = ${id}`,
+      where: eq(newsletters.id, id),
+      with: {
+        user: true
+      }
     });
 
     if (!newsletter) {
@@ -270,7 +283,10 @@ newsletterRoutes.get("/:id/task-status", authenticateToken, async (req: any, res
     const { id } = req.params;
 
     const newsletter = await db.query.newsletters.findFirst({
-      where: sql`${db.newsletters.id} = ${id}`,
+      where: eq(newsletters.id, id),
+      with: {
+        user: true
+      }
     });
 
     if (!newsletter) {
@@ -304,7 +320,10 @@ newsletterRoutes.post("/:id/task-status", authenticateToken, async (req: any, re
     const { status, progress, totalRecipients, processedRecipients, failedRecipients, error } = req.body;
 
     const newsletter = await db.query.newsletters.findFirst({
-      where: sql`${db.newsletters.id} = ${id}`,
+      where: eq(newsletters.id, id),
+      with: {
+        user: true
+      }
     });
 
     if (!newsletter) {
@@ -338,7 +357,7 @@ newsletterRoutes.put("/:newsletterId/task-status/:taskId", authenticateToken, as
     const { status, progress, error } = req.body;
 
     const newsletter = await db.query.newsletters.findFirst({
-      where: sql`${db.newsletters.id} = ${newsletterId}`,
+      where: eq(newsletters.id, newsletterId),
     });
 
     if (!newsletter) {
@@ -368,7 +387,10 @@ newsletterRoutes.post("/:id/initialize-tasks", authenticateToken, async (req: an
     const { id } = req.params;
 
     const newsletter = await db.query.newsletters.findFirst({
-      where: sql`${db.newsletters.id} = ${id}`,
+      where: eq(newsletters.id, id),
+      with: {
+        user: true
+      }
     });
 
     if (!newsletter) {
@@ -415,7 +437,10 @@ newsletterRoutes.post("/:id/send", authenticateToken, async (req: any, res) => {
     const { testEmail } = req.body;
 
     const newsletter = await db.query.newsletters.findFirst({
-      where: sql`${db.newsletters.id} = ${id}`,
+      where: eq(newsletters.id, id),
+      with: {
+        user: true
+      }
     });
 
     if (!newsletter) {
@@ -429,7 +454,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, async (req: any, res) => {
     // If test email is provided, send test email
     if (testEmail) {
       try {
-        await emailService.sendNewsletterTest(testEmail, newsletter);
+        await emailService.sendCustomEmail(testEmail, newsletter.subject, newsletter.content, 'test');
         res.json({
           message: 'Test newsletter sent successfully',
           testEmail,
@@ -442,13 +467,13 @@ newsletterRoutes.post("/:id/send", authenticateToken, async (req: any, res) => {
     }
 
     // Update newsletter status to sending
-    await db.update(db.newsletters)
+    await db.update(newsletters)
       .set({
         status: 'sending',
         sentAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(sql`${db.newsletters.id} = ${id}`);
+      .where(eq(newsletters.id, id));
 
     // Here you would typically:
     // 1. Get the email list
