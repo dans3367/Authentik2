@@ -21,9 +21,15 @@ export interface AuthRequest extends Request {
 // Better Auth session verification middleware
 export const authenticateToken = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    // Check for Better Auth session token in cookies
+    // Check for Better Auth session token in cookies (try multiple possible names)
     const sessionToken = req.cookies?.better_auth_session_token ||
-                        req.cookies?.session_token;
+                        req.cookies?.['better-auth.session_token'] ||
+                        req.cookies?.session_token ||
+                        req.cookies?.session ||
+                        req.cookies?.['better-auth.session'];
+
+    console.log('🔍 [Auth] Available cookies:', Object.keys(req.cookies || {}));
+    console.log('🔍 [Auth] Session token found:', !!sessionToken);
 
     if (!sessionToken) {
       return res.status(401).json({ message: 'No authentication token provided' });
@@ -38,11 +44,13 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     });
 
     if (!session) {
+      console.log('❌ [Auth] Session not found in database for token:', sessionToken.substring(0, 8) + '...');
       return res.status(401).json({ message: 'Invalid or expired session' });
     }
 
     // Check if session is expired
     if (new Date() > session.expiresAt) {
+      console.log('❌ [Auth] Session expired:', session.expiresAt);
       return res.status(401).json({ message: 'Session expired' });
     }
 
