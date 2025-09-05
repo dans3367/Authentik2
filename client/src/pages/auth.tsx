@@ -53,6 +53,7 @@ export default function AuthPage() {
 
   // Add loading state for login
   const isLoginLoading = loginMutation.isPending || false;
+  const isRegisterLoading = registerMutation.isPending || false;
 
   // Handle authentication redirect
   useEffect(() => {
@@ -146,7 +147,7 @@ export default function AuthPage() {
   };
 
   const onForgotPassword = async (data: ForgotPasswordData) => {
-    await forgotPasswordMutation.mutateAsync(data.email);
+    await forgotPasswordMutation.mutateAsync(data);
   };
 
   const onTwoFactorSubmit = async (data: { token: string }) => {
@@ -481,9 +482,9 @@ export default function AuthPage() {
                     <Button
                       type="submit"
                       className="w-full mt-6"
-                      disabled={registerMutation.isPending}
+                      disabled={isRegisterLoading}
                     >
-                      {registerMutation.isPending ? (
+                      {isRegisterLoading ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                           Creating Account...
