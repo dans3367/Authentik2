@@ -35,7 +35,7 @@ const authInstance = betterAuth({
     // Configure social providers as needed
     // Example: google, github, etc.
   },
-  baseURL: process.env.BASE_URL || "http://localhost:5000",
+  baseURL: process.env.BASE_URL || "http://localhost:3001",
   secret: process.env.BETTER_AUTH_SECRET || "fallback-secret-key-change-in-production",
   trustedOrigins: [
     "http://localhost:3001",

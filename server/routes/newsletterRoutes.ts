@@ -190,23 +190,6 @@ newsletterRoutes.delete("/:id", authenticateToken, requireTenant, async (req: an
   }
 });
 
-// Get newsletter statistics
-newsletterRoutes.get("/newsletter-stats", authenticateToken, requireTenant, async (req: any, res) => {
-  try {
-    const stats = await db.select({
-      totalNewsletters: sql<number>`count(*)`,
-      draftNewsletters: sql<number>`count(*) filter (where status = 'draft')`,
-      scheduledNewsletters: sql<number>`count(*) filter (where status = 'scheduled')`,
-      sentNewsletters: sql<number>`count(*) filter (where status = 'sent')`,
-      newslettersThisMonth: sql<number>`count(*) filter (where created_at >= current_date - interval '30 days')`,
-    }).from(newsletters).where(sql`${newsletters.tenantId} = ${req.user.tenantId}`);
-
-    res.json(stats[0]);
-  } catch (error) {
-    console.error('Get newsletter stats error:', error);
-    res.status(500).json({ message: 'Failed to get newsletter statistics' });
-  }
-});
 
 // Get detailed newsletter statistics
 newsletterRoutes.get("/:id/detailed-stats", authenticateToken, requireTenant, async (req: any, res) => {

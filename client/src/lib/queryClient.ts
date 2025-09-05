@@ -15,7 +15,7 @@ export async function apiRequest(
 ): Promise<Response> {
   try {
     // Use direct fetch to the correct server port to bypass Vite proxy issues
-    const baseURL = import.meta.env.VITE_BETTER_AUTH_URL || "http://localhost:5000";
+    const baseURL = import.meta.env.VITE_BETTER_AUTH_URL || "http://localhost:3001";
     const fullUrl = url.startsWith('http') ? url : `${baseURL}${url}`;
 
     const headers: Record<string, string> = {
@@ -43,10 +43,19 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     try {
-      // Better Auth handles session validation automatically
-      // Make authenticated request using Better Auth's fetch method
-      // authClient.$fetch returns parsed JSON directly, not a Response object
-      const data = await authClient.$fetch(queryKey.join("/") as string);
+      const url = queryKey.join("/");
+      // Use authClient.$fetch only for better-auth endpoints (/api/auth/*)
+      // Use regular apiRequest for other API endpoints
+      let data;
+      if (url.startsWith("/api/auth/")) {
+        // Better Auth handles session validation automatically
+        // authClient.$fetch returns parsed JSON directly, not a Response object
+        data = await authClient.$fetch(url);
+      } else {
+        // Use apiRequest for regular API endpoints
+        const response = await apiRequest("GET", url);
+        data = await response.json();
+      }
       return data;
     } catch (error: any) {
       if (

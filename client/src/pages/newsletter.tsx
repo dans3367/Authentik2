@@ -282,10 +282,10 @@ export default function NewsletterPage() {
   });
   // Fetch newsletter stats with fresh data on each page load
   const { data: statsData, refetch: refetchStats } = useQuery({
-    queryKey: ['/api/newsletters/newsletter-stats'],
+    queryKey: ['/api/newsletter-stats'],
     queryFn: async () => {
       console.log('Fetching newsletter stats...');
-      const response = await apiRequest('GET', '/api/newsletters/newsletter-stats');
+      const response = await apiRequest('GET', '/api/newsletter-stats');
       const data = await response.json();
       console.log('Stats data:', data);
       return data;
@@ -299,7 +299,7 @@ export default function NewsletterPage() {
   useEffect(() => {
     // Invalidate cache and refetch fresh data
     queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
-    queryClient.invalidateQueries({ queryKey: ['/api/newsletters/newsletter-stats'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
     refetch();
     refetchStats();
   }, [location, refetch, refetchStats, queryClient]);

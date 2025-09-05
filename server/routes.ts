@@ -14,6 +14,7 @@ import { companyRoutes } from "./routes/companyRoutes";
 import { shopsRoutes } from "./routes/shopsRoutes";
 import { emailManagementRoutes } from "./routes/emailManagementRoutes";
 import { newsletterRoutes } from "./routes/newsletterRoutes";
+import { authenticateToken, requireTenant } from "./middleware/auth-middleware";
 import { campaignRoutes } from "./routes/campaignRoutes";
 import { webhookRoutes } from "./routes/webhookRoutes";
 import { devRoutes } from "./routes/devRoutes";
@@ -45,6 +46,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/shops", shopsRoutes);
   app.use("/api", emailManagementRoutes);
   app.use("/api/newsletters", newsletterRoutes);
+
+  // Newsletter stats endpoint
+  app.get("/api/newsletter-stats", authenticateToken, requireTenant, async (req: any, res) => {
+    try {
+      const { db } = await import('./db');
+      const { sql, newsletters } = await import('@shared/schema');
+
+      const stats = await db.select({
+        totalNewsletters: sql<number>`count(*)`,
+        draftNewsletters: sql<number>`count(*) filter (where status = 'draft')`,
+        scheduledNewsletters: sql<number>`count(*) filter (where status = 'scheduled')`,
+        sentNewsletters: sql<number>`count(*) filter (where status = 'sent')`,
+        newslettersThisMonth: sql<number>`count(*) filter (where created_at >= current_date - interval '30 days')`,
+      }).from(newsletters).where(sql`${newsletters.tenantId} = ${req.user.tenantId}`);
+
+      res.json(stats[0]);
+    } catch (error) {
+      console.error('Get newsletter stats error:', error);
+      res.status(500).json({ message: 'Failed to get newsletter statistics' });
+    }
+  });
+
   app.use("/api/campaigns", campaignRoutes);
   app.use("/api/webhooks", webhookRoutes);
   app.use("/api/dev", devRoutes);
