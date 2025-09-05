@@ -36,7 +36,7 @@ campaignRoutes.get("/", authenticateToken, requireTenant, async (req: any, res) 
 
     const totalCount = await db.select({
       count: sql<number>`count(*)`,
-    }).from(db.campaigns).where(whereClause);
+    }).from(campaigns).where(whereClause);
 
     res.json({
       campaigns: tenantCampaigns,

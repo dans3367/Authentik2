@@ -51,7 +51,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/newsletter-stats", authenticateToken, requireTenant, async (req: any, res) => {
     try {
       const { db } = await import('./db');
-      const { sql, newsletters } = await import('@shared/schema');
+      const { newsletters } = await import('@shared/schema');
+      const { sql } = await import('drizzle-orm');
 
       const stats = await db.select({
         totalNewsletters: sql<number>`count(*)`,
