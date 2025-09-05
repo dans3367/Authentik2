@@ -30,7 +30,8 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
 
     console.log('🔍 [Auth] Available cookies:', Object.keys(req.cookies || {}));
     console.log('🔍 [Auth] Session token found:', !!sessionToken);
-    console.log('🔍 [Auth] Session token value:', sessionToken?.substring(0, 12) + '...');
+    console.log('🔍 [Auth] Session token FULL value:', sessionToken);
+    console.log('🔍 [Auth] Session token length:', sessionToken?.length);
 
     if (!sessionToken) {
       return res.status(401).json({ message: 'No authentication token provided' });
