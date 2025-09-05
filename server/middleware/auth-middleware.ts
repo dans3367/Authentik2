@@ -30,16 +30,24 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
 
     console.log('🔍 [Auth] Available cookies:', Object.keys(req.cookies || {}));
     console.log('🔍 [Auth] Session token found:', !!sessionToken);
+    console.log('🔍 [Auth] Session token value:', sessionToken?.substring(0, 12) + '...');
 
     if (!sessionToken) {
       return res.status(401).json({ message: 'No authentication token provided' });
     }
 
-    // Verify session with Better Auth database
-    // Better Auth might use session ID instead of token for cookies
-    const session = await db.query.betterAuthSession.findFirst({
+    // Try both session ID and token field to see which one works
+    console.log('🔍 [Auth] Looking up session by ID first...');
+    let session = await db.query.betterAuthSession.findFirst({
       where: eq(betterAuthSession.id, sessionToken)
     });
+
+    if (!session) {
+      console.log('🔍 [Auth] Session not found by ID, trying token field...');
+      session = await db.query.betterAuthSession.findFirst({
+        where: eq(betterAuthSession.token, sessionToken)
+      });
+    }
 
     if (!session) {
       console.log('❌ [Auth] Session not found in database for token:', sessionToken.substring(0, 8) + '...');
