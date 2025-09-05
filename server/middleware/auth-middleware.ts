@@ -37,10 +37,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
 
     // Verify session with Better Auth database
     const session = await db.query.betterAuthSession.findFirst({
-      where: eq(betterAuthSession.token, sessionToken),
-      with: {
-        user: true
-      }
+      where: eq(betterAuthSession.token, sessionToken)
     });
 
     if (!session) {
@@ -54,9 +51,13 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       return res.status(401).json({ message: 'Session expired' });
     }
 
-    // Get user information from Better Auth user table
-    const betterAuthUser = session.user as any; // Type assertion for Better Auth user
+    // Get user separately to avoid relation issues
+    const betterAuthUser = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.id, session.userId)
+    });
+
     if (!betterAuthUser) {
+      console.log('❌ [Auth] User not found for session:', session.userId);
       return res.status(401).json({ message: 'User not found' });
     }
 
