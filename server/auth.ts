@@ -35,17 +35,19 @@ const authInstance = betterAuth({
     // Configure social providers as needed
     // Example: google, github, etc.
   },
-  baseURL: process.env.BASE_URL || "http://localhost:3001",
+  baseURL: process.env.BASE_URL || "http://localhost:5000",
   secret: process.env.BETTER_AUTH_SECRET || "fallback-secret-key-change-in-production",
   trustedOrigins: [
     "http://localhost:3001",
+    "http://localhost:5000",
     "http://localhost:5173",
     "https://weby.zendwise.work",
     "http://weby.zendwise.work:3001",
     "http://websy.zendwise.work:3001",
     "https://websy.zendwise.work",
     "http://webx.zendwise.work",
-    "https://webx.zendwise.work"
+    "https://webx.zendwise.work",
+    "https://2850dacc-d7a0-40e0-a90b-43f06888d139-00-18hp2u206zmhk.kirk.replit.dev"
   ],
   // Better Auth hooks will be implemented separately to avoid type conflicts
   // Tenant synchronization will be handled by the registration endpoints
