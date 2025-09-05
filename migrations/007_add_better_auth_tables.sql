@@ -59,3 +59,4 @@ CREATE INDEX IF NOT EXISTS "better_auth_session_user_id_idx" ON "better_auth_ses
 CREATE INDEX IF NOT EXISTS "better_auth_account_user_id_idx" ON "better_auth_account"("user_id");
 CREATE INDEX IF NOT EXISTS "better_auth_verification_identifier_idx" ON "better_auth_verification"("identifier");
 
+

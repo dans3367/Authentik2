@@ -7,3 +7,4 @@ UPDATE better_auth_user
 SET tenant_id = 'default-tenant-id'
 WHERE tenant_id IS NULL;
 
+
