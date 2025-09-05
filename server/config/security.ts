@@ -35,48 +35,6 @@ export const securityConfig = {
     allowedHeaders: ["Content-Type", "Authorization"],
   },
 
-  // Session configuration
-  session: {
-    secret: process.env.SESSION_SECRET || "your-super-secret-session-key",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === "production",
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: "strict" as const,
-    },
-  },
-
-  // JWT configuration
-  jwt: {
-    accessTokenExpiry: "15m", // 15 minutes for non-remember-me
-    accessTokenExpiryRememberMe: "30d", // 30 days for remember-me
-    refreshTokenExpiry: "15m", // 15 minutes for non-remember-me
-    refreshTokenExpiryRememberMe: "90d", // 90 days for remember-me
-  },
-
-  // Session management configuration
-  sessionManagement: {
-    // Cleanup intervals
-    cleanupIntervalMinutes: parseInt(process.env.SESSION_CLEANUP_INTERVAL_MINUTES || "60"),
-    
-    // Session limits
-    maxSessionsPerUser: parseInt(process.env.MAX_SESSIONS_PER_USER || "10"),
-    inactivityTimeoutDays: parseInt(process.env.SESSION_INACTIVITY_TIMEOUT_DAYS || "30"),
-    
-    // Cleanup options
-    cleanExpiredTokens: process.env.CLEAN_EXPIRED_TOKENS !== "false",
-    cleanInactiveSessions: process.env.CLEAN_INACTIVE_SESSIONS !== "false", 
-    enforceSessionLimits: process.env.ENFORCE_SESSION_LIMITS !== "false",
-    
-    // Logging
-    enableCleanupLogs: process.env.ENABLE_SESSION_CLEANUP_LOGS !== "false",
-    
-    // Advanced options
-    automaticCleanup: process.env.AUTOMATIC_SESSION_CLEANUP !== "false",
-    cleanupOnStartup: process.env.CLEANUP_ON_STARTUP !== "false",
-  },
 
   // Password policy
   passwordPolicy: {

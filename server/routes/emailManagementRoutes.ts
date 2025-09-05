@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments } from '@shared/schema';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { type ContactFilters, type BouncedEmailFilters } from '@shared/schema';
 import { sanitizeString, sanitizeEmail } from '../utils/sanitization';
 import { storage } from '../storage';
@@ -10,19 +10,19 @@ import { storage } from '../storage';
 export const emailManagementRoutes = Router();
 
 // Get email contacts
-emailManagementRoutes.get("/email-contacts", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.get("/email-contacts", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { page = 1, limit = 50, search, tags, lists, status, statsOnly } = req.query;
-    
+
     // If statsOnly is requested, return only statistics
     if (statsOnly === 'true') {
       const stats = await storage.getEmailContactStats(req.user.tenantId);
       return res.json({ stats });
     }
-    
+
     const offset = (Number(page) - 1) * Number(limit);
 
-    let whereClause = sql`1=1`;
+    let whereClause = sql`${emailContacts.tenantId} = ${req.user.tenantId}`;
 
     if (search) {
       const sanitizedSearch = sanitizeString(search as string);
@@ -110,12 +110,12 @@ emailManagementRoutes.get("/email-contacts", authenticateToken, async (req: any,
 });
 
 // Get specific email contact
-emailManagementRoutes.get("/email-contacts/:id", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.get("/email-contacts/:id", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
 
     const contact = await db.query.emailContacts.findFirst({
-      where: sql`${emailContacts.id} = ${id}`,
+      where: sql`${emailContacts.id} = ${id} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
       with: {
         tagAssignments: {
           with: {
@@ -153,7 +153,7 @@ emailManagementRoutes.get("/email-contacts/:id", authenticateToken, async (req: 
 });
 
 // Get contact statistics
-emailManagementRoutes.get("/email-contacts/:id/stats", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.get("/email-contacts/:id/stats", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -183,7 +183,7 @@ emailManagementRoutes.get("/email-contacts/:id/stats", authenticateToken, async 
 });
 
 // Create email contact
-emailManagementRoutes.post("/email-contacts", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { email, firstName, lastName, tags, lists, status } = req.body;
 
@@ -197,7 +197,7 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, async (req: any
 
     // Check if contact already exists
     const existingContact = await db.query.emailContacts.findFirst({
-      where: sql`${emailContacts.email} = ${sanitizedEmail}`,
+      where: sql`${emailContacts.email} = ${sanitizedEmail} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
     });
 
     if (existingContact) {
@@ -205,6 +205,7 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, async (req: any
     }
 
     const newContact = await db.insert(emailContacts).values({
+      tenantId: req.user.tenantId,
       email: sanitizedEmail,
       firstName: sanitizedFirstName,
       lastName: sanitizedLastName,
@@ -216,9 +217,11 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, async (req: any
     // Add tags if provided
     if (tags && Array.isArray(tags)) {
       for (const tagId of tags) {
-        await db.insert(contactTags).values({
+        await db.insert(contactTagAssignments).values({
+          tenantId: req.user.tenantId,
           contactId: newContact[0].id,
           tagId,
+          assignedAt: new Date(),
         });
       }
     }
@@ -227,8 +230,10 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, async (req: any
     if (lists && Array.isArray(lists)) {
       for (const listId of lists) {
         await db.insert(contactListMemberships).values({
+          tenantId: req.user.tenantId,
           contactId: newContact[0].id,
           listId,
+          addedAt: new Date(),
         });
       }
     }
@@ -241,7 +246,7 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, async (req: any
 });
 
 // Update email contact
-emailManagementRoutes.put("/email-contacts/:id", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
     const { email, firstName, lastName, status } = req.body;
@@ -298,7 +303,7 @@ emailManagementRoutes.put("/email-contacts/:id", authenticateToken, async (req: 
 });
 
 // Delete email contact
-emailManagementRoutes.delete("/email-contacts/:id", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.delete("/email-contacts/:id", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -322,7 +327,7 @@ emailManagementRoutes.delete("/email-contacts/:id", authenticateToken, async (re
 });
 
 // Bulk delete email contacts
-emailManagementRoutes.delete("/email-contacts", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.delete("/email-contacts", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { contactIds } = req.body;
 
@@ -345,9 +350,10 @@ emailManagementRoutes.delete("/email-contacts", authenticateToken, async (req: a
 });
 
 // Get email lists
-emailManagementRoutes.get("/email-lists", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.get("/email-lists", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const lists = await db.query.emailLists.findMany({
+      where: sql`${emailLists.tenantId} = ${req.user.tenantId}`,
       orderBy: sql`${emailLists.createdAt} DESC`,
     });
 
@@ -359,7 +365,7 @@ emailManagementRoutes.get("/email-lists", authenticateToken, async (req: any, re
 });
 
 // Create email list
-emailManagementRoutes.post("/email-lists", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.post("/email-lists", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { name, description } = req.body;
 
@@ -385,7 +391,7 @@ emailManagementRoutes.post("/email-lists", authenticateToken, async (req: any, r
 });
 
 // Update email list
-emailManagementRoutes.put("/email-lists/:id", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.put("/email-lists/:id", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
     const { name, description } = req.body;
@@ -423,7 +429,7 @@ emailManagementRoutes.put("/email-lists/:id", authenticateToken, async (req: any
 });
 
 // Delete email list
-emailManagementRoutes.delete("/email-lists/:id", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.delete("/email-lists/:id", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -447,7 +453,7 @@ emailManagementRoutes.delete("/email-lists/:id", authenticateToken, async (req: 
 });
 
 // Get bounced emails
-emailManagementRoutes.get("/bounced-emails", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.get("/bounced-emails", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { page = 1, limit = 50, email, reason, startDate, endDate } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
@@ -498,7 +504,7 @@ emailManagementRoutes.get("/bounced-emails", authenticateToken, async (req: any,
 });
 
 // Check if email is bounced
-emailManagementRoutes.get("/bounced-emails/check/:email", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.get("/bounced-emails/check/:email", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { email } = req.params;
     const sanitizedEmail = sanitizeEmail(email);
@@ -518,7 +524,7 @@ emailManagementRoutes.get("/bounced-emails/check/:email", authenticateToken, asy
 });
 
 // Delete bounced email record
-emailManagementRoutes.delete("/bounced-emails/:email", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.delete("/bounced-emails/:email", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { email } = req.params;
     const sanitizedEmail = sanitizeEmail(email);
@@ -539,7 +545,7 @@ emailManagementRoutes.delete("/bounced-emails/:email", authenticateToken, async 
 });
 
 // Add bounced email record
-emailManagementRoutes.post("/bounced-emails", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.post("/bounced-emails", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { email, reason, description } = req.body;
 
@@ -575,7 +581,7 @@ emailManagementRoutes.post("/bounced-emails", authenticateToken, async (req: any
 });
 
 // Get bounced email statistics
-emailManagementRoutes.get("/bounced-emails/stats", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.get("/bounced-emails/stats", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const stats = await db.select({
       totalBounces: sql<number>`count(*)`,
@@ -595,7 +601,7 @@ emailManagementRoutes.get("/bounced-emails/stats", authenticateToken, async (req
 });
 
 // Get contact tags
-emailManagementRoutes.get("/contact-tags", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.get("/contact-tags", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const tags = await db.query.contactTags.findMany({
       orderBy: sql`${contactTags.name} ASC`,
@@ -609,7 +615,7 @@ emailManagementRoutes.get("/contact-tags", authenticateToken, async (req: any, r
 });
 
 // Create contact tag
-emailManagementRoutes.post("/contact-tags", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.post("/contact-tags", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { name, color, description } = req.body;
 
@@ -637,7 +643,7 @@ emailManagementRoutes.post("/contact-tags", authenticateToken, async (req: any, 
 });
 
 // Update contact tag
-emailManagementRoutes.put("/contact-tags/:id", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.put("/contact-tags/:id", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
     const { name, color, description } = req.body;
@@ -679,7 +685,7 @@ emailManagementRoutes.put("/contact-tags/:id", authenticateToken, async (req: an
 });
 
 // Delete contact tag
-emailManagementRoutes.delete("/contact-tags/:id", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.delete("/contact-tags/:id", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -703,7 +709,7 @@ emailManagementRoutes.delete("/contact-tags/:id", authenticateToken, async (req:
 });
 
 // Add contact to list
-emailManagementRoutes.post("/email-contacts/:contactId/lists/:listId", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.post("/email-contacts/:contactId/lists/:listId", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { contactId, listId } = req.params;
 
@@ -729,7 +735,7 @@ emailManagementRoutes.post("/email-contacts/:contactId/lists/:listId", authentic
 });
 
 // Remove contact from list
-emailManagementRoutes.delete("/email-contacts/:contactId/lists/:listId", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.delete("/email-contacts/:contactId/lists/:listId", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { contactId, listId } = req.params;
 
@@ -749,7 +755,7 @@ emailManagementRoutes.delete("/email-contacts/:contactId/lists/:listId", authent
 });
 
 // Add contacts to list (bulk)
-emailManagementRoutes.post("/email-lists/:listId/contacts", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.post("/email-lists/:listId/contacts", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { listId } = req.params;
     const { contactIds } = req.body;
@@ -773,7 +779,7 @@ emailManagementRoutes.post("/email-lists/:listId/contacts", authenticateToken, a
 });
 
 // Add tag to contact
-emailManagementRoutes.post("/email-contacts/:contactId/tags/:tagId", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.post("/email-contacts/:contactId/tags/:tagId", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { contactId, tagId } = req.params;
 
@@ -799,7 +805,7 @@ emailManagementRoutes.post("/email-contacts/:contactId/tags/:tagId", authenticat
 });
 
 // Remove tag from contact
-emailManagementRoutes.delete("/email-contacts/:contactId/tags/:tagId", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.delete("/email-contacts/:contactId/tags/:tagId", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { contactId, tagId } = req.params;
 
@@ -819,7 +825,7 @@ emailManagementRoutes.delete("/email-contacts/:contactId/tags/:tagId", authentic
 });
 
 // Add contacts to tag (bulk)
-emailManagementRoutes.post("/contact-tags/:tagId/contacts", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.post("/contact-tags/:tagId/contacts", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { tagId } = req.params;
     const { contactIds } = req.body;
@@ -843,7 +849,7 @@ emailManagementRoutes.post("/contact-tags/:tagId/contacts", authenticateToken, a
 });
 
 // Get contact activity
-emailManagementRoutes.get("/email-contacts/:contactId/activity", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.get("/email-contacts/:contactId/activity", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { contactId } = req.params;
     const { page = 1, limit = 50 } = req.query;

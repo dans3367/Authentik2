@@ -1,5 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { authManager } from "./auth";
+import { authClient } from "./betterAuthClient";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -14,13 +14,12 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   try {
-    // Check if user is authenticated, if not use direct fetch for auth endpoints
+    // For auth endpoints, use direct fetch (Better Auth handles these)
     if (
-      !authManager.isAuthenticated() &&
-      (url.includes("/auth/login") ||
-        url.includes("/auth/register") ||
-        url.includes("/auth/forgot-password") ||
-        url.includes("/auth/refresh"))
+      url.includes("/auth/login") ||
+      url.includes("/auth/register") ||
+      url.includes("/auth/forgot-password") ||
+      url.includes("/auth/refresh")
     ) {
       const headers: Record<string, string> = {
         ...(data ? { "Content-Type": "application/json" } : {}),
@@ -37,11 +36,21 @@ export async function apiRequest(
       return res;
     }
 
-    // For authenticated requests, use the auth manager's makeAuthenticatedRequest
-    // which handles automatic token refresh on 401 errors
-    const res = await authManager.makeAuthenticatedRequest(method, url, data);
-    await throwIfResNotOk(res);
-    return res;
+    // For all other requests, use Better Auth's authenticated fetch
+    // Better Auth's $fetch returns parsed JSON, not a Response object
+    const result = await authClient.$fetch(url, {
+      method,
+      body: data ? JSON.stringify(data) : undefined,
+      headers: data ? { "Content-Type": "application/json" } : {},
+    });
+
+    // Convert the result to a Response-like object for compatibility
+    const response = new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    return response;
   } catch (error) {
     throw error;
   }
@@ -54,17 +63,11 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     try {
-      // Check if user is authenticated
-      if (!authManager.isAuthenticated()) {
-        if (unauthorizedBehavior === "returnNull") {
-          return null;
-        }
-        throw new Error("401: Not authenticated");
-      }
-
-      // Make authenticated request using auth manager with automatic token refresh
-      const res = await authManager.makeAuthenticatedRequest("GET", queryKey.join("/") as string);
-      return await res.json();
+      // Better Auth handles session validation automatically
+      // Make authenticated request using Better Auth's fetch method
+      // authClient.$fetch returns parsed JSON directly, not a Response object
+      const data = await authClient.$fetch(queryKey.join("/") as string);
+      return data;
     } catch (error: any) {
       if (
         unauthorizedBehavior === "returnNull" &&

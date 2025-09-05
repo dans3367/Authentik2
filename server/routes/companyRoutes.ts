@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { users, tenants, shops, stores } from '@shared/schema';
-import { authenticateToken, requireRole } from '../middleware/auth';
+import { authenticateToken, requireRole } from '../middleware/auth-middleware';
 import { createCompanySchema, updateCompanySchema } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 
@@ -37,7 +37,7 @@ companyRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator"
     const sanitizedWebsite = website ? sanitizeString(website) : null;
     const sanitizedIndustry = industry ? sanitizeString(industry) : null;
 
-    // Check if company name is already taken
+    // Check if company name is already taken (tenant isolation not needed for global uniqueness)
     const existingCompany = await db.query.companies.findFirst({
       where: sql`${db.companies.name} = ${sanitizedName}`,
     });
@@ -86,7 +86,7 @@ companyRoutes.patch("/", authenticateToken, requireRole(["Owner", "Administrator
       
       // Check if new name is already taken by another company
       const existingCompany = await db.query.companies.findFirst({
-        where: sql`${db.companies.name} = ${sanitizedName} AND ${db.companies.id} != ${req.user.tenantId}`,
+        where: sql`${db.companies.name} = ${sanitizedName} AND ${db.companies.tenantId} != ${req.user.tenantId}`,
       });
 
       if (existingCompany) {

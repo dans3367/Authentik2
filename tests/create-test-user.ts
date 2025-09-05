@@ -4,7 +4,7 @@ config(); // Load environment variables
 import { db } from "../server/db";
 import { users, tenants } from "../shared/schema";
 import { eq } from "drizzle-orm";
-import bcrypt from "bcryptjs";
+// Note: bcrypt removed - Better Auth handles password hashing
 
 async function createTestUser() {
   try {
@@ -24,8 +24,8 @@ async function createTestUser() {
 
     console.log("📝 Found default tenant:", defaultTenant.id);
 
-    // Hash the password
-    const hashedPassword = await bcrypt.hash("TestPass123", 12);
+    // Note: Password hashing removed - Better Auth handles authentication
+    // Test user will need to set password through Better Auth registration
 
     // Create the test user
     const [user] = await db
@@ -33,7 +33,7 @@ async function createTestUser() {
       .values({
         tenantId: defaultTenant.id,
         email: "testuser@example.com",
-        password: hashedPassword,
+        // Note: password field removed - Better Auth handles authentication
         firstName: "Test",
         lastName: "User",
         role: "Employee",
@@ -53,7 +53,7 @@ async function createTestUser() {
         tenantId: user.tenantId,
         emailVerified: user.emailVerified
       });
-      console.log("🔑 Password: TestPass123");
+      console.log("🔑 Password: Use Better Auth registration to set password");
     } else {
       console.error("❌ Failed to create test user");
     }

@@ -6,7 +6,7 @@ import { dirname } from "path";
 import cookieParser from "cookie-parser";
 
 // Import route modules
-import { authRoutes } from "./routes/authRoutes";
+// Note: authRoutes removed - better-auth handles authentication now
 import { adminRoutes } from "./routes/adminRoutes";
 import { formsRoutes } from "./routes/formsRoutes";
 import { subscriptionRoutes } from "./routes/subscriptionRoutes";
@@ -19,6 +19,7 @@ import { webhookRoutes } from "./routes/webhookRoutes";
 import { devRoutes } from "./routes/devRoutes";
 import { emailRoutes } from "./routes/emailRoutes";
 import { userRoutes } from "./routes/userRoutes";
+import { authRoutes } from "./routes/authRoutes";
 
 // Import middleware
 import { authRateLimiter, apiRateLimiter } from "./middleware/security";
@@ -31,12 +32,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(cookieParser());
 
   // Rate limiting
-  app.use("/api/auth", authRateLimiter);
+  // Note: Auth rate limiting handled by better-auth
   app.use("/api", apiRateLimiter);
 
   // API Routes
-  app.use("/api/auth", authRoutes);
+  // Note: Auth routes handled by better-auth middleware
   app.use("/api/admin", adminRoutes);
+  app.use("/api/user", authRoutes); // User-facing session endpoints
   app.use("/api/forms", formsRoutes);
   app.use("/api/subscription", subscriptionRoutes);
   app.use("/api/company", companyRoutes);
@@ -51,7 +53,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Legacy routes for backward compatibility (if needed)
   // These can be removed once all clients are updated
-  app.use("/api/email/reviewer-request", authRoutes);
+  // Note: Auth routes removed - better-auth handles authentication
 
   // Health check endpoint
   app.get("/api/health", (req, res) => {
@@ -68,7 +70,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       message: "Authentik API Documentation",
       version: "1.0.0",
       endpoints: {
-        auth: "/api/auth/*",
+        user: "/api/user/* (sessions, logout-all)",
         admin: "/api/admin/*",
         forms: "/api/forms/*",
         subscription: "/api/subscription/*",
@@ -80,6 +82,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         webhooks: "/api/webhooks/*",
         dev: "/api/dev/*",
         email: "/api/email/*",
+        users: "/api/users/*",
       },
       documentation: "https://docs.authentik.com/api",
     });

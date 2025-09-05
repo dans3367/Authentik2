@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { forms, formResponses } from '@shared/schema';
-import { authenticateToken, requireRole } from '../middleware/auth';
+import { authenticateToken, requireRole } from '../middleware/auth-middleware';
 import { sanitizeString } from '../utils/sanitization';
 
 export const formsRoutes = Router();

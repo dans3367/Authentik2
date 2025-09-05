@@ -7,8 +7,8 @@ import { CheckCircle, XCircle, Mail, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { useAppDispatch } from "@/store";
-import { checkAuthStatus } from "@/store/authSlice";
-import { authManager } from "@/lib/auth";
+// Note: Auth status checking will be handled by better-auth
+// Note: Removed old JWT authentication imports - Better Auth handles authentication
 
 export default function VerifyEmailPage() {
   const [location, setLocation] = useLocation();
@@ -66,13 +66,11 @@ export default function VerifyEmailPage() {
           const responseData = await response.json();
           console.log("🔍 [VerifyEmail] Verification response data:", responseData);
           
-          // If the response includes access token, update the auth state
+          // Better Auth handles session management automatically
+          // If the response includes access token, the session should be established
           if (responseData.accessToken) {
-            console.log("🔍 [VerifyEmail] Automatic login detected, updating auth state...");
-            
-            // Update the auth manager with the new token
-            authManager.setAccessToken(responseData.accessToken);
-            
+            console.log("🔍 [VerifyEmail] Automatic login detected, Better Auth will handle session...");
+
             // Invalidate user cache to refresh the verification status
             console.log("🔍 [VerifyEmail] Invalidating user queries...");
             await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
