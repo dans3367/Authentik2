@@ -46,17 +46,33 @@ export default function EmailTestPage() {
   const { data: session } = useSession();
   
   // Query to get external service token when authenticated
-  const { data: tokenData } = useQuery({
+  const { data: tokenData, isLoading: tokenLoading, error: tokenError } = useQuery({
     queryKey: ['/api/external-token', session?.user?.id],
     queryFn: async () => {
+      console.log('🔑 [Token] Requesting external token for user:', session?.user?.email);
       const response = await apiRequest('POST', '/api/external-token');
-      return response.json();
+      if (!response.ok) {
+        throw new Error(`Token request failed: ${response.status}`);
+      }
+      const data = await response.json();
+      console.log('✅ [Token] External token received, length:', data.token?.length);
+      return data;
     },
     enabled: !!session?.user,
     staleTime: 30 * 60 * 1000, // Token valid for 30 minutes
+    retry: 3,
   });
   
   const accessToken = tokenData?.token;
+  
+  console.log('🔍 [Auth] Email test auth state:', {
+    hasSession: !!session?.user,
+    sessionEmail: session?.user?.email,
+    tokenLoading,
+    hasToken: !!accessToken,
+    tokenLength: accessToken?.length,
+    tokenError: tokenError?.message
+  });
   const [campaignData, setCampaignData] = useState<EmailCampaignData>({
     recipient: "dan@zendwise.com",
     subject: "Test Email Campaign",
@@ -169,16 +185,32 @@ export default function EmailTestPage() {
       console.log('🔍 [Campaign] Token check:', {
         hasToken: !!token,
         tokenLength: token?.length || 0,
-        tokenPreview: token ? `${token.substring(0, 20)}...` : 'None'
+        tokenPreview: token ? `${token.substring(0, 20)}...` : 'None',
+        sessionExists: !!session?.user,
+        sessionEmail: session?.user?.email,
+        tokenDataExists: !!tokenData,
+        tokenLoading,
+        tokenError: tokenError?.message
       });
       
       if (!token) {
         console.error('❌ [Campaign] No authentication token available');
-        console.error('🔍 [Campaign] Please check:');
-        console.error('1. Are you logged in?');
-        console.error('2. Try refreshing the page');
-        console.error('3. Check if you have been logged out');
-        throw new Error('No authentication token available. Please make sure you are logged in.');
+        console.error('🔍 [Campaign] Debug info:', {
+          sessionUser: session?.user,
+          tokenData,
+          tokenLoading,
+          tokenError
+        });
+        
+        if (tokenLoading) {
+          throw new Error('Authentication token is still loading. Please wait a moment and try again.');
+        } else if (tokenError) {
+          throw new Error(`Authentication failed: ${tokenError.message}`);
+        } else if (!session?.user) {
+          throw new Error('You are not logged in. Please log in first.');
+        } else {
+          throw new Error('Failed to obtain authentication token. Please refresh the page and try again.');
+        }
       }
       
       const emailId = `campaign-${Date.now()}`;
