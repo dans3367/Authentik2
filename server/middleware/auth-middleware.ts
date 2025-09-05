@@ -36,8 +36,9 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     }
 
     // Verify session with Better Auth database
+    // Better Auth might use session ID instead of token for cookies
     const session = await db.query.betterAuthSession.findFirst({
-      where: eq(betterAuthSession.token, sessionToken)
+      where: eq(betterAuthSession.id, sessionToken)
     });
 
     if (!session) {
@@ -52,11 +53,11 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     }
 
     // Get user separately to avoid relation issues
-    const betterAuthUser = await db.query.betterAuthUser.findFirst({
+    const userRecord = await db.query.betterAuthUser.findFirst({
       where: eq(betterAuthUser.id, session.userId)
     });
 
-    if (!betterAuthUser) {
+    if (!userRecord) {
       console.log('❌ [Auth] User not found for session:', session.userId);
       return res.status(401).json({ message: 'User not found' });
     }
@@ -64,8 +65,8 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     // Parse user name for firstName/lastName
     let firstName: string | undefined;
     let lastName: string | undefined;
-    if (betterAuthUser.name) {
-      const nameParts = betterAuthUser.name.split(' ');
+    if (userRecord.name) {
+      const nameParts = userRecord.name.split(' ');
       firstName = nameParts[0];
       lastName = nameParts.slice(1).join(' ') || undefined;
     }
@@ -73,13 +74,13 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     // Create authenticated user object using Better Auth user data directly
     // No database lookup needed - Better Auth hooks ensure tenantId is synchronized
     const authUser: AuthUser = {
-      id: betterAuthUser.id,
-      email: betterAuthUser.email,
-      name: betterAuthUser.name || undefined,
+      id: userRecord.id,
+      email: userRecord.email,
+      name: userRecord.name || undefined,
       firstName,
       lastName,
-      role: betterAuthUser.role || 'Employee',
-      tenantId: betterAuthUser.tenantId || 'default-tenant-id'
+      role: userRecord.role || 'Employee',
+      tenantId: userRecord.tenantId || 'default-tenant-id'
     };
 
     req.user = authUser;
