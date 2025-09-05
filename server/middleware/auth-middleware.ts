@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { db } from '../db';
 import { betterAuthSession, betterAuthUser, tenants } from '@shared/schema';
 import { eq } from 'drizzle-orm';
+import { auth } from '../auth';
 
 // Better Auth session-based authentication middleware
 export interface AuthUser {
@@ -21,53 +22,26 @@ export interface AuthRequest extends Request {
 // Better Auth session verification middleware
 export const authenticateToken = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    // Check for Better Auth session token in cookies (try multiple possible names)
-    const sessionToken = req.cookies?.better_auth_session_token ||
-                        req.cookies?.['better-auth.session_token'] ||
-                        req.cookies?.session_token ||
-                        req.cookies?.session ||
-                        req.cookies?.['better-auth.session'];
+    // Use Better Auth's built-in session verification
+    const session = await auth.api.getSession({ 
+      headers: req.headers as any,
+      cookies: req.cookies
+    });
 
-    console.log('🔍 [Auth] Available cookies:', Object.keys(req.cookies || {}));
-    console.log('🔍 [Auth] Session token found:', !!sessionToken);
-    console.log('🔍 [Auth] Session token FULL value:', sessionToken);
-    console.log('🔍 [Auth] Session token length:', sessionToken?.length);
-
-    if (!sessionToken) {
+    if (!session) {
+      console.log('❌ [Auth] No valid session found by Better Auth');
       return res.status(401).json({ message: 'No authentication token provided' });
     }
 
-    // Try both session ID and token field to see which one works
-    console.log('🔍 [Auth] Looking up session by ID first...');
-    let session = await db.query.betterAuthSession.findFirst({
-      where: eq(betterAuthSession.id, sessionToken)
-    });
+    console.log('✅ [Auth] Valid session found:', session.user?.email);
 
-    if (!session) {
-      console.log('🔍 [Auth] Session not found by ID, trying token field...');
-      session = await db.query.betterAuthSession.findFirst({
-        where: eq(betterAuthSession.token, sessionToken)
-      });
-    }
-
-    if (!session) {
-      console.log('❌ [Auth] Session not found in database for token:', sessionToken.substring(0, 8) + '...');
-      return res.status(401).json({ message: 'Invalid or expired session' });
-    }
-
-    // Check if session is expired
-    if (new Date() > session.expiresAt) {
-      console.log('❌ [Auth] Session expired:', session.expiresAt);
-      return res.status(401).json({ message: 'Session expired' });
-    }
-
-    // Get user separately to avoid relation issues
+    // Get additional user data from our database for tenant info
     const userRecord = await db.query.betterAuthUser.findFirst({
-      where: eq(betterAuthUser.id, session.userId)
+      where: eq(betterAuthUser.id, session.user.id)
     });
 
     if (!userRecord) {
-      console.log('❌ [Auth] User not found for session:', session.userId);
+      console.log('❌ [Auth] User not found in database:', session.user.id);
       return res.status(401).json({ message: 'User not found' });
     }
 
@@ -80,8 +54,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       lastName = nameParts.slice(1).join(' ') || undefined;
     }
 
-    // Create authenticated user object using Better Auth user data directly
-    // No database lookup needed - Better Auth hooks ensure tenantId is synchronized
+    // Create authenticated user object using Better Auth session data
     const authUser: AuthUser = {
       id: userRecord.id,
       email: userRecord.email,
@@ -92,6 +65,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       tenantId: userRecord.tenantId || 'default-tenant-id'
     };
 
+    console.log('✅ [Auth] Authentication successful for:', authUser.email);
     req.user = authUser;
     next();
   } catch (error) {
