@@ -29,11 +29,8 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     });
 
     if (!session) {
-      console.log('❌ [Auth] No valid session found by Better Auth');
       return res.status(401).json({ message: 'No authentication token provided' });
     }
-
-    console.log('✅ [Auth] Valid session found:', session.user?.email);
 
     // Get additional user data from our database for tenant info
     const userRecord = await db.query.betterAuthUser.findFirst({
@@ -65,7 +62,6 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       tenantId: userRecord.tenantId || 'default-tenant-id'
     };
 
-    console.log('✅ [Auth] Authentication successful for:', authUser.email);
     req.user = authUser;
     next();
   } catch (error) {
