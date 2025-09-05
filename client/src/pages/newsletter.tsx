@@ -80,6 +80,7 @@ const createColumns = (
         </Button>
       )
     },
+    size: 300, // Fixed width for title column
     cell: ({ row }) => {
       const newsletter = row.original;
       return (
@@ -104,6 +105,7 @@ const createColumns = (
     filterFn: (row, id, value) => {
       return value.includes(row.getValue(id));
     },
+    size: 120, // Fixed width for status column
   },
   {
     accessorKey: "user",
@@ -121,6 +123,7 @@ const createColumns = (
         </div>
       );
     },
+    size: 180, // Fixed width for author column
   },
   {
     accessorKey: "recipientCount",
@@ -142,13 +145,14 @@ const createColumns = (
         {row.getValue("recipientCount") || 0}
       </div>
     ),
+    size: 120, // Fixed width for recipients column
   },
   {
     id: "metrics",
     header: "Engagement",
     cell: ({ row }) => {
       const newsletter = row.original;
-      const openRate = (newsletter.recipientCount || 0) > 0 
+      const openRate = (newsletter.recipientCount || 0) > 0
         ? ((newsletter.opens || 0) / (newsletter.recipientCount || 1) * 100).toFixed(1)
         : "0.0";
       return (
@@ -175,6 +179,7 @@ const createColumns = (
         </div>
       );
     },
+    size: 200, // Fixed width for engagement column
   },
   {
     id: "dates",
@@ -624,7 +629,7 @@ export default function NewsletterPage() {
           <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-2xl">
             <CardContent className="p-6">
               {/* Desktop Table View */}
-              <div className="hidden lg:block">
+              <div className="hidden lg:block w-full">
                 <DataTable
                   columns={createColumns(setLocation, () => {})}
                   data={newsletters}
