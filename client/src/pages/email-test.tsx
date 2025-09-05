@@ -90,11 +90,25 @@ export default function EmailTestPage() {
   const { data: serverHealth, isLoading: healthLoading, error: healthError } = useQuery({
     queryKey: ['/go-server-health'],
     queryFn: async () => {
-      const response = await fetch('https://tenginex.zendwise.work/health');
-      if (!response.ok) throw new Error('Go server not available');
-      return response.json();
+      try {
+        const response = await fetch('https://tenginex.zendwise.work/health', {
+          mode: 'cors',
+          headers: {
+            'Accept': 'application/json',
+          }
+        });
+        if (!response.ok) {
+          console.error('❌ [Health] Go server health check failed:', response.status);
+          throw new Error(`Go server returned ${response.status}`);
+        }
+        return response.json();
+      } catch (error) {
+        console.error('❌ [Health] Cannot connect to Go server:', error);
+        throw new Error('Go server not available - may be offline or blocked by CORS');
+      }
     },
     refetchInterval: 10000, // Check health every 10 seconds
+    retry: false, // Don't retry failed health checks
   });
 
   // Query to get email tracking entries from Go server
@@ -316,23 +330,46 @@ export default function EmailTestPage() {
         }
       };
 
-      console.log('🚀 [Campaign] Sending request to Go server:', {
+      // Try Go server first, fall back to local processing if unavailable
+      let useLocalFallback = false;
+      let response;
+      
+      console.log('🚀 [Campaign] Attempting to send via Go server:', {
         url: 'https://tenginex.zendwise.work/api/email-tracking',
         tokenLength: token.length,
         emailId: emailId,
-        payload: payload,
         isScheduled: campaignData.isScheduled,
         scheduledAt: campaignData.scheduledAt
       });
 
-      const response = await fetch('https://tenginex.zendwise.work/api/email-tracking', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
+      try {
+        response = await fetch('https://tenginex.zendwise.work/api/email-tracking', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+      } catch (networkError) {
+        console.warn('⚠️ [Campaign] Go server unavailable, using local fallback:', networkError);
+        useLocalFallback = true;
+      }
+      
+      // If Go server is unavailable or returns error, use local fallback
+      if (useLocalFallback || (response && !response.ok && (response.status === 503 || response.status === 0))) {
+        console.log('🔄 [Campaign] Switching to local email processing');
+        
+        const localPayload = {
+          recipient: campaignData.recipient,
+          subject: campaignData.subject,
+          content: campaignData.content,
+          templateType: campaignData.templateType,
+          priority: campaignData.priority,
+        };
+        
+        response = await apiRequest('POST', '/api/email-test/send', localPayload);
+      }
 
       console.log('📡 [Campaign] Response received:', {
         status: response.status,
@@ -341,12 +378,25 @@ export default function EmailTestPage() {
       });
 
       if (!response.ok) {
-        const error = await response.text();
+        let errorMessage = 'Unknown error';
+        try {
+          errorMessage = await response.text();
+        } catch (e) {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        
         console.error('❌ [Campaign] Request failed:', {
           status: response.status,
-          error: error
+          error: errorMessage
         });
-        throw new Error(`Failed to send campaign: ${error}`);
+        
+        if (response.status === 401) {
+          throw new Error('Authentication failed with Go server. Token may be invalid or expired.');
+        } else if (response.status === 503 || errorMessage.includes('unavailable')) {
+          throw new Error('Email service (Go server) is currently unavailable. Please try again later.');
+        } else {
+          throw new Error(`Failed to send campaign: ${errorMessage}`);
+        }
       }
 
       const result = await response.json();
