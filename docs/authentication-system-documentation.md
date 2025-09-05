@@ -191,9 +191,9 @@ const authInstance = betterAuth({
   emailVerification: {
     sendOnSignUp: true,
   },
-  baseURL: process.env.BASE_URL || "http://localhost:3001",
+  baseURL: process.env.BASE_URL || "http://localhost:5000",
   secret: process.env.BETTER_AUTH_SECRET,
-  trustedOrigins: ["http://localhost:3001", "http://localhost:5173"],
+  trustedOrigins: ["http://localhost:5000", "http://localhost:5173"],
 });
 ```
 
@@ -473,7 +473,7 @@ await storage.createRefreshToken(userId, tenantId, token, expiry, device);
 ```bash
 # Better Auth Configuration
 BETTER_AUTH_SECRET=your-super-secret-better-auth-key
-BASE_URL=http://localhost:3001
+BASE_URL=http://localhost:5000
 
 # Database
 DATABASE_URL=postgresql://user:password@localhost:5432/authentik
@@ -482,7 +482,7 @@ DATABASE_URL=postgresql://user:password@localhost:5432/authentik
 RESEND_API_KEY=your-resend-api-key
 
 # Client Configuration
-VITE_BETTER_AUTH_URL=http://localhost:3001
+VITE_BETTER_AUTH_URL=http://localhost:5000
 VITE_STRIPE_PUBLIC_KEY=pk_test_your_stripe_public_key_here
 
 # Avatar Storage (Optional)

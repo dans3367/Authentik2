@@ -59,8 +59,10 @@ export default function EmailTestPage() {
       return data;
     },
     enabled: !!session?.user,
-    staleTime: 30 * 60 * 1000, // Token valid for 30 minutes
+    staleTime: 12 * 60 * 1000, // Token cached for 12 minutes (3 min buffer before 15 min expiry)
+    gcTime: 15 * 60 * 1000, // Garbage collect after 15 minutes
     retry: 3,
+    refetchOnWindowFocus: false, // Don't refetch on window focus to avoid unnecessary token generation
   });
   
   const accessToken = tokenData?.token;

@@ -5,7 +5,7 @@
  * This tests the complete flow that the dashboard uses
  */
 
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE = 'http://localhost:5000/api';
 
 async function testDashboardRefreshFlow() {
   console.log('🧪 Testing Dashboard Refresh Token Flow\n');

@@ -35,10 +35,10 @@ const authInstance = betterAuth({
     // Configure social providers as needed
     // Example: google, github, etc.
   },
-  baseURL: process.env.BASE_URL || "http://localhost:3001",
+  baseURL: process.env.BASE_URL || "http://localhost:5000",
   secret: process.env.BETTER_AUTH_SECRET || "fallback-secret-key-change-in-production",
   trustedOrigins: [
-    "http://localhost:3001",
+    "http://localhost:5000",
     "http://localhost:5000",
     "http://localhost:5173",
     "https://weby.zendwise.work",

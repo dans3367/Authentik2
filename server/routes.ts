@@ -23,7 +23,7 @@ import { userRoutes } from "./routes/userRoutes";
 import { authRoutes } from "./routes/authRoutes";
 
 // Import middleware
-import { authRateLimiter, apiRateLimiter } from "./middleware/security";
+import { authRateLimiter, apiRateLimiter, jwtTokenRateLimiter } from "./middleware/security";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -80,21 +80,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Note: Auth routes removed - better-auth handles authentication
 
   // Generate external service token endpoint
-  app.post("/api/external-token", authenticateToken, async (req: any, res) => {
+  app.post("/api/external-token", authenticateToken, jwtTokenRateLimiter, async (req: any, res) => {
     try {
+      // Validate JWT secret exists - CRITICAL SECURITY FIX
+      const jwtSecret = process.env.JWT_SECRET;
+      if (!jwtSecret) {
+        console.error('❌ [Security] JWT_SECRET environment variable is not set');
+        return res.status(500).json({ message: 'Server configuration error' });
+      }
+
       const jwt = await import('jsonwebtoken');
+      
+      // Generate token with minimal claims and shorter expiration
       const token = jwt.default.sign(
         {
-          userId: req.user.id,
-          email: req.user.email,
-          tenantId: req.user.tenantId,
-          role: req.user.role,
+          sub: req.user.id,           // Standard 'subject' claim
+          tenant: req.user.tenantId,  // Only essential data
+          scope: 'external-service',  // Specific scope
+          iat: Math.floor(Date.now() / 1000)
         },
-        process.env.JWT_SECRET || 'default-secret',
-        { expiresIn: '1h' }
+        jwtSecret,
+        { 
+          expiresIn: '15m',          // Reduced from 1 hour to 15 minutes
+          algorithm: 'HS256',
+          issuer: 'authentik-api',
+          audience: 'external-services'
+        }
       );
       
-      res.json({ token });
+      // Audit log for security monitoring
+      console.log('🔒 [Security] External JWT token generated:', {
+        userId: req.user.id,
+        userAgent: req.get('User-Agent'),
+        ip: req.ip || req.connection.remoteAddress,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.json({ 
+        token, 
+        expiresIn: 900, // 15 minutes in seconds
+        tokenType: 'Bearer'
+      });
     } catch (error) {
       console.error('External token generation error:', error);
       res.status(500).json({ message: 'Failed to generate external service token' });

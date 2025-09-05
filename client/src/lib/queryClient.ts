@@ -15,7 +15,7 @@ export async function apiRequest(
 ): Promise<Response> {
   try {
     // Use direct fetch to the correct server port to bypass Vite proxy issues
-    const baseURL = import.meta.env.VITE_BETTER_AUTH_URL || "http://localhost:3001";
+    const baseURL = import.meta.env.VITE_BETTER_AUTH_URL || "http://localhost:5000";
     const fullUrl = url.startsWith('http') ? url : `${baseURL}${url}`;
 
     const headers: Record<string, string> = {

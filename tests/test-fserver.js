@@ -48,7 +48,7 @@ async function createTestForm() {
     }).returning({ id: forms.id });
 
     console.log('Test form created with ID:', newForm[0].id);
-    console.log('Access the form at: http://localhost:3001/form/' + newForm[0].id);
+    console.log('Access the form at: http://localhost:5000/form/' + newForm[0].id);
     
     return newForm[0].id;
   } catch (error) {

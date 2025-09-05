@@ -50,7 +50,7 @@ New administrator endpoints:
 ```bash
 # Better Auth Configuration
 BETTER_AUTH_SECRET=your-super-secret-better-auth-key
-BASE_URL=http://localhost:3001
+BASE_URL=http://localhost:5000
 
 # Session Management Configuration
 SESSION_CLEANUP_INTERVAL_MINUTES=60
