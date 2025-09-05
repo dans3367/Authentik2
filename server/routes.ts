@@ -83,7 +83,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/external-token", authenticateToken, async (req: any, res) => {
     try {
       const jwt = await import('jsonwebtoken');
-      const token = jwt.sign(
+      const token = jwt.default.sign(
         {
           userId: req.user.id,
           email: req.user.email,
