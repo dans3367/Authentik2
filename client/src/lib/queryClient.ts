@@ -14,43 +14,23 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   try {
-    // For auth endpoints, use direct fetch (Better Auth handles these)
-    if (
-      url.includes("/auth/login") ||
-      url.includes("/auth/register") ||
-      url.includes("/auth/forgot-password") ||
-      url.includes("/auth/refresh")
-    ) {
-      const headers: Record<string, string> = {
-        ...(data ? { "Content-Type": "application/json" } : {}),
-      };
+    // Use direct fetch to the correct server port to bypass Vite proxy issues
+    const baseURL = import.meta.env.VITE_BETTER_AUTH_URL || "http://localhost:5000";
+    const fullUrl = url.startsWith('http') ? url : `${baseURL}${url}`;
 
-      const res = await fetch(url, {
-        method,
-        headers,
-        body: data ? JSON.stringify(data) : undefined,
-        credentials: "include",
-      });
+    const headers: Record<string, string> = {
+      ...(data ? { "Content-Type": "application/json" } : {}),
+    };
 
-      await throwIfResNotOk(res);
-      return res;
-    }
-
-    // For all other requests, use Better Auth's authenticated fetch
-    // Better Auth's $fetch returns parsed JSON, not a Response object
-    const result = await authClient.$fetch(url, {
+    const res = await fetch(fullUrl, {
       method,
+      headers,
       body: data ? JSON.stringify(data) : undefined,
-      headers: data ? { "Content-Type": "application/json" } : {},
+      credentials: "include",
     });
 
-    // Convert the result to a Response-like object for compatibility
-    const response = new Response(JSON.stringify(result), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
-
-    return response;
+    await throwIfResNotOk(res);
+    return res;
   } catch (error) {
     throw error;
   }
