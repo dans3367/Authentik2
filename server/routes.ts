@@ -79,6 +79,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // These can be removed once all clients are updated
   // Note: Auth routes removed - better-auth handles authentication
 
+  // Generate external service token endpoint
+  app.post("/api/external-token", authenticateToken, async (req: any, res) => {
+    try {
+      const jwt = await import('jsonwebtoken');
+      const token = jwt.sign(
+        {
+          userId: req.user.id,
+          email: req.user.email,
+          tenantId: req.user.tenantId,
+          role: req.user.role,
+        },
+        process.env.JWT_SECRET || 'default-secret',
+        { expiresIn: '1h' }
+      );
+      
+      res.json({ token });
+    } catch (error) {
+      console.error('External token generation error:', error);
+      res.status(500).json({ message: 'Failed to generate external service token' });
+    }
+  });
+
   // Health check endpoint
   app.get("/api/health", (req, res) => {
     res.json({

@@ -13,6 +13,7 @@ import { Send, Mail, Server, Clock, CheckCircle, XCircle, Zap, BarChart3, Target
 import { useLocation } from "wouter";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
+import { useSession } from "@/lib/betterAuthClient";
 
 interface EmailTrackingEntry {
   id: string;
@@ -41,7 +42,21 @@ interface EmailCampaignData {
 export default function EmailTestPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const accessToken = useSelector((state: RootState) => state.auth.accessToken);
+  // Use Better Auth session to get external token
+  const { data: session } = useSession();
+  
+  // Query to get external service token when authenticated
+  const { data: tokenData } = useQuery({
+    queryKey: ['/api/external-token', session?.user?.id],
+    queryFn: async () => {
+      const response = await apiRequest('POST', '/api/external-token');
+      return response.json();
+    },
+    enabled: !!session?.user,
+    staleTime: 30 * 60 * 1000, // Token valid for 30 minutes
+  });
+  
+  const accessToken = tokenData?.token;
   const [campaignData, setCampaignData] = useState<EmailCampaignData>({
     recipient: "dan@zendwise.com",
     subject: "Test Email Campaign",
