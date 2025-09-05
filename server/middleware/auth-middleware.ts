@@ -24,8 +24,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
   try {
     // Use Better Auth's built-in session verification
     const session = await auth.api.getSession({ 
-      headers: req.headers as any,
-      cookies: req.cookies
+      headers: req.headers as any
     });
 
     if (!session) {
@@ -59,7 +58,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       firstName,
       lastName,
       role: userRecord.role || 'Employee',
-      tenantId: userRecord.tenantId || 'default-tenant-id'
+      tenantId: userRecord.tenantId || '29c69b4f-3129-4aa4-a475-7bf892e5c5b9'
     };
 
     req.user = authUser;
@@ -109,7 +108,7 @@ export const requireTenant = (req: AuthRequest, res: Response, next: NextFunctio
 
   // Validate tenant ID format (should be UUID or specific format)
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  if (!uuidRegex.test(req.user.tenantId) && req.user.tenantId !== 'default-tenant-id') {
+  if (!uuidRegex.test(req.user.tenantId) && req.user.tenantId !== '29c69b4f-3129-4aa4-a475-7bf892e5c5b9') {
     return res.status(400).json({
       message: 'Invalid tenant ID format',
       tenantId: req.user.tenantId
@@ -142,7 +141,7 @@ export const requireValidTenant = async (req: AuthRequest, res: Response, next: 
 
   // First, do basic format validation
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  if (!uuidRegex.test(req.user.tenantId) && req.user.tenantId !== 'default-tenant-id') {
+  if (!uuidRegex.test(req.user.tenantId) && req.user.tenantId !== '29c69b4f-3129-4aa4-a475-7bf892e5c5b9') {
     return res.status(400).json({
       message: 'Invalid tenant ID format',
       tenantId: req.user.tenantId
@@ -150,7 +149,7 @@ export const requireValidTenant = async (req: AuthRequest, res: Response, next: 
   }
 
   // Skip tenant existence check for default tenant (for development/testing)
-  if (req.user.tenantId !== 'default-tenant-id') {
+  if (req.user.tenantId !== '29c69b4f-3129-4aa4-a475-7bf892e5c5b9') {
     try {
       // Verify tenant exists in database
       const tenant = await db.query.tenants.findFirst({

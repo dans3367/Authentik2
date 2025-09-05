@@ -14,7 +14,7 @@ export const betterAuthUser = pgTable("better_auth_user", {
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
   role: text("role").default('Employee').notNull(), // Keep our existing role system
-  tenantId: varchar("tenant_id").default(sql`'default-tenant-id'`).notNull(), // Default value for multi-tenancy
+  tenantId: varchar("tenant_id").default(sql`'29c69b4f-3129-4aa4-a475-7bf892e5c5b9'`).notNull(), // Default value for multi-tenancy
 });
 
 export const betterAuthSession = pgTable("better_auth_session", {

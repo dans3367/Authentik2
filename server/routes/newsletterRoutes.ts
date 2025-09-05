@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, and, like, desc } from 'drizzle-orm';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
-import { createNewsletterSchema, updateNewsletterSchema, newsletters } from '@shared/schema';
+import { createNewsletterSchema, updateNewsletterSchema, newsletters, users } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 import { emailService } from '../emailService';
 
@@ -89,9 +89,20 @@ newsletterRoutes.post("/", authenticateToken, requireTenant, async (req: any, re
     const sanitizedTitle = sanitizeString(title);
     const sanitizedSubject = sanitizeString(subject);
 
+    // Get the correct user ID from the users table based on email
+    // since authentication uses betterAuthUser but newsletters reference users table
+    const userRecord = await db.query.users.findFirst({
+      where: sql`${users.email} = ${req.user.email}`,
+    });
+
+    if (!userRecord) {
+      console.error('User not found in users table for newsletter creation:', req.user.email);
+      return res.status(404).json({ message: 'User account not found. Please contact support.' });
+    }
+
     const newNewsletter = await db.insert(newsletters).values({
       tenantId: req.user.tenantId,
-      userId: req.user.userId,
+      userId: userRecord.id,
       title: sanitizedTitle,
       subject: sanitizedSubject,
       content,
