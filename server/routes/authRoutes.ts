@@ -88,21 +88,31 @@ authRoutes.delete("/user-sessions", authenticateToken, async (req: any, res) => 
       return res.status(404).json({ message: 'Session not found' });
     }
 
-    // Prevent deleting current session
-    // Note: Better Auth might use different cookie names, so we need to be careful here
-    const currentSessionToken = req.cookies?.better_auth_session_token ||
-                               req.cookies?.session_token ||
-                               req.cookies?.refreshToken;
+    // Prevent deleting current session using Better Auth cookie
+    const currentSessionToken = req.cookies?.['better-auth.session_token'];
+    
+    console.log('🔍 [Session Delete] Session to delete:', sessionId);
+    console.log('🔍 [Session Delete] Session token to delete:', session.token.substring(0, 8) + '...');
+    console.log('🔍 [Session Delete] Current session token:', currentSessionToken ? currentSessionToken.substring(0, 8) + '...' : 'None');
+    console.log('🔍 [Session Delete] Is current session?:', session.token === currentSessionToken);
 
     if (session.token === currentSessionToken) {
-      return res.status(400).json({ message: 'Cannot delete current session' });
+      console.log('❌ [Session Delete] Prevented deletion of current session');
+      return res.status(400).json({ message: 'Cannot delete current session. Use logout instead.' });
     }
 
     // Delete the session from Better Auth table
-    await db.delete(betterAuthSession)
+    const deleteResult = await db.delete(betterAuthSession)
       .where(eq(betterAuthSession.id, sessionId));
 
-    res.json({ message: 'Session ended successfully' });
+    console.log('✅ [Session Delete] Successfully deleted session:', sessionId);
+    console.log('📊 [Session Delete] Rows affected:', deleteResult.rowCount || 0);
+
+    res.json({ 
+      message: 'Session ended successfully',
+      sessionId,
+      deleted: true
+    });
   } catch (error) {
     console.error('Delete session error:', error);
     res.status(500).json({ message: 'Failed to delete session' });
@@ -115,10 +125,8 @@ authRoutes.post("/logout-all", authenticateToken, async (req: any, res) => {
     // Get the actual user ID from the authenticated session
     const userId = req.user.id;
 
-    // Get current session token (Better Auth might use different cookie names)
-    const currentSessionToken = req.cookies?.better_auth_session_token ||
-                               req.cookies?.session_token ||
-                               req.cookies?.refreshToken;
+    // Get current session token from Better Auth cookie
+    const currentSessionToken = req.cookies?.['better-auth.session_token'];
 
     if (!currentSessionToken) {
       return res.status(400).json({ message: 'No current session found' });
