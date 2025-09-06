@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import { users, shops } from '@shared/schema';
+import { betterAuthUser, shops } from '@shared/schema';
 import { authenticateToken, requireRole } from '../middleware/auth-middleware';
 import { createShopSchema, updateShopSchema, type ShopFilters } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
@@ -113,8 +113,8 @@ shopsRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator", 
 
     // Verify manager belongs to the same company
     if (managerId) {
-      const manager = await db.query.users.findFirst({
-        where: sql`${users.id} = ${managerId} AND ${users.tenantId} = ${req.user.tenantId}`,
+      const manager = await db.query.betterAuthUser.findFirst({
+        where: sql`${betterAuthUser.id} = ${managerId} AND ${betterAuthUser.tenantId} = ${req.user.tenantId}`,
       });
 
       if (!manager) {
@@ -185,8 +185,8 @@ shopsRoutes.put("/:id", authenticateToken, requireRole(["Owner", "Administrator"
     if (managerId !== undefined) {
       if (managerId && managerId.trim() !== '') {
         // Verify manager belongs to the same company
-        const manager = await db.query.users.findFirst({
-          where: sql`${users.id} = ${managerId} AND ${users.tenantId} = ${req.user.tenantId}`,
+        const manager = await db.query.betterAuthUser.findFirst({
+          where: sql`${betterAuthUser.id} = ${managerId} AND ${betterAuthUser.tenantId} = ${req.user.tenantId}`,
         });
 
         if (!manager) {
@@ -318,8 +318,8 @@ shopsRoutes.delete("/:id", authenticateToken, requireRole(["Owner", "Administrat
 // Get available managers for shop assignment
 shopsRoutes.get("/managers/list", authenticateToken, async (req: any, res) => {
   try {
-    const managers = await db.query.users.findMany({
-      where: sql`${users.tenantId} = ${req.user.tenantId} AND ${users.role} IN ('Manager', 'Administrator', 'Owner')`,
+    const managers = await db.query.betterAuthUser.findMany({
+      where: sql`${betterAuthUser.tenantId} = ${req.user.tenantId} AND ${betterAuthUser.role} IN ('Manager', 'Administrator', 'Owner')`,
       columns: {
         id: true,
         email: true,
@@ -327,7 +327,7 @@ shopsRoutes.get("/managers/list", authenticateToken, async (req: any, res) => {
         lastName: true,
         role: true,
       },
-      orderBy: sql`${users.firstName} ASC`,
+      orderBy: sql`${betterAuthUser.firstName} ASC`,
     });
 
     res.json(managers);

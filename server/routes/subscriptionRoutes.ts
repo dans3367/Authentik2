@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import { users, subscriptionPlans, forms, formResponses } from '@shared/schema';
+import { betterAuthUser, subscriptionPlans, forms, formResponses } from '@shared/schema';
 import { authenticateToken, requireRole } from '../middleware/auth-middleware';
 import Stripe from 'stripe';
 
@@ -37,8 +37,8 @@ subscriptionRoutes.post("/free-trial-signup", async (req: any, res) => {
     }
 
     // Check if user already exists
-    const existingUser = await db.query.users.findFirst({
-      where: sql`${users.email} = ${email}`,
+    const existingUser = await db.query.betterAuthUser.findFirst({
+      where: sql`${betterAuthUser.email} = ${email}`,
     });
 
     if (existingUser) {
@@ -49,7 +49,7 @@ subscriptionRoutes.post("/free-trial-signup", async (req: any, res) => {
     // Note: Password handling removed - better-auth handles authentication
     // Users will need to set their password through better-auth registration
 
-    const newUser = await db.insert(users).values({
+    const newUser = await db.insert(betterAuthUser).values({
       email,
       firstName,
       lastName,
@@ -71,12 +71,12 @@ subscriptionRoutes.post("/free-trial-signup", async (req: any, res) => {
     }).returning();
 
     // Update user with correct tenant ID
-    await db.update(users)
+    await db.update(betterAuthUser)
       .set({
         tenantId: newCompany[0].id,
         updatedAt: new Date(),
       })
-      .where(eq(users.id, newUser[0].id));
+      .where(eq(betterAuthUser.id, newUser[0].id));
 
     // Sync tenant information with Better Auth user table
     try {
@@ -411,7 +411,7 @@ subscriptionRoutes.get("/usage", authenticateToken, requireRole(["Owner"]), asyn
     const [formCount, responseCount, userCount] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(forms).where(sql`${forms.tenantId} = ${company.id}`),
       db.select({ count: sql<number>`count(*)` }).from(formResponses).innerJoin(forms, sql`${forms.id} = ${formResponses.formId}`).where(sql`${forms.tenantId} = ${company.id}`),
-      db.select({ count: sql<number>`count(*)` }).from(db.users).where(sql`${users.tenantId} = ${company.id}`),
+      db.select({ count: sql<number>`count(*)` }).from(db.users).where(sql`${betterAuthUser.tenantId} = ${company.id}`),
     ]);
 
     const usage = {

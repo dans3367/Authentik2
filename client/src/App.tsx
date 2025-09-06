@@ -10,7 +10,7 @@ import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { AppLayout } from "@/components/AppLayout";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { setGlobalNavigate } from "@/lib/authErrorHandler";
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useAuthErrorHandler, setGlobalAuthErrorHandler } from "@/hooks/useAuthErrorHandler";
 
 // Lazy load components for code splitting
@@ -81,6 +81,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       }
     } else if (isAuthenticated && isEmailVerified === true) {
       // Redirect auth page to dashboard for verified users
+      // 2FA handling is now done in the login flow itself
       if (['/auth', '/pending-verification'].includes(location)) {
         setLocation('/dashboard');
       }

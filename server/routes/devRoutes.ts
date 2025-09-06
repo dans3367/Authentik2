@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import { users, tenants, betterAuthUser } from '@shared/schema';
+import { tenants, betterAuthUser } from '@shared/schema';
 // Note: bcrypt removed - better-auth handles password hashing
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { randomUUID } from 'crypto';
@@ -27,7 +27,7 @@ devRoutes.post("/create-test-managers", async (req, res) => {
     // Test managers will need to set passwords through better-auth
 
     for (let i = 1; i <= count; i++) {
-      const manager = await db.insert(users).values({
+      const manager = await db.insert(betterAuthUser).values({
         email: `manager${i}@test.com`,
         // Note: password field removed - better-auth handles authentication
         firstName: `Manager`,
@@ -71,8 +71,8 @@ devRoutes.post("/update-test-user", async (req, res) => {
       return res.status(400).json({ message: 'User ID and updates are required' });
     }
 
-    const user = await db.query.users.findFirst({
-      where: sql`${users.id} = ${userId}`,
+    const user = await db.query.betterAuthUser.findFirst({
+      where: sql`${betterAuthUser.id} = ${userId}`,
     });
 
     // For dev routes, skip tenant check if no tenantId provided (for testing purposes)
@@ -80,12 +80,12 @@ devRoutes.post("/update-test-user", async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const updatedUser = await db.update(users)
+    const updatedUser = await db.update(betterAuthUser)
       .set({
         ...updates,
         updatedAt: new Date(),
       })
-      .where(sql`${users.id} = ${userId}`)
+      .where(sql`${betterAuthUser.id} = ${userId}`)
       .returning();
 
     res.json({
@@ -145,8 +145,8 @@ devRoutes.post("/test-verification", async (req, res) => {
       return res.status(400).json({ message: 'Email is required' });
     }
 
-    const user = await db.query.users.findFirst({
-      where: sql`${users.email} = ${email}`,
+    const user = await db.query.betterAuthUser.findFirst({
+      where: sql`${betterAuthUser.email} = ${email}`,
     });
 
     // For dev routes, skip tenant check if no tenantId provided (for testing purposes)
@@ -156,12 +156,12 @@ devRoutes.post("/test-verification", async (req, res) => {
 
     // Generate new verification token
     const verificationToken = randomUUID();
-    await db.update(users)
+    await db.update(betterAuthUser)
       .set({ 
         verificationToken,
         updatedAt: new Date(),
       })
-      .where(sql`${users.id} = ${user.id}`);
+      .where(sql`${betterAuthUser.id} = ${user.id}`);
 
     res.json({
       message: 'Verification token generated successfully',
@@ -183,8 +183,8 @@ devRoutes.get("/debug/info", authenticateToken, async (req: any, res) => {
       return res.status(403).json({ message: 'This endpoint is not available in production' });
     }
 
-    const user = await db.query.users.findFirst({
-      where: sql`${users.id} = ${req.user.id}`,
+    const user = await db.query.betterAuthUser.findFirst({
+      where: sql`${betterAuthUser.id} = ${req.user.id}`,
       with: {
         company: true,
       },
@@ -237,8 +237,8 @@ devRoutes.post("/reset-password", async (req, res) => {
       return res.status(400).json({ message: 'Email is required' });
     }
 
-    const user = await db.query.users.findFirst({
-      where: sql`${users.email} = ${email}`,
+    const user = await db.query.betterAuthUser.findFirst({
+      where: sql`${betterAuthUser.email} = ${email}`,
     });
 
     // For dev routes, skip tenant check if no tenantId provided (for testing purposes)
@@ -249,12 +249,12 @@ devRoutes.post("/reset-password", async (req, res) => {
     // Note: Password hashing removed - better-auth handles password management
     // In a real application, you would use better-auth's password reset flow
 
-    await db.update(users)
+    await db.update(betterAuthUser)
       .set({
         // Note: password field removed - better-auth handles authentication
         updatedAt: new Date(),
       })
-      .where(sql`${users.id} = ${user.id}`);
+      .where(sql`${betterAuthUser.id} = ${user.id}`);
 
     res.json({
       message: 'User updated (password management now handled by better-auth)',
@@ -428,8 +428,8 @@ devRoutes.get("/debug-2fa/:email", async (req, res) => {
     } : 'Not found');
     
     // Check users table
-    const user = await db.query.users.findFirst({
-      where: eq(users.email, email)
+    const user = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.email, email)
     });
     
     console.log('Users table record:', user ? {
@@ -503,8 +503,8 @@ devRoutes.post("/force-disable-2fa/:email", async (req, res) => {
     console.log(`🔍 Force disabling 2FA for email: ${email}`);
     
     // Check current status
-    const user = await db.query.users.findFirst({
-      where: eq(users.email, email)
+    const user = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.email, email)
     });
     
     if (!user) {
@@ -519,19 +519,19 @@ devRoutes.post("/force-disable-2fa/:email", async (req, res) => {
     });
     
     // Force disable 2FA
-    const updateResult = await db.update(users)
+    const updateResult = await db.update(betterAuthUser)
       .set({
         twoFactorEnabled: false,
         twoFactorSecret: null,
         updatedAt: new Date(),
       })
-      .where(eq(users.id, user.id));
+      .where(eq(betterAuthUser.id, user.id));
     
     console.log(`✅ Force disable result: ${updateResult.rowCount} rows affected`);
     
     // Verify the update
-    const updatedUser = await db.query.users.findFirst({
-      where: eq(users.id, user.id)
+    const updatedUser = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.id, user.id)
     });
     
     console.log('🔍 Updated user status:', {
@@ -576,8 +576,8 @@ devRoutes.post("/force-enable-2fa/:email", async (req, res) => {
     console.log(`🔍 Force enabling 2FA for email: ${email}`);
 
     // Check current status
-    const user = await db.query.users.findFirst({
-      where: eq(users.email, email)
+    const user = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.email, email)
     });
 
     if (!user) {
@@ -595,19 +595,19 @@ devRoutes.post("/force-enable-2fa/:email", async (req, res) => {
     const finalSecret = secret || require('crypto').randomBytes(32).toString('base64');
 
     // Force enable 2FA
-    const updateResult = await db.update(users)
+    const updateResult = await db.update(betterAuthUser)
       .set({
         twoFactorEnabled: true,
         twoFactorSecret: finalSecret,
         updatedAt: new Date(),
       })
-      .where(eq(users.id, user.id));
+      .where(eq(betterAuthUser.id, user.id));
 
     console.log(`✅ Force enable result: ${updateResult.rowCount} rows affected`);
 
     // Verify the update
-    const updatedUser = await db.query.users.findFirst({
-      where: eq(users.id, user.id)
+    const updatedUser = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.id, user.id)
     });
 
     console.log('🔍 Updated user status:', {

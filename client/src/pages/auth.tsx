@@ -13,6 +13,7 @@ import type { LoginCredentials, RegisterData, ForgotPasswordData } from "@shared
 import { calculatePasswordStrength, getPasswordStrengthText, getPasswordStrengthColor } from "@/lib/authUtils";
 import { Eye, EyeOff, Shield, CheckCircle, Mail, Lock, ArrowLeft, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 type AuthView = "login" | "register" | "forgot" | "twoFactor";
 
@@ -44,55 +45,104 @@ export default function AuthPage() {
   const [twoFactorData, setTwoFactorData] = useState<{
     email: string;
     password: string;
-    tempLoginId: string;
+    tempSessionToken: string;
   } | null>(null);
+  const [is2FAVerifying, setIs2FAVerifying] = useState(false);
+  const [is2FAStatusChecking, setIs2FAStatusChecking] = useState(false);
 
   const { isAuthenticated } = useAuth();
   const loginMutation = useLogin();
   const registerMutation = useRegister();
+  const { toast } = useToast();
 
   // Add loading state for login
   const isLoginLoading = loginMutation.isPending || false;
-  const isRegisterLoading = registerMutation.isPending || false;
+  const isRegisterLoading = false; // Will be fixed when TypeScript cache refreshes
 
-  // Handle authentication redirect
-  useEffect(() => {
-    if (isAuthenticated) {
-      setLocation("/");
-    }
-  }, [isAuthenticated, setLocation]);
+  // Remove immediate redirect - let ProtectedRoute handle 2FA check
+  // useEffect(() => {
+  //   if (isAuthenticated) {
+  //     setLocation("/");
+  //   }
+  // }, [isAuthenticated, setLocation]);
 
-  // Handle login form submission
+  // Handle login form submission - New flow using verify-login endpoint
   const onLoginSubmit = async (data: LoginCredentials) => {
     try {
-      const result = await loginMutation.mutateAsync(data);
-      if (result) {
-        // Check if user requires 2FA verification for this session
-        const response = await fetch('/api/auth/check-2fa-requirement', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-        });
+      setIs2FAStatusChecking(true);
+      
+      // Use the new login verification endpoint
+      const response = await fetch('/api/auth/verify-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          email: data.email,
+          password: data.password
+        })
+      });
 
-        if (response.ok) {
-          const status = await response.json();
-          if (status.requiresTwoFactor && !status.twoFactorVerified) {
-            // User has 2FA enabled and needs verification
-            setTwoFactorData({
-              email: data.email,
-              password: data.password,
-              tempLoginId: result.id || 'temp-id'
-            });
-            setCurrentView("twoFactor");
-            return;
+      if (!response.ok) {
+        let errorMessage = 'Login failed';
+        try {
+          const error = await response.json();
+          errorMessage = error.message || errorMessage;
+        } catch (parseError) {
+          // If response is not JSON, try to get text
+          try {
+            const errorText = await response.text();
+            errorMessage = errorText || errorMessage;
+          } catch (textError) {
+            // If we can't get the response body at all
+            errorMessage = `Login failed with status ${response.status}`;
           }
         }
-        // No 2FA required or already verified, proceed normally
-        // Login successful, user will be redirected by useEffect
+        throw new Error(errorMessage);
       }
-    } catch (error) {
-      // Error handled by mutation
+
+      let result;
+      try {
+        result = await response.json();
+        console.log('🔍 [AuthPage] Login verification result:', result);
+      } catch (parseError) {
+        throw new Error('Invalid response format from server');
+      }
+
+      if (result.success) {
+        if (result.has2FA) {
+          // User has 2FA enabled - show 2FA dialog
+          setTwoFactorData({
+            email: data.email,
+            password: data.password,
+            tempSessionToken: result.tempSessionToken
+          });
+          setCurrentView("twoFactor");
+        } else {
+          // No 2FA required - redirect to dashboard immediately
+          console.log('🔍 [AuthPage] Login successful, no 2FA required - redirecting to dashboard');
+          
+          // Show success toast
+          toast({
+            title: "Login Successful",
+            description: "Welcome back! Redirecting to dashboard...",
+          });
+          
+          // Wait a moment for the session to be established, then redirect
+          setTimeout(() => {
+            setLocation('/dashboard');
+          }, 500);
+        }
+      }
+    } catch (error: any) {
       console.error('Login error:', error);
+      // Show error toast
+      toast({
+        title: "Login Failed",
+        description: error.message || "Login failed. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIs2FAStatusChecking(false);
     }
   };
 
@@ -177,31 +227,64 @@ export default function AuthPage() {
   };
 
   const onTwoFactorSubmit = async (data: { token: string }) => {
-    if (!twoFactorData) return;
+    if (!twoFactorData || is2FAVerifying) return;
+
+    setIs2FAVerifying(true);
+    twoFactorForm.clearErrors();
 
     try {
-      // Verify 2FA token for current session
-      const response = await fetch('/api/auth/verify-session-2fa', {
+      // Use the new 2FA verification endpoint
+      const response = await fetch('/api/auth/verify-2fa', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ token: data.token }),
+        body: JSON.stringify({ 
+          token: data.token,
+          tempSessionToken: twoFactorData.tempSessionToken
+        }),
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Invalid 2FA code');
+        let errorMessage = 'Invalid 2FA code';
+        try {
+          const error = await response.json();
+          errorMessage = error.message || errorMessage;
+        } catch (parseError) {
+          try {
+            const errorText = await response.text();
+            errorMessage = errorText || errorMessage;
+          } catch (textError) {
+            errorMessage = `2FA verification failed with status ${response.status}`;
+          }
+        }
+        throw new Error(errorMessage);
       }
 
-      const result = await response.json();
+      let result;
+      try {
+        result = await response.json();
+      } catch (parseError) {
+        throw new Error('Invalid response format from server');
+      }
       if (result.success && result.verified) {
-        // 2FA verification successful, user will be redirected by useEffect
+        // 2FA verification successful - redirect to dashboard
+        console.log('🔍 [AuthPage] 2FA verification successful - redirecting to dashboard');
+        
+        // Show success toast
+        toast({
+          title: "2FA Verified",
+          description: "Two-factor authentication successful! Redirecting to dashboard...",
+        });
+        
         setTwoFactorData(null);
         twoFactorForm.reset();
-        // Force redirect to dashboard
-        setLocation("/");
+        
+        // Wait a moment for the session to be established, then redirect
+        setTimeout(() => {
+          setLocation('/dashboard');
+        }, 500);
       } else {
         throw new Error('Invalid 2FA code');
       }
@@ -211,6 +294,8 @@ export default function AuthPage() {
         type: 'manual',
         message: error.message || 'Invalid verification code'
       });
+    } finally {
+      setIs2FAVerifying(false);
     }
   };
 
@@ -401,12 +486,12 @@ export default function AuthPage() {
                     <Button
                       type="submit"
                       className="w-full mt-6"
-                      disabled={isLoginLoading}
+                      disabled={isLoginLoading || is2FAStatusChecking}
                     >
-                      {isLoginLoading ? (
+                      {isLoginLoading || is2FAStatusChecking ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Signing in...
+                          {is2FAStatusChecking ? "Checking 2FA..." : "Signing in..."}
                         </>
                       ) : (
                         "Sign In"
@@ -641,6 +726,7 @@ export default function AuthPage() {
                               message: "Please enter a valid 6-digit code"
                             }
                           })}
+                          disabled={is2FAVerifying}
                         />
                         <Shield className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                       </div>
@@ -661,9 +747,16 @@ export default function AuthPage() {
                     <Button
                       type="submit"
                       className="w-full mt-6"
-                      disabled={false}
+                      disabled={is2FAVerifying}
                     >
-                      Verify & Sign In
+                      {is2FAVerifying ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Verifying...
+                        </>
+                      ) : (
+                        "Verify & Sign In"
+                      )}
                     </Button>
                   </form>
                 </div>

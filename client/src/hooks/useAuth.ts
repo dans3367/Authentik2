@@ -73,9 +73,10 @@ export function useLogin() {
 
 export function useRegister() {
   const { toast } = useToast();
+  const [isPending, setIsPending] = useState(false);
 
-  return {
-    mutateAsync: async (data: RegisterData) => {
+  const mutateAsync = async (data: RegisterData) => {
+    setIsPending(true);
       try {
         const result = await signUp.email({
           email: data.email,
@@ -109,8 +110,14 @@ export function useRegister() {
         });
 
         throw error;
+      } finally {
+        setIsPending(false);
       }
-    },
+    };
+
+  return {
+    mutateAsync,
+    isPending,
   };
 }
 
