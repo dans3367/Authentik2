@@ -9,6 +9,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { AppLayout } from "@/components/AppLayout";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { setGlobalNavigate } from "@/lib/authErrorHandler";
 import { lazy, Suspense, useEffect } from "react";
 
 // Lazy load components for code splitting
@@ -92,6 +93,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function Router() {
   const { isAuthenticated, isLoading, user, isInitialized } = useReduxAuth();
+  const [, setLocation] = useLocation();
+
+  // Set global navigate function for 401 error handling
+  useEffect(() => {
+    setGlobalNavigate(setLocation);
+  }, [setLocation]);
 
   console.log("🔍 [Redux] Router state:", {
     isAuthenticated,

@@ -114,6 +114,14 @@ export const apiRateLimiter = createRateLimiter({
   max: 300, // Increased from 60 to 300 for debugging
 });
 
+// JWT Token generation rate limiter - more restrictive
+export const jwtTokenRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Only 10 token requests per user per 15 minutes
+  message: "Too many token generation requests. Please try again later.",
+  skipSuccessfulRequests: false, // Count both successful and failed attempts
+});
+
 // MongoDB injection protection
 export const mongoSanitizer = mongoSanitize({
   replaceWith: "_",

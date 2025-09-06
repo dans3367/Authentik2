@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Test JWT token refresh functionality
-API_URL="http://localhost:3001/api"
+API_URL="http://localhost:5000/api"
 
 echo "🔄 Testing JWT Token Refresh"
 echo "============================"
@@ -29,4 +29,6 @@ echo "   - Returns 401 for missing/invalid refresh tokens"
 echo "   - Uses centralized JWT utilities"
 echo "   - No longer returns accessToken in JSON response"
 echo "   - Returns user data in refresh response"
+
+
 

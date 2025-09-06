@@ -1,3 +1,4 @@
+import "./config";
 import { db } from "./db";
 import { tenants, subscriptionPlans } from "@shared/schema";
 import { eq } from "drizzle-orm";

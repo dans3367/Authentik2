@@ -1,0 +1,54 @@
+ [Auth] Valid session found: owner@example.com
+✅ [Auth] Valid session found: owner@example.com
+✅ [Auth] Authentication successful for: owner@example.com
+✅ Tenant validation passed: {
+  userId: 'SYsPH1iAW5mktT8lXShHhBXXR3gXfhGA',
+  email: 'owner@example.com',
+  tenantId: 'default-tenant-id',
+  role: 'Owner'
+}
+✅ [Auth] Authentication successful for: owner@example.com
+✅ Tenant validation passed: {
+  userId: 'SYsPH1iAW5mktT8lXShHhBXXR3gXfhGA',
+  email: 'owner@example.com',
+  tenantId: 'default-tenant-id',
+  role: 'Owner'
+}
+7:02:57 PM [express] GET /api/newsletters/newsletter-stats 404 in 490ms :: {"message":"Newsletter no…
+7:02:57 PM [express] GET /api/newsletters 200 in 532ms :: {"newsletters":[],"pagination":{"page":1,"…
+✅ [Auth] Valid session found: owner@example.com
+✅ [Auth] Valid session found: owner@example.com
+✅ [Auth] Authentication successful for: owner@example.com
+✅ Tenant validation passed: {
+  userId: 'SYsPH1iAW5mktT8lXShHhBXXR3gXfhGA',
+  email: 'owner@example.com',
+  tenantId: 'default-tenant-id',
+  role: 'Owner'
+}
+✅ [Auth] Authentication successful for: owner@example.com
+✅ Tenant validation passed: {
+  userId: 'SYsPH1iAW5mktT8lXShHhBXXR3gXfhGA',
+  email: 'owner@example.com',
+  tenantId: 'default-tenant-id',
+  role: 'Owner'
+}
+7:03:01 PM [express] GET /api/newsletters/newsletter-stats 404 in 278ms :: {"message":"Newsletter no…
+7:03:01 PM [express] GET /api/newsletters 200 in 343ms :: {"newsletters":[],"pagination":{"page":1,"…
+✅ [Auth] Valid session found: owner@example.com
+✅ [Auth] Authentication successful for: owner@example.com
+✅ Tenant validation passed: {
+  userId: 'SYsPH1iAW5mktT8lXShHhBXXR3gXfhGA',
+  email: 'owner@example.com',
+  tenantId: 'default-tenant-id',
+  role: 'Owner'
+}
+7:03:02 PM [express] GET /api/newsletters/newsletter-stats 404 in 268ms :: {"message":"Newsletter no…
+✅ [Auth] Valid session found: owner@example.com
+✅ [Auth] Authentication successful for: owner@example.com
+✅ Tenant validation passed: {
+  userId: 'SYsPH1iAW5mktT8lXShHhBXXR3gXfhGA',
+  email: 'owner@example.com',
+  tenantId: 'default-tenant-id',
+  role: 'Owner'
+}
+7:03:04 PM [express] GET /api/newsletters/newsletter-stats 404 in 262ms :: {"message":"Newsletter no…

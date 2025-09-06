@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { authManager } from "@/lib/auth";
+// Note: authManager removed - Better Auth handles authentication
 import { useReduxAuth } from "@/hooks/useReduxAuth";
+import { useSession } from "@/lib/betterAuthClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,12 +36,13 @@ function getDeviceIcon(deviceName: string) {
 export default function Sessions() {
   console.log("🔍 [SessionsPage] Component rendered");
   const { user, isLoading: authLoading } = useReduxAuth();
+  const { data: betterAuthSession, isPending: sessionLoading } = useSession();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Check authentication first
-  if (authLoading) {
+  if (authLoading || sessionLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
@@ -54,9 +56,9 @@ export default function Sessions() {
   }
 
   const { data: sessionsData, isLoading } = useQuery({
-    queryKey: ['/api/auth/sessions'],
+    queryKey: ['/api/user/user-sessions'],
     queryFn: async () => {
-      const response = await authManager.makeAuthenticatedRequest('GET', '/api/auth/sessions');
+      const response = await apiRequest('GET', '/api/user/user-sessions');
       if (!response.ok) {
         throw new Error('Failed to fetch sessions');
       }
@@ -76,23 +78,23 @@ export default function Sessions() {
 
   const logoutSessionMutation = useMutation({
     mutationFn: async (sessionId: string) => {
-      const response = await authManager.makeAuthenticatedRequest('DELETE', '/api/auth/sessions', { sessionId });
+      const response = await apiRequest('DELETE', '/api/user/user-sessions', { sessionId });
       if (!response.ok) {
         throw new Error('Failed to logout session');
       }
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/user-sessions'] });
       toast({
         title: "Success",
-        description: "Device logged out successfully",
+        description: "Session ended successfully",
       });
     },
     onError: (error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to log out device",
+        description: error.message || "Failed to end session",
         variant: "destructive",
       });
     },
@@ -100,23 +102,23 @@ export default function Sessions() {
 
   const logoutAllOtherSessionsMutation = useMutation({
     mutationFn: async () => {
-      const response = await authManager.makeAuthenticatedRequest('POST', '/api/auth/logout-all');
+      const response = await apiRequest('POST', '/api/user/logout-all');
       if (!response.ok) {
         throw new Error('Failed to logout all other sessions');
       }
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/user-sessions'] });
       toast({
         title: "Success",
-        description: "All other devices logged out successfully",
+        description: "All other sessions ended successfully",
       });
     },
     onError: (error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to log out other devices",
+        description: error.message || "Failed to end other sessions",
         variant: "destructive",
       });
     },
@@ -172,10 +174,10 @@ export default function Sessions() {
                 <Monitor className="text-blue-600 dark:text-blue-500 w-8 h-8" />
                 <div>
                   <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-                    Active Sessions
+                    Session Management
                   </h1>
                   <p className="text-gray-600 dark:text-gray-400 mt-1">
-                    Manage your active login sessions across different devices
+                    Manage your active sessions powered by Better Auth
                   </p>
                 </div>
               </div>
@@ -188,14 +190,14 @@ export default function Sessions() {
                     className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/30 dark:to-red-800/30 border-red-200 dark:border-red-700/50 hover:from-red-100 hover:to-red-200 dark:hover:from-red-800/40 dark:hover:to-red-700/40 transition-all duration-300 text-red-700 dark:text-red-300"
                   >
                     <LogOut className="h-4 w-4 mr-2" />
-                    Log Out All Other Devices
+                    Log Out All Other Sessions
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Log Out All Other Devices?</AlertDialogTitle>
+                    <AlertDialogTitle>Log Out All Other Sessions?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This will log you out from all other devices except this one. 
+                      This will log you out from all other sessions except this one.
                       You'll need to sign in again on those devices.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
@@ -205,7 +207,7 @@ export default function Sessions() {
                       onClick={() => logoutAllOtherSessionsMutation.mutate()}
                       disabled={logoutAllOtherSessionsMutation.isPending}
                     >
-                      {logoutAllOtherSessionsMutation.isPending ? "Logging out..." : "Log Out All"}
+                      {logoutAllOtherSessionsMutation.isPending ? "Ending sessions..." : "End All Sessions"}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -214,7 +216,7 @@ export default function Sessions() {
           </div>
 
           {/* Current Session */}
-          {currentSession && (
+          {betterAuthSession && (
             <div>
               <h2 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">Current Session</h2>
               <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-green-200/50 dark:border-green-700/30 hover:shadow-lg transition-all duration-300">
@@ -222,21 +224,17 @@ export default function Sessions() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <div className="text-green-600 dark:text-green-500 w-8 h-8 flex items-center justify-center">
-                        {getDeviceIcon(currentSession.deviceName)}
+                        <Monitor className="h-5 w-5" />
                       </div>
                       <div>
-                        <CardTitle className="text-base text-gray-900 dark:text-gray-100">{currentSession.deviceName}</CardTitle>
+                        <CardTitle className="text-base text-gray-900 dark:text-gray-100">
+                          {betterAuthSession.user?.email || 'Current Device'}
+                        </CardTitle>
                         <CardDescription className="flex items-center space-x-4 mt-1">
                           <span className="flex items-center">
                             <Globe className="h-3 w-3 mr-1" />
-                            {currentSession.ipAddress}
+                            Active Session
                           </span>
-                          {currentSession.location && (
-                            <span className="flex items-center">
-                              <MapPin className="h-3 w-3 mr-1" />
-                              {currentSession.location}
-                            </span>
-                          )}
                         </CardDescription>
                       </div>
                     </div>
@@ -246,7 +244,7 @@ export default function Sessions() {
                 <CardContent className="pt-0">
                   <div className="flex items-center text-sm text-muted-foreground">
                     <Clock className="h-3 w-3 mr-1" />
-                    Created {formatDistanceToNow(new Date(currentSession.createdAt), { addSuffix: true })}
+                    Active session managed by Better Auth
                   </div>
                 </CardContent>
               </Card>
@@ -256,7 +254,7 @@ export default function Sessions() {
           {/* Other Sessions */}
           {otherSessions.length > 0 ? (
             <div>
-              <h2 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">Other Sessions</h2>
+              <h2 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">Other Device Sessions</h2>
               <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
                 <CardContent className="p-0">
                   <div className="overflow-x-auto">
@@ -265,7 +263,7 @@ export default function Sessions() {
                         <tr className="border-b border-gray-200 dark:border-gray-700">
                           <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-gray-100">Device</th>
                           <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-gray-100">IP Address</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-gray-100">Created</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-gray-100">Started</th>
                           <th className="text-right py-3 px-4 font-medium text-gray-900 dark:text-gray-100">Action</th>
                         </tr>
                       </thead>
@@ -301,14 +299,14 @@ export default function Sessions() {
                                     className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20"
                                   >
                                     <LogOut className="h-3 w-3 mr-1" />
-                                    Log Out
+                                    End Session
                                   </Button>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
                                   <AlertDialogHeader>
-                                    <AlertDialogTitle>Log Out Device?</AlertDialogTitle>
+                                    <AlertDialogTitle>End Session?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                      This will log you out from "{session.deviceName}". 
+                                      This will end the session for "{session.deviceName}".
                                       You'll need to sign in again on that device.
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
@@ -319,7 +317,7 @@ export default function Sessions() {
                                       disabled={logoutSessionMutation.isPending}
                                       className="bg-red-600 hover:bg-red-700 text-white"
                                     >
-                                      {logoutSessionMutation.isPending ? "Logging out..." : "Log Out"}
+                                      {logoutSessionMutation.isPending ? "Ending session..." : "End Session"}
                                     </AlertDialogAction>
                                   </AlertDialogFooter>
                                 </AlertDialogContent>
@@ -335,11 +333,11 @@ export default function Sessions() {
             </div>
           ) : (
             <div>
-              <h2 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">Other Sessions</h2>
+              <h2 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">Other Device Sessions</h2>
               <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
                 <CardContent className="p-6">
                   <p className="text-center text-muted-foreground">
-                    No other active sessions found
+                    No other device sessions found
                   </p>
                 </CardContent>
               </Card>
@@ -354,9 +352,9 @@ export default function Sessions() {
                   <div className="text-center space-y-4">
                     <Monitor className="h-12 w-12 text-gray-400 mx-auto" />
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">No Active Sessions</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">No Sessions Found</h3>
                       <p className="text-muted-foreground mt-2">
-                        No active sessions found. This might indicate a temporary issue.
+                        No active sessions found. Your current session should be visible above.
                       </p>
                       <Button 
                         onClick={() => window.location.reload()} 

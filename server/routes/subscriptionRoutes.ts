@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { users, subscriptionPlans, forms, formResponses } from '@shared/schema';
-import { authenticateToken, requireRole } from '../middleware/auth';
+import { authenticateToken, requireRole } from '../middleware/auth-middleware';
 import Stripe from 'stripe';
 
 export const subscriptionRoutes = Router();
@@ -46,38 +46,75 @@ subscriptionRoutes.post("/free-trial-signup", async (req: any, res) => {
     }
 
     // Create user with free trial
-    const bcrypt = require('bcryptjs');
-    const hashedPassword = await bcrypt.hash('temp-password-' + Date.now(), 12);
+    // Note: Password handling removed - better-auth handles authentication
+    // Users will need to set their password through better-auth registration
 
     const newUser = await db.insert(users).values({
       email,
       firstName,
       lastName,
-      password: hashedPassword,
+      // Note: password field removed - better-auth handles authentication
       role: 'Owner',
+      tenantId: 'default-tenant-id', // Will be updated after tenant creation
       emailVerified: true, // Auto-verify for free trial
       createdAt: new Date(),
+      updatedAt: new Date(),
     }).returning();
 
-    // Create company
-    const newCompany = await db.insert(db.companies).values({
+    // Create company/tenant
+    const newCompany = await db.insert(tenants).values({
       name: companyName,
       slug: companyName.toLowerCase().replace(/\s+/g, '-'),
-      ownerId: newUser[0].id,
-      trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days trial
+      isActive: true,
       createdAt: new Date(),
+      updatedAt: new Date(),
     }).returning();
 
-    // Update user with company ID
+    // Update user with correct tenant ID
     await db.update(users)
-      .set({ companyId: newCompany[0].id })
-      .where(sql`${users.id} = ${newUser[0].id}`);
+      .set({
+        tenantId: newCompany[0].id,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, newUser[0].id));
+
+    // Sync tenant information with Better Auth user table
+    try {
+      // Check if Better Auth user exists (they might have signed up via Better Auth first)
+      const existingBetterAuthUser = await db.query.betterAuthUser.findFirst({
+        where: eq(betterAuthUser.email, email),
+      });
+
+      if (existingBetterAuthUser) {
+        // Update Better Auth user with tenant information
+        await db.update(betterAuthUser)
+          .set({
+            tenantId: newCompany[0].id,
+            role: 'Owner',
+            updatedAt: new Date(),
+          })
+          .where(eq(betterAuthUser.id, existingBetterAuthUser.id));
+
+        console.log('✅ Synced tenant info to Better Auth user during free trial signup:', {
+          userId: existingBetterAuthUser.id,
+          email,
+          tenantId: newCompany[0].id
+        });
+      } else {
+        console.warn('⚠️ No Better Auth user found for free trial signup:', email);
+        console.log('🏢 User should sign up via Better Auth first, then use this endpoint');
+      }
+    } catch (error) {
+      console.error('❌ Failed to sync tenant info during free trial signup:', error);
+      // Don't fail the signup, just log the error
+    }
+
 
     res.status(201).json({
       message: 'Free trial account created successfully',
       userId: newUser[0].id,
-      companyId: newCompany[0].id,
-      trialEndsAt: newCompany[0].trialEndsAt,
+      tenantId: newCompany[0].id,
+      tenantSlug: newCompany[0].slug,
     });
   } catch (error) {
     console.error('Free trial signup error:', error);

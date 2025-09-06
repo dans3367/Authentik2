@@ -1,48 +1,24 @@
-import { useEffect } from "react";
-import { useAppDispatch, useAppSelector } from "@/store";
-import {
-  checkAuthStatus,
-  loginUser,
-  logoutUser,
-  updateUserProfile,
-  clearAuth,
-  setError,
-  clearError,
-  initializeFromAuthManager,
-} from "@/store/authSlice";
+import { useAuth, useLogin, useLogout } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
-// Main authentication hook
+// Main authentication hook - now uses better-auth
 export function useReduxAuth() {
-  const dispatch = useAppDispatch();
-  const authState = useAppSelector((state) => state.auth);
-
-  // Initialize authentication on mount
-  useEffect(() => {
-    if (!authState.isInitialized && !authState.isLoading) {
-      console.log("🔐 [Hook] Initializing authentication...");
-      // First, sync with authManager's localStorage data
-      dispatch(initializeFromAuthManager());
-      // Then check auth status
-      dispatch(checkAuthStatus());
-    }
-  }, [dispatch, authState.isInitialized, authState.isLoading]);
+  const auth = useAuth();
 
   return {
-    user: authState.user,
-    isAuthenticated: authState.isAuthenticated,
-    isLoading: authState.isLoading,
-    isInitialized: authState.isInitialized,
-    error: authState.error,
-    accessToken: authState.accessToken,
+    user: auth.user,
+    isAuthenticated: auth.isAuthenticated,
+    isLoading: auth.isLoading,
+    isInitialized: auth.hasInitialized,
+    error: auth.error,
+    accessToken: null, // Better-auth handles tokens internally
   };
 }
 
-// Login hook
+// Login hook - placeholder for better-auth integration
 export function useReduxLogin() {
-  const dispatch = useAppDispatch();
   const { toast } = useToast();
-  const { isLoginLoading, error } = useAppSelector((state) => state.auth);
+  const loginMutation = useLogin();
 
   const login = async (credentials: {
     email: string;
@@ -51,108 +27,58 @@ export function useReduxLogin() {
     rememberMe?: boolean;
   }) => {
     try {
-      const result = await dispatch(loginUser(credentials)).unwrap();
-
       toast({
-        title: "Success",
-        description: "Login successful! Welcome back.",
+        title: "Info",
+        description: "Authentication system is being updated. Please try again later.",
       });
-
-      return result;
+      return null;
     } catch (error: any) {
-      let message = "Login failed. Please try again.";
-
-      if (error === "2FA_REQUIRED") {
-        throw new Error("2FA_REQUIRED");
-      }
-
-      const errorString = typeof error === 'string' ? error : error.toString();
-      
-      if (errorString.includes("401")) {
-        message = "Invalid email or password. Please check your credentials.";
-      } else if (errorString.includes("403") && errorString.includes("verify")) {
-        message =
-          "Please verify your email address before logging in. Check your inbox for the verification email.";
-      } else if (errorString.includes("400")) {
-        message = "Please check your input and try again.";
-      }
-
       toast({
         title: "Login Failed",
-        description: message,
+        description: "Authentication system temporarily unavailable.",
         variant: "destructive",
       });
-
-      throw new Error(error);
+      throw error;
     }
   };
 
   return {
     login,
-    isLoading: isLoginLoading,
-    error,
+    isLoading: false,
+    error: null,
   };
 }
 
-// Logout hook
+// Logout hook - uses better-auth
 export function useReduxLogout() {
-  const dispatch = useAppDispatch();
   const { toast } = useToast();
+  const logoutMutation = useLogout();
 
   const logout = async () => {
     try {
-      await dispatch(logoutUser()).unwrap();
-
-      toast({
-        title: "Success",
-        description: "Logged out successfully.",
-      });
+      await logoutMutation.mutateAsync();
     } catch (error) {
-      // Even if logout fails on server, we've cleared local state
-      toast({
-        title: "Info",
-        description: "Logged out locally.",
-      });
+      console.error("Logout error:", error);
     }
   };
 
   return { logout };
 }
 
-// Profile update hook
+// Profile update hook - placeholder
 export function useReduxUpdateProfile() {
-  const dispatch = useAppDispatch();
   const { toast } = useToast();
 
   const updateProfile = async (profileData: any) => {
-    try {
-      await dispatch(updateUserProfile(profileData)).unwrap();
-
-      toast({
-        title: "Success",
-        description: "Profile updated successfully.",
-      });
-    } catch (error: any) {
-      let message = "Failed to update profile. Please try again.";
-
-      if (error.includes("409")) {
-        message = "Email already taken by another user.";
-      } else if (error.includes("400")) {
-        message = "Please check your input and try again.";
-      }
-
-      toast({
-        title: "Update Failed",
-        description: message,
-        variant: "destructive",
-      });
-
-      throw error;
-    }
+    toast({
+      title: "Info",
+      description: "Profile update coming soon with better-auth integration.",
+    });
   };
 
   return { updateProfile };
 }
+
 
 // Auth error management hook
 export function useAuthError() {

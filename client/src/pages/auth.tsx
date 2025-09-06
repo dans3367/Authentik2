@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useReduxLogin } from "@/hooks/useReduxAuth";
+import { useAuth, useLogin, useRegister } from "@/hooks/useAuth";
 import { loginSchema, registerSchema, forgotPasswordSchema } from "@shared/schema";
 import type { LoginCredentials, RegisterData, ForgotPasswordData } from "@shared/schema";
 import { calculatePasswordStrength, getPasswordStrengthText, getPasswordStrengthColor } from "@/lib/authUtils";
@@ -47,24 +47,27 @@ export default function AuthPage() {
     tempLoginId: string;
   } | null>(null);
 
-  const { login, isLoading: isLoginLoading } = useReduxLogin();
+  const { isAuthenticated } = useAuth();
+  const loginMutation = useLogin();
+  const registerMutation = useRegister();
 
-  // For now, keep register and forgot password as simple fetch calls
-  // These can be moved to Redux later if needed
-  const registerMutation = { 
-    mutateAsync: async (data: RegisterData) => {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message);
-      }
-      return response.json();
-    },
-    isPending: false 
+  // Add loading state for login
+  const isLoginLoading = loginMutation.isPending || false;
+  const isRegisterLoading = registerMutation.isPending || false;
+
+  // Handle authentication redirect
+  useEffect(() => {
+    if (isAuthenticated) {
+      setLocation("/");
+    }
+  }, [isAuthenticated, setLocation]);
+
+  // Handle login form submission
+  const onLoginSubmit = async (data: LoginCredentials) => {
+    const result = await loginMutation.mutateAsync(data);
+    if (result) {
+      // Login successful, user will be redirected by useEffect
+    }
   };
 
   const forgotPasswordMutation = { 
@@ -132,35 +135,8 @@ export default function AuthPage() {
     }
   }, [watchPassword]);
 
-  const onLogin = async (data: LoginCredentials) => {
-    try {
-      const result = await login({ ...data, rememberMe });
-      
-      // After successful login, check user state for redirects
-      if (result && result.user) {
-        // Check if email verification is required
-        if (result.user.emailVerified === false) {
-          setLocation("/pending-verification");
-        } else {
-          // Always redirect to dashboard after successful login
-          setLocation("/dashboard");
-        }
-      }
-    } catch (error: any) {
-      const errorMessage = error?.message || error?.toString() || "Unknown error";
-      
-      // Handle 2FA requirement
-      if (errorMessage === "2FA_REQUIRED") {
-        setTwoFactorData({
-          email: data.email,
-          password: data.password,
-          tempLoginId: "", // We don't have this from Redux, will need to handle differently
-        });
-        setCurrentView("twoFactor");
-      }
-      // Other errors are handled by the useReduxLogin hook's toast
-    }
-  };
+  // Login function is now handled by the better-auth hooks
+  // The redirect logic is handled by the useEffect above
 
   const onRegister = async (data: RegisterData) => {
     const result = await registerMutation.mutateAsync(data);
@@ -171,33 +147,15 @@ export default function AuthPage() {
   };
 
   const onForgotPassword = async (data: ForgotPasswordData) => {
-    await forgotPasswordMutation.mutateAsync(data.email);
+    await forgotPasswordMutation.mutateAsync(data);
   };
 
   const onTwoFactorSubmit = async (data: { token: string }) => {
     if (!twoFactorData) return;
 
-    try {
-      const result = await login({
-        email: twoFactorData.email,
-        password: twoFactorData.password,
-        twoFactorToken: data.token,
-        rememberMe,
-      });
-
-      // After successful login, check user state for redirects
-      if (result && result.user) {
-        // Check if email verification is required
-        if (result.user.emailVerified === false) {
-          setLocation("/pending-verification");
-        } else {
-          // Always redirect to dashboard after successful login
-          setLocation("/dashboard");
-        }
-      }
-    } catch (error) {
-      // Error is handled by the useReduxLogin hook's toast
-    }
+    // For now, 2FA is not implemented with better-auth
+    // This is a placeholder that will need to be implemented when 2FA is added to better-auth
+    console.log("2FA not yet implemented with better-auth", data);
   };
 
   const renderPasswordStrength = () => {
@@ -318,7 +276,7 @@ export default function AuthPage() {
                     <p className="text-gray-600">Sign in to your account to continue</p>
                   </div>
 
-                  <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-4">
+                  <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
                     <div>
                       <Label htmlFor="email">Email address</Label>
                       <div className="relative mt-2">
@@ -524,9 +482,9 @@ export default function AuthPage() {
                     <Button
                       type="submit"
                       className="w-full mt-6"
-                      disabled={registerMutation.isPending}
+                      disabled={isRegisterLoading}
                     >
-                      {registerMutation.isPending ? (
+                      {isRegisterLoading ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                           Creating Account...
@@ -647,16 +605,9 @@ export default function AuthPage() {
                     <Button
                       type="submit"
                       className="w-full mt-6"
-                      disabled={isLoginLoading}
+                      disabled={true} // 2FA not implemented yet
                     >
-                      {isLoginLoading ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Verifying...
-                        </>
-                      ) : (
-                        "Verify & Sign In"
-                      )}
+                      Verify & Sign In
                     </Button>
                   </form>
                 </div>

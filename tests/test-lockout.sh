@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Test script for account lockout functionality
-API_URL="http://localhost:3001/api/auth"
+API_URL="http://localhost:5000/api/auth"
 
 echo "🛡️  Testing Account Lockout System"
 echo "==================================="

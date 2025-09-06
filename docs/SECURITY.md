@@ -89,8 +89,8 @@ The main security configuration is in `server/config/security.ts`:
 {
   rateLimits: { /* rate limit configurations */ },
   cors: { /* CORS settings */ },
-  session: { /* session security */ },
-  jwt: { /* JWT token expiry */ },
+  betterAuth: { /* better-auth security settings */ },
+  sessionManagement: { /* session cleanup and management */ },
   passwordPolicy: { /* password requirements */ },
   headers: { /* security headers */ },
   fileUpload: { /* file upload restrictions */ },
@@ -98,6 +98,28 @@ The main security configuration is in `server/config/security.ts`:
   csp: { /* Content Security Policy */ }
 }
 ```
+
+## Better-Auth Security Features
+
+The application uses Better Auth for comprehensive authentication security:
+
+### Authentication Security
+- **Secure Token Management**: Better-auth handles JWT token generation and validation
+- **Session Security**: Automatic session management with secure cookies
+- **CSRF Protection**: Built-in protection against cross-site request forgery
+- **Rate Limiting**: Authentication endpoints protected against brute force attacks
+
+### Session Management
+- **Automatic Cleanup**: Expired and inactive sessions are automatically cleaned up
+- **Device Tracking**: Sessions are tracked per device with user-agent and IP logging
+- **Session Limits**: Configurable maximum sessions per user
+- **Inactivity Timeout**: Sessions expire after configurable periods of inactivity
+
+### Token Security
+- **Access Tokens**: Short-lived tokens (default: 1 hour) for API access
+- **Refresh Tokens**: Long-lived tokens (default: 7 days) for token renewal
+- **Token Rotation**: New tokens issued on refresh to maintain security
+- **Secure Storage**: Tokens stored in httpOnly cookies when possible
 
 ## Usage Examples
 
@@ -168,11 +190,18 @@ This tests:
 
 Required security-related environment variables:
 
+**Server-side (.env):**
 ```
-JWT_SECRET=your-super-secret-jwt-key
-REFRESH_TOKEN_SECRET=your-super-secret-refresh-key
-SESSION_SECRET=your-super-secret-session-key
+BETTER_AUTH_SECRET=your-super-secret-better-auth-key
 DATABASE_URL=your-database-connection-string
+BASE_URL=http://localhost:5000
+```
+
+**Client-side (VITE_ prefixed):**
+```
+VITE_BETTER_AUTH_URL=http://localhost:5000
+VITE_STRIPE_PUBLIC_KEY=pk_test_your_stripe_public_key_here
+VITE_FORMS_URL=http://localhost:3003
 ```
 
 ## Compliance

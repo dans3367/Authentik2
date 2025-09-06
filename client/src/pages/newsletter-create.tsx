@@ -204,7 +204,7 @@ export default function NewsletterCreatePage() {
       onSuccess: (response) => {
         console.log('[Newsletter Frontend] Newsletter created:', response);
         // After creating, send the newsletter
-        sendNewsletterMutation.mutate(response.newsletter.id);
+        sendNewsletterMutation.mutate(response.id);
       },
       onError: (error) => {
         console.error('[Newsletter Frontend] Failed to create newsletter:', error);

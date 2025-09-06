@@ -34,7 +34,7 @@ cd ..
 echo ""
 echo "✅ Form servers started successfully!"
 echo "====================================="
-echo "🔗 Form Server API:      http://localhost:3001/api"
+echo "🔗 Form Server API:      http://localhost:5000/api"
 echo "📝 Form Server Frontend: http://localhost:3002"
 echo ""
 echo "Process IDs:"

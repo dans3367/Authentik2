@@ -343,13 +343,14 @@ export default function EmailContacts() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-4">
+    <div className="min-h-screen bg-white dark:bg-slate-800">
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
       {/* Page Header */}
-      <div className="mb-6">
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Contacts</h1>
-            <p className="text-gray-600 dark:text-gray-400">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">Contacts</h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
               Manage your email subscribers and contact lists
             </p>
           </div>
@@ -367,6 +368,9 @@ export default function EmailContacts() {
             </Button>
           </div>
         </div>
+
+        {/* Add minimal spacer after the header section */}
+        <div className="h-3"></div>
       </div>
 
       {/* Stats Overview */}
@@ -424,88 +428,87 @@ export default function EmailContacts() {
       </div>
 
       {/* Main Content */}
-      <div className="w-full">
-          {/* Filters and Search */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <ContactSearch 
-              key="contact-search"
-              value={searchQuery}
-              onSearchChange={handleSearchChange}
-              placeholder="Search contacts..."
-            />
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="unsubscribed">Unsubscribed</SelectItem>
-                <SelectItem value="bounced">Bounced</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button 
-              type="button"
-              variant="outline"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </Button>
+      {/* Filters and Search */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+      <ContactSearch
+        key="contact-search"
+        value={searchQuery}
+        onSearchChange={handleSearchChange}
+        placeholder="Search contacts..."
+      />
+      <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <SelectTrigger className="w-[180px]">
+          <Filter className="w-4 h-4 mr-2" />
+          <SelectValue placeholder="Filter by status" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Status</SelectItem>
+          <SelectItem value="active">Active</SelectItem>
+          <SelectItem value="unsubscribed">Unsubscribed</SelectItem>
+          <SelectItem value="bounced">Bounced</SelectItem>
+          <SelectItem value="pending">Pending</SelectItem>
+        </SelectContent>
+      </Select>
+      <Button
+        type="button"
+        variant="outline"
+      >
+        <Download className="w-4 h-4 mr-2" />
+        Export
+      </Button>
+      </div>
+
+      {/* Bulk Actions */}
+      {selectedContacts.length > 0 && (
+        <Card className="mb-4">
+          <CardContent className="py-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                {selectedContacts.length} contact{selectedContacts.length > 1 ? 's' : ''} selected
+              </span>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm">
+                  <Tag className="w-4 h-4 mr-2" />
+                  Add Tags
+                </Button>
+                <Button variant="outline" size="sm">
+                  <Users className="w-4 h-4 mr-2" />
+                  Add to List
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-red-600"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleBulkDelete();
+                  }}
+                  disabled={bulkDeleteMutation.isPending}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  {bulkDeleteMutation.isPending ? 'Deleting...' : 'Delete'}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Contacts Table */}
+      <Card className="relative">
+      <CardContent className="p-0">
+        {/* Search Loading Indicator */}
+        {isFetching && (
+          <div className="absolute right-4 top-4 z-10">
+            <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full text-sm">
+              <div className="animate-spin rounded-full h-3 w-3 border border-blue-600 border-t-transparent"></div>
+              Searching...
+            </div>
           </div>
-
-          {/* Bulk Actions */}
-          {selectedContacts.length > 0 && (
-            <Card className="mb-4">
-              <CardContent className="py-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    {selectedContacts.length} contact{selectedContacts.length > 1 ? 's' : ''} selected
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm">
-                      <Tag className="w-4 h-4 mr-2" />
-                      Add Tags
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      <Users className="w-4 h-4 mr-2" />
-                      Add to List
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="text-red-600"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleBulkDelete();
-                      }}
-                      disabled={bulkDeleteMutation.isPending}
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      {bulkDeleteMutation.isPending ? 'Deleting...' : 'Delete'}
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Contacts Table */}
-          <Card className="relative">
-            <CardContent className="p-0">
-              {/* Search Loading Indicator */}
-              {isFetching && (
-                <div className="absolute right-4 top-4 z-10">
-                  <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full text-sm">
-                    <div className="animate-spin rounded-full h-3 w-3 border border-blue-600 border-t-transparent"></div>
-                    Searching...
-                  </div>
-                </div>
-              )}
-              {/* Table with smooth transition */}
-              <div className={`transition-opacity duration-200 ${isFetching ? 'opacity-50' : 'opacity-100'}`}>
+        )}
+        {/* Table with smooth transition */}
+        <div className={`transition-opacity duration-200 ${isFetching ? 'opacity-50' : 'opacity-100'}`}>
                 <Table>
                 <TableHeader>
                   <TableRow>
@@ -661,10 +664,10 @@ export default function EmailContacts() {
                     ))
                   )}
                 </TableBody>
-              </Table>
-              </div>
-            </CardContent>
-          </Card>
+        </Table>
+        </div>
+        </CardContent>
+      </Card>
       </div>
     </div>
   );

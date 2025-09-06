@@ -6,13 +6,15 @@ import type { Server } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeDatabase } from "./init-db";
-import { 
-  helmetMiddleware, 
-  generalRateLimiter, 
+import {
+  helmetMiddleware,
+  generalRateLimiter,
   mongoSanitizer,
   sanitizeMiddleware,
-  requestSizeLimiter 
+  requestSizeLimiter
 } from "./middleware/security";
+import { auth } from "./auth";
+import { toNodeHandler } from "better-auth/node";
 
 const app = express();
 
@@ -69,13 +71,16 @@ app.use((req, res, next) => {
 app.use(generalRateLimiter);
 app.use(mongoSanitizer);
 
-// Body parsing with size limits
-app.use(express.json(requestSizeLimiter.json));
-app.use(express.urlencoded(requestSizeLimiter.urlencoded));
-
-
 // Input sanitization
 app.use(sanitizeMiddleware);
+
+// Better Auth middleware for authentication
+// Note: better-auth uses toNodeHandler for Express integration
+app.all("/api/auth/*", toNodeHandler(auth));
+
+// Body parsing with size limits - applied after auth handler
+app.use(express.json(requestSizeLimiter.json));
+app.use(express.urlencoded(requestSizeLimiter.urlencoded));
 
 app.use((req, res, next) => {
   const start = Date.now();

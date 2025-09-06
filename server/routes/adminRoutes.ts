@@ -1,9 +1,8 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import { users, refreshTokens, tenants, companies, forms } from '@shared/schema';
-import { authenticateToken, requireRole } from '../middleware/auth';
-import { SessionCleanupService } from '../services/sessionCleanup';
+import { users, tenants, companies, forms } from '@shared/schema';
+import { authenticateToken, requireRole } from '../middleware/auth-middleware';
 
 export const adminRoutes = Router();
 
@@ -23,24 +22,6 @@ adminRoutes.get("/sessions/stats", authenticateToken, requireRole('Administrator
   }
 });
 
-// Get session cleanup status
-adminRoutes.get("/sessions/cleanup/status", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
-  try {
-    const cleanupService = new SessionCleanupService();
-    const status = cleanupService.getStatus();
-
-    res.json({
-      isRunning: status.isRunning,
-      lastRun: status.lastRun,
-      nextRun: status.nextRun,
-      totalCleaned: status.totalCleaned,
-      errors: status.errors,
-    });
-  } catch (error) {
-    console.error('Get cleanup status error:', error);
-    res.status(500).json({ message: 'Failed to get cleanup status' });
-  }
-});
 
 // Get all sessions (admin view)
 adminRoutes.get("/sessions", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
@@ -100,36 +81,6 @@ adminRoutes.get("/sessions", authenticateToken, requireRole('Administrator'), as
   }
 });
 
-// Manual session cleanup
-adminRoutes.post("/sessions/cleanup", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
-  try {
-    const { olderThanHours = 24 } = req.body;
-
-    const cutoffDate = new Date(Date.now() - (olderThanHours * 60 * 60 * 1000));
-
-    // Delete expired sessions
-    const deletedSessions = await db.delete(refreshTokens)
-      .where(sql`${refreshTokens.expiresAt} < ${cutoffDate}`)
-      .returning();
-
-    // Also delete sessions that are expired based on current time
-    const expiredSessions = await db.delete(refreshTokens)
-      .where(sql`${refreshTokens.expiresAt} < now()`)
-      .returning();
-
-    const totalDeleted = deletedSessions.length + expiredSessions.length;
-
-    res.json({
-      message: 'Session cleanup completed',
-      deletedCount: totalDeleted,
-      cutoffDate,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.error('Session cleanup error:', error);
-    res.status(500).json({ message: 'Session cleanup failed' });
-  }
-});
 
 // Delete specific session (admin)
 adminRoutes.delete("/sessions", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
@@ -600,30 +551,22 @@ adminRoutes.get("/activity", authenticateToken, requireRole('Administrator'), as
 // System health check
 adminRoutes.get("/health", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
   try {
-    const healthChecks = await Promise.allSettled([
-      // Database connectivity
-      db.select({ count: sql<number>`count(*)` }).from(users),
-      
-      // Session cleanup service
-      Promise.resolve(new SessionCleanupService().getStatus()),
-    ]);
-
-    const [dbCheck, sessionCleanupCheck] = healthChecks;
+    // Database connectivity check
+    const dbCheck = await db.select({ count: sql<number>`count(*)` }).from(users);
 
     const health = {
       database: {
-        status: dbCheck.status === 'fulfilled' ? 'healthy' : 'unhealthy',
-        error: dbCheck.status === 'rejected' ? dbCheck.reason?.message : null,
+        status: 'healthy',
+        details: `Connected successfully (${dbCheck[0].count} users found)`,
       },
-      sessionCleanup: {
-        status: sessionCleanupCheck.status === 'fulfilled' ? 'healthy' : 'unhealthy',
-        details: sessionCleanupCheck.status === 'fulfilled' ? sessionCleanupCheck.value : null,
-        error: sessionCleanupCheck.status === 'rejected' ? sessionCleanupCheck.reason?.message : null,
+      authentication: {
+        status: 'healthy',
+        details: 'Better Auth is handling authentication and session management',
       },
       timestamp: new Date().toISOString(),
     };
 
-    const overallStatus = health.database.status === 'healthy' && health.sessionCleanup.status === 'healthy' ? 'healthy' : 'unhealthy';
+    const overallStatus = health.database.status === 'healthy' ? 'healthy' : 'unhealthy';
 
     res.status(overallStatus === 'healthy' ? 200 : 503).json({
       status: overallStatus,

@@ -2,8 +2,8 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { users, tenants } from '@shared/schema';
-import { authenticateToken } from '../middleware/auth';
-import bcrypt from 'bcryptjs';
+// Note: bcrypt removed - better-auth handles password hashing
+import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { randomUUID } from 'crypto';
 
 export const devRoutes = Router();
@@ -23,17 +23,18 @@ devRoutes.post("/create-test-managers", async (req, res) => {
     }
 
     const managers = [];
-    const hashedPassword = await bcrypt.hash('test123', 12);
+    // Note: Password hashing removed - better-auth handles authentication
+    // Test managers will need to set passwords through better-auth
 
     for (let i = 1; i <= count; i++) {
       const manager = await db.insert(users).values({
         email: `manager${i}@test.com`,
-        password: hashedPassword,
+        // Note: password field removed - better-auth handles authentication
         firstName: `Manager`,
         lastName: `${i}`,
         role: 'Manager',
         emailVerified: true,
-        companyId,
+        tenantId: companyId,
         createdAt: new Date(),
       }).returning();
 
@@ -74,6 +75,7 @@ devRoutes.post("/update-test-user", async (req, res) => {
       where: sql`${users.id} = ${userId}`,
     });
 
+    // For dev routes, skip tenant check if no tenantId provided (for testing purposes)
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -110,28 +112,17 @@ devRoutes.post("/test-token", async (req, res) => {
       return res.status(400).json({ message: 'User ID, email, and role are required' });
     }
 
-    const jwt = require('jsonwebtoken');
-    const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key";
-
-    const token = jwt.sign(
-      { 
-        userId, 
-        email, 
-        role,
-        companyId: companyId || null,
-      },
-      JWT_SECRET,
-      { expiresIn: '1d' }
-    );
+    // Note: JWT token generation removed - better-auth handles authentication
+    // Use better-auth endpoints for authentication instead
 
     res.json({
-      message: 'Test token generated successfully',
-      token,
-      payload: {
+      message: 'Authentication now handled by better-auth',
+      note: 'Use /api/auth endpoints for login/register',
+      userInfo: {
         userId,
         email,
         role,
-        companyId: companyId || null,
+        tenantId: companyId || null,
       },
     });
   } catch (error) {
@@ -158,6 +149,7 @@ devRoutes.post("/test-verification", async (req, res) => {
       where: sql`${users.email} = ${email}`,
     });
 
+    // For dev routes, skip tenant check if no tenantId provided (for testing purposes)
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -192,7 +184,7 @@ devRoutes.get("/debug/info", authenticateToken, async (req: any, res) => {
     }
 
     const user = await db.query.users.findFirst({
-      where: sql`${users.id} = ${req.user.userId}`,
+      where: sql`${users.id} = ${req.user.id}`,
       with: {
         company: true,
       },
@@ -249,23 +241,25 @@ devRoutes.post("/reset-password", async (req, res) => {
       where: sql`${users.email} = ${email}`,
     });
 
+    // For dev routes, skip tenant check if no tenantId provided (for testing purposes)
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    // Note: Password hashing removed - better-auth handles password management
+    // In a real application, you would use better-auth's password reset flow
 
     await db.update(users)
       .set({
-        password: hashedPassword,
+        // Note: password field removed - better-auth handles authentication
         updatedAt: new Date(),
       })
       .where(sql`${users.id} = ${user.id}`);
 
     res.json({
-      message: 'Password reset successfully',
+      message: 'User updated (password management now handled by better-auth)',
       email: user.email,
-      newPassword,
+      note: 'Use better-auth password reset flow for password changes',
     });
   } catch (error) {
     console.error('Reset password error:', error);
@@ -341,6 +335,38 @@ devRoutes.post("/create-test-data", async (req, res) => {
   } catch (error) {
     console.error('Create test data error:', error);
     res.status(500).json({ message: 'Failed to create test data' });
+  }
+});
+
+// Create test newsletter
+devRoutes.post("/create-test-newsletter", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    // This endpoint is for development/testing purposes only
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ message: 'This endpoint is not available in production' });
+    }
+
+    const { newsletters } = await import('@shared/schema');
+    const { sql } = await import('drizzle-orm');
+
+    const testNewsletter = await db.insert(newsletters).values({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      title: 'Test Newsletter',
+      subject: 'Test Subject',
+      content: '<h1>Test Newsletter Content</h1><p>This is a test newsletter.</p>',
+      status: 'draft',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
+
+    res.json({
+      message: 'Test newsletter created successfully',
+      newsletter: testNewsletter[0],
+    });
+  } catch (error) {
+    console.error('Create test newsletter error:', error);
+    res.status(500).json({ message: 'Failed to create test newsletter' });
   }
 });
 

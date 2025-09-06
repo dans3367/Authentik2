@@ -1,19 +1,19 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { users, campaigns, emailTemplates, mailingLists, emails, emailStatistics, createCampaignSchema, updateCampaignSchema } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 
 export const campaignRoutes = Router();
 
 // Get all campaigns
-campaignRoutes.get("/", authenticateToken, async (req: any, res) => {
+campaignRoutes.get("/", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { page = 1, limit = 50, search, status } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
-    let whereClause = sql`1=1`;
+    let whereClause = sql`${campaigns.tenantId} = ${req.user.tenantId}`;
 
     if (search) {
       const sanitizedSearch = sanitizeString(search as string);
@@ -27,7 +27,7 @@ campaignRoutes.get("/", authenticateToken, async (req: any, res) => {
       whereClause = sql`${whereClause} AND ${campaigns.status} = ${status}`;
     }
 
-    const campaigns = await db.query.campaigns.findMany({
+    const tenantCampaigns = await db.query.campaigns.findMany({
       where: whereClause,
       orderBy: sql`${campaigns.createdAt} DESC`,
       limit: Number(limit),
@@ -36,10 +36,10 @@ campaignRoutes.get("/", authenticateToken, async (req: any, res) => {
 
     const totalCount = await db.select({
       count: sql<number>`count(*)`,
-    }).from(db.campaigns).where(whereClause);
+    }).from(campaigns).where(whereClause);
 
     res.json({
-      campaigns,
+      campaigns: tenantCampaigns,
       pagination: {
         page: Number(page),
         limit: Number(limit),
@@ -54,12 +54,12 @@ campaignRoutes.get("/", authenticateToken, async (req: any, res) => {
 });
 
 // Get specific campaign
-campaignRoutes.get("/:id", authenticateToken, async (req: any, res) => {
+campaignRoutes.get("/:id", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
 
     const campaign = await db.query.campaigns.findFirst({
-      where: sql`${campaigns.id} = ${id}`,
+      where: sql`${campaigns.id} = ${id} AND ${campaigns.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!campaign) {
@@ -74,7 +74,7 @@ campaignRoutes.get("/:id", authenticateToken, async (req: any, res) => {
 });
 
 // Create campaign
-campaignRoutes.post("/", authenticateToken, async (req: any, res) => {
+campaignRoutes.post("/", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const validatedData = createCampaignSchema.parse(req.body);
     const { name, description, type, targetAudience, budget, startDate, endDate, status } = validatedData;
@@ -83,6 +83,8 @@ campaignRoutes.post("/", authenticateToken, async (req: any, res) => {
     const sanitizedDescription = description ? sanitizeString(description) : null;
 
     const newCampaign = await db.insert(campaigns).values({
+      tenantId: req.user.tenantId,
+      userId: req.user.userId,
       name: sanitizedName,
       description: sanitizedDescription,
       type,
@@ -103,14 +105,14 @@ campaignRoutes.post("/", authenticateToken, async (req: any, res) => {
 });
 
 // Update campaign
-campaignRoutes.put("/:id", authenticateToken, async (req: any, res) => {
+campaignRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
     const validatedData = updateCampaignSchema.parse(req.body);
     const { name, description, type, targetAudience, budget, startDate, endDate, status } = validatedData;
 
     const campaign = await db.query.campaigns.findFirst({
-      where: sql`${campaigns.id} = ${id}`,
+      where: sql`${campaigns.id} = ${id} AND ${campaigns.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!campaign) {
@@ -155,7 +157,7 @@ campaignRoutes.put("/:id", authenticateToken, async (req: any, res) => {
 
     const updatedCampaign = await db.update(campaigns)
       .set(updateData)
-      .where(sql`${campaigns.id} = ${id}`)
+      .where(sql`${campaigns.id} = ${id} AND ${campaigns.tenantId} = ${req.user.tenantId}`)
       .returning();
 
     res.json(updatedCampaign[0]);
@@ -166,12 +168,12 @@ campaignRoutes.put("/:id", authenticateToken, async (req: any, res) => {
 });
 
 // Delete campaign
-campaignRoutes.delete("/:id", authenticateToken, async (req: any, res) => {
+campaignRoutes.delete("/:id", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
 
     const campaign = await db.query.campaigns.findFirst({
-      where: sql`${campaigns.id} = ${id}`,
+      where: sql`${campaigns.id} = ${id} AND ${campaigns.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!campaign) {
@@ -180,7 +182,7 @@ campaignRoutes.delete("/:id", authenticateToken, async (req: any, res) => {
 
     // Delete campaign
     await db.delete(campaigns)
-      .where(sql`${campaigns.id} = ${id}`);
+      .where(sql`${campaigns.id} = ${id} AND ${campaigns.tenantId} = ${req.user.tenantId}`);
 
     res.json({ message: 'Campaign deleted successfully' });
   } catch (error) {
@@ -190,7 +192,7 @@ campaignRoutes.delete("/:id", authenticateToken, async (req: any, res) => {
 });
 
 // Get campaign statistics
-campaignRoutes.get("/campaign-stats", authenticateToken, async (req: any, res) => {
+campaignRoutes.get("/campaign-stats", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const stats = await db.select({
       totalCampaigns: sql<number>`count(*)`,
@@ -198,7 +200,7 @@ campaignRoutes.get("/campaign-stats", authenticateToken, async (req: any, res) =
       draftCampaigns: sql<number>`count(*) filter (where status = 'draft')`,
       completedCampaigns: sql<number>`count(*) filter (where status = 'completed')`,
       campaignsThisMonth: sql<number>`count(*) filter (where created_at >= current_date - interval '30 days')`,
-    }).from(db.campaigns);
+    }).from(db.campaigns).where(sql`${db.campaigns.tenantId} = ${req.user.tenantId}`);
 
     res.json(stats[0]);
   } catch (error) {
@@ -208,10 +210,10 @@ campaignRoutes.get("/campaign-stats", authenticateToken, async (req: any, res) =
 });
 
 // Get managers list
-campaignRoutes.get("/managers", authenticateToken, async (req: any, res) => {
+campaignRoutes.get("/managers", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const managers = await db.query.users.findMany({
-      where: sql`${users.role} IN ('Manager', 'Administrator', 'Owner')`,
+      where: sql`${users.role} IN ('Manager', 'Administrator', 'Owner') AND ${users.tenantId} = ${req.user.tenantId}`,
       columns: {
         id: true,
         email: true,
@@ -230,12 +232,12 @@ campaignRoutes.get("/managers", authenticateToken, async (req: any, res) => {
 });
 
 // Debug newsletter tracking
-campaignRoutes.get("/debug/newsletter/:newsletterId/tracking", authenticateToken, async (req: any, res) => {
+campaignRoutes.get("/debug/newsletter/:newsletterId/tracking", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { newsletterId } = req.params;
 
     const newsletter = await db.query.newsletters.findFirst({
-      where: sql`${db.newsletters.id} = ${newsletterId}`,
+      where: sql`${db.newsletters.id} = ${newsletterId} AND ${db.newsletters.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!newsletter) {
@@ -261,13 +263,13 @@ campaignRoutes.get("/debug/newsletter/:newsletterId/tracking", authenticateToken
 });
 
 // Debug webhook flow
-campaignRoutes.post("/debug/webhook-flow/:newsletterId", authenticateToken, async (req: any, res) => {
+campaignRoutes.post("/debug/webhook-flow/:newsletterId", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { newsletterId } = req.params;
     const { eventType, email, data } = req.body;
 
     const newsletter = await db.query.newsletters.findFirst({
-      where: sql`${db.newsletters.id} = ${newsletterId}`,
+      where: sql`${db.newsletters.id} = ${newsletterId} AND ${db.newsletters.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!newsletter) {

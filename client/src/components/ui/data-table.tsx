@@ -84,9 +84,9 @@ export function DataTable<TData, TValue>({
   })
 
   return (
-    <div className="w-full">
+    <div className="w-full space-y-4">
       {(searchKey || showColumnVisibility) && (
-        <div className="flex items-center py-4 px-6">
+        <div className="flex items-center justify-between py-4">
           {searchKey && (
             <Input
               placeholder={searchPlaceholder}
@@ -127,7 +127,7 @@ export function DataTable<TData, TValue>({
           )}
         </div>
       )}
-      <div className="overflow-hidden">
+      <div className="w-full overflow-hidden border border-gray-200 dark:border-gray-700 rounded-lg">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (

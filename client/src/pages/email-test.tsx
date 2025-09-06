@@ -13,6 +13,7 @@ import { Send, Mail, Server, Clock, CheckCircle, XCircle, Zap, BarChart3, Target
 import { useLocation } from "wouter";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
+import { useSession } from "@/lib/betterAuthClient";
 
 interface EmailTrackingEntry {
   id: string;
@@ -41,7 +42,39 @@ interface EmailCampaignData {
 export default function EmailTestPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const accessToken = useSelector((state: RootState) => state.auth.accessToken);
+  // Use Better Auth session to get external token
+  const { data: session } = useSession();
+  
+  // Query to get external service token when authenticated
+  const { data: tokenData, isLoading: tokenLoading, error: tokenError } = useQuery({
+    queryKey: ['/api/external-token', session?.user?.id],
+    queryFn: async () => {
+      console.log('🔑 [Token] Requesting external token for user:', session?.user?.email);
+      const response = await apiRequest('POST', '/api/external-token');
+      if (!response.ok) {
+        throw new Error(`Token request failed: ${response.status}`);
+      }
+      const data = await response.json();
+      console.log('✅ [Token] External token received, length:', data.token?.length);
+      return data;
+    },
+    enabled: !!session?.user,
+    staleTime: 12 * 60 * 1000, // Token cached for 12 minutes (3 min buffer before 15 min expiry)
+    gcTime: 15 * 60 * 1000, // Garbage collect after 15 minutes
+    retry: 3,
+    refetchOnWindowFocus: false, // Don't refetch on window focus to avoid unnecessary token generation
+  });
+  
+  const accessToken = tokenData?.token;
+  
+  console.log('🔍 [Auth] Email test auth state:', {
+    hasSession: !!session?.user,
+    sessionEmail: session?.user?.email,
+    tokenLoading,
+    hasToken: !!accessToken,
+    tokenLength: accessToken?.length,
+    tokenError: tokenError?.message
+  });
   const [campaignData, setCampaignData] = useState<EmailCampaignData>({
     recipient: "dan@zendwise.com",
     subject: "Test Email Campaign",
@@ -59,11 +92,25 @@ export default function EmailTestPage() {
   const { data: serverHealth, isLoading: healthLoading, error: healthError } = useQuery({
     queryKey: ['/go-server-health'],
     queryFn: async () => {
-      const response = await fetch('https://tenginex.zendwise.work/health');
-      if (!response.ok) throw new Error('Go server not available');
-      return response.json();
+      try {
+        const response = await fetch('https://tenginex.zendwise.work/health', {
+          mode: 'cors',
+          headers: {
+            'Accept': 'application/json',
+          }
+        });
+        if (!response.ok) {
+          console.error('❌ [Health] Go server health check failed:', response.status);
+          throw new Error(`Go server returned ${response.status}`);
+        }
+        return response.json();
+      } catch (error) {
+        console.error('❌ [Health] Cannot connect to Go server:', error);
+        throw new Error('Go server not available - may be offline or blocked by CORS');
+      }
     },
     refetchInterval: 10000, // Check health every 10 seconds
+    retry: false, // Don't retry failed health checks
   });
 
   // Query to get email tracking entries from Go server
@@ -154,16 +201,32 @@ export default function EmailTestPage() {
       console.log('🔍 [Campaign] Token check:', {
         hasToken: !!token,
         tokenLength: token?.length || 0,
-        tokenPreview: token ? `${token.substring(0, 20)}...` : 'None'
+        tokenPreview: token ? `${token.substring(0, 20)}...` : 'None',
+        sessionExists: !!session?.user,
+        sessionEmail: session?.user?.email,
+        tokenDataExists: !!tokenData,
+        tokenLoading,
+        tokenError: tokenError?.message
       });
       
       if (!token) {
         console.error('❌ [Campaign] No authentication token available');
-        console.error('🔍 [Campaign] Please check:');
-        console.error('1. Are you logged in?');
-        console.error('2. Try refreshing the page');
-        console.error('3. Check if you have been logged out');
-        throw new Error('No authentication token available. Please make sure you are logged in.');
+        console.error('🔍 [Campaign] Debug info:', {
+          sessionUser: session?.user,
+          tokenData,
+          tokenLoading,
+          tokenError
+        });
+        
+        if (tokenLoading) {
+          throw new Error('Authentication token is still loading. Please wait a moment and try again.');
+        } else if (tokenError) {
+          throw new Error(`Authentication failed: ${tokenError.message}`);
+        } else if (!session?.user) {
+          throw new Error('You are not logged in. Please log in first.');
+        } else {
+          throw new Error('Failed to obtain authentication token. Please refresh the page and try again.');
+        }
       }
       
       const emailId = `campaign-${Date.now()}`;
@@ -269,23 +332,46 @@ export default function EmailTestPage() {
         }
       };
 
-      console.log('🚀 [Campaign] Sending request to Go server:', {
+      // Try Go server first, fall back to local processing if unavailable
+      let useLocalFallback = false;
+      let response;
+      
+      console.log('🚀 [Campaign] Attempting to send via Go server:', {
         url: 'https://tenginex.zendwise.work/api/email-tracking',
         tokenLength: token.length,
         emailId: emailId,
-        payload: payload,
         isScheduled: campaignData.isScheduled,
         scheduledAt: campaignData.scheduledAt
       });
 
-      const response = await fetch('https://tenginex.zendwise.work/api/email-tracking', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
+      try {
+        response = await fetch('https://tenginex.zendwise.work/api/email-tracking', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+      } catch (networkError) {
+        console.warn('⚠️ [Campaign] Go server unavailable, using local fallback:', networkError);
+        useLocalFallback = true;
+      }
+      
+      // If Go server is unavailable or returns error, use local fallback
+      if (useLocalFallback || (response && !response.ok && (response.status === 503 || response.status === 0))) {
+        console.log('🔄 [Campaign] Switching to local email processing');
+        
+        const localPayload = {
+          recipient: campaignData.recipient,
+          subject: campaignData.subject,
+          content: campaignData.content,
+          templateType: campaignData.templateType,
+          priority: campaignData.priority,
+        };
+        
+        response = await apiRequest('POST', '/api/email-test/send', localPayload);
+      }
 
       console.log('📡 [Campaign] Response received:', {
         status: response.status,
@@ -294,12 +380,25 @@ export default function EmailTestPage() {
       });
 
       if (!response.ok) {
-        const error = await response.text();
+        let errorMessage = 'Unknown error';
+        try {
+          errorMessage = await response.text();
+        } catch (e) {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        
         console.error('❌ [Campaign] Request failed:', {
           status: response.status,
-          error: error
+          error: errorMessage
         });
-        throw new Error(`Failed to send campaign: ${error}`);
+        
+        if (response.status === 401) {
+          throw new Error('Authentication failed with Go server. Token may be invalid or expired.');
+        } else if (response.status === 503 || errorMessage.includes('unavailable')) {
+          throw new Error('Email service (Go server) is currently unavailable. Please try again later.');
+        } else {
+          throw new Error(`Failed to send campaign: ${errorMessage}`);
+        }
       }
 
       const result = await response.json();

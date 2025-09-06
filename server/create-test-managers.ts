@@ -3,7 +3,7 @@ dotenv.config();
 
 import { db } from "./db";
 import { users, tenants } from "@shared/schema";
-import bcrypt from "bcryptjs";
+// Note: bcrypt removed - better-auth handles password hashing
 import { eq } from "drizzle-orm";
 
 async function createTestManagers() {
@@ -52,7 +52,7 @@ async function createTestManagers() {
       }
     ];
     
-    const hashedPassword = await bcrypt.hash("password123", 10);
+    // Note: Password hashing removed - better-auth handles authentication
     
     for (const userData of testUsers) {
       // Check if user already exists
@@ -68,10 +68,11 @@ async function createTestManagers() {
       }
       
       // Create user
+      // Note: password field removed - better-auth handles authentication
       await db.insert(users).values({
         id: crypto.randomUUID(),
         email: userData.email,
-        password: hashedPassword,
+        // Note: password field removed - better-auth handles authentication
         firstName: userData.firstName,
         lastName: userData.lastName,
         role: userData.role,
