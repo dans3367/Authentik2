@@ -34,6 +34,7 @@ loginRoutes.post('/verify-login', async (req, res) => {
         return res.status(500).json({ message: 'Authentication method not available' });
       }
       console.log('🔍 [Verify Login] Better Auth result received');
+      console.log('🔍 [Verify Login] Login result structure:', JSON.stringify(loginResult, null, 2));
     } catch (authError: any) {
       console.error('❌ [Verify Login] Better Auth error:', authError);
       console.error('❌ [Verify Login] Auth error details:', authError?.message);
