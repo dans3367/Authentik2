@@ -22,6 +22,8 @@ export const helmetMiddleware = helmet({
         "https://tenginex.zendwise.work/*",
         "https://*.zendwise.work",
         "https://*.zendwise.work/*",
+        "https://weby.zendwise.work",
+        "https://websy.zendwise.work",
         "ws:",
         "wss:",
         "http:",
@@ -52,6 +54,8 @@ export const helmetMiddleware = helmet({
         "https://tenginex.zendwise.work/*",
         "https://*.zendwise.work",
         "https://*.zendwise.work/*",
+        "https://weby.zendwise.work",
+        "https://websy.zendwise.work",
         "ws:",
         "wss:",
         "http://localhost:*",
@@ -64,6 +68,8 @@ export const helmetMiddleware = helmet({
     },
   },
   crossOriginEmbedderPolicy: false,
+  // Configure Cross-Origin-Opener-Policy for trusted domains
+  crossOriginOpenerPolicy: process.env.NODE_ENV === 'development' ? false : { policy: "same-origin" },
   // Disable HSTS in development to prevent HTTPS enforcement
   hsts: process.env.NODE_ENV === 'production',
 });
@@ -108,6 +114,14 @@ export const apiRateLimiter = createRateLimiter({
   max: 300, // Increased from 60 to 300 for debugging
 });
 
+// JWT Token generation rate limiter - more restrictive
+export const jwtTokenRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Only 10 token requests per user per 15 minutes
+  message: "Too many token generation requests. Please try again later.",
+  skipSuccessfulRequests: false, // Count both successful and failed attempts
+});
+
 // MongoDB injection protection
 export const mongoSanitizer = mongoSanitize({
   replaceWith: "_",
@@ -142,9 +156,13 @@ export const sanitizeInput = (input: any): any => {
 
 // Express middleware for input sanitization
 export const sanitizeMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  req.body = sanitizeInput(req.body);
+  // Only sanitize if the body exists
+  if (req.body !== undefined) {
+    req.body = sanitizeInput(req.body);
+  }
   req.query = sanitizeInput(req.query);
   req.params = sanitizeInput(req.params);
+
   next();
 };
 

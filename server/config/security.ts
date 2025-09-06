@@ -35,25 +35,6 @@ export const securityConfig = {
     allowedHeaders: ["Content-Type", "Authorization"],
   },
 
-  // Session configuration
-  session: {
-    secret: process.env.SESSION_SECRET || "your-super-secret-session-key",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === "production",
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: "strict" as const,
-    },
-  },
-
-  // JWT configuration
-  jwt: {
-    accessTokenExpiry: "15m",
-    refreshTokenExpiry: "7d",
-    rememberMeExpiry: "30d",
-  },
 
   // Password policy
   passwordPolicy: {

@@ -9,7 +9,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { AppLayout } from "@/components/AppLayout";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { setGlobalNavigate } from "@/lib/authErrorHandler";
 import { lazy, Suspense, useEffect } from "react";
+import { useAuthErrorHandler, setGlobalAuthErrorHandler } from "@/hooks/useAuthErrorHandler";
 
 // Lazy load components for code splitting
 const AuthPage = lazy(() => import("@/pages/auth"));
@@ -92,6 +94,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function Router() {
   const { isAuthenticated, isLoading, user, isInitialized } = useReduxAuth();
+  const { handleAuthError } = useAuthErrorHandler();
+
+  // Set up global auth error handler
+  useEffect(() => {
+    setGlobalAuthErrorHandler(handleAuthError);
+  }, [handleAuthError]);
 
   console.log("🔍 [Redux] Router state:", {
     isAuthenticated,
@@ -99,8 +107,7 @@ function Router() {
     hasUser: !!user,
     isInitialized,
     userEmail: user?.email,
-    userEmailVerified: user?.emailVerified,
-    userRole: user?.role
+    userEmailVerified: user?.emailVerified
   });
 
   // Show loading state while authentication is being determined

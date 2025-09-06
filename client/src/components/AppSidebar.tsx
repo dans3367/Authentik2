@@ -16,6 +16,7 @@ import {
   Newspaper,
   Settings,
   ClipboardList,
+  X,
 } from "lucide-react";
 import logoUrl from "@assets/logo.png";
 import { cn } from "@/lib/utils";
@@ -80,7 +81,7 @@ export function AppSidebar() {
   const navigation = getNavigation(user?.role);
   const updateThemeMutation = useUpdateTheme();
   const [isThemeChanging, setIsThemeChanging] = useState(false);
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
 
   // Fetch subscription data for the user's plan
   const { data: subscriptionData } = useQuery<UserSubscriptionResponse>({
@@ -111,6 +112,12 @@ export function AppSidebar() {
     }
   };
 
+  const handleMobileNavClick = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
+
   if (!user) {
     return null;
   }
@@ -120,9 +127,42 @@ export function AppSidebar() {
   return (
     <Sidebar variant="sidebar" collapsible="icon">
       <SidebarHeader>
+        {/* Mobile Header with Close Button */}
+        {isMobile && (
+          <div className="flex items-center justify-between p-4 border-b md:hidden">
+            <div className="flex items-center gap-3">
+              <div className="bg-indigo-600 dark:bg-indigo-500 rounded-2xl p-2 flex items-center justify-center">
+                <img 
+                  src={logoUrl} 
+                  alt="Company Logo" 
+                  className="w-6 h-6 object-contain filter brightness-0 invert"
+                />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sidebar-foreground font-semibold text-base">
+                  SaaS Platform
+                </span>
+                <span className="text-sidebar-foreground/60 text-sm">
+                  Management Suite
+                </span>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setOpenMobile(false)}
+              className="h-8 w-8 hover:bg-sidebar-accent"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close menu</span>
+            </Button>
+          </div>
+        )}
+
+        {/* Desktop Header */}
         <div className={cn(
           "flex items-center transition-all duration-300",
-          isCollapsed ? "justify-center" : "justify-start"
+          isMobile ? "hidden" : (isCollapsed ? "justify-center" : "justify-start")
         )}>
           <div className="bg-indigo-600 dark:bg-indigo-500 rounded-2xl p-2 flex items-center justify-center">
             <img 
@@ -144,11 +184,11 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
-        <SidebarGroup className="mt-6">
-          <SidebarGroupLabel className="mb-4">Navigation</SidebarGroupLabel>
+      <SidebarContent className={cn(isMobile && "px-2")}>
+        <SidebarGroup className={cn(isMobile ? "mt-4" : "mt-6")}>
+          <SidebarGroupLabel className={cn("mb-4 text-left", isMobile ? "px-4 text-sm font-medium text-muted-foreground" : "px-3")}>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu className="space-y-3">
+            <SidebarMenu className={cn("w-full", isMobile ? "space-y-0.5" : "space-y-1")}>
               {navigation.map((item) => {
                 const isActive =
                   location === item.href ||
@@ -156,11 +196,19 @@ export function AppSidebar() {
                 const Icon = item.icon;
 
                 return (
-                  <SidebarMenuItem key={item.name}>
-                    <SidebarMenuButton asChild isActive={isActive} className="py-3">
-                      <Link href={item.href}>
-                        <Icon className="h-5 w-5" />
-                        <span>{item.name}</span>
+                  <SidebarMenuItem key={item.name} className="w-full flex justify-center group-data-[collapsible=icon]:justify-center">
+                    <SidebarMenuButton 
+                      asChild 
+                      isActive={isActive} 
+                      className={cn(
+                        "w-full justify-start group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0 hover:!bg-[#e1fce9] data-[active=true]:!bg-[#e1fce9] hover:!text-gray-800 data-[active=true]:!text-gray-800",
+                        isMobile ? "px-4 py-3 mx-2 rounded-lg" : "px-3 py-2.5"
+                      )}
+                      tooltip={item.name}
+                    >
+                      <Link href={item.href} className="flex items-center gap-3 w-full group-data-[collapsible=icon]:justify-center" onClick={handleMobileNavClick}>
+                        <Icon className="h-5 w-5 flex-shrink-0" />
+                        <span className="group-data-[collapsible=icon]:hidden">{item.name}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -173,19 +221,20 @@ export function AppSidebar() {
 
       <SidebarFooter>
         <SidebarMenu>
-          <SidebarMenuItem>
+          <SidebarMenuItem className="flex justify-center group-data-[collapsible=icon]:justify-center">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   size="lg"
-                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                  className="data-[state=open]:!bg-[#e1fce9] data-[state=open]:!text-gray-800 hover:!bg-[#e1fce9] hover:!text-gray-800 group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0"
+                  tooltip="User Menu"
                 >
                   <CustomAvatar 
                     user={user}
                     size="sm"
                     className="w-8 h-8 flex-shrink-0"
                   />
-                  <div className="grid flex-1 text-left text-sm leading-tight">
+                  <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                     <span className="truncate font-semibold">
                       {user.firstName} {user.lastName}
                     </span>
@@ -221,26 +270,35 @@ export function AppSidebar() {
                 {/* Menu Items */}
                 <div className="py-2">
                   <DropdownMenuItem 
-                    onClick={() => setLocation('/profile')} 
+                    onClick={() => {
+                      setLocation('/profile');
+                      handleMobileNavClick();
+                    }} 
                     className="cursor-pointer flex items-center gap-3 px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 rounded-none"
                   >
-                    <User className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    <User className="h-4 w-4" style={{color: "#3396D3"}} />
                     <span className="text-sm">Profile</span>
                   </DropdownMenuItem>
                   
                   <DropdownMenuItem 
-                    onClick={() => setLocation('/company')} 
+                    onClick={() => {
+                      setLocation('/company');
+                      handleMobileNavClick();
+                    }} 
                     className="cursor-pointer flex items-center gap-3 px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 rounded-none"
                   >
-                    <Building2 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    <Building2 className="h-4 w-4" style={{color: "#3396D3"}} />
                     <span className="text-sm">Company</span>
                   </DropdownMenuItem>
                   
                   <DropdownMenuItem 
-                    onClick={() => setLocation('/sessions')} 
+                    onClick={() => {
+                      setLocation('/sessions');
+                      handleMobileNavClick();
+                    }} 
                     className="cursor-pointer flex items-center gap-3 px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 rounded-none"
                   >
-                    <Activity className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    <Activity className="h-4 w-4" style={{color: "#3396D3"}} />
                     <span className="text-sm">Sessions</span>
                   </DropdownMenuItem>
 
@@ -253,12 +311,12 @@ export function AppSidebar() {
                   >
                     {theme === 'light' ? (
                       <>
-                        <Moon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                        <Moon className="h-4 w-4" style={{color: "#3396D3"}} />
                         <span className="text-sm">Dark mode</span>
                       </>
                     ) : (
                       <>
-                        <Sun className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                        <Sun className="h-4 w-4" style={{color: "#3396D3"}} />
                         <span className="text-sm">Light mode</span>
                       </>
                     )}
@@ -304,7 +362,7 @@ export function AppSidebar() {
                     onClick={handleLogout}
                     className="cursor-pointer flex items-center gap-3 px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 rounded-none"
                   >
-                    <LogOut className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    <LogOut className="h-4 w-4" style={{color: "#3396D3"}} />
                     <span className="text-sm">Logout</span>
                   </DropdownMenuItem>
                 </div>

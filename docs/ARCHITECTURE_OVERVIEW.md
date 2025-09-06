@@ -10,7 +10,7 @@ Authentik is a comprehensive multi-tenant authentication and form management sys
 - **Frontend**: React 18 with TypeScript, Redux Toolkit, React Query
 - **Backend**: Node.js with Express.js and TypeScript
 - **Database**: PostgreSQL with Drizzle ORM
-- **Authentication**: JWT with session management
+- **Authentication**: Better Auth with secure session management
 - **Payments**: Stripe integration
 - **Email**: Resend for transactional emails
 - **Process Management**: PM2
@@ -52,13 +52,13 @@ Authentik is a comprehensive multi-tenant authentication and form management sys
 **Technology**: Node.js with Express.js and TypeScript, built with esbuild
 
 **Key Responsibilities**:
-- User authentication and authorization
+- Better Auth authentication and authorization
 - Multi-tenant data isolation
 - Form CRUD operations
 - Form response handling
 - Subscription management with Stripe
 - Email verification and notifications
-- Session management with device tracking
+- Session management with device tracking via Better Auth
 
 **Key Files**:
 - `index.ts`: Main server entry point with middleware setup
@@ -68,11 +68,12 @@ Authentik is a comprehensive multi-tenant authentication and form management sys
 
 **API Structure**:
 ```
-/api/auth/*          - Authentication endpoints
+/api/auth/*          - Better Auth authentication endpoints
 /api/forms/*         - Form management
 /api/users/*         - User management
 /api/subscriptions/* - Stripe integration
 /api/public/*        - Public form embedding endpoints
+/api/admin/*         - Administrative endpoints
 ```
 
 ### 3. Form Server (`/fserver`)
@@ -147,14 +148,14 @@ subscriptionPlans - Stripe subscription configurations
 
 ### 1. User Authentication Flow
 ```
-Client → Main Server → Database → Redis/Memory (Sessions) → Client
+Client → Better Auth → Main Server → Database → Client
 ```
 
 **Process**:
-1. User submits credentials
-2. Server validates against database
-3. JWT token generated and session stored
-4. Client receives token and user data
+1. User submits credentials via Better Auth client
+2. Better Auth validates against database
+3. Secure JWT tokens generated and sessions stored
+4. Client receives authentication data
 5. Redux store updated with auth state
 
 ### 2. Form Creation Flow
@@ -197,8 +198,8 @@ Client → Main Server → Stripe API → Webhook → Main Server → Database
 ## Security Architecture
 
 ### Authentication & Authorization
-- **JWT Tokens**: Stateless authentication with configurable expiration
-- **Session Management**: Server-side session storage with device tracking
+- **Better Auth**: Modern authentication with secure JWT token management
+- **Session Management**: Automatic session storage with device tracking
 - **Role-Based Access**: Owner, Administrator, Manager, Employee roles
 - **Multi-Factor Authentication**: TOTP-based 2FA with QR code generation
 

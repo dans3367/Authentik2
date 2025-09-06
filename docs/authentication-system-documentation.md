@@ -1,8 +1,8 @@
-# Authentik Authentication and JWT Management System Documentation
+# Authentik Authentication System with Better Auth Documentation
 
 ## Overview
 
-Authentik implements a robust, multi-tenant authentication system using JWT tokens with automatic refresh capabilities, device tracking, and comprehensive session management. The system is built with TypeScript across both frontend (React/Redux) and backend (Express.js) components.
+Authentik implements a robust, multi-tenant authentication system using Better Auth, a modern authentication library that provides secure JWT token management with automatic refresh capabilities, device tracking, and comprehensive session management. The system is built with TypeScript across both frontend (React/Redux) and backend (Express.js) components.
 
 ## Architecture Components
 
@@ -14,9 +14,10 @@ Authentik implements a robust, multi-tenant authentication system using JWT toke
 - **Event System**: Auth state change notifications
 
 ### Backend Architecture
-- **Express.js Middleware**: JWT validation and user authentication
+- **Better Auth Integration**: Secure authentication with automatic JWT management
+- **Express.js Middleware**: Better-auth handlers for authentication endpoints
 - **PostgreSQL + Drizzle ORM**: Session and user data persistence
-- **Device Tracking**: Unique device identification and management
+- **Device Tracking**: Unique device identification and management via Better Auth
 - **Rate Limiting**: Protection against brute force attacks
 - **Multi-tenant Support**: Isolated authentication per tenant
 
@@ -63,39 +64,37 @@ Authentik implements a robust, multi-tenant authentication system using JWT toke
 ### Backend Files
 
 #### Core Authentication Logic
-- **`server/routes.ts`** - Main authentication endpoints and middleware
-  - `authenticateToken` middleware for JWT validation
-  - `generateTokens()` function for JWT creation
-  - `getDeviceInfo()` function for device fingerprinting
-  - All authentication endpoints (`/api/auth/*`)
-  - Token configuration constants (`ACCESS_TOKEN_EXPIRES`, `REFRESH_TOKEN_EXPIRES`)
+- **`server/auth.ts`** - Better Auth configuration and setup
+  - Better Auth instance with database adapter
+  - Email and password authentication configuration
+  - Email verification settings
+  - Social provider configuration
+  - Security and trusted origins settings
 
-#### Key Authentication Endpoints in `server/routes.ts`:
-```typescript
-Lines 94-153:   authenticateToken middleware
-Lines 175-186:  generateTokens function
-Lines 457-590:  POST /api/auth/login endpoint
-Lines 794-909:  POST /api/auth/refresh endpoint
-Lines 910-959:  POST /api/auth/logout endpoint
-Lines 996-1013: GET /api/auth/me endpoint
-Lines 962-991:  GET /api/auth/check endpoint
-Lines 1550-1578: GET /api/auth/sessions endpoint
-```
+#### Better Auth Integration
+Better Auth automatically provides the following authentication endpoints:
+- `POST /api/auth/sign-in` - User sign in
+- `POST /api/auth/sign-up` - User registration
+- `POST /api/auth/sign-out` - User logout
+- `GET /api/auth/session` - Get current session
+- `POST /api/auth/refresh` - Refresh tokens (automatic)
+- `POST /api/auth/reset-password` - Password reset
+- `POST /api/auth/verify-email` - Email verification
 
 #### Data Persistence
-- **`server/storage.ts`** - Database operations for authentication
-  - `IStorage` interface defining auth operations
-  - Refresh token CRUD operations
-  - User session management
-  - Device tracking data storage
+- **`server/storage.ts`** - Database operations for user management
+  - User CRUD operations
   - Multi-tenant user lookup functions
+  - Device tracking data storage (legacy support)
 
 #### Key Storage Functions:
 ```typescript
-Lines 89-94:   createRefreshToken, getRefreshToken, deleteRefreshToken
-Lines 96-100:  getUserSessions, updateSessionLastUsed, deleteSession
-Lines 71-72:   findUserByEmailAcrossTenants (for login)
-Lines 68-69:   getTenantOwner (for tenant context)
+// User management functions
+findUserByEmailAcrossTenants(email) - Multi-tenant user lookup
+getTenantOwner(tenantId) - Get tenant owner information
+getUser(userId, tenantId) - Get user by ID with tenant context
+createUser(userData) - Create new user
+updateUser(userId, updates) - Update user information
 ```
 
 #### Security and Validation
@@ -154,177 +153,108 @@ Lines 68-69:   getTenantOwner (for tenant context)
 
 This file organization ensures clear separation of concerns with authentication logic distributed across specialized modules for maintainability and security.
 
-## JWT Token System
+## Better Auth Token System
 
-### Token Types and Configuration
+### Token Management
 
-```typescript
-// Token Configuration
-const ACCESS_TOKEN_EXPIRES = "15m";    // 15 minutes
-const REFRESH_TOKEN_EXPIRES = "7d";    // 7 days (or 30 days with "Remember Me")
-```
+Better Auth automatically manages JWT tokens with secure defaults:
 
-#### Access Token
+#### Access Tokens
 - **Purpose**: Short-lived authentication token for API requests
-- **Lifetime**: 15 minutes
-- **Storage**: localStorage on frontend
-- **Payload**: `{ userId, tenantId, exp, iat }`
-- **Usage**: Bearer token in Authorization header
+- **Lifetime**: 1 hour (better-auth default)
+- **Storage**: Secure HTTP-only cookies or localStorage
+- **Automatic Refresh**: Handled transparently by Better Auth client
 
-#### Refresh Token
+#### Refresh Tokens
 - **Purpose**: Long-lived token for obtaining new access tokens
-- **Lifetime**: 7 days (default) or 30 days (with "Remember Me")
-- **Storage**: httpOnly cookie (secure, sameSite: lax)
-- **Payload**: `{ userId, tenantId, tokenId, exp, iat }`
-- **Usage**: Automatic refresh via `/api/auth/refresh` endpoint
+- **Lifetime**: 7 days (better-auth default)
+- **Storage**: Secure HTTP-only cookies
+- **Automatic Rotation**: New refresh tokens issued on each refresh
 
-### Token Generation
-
-```typescript
-const generateTokens = (userId: string, tenantId: string) => {
-  const accessToken = jwt.sign({ userId, tenantId }, JWT_SECRET, {
-    expiresIn: ACCESS_TOKEN_EXPIRES,
-  });
-  const refreshToken = jwt.sign(
-    { userId, tenantId, tokenId: randomBytes(16).toString("hex") },
-    REFRESH_TOKEN_SECRET,
-    { expiresIn: REFRESH_TOKEN_EXPIRES },
-  );
-  return { accessToken, refreshToken };
-};
-```
-
-### Token Validation Middleware
-
-The `authenticateToken` middleware validates access tokens on protected routes:
-
-1. **Extract Token**: From `Authorization: Bearer <token>` header
-2. **Verify Signature**: Using JWT_SECRET
-3. **Check User**: Validate user exists and is active
-4. **Attach User**: Add user data to `req.user` for downstream handlers
+### Better Auth Configuration
 
 ```typescript
-const authenticateToken = async (req: any, res: any, next: any) => {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
-
-  if (!token) {
-    return res.status(401).json({ message: "Access token required" });
-  }
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    const user = await storage.getUser(decoded.userId, decoded.tenantId);
-    
-    if (!user || !user.isActive) {
-      return res.status(401).json({ message: "User not found or inactive" });
-    }
-
-    req.user = { ...user }; // Attach full user data
-    next();
-  } catch (error) {
-    // Handle TokenExpiredError, JsonWebTokenError, etc.
-    return res.status(401).json({ message: "Invalid access token" });
-  }
-};
+// server/auth.ts
+const authInstance = betterAuth({
+  database: drizzleAdapter(db, {
+    provider: "pg",
+    schema: {
+      user: betterAuthUser,
+      session: betterAuthSession,
+      account: betterAuthAccount,
+      verification: betterAuthVerification,
+    },
+  }),
+  emailAndPassword: {
+    enabled: true,
+  },
+  emailVerification: {
+    sendOnSignUp: true,
+  },
+  baseURL: process.env.BASE_URL || "http://localhost:5000",
+  secret: process.env.BETTER_AUTH_SECRET,
+  trustedOrigins: ["http://localhost:5000", "http://localhost:5173"],
+});
 ```
+
+### Automatic Token Handling
+
+Better Auth provides automatic token management:
+
+1. **Token Generation**: Automatic JWT creation with secure signing
+2. **Token Validation**: Built-in middleware for protected routes
+3. **Token Refresh**: Automatic background refresh before expiration
+4. **Session Management**: Secure session storage and cleanup
+5. **Security Headers**: Automatic security headers for authentication
 
 ## Authentication Flow
 
 ### 1. Login Process
 
-#### Frontend (Redux)
+#### Frontend (Better Auth Client)
 ```typescript
-// 1. User submits credentials
-const loginUser = createAsyncThunk("auth/login", async (credentials) => {
-  const response = await fetch("/api/auth/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include", // Include cookies
-    body: JSON.stringify(credentials),
-  });
-  
-  const data = await response.json();
-  
-  // Handle 2FA requirement
-  if (data.requires2FA) {
-    return rejectWithValue("2FA_REQUIRED");
-  }
-  
-  return {
-    user: data.user,
-    accessToken: data.accessToken,
+// Using Better Auth client hooks
+import { useSession, signIn } from "@/lib/betterAuthClient";
+
+const LoginComponent = () => {
+  const signInMutation = signIn();
+
+  const handleLogin = async (credentials) => {
+    try {
+      await signInMutation.mutateAsync({
+        email: credentials.email,
+        password: credentials.password,
+      });
+      // Better Auth automatically handles token storage and session management
+    } catch (error) {
+      console.error("Login failed:", error);
+    }
   };
-});
+
+  return (
+    <form onSubmit={handleLogin}>
+      {/* Login form */}
+    </form>
+  );
+};
 ```
 
-#### Backend (Express)
+#### Backend (Better Auth)
 ```typescript
-app.post("/api/auth/login", async (req, res) => {
-  // 1. Rate limiting check
-  if (!checkRateLimit(clientIP)) {
-    return res.status(429).json({ message: "Too many login attempts" });
-  }
-
-  // 2. Input validation and sanitization
-  const { email, password, twoFactorToken, rememberMe } = loginSchema.parse(req.body);
-
-  // 3. Find user across all tenants
-  const userResult = await storage.findUserByEmailAcrossTenants(email);
-  
-  // 4. Password verification
-  const isValidPassword = await bcrypt.compare(password, user.password);
-  
-  // 5. 2FA verification (if enabled)
-  if (user.twoFactorEnabled) {
-    const isValid2FA = authenticator.verify({
-      token: twoFactorToken,
-      secret: user.twoFactorSecret,
-    });
-  }
-
-  // 6. Generate tokens
-  const { accessToken, refreshToken } = generateTokens(user.id, user.tenantId);
-
-  // 7. Store refresh token with device info
-  const deviceInfo = getDeviceInfo(req);
-  const tokenExpiryDays = rememberMe ? 30 : 7;
-  const refreshTokenExpiry = new Date(Date.now() + tokenExpiryDays * 24 * 60 * 60 * 1000);
-  
-  await storage.createRefreshToken(
-    user.id,
-    user.tenantId,
-    refreshToken,
-    refreshTokenExpiry,
-    deviceInfo,
-  );
-
-  // 8. Set httpOnly cookie
-  res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: tokenExpiryDays * 24 * 60 * 60 * 1000,
-  });
-
-  // 9. Return user data and access token
-  res.json({
-    message: "Login successful",
-    accessToken,
-    user: {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      twoFactorEnabled: user.twoFactorEnabled,
-      emailVerified: user.emailVerified,
-      theme: user.theme || 'light',
-      avatarUrl: user.avatarUrl || null,
-    },
-    emailVerificationRequired: !user.emailVerified,
-  });
+// server/auth.ts - Better Auth handles login automatically
+const authInstance = betterAuth({
+  // Configuration as shown above
+  // Better Auth automatically:
+  // 1. Validates credentials
+  // 2. Generates secure JWT tokens
+  // 3. Manages session storage
+  // 4. Handles rate limiting
+  // 5. Sets secure cookies
 });
+
+// In server/index.ts
+app.all("/api/auth/*", toNodeHandler(auth));
+// This single line handles all authentication endpoints
 ```
 
 ### 2. Authentication State Management
@@ -360,189 +290,91 @@ interface AuthState {
 
 ### 3. Automatic Token Refresh System
 
-#### Frontend Implementation
-The `AuthManager` class handles automatic token refresh:
+#### Better Auth Automatic Token Management
+
+Better Auth handles token refresh automatically with no manual implementation required:
 
 ```typescript
-class AuthManager {
-  private scheduleTokenRefresh(token: string): void {
-    // Parse token to get expiry time
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    const expTime = payload.exp * 1000;
-    const timeUntilExpiry = expTime - now;
+// client/src/lib/betterAuthClient.ts
+import { createAuthClient } from "better-auth/react";
 
-    // Schedule refresh 2 minutes before expiry
-    const refreshTime = Math.max(timeUntilExpiry - 120000, 30000);
+export const authClient = createAuthClient({
+  baseURL: import.meta.env.VITE_BETTER_AUTH_URL,
+  // Better Auth automatically:
+  // - Refreshes tokens before expiration
+  // - Handles token storage securely
+  // - Manages session state
+  // - Provides automatic retry on 401 responses
+});
 
-    this.refreshTimer = setTimeout(async () => {
-      try {
-        const newToken = await this.refreshAccessToken();
-        this.scheduleTokenRefresh(newToken); // Re-schedule with new token
-      } catch (error) {
-        console.error("Automatic token refresh failed:", error);
-        // Only clear tokens on definitive auth failures
-        if (error.message.includes("authentication required")) {
-          this.clearTokens();
-        }
-      }
-    }, refreshTime);
-  }
-
-  async refreshAccessToken(): Promise<string> {
-    const response = await fetch("/api/auth/refresh", {
-      method: "POST",
-      credentials: "include", // Send httpOnly cookie
-    });
-
-    if (!response.ok) {
-      if (response.status === 401 || response.status === 403) {
-        this.clearTokens();
-        throw new Error("Token refresh failed - authentication required");
-      }
-      throw new Error("Token refresh failed - temporary error");
-    }
-
-    const data = await response.json();
-    this.setAccessToken(data.accessToken);
-    return data.accessToken;
-  }
-}
+export const { useSession, signIn, signOut, signUp } = authClient;
 ```
 
-#### Backend Refresh Endpoint
+#### Automatic Refresh Features
+- **Transparent Operation**: Token refresh happens automatically in the background
+- **Smart Timing**: Refreshes tokens before they expire to prevent interruptions
+- **Error Handling**: Automatic retry logic for network issues
+- **Session Persistence**: Maintains user session across browser refreshes
+- **Security**: Uses secure HTTP-only cookies for refresh tokens
+
+#### Usage in Components
 ```typescript
-app.post("/api/auth/refresh", async (req, res) => {
-  // 1. Extract refresh token from httpOnly cookie
-  const refreshToken = req.cookies.refreshToken;
+const MyComponent = () => {
+  const { data: session, isLoading } = useSession();
 
-  // 2. Verify refresh token signature
-  const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
+  // Better Auth automatically handles:
+  // - Token refresh before expiration
+  // - Session validation
+  // - Secure token storage
+  // - Authentication state management
 
-  // 3. Check token exists in database
-  const storedToken = await storage.getRefreshToken(refreshToken);
-  
-  // 4. Validate user is still active
-  const user = await storage.getUser(decoded.userId, decoded.tenantId);
+  if (isLoading) return <div>Loading...</div>;
+  if (!session) return <div>Please sign in</div>;
 
-  // 5. Update session last used time
-  await storage.updateSessionLastUsed(refreshToken);
-
-  // 6. Generate new tokens
-  const { accessToken, refreshToken: newRefreshToken } = generateTokens(
-    user.id,
-    user.tenantId,
-  );
-
-  // 7. Replace refresh token in database
-  await storage.deleteRefreshToken(refreshToken);
-  await storage.createRefreshToken(
-    user.id,
-    user.tenantId,
-    newRefreshToken,
-    preservedExpiry,
-    preservedDeviceInfo,
-  );
-
-  // 8. Set new httpOnly cookie
-  res.cookie("refreshToken", newRefreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: cookieMaxAge,
-  });
-
-  // 9. Return new access token and user data
-  res.json({
-    message: "Token refreshed successfully",
-    accessToken,
-    user: { /* user data */ },
-  });
-});
+  return <div>Welcome {session.user.email}!</div>;
+};
 ```
 
 ## Session and Device Management
 
-### Device Identification
+### Better Auth Session Management
 
-Each login creates a unique device session:
+Better Auth provides built-in session management with device tracking:
 
+#### Automatic Session Tracking
+- **Device Fingerprinting**: Automatic device identification and tracking
+- **Session Storage**: Secure session storage in database with device information
+- **Session Cleanup**: Automatic cleanup of expired and inactive sessions
+- **Multi-device Support**: Support for multiple concurrent sessions per user
+
+#### Session Configuration
 ```typescript
-function getDeviceInfo(req: any) {
-  const userAgentString = req.get("User-Agent") || "Unknown";
-  const parser = new UAParser(userAgentString);
-  const result = parser.getResult();
-
-  // Create unique device fingerprint
-  const deviceFingerprint = `${result.browser.name}-${result.os.name}-${req.ip}`;
-  const deviceId = createHash("sha256")
-    .update(deviceFingerprint)
-    .digest("hex")
-    .substring(0, 16);
-
-  // Generate user-friendly device name
-  const browserName = result.browser.name || "Unknown Browser";
-  const osName = result.os.name || "Unknown OS";
-  const deviceName = `${browserName} on ${osName}`;
-
-  return {
-    deviceId,
-    deviceName,
-    userAgent: userAgentString,
-    ipAddress: req.ip || "Unknown",
-  };
-}
+// server/services/sessionCleanup.ts
+export const defaultSessionConfig: SessionCleanupConfig = {
+  cleanupIntervalMinutes: 60,      // Run cleanup every hour
+  maxSessionsPerUser: 10,          // Maximum 10 active sessions per user
+  inactivityTimeoutDays: 30,       // Clean sessions inactive for 30 days
+  cleanExpiredTokens: true,        // Remove expired sessions
+  cleanInactiveSessions: true,     // Remove inactive sessions
+  enforceSessionLimits: true,      // Enforce per-user limits
+  enableCleanupLogs: true,         // Enable cleanup logging
+};
 ```
 
-### Session Storage
-
-Refresh tokens are stored with comprehensive device information:
-
+#### Session Statistics and Monitoring
 ```typescript
-interface RefreshToken {
-  id: string;
-  userId: string;
-  tenantId: string;
-  token: string;
-  expiresAt: Date;
-  createdAt: Date;
-  lastUsedAt: Date;
-  deviceId: string;
-  deviceName: string;
-  userAgent: string;
-  ipAddress: string;
-}
+// Get comprehensive session statistics
+const sessionStats = await sessionCleanupService.getSessionStats();
+// Returns: totalActiveSessions, expiredSessions, inactiveSessions, sessionsByTenant
 ```
 
-### Session Management Operations
-
+#### Administrative Session Management
 ```typescript
-// Get all user sessions
-app.get("/api/auth/sessions", authenticateToken, async (req, res) => {
-  const sessions = await storage.getUserSessions(req.user.id, req.user.tenantId);
-  
-  res.json({
-    sessions: sessions.map(session => ({
-      id: session.id,
-      deviceName: session.deviceName,
-      ipAddress: session.ipAddress,
-      lastUsedAt: session.lastUsedAt,
-      createdAt: session.createdAt,
-      isCurrent: session.token === req.cookies.refreshToken,
-    })),
-  });
-});
-
-// Delete specific session
-app.delete("/api/auth/sessions/:sessionId", authenticateToken, async (req, res) => {
-  await storage.deleteSession(req.params.sessionId, req.user.id, req.user.tenantId);
-  res.json({ message: "Session deleted successfully" });
-});
-
-// Delete all sessions (logout everywhere)
-app.delete("/api/auth/sessions", authenticateToken, async (req, res) => {
-  await storage.deleteAllUserSessions(req.user.id, req.user.tenantId);
-  res.json({ message: "All sessions deleted successfully" });
-});
+// Admin endpoints for session management
+GET /api/admin/sessions/stats        // Session statistics
+GET /api/admin/sessions              // List all sessions
+POST /api/admin/sessions/cleanup     // Manual cleanup
+DELETE /api/admin/sessions           // Bulk session deletion
 ```
 
 ## Security Features
@@ -611,41 +443,47 @@ await storage.createRefreshToken(userId, tenantId, token, expiry, device);
 
 ## API Endpoints
 
-### Authentication Endpoints
-- `POST /api/auth/login` - User login with credentials
-- `POST /api/auth/refresh` - Refresh access token
-- `POST /api/auth/logout` - Logout current session
-- `GET /api/auth/me` - Get current user info
-- `GET /api/auth/check` - Check auth status (refresh token validity)
+### Better Auth Authentication Endpoints
+- `POST /api/auth/sign-in` - User sign in with email/password
+- `POST /api/auth/sign-up` - User registration
+- `POST /api/auth/sign-out` - User logout
+- `GET /api/auth/session` - Get current session information
+- `POST /api/auth/refresh` - Automatic token refresh (handled by Better Auth)
+- `POST /api/auth/reset-password` - Password reset request
+- `POST /api/auth/verify-email` - Email verification
 
-### Session Management
-- `GET /api/auth/sessions` - List user sessions
-- `DELETE /api/auth/sessions/:id` - Delete specific session
-- `DELETE /api/auth/sessions` - Delete all sessions (logout everywhere)
+### User Management Endpoints
+- `PUT /api/users/profile` - Update user profile
+- `PUT /api/users/change-password` - Change password
+- `DELETE /api/users/account` - Delete user account
 
-### User Management
-- `PUT /api/auth/profile` - Update user profile
-- `PUT /api/auth/change-password` - Change password
-- `DELETE /api/auth/account` - Delete user account
+### Administrative Endpoints
+- `GET /api/admin/sessions/stats` - Session statistics and monitoring
+- `GET /api/admin/sessions` - List all user sessions
+- `POST /api/admin/sessions/cleanup` - Manual session cleanup
+- `DELETE /api/admin/sessions` - Bulk session deletion
 
-### 2FA Management
-- `POST /api/auth/2fa/setup` - Initialize 2FA setup
-- `POST /api/auth/2fa/enable` - Enable 2FA with verification
-- `POST /api/auth/2fa/disable` - Disable 2FA with verification
+### Additional Endpoints
+- `GET /api/health` - Health check endpoint
+- `GET /api/docs` - API documentation
 
 ## Configuration
 
 ### Environment Variables
 ```bash
-# JWT Configuration
-JWT_SECRET=your-super-secret-jwt-key
-REFRESH_TOKEN_SECRET=your-super-secret-refresh-key
+# Better Auth Configuration
+BETTER_AUTH_SECRET=your-super-secret-better-auth-key
+BASE_URL=http://localhost:5000
 
 # Database
 DATABASE_URL=postgresql://user:password@localhost:5432/authentik
 
 # Email Service
 RESEND_API_KEY=your-resend-api-key
+
+# Client Configuration
+VITE_BETTER_AUTH_URL=http://localhost:5000
+VITE_STRIPE_PUBLIC_KEY=pk_test_your_stripe_public_key_here
 
 # Avatar Storage (Optional)
 R2_ACCESS_KEY_ID=your-r2-access-key
@@ -656,25 +494,26 @@ R2_PUBLIC_URL=your-r2-public-url
 ```
 
 ### Security Best Practices
-1. **Use strong, unique secrets** for JWT signing
+1. **Use strong, unique secrets** for Better Auth signing
 2. **Enable HTTPS in production** for secure cookie transmission
-3. **Regular token rotation** via automatic refresh
+3. **Configure trusted origins** properly for CORS security
 4. **Monitor session activity** for suspicious behavior
-5. **Implement proper CORS** policies for API access
+5. **Regular session cleanup** to maintain database performance
 6. **Use environment-specific configurations**
 
 ## Troubleshooting
 
 ### Common Issues
-1. **Token Not Found**: Check localStorage and cookie storage
-2. **Refresh Failures**: Verify refresh token cookie and database entry
-3. **CORS Errors**: Ensure proper credentials handling in requests
-4. **Session Cleanup**: Monitor expired token cleanup process
+1. **Session Not Found**: Check Better Auth session storage
+2. **Authentication Failures**: Verify Better Auth configuration and database connection
+3. **CORS Errors**: Ensure trusted origins are properly configured
+4. **Session Cleanup**: Monitor session cleanup service logs
 
 ### Debugging Tools
-- **Console Logging**: Comprehensive auth flow logging
-- **Network Tab**: Monitor token refresh requests
-- **Session Storage**: Inspect stored tokens and user data
-- **Database Queries**: Check refresh token and user tables
+- **Console Logging**: Better Auth client logging for authentication flows
+- **Network Tab**: Monitor Better Auth API requests
+- **Browser DevTools**: Inspect Better Auth session data
+- **Database Queries**: Check Better Auth session and user tables
+- **Session Cleanup Logs**: Monitor automatic session cleanup operations
 
-This documentation provides a comprehensive overview of the Authentik authentication system architecture, implementation details, and operational procedures. 
+This documentation provides a comprehensive overview of the Authentik authentication system using Better Auth, including implementation details, configuration, and operational procedures. 

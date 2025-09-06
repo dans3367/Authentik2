@@ -5,18 +5,17 @@ import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function AddForm() {
-  const { isAuthenticated, isLoading: authLoading } = useReduxAuth();
-  const { hasInitialized } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, isInitialized } = useReduxAuth();
   const [, setLocation] = useLocation();
 
   // Redirect unauthenticated users immediately
-  if (hasInitialized && !isAuthenticated) {
+  if (isInitialized && !isAuthenticated) {
     setLocation('/auth');
     return null;
   }
 
   // Show loading while authentication is being determined
-  if (!hasInitialized || authLoading) {
+  if (!isInitialized || authLoading) {
     return (
       <div className="min-h-screen p-6 flex items-center justify-center">
         <div className="flex items-center justify-center">

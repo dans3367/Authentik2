@@ -27,6 +27,11 @@ curl -s -X GET "${API_URL}/auth/sessions" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -w "\nHTTP Status: %{http_code}\n" | head -50
 
+echo -e "\n4. Testing /api/auth/logout-all endpoint:"
+curl -s -X POST "${API_URL}/auth/logout-all" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -w "\nHTTP Status: %{http_code}\n"
+
 echo -e "\n==============================================="
 echo "Now please click 'Log Out All Other Devices' in the browser"
 read -p "Press Enter after clicking logout all devices: "

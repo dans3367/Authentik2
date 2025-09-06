@@ -1,6 +1,5 @@
 import { 
   users, 
-  refreshTokens, 
   subscriptionPlans, 
   subscriptions,
   tenants,
@@ -21,7 +20,6 @@ import {
   bouncedEmails,
   type User, 
   type InsertUser, 
-  type RefreshToken, 
   type UserFilters, 
   type CreateUserData, 
   type UpdateUserData, 
@@ -90,15 +88,8 @@ import {
   type BouncedEmailFilters
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gt, lt, gte, lte, desc, ne, or, ilike, count, sql, inArray } from "drizzle-orm";
+import { eq, and, gt, lt, gte, lte, desc, ne, or, ilike, count, sql, inArray, not } from "drizzle-orm";
 
-export interface DeviceInfo {
-  deviceId?: string;
-  deviceName?: string;
-  userAgent?: string;
-  ipAddress?: string;
-  location?: string;
-}
 
 export interface IStorage {
   // Tenant operations
@@ -130,22 +121,6 @@ export interface IStorage {
   deleteUser(id: string, tenantId: string): Promise<void>;
   toggleUserStatus(id: string, isActive: boolean, tenantId: string): Promise<User | undefined>;
   getManagerUsers(tenantId: string): Promise<User[]>;
-  
-  // Refresh token operations with device tracking (tenant-aware)
-  createRefreshToken(userId: string, tenantId: string, token: string, expiresAt: Date, deviceInfo?: DeviceInfo): Promise<RefreshToken>;
-  getRefreshToken(token: string): Promise<RefreshToken | undefined>;
-  updateRefreshToken(id: string, token: string, tenantId: string): Promise<void>;
-  deleteRefreshToken(token: string): Promise<void>;
-  deleteUserRefreshTokens(userId: string, tenantId: string): Promise<void>;
-  cleanExpiredTokens(): Promise<void>;
-  
-  // Device session management (tenant-aware)
-  getUserSessions(userId: string, tenantId: string): Promise<RefreshToken[]>;
-  updateSessionLastUsed(token: string): Promise<void>;
-  deleteSession(sessionId: string, userId: string, tenantId: string): Promise<void>;
-  deleteAllUserSessions(userId: string, tenantId: string): Promise<void>;
-  deleteOtherUserSessions(userId: string, currentRefreshToken: string, tenantId: string): Promise<void>;
-  refreshTokenExists(refreshTokenId: string, tenantId: string): Promise<boolean>;
   
   // Email verification (tenant-aware)
   setEmailVerificationToken(userId: string, tenantId: string, token: string, expiresAt: Date): Promise<void>;
@@ -453,6 +428,37 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date(),
       })
       .returning();
+
+    // Sync tenant information with Better Auth user table
+    try {
+      // Check if Better Auth user exists
+      const existingBetterAuthUser = await db.query.betterAuthUser.findFirst({
+        where: eq(betterAuthUser.email, user.email),
+      });
+
+      if (existingBetterAuthUser) {
+        // Update Better Auth user with tenant information
+        await db.update(betterAuthUser)
+          .set({
+            tenantId: user.tenantId,
+            role: user.role,
+            updatedAt: new Date(),
+          })
+          .where(eq(betterAuthUser.id, existingBetterAuthUser.id));
+
+        console.log('✅ Synced tenant info to Better Auth user during createUser:', {
+          userId: user.id,
+          email: user.email,
+          tenantId: user.tenantId
+        });
+      } else {
+        console.warn('⚠️ No Better Auth user found for email during createUser:', user.email);
+      }
+    } catch (error) {
+      console.error('❌ Failed to sync tenant info during createUser:', error);
+      // Don't fail the user creation, just log the error
+    }
+
     return user;
   }
 
@@ -465,125 +471,8 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async createRefreshToken(userId: string, tenantId: string, token: string, expiresAt: Date, deviceInfo?: DeviceInfo): Promise<RefreshToken> {
-    const [refreshToken] = await db
-      .insert(refreshTokens)
-      .values({
-        userId,
-        tenantId,
-        token,
-        expiresAt,
-        deviceId: deviceInfo?.deviceId,
-        deviceName: deviceInfo?.deviceName,
-        userAgent: deviceInfo?.userAgent,
-        ipAddress: deviceInfo?.ipAddress,
-        location: deviceInfo?.location,
-        lastUsed: new Date(),
-        isActive: true,
-      })
-      .returning();
-    return refreshToken;
-  }
 
-  async getRefreshToken(token: string): Promise<RefreshToken | undefined> {
-    const [refreshToken] = await db
-      .select()
-      .from(refreshTokens)
-      .where(and(
-        eq(refreshTokens.token, token),
-        gt(refreshTokens.expiresAt, new Date())
-      ));
-    return refreshToken;
-  }
 
-  async deleteRefreshToken(token: string): Promise<void> {
-    await db.delete(refreshTokens).where(eq(refreshTokens.token, token));
-  }
-
-  async deleteUserRefreshTokens(userId: string, tenantId: string): Promise<void> {
-    await db.delete(refreshTokens).where(and(
-      eq(refreshTokens.userId, userId),
-      eq(refreshTokens.tenantId, tenantId)
-    ));
-  }
-
-  async cleanExpiredTokens(): Promise<void> {
-    await db.delete(refreshTokens).where(
-      lt(refreshTokens.expiresAt, new Date())
-    );
-  }
-
-  // Device session management methods
-  async getUserSessions(userId: string, tenantId: string): Promise<RefreshToken[]> {
-    const sessions = await db
-      .select()
-      .from(refreshTokens)
-      .where(and(
-        eq(refreshTokens.userId, userId),
-        eq(refreshTokens.tenantId, tenantId),
-        eq(refreshTokens.isActive, true),
-        gt(refreshTokens.expiresAt, new Date())
-      ))
-      .orderBy(desc(refreshTokens.lastUsed));
-    return sessions;
-  }
-
-  async updateSessionLastUsed(token: string): Promise<void> {
-    await db
-      .update(refreshTokens)
-      .set({ lastUsed: new Date() })
-      .where(eq(refreshTokens.token, token));
-  }
-
-  async deleteSession(sessionId: string, userId: string, tenantId: string): Promise<void> {
-    await db
-      .delete(refreshTokens)
-      .where(and(
-        eq(refreshTokens.id, sessionId),
-        eq(refreshTokens.userId, userId),
-        eq(refreshTokens.tenantId, tenantId)
-      ));
-  }
-
-  async deleteAllUserSessions(userId: string, tenantId: string): Promise<void> {
-    await db
-      .delete(refreshTokens)
-      .where(and(
-        eq(refreshTokens.userId, userId),
-        eq(refreshTokens.tenantId, tenantId)
-      ));
-  }
-
-  async deleteOtherUserSessions(userId: string, currentRefreshToken: string, tenantId: string): Promise<void> {
-    await db
-      .delete(refreshTokens)
-      .where(and(
-        eq(refreshTokens.userId, userId),
-        eq(refreshTokens.tenantId, tenantId),
-        ne(refreshTokens.token, currentRefreshToken)
-      ));
-  }
-
-  async updateRefreshToken(id: string, token: string, tenantId: string): Promise<void> {
-    await db
-      .update(refreshTokens)
-      .set({ token })
-      .where(and(eq(refreshTokens.id, id), eq(refreshTokens.tenantId, tenantId)));
-  }
-
-  async refreshTokenExists(refreshTokenId: string, tenantId: string): Promise<boolean> {
-    const [token] = await db
-      .select({ id: refreshTokens.id })
-      .from(refreshTokens)
-      .where(and(
-        eq(refreshTokens.id, refreshTokenId),
-        eq(refreshTokens.tenantId, tenantId),
-        eq(refreshTokens.isActive, true),
-        gt(refreshTokens.expiresAt, new Date())
-      ))
-      .limit(1);
-    return !!token;
-  }
 
   // Email verification methods (tenant-aware)
   async setEmailVerificationToken(userId: string, tenantId: string, token: string, expiresAt: Date): Promise<void> {
@@ -908,6 +797,37 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date(),
       })
       .returning();
+
+    // Sync tenant information with Better Auth user table
+    try {
+      // Check if Better Auth user exists
+      const existingBetterAuthUser = await db.query.betterAuthUser.findFirst({
+        where: eq(betterAuthUser.email, user.email),
+      });
+
+      if (existingBetterAuthUser) {
+        // Update Better Auth user with tenant information
+        await db.update(betterAuthUser)
+          .set({
+            tenantId: user.tenantId,
+            role: user.role,
+            updatedAt: new Date(),
+          })
+          .where(eq(betterAuthUser.id, existingBetterAuthUser.id));
+
+        console.log('✅ Synced tenant info to Better Auth user during createUserAsAdmin:', {
+          userId: user.id,
+          email: user.email,
+          tenantId: user.tenantId
+        });
+      } else {
+        console.warn('⚠️ No Better Auth user found for email during createUserAsAdmin:', user.email);
+      }
+    } catch (error) {
+      console.error('❌ Failed to sync tenant info during createUserAsAdmin:', error);
+      // Don't fail the user creation, just log the error
+    }
+
     return user;
   }
 

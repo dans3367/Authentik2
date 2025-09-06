@@ -32,7 +32,7 @@
   --chart-5: hsl(27, 87%, 67%);
 
   /* Sidebar colors */
-  --sidebar-background: hsl(0, 0%, 98%);
+  --sidebar-background: hsl(0, 0%, 100%);
   --sidebar-foreground: hsl(240, 5.3%, 26.1%);
   --sidebar-primary: hsl(240, 5.9%, 10%);
   --sidebar-primary-foreground: hsl(0, 0%, 98%);

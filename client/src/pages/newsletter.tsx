@@ -5,28 +5,25 @@ import {
   Plus, 
   Mail, 
   Calendar, 
-  Eye, 
-  Edit, 
-  Trash2, 
-  Send,
+  Eye,  Send,
   Clock,
   FileText,
   MoreHorizontal,
-  Filter,
   TrendingUp,
   Users,
   MousePointer,
-  ArrowUpDown
+  ArrowUpDown,
+  Search,
+  AlertTriangle,
+  Edit
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Tooltip,
-  TooltipContent,
   TooltipProvider,
-  TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
@@ -45,14 +42,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { NewsletterWithUser } from "@shared/schema";
 import type { ColumnDef } from "@tanstack/react-table";
-
 // Status badge helper function
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -66,7 +61,6 @@ const getStatusBadge = (status: string) => {
       return <Badge variant="secondary">{status}</Badge>;
   }
 };
-
 // Column definitions for the newsletter table
 const createColumns = (
   setLocation: (location: string) => void,
@@ -86,6 +80,7 @@ const createColumns = (
         </Button>
       )
     },
+    size: 300, // Fixed width for title column
     cell: ({ row }) => {
       const newsletter = row.original;
       return (
@@ -110,6 +105,7 @@ const createColumns = (
     filterFn: (row, id, value) => {
       return value.includes(row.getValue(id));
     },
+    size: 120, // Fixed width for status column
   },
   {
     accessorKey: "user",
@@ -127,6 +123,7 @@ const createColumns = (
         </div>
       );
     },
+    size: 180, // Fixed width for author column
   },
   {
     accessorKey: "recipientCount",
@@ -148,16 +145,16 @@ const createColumns = (
         {row.getValue("recipientCount") || 0}
       </div>
     ),
+    size: 120, // Fixed width for recipients column
   },
   {
     id: "metrics",
     header: "Engagement",
     cell: ({ row }) => {
       const newsletter = row.original;
-      const openRate = newsletter.recipientCount > 0 
-        ? ((newsletter.opens || 0) / newsletter.recipientCount * 100).toFixed(1)
+      const openRate = (newsletter.recipientCount || 0) > 0
+        ? ((newsletter.opens || 0) / (newsletter.recipientCount || 1) * 100).toFixed(1)
         : "0.0";
-      
       return (
         <div className="space-y-2">
           <div className="flex items-center space-x-4 text-sm">
@@ -182,6 +179,7 @@ const createColumns = (
         </div>
       );
     },
+    size: 200, // Fixed width for engagement column
   },
   {
     id: "dates",
@@ -202,7 +200,6 @@ const createColumns = (
     cell: ({ row }) => {
       const newsletter = row.original;
       const status = newsletter.status;
-      
       if (status === 'sent' && newsletter.sentAt) {
         return (
           <div className="space-y-1">
@@ -244,7 +241,6 @@ const createColumns = (
     header: "",
     cell: ({ row }) => {
       const newsletter = row.original;
-      
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -261,178 +257,198 @@ const createColumns = (
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              onClick={() => handleDeleteNewsletter(newsletter.id)}
-              className="text-red-600 dark:text-red-400"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete
-            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       );
     },
   },
 ];
-
 export default function NewsletterPage() {
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [newsletterToDelete, setNewsletterToDelete] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [location, setLocation] = useLocation();
-
   // Fetch newsletters with fresh data on each page load
   const { data: newslettersData, isLoading, error, refetch } = useQuery({
     queryKey: ['/api/newsletters'],
+    queryFn: async () => {
+      console.log('Fetching newsletters...');
+      const response = await apiRequest('GET', '/api/newsletters');
+      const data = await response.json();
+      console.log('Newsletters data:', data);
+      // The API returns { newsletters: [...] }
+      return data.newsletters || [];
+    },
     staleTime: 0, // Always consider data stale to ensure fresh fetches
     refetchOnMount: 'always', // Always refetch when component mounts
     refetchOnWindowFocus: true, // Refetch when window regains focus
+    retry: 2, // Retry failed requests
   });
-
   // Fetch newsletter stats with fresh data on each page load
   const { data: statsData, refetch: refetchStats } = useQuery({
     queryKey: ['/api/newsletter-stats'],
+    queryFn: async () => {
+      console.log('Fetching newsletter stats...');
+      const response = await apiRequest('GET', '/api/newsletter-stats');
+      const data = await response.json();
+      console.log('Stats data:', data);
+      return data;
+    },
     staleTime: 0, // Always consider data stale to ensure fresh fetches
     refetchOnMount: 'always', // Always refetch when component mounts
     refetchOnWindowFocus: true, // Refetch when window regains focus
+    retry: 2, // Retry failed requests
   });
-
-  // Delete newsletter mutation
-  const deleteNewsletterMutation = useMutation({
-    mutationFn: (id: string) => 
-      apiRequest('DELETE', `/api/newsletters/${id}`).then(res => res.json()),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
-      toast({
-        title: "Success",
-        description: "Newsletter deleted successfully",
-      });
-      setShowDeleteDialog(false);
-      setNewsletterToDelete(null);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete newsletter",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const allNewsletters: (NewsletterWithUser & { opens?: number; totalOpens?: number })[] = (newslettersData as any)?.newsletters || [];
-  
+  // Force refresh data when component mounts or location changes
+  useEffect(() => {
+    // Invalidate cache and refetch fresh data
+    queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
+    refetch();
+    refetchStats();
+  }, [location, refetch, refetchStats, queryClient]);
+  // Process the data - newslettersData is already an array from our queryFn
+  const newsletters = newslettersData || [];
+  const stats = statsData || {
+    totalNewsletters: 0,
+    draftNewsletters: 0,
+    scheduledNewsletters: 0,
+    sentNewsletters: 0
+  };
+  // Log data for debugging
+  console.log('Processing data:', { newslettersData, statsData, newsletters, stats, isLoading, error });  const allNewsletters: (NewsletterWithUser & { opens?: number; totalOpens?: number })[] = newsletters;
   // Filter newsletters based on search query and status
   const filteredNewsletters = allNewsletters.filter((newsletter) => {
     const matchesSearch = searchQuery === "" || 
       newsletter.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       newsletter.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
       `${newsletter.user.firstName} ${newsletter.user.lastName}`.toLowerCase().includes(searchQuery.toLowerCase());
-    
     const matchesStatus = statusFilter === "all" || newsletter.status === statusFilter;
-    
     return matchesSearch && matchesStatus;
   });
-
-  const stats = (statsData as any) || {
-    totalNewsletters: 0,
-    draftNewsletters: 0,
-    scheduledNewsletters: 0,
-    sentNewsletters: 0,
-  };
-
-  const handleDeleteNewsletter = (id: string) => {
-    setNewsletterToDelete(id);
-    setShowDeleteDialog(true);
-  };
-
-  const confirmDelete = () => {
-    if (newsletterToDelete) {
-      deleteNewsletterMutation.mutate(newsletterToDelete);
-    }
-  };
-
-
-
-  if (isLoading) {
+  // Show error state if there's an error
+  if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:bg-gradient-to-br dark:from-slate-800 dark:via-slate-700 dark:to-slate-800">
         <div className="container mx-auto p-6">
-          <div className="flex items-center justify-center h-64">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 rounded-2xl flex items-center justify-center shadow-lg">
-              <div className="animate-spin rounded-full h-8 w-8 border-4 border-white border-t-transparent"></div>
-            </div>
-
-            {/* Search Bar Skeleton */}
-            <Card className="p-4 sm:p-6">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <Skeleton className="h-10 w-full max-w-sm" />
-                <div className="flex items-center gap-2">
-                  <Skeleton className="h-8 w-12" />
-                  <Skeleton className="h-8 w-16" />
-                  <Skeleton className="h-8 w-20" />
-                  <Skeleton className="h-8 w-14" />
-                </div>
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-red-200/50 dark:border-red-700/30 rounded-2xl">
+            <CardContent className="p-12 text-center">
+              <div className="w-20 h-20 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <AlertTriangle className="h-10 w-10 text-red-600 dark:text-red-400" />
               </div>
-            </Card>
-
-            {/* Stats Cards Skeleton */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Card key={i}>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-24" />
-                        <Skeleton className="h-8 w-12" />
-                      </div>
-                      <Skeleton className="h-12 w-12 rounded-lg" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {/* Newsletter List Skeleton */}
-            <div className="space-y-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Card key={i}>
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0 space-y-4">
-                        <div className="flex items-center gap-3">
-                          <Skeleton className="h-6 w-48" />
-                          <Skeleton className="h-5 w-16" />
-                        </div>
-                        <Skeleton className="h-4 w-full max-w-md" />
-                        <div className="flex items-center gap-6">
-                          <Skeleton className="h-4 w-20" />
-                          <Skeleton className="h-4 w-16" />
-                          <Skeleton className="h-4 w-24" />
-                          <Skeleton className="h-4 w-32" />
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 ml-6">
-                        <Skeleton className="h-9 w-9" />
-                        <Skeleton className="h-9 w-9" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
+              <h3 className="text-lg font-semibold mb-2 text-red-800 dark:text-red-300">
+                Error Loading Newsletters
+              </h3>
+              <p className="text-red-600 dark:text-red-400 mb-4">
+                {error instanceof Error ? error.message : 'Failed to load newsletter data'}
+              </p>
+              <Button 
+                onClick={() => {
+                  refetch();
+                  refetchStats();
+                }}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                Try Again
+              </Button>
+            </CardContent>
+          </Card>
         </div>
-      </TooltipProvider>
+      </div>
     );
   }
-
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:bg-gradient-to-br dark:from-slate-800 dark:via-slate-700 dark:to-slate-800">
+        <div className="max-w-7xl mx-auto p-6 space-y-6">
+          {/* Header Skeleton */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Skeleton className="h-9 w-64 mb-2" />
+                <Skeleton className="h-5 w-96" />
+              </div>
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-9 w-20" />
+                <Skeleton className="h-9 w-32" />
+              </div>
+            </div>
+          </div>
+          {/* Stats Cards Skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i} className="rounded-2xl">
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-6 w-32" />
+                      <Skeleton className="h-8 w-12" />
+                    </div>
+                    <Skeleton className="h-12 w-16" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-3/4" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          {/* Secondary Cards Skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <Card key={i} className="rounded-2xl">
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-6 w-40" />
+                      <Skeleton className="h-8 w-16" />
+                    </div>
+                    <Skeleton className="h-12 w-20" />
+                    <Skeleton className="h-20 w-full" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          {/* Newsletter List Skeleton */}
+          <Card className="rounded-2xl">
+            <CardContent className="p-6">
+              <div className="space-y-6">
+                {/* Table header */}
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-10 w-64" />
+                  <Skeleton className="h-8 w-24" />
+                </div>
+                {/* Table rows */}
+                <div className="space-y-4">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="flex items-center justify-between p-4 border border-gray-100 dark:border-gray-700 rounded-lg">
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-5 w-48" />
+                        <Skeleton className="h-4 w-64" />
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Skeleton className="h-6 w-16" />
+                        <Skeleton className="h-8 w-8 rounded-full" />
+                        <Skeleton className="h-4 w-12" />
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-8 w-8" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:bg-gradient-to-br dark:from-slate-800 dark:via-slate-700 dark:to-slate-800">
+    <TooltipProvider>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:bg-gradient-to-br dark:from-slate-800 dark:via-slate-700 dark:to-slate-800">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="space-y-4">
@@ -446,25 +462,10 @@ export default function NewsletterPage() {
               </p>
             </div>
             <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant="outline"
-                    size="sm"
-                    className="h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm"
-                  >
-                    <Filter className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                    Filter
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Filter newsletters by status</p>
-                </TooltipContent>
-              </Tooltip>
               <Button 
                 onClick={() => setLocation('/newsletter/create')} 
                 size="sm"
-                className="h-8 sm:h-9 px-3 sm:px-4 shadow-sm text-xs sm:text-sm"
+                className="h-8 sm:h-9 px-3 sm:px-4  text-xs sm:text-sm"
               >
                 <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                 Create Newsletter
@@ -472,11 +473,10 @@ export default function NewsletterPage() {
             </div>
           </div>
         </div>
-
         {/* Stats Cards - Modern Style like Dashboard */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
           {/* Total Newsletters - Yellow Card */}
-          <Card className="bg-yellow-400 dark:bg-yellow-400 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300 relative overflow-hidden">
+          <Card className="bg-yellow-400 dark:bg-yellow-400 border-0 rounded-2xl  transition-all duration-300 relative overflow-hidden">
             <CardContent className="p-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -507,9 +507,8 @@ export default function NewsletterPage() {
               </div>
             </CardContent>
           </Card>
-
           {/* Draft Newsletters - Dark Card */}
-          <Card className="bg-slate-800 dark:bg-slate-900 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
+          <Card className="bg-slate-800 dark:bg-slate-900 border-0 rounded-2xl  transition-all duration-300">
             <CardContent className="p-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -529,9 +528,8 @@ export default function NewsletterPage() {
               </div>
             </CardContent>
           </Card>
-
           {/* Scheduled Newsletters - Light Card */}
-          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
+          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-2xl  transition-all duration-300">
             <CardContent className="p-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -555,9 +553,8 @@ export default function NewsletterPage() {
               </div>
             </CardContent>
           </Card>
-
           {/* Sent Newsletters - Light Card with Chart */}
-          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
+          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-2xl  transition-all duration-300">
             <CardContent className="p-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -582,87 +579,10 @@ export default function NewsletterPage() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Campaign Management - Light Card */}
-          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-black">Campaign Management</h3>
-                  <Mail className="w-5 h-5 text-black" />
-                </div>
-                <div className="text-center py-8">
-                  <div className="w-24 h-24 bg-slate-800 rounded-2xl flex items-center justify-center mx-auto">
-                    <Send className="w-12 h-12 text-white" />
-                  </div>
-                </div>
-                <Button className="w-full bg-yellow-400 hover:bg-yellow-500 text-black border-0 rounded-2xl font-semibold">
-                  Campaign Analytics Dashboard
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
         </div>
-
-        {/* Secondary Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Open Rate Analytics - Dark Card with Chart */}
-          <Card className="bg-slate-800 dark:bg-slate-900 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-yellow-400" />
-                    <h3 className="text-lg font-semibold text-white">Open Rate Analytics</h3>
-                  </div>
-                  <Button size="sm" variant="ghost" className="text-gray-400 hover:bg-white/10 text-xs">
-                    Details
-                  </Button>
-                </div>
-                <div>
-                  <div className="text-4xl font-bold text-white">58.3%</div>
-                  <div className="text-sm text-gray-400 mt-1">Average Open Rate</div>
-                </div>
-                <div className="h-20 flex items-end">
-                  <svg viewBox="0 0 200 60" className="w-full h-full">
-                    <path 
-                      d="M0,50 Q50,30 100,35 T200,20" 
-                      stroke="#eab308" 
-                      strokeWidth="3" 
-                      fill="none"
-                      className="drop-shadow-sm"
-                    />
-                    <circle cx="180" cy="25" r="4" fill="#eab308" />
-                  </svg>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Campaign Management - Light Card */}
-          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-black">Campaign Management</h3>
-                  <Mail className="w-5 h-5 text-black" />
-                </div>
-                <div className="text-center py-8">
-                  <div className="w-24 h-24 bg-slate-800 rounded-2xl flex items-center justify-center mx-auto">
-                    <Send className="w-12 h-12 text-white" />
-                  </div>
-                </div>
-                <Button className="w-full bg-yellow-400 hover:bg-yellow-500 text-black border-0 rounded-2xl font-semibold">
-                  Campaign Analytics Dashboard
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Newsletters List */}
         {newsletters.length === 0 ? (
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-3xl">
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-2xl">
             <CardContent className="p-12 text-center">
               <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Mail className="h-10 w-10 text-primary" />
@@ -675,7 +595,7 @@ export default function NewsletterPage() {
               </p>
               <Button 
                 onClick={() => setLocation('/newsletter/create')}
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg transition-all duration-300 rounded-2xl"
+                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white  transition-all duration-300 rounded-2xl"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Create Your First Newsletter
@@ -706,46 +626,173 @@ export default function NewsletterPage() {
             </CardContent>
           </Card>
         ) : (
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-3xl">
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-2xl">
             <CardContent className="p-6">
-              <DataTable
-                columns={createColumns(setLocation, handleDeleteNewsletter)}
-                data={newsletters}
-                searchKey="title"
-                searchPlaceholder="Search newsletters..."
-                showColumnVisibility={true}
-                showPagination={true}
-                pageSize={10}
-              />
+              {/* Desktop Table View */}
+              <div className="hidden lg:block w-full">
+                <DataTable
+                  columns={createColumns(setLocation, () => {})}
+                  data={newsletters}
+                  searchKey="title"
+                  searchPlaceholder="Search newsletters..."
+                  showColumnVisibility={true}
+                  showPagination={true}
+                  pageSize={10}
+                />
+              </div>
+              {/* Mobile Card View */}
+              <div className="lg:hidden space-y-4">
+                {/* Search Input for Mobile */}
+                <div className="flex items-center space-x-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search newsletters..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                {/* Mobile Cards */}
+                {filteredNewsletters.map((newsletter) => {
+                  const openRate = (newsletter.recipientCount || 0) > 0 
+                    ? ((newsletter.opens || 0) / (newsletter.recipientCount || 1) * 100).toFixed(1)
+                    : "0.0";
+                  return (
+                    <Card key={newsletter.id} className="border border-gray-200 dark:border-gray-700 rounded-xl hover:shadow-md transition-shadow duration-200">
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          {/* Header with Title and Status */}
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <h3 
+                                className="font-semibold text-gray-900 dark:text-gray-100 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 truncate"
+                                onClick={() => setLocation(`/newsletters/${newsletter.id}`)}
+                              >
+                                {newsletter.title}
+                              </h3>
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 overflow-hidden" style={{display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical'}}>
+                                {newsletter.subject}
+                              </p>
+                            </div>
+                            <div className="flex items-center space-x-2 ml-3">
+                              {getStatusBadge(newsletter.status)}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => setLocation(`/newsletters/${newsletter.id}`)}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </div>
+                          {/* Author and Date */}
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center space-x-2">
+                              <div className="h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-medium">
+                                {newsletter.user.firstName?.[0] || 'U'}{newsletter.user.lastName?.[0] || 'U'}
+                              </div>
+                              <span className="text-gray-600 dark:text-gray-400">
+                                {newsletter.user.firstName || 'Unknown'} {newsletter.user.lastName || 'User'}
+                              </span>
+                            </div>
+                            <div className="text-gray-500 dark:text-gray-400">
+                              {newsletter.status === 'sent' && newsletter.sentAt ? (
+                                <div className="text-right">
+                                  <div className="text-xs">Sent</div>
+                                  <div className="text-xs">{format(new Date(newsletter.sentAt), 'MMM d, HH:mm')}</div>
+                                </div>
+                              ) : newsletter.status === 'scheduled' && newsletter.scheduledAt ? (
+                                <div className="text-right">
+                                  <div className="text-xs text-blue-600 dark:text-blue-400">Scheduled</div>
+                                  <div className="text-xs">{format(new Date(newsletter.scheduledAt), 'MMM d, HH:mm')}</div>
+                                </div>
+                              ) : (
+                                <div className="text-right">
+                                  <div className="text-xs">Created</div>
+                                  <div className="text-xs">{format(new Date(newsletter.createdAt || new Date()), 'MMM d, HH:mm')}</div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          {/* Metrics */}
+                          <div className="grid grid-cols-3 gap-4 pt-2 border-t border-gray-100 dark:border-gray-700">
+                            <div className="text-center">
+                              <div className="flex items-center justify-center space-x-1 text-sm">
+                                <Users className="h-3 w-3 text-gray-500" />
+                                <span className="font-medium text-gray-900 dark:text-gray-100">
+                                  {newsletter.recipientCount || 0}
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">Recipients</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="flex items-center justify-center space-x-1 text-sm">
+                                <Eye className="h-3 w-3 text-green-500" />
+                                <span className="font-medium text-gray-900 dark:text-gray-100">
+                                  {newsletter.opens || 0}
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">Opens</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="flex items-center justify-center space-x-1 text-sm">
+                                <MousePointer className="h-3 w-3 text-blue-500" />
+                                <span className="font-medium text-gray-900 dark:text-gray-100">
+                                  {newsletter.clickCount || 0}
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">Clicks</div>
+                            </div>
+                          </div>
+                          {/* Open Rate */}
+                          <div className="text-center text-xs text-gray-500 dark:text-gray-400">
+                            {openRate}% open rate
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+                {/* Mobile Pagination */}
+                {filteredNewsletters.length > 10 && (
+                  <div className="flex items-center justify-center space-x-2 pt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {/* Add pagination logic */}}
+                      disabled={true}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      Page 1 of {Math.ceil(filteredNewsletters.length / 10)}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {/* Add pagination logic */}}
+                      disabled={true}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}
-
         {/* Delete Confirmation Dialog */}
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-3xl">
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Newsletter</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete this newsletter? This action cannot be undone and all associated data will be permanently removed.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel className="hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 rounded-2xl">
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={confirmDelete}
-                className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white shadow-lg transition-all duration-300 rounded-2xl"
-                disabled={deleteNewsletterMutation.isPending}
-              >
-                {deleteNewsletterMutation.isPending ? "Deleting..." : "Delete Newsletter"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-        </div>
       </div>
+    </div>
     </TooltipProvider>
   );
 }

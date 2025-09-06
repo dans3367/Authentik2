@@ -349,13 +349,12 @@ export default function Subscribe() {
   const [currentPlan, setCurrentPlan] = useState<string>('');
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { user, isLoading: authLoading, hasInitialized } = useAuth();
-  const { user: reduxUser, isAuthenticated } = useReduxAuth();
+  const { user, isLoading: authLoading, isAuthenticated, isInitialized } = useReduxAuth();
 
   // Check if user already has a subscription - moved before conditional returns
   const { data: userSubscription, isLoading: subscriptionLoading } = useQuery<UserSubscriptionResponse>({
     queryKey: ['/api/my-subscription'],
-    enabled: hasInitialized && !!user && !authLoading && user?.role === 'Owner',
+    enabled: isInitialized && !!user && !authLoading && user?.role === 'Owner',
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 60 * 1000, // 1 minute
   });
