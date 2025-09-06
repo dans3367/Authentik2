@@ -176,7 +176,7 @@ export function AppSidebar() {
               <span className="text-sidebar-foreground font-semibold text-lg">
                 SaaS Platform
               </span>
-              <span className="text-sidebar-foreground/60 text-sm">
+              <span className="text-sidebar-foreground/60 text-sm font-bold">
                 Management Suite
               </span>
             </div>
@@ -208,7 +208,7 @@ export function AppSidebar() {
                     >
                       <Link href={item.href} className="flex items-center gap-3 w-full group-data-[collapsible=icon]:justify-center" onClick={handleMobileNavClick}>
                         <Icon className="h-5 w-5 flex-shrink-0" />
-                        <span className="group-data-[collapsible=icon]:hidden">{item.name}</span>
+                        <span className="group-data-[collapsible=icon]:hidden font-medium">{item.name}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

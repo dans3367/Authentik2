@@ -8,9 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
-import { useAuth, useUpdateTheme, useUpdateMenuPreference } from "@/hooks/useAuth";
-// Note: Profile management hooks will be implemented with better-auth
-// import { useUpdateProfile, useChangePassword, useDeleteAccount, useSetup2FA, useEnable2FA, useDisable2FA } from "@/hooks/useAuth";
+import { useAuth, useUpdateTheme, useUpdateMenuPreference, useUpdateProfile, useChangePassword, useDeleteAccount, useSetup2FA, useEnable2FA, useDisable2FA } from "@/hooks/useAuth";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { updateProfileSchema, changePasswordSchema } from "@shared/schema";
 import type { UpdateProfileData, ChangePasswordData, SubscriptionPlan, UserSubscriptionResponse } from "@shared/schema";
@@ -39,11 +37,11 @@ import {
 } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
@@ -295,6 +293,19 @@ export default function ProfilePage() {
   const { user, isLoading: authLoading, isAuthenticated, isInitialized } = useReduxAuth();
   const { toast } = useToast();
   
+  // Debug logging
+  console.log("🔍 [ProfilePage] User data:", {
+    user,
+    isLoading: authLoading,
+    isAuthenticated,
+    isInitialized,
+    hasUser: !!user,
+    userEmail: user?.email,
+    userName: user?.name,
+    userFirstName: user?.firstName,
+    userLastName: user?.lastName
+  });
+  
   // All hooks must be called before any conditional returns
   const updateProfileMutation = useUpdateProfile();
   const changePasswordMutation = useChangePassword();
@@ -419,8 +430,8 @@ export default function ProfilePage() {
   const profileForm = useForm<UpdateProfileData>({
     resolver: zodResolver(updateProfileSchema),
     defaultValues: {
-      firstName: user?.firstName || "",
-      lastName: user?.lastName || "",
+      firstName: user?.firstName || (user?.name ? user.name.split(' ')[0] : "") || "",
+      lastName: user?.lastName || (user?.name ? user.name.split(' ').slice(1).join(' ') : "") || "",
       email: user?.email || "",
     },
   });
@@ -443,14 +454,28 @@ export default function ProfilePage() {
     }
   }, [watchNewPassword]);
 
+  // Update form when user data changes
+  useEffect(() => {
+    if (user) {
+      const firstName = user.firstName || (user.name ? user.name.split(' ')[0] : "");
+      const lastName = user.lastName || (user.name ? user.name.split(' ').slice(1).join(' ') : "");
+      
+      profileForm.reset({
+        firstName,
+        lastName,
+        email: user.email || "",
+      });
+    }
+  }, [user, profileForm]);
+
   // Redirect unauthenticated users immediately
-  if (hasInitialized && !isAuthenticated) {
+  if (isInitialized && !isAuthenticated) {
     setLocation('/auth');
     return null;
   }
 
   // Show loading while authentication is being determined
-  if (!hasInitialized || authLoading) {
+  if (!isInitialized || authLoading) {
     return (
       <div className="max-w-4xl mx-auto p-6">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -478,17 +503,21 @@ export default function ProfilePage() {
   const onSetup2FA = async () => {
     try {
       const result = await setup2FAMutation.mutateAsync();
-      setTwoFactorSetup(result);
+      setTwoFactorSetup({
+        secret: result.secret,
+        qrCode: result.qrCode,
+        backupCodes: result.backupCodes || []
+      });
     } catch (error) {
       // Error handled by mutation
     }
   };
 
   const onEnable2FA = async () => {
-    if (!twoFactorToken.trim()) return;
-    
+    if (!twoFactorToken.trim() || !twoFactorSetup?.secret) return;
+
     try {
-      await enable2FAMutation.mutateAsync(twoFactorToken);
+      await enable2FAMutation.mutateAsync(twoFactorToken, twoFactorSetup.secret);
       setTwoFactorSetup(null);
       setTwoFactorToken("");
     } catch (error) {
@@ -553,6 +582,13 @@ export default function ProfilePage() {
               <p className="text-gray-600 dark:text-gray-400 mt-1">
                 Manage your account information and security settings
               </p>
+              {/* Debug info */}
+              {process.env.NODE_ENV === 'development' && user && (
+                <div className="mt-2 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded px-2 py-1">
+                  <strong>Debug:</strong> Email: {user.email || 'none'} | Name: {user.name || 'none'} | 
+                  FirstName: {user.firstName || 'none'} | LastName: {user.lastName || 'none'}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -961,7 +997,7 @@ export default function ProfilePage() {
           </TabsContent>
 
           {/* Two-Factor Authentication Tab */}
-          <TabsContent value="2fa">
+            <TabsContent value="2fa">
             <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-orange-200/50 dark:border-orange-700/30 shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-3 text-gray-900 dark:text-gray-100">
@@ -969,7 +1005,19 @@ export default function ProfilePage() {
                     <Lock className="w-5 h-5 text-white" />
                   </div>
                   <span>Two-Factor Authentication</span>
+                  {user?.twoFactorEnabled && (
+                    <div className="ml-auto flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="text-sm text-green-600 dark:text-green-400 font-medium">Enabled</span>
+                    </div>
+                  )}
                 </CardTitle>
+                <CardDescription>
+                  {user?.twoFactorEnabled
+                    ? "Your account is protected with two-factor authentication."
+                    : "Add an extra layer of security to your account with two-factor authentication."
+                  }
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {user?.twoFactorEnabled ? (
@@ -1072,16 +1120,31 @@ export default function ProfilePage() {
                             <QrCode className="w-4 h-4 mr-2 text-orange-500 dark:text-orange-400" />
                             Step 1: Scan QR Code
                           </h4>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-                            Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            Scan this QR code with your authenticator app (Google Authenticator, Authy, Microsoft Authenticator, etc.)
                           </p>
-                          <div className="flex justify-center">
-                            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg">
-                              <img 
-                                src={twoFactorSetup.qrCode} 
-                                alt="2FA QR Code" 
+
+                          {/* QR Code Display */}
+                          <div className="flex justify-center mb-4">
+                            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg border border-gray-200 dark:border-gray-600">
+                              <img
+                                src={twoFactorSetup.qrCode}
+                                alt="2FA QR Code"
                                 className="w-48 h-48 rounded-lg"
                               />
+                            </div>
+                          </div>
+
+                          {/* Manual Entry Option */}
+                          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                              Can't scan the QR code?
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-500 mb-2">
+                              Enter this code manually in your authenticator app:
+                            </p>
+                            <div className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-3 py-2 font-mono text-sm break-all">
+                              {twoFactorSetup.secret}
                             </div>
                           </div>
                         </div>

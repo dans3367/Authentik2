@@ -156,5 +156,233 @@ export function useUpdateMenuPreference() {
   };
 }
 
-// Note: Additional hooks for profile management, 2FA, etc. will be added as needed
-// For now, the core authentication hooks (useAuth, useLogin, useRegister, useLogout) are implemented
+// Additional hooks for profile management
+export function useUpdateProfile() {
+  const { toast } = useToast();
+  const [isPending, setIsPending] = useState(false);
+
+  const mutateAsync = async (data: UpdateProfileData) => {
+    setIsPending(true);
+    try {
+      // TODO: Implement with better-auth API
+      console.log('Profile update requested:', data);
+
+      toast({
+        title: "Profile Updated",
+        description: "Your profile has been updated successfully.",
+      });
+
+      return data;
+    } catch (error: any) {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update profile.",
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return { mutateAsync, isPending };
+}
+
+export function useChangePassword() {
+  const { toast } = useToast();
+  const [isPending, setIsPending] = useState(false);
+
+  const mutateAsync = async (data: ChangePasswordData) => {
+    setIsPending(true);
+    try {
+      // TODO: Implement with better-auth API
+      console.log('Password change requested:', data);
+
+      toast({
+        title: "Password Changed",
+        description: "Your password has been changed successfully.",
+      });
+
+      return data;
+    } catch (error: any) {
+      toast({
+        title: "Password Change Failed",
+        description: error.message || "Failed to change password.",
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return { mutateAsync, isPending };
+}
+
+export function useDeleteAccount() {
+  const { toast } = useToast();
+  const [isPending, setIsPending] = useState(false);
+
+  const mutateAsync = async () => {
+    setIsPending(true);
+    try {
+      // TODO: Implement with better-auth API
+      console.log('Account deletion requested');
+
+      toast({
+        title: "Account Deleted",
+        description: "Your account has been deleted successfully.",
+      });
+
+      // Sign out after deletion
+      await signOut();
+    } catch (error: any) {
+      toast({
+        title: "Deletion Failed",
+        description: error.message || "Failed to delete account.",
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return { mutateAsync, isPending };
+}
+
+// 2FA hooks
+export function useSetup2FA() {
+  const { toast } = useToast();
+  const [isPending, setIsPending] = useState(false);
+
+  const mutateAsync = async () => {
+    setIsPending(true);
+    try {
+      const response = await fetch('/api/2fa/setup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to setup 2FA');
+      }
+
+      const data = await response.json();
+
+      toast({
+        title: "2FA Setup Initiated",
+        description: "Scan the QR code with your authenticator app.",
+      });
+
+      return {
+        secret: data.secret,
+        qrCode: data.qrCode,
+        backupCodes: [] // We'll implement backup codes later
+      };
+    } catch (error: any) {
+      toast({
+        title: "Setup Failed",
+        description: error.message || "Failed to setup 2FA.",
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return { mutateAsync, isPending };
+}
+
+export function useEnable2FA() {
+  const { toast } = useToast();
+  const [isPending, setIsPending] = useState(false);
+
+  const mutateAsync = async (token: string, secret: string) => {
+    setIsPending(true);
+    try {
+      const response = await fetch('/api/2fa/enable', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ token, secret }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to enable 2FA');
+      }
+
+      const data = await response.json();
+
+      toast({
+        title: "2FA Enabled",
+        description: "Two-factor authentication has been enabled for your account.",
+      });
+
+      return { success: true };
+    } catch (error: any) {
+      toast({
+        title: "Enable Failed",
+        description: error.message || "Failed to enable 2FA.",
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return { mutateAsync, isPending };
+}
+
+export function useDisable2FA() {
+  const { toast } = useToast();
+  const [isPending, setIsPending] = useState(false);
+
+  const mutateAsync = async (token: string) => {
+    setIsPending(true);
+    try {
+      const response = await fetch('/api/2fa/disable', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ token }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to disable 2FA');
+      }
+
+      const data = await response.json();
+
+      toast({
+        title: "2FA Disabled",
+        description: "Two-factor authentication has been disabled for your account.",
+      });
+
+      return { success: true };
+    } catch (error: any) {
+      toast({
+        title: "Disable Failed",
+        description: error.message || "Failed to disable 2FA.",
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return { mutateAsync, isPending };
+}

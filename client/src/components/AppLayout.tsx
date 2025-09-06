@@ -12,6 +12,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { TwoFactorGuard } from "@/components/TwoFactorGuard";
 
 
 
@@ -133,7 +134,9 @@ export function AppLayout({ children }: AppLayoutProps) {
           <div className="flex-1" />
         </header>
         <div className="flex flex-1 flex-col">
-          {children}
+          <TwoFactorGuard>
+            {children}
+          </TwoFactorGuard>
         </div>
       </SidebarInset>
     </SidebarProvider>
