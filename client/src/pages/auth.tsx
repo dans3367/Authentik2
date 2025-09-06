@@ -56,9 +56,14 @@ export default function AuthPage() {
   const isLoginLoading = loginMutation.isPending || false;
   const isRegisterLoading = false; // useRegister doesn't have isPending property
 
-  // Handle authentication redirect - only redirect if not in 2FA flow or checking
+  // Handle authentication redirect - disable automatic redirect for login view
   useEffect(() => {
-    if (isAuthenticated && !checkingTwoFactor && !twoFactorData && currentView !== "twoFactor") {
+    // Don't redirect if we're on the login view (might need 2FA)
+    if (currentView === "login" || currentView === "twoFactor") {
+      return;
+    }
+    
+    if (isAuthenticated && !checkingTwoFactor && !twoFactorData) {
       setLocation("/");
     }
   }, [isAuthenticated, checkingTwoFactor, twoFactorData, currentView, setLocation]);
@@ -96,12 +101,13 @@ export default function AuthPage() {
               tempLoginId: 'temp-id'
             });
             setCurrentView("twoFactor");
-            // Keep checkingTwoFactor true to prevent redirect
+            setCheckingTwoFactor(false);
             return;
           } else {
-            console.log('2FA not required or already verified');
-            // Only allow redirect after confirming 2FA not needed
+            console.log('2FA not required or already verified, redirecting...');
+            // No 2FA needed, redirect manually
             setCheckingTwoFactor(false);
+            setLocation("/");
           }
         } else {
           console.error('2FA check failed with status:', response.status);
