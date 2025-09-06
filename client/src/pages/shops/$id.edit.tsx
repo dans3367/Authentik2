@@ -71,6 +71,10 @@ export default function EditShopPage() {
     resolver: zodResolver(updateShopSchema),
     mode: 'onSubmit',
     defaultValues: {
+      name: '',
+      country: 'United States',
+      phone: '',
+      email: '',
       status: 'active',
       isActive: true,
     },
@@ -151,6 +155,11 @@ export default function EditShopPage() {
   }, [shopData, reset]);
 
   const onSubmit = (data: UpdateShopData) => {
+    console.log('Form submission triggered');
+    console.log('Form data:', data);
+    console.log('Form errors:', errors);
+    console.log('Form is valid:', Object.keys(errors).length === 0);
+    
     // Prepare submit data
     const submitData = {
       ...data,
@@ -159,6 +168,7 @@ export default function EditShopPage() {
       isActive: data.isActive !== undefined ? data.isActive : true,
     };
 
+    console.log('Submit data:', submitData);
     updateShopMutation.mutate(submitData);
   };
 
@@ -301,7 +311,7 @@ export default function EditShopPage() {
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="status">Status</Label>
+                    <Label htmlFor="status">Status *</Label>
                     <Select 
                       value={watch('status') || 'active'} 
                       onValueChange={(value) => setValue('status', value as 'active' | 'inactive' | 'maintenance')}
@@ -315,6 +325,9 @@ export default function EditShopPage() {
                         <SelectItem value="maintenance">Maintenance</SelectItem>
                       </SelectContent>
                     </Select>
+                    {errors.status && (
+                      <p className="text-sm text-destructive">{errors.status.message}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -397,13 +410,16 @@ export default function EditShopPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="country">Country</Label>
+                  <Label htmlFor="country">Country *</Label>
                   <Input
                     id="country"
                     {...register('country')}
                     placeholder="United States"
                     data-testid="input-country"
                   />
+                  {errors.country && (
+                    <p className="text-sm text-destructive">{errors.country.message}</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -517,6 +533,12 @@ export default function EditShopPage() {
                   disabled={updateShopMutation.isPending}
                   className="w-full sm:w-auto"
                   data-testid="button-submit"
+                  onClick={() => {
+                    console.log('Save button clicked!');
+                    console.log('Current form errors:', errors);
+                    console.log('Current form values:', watch());
+                    console.log('Form is submitting:', updateShopMutation.isPending);
+                  }}
                 >
                   {updateShopMutation.isPending ? (
                     <>
