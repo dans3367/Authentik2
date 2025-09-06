@@ -145,7 +145,7 @@ emailManagementRoutes.get("/email-contacts/:id", authenticateToken, requireTenan
       lists,
     };
 
-    res.json(transformedContact);
+    res.json({ contact: transformedContact });
   } catch (error) {
     console.error('Get email contact error:', error);
     res.status(500).json({ message: 'Failed to get email contact' });

@@ -92,7 +92,7 @@ shopsRoutes.get("/:id", authenticateToken, async (req: any, res) => {
       return res.status(404).json({ message: 'Shop not found' });
     }
 
-    res.json(shop);
+    res.json({ shop });
   } catch (error) {
     console.error('Get shop error:', error);
     res.status(500).json({ message: 'Failed to get shop' });

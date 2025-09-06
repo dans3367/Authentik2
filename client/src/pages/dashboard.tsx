@@ -3,16 +3,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLogout } from "@/hooks/useAuth";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
-import { TrendingUp, LogOut, Calendar, Mail, Send, Eye, MousePointer, FileText } from "lucide-react";
+import { TrendingUp, LogOut, Calendar, Mail, Send, Eye, MousePointer, FileText, RefreshCw, Bug } from "lucide-react";
 import { useLocation } from "wouter";
 import { NewsletterCard } from "@/components/ui/newsletter-card";
 import { HighlightsCard } from "@/components/ui/highlights-card";
 import { Test401Button } from "@/components/Test401Button";
+import { useSession } from "@/lib/betterAuthClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user, isLoading } = useReduxAuth();
   const logoutMutation = useLogout();
+  const { toast } = useToast();
+  const { data: session, refetch: refetchSession } = useSession();
+  const [isRefreshingSession, setIsRefreshingSession] = useState(false);
   const [apiRequests] = useState(1247);
   const [emailStats] = useState({
     totalSent: 23847,
@@ -25,6 +30,26 @@ export default function Dashboard() {
   const handleLogout = async () => {
     await logoutMutation.mutateAsync();
     setLocation("/auth");
+  };
+
+  const handleSessionRefresh = async () => {
+    setIsRefreshingSession(true);
+    try {
+      await refetchSession();
+      toast({
+        title: "Session Refreshed",
+        description: "Your session has been successfully refreshed.",
+      });
+    } catch (error) {
+      console.error("Session refresh failed:", error);
+      toast({
+        title: "Refresh Failed",
+        description: "Failed to refresh session. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshingSession(false);
+    }
   };
 
   if (isLoading) {
@@ -81,9 +106,107 @@ export default function Dashboard() {
         {/* Development Testing Section - Only show in development */}
         {import.meta.env.DEV && (
           <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-              Development Tools
+            <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
+              <Bug className="w-5 h-5" />
+              Debug Panel
             </h2>
+
+            {/* Session Debug Panel */}
+            <Card className="mb-4">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4" />
+                  Session Management
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Session Validity Status */}
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="font-medium text-gray-600 dark:text-gray-400">Session Status:</span>
+                  {(() => {
+                    if (!session?.session?.expiresAt) {
+                      return (
+                        <span className="px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-md text-xs">
+                          Unknown
+                        </span>
+                      );
+                    }
+
+                    const expiresAt = new Date(session.session.expiresAt);
+                    const now = new Date();
+                    const isValid = expiresAt > now;
+                    const timeUntilExpiry = expiresAt.getTime() - now.getTime();
+                    const minutesUntilExpiry = Math.floor(timeUntilExpiry / (1000 * 60));
+
+                    return (
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-1 rounded-md text-xs font-medium ${
+                          isValid
+                            ? minutesUntilExpiry > 30
+                              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                              : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
+                            : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                        }`}>
+                          {isValid ? 'Valid' : 'Expired'}
+                        </span>
+                        {isValid && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            Expires in {minutesUntilExpiry > 60
+                              ? `${Math.floor(minutesUntilExpiry / 60)}h ${minutesUntilExpiry % 60}m`
+                              : `${minutesUntilExpiry}m`
+                            }
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium text-gray-600 dark:text-gray-400">User ID:</span>
+                    <p className="font-mono text-xs mt-1">{user?.id || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-600 dark:text-gray-400">Session Expires:</span>
+                    <p className="font-mono text-xs mt-1">
+                      {session?.session?.expiresAt
+                        ? new Date(session.session.expiresAt).toLocaleString()
+                        : 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-600 dark:text-gray-400">Last Updated:</span>
+                    <p className="font-mono text-xs mt-1">
+                      {session?.session?.updatedAt
+                        ? new Date(session.session.updatedAt).toLocaleString()
+                        : 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-600 dark:text-gray-400">Session ID:</span>
+                    <p className="font-mono text-xs mt-1 break-all">
+                      {session?.session?.id || 'N/A'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleSessionRefresh}
+                    disabled={isRefreshingSession}
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-2"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isRefreshingSession ? 'animate-spin' : ''}`} />
+                    {isRefreshingSession ? 'Refreshing...' : 'Refresh Session'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Other Development Tools */}
             <Test401Button />
           </div>
         )}
