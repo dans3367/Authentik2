@@ -82,7 +82,7 @@ export default function EditShopPage() {
   });
 
   // Fetch managers
-  const { data: managersData, isLoading: managersLoading } = useQuery<Manager[]>({
+  const { data: managersData, isLoading: managersLoading } = useQuery<{ managers: Manager[] }>({
     queryKey: ['/api/shops/managers/list'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/shops/managers/list');
@@ -98,6 +98,7 @@ export default function EditShopPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/shops'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/shops', id] });
       toast({
         title: "Success",
         description: "Shop updated successfully",
@@ -113,12 +114,6 @@ export default function EditShopPage() {
     },
   });
 
-  // Reset mutation state when component mounts or shop ID changes
-  useEffect(() => {
-    // Always reset mutation state to ensure clean state on page entry
-    updateShopMutation.reset();
-  }, [id, updateShopMutation]);
-
   // Set form values when shop data is loaded
   useEffect(() => {
     if (shopData?.shop) {
@@ -130,29 +125,30 @@ export default function EditShopPage() {
         city: shop.city || '',
         state: shop.state || '',
         zipCode: shop.zipCode || '',
-        country: shop.country,
-        phone: shop.phone,
-        email: shop.email,
+        country: shop.country || 'United States',
+        phone: shop.phone || '',
+        email: shop.email || '',
         website: shop.website || '',
-        managerId: shop.managerId || 'no-manager',
+        managerId: shop.managerId || undefined,
         operatingHours: shop.operatingHours || '',
         status: shop.status as any || 'active',
         category: shop.category || '',
         tags: shop.tags || [],
         socialMedia: shop.socialMedia || '',
         settings: shop.settings || '',
-        isActive: shop.isActive ?? true,
+        isActive: shop.isActive !== undefined ? shop.isActive : true,
       });
       setTags(shop.tags || []);
     }
   }, [shopData, reset]);
 
-  const onSubmit = (data: UpdateShopData) => {
-    // Convert "no-manager" to null for the API
+  const onSubmit = async (data: UpdateShopData) => {
+    // Prepare submit data
     const submitData = {
       ...data,
-      managerId: data.managerId === 'no-manager' || data.managerId === '' ? null : data.managerId,
+      managerId: (!data.managerId || data.managerId === 'no-manager' || data.managerId === '') ? null : data.managerId,
       tags: tags.length > 0 ? tags : undefined,
+      isActive: data.isActive !== undefined ? data.isActive : true,
     };
 
     updateShopMutation.mutate(submitData);
@@ -316,7 +312,7 @@ export default function EditShopPage() {
                     <Label htmlFor="managerId">Manager</Label>
                     <Select
                       value={watch('managerId') || 'no-manager'}
-                      onValueChange={(value) => setValue('managerId', value)}
+                      onValueChange={(value) => setValue('managerId', value === 'no-manager' ? undefined : value)}
                       disabled={managersLoading}
                     >
                       <SelectTrigger data-testid="select-manager">
@@ -324,7 +320,7 @@ export default function EditShopPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="no-manager">No Manager</SelectItem>
-                        {managersData?.map(manager => (
+                        {managersData?.managers?.map(manager => (
                           <SelectItem key={manager.id} value={manager.id}>
                             {manager.firstName} {manager.lastName} ({manager.email})
                           </SelectItem>
@@ -495,33 +491,25 @@ export default function EditShopPage() {
             </Card>
 
             {/* Actions */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-6 relative">
-              {updateShopMutation.isPending && (
-                <div className="absolute inset-0 bg-white/50 dark:bg-gray-800/50 rounded-lg flex items-center justify-center z-10 pointer-events-none">
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Saving changes...
-                  </div>
-                </div>
-              )}
-              <div className="flex flex-col sm:flex-row gap-4 sm:justify-end relative z-20">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-6">
+              <div className="flex flex-col sm:flex-row gap-4 sm:justify-end">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => navigate('/shops')}
-                  disabled={updateShopMutation.isPending}
-                  className="w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isSubmitting || updateShopMutation.isPending}
+                  className="w-full sm:w-auto"
                   data-testid="button-cancel"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
-                  disabled={updateShopMutation.isPending}
-                  className="w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isSubmitting || updateShopMutation.isPending}
+                  className="w-full sm:w-auto"
                   data-testid="button-submit"
                 >
-                  {updateShopMutation.isPending ? (
+                  {(isSubmitting || updateShopMutation.isPending) ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Saving...
