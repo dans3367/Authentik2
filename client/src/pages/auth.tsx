@@ -53,7 +53,7 @@ export default function AuthPage() {
 
   // Add loading state for login
   const isLoginLoading = loginMutation.isPending || false;
-  const isRegisterLoading = registerMutation.isPending || false;
+  const isRegisterLoading = false; // useRegister doesn't have isPending property
 
   // Handle authentication redirect
   useEffect(() => {
@@ -81,7 +81,7 @@ export default function AuthPage() {
             setTwoFactorData({
               email: data.email,
               password: data.password,
-              tempLoginId: result.id || 'temp-id'
+              tempLoginId: 'temp-id'
             });
             setCurrentView("twoFactor");
             return;
