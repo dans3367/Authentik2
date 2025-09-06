@@ -94,12 +94,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function Router() {
   const { isAuthenticated, isLoading, user, isInitialized } = useReduxAuth();
-  const [, setLocation] = useLocation();
+  const { handleAuthError } = useAuthErrorHandler();
 
-  // Set global navigate function for 401 error handling
+  // Set up global auth error handler
   useEffect(() => {
-    setGlobalNavigate(setLocation);
-  }, [setLocation]);
+    setGlobalAuthErrorHandler(handleAuthError);
+  }, [handleAuthError]);
 
   console.log("🔍 [Redux] Router state:", {
     isAuthenticated,
@@ -107,8 +107,7 @@ function Router() {
     hasUser: !!user,
     isInitialized,
     userEmail: user?.email,
-    userEmailVerified: user?.emailVerified,
-    userRole: user?.role
+    userEmailVerified: user?.emailVerified
   });
 
   // Show loading state while authentication is being determined

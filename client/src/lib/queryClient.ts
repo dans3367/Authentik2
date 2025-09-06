@@ -1,6 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { authClient } from "./betterAuthClient";
-import { handle401Error, is401Error, is401Response } from "./authErrorHandler";
+import { triggerGlobalAuthError } from "@/hooks/useAuthErrorHandler";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -44,24 +44,9 @@ export async function apiRequest(
       credentials: "include",
     });
 
-    // Check for 401 response before throwing
-    if (is401Response(res)) {
-      console.log(`🔍 [API] 401 detected in ${method} ${url}`);
-      // Handle 401 globally (logout + redirect)
-      await handle401Error(`${method} ${url}`);
-      // Throw error after handling
-      const text = (await res.text()) || res.statusText;
-      throw new Error(`${res.status}: ${text}`);
-    }
-
     await throwIfResNotOk(res);
     return res;
   } catch (error) {
-    // Check if the error is a 401 that wasn't caught by the response check
-    if (is401Error(error)) {
-      console.log(`🔍 [API] 401 error detected in catch block for ${method} ${url}`);
-      await handle401Error(`${method} ${url}`);
-    }
     throw error;
   }
 }
@@ -88,14 +73,22 @@ export const getQueryFn: <T>(options: {
       }
       return data;
     } catch (error: any) {
-      // Handle 401 errors globally
-      if (is401Error(error)) {
-        console.log(`🔍 [Query] 401 detected in query ${queryKey.join("/")}`);
-        await handle401Error(`Query ${queryKey.join("/")}`);
+      // Handle 401 errors globally through our error handler
+      if (error.message?.includes("401") || error.message?.includes("Authentication failed")) {
+        console.log('🚨 [Query] 401 error detected in query:', queryKey.join("/"));
         
         if (unauthorizedBehavior === "returnNull") {
           return null;
         }
+        
+        // Trigger global auth error handler
+        setTimeout(() => {
+          triggerGlobalAuthError({
+            showToast: true,
+            customMessage: 'Authentication required. Please log in to continue.'
+          });
+        }, 100);
+        
         throw error;
       }
       
@@ -116,8 +109,26 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       staleTime: 5 * 60 * 1000, // 5 minutes default stale time
       retry: (failureCount, error: any) => {
-        // Don't retry for auth errors
-        if (is401Error(error) || error?.message?.includes("403") || error?.message?.includes("Forbidden")) {
+        // Don't retry for auth errors and trigger global handler
+        if (
+          error?.message?.includes("401") ||
+          error?.message?.includes("Authentication failed")
+        ) {
+          console.log('🚨 [Query Retry] 401 detected, triggering global auth handler');
+          setTimeout(() => {
+            triggerGlobalAuthError({
+              showToast: true,
+              customMessage: 'Session expired. Please log in again.'
+            });
+          }, 100);
+          return false;
+        }
+        
+        // Don't retry for 403 errors
+        if (
+          error?.message?.includes("403") ||
+          error?.message?.includes("Forbidden")
+        ) {
           return false;
         }
         
@@ -127,11 +138,16 @@ export const queryClient = new QueryClient({
     },
     mutations: {
       retry: false,
-      onError: async (error: any) => {
-        // Global mutation error handler for 401s
-        if (is401Error(error)) {
-          console.log('🔍 [Mutation] 401 detected in mutation');
-          await handle401Error('Mutation');
+      onError: (error: any) => {
+        // Handle 401 errors in mutations globally
+        if (error?.message?.includes("401") || error?.message?.includes("Authentication failed")) {
+          console.log('🚨 [Mutation] 401 error detected, triggering global auth handler');
+          setTimeout(() => {
+            triggerGlobalAuthError({
+              showToast: true,
+              customMessage: 'Your session has expired. Please log in again.'
+            });
+          }, 100);
         }
       },
     },
