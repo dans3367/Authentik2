@@ -83,6 +83,7 @@ loginRoutes.post('/verify-login', async (req, res) => {
       console.log(`✅ [Login] No 2FA required for user ${userRecord.email}`);
       
       // Check if session was created in database
+      console.log('🔍 [Login] Checking for session token in database:', authSessionToken.substring(0, 8) + '...');
       const sessionCheck = await db.query.betterAuthSession.findFirst({
         where: eq(betterAuthSession.token, authSessionToken)
       });
@@ -90,8 +91,9 @@ loginRoutes.post('/verify-login', async (req, res) => {
       if (!sessionCheck) {
         console.log('⚠️ [Login] Session not found in database, creating manually');
         // Create session manually if Better Auth didn't create it
+        const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2)}`;
         await db.insert(betterAuthSession).values({
-          id: `session_${Date.now()}_${Math.random().toString(36).substring(2)}`,
+          id: sessionId,
           token: authSessionToken,
           userId: user.id,
           expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
@@ -100,6 +102,9 @@ loginRoutes.post('/verify-login', async (req, res) => {
           ipAddress: req.ip || req.connection.remoteAddress,
           userAgent: req.headers['user-agent'] || null
         });
+        console.log('✅ [Login] Created session in database:', sessionId);
+      } else {
+        console.log('✅ [Login] Session already exists in database:', sessionCheck.id);
       }
       
       // Set Better Auth session cookie with correct name format
