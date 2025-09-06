@@ -22,21 +22,12 @@ export interface AuthRequest extends Request {
 // Better Auth session verification middleware
 export const authenticateToken = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    console.log('🔍 [Auth Middleware] Request headers:', {
-      cookie: req.headers.cookie,
-      authorization: req.headers.authorization,
-      'user-agent': req.headers['user-agent']
-    });
-    
     // Use Better Auth's built-in session verification
     const session = await auth.api.getSession({ 
       headers: req.headers as any
     });
 
-    console.log('🔍 [Auth Middleware] Better Auth session result:', session);
-
     if (!session) {
-      console.log('❌ [Auth Middleware] No session found by Better Auth');
       return res.status(401).json({ message: 'No authentication token provided' });
     }
 

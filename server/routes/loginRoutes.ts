@@ -28,12 +28,14 @@ loginRoutes.post('/verify-login', async (req, res) => {
       if (auth.api.signInEmail) {
         loginResult = await auth.api.signInEmail({
           body: { email, password },
+          headers: req.headers as any
         });
       } else {
         console.log('🔍 [Verify Login] signInEmail not available, no other method available');
         return res.status(500).json({ message: 'Authentication method not available' });
       }
       console.log('🔍 [Verify Login] Better Auth result received');
+      
     } catch (authError: any) {
       console.error('❌ [Verify Login] Better Auth error:', authError);
       console.error('❌ [Verify Login] Auth error details:', authError?.message);
@@ -82,47 +84,16 @@ loginRoutes.post('/verify-login', async (req, res) => {
       // No 2FA enabled - create normal session and redirect to dashboard
       console.log(`✅ [Login] No 2FA required for user ${userRecord.email}`);
       
-      // Check if session was created in database
-      console.log('🔍 [Login] Checking for session token in database:', authSessionToken.substring(0, 8) + '...');
-      const sessionCheck = await db.query.betterAuthSession.findFirst({
-        where: eq(betterAuthSession.token, authSessionToken)
-      });
+      // Since Better Auth already authenticated the user and returned a session token,
+      // we need to manually set the session cookie for the frontend to recognize it
+      console.log('✅ [Login] Setting Better Auth session cookie:', authSessionToken.substring(0, 8) + '...');
       
-      if (!sessionCheck) {
-        console.log('⚠️ [Login] Session not found in database, creating manually');
-        // Create session manually if Better Auth didn't create it
-        const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2)}`;
-        await db.insert(betterAuthSession).values({
-          id: sessionId,
-          token: authSessionToken,
-          userId: user.id,
-          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          ipAddress: req.ip || req.connection.remoteAddress,
-          userAgent: req.headers['user-agent'] || null
-        });
-        console.log('✅ [Login] Created session in database:', sessionId);
-      } else {
-        console.log('✅ [Login] Session already exists in database:', sessionCheck.id);
-      }
-      
-      // Set Better Auth session cookie with correct name format
-      // Better Auth expects 'better_auth_session_token' not 'better-auth.session_token'
-      res.cookie('better_auth_session_token', authSessionToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
-        path: '/'
-      });
-      
-      // Also set the alternative cookie name for compatibility
+      // Set the exact cookie that Better Auth expects
       res.cookie('better-auth.session_token', authSessionToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days (Better Auth default)
         path: '/'
       });
 
@@ -133,8 +104,7 @@ loginRoutes.post('/verify-login', async (req, res) => {
           id: user.id,
           email: user.email,
           name: user.name
-        },
-        token: authSessionToken // Include token in response for frontend
+        }
       });
     }
 
@@ -402,34 +372,16 @@ loginRoutes.post('/verify-2fa', async (req, res) => {
     await db.delete(temp2faSessions)
       .where(eq(temp2faSessions.id, tempSession.id));
 
-    // Create a proper Better Auth session in the database
-    const newSessionToken = `auth_${user.id}_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+    // Create a proper Better Auth session using the original login token
+    // We'll use the same session token from the temporary session for consistency
+    console.log('✅ [2FA] Setting Better Auth session cookie after 2FA verification');
     
-    await db.insert(betterAuthSession).values({
-      id: `session_${Date.now()}_${Math.random().toString(36).substring(2)}`,
-      token: newSessionToken,
-      userId: user.id,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      ipAddress: req.ip || req.connection.remoteAddress,
-      userAgent: req.headers['user-agent'] || null
-    });
-
-    // Set Better Auth session cookies with both possible names
-    res.cookie('better_auth_session_token', newSessionToken, {
+    // Set the exact cookie that Better Auth expects
+    res.cookie('better-auth.session_token', tempSessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      path: '/'
-    });
-    
-    res.cookie('better-auth.session_token', newSessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days (Better Auth default)
       path: '/'
     });
 
