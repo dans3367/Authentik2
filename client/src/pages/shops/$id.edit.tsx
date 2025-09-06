@@ -66,9 +66,10 @@ export default function EditShopPage() {
     setValue,
     watch,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<UpdateShopData>({
     resolver: zodResolver(updateShopSchema),
+    mode: 'onSubmit',
   });
 
   // Fetch shop data
@@ -114,6 +115,12 @@ export default function EditShopPage() {
     },
   });
 
+  // Reset mutation state when component mounts or ID changes
+  useEffect(() => {
+    updateShopMutation.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
   // Set form values when shop data is loaded
   useEffect(() => {
     if (shopData?.shop) {
@@ -143,6 +150,15 @@ export default function EditShopPage() {
   }, [shopData, reset]);
 
   const onSubmit = async (data: UpdateShopData) => {
+    console.log('Form submitted with data:', data);
+    console.log('Mutation pending state:', updateShopMutation.isPending);
+    
+    // Prevent multiple submissions
+    if (updateShopMutation.isPending) {
+      console.log('Submission prevented - mutation already pending');
+      return;
+    }
+    
     // Prepare submit data
     const submitData = {
       ...data,
@@ -151,7 +167,14 @@ export default function EditShopPage() {
       isActive: data.isActive !== undefined ? data.isActive : true,
     };
 
-    updateShopMutation.mutate(submitData);
+    console.log('Submitting data:', submitData);
+
+    try {
+      await updateShopMutation.mutateAsync(submitData);
+    } catch (error) {
+      // Error is handled by mutation's onError
+      console.error('Failed to update shop:', error);
+    }
   };
 
   const handleAddTag = () => {
@@ -497,7 +520,7 @@ export default function EditShopPage() {
                   type="button"
                   variant="outline"
                   onClick={() => navigate('/shops')}
-                  disabled={isSubmitting || updateShopMutation.isPending}
+                  disabled={updateShopMutation.isPending}
                   className="w-full sm:w-auto"
                   data-testid="button-cancel"
                 >
@@ -505,11 +528,16 @@ export default function EditShopPage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isSubmitting || updateShopMutation.isPending}
+                  disabled={updateShopMutation.isPending}
                   className="w-full sm:w-auto"
                   data-testid="button-submit"
+                  onClick={(e) => {
+                    console.log('Save button clicked');
+                    console.log('Form errors:', errors);
+                    console.log('Mutation state:', updateShopMutation.status);
+                  }}
                 >
-                  {(isSubmitting || updateShopMutation.isPending) ? (
+                  {updateShopMutation.isPending ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Saving...
