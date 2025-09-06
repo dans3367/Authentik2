@@ -34,7 +34,6 @@ loginRoutes.post('/verify-login', async (req, res) => {
         return res.status(500).json({ message: 'Authentication method not available' });
       }
       console.log('🔍 [Verify Login] Better Auth result received');
-      console.log('🔍 [Verify Login] Login result structure:', JSON.stringify(loginResult, null, 2));
     } catch (authError: any) {
       console.error('❌ [Verify Login] Better Auth error:', authError);
       console.error('❌ [Verify Login] Auth error details:', authError?.message);
@@ -83,12 +82,43 @@ loginRoutes.post('/verify-login', async (req, res) => {
       // No 2FA enabled - create normal session and redirect to dashboard
       console.log(`✅ [Login] No 2FA required for user ${userRecord.email}`);
       
-      // Set Better Auth session cookie as per diagram: "Session Cookie set better-auth.session_token"
+      // Check if session was created in database
+      const sessionCheck = await db.query.betterAuthSession.findFirst({
+        where: eq(betterAuthSession.token, authSessionToken)
+      });
+      
+      if (!sessionCheck) {
+        console.log('⚠️ [Login] Session not found in database, creating manually');
+        // Create session manually if Better Auth didn't create it
+        await db.insert(betterAuthSession).values({
+          id: `session_${Date.now()}_${Math.random().toString(36).substring(2)}`,
+          token: authSessionToken,
+          userId: user.id,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          ipAddress: req.ip || req.connection.remoteAddress,
+          userAgent: req.headers['user-agent'] || null
+        });
+      }
+      
+      // Set Better Auth session cookie with correct name format
+      // Better Auth expects 'better_auth_session_token' not 'better-auth.session_token'
+      res.cookie('better_auth_session_token', authSessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        path: '/'
+      });
+      
+      // Also set the alternative cookie name for compatibility
       res.cookie('better-auth.session_token', authSessionToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        path: '/'
       });
 
       return res.json({
@@ -98,7 +128,8 @@ loginRoutes.post('/verify-login', async (req, res) => {
           id: user.id,
           email: user.email,
           name: user.name
-        }
+        },
+        token: authSessionToken // Include token in response for frontend
       });
     }
 
@@ -366,12 +397,35 @@ loginRoutes.post('/verify-2fa', async (req, res) => {
     await db.delete(temp2faSessions)
       .where(eq(temp2faSessions.id, tempSession.id));
 
-    // Create a new Better Auth session (the temp session token becomes the real session)
-    res.cookie('better-auth.session_token', tempSessionToken, {
+    // Create a proper Better Auth session in the database
+    const newSessionToken = `auth_${user.id}_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+    
+    await db.insert(betterAuthSession).values({
+      id: `session_${Date.now()}_${Math.random().toString(36).substring(2)}`,
+      token: newSessionToken,
+      userId: user.id,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      ipAddress: req.ip || req.connection.remoteAddress,
+      userAgent: req.headers['user-agent'] || null
+    });
+
+    // Set Better Auth session cookies with both possible names
+    res.cookie('better_auth_session_token', newSessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      path: '/'
+    });
+    
+    res.cookie('better-auth.session_token', newSessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      path: '/'
     });
 
     // Update last login time
