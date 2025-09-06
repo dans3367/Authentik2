@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 // Note: authManager removed - Better Auth handles authentication
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { useSession } from "@/lib/betterAuthClient";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
