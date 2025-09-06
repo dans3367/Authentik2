@@ -55,12 +55,12 @@ export default function AuthPage() {
   const isLoginLoading = loginMutation.isPending || false;
   const isRegisterLoading = false; // useRegister doesn't have isPending property
 
-  // Handle authentication redirect
+  // Handle authentication redirect - only redirect if not in 2FA flow
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !twoFactorData && currentView !== "twoFactor") {
       setLocation("/");
     }
-  }, [isAuthenticated, setLocation]);
+  }, [isAuthenticated, twoFactorData, currentView, setLocation]);
 
   // Handle login form submission
   const onLoginSubmit = async (data: LoginCredentials) => {
