@@ -127,9 +127,10 @@ export default function AuthPage() {
             description: "Welcome back! Redirecting to dashboard...",
           });
           
-          // Wait a moment for the session to be established, then redirect
+          // Force a page reload to refresh the Better Auth session state
+          // This ensures the authentication hooks pick up the new session cookie
           setTimeout(() => {
-            setLocation('/dashboard');
+            window.location.href = '/dashboard';
           }, 500);
         }
       }
@@ -281,9 +282,10 @@ export default function AuthPage() {
         setTwoFactorData(null);
         twoFactorForm.reset();
         
-        // Wait a moment for the session to be established, then redirect
+        // Force a page reload to refresh the Better Auth session state after 2FA
+        // This ensures the authentication hooks pick up the new session cookie
         setTimeout(() => {
-          setLocation('/dashboard');
+          window.location.href = '/dashboard';
         }, 500);
       } else {
         throw new Error('Invalid 2FA code');
