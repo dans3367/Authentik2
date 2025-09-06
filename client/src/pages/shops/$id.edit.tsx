@@ -95,6 +95,9 @@ export default function EditShopPage() {
   const updateShopMutation = useMutation({
     mutationFn: async (data: UpdateShopData) => {
       const response = await apiRequest('PUT', `/api/shops/${id}`, data);
+      if (!response.ok) {
+        throw new Error('Failed to update shop');
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -114,12 +117,6 @@ export default function EditShopPage() {
       });
     },
   });
-
-  // Reset mutation state when component mounts or ID changes
-  useEffect(() => {
-    updateShopMutation.reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
 
   // Set form values when shop data is loaded
   useEffect(() => {
@@ -149,16 +146,7 @@ export default function EditShopPage() {
     }
   }, [shopData, reset]);
 
-  const onSubmit = async (data: UpdateShopData) => {
-    console.log('Form submitted with data:', data);
-    console.log('Mutation pending state:', updateShopMutation.isPending);
-    
-    // Prevent multiple submissions
-    if (updateShopMutation.isPending) {
-      console.log('Submission prevented - mutation already pending');
-      return;
-    }
-    
+  const onSubmit = (data: UpdateShopData) => {
     // Prepare submit data
     const submitData = {
       ...data,
@@ -167,14 +155,7 @@ export default function EditShopPage() {
       isActive: data.isActive !== undefined ? data.isActive : true,
     };
 
-    console.log('Submitting data:', submitData);
-
-    try {
-      await updateShopMutation.mutateAsync(submitData);
-    } catch (error) {
-      // Error is handled by mutation's onError
-      console.error('Failed to update shop:', error);
-    }
+    updateShopMutation.mutate(submitData);
   };
 
   const handleAddTag = () => {
@@ -258,6 +239,7 @@ export default function EditShopPage() {
           </div>
 
           <form
+            key={id}
             onSubmit={handleSubmit(onSubmit)}
             className="space-y-6"
           >
@@ -531,11 +513,6 @@ export default function EditShopPage() {
                   disabled={updateShopMutation.isPending}
                   className="w-full sm:w-auto"
                   data-testid="button-submit"
-                  onClick={(e) => {
-                    console.log('Save button clicked');
-                    console.log('Form errors:', errors);
-                    console.log('Mutation state:', updateShopMutation.status);
-                  }}
                 >
                   {updateShopMutation.isPending ? (
                     <>
