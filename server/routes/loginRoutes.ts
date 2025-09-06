@@ -40,36 +40,18 @@ loginRoutes.post('/verify-login', async (req, res) => {
       return res.status(500).json({ message: 'Authentication service error: ' + authError.message });
     }
 
-    if (loginResult?.error) {
+    // Check if authentication was successful
+    if (!loginResult || !loginResult.user) {
       console.log('❌ [Verify Login] Invalid credentials for:', email);
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials',
-        error: loginResult.error.message
+        message: 'Invalid credentials'
       });
     }
 
-    // Step 2: Credentials are valid, now check if user has 2FA enabled
-    let user = loginResult?.data?.user;
-
-    // Handle different Better Auth response structures
-    if (!user && loginResult?.data) {
-      // Try alternative response structures
-      user = loginResult.data;
-    }
-
-    if (!user && loginResult?.user) {
-      // Some versions might put user directly on result
-      user = loginResult.user;
-    }
-
-    if (!user) {
-      console.error('❌ [Verify Login] No user data returned from Better Auth');
-      return res.status(500).json({ 
-        success: false, 
-        message: 'Login failed - no user data' 
-      });
-    }
+    // Step 2: Credentials are valid, extract user from Better Auth response
+    const user = loginResult.user;
+    const authSessionToken = loginResult.token; // Better Auth session token
 
     console.log('✅ [Verify Login] User found:', { id: user.id, email: user.email });
 
@@ -100,15 +82,13 @@ loginRoutes.post('/verify-login', async (req, res) => {
       // No 2FA enabled - create normal session and redirect to dashboard
       console.log(`✅ [Login] No 2FA required for user ${userRecord.email}`);
       
-      // Set session cookie (Better Auth should handle this)
-      if (loginResult.data?.session) {
-        res.cookie('better-auth.session_token', loginResult.data.session.token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 24 * 60 * 60 * 1000 // 24 hours
-        });
-      }
+      // Set Better Auth session cookie as per diagram: "Session Cookie set better-auth.session_token"
+      res.cookie('better-auth.session_token', authSessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+      });
 
       return res.json({
         success: true,
