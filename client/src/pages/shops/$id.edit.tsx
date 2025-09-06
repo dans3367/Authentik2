@@ -70,6 +70,10 @@ export default function EditShopPage() {
   } = useForm<UpdateShopData>({
     resolver: zodResolver(updateShopSchema),
     mode: 'onSubmit',
+    defaultValues: {
+      status: 'active',
+      isActive: true,
+    },
   });
 
   // Fetch shop data
@@ -135,7 +139,7 @@ export default function EditShopPage() {
         website: shop.website || '',
         managerId: shop.managerId || undefined,
         operatingHours: shop.operatingHours || '',
-        status: shop.status as any || 'active',
+        status: (shop.status as 'active' | 'inactive' | 'maintenance') || 'active',
         category: shop.category || '',
         tags: shop.tags || [],
         socialMedia: shop.socialMedia || '',
@@ -299,11 +303,11 @@ export default function EditShopPage() {
                   <div className="space-y-2">
                     <Label htmlFor="status">Status</Label>
                     <Select 
-                      value={watch('status')} 
-                      onValueChange={(value) => setValue('status', value as any)}
+                      value={watch('status') || 'active'} 
+                      onValueChange={(value) => setValue('status', value as 'active' | 'inactive' | 'maintenance')}
                     >
                       <SelectTrigger data-testid="select-status">
-                        <SelectValue />
+                        <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="active">Active</SelectItem>
