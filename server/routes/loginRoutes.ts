@@ -6,6 +6,7 @@ import { authenticator } from 'otplib';
 import { z } from 'zod';
 import { authenticateToken } from '../middleware/auth-middleware';
 import { auth } from '../auth';
+import bcrypt from 'bcryptjs';
 
 export const loginRoutes = Router();
 
@@ -207,38 +208,50 @@ loginRoutes.post('/check-2fa-requirement', async (req, res) => {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    // Step 1: Just validate credentials by looking up user directly
-    // We don't call Better Auth signin here since we want to control the session creation
+    // Step 1: Validate credentials using Better Auth (but don't create full session)
+    let loginResult;
+    try {
+      loginResult = await auth.api.signInEmail({
+        body: { email, password },
+        headers: req.headers as any
+      });
+    } catch (authError: any) {
+      console.error('❌ [2FA Check] Better Auth error:', authError);
+      return res.status(401).json({ 
+        success: false,
+        message: 'Invalid credentials' 
+      });
+    }
+
+    // Check if authentication was successful
+    if (!loginResult || !loginResult.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    const user = loginResult.user;
+    console.log(`🔍 [2FA Check] Credentials valid for user: ${user.email}`);
+
+    // Get user record to check 2FA status
     let userRecord;
     try {
       userRecord = await db.query.betterAuthUser.findFirst({
-        where: eq(betterAuthUser.email, email)
+        where: eq(betterAuthUser.id, user.id)
       });
 
       if (!userRecord) {
-        return res.status(401).json({
+        return res.status(500).json({
           success: false,
-          message: 'Invalid credentials'
+          message: 'User record not found'
         });
       }
-
-      // Validate password using Better Auth's password verification
-      const bcrypt = require('bcryptjs');
-      const isPasswordValid = await bcrypt.compare(password, userRecord.password);
-      
-      if (!isPasswordValid) {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid credentials'
-        });
-      }
-
-      console.log(`🔍 [2FA Check] Credentials valid for user: ${userRecord.email}`);
     } catch (error) {
-      console.error('❌ [2FA Check] Error validating credentials:', error);
+      console.error('❌ [2FA Check] Error getting user record:', error);
       return res.status(500).json({
         success: false,
-        message: 'Failed to validate credentials'
+        message: 'Failed to get user information'
       });
     }
 
