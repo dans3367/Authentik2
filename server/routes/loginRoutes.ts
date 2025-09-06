@@ -33,12 +33,15 @@ loginRoutes.post('/check-2fa-requirement', authenticateToken, async (req: any, r
     const userId = req.user.id;
     const tenantId = req.user.tenantId;
 
+    console.log(`🔍 [2FA Check] Checking requirement for user ID: ${userId}, tenant: ${tenantId}`);
+
     // Get or create user record to check 2FA status
     let user;
     try {
       user = await getOrCreateUser(userId, tenantId);
+      console.log(`✅ [2FA Check] User found/created: ${user.email}, 2FA enabled: ${user.twoFactorEnabled}, has secret: ${!!user.twoFactorSecret}`);
     } catch (error) {
-      console.error('Error getting user for 2FA check:', error);
+      console.error('❌ [2FA Check] Error getting user for 2FA check:', error);
       return res.status(500).json({ 
         message: 'Failed to check user 2FA status' 
       });
@@ -46,15 +49,21 @@ loginRoutes.post('/check-2fa-requirement', authenticateToken, async (req: any, r
 
     // Check if user has 2FA enabled
     if (!user.twoFactorEnabled || !user.twoFactorSecret) {
+      console.log(`ℹ️ [2FA Check] No 2FA required for user ${user.email}`);
       return res.json({
         requiresTwoFactor: false,
-        message: 'No 2FA required'
+        message: 'No 2FA required',
+        debug: {
+          twoFactorEnabled: user.twoFactorEnabled,
+          hasSecret: !!user.twoFactorSecret
+        }
       });
     }
 
     // User has 2FA enabled - check if already verified for this session
     const sessionToken = req.cookies?.['better-auth.session_token'];
     if (!sessionToken) {
+      console.log(`❌ [2FA Check] No session token found`);
       return res.status(401).json({ 
         message: 'No session found' 
       });
@@ -62,6 +71,7 @@ loginRoutes.post('/check-2fa-requirement', authenticateToken, async (req: any, r
 
     const verification = twoFactorPendingVerifications.get(sessionToken);
     if (verification && verification.verified && verification.expiresAt > Date.now()) {
+      console.log(`✅ [2FA Check] 2FA already verified for session`);
       return res.json({
         requiresTwoFactor: false,
         twoFactorVerified: true,
@@ -70,6 +80,8 @@ loginRoutes.post('/check-2fa-requirement', authenticateToken, async (req: any, r
     }
 
     // 2FA required and not yet verified
+    console.log(`🔐 [2FA Check] 2FA verification required for user ${user.email}`);
+    
     // Store pending verification
     twoFactorPendingVerifications.set(sessionToken, {
       userId,
@@ -81,11 +93,16 @@ loginRoutes.post('/check-2fa-requirement', authenticateToken, async (req: any, r
     res.json({
       requiresTwoFactor: true,
       twoFactorVerified: false,
-      message: 'Please verify your 2FA code to continue'
+      message: 'Please verify your 2FA code to continue',
+      debug: {
+        twoFactorEnabled: user.twoFactorEnabled,
+        hasSecret: !!user.twoFactorSecret,
+        userEmail: user.email
+      }
     });
 
   } catch (error) {
-    console.error('2FA requirement check error:', error);
+    console.error('❌ [2FA Check] Error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });
@@ -186,33 +203,66 @@ loginRoutes.get('/2fa-status', authenticateToken, async (req: any, res) => {
       });
     }
 
+    console.log(`🔍 [2FA Status] Checking user: ${user.email}, twoFactorEnabled: ${user.twoFactorEnabled}, hasSecret: ${!!user.twoFactorSecret}`);
+
     // Check if user has 2FA enabled
     if (!user.twoFactorEnabled || !user.twoFactorSecret) {
+      console.log(`ℹ️ [2FA Status] User ${user.email} does not have 2FA enabled`);
       return res.json({
         requiresTwoFactor: false,
         twoFactorEnabled: false,
-        verified: true // No 2FA means always verified
+        verified: true, // No 2FA means always verified
+        debug: {
+          userEmail: user.email,
+          twoFactorEnabled: user.twoFactorEnabled,
+          hasSecret: !!user.twoFactorSecret
+        }
       });
     }
+
+    console.log(`🔐 [2FA Status] User ${user.email} has 2FA enabled`);
 
     // Check if current session is 2FA verified
     const sessionToken = req.cookies?.['better-auth.session_token'];
     if (!sessionToken) {
+      console.log(`❌ [2FA Status] No session token found for user ${user.email}`);
       return res.json({
         requiresTwoFactor: true,
         twoFactorEnabled: true,
-        verified: false
+        verified: false,
+        debug: {
+          userEmail: user.email,
+          sessionToken: 'none'
+        }
       });
     }
 
     const verification = twoFactorPendingVerifications.get(sessionToken);
     const isVerified = verification && verification.verified && verification.expiresAt > Date.now();
 
-    res.json({
+    console.log(`📊 [2FA Status] Session verification for ${user.email}:`, {
+      sessionToken: sessionToken.substring(0, 8) + '...',
+      verification: verification ? 'found' : 'not found',
+      isVerified
+    });
+
+    const response = {
       requiresTwoFactor: !isVerified,
       twoFactorEnabled: true,
-      verified: isVerified
-    });
+      verified: isVerified,
+      debug: {
+        userId,
+        tenantId,
+        userEmail: user.email,
+        sessionToken: sessionToken.substring(0, 8) + '...',
+        verification: verification ? 'found' : 'not found',
+        isVerified,
+        verificationExpiresAt: verification?.expiresAt
+      }
+    };
+
+    console.log(`📊 [2FA Status] Response:`, response);
+    res.json(response);
 
   } catch (error) {
     console.error('2FA status check error:', error);

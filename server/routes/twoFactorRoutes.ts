@@ -39,7 +39,9 @@ export async function getOrCreateUser(userId: string, tenantId: string) {
           console.log(`User ID mismatch: existing user ID ${existingUserByEmail.id} != better-auth ID ${betterAuthUserRecord.id} for email ${betterAuthUserRecord.email}`);
         }
         
-        // Update existing user record with better-auth data (but keep existing ID to preserve foreign key relationships)
+        // Update existing user record with better-auth data (but preserve 2FA settings and ID)
+        console.log(`🔄 [User Sync] Preserving 2FA settings: enabled=${existingUserByEmail.twoFactorEnabled}, hasSecret=${!!existingUserByEmail.twoFactorSecret}`);
+        
         await db.update(users)
           .set({
             // Don't update ID - keep existing to preserve foreign key relationships
@@ -48,6 +50,9 @@ export async function getOrCreateUser(userId: string, tenantId: string) {
             lastName: betterAuthUserRecord.name ? betterAuthUserRecord.name.split(' ').slice(1).join(' ') : null,
             role: betterAuthUserRecord.role || existingUserByEmail.role || 'Employee',
             emailVerified: betterAuthUserRecord.emailVerified,
+            // IMPORTANT: Preserve existing 2FA settings - don't overwrite them
+            twoFactorEnabled: existingUserByEmail.twoFactorEnabled,
+            twoFactorSecret: existingUserByEmail.twoFactorSecret,
             updatedAt: new Date(),
           })
           .where(eq(users.email, betterAuthUserRecord.email));
@@ -166,18 +171,41 @@ twoFactorRoutes.post('/enable', authenticateToken, async (req: any, res) => {
     }
 
     // Enable 2FA by storing the secret
-    await db.update(users)
+    console.log(`🔐 [2FA Enable] Updating 2FA for user ID: ${userId}, tenant: ${tenantId}, actual user ID: ${user.id}`);
+    
+    const updateResult = await db.update(users)
       .set({
         twoFactorEnabled: true,
         twoFactorSecret: secret,
         updatedAt: new Date(),
       })
-      .where(and(
-        eq(users.id, userId),
-        eq(users.tenantId, tenantId)
-      ));
+      .where(eq(users.id, user.id)); // Use the actual user ID from the fetched record, not the auth token
 
-    res.json({ message: '2FA enabled successfully' });
+    console.log(`📊 [2FA Enable] Update result:`, updateResult);
+    console.log(`✅ [2FA Enable] Rows affected: ${updateResult.rowCount || 0}`);
+
+    if (updateResult.rowCount === 0) {
+      console.error(`❌ [2FA Enable] No rows updated! User ID ${user.id} not found in update`);
+      return res.status(500).json({ message: 'Failed to enable 2FA - user record not updated' });
+    }
+
+    // Verify the update worked by fetching the user again
+    const updatedUser = await db.query.users.findFirst({
+      where: eq(users.id, user.id)
+    });
+
+    console.log(`🔍 [2FA Enable] Verification - Updated user 2FA status: ${updatedUser?.twoFactorEnabled}, has secret: ${!!updatedUser?.twoFactorSecret}`);
+
+    res.json({ 
+      message: '2FA enabled successfully',
+      debug: {
+        originalUserId: userId,
+        actualUserId: user.id,
+        rowsAffected: updateResult.rowCount,
+        verifiedEnabled: updatedUser?.twoFactorEnabled,
+        verifiedHasSecret: !!updatedUser?.twoFactorSecret
+      }
+    });
   } catch (error) {
     console.error('2FA enable error:', error);
     res.status(500).json({ message: 'Failed to enable 2FA' });
@@ -286,21 +314,34 @@ twoFactorRoutes.get('/status', authenticateToken, async (req: any, res) => {
     const userId = req.user.id;
     const tenantId = req.user.tenantId;
 
+    console.log(`🔍 [2FA Status] Checking for user ID: ${userId}, tenant: ${tenantId}`);
+
     // Get or create user using helper function
     let user;
     try {
       user = await getOrCreateUser(userId, tenantId);
+      console.log(`✅ [2FA Status] User found/created: ${user.email}, 2FA enabled: ${user.twoFactorEnabled}, has secret: ${!!user.twoFactorSecret}`);
     } catch (error) {
-      console.error('Error getting or creating user:', error);
+      console.error('❌ [2FA Status] Error getting or creating user:', error);
       return res.status(404).json({ message: 'User not found' });
     }
 
-    res.json({
+    const result = {
       enabled: user.twoFactorEnabled || false,
       hasSecret: !!user.twoFactorSecret,
-    });
+      debug: {
+        userId: user.id,
+        email: user.email,
+        tenantId: user.tenantId,
+        twoFactorEnabled: user.twoFactorEnabled,
+        hasSecret: !!user.twoFactorSecret
+      }
+    };
+
+    console.log(`📊 [2FA Status] Response:`, result);
+    res.json(result);
   } catch (error) {
-    console.error('2FA status error:', error);
+    console.error('❌ [2FA Status] Error:', error);
     res.status(500).json({ message: 'Failed to get 2FA status' });
   }
 });

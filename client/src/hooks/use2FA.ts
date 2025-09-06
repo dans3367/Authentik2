@@ -46,7 +46,9 @@ export function use2FA(): TwoFactorStatus & {
       }
 
       const data = await response.json();
-      
+
+      console.log('🔍 [use2FA] Received 2FA status from API:', data);
+
       setStatus(prev => ({
         ...prev,
         requiresTwoFactor: data.requiresTwoFactor || false,

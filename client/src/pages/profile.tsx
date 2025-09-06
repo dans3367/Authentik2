@@ -10,6 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Switch } from "@/components/ui/switch";
 import { useAuth, useUpdateTheme, useUpdateMenuPreference, useUpdateProfile, useChangePassword, useDeleteAccount, useSetup2FA, useEnable2FA, useDisable2FA } from "@/hooks/useAuth";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
+import { use2FA } from "@/hooks/use2FA";
 import { updateProfileSchema, changePasswordSchema } from "@shared/schema";
 import type { UpdateProfileData, ChangePasswordData, SubscriptionPlan, UserSubscriptionResponse } from "@shared/schema";
 import { calculatePasswordStrength, getPasswordStrengthText, getPasswordStrengthColor } from "@/lib/authUtils";
@@ -315,6 +316,18 @@ export default function ProfilePage() {
   const disable2FAMutation = useDisable2FA();
   const updateMenuPreferenceMutation = useUpdateMenuPreference();
 
+  // Get current 2FA status from the database
+  const { twoFactorEnabled, loading: twoFALoading, check2FARequirement } = use2FA();
+
+  // Debug: Log 2FA status changes
+  useEffect(() => {
+    console.log('🔍 [Profile] 2FA status changed:', {
+      twoFactorEnabled,
+      twoFALoading,
+      userEmail: user?.email
+    });
+  }, [twoFactorEnabled, twoFALoading, user?.email]);
+
   // Subscription-related state and queries
   const [clientSecret, setClientSecret] = useState("");
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
@@ -520,6 +533,8 @@ export default function ProfilePage() {
       await enable2FAMutation.mutateAsync(twoFactorToken, twoFactorSetup.secret);
       setTwoFactorSetup(null);
       setTwoFactorToken("");
+      // Refresh 2FA status to update the UI immediately
+      await check2FARequirement();
     } catch (error) {
       // Error handled by mutation
     }
@@ -527,10 +542,12 @@ export default function ProfilePage() {
 
   const onDisable2FA = async () => {
     if (!disableTwoFactorToken.trim()) return;
-    
+
     try {
       await disable2FAMutation.mutateAsync(disableTwoFactorToken);
       setDisableTwoFactorToken("");
+      // Refresh 2FA status to update the UI immediately
+      await check2FARequirement();
     } catch (error) {
       // Error handled by mutation
     }
@@ -1005,7 +1022,7 @@ export default function ProfilePage() {
                     <Lock className="w-5 h-5 text-white" />
                   </div>
                   <span>Two-Factor Authentication</span>
-                  {user?.twoFactorEnabled && (
+                  {twoFactorEnabled && (
                     <div className="ml-auto flex items-center space-x-2">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                       <span className="text-sm text-green-600 dark:text-green-400 font-medium">Enabled</span>
@@ -1013,14 +1030,14 @@ export default function ProfilePage() {
                   )}
                 </CardTitle>
                 <CardDescription>
-                  {user?.twoFactorEnabled
+                  {twoFactorEnabled
                     ? "Your account is protected with two-factor authentication."
                     : "Add an extra layer of security to your account with two-factor authentication."
                   }
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {user?.twoFactorEnabled ? (
+                {twoFactorEnabled ? (
                   <div className="space-y-6">
                     <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200/50 dark:border-green-700/30 rounded-xl p-6">
                       <div className="flex items-center space-x-4">
