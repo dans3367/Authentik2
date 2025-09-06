@@ -30,16 +30,13 @@ loginRoutes.post('/verify-login', async (req, res) => {
           body: { email, password },
         });
       } else {
-        console.log('🔍 [Verify Login] signInEmail not available, trying signIn');
-        // Fallback to signIn method
-        loginResult = await auth.api.signIn({
-          body: { email, password },
-        });
+        console.log('🔍 [Verify Login] signInEmail not available, no other method available');
+        return res.status(500).json({ message: 'Authentication method not available' });
       }
       console.log('🔍 [Verify Login] Better Auth result received');
-    } catch (authError) {
+    } catch (authError: any) {
       console.error('❌ [Verify Login] Better Auth error:', authError);
-      console.error('❌ [Verify Login] Auth error details:', authError.message);
+      console.error('❌ [Verify Login] Auth error details:', authError?.message);
       return res.status(500).json({ message: 'Authentication service error: ' + authError.message });
     }
 
@@ -191,7 +188,8 @@ const twoFactorPendingVerifications = new Map<string, {
 // Clean up expired verifications every 5 minutes
 setInterval(() => {
   const now = Date.now();
-  for (const [sessionToken, verification] of twoFactorPendingVerifications.entries()) {
+  const entries = Array.from(twoFactorPendingVerifications.entries());
+  for (const [sessionToken, verification] of entries) {
     if (verification.expiresAt < now) {
       twoFactorPendingVerifications.delete(sessionToken);
     }
@@ -374,8 +372,7 @@ loginRoutes.post('/verify-2fa', async (req, res) => {
     // Step 3: Verify the 2FA token
     const isValidToken = authenticator.verify({
       token,
-      secret: user.twoFactorSecret,
-      window: 1 // Allow 1 step tolerance for clock drift
+      secret: user.twoFactorSecret
     });
 
     if (!isValidToken) {
@@ -397,12 +394,12 @@ loginRoutes.post('/verify-2fa', async (req, res) => {
     });
 
     // Update last login time
-    await db.update(users)
+    await db.update(betterAuthUser)
       .set({ 
         lastLoginAt: new Date(),
         updatedAt: new Date()
       })
-      .where(eq(users.id, user.id));
+      .where(eq(betterAuthUser.id, user.id));
 
     res.json({
       success: true,
@@ -464,8 +461,7 @@ loginRoutes.post('/verify-session-2fa', authenticateToken, async (req: any, res)
     // Verify the 2FA token
     const isValidToken = authenticator.verify({
       token,
-      secret: user.twoFactorSecret,
-      window: 1 // Allow 1 step tolerance for clock drift
+      secret: user.twoFactorSecret
     });
 
     if (!isValidToken) {
@@ -490,12 +486,12 @@ loginRoutes.post('/verify-session-2fa', authenticateToken, async (req: any, res)
     });
 
     // Update last login time
-    await db.update(users)
+    await db.update(betterAuthUser)
       .set({ 
         lastLoginAt: new Date(),
         updatedAt: new Date()
       })
-      .where(eq(users.id, user.id));
+      .where(eq(betterAuthUser.id, user.id));
 
     res.json({
       success: true,
