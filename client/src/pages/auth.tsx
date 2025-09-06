@@ -41,6 +41,7 @@ export default function AuthPage() {
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [rememberMe, setRememberMe] = useState(false);
+  const [checkingTwoFactor, setCheckingTwoFactor] = useState(false);
   const [twoFactorData, setTwoFactorData] = useState<{
     email: string;
     password: string;
@@ -55,18 +56,21 @@ export default function AuthPage() {
   const isLoginLoading = loginMutation.isPending || false;
   const isRegisterLoading = false; // useRegister doesn't have isPending property
 
-  // Handle authentication redirect - only redirect if not in 2FA flow
+  // Handle authentication redirect - only redirect if not in 2FA flow or checking
   useEffect(() => {
-    if (isAuthenticated && !twoFactorData && currentView !== "twoFactor") {
+    if (isAuthenticated && !checkingTwoFactor && !twoFactorData && currentView !== "twoFactor") {
       setLocation("/");
     }
-  }, [isAuthenticated, twoFactorData, currentView, setLocation]);
+  }, [isAuthenticated, checkingTwoFactor, twoFactorData, currentView, setLocation]);
 
   // Handle login form submission
   const onLoginSubmit = async (data: LoginCredentials) => {
     try {
       const result = await loginMutation.mutateAsync(data);
       if (result) {
+        // Set checking state to prevent redirect
+        setCheckingTwoFactor(true);
+        
         // Check if user requires 2FA verification for this session
         const response = await fetch('/api/auth/check-2fa-requirement', {
           method: 'POST',
@@ -76,6 +80,8 @@ export default function AuthPage() {
 
         if (response.ok) {
           const status = await response.json();
+          console.log('2FA Check Response:', status);
+          
           if (status.requiresTwoFactor && !status.twoFactorVerified) {
             // User has 2FA enabled and needs verification
             setTwoFactorData({
@@ -84,14 +90,17 @@ export default function AuthPage() {
               tempLoginId: 'temp-id'
             });
             setCurrentView("twoFactor");
+            setCheckingTwoFactor(false);
             return;
           }
         }
         // No 2FA required or already verified, proceed normally
+        setCheckingTwoFactor(false);
         // Login successful, user will be redirected by useEffect
       }
     } catch (error) {
       // Error handled by mutation
+      setCheckingTwoFactor(false);
       console.error('Login error:', error);
     }
   };
