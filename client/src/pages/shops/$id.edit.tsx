@@ -155,11 +155,6 @@ export default function EditShopPage() {
   }, [shopData, reset]);
 
   const onSubmit = (data: UpdateShopData) => {
-    console.log('Form submission triggered');
-    console.log('Form data:', data);
-    console.log('Form errors:', errors);
-    console.log('Form is valid:', Object.keys(errors).length === 0);
-    
     // Prepare submit data
     const submitData = {
       ...data,
@@ -168,7 +163,6 @@ export default function EditShopPage() {
       isActive: data.isActive !== undefined ? data.isActive : true,
     };
 
-    console.log('Submit data:', submitData);
     updateShopMutation.mutate(submitData);
   };
 
@@ -533,12 +527,6 @@ export default function EditShopPage() {
                   disabled={updateShopMutation.isPending}
                   className="w-full sm:w-auto"
                   data-testid="button-submit"
-                  onClick={() => {
-                    console.log('Save button clicked!');
-                    console.log('Current form errors:', errors);
-                    console.log('Current form values:', watch());
-                    console.log('Form is submitting:', updateShopMutation.isPending);
-                  }}
                 >
                   {updateShopMutation.isPending ? (
                     <>
