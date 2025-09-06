@@ -14,7 +14,7 @@ import { calculatePasswordStrength, getPasswordStrengthText, getPasswordStrength
 import { Eye, EyeOff, Shield, CheckCircle, Mail, Lock, ArrowLeft, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 
-type AuthView = "login" | "register" | "forgot" | "twoFactor";
+type AuthView = "login" | "register" | "forgot";
 
 export default function AuthPage() {
   const [, setLocation] = useLocation();
@@ -41,12 +41,6 @@ export default function AuthPage() {
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [rememberMe, setRememberMe] = useState(false);
-  const [checkingTwoFactor, setCheckingTwoFactor] = useState(false);
-  const [twoFactorData, setTwoFactorData] = useState<{
-    email: string;
-    password: string;
-    tempLoginId: string;
-  } | null>(null);
 
   const { isAuthenticated } = useAuth();
   const loginMutation = useLogin();
@@ -56,71 +50,20 @@ export default function AuthPage() {
   const isLoginLoading = loginMutation.isPending || false;
   const isRegisterLoading = false; // useRegister doesn't have isPending property
 
-  // Handle authentication redirect - disable automatic redirect for login view
+  // Handle authentication redirect
   useEffect(() => {
-    // Don't redirect if we're on the login view (might need 2FA)
-    if (currentView === "login" || currentView === "twoFactor") {
-      return;
-    }
-    
-    if (isAuthenticated && !checkingTwoFactor && !twoFactorData) {
+    if (isAuthenticated) {
       setLocation("/");
     }
-  }, [isAuthenticated, checkingTwoFactor, twoFactorData, currentView, setLocation]);
+  }, [isAuthenticated, setLocation]);
 
   // Handle login form submission
   const onLoginSubmit = async (data: LoginCredentials) => {
     try {
-      // Set checking state immediately to prevent redirect
-      setCheckingTwoFactor(true);
-      
-      const result = await loginMutation.mutateAsync(data);
-      if (result) {
-        // Small delay to ensure session is properly established
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Check if user requires 2FA verification for this session
-        const response = await fetch('/api/auth/check-2fa-requirement', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-        });
-
-        console.log('2FA Check Response status:', response.status);
-        
-        if (response.ok) {
-          const status = await response.json();
-          console.log('2FA Check Response data:', status);
-          
-          if (status.requiresTwoFactor && !status.twoFactorVerified) {
-            console.log('2FA is required, switching to 2FA view');
-            // User has 2FA enabled and needs verification
-            setTwoFactorData({
-              email: data.email,
-              password: data.password,
-              tempLoginId: 'temp-id'
-            });
-            setCurrentView("twoFactor");
-            setCheckingTwoFactor(false);
-            return;
-          } else {
-            console.log('2FA not required or already verified, redirecting...');
-            // No 2FA needed, redirect manually
-            setCheckingTwoFactor(false);
-            setLocation("/");
-          }
-        } else {
-          console.error('2FA check failed with status:', response.status);
-          const errorData = await response.text();
-          console.error('Error response:', errorData);
-          setCheckingTwoFactor(false);
-        }
-      } else {
-        setCheckingTwoFactor(false);
-      }
+      await loginMutation.mutateAsync(data);
+      // Login successful, redirect will happen automatically
     } catch (error) {
       // Error handled by mutation
-      setCheckingTwoFactor(false);
       console.error('Login error:', error);
     }
   };
@@ -176,12 +119,6 @@ export default function AuthPage() {
     },
   });
 
-  const twoFactorForm = useForm<{ token: string }>({
-    defaultValues: {
-      token: "",
-    },
-  });
-
   const watchPassword = registerForm.watch("password");
 
   useEffect(() => {
@@ -205,43 +142,6 @@ export default function AuthPage() {
     await forgotPasswordMutation.mutateAsync(data);
   };
 
-  const onTwoFactorSubmit = async (data: { token: string }) => {
-    if (!twoFactorData) return;
-
-    try {
-      // Verify 2FA token for current session
-      const response = await fetch('/api/auth/verify-session-2fa', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ token: data.token }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Invalid 2FA code');
-      }
-
-      const result = await response.json();
-      if (result.success && result.verified) {
-        // 2FA verification successful, user will be redirected by useEffect
-        setTwoFactorData(null);
-        twoFactorForm.reset();
-        // Force redirect to dashboard
-        setLocation("/");
-      } else {
-        throw new Error('Invalid 2FA code');
-      }
-    } catch (error: any) {
-      console.error('2FA verification error:', error);
-      twoFactorForm.setError('token', {
-        type: 'manual',
-        message: error.message || 'Invalid verification code'
-      });
-    }
-  };
 
   const renderPasswordStrength = () => {
     const strengthBars = Array.from({ length: 4 }, (_, index) => (
@@ -635,68 +535,6 @@ export default function AuthPage() {
                 </div>
               )}
 
-              {/* Two-Factor Authentication Form */}
-              {currentView === "twoFactor" && (
-                <div>
-                  <div className="mb-6">
-                    <button
-                      onClick={() => {
-                        setCurrentView("login");
-                        setTwoFactorData(null);
-                      }}
-                      className="flex items-center text-blue-600 hover:text-blue-700 mb-4"
-                    >
-                      <ArrowLeft className="w-4 h-4 mr-2" />
-                      Back to login
-                    </button>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Two-Factor Authentication</h2>
-                    <p className="text-gray-600">Enter the 6-digit code from your authenticator app</p>
-                  </div>
-
-                  <form onSubmit={twoFactorForm.handleSubmit(onTwoFactorSubmit)} className="space-y-4">
-                    <div>
-                      <Label htmlFor="twoFactorToken">Authentication Code</Label>
-                      <div className="relative mt-2">
-                        <Input
-                          id="twoFactorToken"
-                          type="text"
-                          placeholder="000000"
-                          maxLength={6}
-                          className="text-center text-xl tracking-widest font-mono"
-                          {...twoFactorForm.register("token", {
-                            required: "Authentication code is required",
-                            pattern: {
-                              value: /^\d{6}$/,
-                              message: "Please enter a valid 6-digit code"
-                            }
-                          })}
-                        />
-                        <Shield className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      </div>
-                      {twoFactorForm.formState.errors.token && (
-                        <p className="text-red-500 text-sm mt-1">
-                          {twoFactorForm.formState.errors.token.message}
-                        </p>
-                      )}
-                    </div>
-
-                    <Alert>
-                      <Shield className="h-4 w-4" />
-                      <AlertDescription>
-                        Open your authenticator app (Google Authenticator, Authy, etc.) and enter the 6-digit code for SecureAuth.
-                      </AlertDescription>
-                    </Alert>
-
-                    <Button
-                      type="submit"
-                      className="w-full mt-6"
-                      disabled={false}
-                    >
-                      Verify & Sign In
-                    </Button>
-                  </form>
-                </div>
-              )}
             </CardContent>
           </Card>
         </div>

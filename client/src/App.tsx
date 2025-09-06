@@ -34,6 +34,7 @@ const FormsEditPage = lazy(() => import("@/pages/forms/edit"));
 const Subscribe = lazy(() => import("@/pages/subscribe"));
 const VerifyEmailPage = lazy(() => import("@/pages/verify-email"));
 const PendingVerificationPage = lazy(() => import("@/pages/pending-verification"));
+const TwoFactorVerifyPage = lazy(() => import("@/pages/auth/2fa-verify"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 const CreateCampaignPage = lazy(() => import("@/pages/campaigns/create"));
 const EmailCampaignsPage = lazy(() => import("@/pages/email-campaigns"));
@@ -183,6 +184,7 @@ function Router() {
             <Switch>
               <Route path="/" component={isAuthenticated ? PendingVerificationPage : AuthPage} />
               <Route path="/auth" component={AuthPage} />
+              <Route path="/auth/2fa-verify" component={TwoFactorVerifyPage} />
               <Route path="/pending-verification" component={PendingVerificationPage} />
               <Route path="/verify-email" component={VerifyEmailPage} />
 
