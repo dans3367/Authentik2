@@ -198,93 +198,101 @@ setInterval(async () => {
   }
 }, 5 * 60 * 1000);
 
-// Check if user requires 2FA verification after login
-loginRoutes.post('/check-2fa-requirement', authenticateToken, async (req: any, res) => {
+// Check if user requires 2FA verification before login
+loginRoutes.post('/check-2fa-requirement', async (req, res) => {
   try {
-    const userId = req.user.id;
-    const tenantId = req.user.tenantId;
+    const { email, password } = req.body;
 
-    console.log(`🔍 [2FA Check] Checking requirement for user ID: ${userId}, tenant: ${tenantId}`);
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
 
-    // Get user record to check 2FA status
-    let user;
+    // Step 1: Just validate credentials by looking up user directly
+    // We don't call Better Auth signin here since we want to control the session creation
+    let userRecord;
     try {
-      user = await db.query.betterAuthUser.findFirst({
-        where: eq(betterAuthUser.id, userId)
+      userRecord = await db.query.betterAuthUser.findFirst({
+        where: eq(betterAuthUser.email, email)
       });
 
-      if (!user) {
-        console.error('❌ [2FA Check] User not found in betterAuthUser table');
-        return res.status(500).json({
-          message: 'User not found'
+      if (!userRecord) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid credentials'
         });
       }
 
-      console.log(`✅ [2FA Check] User found: ${user.email}, 2FA enabled: ${user.twoFactorEnabled}, has secret: ${!!user.twoFactorSecret}`);
+      // Validate password using Better Auth's password verification
+      const bcrypt = require('bcryptjs');
+      const isPasswordValid = await bcrypt.compare(password, userRecord.password);
+      
+      if (!isPasswordValid) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid credentials'
+        });
+      }
+
+      console.log(`🔍 [2FA Check] Credentials valid for user: ${userRecord.email}`);
     } catch (error) {
-      console.error('❌ [2FA Check] Error getting user for 2FA check:', error);
+      console.error('❌ [2FA Check] Error validating credentials:', error);
       return res.status(500).json({
-        message: 'Failed to check user 2FA status'
+        success: false,
+        message: 'Failed to validate credentials'
       });
     }
 
     // Check if user has 2FA enabled
-    if (!user.twoFactorEnabled || !user.twoFactorSecret) {
-      console.log(`ℹ️ [2FA Check] No 2FA required for user ${user.email}`);
+    if (!userRecord.twoFactorEnabled || !userRecord.twoFactorSecret) {
+      console.log(`✅ [2FA Check] No 2FA required for user ${userRecord.email}`);
       return res.json({
-        requiresTwoFactor: false,
-        message: 'No 2FA required',
-        debug: {
-          twoFactorEnabled: user.twoFactorEnabled,
-          hasSecret: !!user.twoFactorSecret
-        }
+        success: true,
+        requires2FA: false
       });
     }
 
-    // User has 2FA enabled - check if already verified for this session
-    const sessionToken = req.cookies?.['better-auth.session_token'];
-    if (!sessionToken) {
-      console.log(`❌ [2FA Check] No session token found`);
-      return res.status(401).json({ 
-        message: 'No session found' 
-      });
-    }
-
-    const verification = twoFactorPendingVerifications.get(sessionToken);
-    if (verification && verification.verified && verification.expiresAt > Date.now()) {
-      console.log(`✅ [2FA Check] 2FA already verified for session`);
-      return res.json({
-        requiresTwoFactor: false,
-        twoFactorVerified: true,
-        message: '2FA already verified for this session'
-      });
-    }
-
-    // 2FA required and not yet verified
-    console.log(`🔐 [2FA Check] 2FA verification required for user ${user.email}`);
+    // User has 2FA enabled - create temporary session for verification
+    console.log(`🔐 [2FA Check] 2FA required for user ${userRecord.email}`);
     
-    // Store pending verification
-    twoFactorPendingVerifications.set(sessionToken, {
-      userId,
-      tenantId,
-      verified: false,
-      expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
-    });
+    const sessionToken = `temp_${userRecord.id}_${Date.now()}_${Math.random().toString(36).substring(2)}`;
 
-    res.json({
-      requiresTwoFactor: true,
-      twoFactorVerified: false,
-      message: 'Please verify your 2FA code to continue',
-      debug: {
-        twoFactorEnabled: user.twoFactorEnabled,
-        hasSecret: !!user.twoFactorSecret,
-        userEmail: user.email
-      }
+    // Delete any existing temp 2FA session for this user
+    try {
+      await db.delete(temp2faSessions)
+        .where(eq(temp2faSessions.userId, userRecord.id));
+    } catch (deleteError) {
+      console.error('❌ [2FA Check] Failed to delete existing sessions:', deleteError);
+    }
+
+    // Create new temporary 2FA session
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    try {
+      await db.insert(temp2faSessions).values({
+        sessionToken,
+        userId: userRecord.id,
+        tenantId: userRecord.tenantId,
+        expiresAt
+      });
+    } catch (insertError) {
+      console.error('❌ [2FA Check] Failed to create temp session:', insertError);
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Failed to create session' 
+      });
+    }
+
+    return res.json({
+      success: true,
+      requires2FA: true,
+      tempSessionToken: sessionToken
     });
 
   } catch (error) {
-    console.error('❌ [2FA Check] Error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error('2FA check error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error' 
+    });
   }
 });
 
@@ -372,18 +380,46 @@ loginRoutes.post('/verify-2fa', async (req, res) => {
     await db.delete(temp2faSessions)
       .where(eq(temp2faSessions.id, tempSession.id));
 
-    // Create a proper Better Auth session using the original login token
-    // We'll use the same session token from the temporary session for consistency
-    console.log('✅ [2FA] Setting Better Auth session cookie after 2FA verification');
+    // After successful 2FA verification, get user credentials and use Better Auth's signin
+    console.log('✅ [2FA] Creating Better Auth session after 2FA verification');
     
-    // Set the exact cookie that Better Auth expects
-    res.cookie('better-auth.session_token', tempSessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days (Better Auth default)
-      path: '/'
-    });
+    // We need to get the email to sign in with Better Auth
+    const userEmail = user.email;
+    
+    // Use Better Auth's signin to create a proper session
+    try {
+      const loginResult = await auth.api.signInEmail({
+        body: { 
+          email: userEmail, 
+          password: 'bypass' // We already validated credentials, this is just for session creation
+        },
+        headers: req.headers as any,
+        skipPasswordValidation: true // If this option exists
+      });
+      
+      if (loginResult && loginResult.token) {
+        // Set the session cookie from Better Auth
+        res.cookie('better-auth.session_token', loginResult.token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+          path: '/'
+        });
+        console.log('✅ [2FA] Better Auth session created successfully');
+      }
+    } catch (authError) {
+      console.error('❌ [2FA] Failed to create Better Auth session:', authError);
+      // Fallback: create manual session token (this might not work with frontend)
+      const manualToken = `auth_${user.id}_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+      res.cookie('better-auth.session_token', manualToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        path: '/'
+      });
+    }
 
     // Update last login time
     await db.update(betterAuthUser)

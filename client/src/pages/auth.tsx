@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth, useLogin, useRegister } from "@/hooks/useAuth";
+import { signIn } from "@/lib/betterAuthClient";
 import { loginSchema, registerSchema, forgotPasswordSchema } from "@shared/schema";
 import type { LoginCredentials, RegisterData, ForgotPasswordData } from "@shared/schema";
 import { calculatePasswordStrength, getPasswordStrengthText, getPasswordStrengthColor } from "@/lib/authUtils";
@@ -66,13 +67,13 @@ export default function AuthPage() {
   //   }
   // }, [isAuthenticated, setLocation]);
 
-  // Handle login form submission - New flow using verify-login endpoint
+  // Handle login form submission - Use Better Auth's native flow with 2FA check
   const onLoginSubmit = async (data: LoginCredentials) => {
     try {
       setIs2FAStatusChecking(true);
       
-      // Use the new login verification endpoint
-      const response = await fetch('/api/auth/verify-login', {
+      // First, check if user has 2FA enabled
+      const check2FAResponse = await fetch('/api/auth/check-2fa-requirement', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -82,57 +83,52 @@ export default function AuthPage() {
         })
       });
 
-      if (!response.ok) {
+      if (!check2FAResponse.ok) {
         let errorMessage = 'Login failed';
         try {
-          const error = await response.json();
+          const error = await check2FAResponse.json();
           errorMessage = error.message || errorMessage;
         } catch (parseError) {
-          // If response is not JSON, try to get text
-          try {
-            const errorText = await response.text();
-            errorMessage = errorText || errorMessage;
-          } catch (textError) {
-            // If we can't get the response body at all
-            errorMessage = `Login failed with status ${response.status}`;
-          }
+          errorMessage = `Login failed with status ${check2FAResponse.status}`;
         }
         throw new Error(errorMessage);
       }
 
-      let result;
-      try {
-        result = await response.json();
-        console.log('🔍 [AuthPage] Login verification result:', result);
-      } catch (parseError) {
-        throw new Error('Invalid response format from server');
-      }
+      const check2FAResult = await check2FAResponse.json();
+      console.log('🔍 [AuthPage] 2FA check result:', check2FAResult);
 
-      if (result.success) {
-        if (result.has2FA) {
-          // User has 2FA enabled - show 2FA dialog
-          setTwoFactorData({
-            email: data.email,
-            password: data.password,
-            tempSessionToken: result.tempSessionToken
-          });
-          setCurrentView("twoFactor");
-        } else {
-          // No 2FA required - redirect to dashboard immediately
-          console.log('🔍 [AuthPage] Login successful, no 2FA required - redirecting to dashboard');
-          
-          // Show success toast
-          toast({
-            title: "Login Successful",
-            description: "Welcome back! Redirecting to dashboard...",
-          });
-          
-          // Force a page reload to refresh the Better Auth session state
-          // This ensures the authentication hooks pick up the new session cookie
-          setTimeout(() => {
-            window.location.href = '/dashboard';
-          }, 500);
+      if (check2FAResult.requires2FA) {
+        // User has 2FA enabled - show 2FA dialog but don't login yet
+        setTwoFactorData({
+          email: data.email,
+          password: data.password,
+          tempSessionToken: check2FAResult.tempSessionToken
+        });
+        setCurrentView("twoFactor");
+      } else {
+        // No 2FA required - use Better Auth's native signin
+        console.log('🔍 [AuthPage] No 2FA required - using Better Auth signin');
+        
+        const result = await signIn.email({
+          email: data.email,
+          password: data.password,
+        });
+
+        if (result.error) {
+          throw new Error(result.error.message);
         }
+
+        // Show success toast
+        toast({
+          title: "Login Successful",
+          description: "Welcome back! Redirecting to dashboard...",
+        });
+        
+        // Better Auth will handle the session automatically
+        // Use router navigation instead of page reload
+        setTimeout(() => {
+          setLocation('/dashboard');
+        }, 500);
       }
     } catch (error: any) {
       console.error('Login error:', error);
@@ -270,8 +266,17 @@ export default function AuthPage() {
         throw new Error('Invalid response format from server');
       }
       if (result.success && result.verified) {
-        // 2FA verification successful - redirect to dashboard
-        console.log('🔍 [AuthPage] 2FA verification successful - redirecting to dashboard');
+        // Step 2: 2FA verified - now use Better Auth's signin to create proper session
+        console.log('🔍 [AuthPage] 2FA verified - creating Better Auth session');
+        
+        const signinResult = await signIn.email({
+          email: twoFactorData.email,
+          password: twoFactorData.password,
+        });
+
+        if (signinResult.error) {
+          throw new Error(signinResult.error.message);
+        }
         
         // Show success toast
         toast({
@@ -282,10 +287,9 @@ export default function AuthPage() {
         setTwoFactorData(null);
         twoFactorForm.reset();
         
-        // Force a page reload to refresh the Better Auth session state after 2FA
-        // This ensures the authentication hooks pick up the new session cookie
+        // Use router navigation instead of page reload
         setTimeout(() => {
-          window.location.href = '/dashboard';
+          setLocation('/dashboard');
         }, 500);
       } else {
         throw new Error('Invalid 2FA code');
