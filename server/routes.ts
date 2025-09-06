@@ -21,6 +21,8 @@ import { devRoutes } from "./routes/devRoutes";
 import { emailRoutes } from "./routes/emailRoutes";
 import { userRoutes } from "./routes/userRoutes";
 import { authRoutes } from "./routes/authRoutes";
+import { twoFactorRoutes } from "./routes/twoFactorRoutes";
+import { loginRoutes } from "./routes/loginRoutes";
 
 // Import middleware
 import { authRateLimiter, apiRateLimiter, jwtTokenRateLimiter } from "./middleware/security";
@@ -74,6 +76,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/dev", devRoutes);
   app.use("/api/email", emailRoutes);
   app.use("/api/users", userRoutes);
+  app.use("/api/2fa", twoFactorRoutes);
+  app.use("/api/auth", loginRoutes);
 
   // Legacy routes for backward compatibility (if needed)
   // These can be removed once all clients are updated
@@ -186,6 +190,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dev: "/api/dev/*",
         email: "/api/email/*",
         users: "/api/users/*",
+        twoFactor: "/api/2fa/*",
       },
       documentation: "https://docs.authentik.com/api",
     });

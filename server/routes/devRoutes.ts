@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import { users, tenants } from '@shared/schema';
+import { users, tenants, betterAuthUser } from '@shared/schema';
 // Note: bcrypt removed - better-auth handles password hashing
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { randomUUID } from 'crypto';
@@ -402,5 +402,240 @@ devRoutes.delete("/clear-test-data", async (req, res) => {
   } catch (error) {
     console.error('Clear test data error:', error);
     res.status(500).json({ message: 'Failed to clear test data' });
+  }
+});
+
+// Debug 2FA status for a user
+devRoutes.get("/debug-2fa/:email", async (req, res) => {
+  try {
+    // This endpoint is for development/testing purposes only
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ message: 'This endpoint is not available in production' });
+    }
+
+    const { email } = req.params;
+    console.log(`🔍 Debug 2FA for email: ${email}`);
+    
+    // Check better-auth user
+    const betterAuthUserRecord = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.email, email)
+    });
+    
+    console.log('Better-auth user:', betterAuthUserRecord ? {
+      id: betterAuthUserRecord.id,
+      email: betterAuthUserRecord.email,
+      tenantId: betterAuthUserRecord.tenantId
+    } : 'Not found');
+    
+    // Check users table
+    const user = await db.query.users.findFirst({
+      where: eq(users.email, email)
+    });
+    
+    console.log('Users table record:', user ? {
+      id: user.id,
+      email: user.email,
+      tenantId: user.tenantId,
+      twoFactorEnabled: user.twoFactorEnabled,
+      hasSecret: !!user.twoFactorSecret,
+      secretPreview: user.twoFactorSecret ? `${user.twoFactorSecret.substring(0, 8)}...` : 'None'
+    } : 'Not found');
+    
+    // If both exist, check ID mismatch
+    const idMatch = betterAuthUserRecord && user ? betterAuthUserRecord.id === user.id : null;
+    const tenantMatch = betterAuthUserRecord && user ? betterAuthUserRecord.tenantId === user.tenantId : null;
+    
+    const result = {
+      email,
+      betterAuthUser: betterAuthUserRecord ? {
+        id: betterAuthUserRecord.id,
+        email: betterAuthUserRecord.email,
+        tenantId: betterAuthUserRecord.tenantId
+      } : null,
+      usersTableRecord: user ? {
+        id: user.id,
+        email: user.email,
+        tenantId: user.tenantId,
+        twoFactorEnabled: user.twoFactorEnabled,
+        hasSecret: !!user.twoFactorSecret,
+        secretPreview: user.twoFactorSecret ? `${user.twoFactorSecret.substring(0, 8)}...` : null
+      } : null,
+      matches: {
+        idMatch,
+        tenantMatch
+      },
+      issues: []
+    };
+    
+    // Identify potential issues
+    if (!betterAuthUserRecord) {
+      result.issues.push('User not found in better_auth_user table');
+    }
+    if (!user) {
+      result.issues.push('User not found in users table');
+    }
+    if (betterAuthUserRecord && user && idMatch === false) {
+      result.issues.push('ID mismatch between better-auth and users table');
+    }
+    if (betterAuthUserRecord && user && tenantMatch === false) {
+      result.issues.push('Tenant ID mismatch between better-auth and users table');
+    }
+    if (user && user.twoFactorEnabled && !user.twoFactorSecret) {
+      result.issues.push('2FA enabled but no secret stored');
+    }
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Debug 2FA error:', error);
+    res.status(500).json({ message: 'Failed to debug 2FA status' });
+  }
+});
+
+// Force disable 2FA for a user (dev only)
+devRoutes.post("/force-disable-2fa/:email", async (req, res) => {
+  try {
+    // This endpoint is for development/testing purposes only
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ message: 'This endpoint is not available in production' });
+    }
+
+    const { email } = req.params;
+    console.log(`🔍 Force disabling 2FA for email: ${email}`);
+    
+    // Check current status
+    const user = await db.query.users.findFirst({
+      where: eq(users.email, email)
+    });
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found in users table' });
+    }
+    
+    console.log('📊 Current user status:', {
+      id: user.id,
+      email: user.email,
+      twoFactorEnabled: user.twoFactorEnabled,
+      hasSecret: !!user.twoFactorSecret
+    });
+    
+    // Force disable 2FA
+    const updateResult = await db.update(users)
+      .set({
+        twoFactorEnabled: false,
+        twoFactorSecret: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, user.id));
+    
+    console.log(`✅ Force disable result: ${updateResult.rowCount} rows affected`);
+    
+    // Verify the update
+    const updatedUser = await db.query.users.findFirst({
+      where: eq(users.id, user.id)
+    });
+    
+    console.log('🔍 Updated user status:', {
+      id: updatedUser?.id,
+      email: updatedUser?.email,
+      twoFactorEnabled: updatedUser?.twoFactorEnabled,
+      hasSecret: !!updatedUser?.twoFactorSecret
+    });
+    
+    const result = {
+      message: '2FA forcefully disabled',
+      email,
+      before: {
+        twoFactorEnabled: user.twoFactorEnabled,
+        hasSecret: !!user.twoFactorSecret
+      },
+      after: {
+        twoFactorEnabled: updatedUser?.twoFactorEnabled || false,
+        hasSecret: !!updatedUser?.twoFactorSecret
+      },
+      rowsAffected: updateResult.rowCount
+    };
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Force disable 2FA error:', error);
+    res.status(500).json({ message: 'Failed to force disable 2FA' });
+  }
+});
+
+// Force enable 2FA for a user (dev only)
+devRoutes.post("/force-enable-2fa/:email", async (req, res) => {
+  try {
+    // This endpoint is for development/testing purposes only
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ message: 'This endpoint is not available in production' });
+    }
+
+    const { email } = req.params;
+    const { secret } = req.body || {};
+
+    console.log(`🔍 Force enabling 2FA for email: ${email}`);
+
+    // Check current status
+    const user = await db.query.users.findFirst({
+      where: eq(users.email, email)
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found in users table' });
+    }
+
+    console.log('📊 Current user status:', {
+      id: user.id,
+      email: user.email,
+      twoFactorEnabled: user.twoFactorEnabled,
+      hasSecret: !!user.twoFactorSecret
+    });
+
+    // Generate a secret if not provided
+    const finalSecret = secret || require('crypto').randomBytes(32).toString('base64');
+
+    // Force enable 2FA
+    const updateResult = await db.update(users)
+      .set({
+        twoFactorEnabled: true,
+        twoFactorSecret: finalSecret,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, user.id));
+
+    console.log(`✅ Force enable result: ${updateResult.rowCount} rows affected`);
+
+    // Verify the update
+    const updatedUser = await db.query.users.findFirst({
+      where: eq(users.id, user.id)
+    });
+
+    console.log('🔍 Updated user status:', {
+      id: updatedUser?.id,
+      email: updatedUser?.email,
+      twoFactorEnabled: updatedUser?.twoFactorEnabled,
+      hasSecret: !!updatedUser?.twoFactorSecret,
+      secretPreview: updatedUser?.twoFactorSecret ? `${updatedUser.twoFactorSecret.substring(0, 8)}...` : 'None'
+    });
+
+    const result = {
+      message: '2FA forcefully enabled',
+      email,
+      before: {
+        twoFactorEnabled: user.twoFactorEnabled,
+        hasSecret: !!user.twoFactorSecret
+      },
+      after: {
+        twoFactorEnabled: updatedUser?.twoFactorEnabled || false,
+        hasSecret: !!updatedUser?.twoFactorSecret
+      },
+      secret: finalSecret,
+      rowsAffected: updateResult.rowCount
+    };
+
+    res.json(result);
+  } catch (error) {
+    console.error('Force enable 2FA error:', error);
+    res.status(500).json({ message: 'Failed to force enable 2FA' });
   }
 });

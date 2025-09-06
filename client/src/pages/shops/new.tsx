@@ -94,7 +94,7 @@ export default function NewShopPage() {
   });
 
   // Fetch managers
-  const { data: managersData, isLoading: managersLoading, error: managersError } = useQuery<{ managers: Manager[] }>({
+  const { data: managersData, isLoading: managersLoading, error: managersError } = useQuery<Manager[]>({
     queryKey: ['/api/shops/managers/list'],
     queryFn: async () => {
       console.log('🔍 Fetching managers list...');
@@ -333,8 +333,8 @@ export default function NewShopPage() {
                           <SelectItem value="error" disabled>
                             Error loading managers
                           </SelectItem>
-                        ) : managersData?.managers && managersData.managers.length > 0 ? (
-                          managersData.managers.map(manager => (
+                        ) : managersData && managersData.length > 0 ? (
+                          managersData.map(manager => (
                             <SelectItem key={manager.id} value={manager.id}>
                               {manager.firstName || manager.lastName 
                                 ? `${manager.firstName || ''} ${manager.lastName || ''}`.trim() 
@@ -353,7 +353,7 @@ export default function NewShopPage() {
                         Failed to load managers. Please try refreshing the page.
                       </p>
                     )}
-                    {!managersLoading && !managersError && managersData?.managers && managersData.managers.length === 0 && (
+                    {!managersLoading && !managersError && managersData && managersData.length === 0 && (
                       <div className="space-y-2">
                         <p className="text-sm text-muted-foreground">
                           No managers found. Only users with "Manager" or "Owner" role can be assigned to shops.

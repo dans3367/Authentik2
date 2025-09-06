@@ -121,14 +121,11 @@ export default function NewsletterEditPage() {
   // Send newsletter mutation
   const sendNewsletterMutation = useMutation({
     mutationFn: async (newsletterId: string) => {
-      console.log('[Newsletter Edit] Sending newsletter:', newsletterId);
       const response = await apiRequest('POST', `/api/newsletters/${newsletterId}/send`);
       const result = await response.json();
-      console.log('[Newsletter Edit] Send response:', result);
       return result;
     },
     onSuccess: (response, newsletterId) => {
-      console.log('[Newsletter Edit] Send successful:', response);
       // Invalidate all newsletter-related queries to refresh the data
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters', newsletterId] });
@@ -195,10 +192,8 @@ export default function NewsletterEditPage() {
       ...segmentationData,
     };
     
-    console.log('[Newsletter Edit] Updating newsletter before send:', newsletterData);
     updateNewsletterMutation.mutate(newsletterData, {
       onSuccess: () => {
-        console.log('[Newsletter Edit] Newsletter updated, now sending...');
         // After updating, send the newsletter
         if (id) {
           sendNewsletterMutation.mutate(id);
