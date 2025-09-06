@@ -1,13 +1,184 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { users, betterAuthUser, betterAuthSession } from '@shared/schema';
-import { eq, and } from 'drizzle-orm';
+import { betterAuthUser, betterAuthSession, temp2faSessions } from '@shared/schema';
+import { eq, and, sql } from 'drizzle-orm';
 import { authenticator } from 'otplib';
 import { z } from 'zod';
 import { authenticateToken } from '../middleware/auth-middleware';
-import { getOrCreateUser } from './twoFactorRoutes';
+import { auth } from '../auth';
 
 export const loginRoutes = Router();
+
+// New login verification endpoint that follows the flow in the image
+loginRoutes.post('/verify-login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
+
+    // Step 1: Check credentials using Better Auth
+    let loginResult;
+    try {
+      console.log('🔍 [Verify Login] Available auth methods:', Object.keys(auth.api || {}));
+      console.log('🔍 [Verify Login] Auth object:', typeof auth.api);
+
+      // Try the correct Better Auth method - check if signInEmail exists
+      if (auth.api.signInEmail) {
+        loginResult = await auth.api.signInEmail({
+          body: { email, password },
+        });
+      } else {
+        console.log('🔍 [Verify Login] signInEmail not available, trying signIn');
+        // Fallback to signIn method
+        loginResult = await auth.api.signIn({
+          body: { email, password },
+        });
+      }
+      console.log('🔍 [Verify Login] Better Auth result received');
+    } catch (authError) {
+      console.error('❌ [Verify Login] Better Auth error:', authError);
+      console.error('❌ [Verify Login] Auth error details:', authError.message);
+      return res.status(500).json({ message: 'Authentication service error: ' + authError.message });
+    }
+
+    if (loginResult?.error) {
+      console.log('❌ [Verify Login] Invalid credentials for:', email);
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials',
+        error: loginResult.error.message
+      });
+    }
+
+    // Step 2: Credentials are valid, now check if user has 2FA enabled
+    let user = loginResult?.data?.user;
+
+    // Handle different Better Auth response structures
+    if (!user && loginResult?.data) {
+      // Try alternative response structures
+      user = loginResult.data;
+    }
+
+    if (!user && loginResult?.user) {
+      // Some versions might put user directly on result
+      user = loginResult.user;
+    }
+
+    if (!user) {
+      console.error('❌ [Verify Login] No user data returned from Better Auth');
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Login failed - no user data' 
+      });
+    }
+
+    console.log('✅ [Verify Login] User found:', { id: user.id, email: user.email });
+
+    // Get user record directly from better_auth_user table
+    let userRecord;
+    try {
+      userRecord = await db.query.betterAuthUser.findFirst({
+        where: eq(betterAuthUser.id, user.id)
+      });
+
+      if (!userRecord) {
+        console.error('❌ [Login] User not found in better_auth_user table');
+        return res.status(500).json({ 
+          success: false, 
+          message: 'User record not found' 
+        });
+      }
+    } catch (error) {
+      console.error('Error getting user for 2FA check:', error);
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Failed to check user status' 
+      });
+    }
+
+    // Step 3: Check if user has 2FA enabled
+    if (!userRecord.twoFactorEnabled || !userRecord.twoFactorSecret) {
+      // No 2FA enabled - create normal session and redirect to dashboard
+      console.log(`✅ [Login] No 2FA required for user ${userRecord.email}`);
+      
+      // Set session cookie (Better Auth should handle this)
+      if (loginResult.data?.session) {
+        res.cookie('better-auth.session_token', loginResult.data.session.token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        });
+      }
+
+      return res.json({
+        success: true,
+        has2FA: false,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name
+        }
+      });
+    }
+
+    // Step 4: User has 2FA enabled - create temporary 2FA session
+    console.log(`🔐 [Login] 2FA required for user ${userRecord.email}`);
+    
+    // For 2FA flow, we create our own temporary session token
+    // since Better Auth doesn't provide one during 2FA verification
+    const sessionToken = `temp_${user.id}_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+
+    console.log('🔍 [Login] Created temporary session token for 2FA:', sessionToken.substring(0, 8) + '...');
+
+    // Delete any existing temp 2FA session for this user
+    try {
+      await db.delete(temp2faSessions)
+        .where(eq(temp2faSessions.userId, user.id));
+      console.log('✅ [Login] Deleted existing temp sessions for user', user.id);
+    } catch (deleteError) {
+      console.error('❌ [Login] Failed to delete existing sessions:', deleteError);
+    }
+
+    // Create new temporary 2FA session
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    try {
+      await db.insert(temp2faSessions).values({
+        sessionToken,
+        userId: user.id,
+        tenantId: userRecord.tenantId,
+        expiresAt
+      });
+      console.log('✅ [Login] Created temp 2FA session for user', user.id);
+    } catch (insertError) {
+      console.error('❌ [Login] Failed to create temp session:', insertError);
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Failed to create session' 
+      });
+    }
+
+    return res.json({
+      success: true,
+      has2FA: true,
+      tempSessionToken: sessionToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name
+      }
+    });
+
+  } catch (error) {
+    console.error('Login verification error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error' 
+    });
+  }
+});
 
 // 2FA verification state storage (in production, use Redis)
 const twoFactorPendingVerifications = new Map<string, {
@@ -27,6 +198,21 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
+// Clean up expired temporary 2FA sessions every 5 minutes
+setInterval(async () => {
+  try {
+    const now = new Date();
+    const result = await db.delete(temp2faSessions)
+      .where(sql`${temp2faSessions.expiresAt} < ${now}`);
+    
+    if (result.rowCount && result.rowCount > 0) {
+      console.log(`🧹 [Cleanup] Removed ${result.rowCount} expired temporary 2FA sessions`);
+    }
+  } catch (error) {
+    console.error('Error cleaning up expired temp 2FA sessions:', error);
+  }
+}, 5 * 60 * 1000);
+
 // Check if user requires 2FA verification after login
 loginRoutes.post('/check-2fa-requirement', authenticateToken, async (req: any, res) => {
   try {
@@ -35,15 +221,25 @@ loginRoutes.post('/check-2fa-requirement', authenticateToken, async (req: any, r
 
     console.log(`🔍 [2FA Check] Checking requirement for user ID: ${userId}, tenant: ${tenantId}`);
 
-    // Get or create user record to check 2FA status
+    // Get user record to check 2FA status
     let user;
     try {
-      user = await getOrCreateUser(userId, tenantId);
-      console.log(`✅ [2FA Check] User found/created: ${user.email}, 2FA enabled: ${user.twoFactorEnabled}, has secret: ${!!user.twoFactorSecret}`);
+      user = await db.query.betterAuthUser.findFirst({
+        where: eq(betterAuthUser.id, userId)
+      });
+
+      if (!user) {
+        console.error('❌ [2FA Check] User not found in betterAuthUser table');
+        return res.status(500).json({
+          message: 'User not found'
+        });
+      }
+
+      console.log(`✅ [2FA Check] User found: ${user.email}, 2FA enabled: ${user.twoFactorEnabled}, has secret: ${!!user.twoFactorSecret}`);
     } catch (error) {
       console.error('❌ [2FA Check] Error getting user for 2FA check:', error);
-      return res.status(500).json({ 
-        message: 'Failed to check user 2FA status' 
+      return res.status(500).json({
+        message: 'Failed to check user 2FA status'
       });
     }
 
@@ -107,7 +303,125 @@ loginRoutes.post('/check-2fa-requirement', authenticateToken, async (req: any, r
   }
 });
 
-// Verify 2FA for current session
+// New 2FA verification endpoint that follows the flow in the image
+loginRoutes.post('/verify-2fa', async (req, res) => {
+  try {
+    const { token, tempSessionToken } = req.body;
+    
+    if (!token) {
+      return res.status(400).json({ 
+        message: '2FA token is required' 
+      });
+    }
+
+    if (!tempSessionToken) {
+      return res.status(400).json({ 
+        message: 'Temporary session token is required' 
+      });
+    }
+
+    // Step 1: Find the temporary 2FA session
+    const tempSession = await db.query.temp2faSessions.findFirst({
+      where: eq(temp2faSessions.sessionToken, tempSessionToken)
+    });
+
+    if (!tempSession) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Invalid or expired temporary session' 
+      });
+    }
+
+    // Check if temporary session has expired
+    if (new Date() > tempSession.expiresAt) {
+      // Clean up expired session
+      await db.delete(temp2faSessions)
+        .where(eq(temp2faSessions.id, tempSession.id));
+      
+      return res.status(401).json({ 
+        success: false,
+        message: 'Temporary session expired. Please log in again.' 
+      });
+    }
+
+    // Step 2: Get user to check 2FA secret
+    let user;
+    try {
+      user = await db.query.betterAuthUser.findFirst({
+        where: eq(betterAuthUser.id, tempSession.userId)
+      });
+
+      if (!user) {
+        console.error('User not found in betterAuthUser table for 2FA verification');
+        return res.status(500).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+    } catch (error) {
+      console.error('Error getting user for 2FA verification:', error);
+      return res.status(500).json({
+        message: 'Failed to verify 2FA'
+      });
+    }
+
+    if (!user.twoFactorEnabled || !user.twoFactorSecret) {
+      return res.status(400).json({ 
+        message: '2FA is not enabled for this account' 
+      });
+    }
+
+    // Step 3: Verify the 2FA token
+    const isValidToken = authenticator.verify({
+      token,
+      secret: user.twoFactorSecret,
+      window: 1 // Allow 1 step tolerance for clock drift
+    });
+
+    if (!isValidToken) {
+      return res.status(400).json({ 
+        message: 'Invalid 2FA code. Please try again.' 
+      });
+    }
+
+    // Step 4: 2FA verification successful - delete temp session and create normal session
+    await db.delete(temp2faSessions)
+      .where(eq(temp2faSessions.id, tempSession.id));
+
+    // Create a new Better Auth session (the temp session token becomes the real session)
+    res.cookie('better-auth.session_token', tempSessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    });
+
+    // Update last login time
+    await db.update(users)
+      .set({ 
+        lastLoginAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, user.id));
+
+    res.json({
+      success: true,
+      message: '2FA verification successful',
+      verified: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email
+      }
+    });
+
+  } catch (error) {
+    console.error('2FA verification error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Legacy endpoint for backward compatibility
 loginRoutes.post('/verify-session-2fa', authenticateToken, async (req: any, res) => {
   try {
     const { token } = req.body;
@@ -124,11 +438,20 @@ loginRoutes.post('/verify-session-2fa', authenticateToken, async (req: any, res)
     // Get user to check 2FA secret
     let user;
     try {
-      user = await getOrCreateUser(userId, tenantId);
+      user = await db.query.betterAuthUser.findFirst({
+        where: eq(betterAuthUser.id, userId)
+      });
+
+      if (!user) {
+        console.error('User not found in betterAuthUser table for session 2FA verification');
+        return res.status(500).json({
+          message: 'User not found'
+        });
+      }
     } catch (error) {
       console.error('Error getting user for 2FA verification:', error);
-      return res.status(500).json({ 
-        message: 'Failed to verify 2FA' 
+      return res.status(500).json({
+        message: 'Failed to verify 2FA'
       });
     }
 
@@ -195,11 +518,20 @@ loginRoutes.get('/2fa-status', authenticateToken, async (req: any, res) => {
     // Get user to check 2FA settings
     let user;
     try {
-      user = await getOrCreateUser(userId, tenantId);
+      user = await db.query.betterAuthUser.findFirst({
+        where: eq(betterAuthUser.id, userId)
+      });
+
+      if (!user) {
+        console.error('User not found in betterAuthUser table for 2FA status');
+        return res.status(500).json({
+          message: 'User not found'
+        });
+      }
     } catch (error) {
       console.error('Error getting user for 2FA status:', error);
-      return res.status(500).json({ 
-        message: 'Failed to get 2FA status' 
+      return res.status(500).json({
+        message: 'Failed to get 2FA status'
       });
     }
 

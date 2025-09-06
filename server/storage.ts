@@ -1,6 +1,6 @@
-import { 
-  users, 
-  subscriptionPlans, 
+import {
+  betterAuthUser,
+  subscriptionPlans,
   subscriptions,
   tenants,
   forms,

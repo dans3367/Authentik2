@@ -10,7 +10,8 @@
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "db:init": "tsx server/init-db.ts",
-    "user:set-owner": "tsx server/update-user-role.ts"
+    "user:set-owner": "tsx server/update-user-role.ts",
+    "db:fix-foreign-keys": "tsx server/migrate-users.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.855.0",

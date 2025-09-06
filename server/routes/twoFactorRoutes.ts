@@ -1,96 +1,21 @@
 import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth-middleware';
 import { db } from '../db';
-import { users, betterAuthUser } from '@shared/schema';
+import { betterAuthUser } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { authenticator } from 'otplib';
 import * as qrcode from 'qrcode';
 
 export const twoFactorRoutes = Router();
 
-// Helper function to get or create user from betterAuthUser
-export async function getOrCreateUser(userId: string, tenantId: string) {
-  // Get user - first check if user exists in users table
-  let user = await db.query.users.findFirst({
-    where: and(
-      eq(users.id, userId),
-      eq(users.tenantId, tenantId)
-    ),
+// Helper function to get user from betterAuthUser table
+export async function getUser(userId: string) {
+  const user = await db.query.betterAuthUser.findFirst({
+    where: eq(betterAuthUser.id, userId)
   });
 
-  // If user doesn't exist in users table, get from betterAuthUser and create/update
   if (!user) {
-    const betterAuthUserRecord = await db.query.betterAuthUser.findFirst({
-      where: eq(betterAuthUser.id, userId)
-    });
-
-    if (!betterAuthUserRecord) {
-      throw new Error('User not found in betterAuthUser table');
-    }
-
-    // Check if a user with this email already exists
-    const existingUserByEmail = await db.query.users.findFirst({
-      where: eq(users.email, betterAuthUserRecord.email)
-    });
-
-      if (existingUserByEmail) {
-        // Log ID mismatch for debugging
-        if (existingUserByEmail.id !== betterAuthUserRecord.id) {
-          console.log(`User ID mismatch: existing user ID ${existingUserByEmail.id} != better-auth ID ${betterAuthUserRecord.id} for email ${betterAuthUserRecord.email}`);
-        }
-        
-        // Update existing user record with better-auth data (but preserve 2FA settings and ID)
-        console.log(`🔄 [User Sync] Preserving 2FA settings: enabled=${existingUserByEmail.twoFactorEnabled}, hasSecret=${!!existingUserByEmail.twoFactorSecret}`);
-        
-        await db.update(users)
-          .set({
-            // Don't update ID - keep existing to preserve foreign key relationships
-            tenantId: betterAuthUserRecord.tenantId,
-            firstName: betterAuthUserRecord.name ? betterAuthUserRecord.name.split(' ')[0] : null,
-            lastName: betterAuthUserRecord.name ? betterAuthUserRecord.name.split(' ').slice(1).join(' ') : null,
-            role: betterAuthUserRecord.role || existingUserByEmail.role || 'Employee',
-            emailVerified: betterAuthUserRecord.emailVerified,
-            // IMPORTANT: Preserve existing 2FA settings - don't overwrite them
-            twoFactorEnabled: existingUserByEmail.twoFactorEnabled,
-            twoFactorSecret: existingUserByEmail.twoFactorSecret,
-            updatedAt: new Date(),
-          })
-          .where(eq(users.email, betterAuthUserRecord.email));
-        
-        // Get the updated user record (fetch fresh after update)
-        user = await db.query.users.findFirst({
-          where: eq(users.id, existingUserByEmail.id)
-        });
-    } else {
-      // Create new user record in users table
-      await db.insert(users).values({
-        id: betterAuthUserRecord.id,
-        tenantId: betterAuthUserRecord.tenantId,
-        email: betterAuthUserRecord.email,
-        password: null, // Using better-auth system, no password needed here
-        firstName: betterAuthUserRecord.name ? betterAuthUserRecord.name.split(' ')[0] : null,
-        lastName: betterAuthUserRecord.name ? betterAuthUserRecord.name.split(' ').slice(1).join(' ') : null,
-        role: betterAuthUserRecord.role || 'Employee',
-        isActive: true,
-        twoFactorEnabled: false,
-        twoFactorSecret: null,
-        emailVerified: betterAuthUserRecord.emailVerified,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-      
-      // Get the newly created user record
-      user = await db.query.users.findFirst({
-        where: and(
-          eq(users.id, betterAuthUserRecord.id),
-          eq(users.tenantId, betterAuthUserRecord.tenantId)
-        ),
-      });
-    }
-
-    if (!user) {
-      throw new Error('Failed to create or update user record');
-    }
+    throw new Error('User not found in betterAuthUser table');
   }
 
   return user;
@@ -105,7 +30,7 @@ twoFactorRoutes.post('/setup', authenticateToken, async (req: any, res) => {
     // Get or create user using helper function
     let user;
     try {
-      user = await getOrCreateUser(userId, tenantId);
+      user = await getUser(userId);
     } catch (error) {
       console.error('Error getting or creating user:', error);
       return res.status(404).json({ message: 'User not found' });
@@ -152,7 +77,7 @@ twoFactorRoutes.post('/enable', authenticateToken, async (req: any, res) => {
     // Get or create user using helper function
     let user;
     try {
-      user = await getOrCreateUser(userId, tenantId);
+      user = await getUser(userId);
     } catch (error) {
       console.error('Error getting or creating user:', error);
       return res.status(404).json({ message: 'User not found' });
@@ -173,13 +98,13 @@ twoFactorRoutes.post('/enable', authenticateToken, async (req: any, res) => {
     // Enable 2FA by storing the secret
     console.log(`🔐 [2FA Enable] Updating 2FA for user ID: ${userId}, tenant: ${tenantId}, actual user ID: ${user.id}`);
     
-    const updateResult = await db.update(users)
+    const updateResult = await db.update(betterAuthUser)
       .set({
         twoFactorEnabled: true,
         twoFactorSecret: secret,
         updatedAt: new Date(),
       })
-      .where(eq(users.id, user.id)); // Use the actual user ID from the fetched record, not the auth token
+      .where(eq(betterAuthUser.id, user.id)); // Use the actual user ID from the fetched record, not the auth token
 
     console.log(`📊 [2FA Enable] Update result:`, updateResult);
     console.log(`✅ [2FA Enable] Rows affected: ${updateResult.rowCount || 0}`);
@@ -190,8 +115,8 @@ twoFactorRoutes.post('/enable', authenticateToken, async (req: any, res) => {
     }
 
     // Verify the update worked by fetching the user again
-    const updatedUser = await db.query.users.findFirst({
-      where: eq(users.id, user.id)
+    const updatedUser = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.id, user.id)
     });
 
     console.log(`🔍 [2FA Enable] Verification - Updated user 2FA status: ${updatedUser?.twoFactorEnabled}, has secret: ${!!updatedUser?.twoFactorSecret}`);
@@ -226,7 +151,7 @@ twoFactorRoutes.post('/disable', authenticateToken, async (req: any, res) => {
     // Get or create user using helper function
     let user;
     try {
-      user = await getOrCreateUser(userId, tenantId);
+      user = await getUser(userId);
     } catch (error) {
       console.error('Error getting or creating user:', error);
       return res.status(404).json({ message: 'User not found' });
@@ -248,15 +173,15 @@ twoFactorRoutes.post('/disable', authenticateToken, async (req: any, res) => {
     }
 
     // Disable 2FA
-    await db.update(users)
+    await db.update(betterAuthUser)
       .set({
         twoFactorEnabled: false,
         twoFactorSecret: null,
         updatedAt: new Date(),
       })
       .where(and(
-        eq(users.id, userId),
-        eq(users.tenantId, tenantId)
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, tenantId)
       ));
 
     res.json({ message: '2FA disabled successfully' });
@@ -280,7 +205,7 @@ twoFactorRoutes.post('/verify', authenticateToken, async (req: any, res) => {
     // Get or create user using helper function
     let user;
     try {
-      user = await getOrCreateUser(userId, tenantId);
+      user = await getUser(userId);
     } catch (error) {
       console.error('Error getting or creating user:', error);
       return res.status(404).json({ message: 'User not found' });
@@ -319,7 +244,7 @@ twoFactorRoutes.get('/status', authenticateToken, async (req: any, res) => {
     // Get or create user using helper function
     let user;
     try {
-      user = await getOrCreateUser(userId, tenantId);
+      user = await getUser(userId);
       console.log(`✅ [2FA Status] User found/created: ${user.email}, 2FA enabled: ${user.twoFactorEnabled}, has secret: ${!!user.twoFactorSecret}`);
     } catch (error) {
       console.error('❌ [2FA Status] Error getting or creating user:', error);

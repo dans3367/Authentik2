@@ -76,7 +76,19 @@ app.use(sanitizeMiddleware);
 
 // Better Auth middleware for authentication
 // Note: better-auth uses toNodeHandler for Express integration
-app.all("/api/auth/*", toNodeHandler(auth));
+// Only handle standard better-auth routes, exclude custom routes like verify-login
+app.all("/api/auth/*", (req, res, next) => {
+  // Skip custom auth routes that should be handled by our custom routes
+  const customRoutes = ['verify-login', 'verify-2fa', 'check-2fa-requirement', 'verify-session-2fa', '2fa-status'];
+  const path = req.path.replace('/api/auth/', '');
+
+  if (customRoutes.includes(path)) {
+    return next();
+  }
+
+  // Handle with Better Auth
+  return toNodeHandler(auth)(req, res, next);
+});
 
 // Body parsing with size limits - applied after auth handler
 app.use(express.json(requestSizeLimiter.json));
