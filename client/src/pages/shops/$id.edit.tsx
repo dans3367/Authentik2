@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -82,7 +82,7 @@ export default function EditShopPage() {
   });
 
   // Fetch managers
-  const { data: managersData, isLoading: managersLoading } = useQuery<{ managers: Manager[] }>({
+  const { data: managersData, isLoading: managersLoading } = useQuery<Manager[]>({
     queryKey: ['/api/shops/managers/list'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/shops/managers/list');
@@ -113,6 +113,12 @@ export default function EditShopPage() {
     },
   });
 
+  // Reset mutation state when component mounts or shop ID changes
+  useEffect(() => {
+    // Always reset mutation state to ensure clean state on page entry
+    updateShopMutation.reset();
+  }, [id, updateShopMutation]);
+
   // Set form values when shop data is loaded
   useEffect(() => {
     if (shopData?.shop) {
@@ -135,7 +141,7 @@ export default function EditShopPage() {
         tags: shop.tags || [],
         socialMedia: shop.socialMedia || '',
         settings: shop.settings || '',
-        isActive: shop.isActive ?? undefined,
+        isActive: shop.isActive ?? true,
       });
       setTags(shop.tags || []);
     }
@@ -145,10 +151,10 @@ export default function EditShopPage() {
     // Convert "no-manager" to null for the API
     const submitData = {
       ...data,
-      managerId: data.managerId === 'no-manager' ? null : data.managerId,
+      managerId: data.managerId === 'no-manager' || data.managerId === '' ? null : data.managerId,
       tags: tags.length > 0 ? tags : undefined,
     };
-    
+
     updateShopMutation.mutate(submitData);
   };
 
@@ -232,7 +238,10 @@ export default function EditShopPage() {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            className="space-y-6"
+          >
             {/* Basic Information */}
             <Card>
               <CardHeader>
@@ -305,8 +314,8 @@ export default function EditShopPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="managerId">Manager</Label>
-                    <Select 
-                      value={watch('managerId') || undefined}
+                    <Select
+                      value={watch('managerId') || 'no-manager'}
                       onValueChange={(value) => setValue('managerId', value)}
                       disabled={managersLoading}
                     >
@@ -315,7 +324,7 @@ export default function EditShopPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="no-manager">No Manager</SelectItem>
-                        {managersData?.managers.map(manager => (
+                        {managersData?.map(manager => (
                           <SelectItem key={manager.id} value={manager.id}>
                             {manager.firstName} {manager.lastName} ({manager.email})
                           </SelectItem>
@@ -486,24 +495,33 @@ export default function EditShopPage() {
             </Card>
 
             {/* Actions */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-6">
-              <div className="flex flex-col sm:flex-row gap-4 sm:justify-end">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-6 relative">
+              {updateShopMutation.isPending && (
+                <div className="absolute inset-0 bg-white/50 dark:bg-gray-800/50 rounded-lg flex items-center justify-center z-10 pointer-events-none">
+                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving changes...
+                  </div>
+                </div>
+              )}
+              <div className="flex flex-col sm:flex-row gap-4 sm:justify-end relative z-20">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => navigate('/shops')}
-                  className="w-full sm:w-auto"
+                  disabled={updateShopMutation.isPending}
+                  className="w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
                   data-testid="button-cancel"
                 >
                   Cancel
                 </Button>
-                <Button 
-                  type="submit" 
-                  disabled={isSubmitting}
-                  className="w-full sm:w-auto"
+                <Button
+                  type="submit"
+                  disabled={updateShopMutation.isPending}
+                  className="w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
                   data-testid="button-submit"
                 >
-                  {isSubmitting ? (
+                  {updateShopMutation.isPending ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Saving...

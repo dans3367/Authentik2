@@ -147,7 +147,7 @@ shopsRoutes.put("/:id", authenticateToken, requireRole(["Owner", "Administrator"
   try {
     const { id } = req.params;
     const validatedData = updateShopSchema.parse(req.body);
-    const { name, description, address, phone, email, managerId, status } = validatedData;
+    const { name, description, address, city, state, zipCode, country, phone, email, website, managerId, operatingHours, status, category, tags, socialMedia, settings, isActive } = validatedData;
 
     // Check if shop exists and belongs to user's company
     const existingShop = await db.query.shops.findFirst({
@@ -183,7 +183,7 @@ shopsRoutes.put("/:id", authenticateToken, requireRole(["Owner", "Administrator"
     }
 
     if (managerId !== undefined) {
-      if (managerId) {
+      if (managerId && managerId.trim() !== '') {
         // Verify manager belongs to the same company
         const manager = await db.query.users.findFirst({
           where: sql`${users.id} = ${managerId} AND ${users.tenantId} = ${req.user.tenantId}`,
@@ -192,12 +192,59 @@ shopsRoutes.put("/:id", authenticateToken, requireRole(["Owner", "Administrator"
         if (!manager) {
           return res.status(400).json({ message: 'Manager not found or does not belong to your company' });
         }
+        updateData.managerId = managerId;
+      } else {
+        // Set to null for no manager or empty string
+        updateData.managerId = null;
       }
-      updateData.managerId = managerId;
     }
 
     if (status !== undefined) {
       updateData.status = status;
+    }
+
+    if (city !== undefined) {
+      updateData.city = city ? sanitizeString(city) : null;
+    }
+
+    if (state !== undefined) {
+      updateData.state = state ? sanitizeString(state) : null;
+    }
+
+    if (zipCode !== undefined) {
+      updateData.zipCode = zipCode ? sanitizeString(zipCode) : null;
+    }
+
+    if (country !== undefined) {
+      updateData.country = sanitizeString(country);
+    }
+
+    if (website !== undefined) {
+      updateData.website = website ? sanitizeString(website) : null;
+    }
+
+    if (operatingHours !== undefined) {
+      updateData.operatingHours = operatingHours ? sanitizeString(operatingHours) : null;
+    }
+
+    if (category !== undefined) {
+      updateData.category = category ? sanitizeString(category) : null;
+    }
+
+    if (tags !== undefined) {
+      updateData.tags = tags;
+    }
+
+    if (socialMedia !== undefined) {
+      updateData.socialMedia = socialMedia ? sanitizeString(socialMedia) : null;
+    }
+
+    if (settings !== undefined) {
+      updateData.settings = settings ? sanitizeString(settings) : null;
+    }
+
+    if (isActive !== undefined) {
+      updateData.isActive = isActive;
     }
 
     const updatedShop = await db.update(shops)
