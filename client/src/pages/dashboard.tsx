@@ -1,32 +1,11 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { useLogout } from "@/hooks/useAuth";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
-import { TrendingUp, LogOut, Calendar, Mail, Send, Eye, MousePointer, FileText, Bug } from "lucide-react";
 import { useLocation } from "wouter";
 import { NewsletterCard } from "@/components/ui/newsletter-card";
 import { HighlightsCard } from "@/components/ui/highlights-card";
-import { Test401Button } from "@/components/Test401Button";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user, isLoading } = useReduxAuth();
-  const logoutMutation = useLogout();
-  const [apiRequests] = useState(1247);
-  const [emailStats] = useState({
-    totalSent: 23847,
-    totalOpened: 13894,
-    totalClicked: 5182,
-    avgOpenRate: 58.3,
-    avgClickRate: 21.7
-  });
-
-  const handleLogout = async () => {
-    await logoutMutation.mutateAsync();
-    setLocation("/auth");
-  };
-
 
   if (isLoading) {
     return (
@@ -61,6 +40,7 @@ export default function Dashboard() {
                 Welcome back, {user.name || user.email}
               </p>
             </div>
+          </div>
         </div>
         
         {/* Add minimal spacer after the header section */}
@@ -78,23 +58,7 @@ export default function Dashboard() {
             <HighlightsCard />
           </div>
         </div>
-        
-        {/* Development Testing Section - Only show in development */}
-        {import.meta.env.DEV && (
-          <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
-              <Bug className="w-5 h-5" />
-              Debug Panel
-            </h2>
-
-            {/* Other Development Tools */}
-            <Test401Button />
-          </div>
-        )}
-      </div>
-
-
       </div>
     </div>
-    );
-  }
+  );
+}
