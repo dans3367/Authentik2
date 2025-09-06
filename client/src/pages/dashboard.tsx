@@ -7,6 +7,7 @@ import { TrendingUp, LogOut, Calendar, Mail, Send, Eye, MousePointer, FileText }
 import { useLocation } from "wouter";
 import { NewsletterCard } from "@/components/ui/newsletter-card";
 import { HighlightsCard } from "@/components/ui/highlights-card";
+import { Test401Button } from "@/components/Test401Button";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
@@ -56,7 +57,7 @@ export default function Dashboard() {
                 Dashboard
               </h1>
               <p className="text-gray-600 dark:text-gray-400 mt-1">
-                Welcome back, {user.firstName} {user.lastName}
+                Welcome back, {user.name || user.email}
               </p>
             </div>
         </div>
@@ -76,6 +77,16 @@ export default function Dashboard() {
             <HighlightsCard />
           </div>
         </div>
+        
+        {/* Development Testing Section - Only show in development */}
+        {import.meta.env.DEV && (
+          <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+              Development Tools
+            </h2>
+            <Test401Button />
+          </div>
+        )}
       </div>
 
 

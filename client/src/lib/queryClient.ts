@@ -1,5 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { authClient } from "./betterAuthClient";
+import { handle401Error, is401Error, is401Response } from "./authErrorHandler";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -29,9 +30,24 @@ export async function apiRequest(
       credentials: "include",
     });
 
+    // Check for 401 response before throwing
+    if (is401Response(res)) {
+      console.log(`🔍 [API] 401 detected in ${method} ${url}`);
+      // Handle 401 globally (logout + redirect)
+      await handle401Error(`${method} ${url}`);
+      // Throw error after handling
+      const text = (await res.text()) || res.statusText;
+      throw new Error(`${res.status}: ${text}`);
+    }
+
     await throwIfResNotOk(res);
     return res;
   } catch (error) {
+    // Check if the error is a 401 that wasn't caught by the response check
+    if (is401Error(error)) {
+      console.log(`🔍 [API] 401 error detected in catch block for ${method} ${url}`);
+      await handle401Error(`${method} ${url}`);
+    }
     throw error;
   }
 }
@@ -58,12 +74,17 @@ export const getQueryFn: <T>(options: {
       }
       return data;
     } catch (error: any) {
-      if (
-        unauthorizedBehavior === "returnNull" &&
-        (error.message?.includes("401") || error.message?.includes("Authentication failed"))
-      ) {
-        return null;
+      // Handle 401 errors globally
+      if (is401Error(error)) {
+        console.log(`🔍 [Query] 401 detected in query ${queryKey.join("/")}`);
+        await handle401Error(`Query ${queryKey.join("/")}`);
+        
+        if (unauthorizedBehavior === "returnNull") {
+          return null;
+        }
+        throw error;
       }
+      
       // Log 403 errors but don't throw them in console
       if (error.message?.includes("403")) {
         console.debug("Access forbidden:", queryKey.join("/"));
@@ -82,12 +103,7 @@ export const queryClient = new QueryClient({
       staleTime: 5 * 60 * 1000, // 5 minutes default stale time
       retry: (failureCount, error: any) => {
         // Don't retry for auth errors
-        if (
-          error?.message?.includes("401") ||
-          error?.message?.includes("403") ||
-          error?.message?.includes("Authentication failed") ||
-          error?.message?.includes("Forbidden")
-        ) {
+        if (is401Error(error) || error?.message?.includes("403") || error?.message?.includes("Forbidden")) {
           return false;
         }
         return failureCount < 1;
@@ -96,6 +112,13 @@ export const queryClient = new QueryClient({
     },
     mutations: {
       retry: false,
+      onError: async (error: any) => {
+        // Global mutation error handler for 401s
+        if (is401Error(error)) {
+          console.log('🔍 [Mutation] 401 detected in mutation');
+          await handle401Error('Mutation');
+        }
+      },
     },
   },
 });
