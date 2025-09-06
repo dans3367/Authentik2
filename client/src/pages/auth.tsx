@@ -66,10 +66,13 @@ export default function AuthPage() {
   // Handle login form submission
   const onLoginSubmit = async (data: LoginCredentials) => {
     try {
+      // Set checking state immediately to prevent redirect
+      setCheckingTwoFactor(true);
+      
       const result = await loginMutation.mutateAsync(data);
       if (result) {
-        // Set checking state to prevent redirect
-        setCheckingTwoFactor(true);
+        // Small delay to ensure session is properly established
+        await new Promise(resolve => setTimeout(resolve, 100));
         
         // Check if user requires 2FA verification for this session
         const response = await fetch('/api/auth/check-2fa-requirement', {
@@ -78,11 +81,14 @@ export default function AuthPage() {
           credentials: 'include',
         });
 
+        console.log('2FA Check Response status:', response.status);
+        
         if (response.ok) {
           const status = await response.json();
-          console.log('2FA Check Response:', status);
+          console.log('2FA Check Response data:', status);
           
           if (status.requiresTwoFactor && !status.twoFactorVerified) {
+            console.log('2FA is required, switching to 2FA view');
             // User has 2FA enabled and needs verification
             setTwoFactorData({
               email: data.email,
@@ -90,13 +96,21 @@ export default function AuthPage() {
               tempLoginId: 'temp-id'
             });
             setCurrentView("twoFactor");
-            setCheckingTwoFactor(false);
+            // Keep checkingTwoFactor true to prevent redirect
             return;
+          } else {
+            console.log('2FA not required or already verified');
+            // Only allow redirect after confirming 2FA not needed
+            setCheckingTwoFactor(false);
           }
+        } else {
+          console.error('2FA check failed with status:', response.status);
+          const errorData = await response.text();
+          console.error('Error response:', errorData);
+          setCheckingTwoFactor(false);
         }
-        // No 2FA required or already verified, proceed normally
+      } else {
         setCheckingTwoFactor(false);
-        // Login successful, user will be redirected by useEffect
       }
     } catch (error) {
       // Error handled by mutation
