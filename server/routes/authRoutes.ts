@@ -2,23 +2,29 @@ import { Router } from 'express';
 import { db } from '../db';
 import { betterAuthSession, betterAuthUser } from '@shared/schema';
 import { eq, and, not } from 'drizzle-orm';
+import { authenticateToken } from '../middleware/auth-middleware';
 
 export const authRoutes = Router();
 
 // Get user's own sessions
-authRoutes.get("/user-sessions", async (req: any, res) => {
+authRoutes.get("/user-sessions", authenticateToken, async (req: any, res) => {
   try {
-    // For now, use a mock user ID since Better Auth session validation
-    // would require more complex integration
-    // In production, you'd validate the Better Auth session here
-    const userId = 'temp-user-id'; // This should come from validated Better Auth session
+    // Get the actual user ID from the authenticated session
+    const userId = req.user.id;
+    console.log('📊 [Sessions] Fetching sessions for user:', userId);
 
     // Get all Better Auth sessions for this user
     const userSessions = await db.query.betterAuthSession.findMany({
       where: eq(betterAuthSession.userId, userId),
       orderBy: (betterAuthSession, { desc }) => [desc(betterAuthSession.createdAt)],
     });
+    
+    console.log(`📊 [Sessions] Found ${userSessions.length} sessions for user ${userId}`);
 
+    // Log the current session token from cookies for debugging
+    const currentToken = req.cookies?.['better-auth.session_token'];
+    console.log('🔍 [Sessions] Current session token from cookie:', currentToken ? `${currentToken.substring(0, 8)}...` : 'None');
+    
     // Format sessions for frontend (adapt Better Auth data structure)
     const sessions = userSessions.map(session => {
       // Parse user agent to get device info
@@ -44,7 +50,9 @@ authRoutes.get("/user-sessions", async (req: any, res) => {
         deviceName: deviceName,
         ipAddress: session.ipAddress || 'Unknown',
         location: null, // Better Auth doesn't store location data
-        isCurrent: session.token === req.cookies?.refreshToken, // Compare with current session token
+        // Better Auth stores the session token in the cookie, not the session ID
+        // Check both token and ID for compatibility
+        isCurrent: session.token === req.cookies?.['better-auth.session_token'],
         createdAt: session.createdAt.toISOString(),
         expiresAt: session.expiresAt.toISOString(),
       };
@@ -58,11 +66,11 @@ authRoutes.get("/user-sessions", async (req: any, res) => {
 });
 
 // Delete a specific session
-authRoutes.delete("/user-sessions", async (req: any, res) => {
+authRoutes.delete("/user-sessions", authenticateToken, async (req: any, res) => {
   try {
     const { sessionId } = req.body;
-    // Mock user ID for now - should come from validated Better Auth session
-    const userId = 'temp-user-id';
+    // Get the actual user ID from the authenticated session
+    const userId = req.user.id;
 
     if (!sessionId) {
       return res.status(400).json({ message: 'Session ID is required' });
@@ -80,21 +88,31 @@ authRoutes.delete("/user-sessions", async (req: any, res) => {
       return res.status(404).json({ message: 'Session not found' });
     }
 
-    // Prevent deleting current session
-    // Note: Better Auth might use different cookie names, so we need to be careful here
-    const currentSessionToken = req.cookies?.better_auth_session_token ||
-                               req.cookies?.session_token ||
-                               req.cookies?.refreshToken;
+    // Prevent deleting current session using Better Auth cookie
+    const currentSessionToken = req.cookies?.['better-auth.session_token'];
+    
+    console.log('🔍 [Session Delete] Session to delete:', sessionId);
+    console.log('🔍 [Session Delete] Session token to delete:', session.token.substring(0, 8) + '...');
+    console.log('🔍 [Session Delete] Current session token:', currentSessionToken ? currentSessionToken.substring(0, 8) + '...' : 'None');
+    console.log('🔍 [Session Delete] Is current session?:', session.token === currentSessionToken);
 
     if (session.token === currentSessionToken) {
-      return res.status(400).json({ message: 'Cannot delete current session' });
+      console.log('❌ [Session Delete] Prevented deletion of current session');
+      return res.status(400).json({ message: 'Cannot delete current session. Use logout instead.' });
     }
 
     // Delete the session from Better Auth table
-    await db.delete(betterAuthSession)
+    const deleteResult = await db.delete(betterAuthSession)
       .where(eq(betterAuthSession.id, sessionId));
 
-    res.json({ message: 'Session ended successfully' });
+    console.log('✅ [Session Delete] Successfully deleted session:', sessionId);
+    console.log('📊 [Session Delete] Rows affected:', deleteResult.rowCount || 0);
+
+    res.json({ 
+      message: 'Session ended successfully',
+      sessionId,
+      deleted: true
+    });
   } catch (error) {
     console.error('Delete session error:', error);
     res.status(500).json({ message: 'Failed to delete session' });
@@ -102,15 +120,13 @@ authRoutes.delete("/user-sessions", async (req: any, res) => {
 });
 
 // Log out all other sessions
-authRoutes.post("/logout-all", async (req: any, res) => {
+authRoutes.post("/logout-all", authenticateToken, async (req: any, res) => {
   try {
-    // Mock user ID for now - should come from validated Better Auth session
-    const userId = 'temp-user-id';
+    // Get the actual user ID from the authenticated session
+    const userId = req.user.id;
 
-    // Get current session token (Better Auth might use different cookie names)
-    const currentSessionToken = req.cookies?.better_auth_session_token ||
-                               req.cookies?.session_token ||
-                               req.cookies?.refreshToken;
+    // Get current session token from Better Auth cookie
+    const currentSessionToken = req.cookies?.['better-auth.session_token'];
 
     if (!currentSessionToken) {
       return res.status(400).json({ message: 'No current session found' });

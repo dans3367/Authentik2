@@ -5,6 +5,20 @@ import { handle401Error, is401Error, is401Response } from "./authErrorHandler";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
+    
+    // Handle 401 authentication errors globally
+    if (res.status === 401) {
+      console.log('🚨 [API] 401 Unauthorized detected, triggering auth error handler');
+      
+      // Trigger global auth error handler with a small delay to prevent race conditions
+      setTimeout(() => {
+        triggerGlobalAuthError({
+          showToast: true,
+          customMessage: 'Your session has expired. Please log in again.'
+        });
+      }, 100);
+    }
+    
     throw new Error(`${res.status}: ${text}`);
   }
 }
@@ -106,6 +120,7 @@ export const queryClient = new QueryClient({
         if (is401Error(error) || error?.message?.includes("403") || error?.message?.includes("Forbidden")) {
           return false;
         }
+        
         return failureCount < 1;
       },
       retryDelay: 1000,

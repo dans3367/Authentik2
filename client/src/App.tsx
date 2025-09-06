@@ -11,6 +11,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { setGlobalNavigate } from "@/lib/authErrorHandler";
 import { lazy, Suspense, useEffect } from "react";
+import { useAuthErrorHandler, setGlobalAuthErrorHandler } from "@/hooks/useAuthErrorHandler";
 
 // Lazy load components for code splitting
 const AuthPage = lazy(() => import("@/pages/auth"));
