@@ -92,14 +92,11 @@ export default function NewsletterCreatePage() {
   // Send newsletter mutation
   const sendNewsletterMutation = useMutation({
     mutationFn: async (newsletterId: string) => {
-      console.log('[Newsletter Frontend] Sending newsletter:', newsletterId);
       const response = await apiRequest('POST', `/api/newsletters/${newsletterId}/send`);
       const result = await response.json();
-      console.log('[Newsletter Frontend] Send response:', result);
       return result;
     },
     onSuccess: (response, newsletterId) => {
-      console.log('[Newsletter Frontend] Send successful:', response);
       // Invalidate all newsletter-related queries to refresh the data
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters', newsletterId] });
@@ -199,10 +196,8 @@ export default function NewsletterCreatePage() {
       status: "draft" as const, // Create as draft first
     };
     
-    console.log('[Newsletter Frontend] Creating newsletter with data:', newsletterData);
     createNewsletterMutation.mutate(newsletterData, {
       onSuccess: (response) => {
-        console.log('[Newsletter Frontend] Newsletter created:', response);
         // After creating, send the newsletter
         sendNewsletterMutation.mutate(response.id);
       },

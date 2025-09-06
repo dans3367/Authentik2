@@ -97,15 +97,6 @@ export default function NewsletterViewPage() {
 
   // Fetch detailed email stats
 
-  // Debug logging for detailed stats query
-  useEffect(() => {
-    console.log("📊 Detailed stats query state:", {
-      id,
-      newsletterStatus: newsletter?.status,
-      enabled: !!id && newsletter?.status === "sent",
-      hasNewsletter: !!newsletter
-    });
-  }, [id, newsletter?.status]);
 
   const { data: detailedStatsData, isLoading: isDetailedStatsLoading, error: detailedStatsError } = useQuery<{
     newsletter: { id: string; title: string; status: string };
@@ -125,10 +116,8 @@ export default function NewsletterViewPage() {
   }>({
     queryKey: ["/api/newsletters", id, "detailed-stats"],
     queryFn: async () => {
-      console.log("📊 Fetching detailed stats for newsletter:", id);
       const response = await apiRequest("GET", `/api/newsletters/${id}/detailed-stats`);
       const data = await response.json();
-      console.log("📊 Detailed stats response:", data);
       return data;
     },
     enabled: !!id && !!newsletter && newsletter.status === "sent",
