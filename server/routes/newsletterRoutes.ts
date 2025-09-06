@@ -73,7 +73,7 @@ newsletterRoutes.get("/:id", authenticateToken, requireTenant, async (req: any, 
       return res.status(404).json({ message: 'Newsletter not found' });
     }
 
-    res.json(newsletter);
+    res.json({ newsletter });
   } catch (error) {
     console.error('Get newsletter error:', error);
     res.status(500).json({ message: 'Failed to get newsletter' });

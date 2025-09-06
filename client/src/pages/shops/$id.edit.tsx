@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -66,9 +66,18 @@ export default function EditShopPage() {
     setValue,
     watch,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<UpdateShopData>({
     resolver: zodResolver(updateShopSchema),
+    mode: 'onSubmit',
+    defaultValues: {
+      name: '',
+      country: 'United States',
+      phone: '',
+      email: '',
+      status: 'active',
+      isActive: true,
+    },
   });
 
   // Fetch shop data
@@ -94,10 +103,14 @@ export default function EditShopPage() {
   const updateShopMutation = useMutation({
     mutationFn: async (data: UpdateShopData) => {
       const response = await apiRequest('PUT', `/api/shops/${id}`, data);
+      if (!response.ok) {
+        throw new Error('Failed to update shop');
+      }
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/shops'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/shops', id] });
       toast({
         title: "Success",
         description: "Shop updated successfully",
@@ -124,31 +137,32 @@ export default function EditShopPage() {
         city: shop.city || '',
         state: shop.state || '',
         zipCode: shop.zipCode || '',
-        country: shop.country,
-        phone: shop.phone,
-        email: shop.email,
+        country: shop.country || 'United States',
+        phone: shop.phone || '',
+        email: shop.email || '',
         website: shop.website || '',
-        managerId: shop.managerId || 'no-manager',
+        managerId: shop.managerId || undefined,
         operatingHours: shop.operatingHours || '',
-        status: shop.status as any || 'active',
+        status: (shop.status as 'active' | 'inactive' | 'maintenance') || 'active',
         category: shop.category || '',
         tags: shop.tags || [],
         socialMedia: shop.socialMedia || '',
         settings: shop.settings || '',
-        isActive: shop.isActive ?? undefined,
+        isActive: shop.isActive !== undefined ? shop.isActive : true,
       });
       setTags(shop.tags || []);
     }
   }, [shopData, reset]);
 
   const onSubmit = (data: UpdateShopData) => {
-    // Convert "no-manager" to null for the API
+    // Prepare submit data
     const submitData = {
       ...data,
-      managerId: data.managerId === 'no-manager' ? null : data.managerId,
+      managerId: (!data.managerId || data.managerId === 'no-manager' || data.managerId === '') ? null : data.managerId,
       tags: tags.length > 0 ? tags : undefined,
+      isActive: data.isActive !== undefined ? data.isActive : true,
     };
-    
+
     updateShopMutation.mutate(submitData);
   };
 
@@ -232,7 +246,11 @@ export default function EditShopPage() {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form
+            key={id}
+            onSubmit={handleSubmit(onSubmit)}
+            className="space-y-6"
+          >
             {/* Basic Information */}
             <Card>
               <CardHeader>
@@ -287,13 +305,13 @@ export default function EditShopPage() {
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="status">Status</Label>
+                    <Label htmlFor="status">Status *</Label>
                     <Select 
-                      value={watch('status')} 
-                      onValueChange={(value) => setValue('status', value as any)}
+                      value={watch('status') || 'active'} 
+                      onValueChange={(value) => setValue('status', value as 'active' | 'inactive' | 'maintenance')}
                     >
                       <SelectTrigger data-testid="select-status">
-                        <SelectValue />
+                        <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="active">Active</SelectItem>
@@ -301,13 +319,16 @@ export default function EditShopPage() {
                         <SelectItem value="maintenance">Maintenance</SelectItem>
                       </SelectContent>
                     </Select>
+                    {errors.status && (
+                      <p className="text-sm text-destructive">{errors.status.message}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="managerId">Manager</Label>
-                    <Select 
-                      value={watch('managerId') || undefined}
-                      onValueChange={(value) => setValue('managerId', value)}
+                    <Select
+                      value={watch('managerId') || 'no-manager'}
+                      onValueChange={(value) => setValue('managerId', value === 'no-manager' ? undefined : value)}
                       disabled={managersLoading}
                     >
                       <SelectTrigger data-testid="select-manager">
@@ -315,7 +336,7 @@ export default function EditShopPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="no-manager">No Manager</SelectItem>
-                        {managersData?.managers.map(manager => (
+                        {managersData?.managers?.map(manager => (
                           <SelectItem key={manager.id} value={manager.id}>
                             {manager.firstName} {manager.lastName} ({manager.email})
                           </SelectItem>
@@ -383,13 +404,16 @@ export default function EditShopPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="country">Country</Label>
+                  <Label htmlFor="country">Country *</Label>
                   <Input
                     id="country"
                     {...register('country')}
                     placeholder="United States"
                     data-testid="input-country"
                   />
+                  {errors.country && (
+                    <p className="text-sm text-destructive">{errors.country.message}</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -492,18 +516,19 @@ export default function EditShopPage() {
                   type="button"
                   variant="outline"
                   onClick={() => navigate('/shops')}
+                  disabled={updateShopMutation.isPending}
                   className="w-full sm:w-auto"
                   data-testid="button-cancel"
                 >
                   Cancel
                 </Button>
-                <Button 
-                  type="submit" 
-                  disabled={isSubmitting}
+                <Button
+                  type="submit"
+                  disabled={updateShopMutation.isPending}
                   className="w-full sm:w-auto"
                   data-testid="button-submit"
                 >
-                  {isSubmitting ? (
+                  {updateShopMutation.isPending ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Saving...

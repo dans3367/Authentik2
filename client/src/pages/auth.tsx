@@ -64,9 +64,35 @@ export default function AuthPage() {
 
   // Handle login form submission
   const onLoginSubmit = async (data: LoginCredentials) => {
-    const result = await loginMutation.mutateAsync(data);
-    if (result) {
-      // Login successful, user will be redirected by useEffect
+    try {
+      const result = await loginMutation.mutateAsync(data);
+      if (result) {
+        // Check if user requires 2FA verification for this session
+        const response = await fetch('/api/auth/check-2fa-requirement', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          const status = await response.json();
+          if (status.requiresTwoFactor && !status.twoFactorVerified) {
+            // User has 2FA enabled and needs verification
+            setTwoFactorData({
+              email: data.email,
+              password: data.password,
+              tempLoginId: result.id || 'temp-id'
+            });
+            setCurrentView("twoFactor");
+            return;
+          }
+        }
+        // No 2FA required or already verified, proceed normally
+        // Login successful, user will be redirected by useEffect
+      }
+    } catch (error) {
+      // Error handled by mutation
+      console.error('Login error:', error);
     }
   };
 
@@ -153,9 +179,39 @@ export default function AuthPage() {
   const onTwoFactorSubmit = async (data: { token: string }) => {
     if (!twoFactorData) return;
 
-    // For now, 2FA is not implemented with better-auth
-    // This is a placeholder that will need to be implemented when 2FA is added to better-auth
-    console.log("2FA not yet implemented with better-auth", data);
+    try {
+      // Verify 2FA token for current session
+      const response = await fetch('/api/auth/verify-session-2fa', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ token: data.token }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Invalid 2FA code');
+      }
+
+      const result = await response.json();
+      if (result.success && result.verified) {
+        // 2FA verification successful, user will be redirected by useEffect
+        setTwoFactorData(null);
+        twoFactorForm.reset();
+        // Force redirect to dashboard
+        setLocation("/");
+      } else {
+        throw new Error('Invalid 2FA code');
+      }
+    } catch (error: any) {
+      console.error('2FA verification error:', error);
+      twoFactorForm.setError('token', {
+        type: 'manual',
+        message: error.message || 'Invalid verification code'
+      });
+    }
   };
 
   const renderPasswordStrength = () => {
@@ -605,7 +661,7 @@ export default function AuthPage() {
                     <Button
                       type="submit"
                       className="w-full mt-6"
-                      disabled={true} // 2FA not implemented yet
+                      disabled={false}
                     >
                       Verify & Sign In
                     </Button>

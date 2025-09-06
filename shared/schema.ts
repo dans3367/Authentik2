@@ -74,7 +74,7 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   email: text("email").notNull().unique(),
-  password: text("password").notNull(),
+  password: text("password"), // Made nullable to support better-auth integration
   firstName: text("first_name"),
   lastName: text("last_name"),
   role: text("role").default('Employee').notNull(), // User role for permissions

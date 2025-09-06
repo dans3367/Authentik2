@@ -1,15 +1,13 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { 
   Plus, 
   Mail, 
   Calendar, 
-  Eye,  Send,
+  Eye,
   Clock,
-  FileText,
   MoreHorizontal,
-  TrendingUp,
   Users,
   MousePointer,
   ArrowUpDown,
@@ -32,16 +30,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
@@ -273,10 +261,8 @@ export default function NewsletterPage() {
   const { data: newslettersData, isLoading, error, refetch } = useQuery({
     queryKey: ['/api/newsletters'],
     queryFn: async () => {
-      console.log('Fetching newsletters...');
       const response = await apiRequest('GET', '/api/newsletters');
       const data = await response.json();
-      console.log('Newsletters data:', data);
       // The API returns { newsletters: [...] }
       return data.newsletters || [];
     },
@@ -289,10 +275,8 @@ export default function NewsletterPage() {
   const { data: statsData, refetch: refetchStats } = useQuery({
     queryKey: ['/api/newsletter-stats'],
     queryFn: async () => {
-      console.log('Fetching newsletter stats...');
       const response = await apiRequest('GET', '/api/newsletter-stats');
       const data = await response.json();
-      console.log('Stats data:', data);
       return data;
     },
     staleTime: 0, // Always consider data stale to ensure fresh fetches
@@ -316,8 +300,7 @@ export default function NewsletterPage() {
     scheduledNewsletters: 0,
     sentNewsletters: 0
   };
-  // Log data for debugging
-  console.log('Processing data:', { newslettersData, statsData, newsletters, stats, isLoading, error });  const allNewsletters: (NewsletterWithUser & { opens?: number; totalOpens?: number })[] = newsletters;
+  const allNewsletters: (NewsletterWithUser & { opens?: number; totalOpens?: number })[] = newsletters;
   // Filter newsletters based on search query and status
   const filteredNewsletters = allNewsletters.filter((newsletter) => {
     const matchesSearch = searchQuery === "" || 
