@@ -157,51 +157,57 @@ export default function NewsletterCreatePage() {
     });
   };
 
-  const handleSendNow = () => {
+  // handleCreateAndSend - matches flowchart exactly
+  const handleCreateAndSend = () => {
     const data = form.getValues();
     
     // Validate required fields
     if (!data.title || !data.subject || !data.content) {
+      // Error path from flowchart - Show Toast
       toast({
         variant: "destructive",
-        title: "Missing Information",
+        title: "Error",
         description: "Please fill in title, subject, and content fields.",
       });
       return;
     }
 
-    if (!serverHealth) {
-      toast({
-        variant: "destructive",
-        title: "Server Unavailable",
-        description: "Go server must be online to send newsletters",
-      });
-      return;
-    }
-
+    // Execute Auth Ver checks (handled by backend authenticateToken)
     if (!session) {
+      // Error path from flowchart - Show Toast
       toast({
         variant: "destructive",
-        title: "Authentication Error",
-        description: "Please make sure you are logged in.",
+        title: "Error",
+        description: "Authentication required. Please log in.",
       });
       return;
     }
 
-    // First create the newsletter, then send it
+    // Check if go-server is available (for temporal task creation)
+    if (!serverHealth) {
+      console.warn('[Newsletter] Go-server offline, will use fallback mode');
+    }
+
+    // Save Newsletter to DB (first step)
     const newsletterData = {
       ...data,
       ...segmentationData,
-      status: "draft" as const, // Create as draft first
+      status: "draft" as const, // Create as draft first as per flowchart
     };
     
     createNewsletterMutation.mutate(newsletterData, {
       onSuccess: (response) => {
-        // After creating, send the newsletter
+        // Send POST to go-server (via backend which handles temporal task creation)
         sendNewsletterMutation.mutate(response.id);
       },
       onError: (error) => {
-        console.error('[Newsletter Frontend] Failed to create newsletter:', error);
+        // Error path from flowchart - Send error back, Show Toast
+        console.error('[Newsletter Frontend] Create and send failed:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: error.message || "Failed to create newsletter",
+        });
       }
     });
   };
@@ -616,9 +622,9 @@ export default function NewsletterCreatePage() {
                   <TooltipTrigger asChild>
                     <Button
                       type="button"
-                      onClick={handleSendNow}
+                      onClick={handleCreateAndSend}
                       className="w-full h-11 shadow-lg"
-                      disabled={createNewsletterMutation.isPending || sendNewsletterMutation.isPending || !serverHealth}
+                      disabled={createNewsletterMutation.isPending || sendNewsletterMutation.isPending}
                     >
                       {createNewsletterMutation.isPending || sendNewsletterMutation.isPending ? (
                         <>

@@ -578,55 +578,127 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
 
       console.log(`[Newsletter] Found ${recipients.length} recipients for newsletter ${id}`);
 
-      // Prepare emails for batch sending
-      const emails = recipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => ({
-        to: contact.email,
-        subject: newsletter.subject,
-        html: newsletter.content,
-        text: newsletter.content.replace(/<[^>]*>/g, ''), // Strip HTML for text version
-        metadata: {
-          type: 'newsletter',
+      // Send POST to go-server to create temporal task for email sending
+      const goServerUrl = process.env.GO_SERVER_URL || 'http://localhost:3501';
+      
+      try {
+        console.log(`[Newsletter] Sending to go-server for temporal task creation`);
+        
+        // Prepare the request to go-server
+        const goServerRequest = {
           newsletterId: newsletter.id,
+          tenantId: req.user.tenantId,
+          userId: req.user.id,
           groupUUID,
-          recipientId: contact.id,
-          tags: [`newsletter-${newsletter.id}`, `groupUUID-${groupUUID}`]
+          subject: newsletter.subject,
+          content: newsletter.content,
+          recipients: recipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => ({
+            id: contact.id,
+            email: contact.email,
+            firstName: contact.firstName || '',
+            lastName: contact.lastName || ''
+          })),
+          metadata: {
+            tags: [`newsletter-${newsletter.id}`, `groupUUID-${groupUUID}`]
+          }
+        };
+
+        // Send to go-server endpoint
+        const goResponse = await fetch(`${goServerUrl}/api/email-tracking`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': req.headers.authorization || ''
+          },
+          body: JSON.stringify(goServerRequest)
+        });
+
+        if (!goResponse.ok) {
+          const errorText = await goResponse.text();
+          throw new Error(`Go-server returned ${goResponse.status}: ${errorText}`);
         }
-      }));
 
-      // Send emails in batches
-      console.log(`[Newsletter] Sending ${emails.length} emails for newsletter ${id}`);
-      const result = await enhancedEmailService.sendBatchEmails(emails, {
-        batchSize: 10,
-        delayBetweenBatches: 1000 // 1 second delay between batches
-      });
+        const goResult = await goResponse.json();
+        console.log(`[Newsletter] Go-server temporal task created:`, goResult);
 
-      console.log(`[Newsletter] Batch sending complete for ${id}:`, {
-        queued: result.queued.length,
-        errors: result.errors.length
-      });
+        // Update newsletter status to sent
+        await db.update(newsletters)
+          .set({
+            status: 'sent',
+            recipientCount: recipients.length,
+            updatedAt: new Date(),
+          })
+          .where(eq(newsletters.id, id));
 
-      // Update newsletter status based on results
-      const successful = result.queued.length;
-      const failed = result.errors.length;
-      const totalSent = successful + failed;
-
-      await db.update(newsletters)
-        .set({
+        // Return success response
+        res.json({
+          message: 'Newsletter sent successfully',
+          newsletterId: id,
           status: 'sent',
-          recipientCount: totalSent,
-          updatedAt: new Date(),
-        })
-        .where(eq(newsletters.id, id));
+          successful: recipients.length,
+          failed: 0,
+          total: recipients.length,
+          groupUUID,
+          temporalTask: goResult
+        });
 
-      res.json({
-        message: 'Newsletter sent successfully',
-        newsletterId: id,
-        status: 'sent',
-        successful,
-        failed,
-        total: totalSent,
-        groupUUID
-      });
+      } catch (goServerError: any) {
+        console.error(`[Newsletter] Failed to create temporal task via go-server:`, goServerError);
+        
+        // Fallback to direct sending if go-server is unavailable
+        console.log(`[Newsletter] Falling back to direct email sending`);
+        
+        // Prepare emails for batch sending
+        const emails = recipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => ({
+          to: contact.email,
+          subject: newsletter.subject,
+          html: newsletter.content,
+          text: newsletter.content.replace(/<[^>]*>/g, ''), // Strip HTML for text version
+          metadata: {
+            type: 'newsletter',
+            newsletterId: newsletter.id,
+            groupUUID,
+            recipientId: contact.id,
+            tags: [`newsletter-${newsletter.id}`, `groupUUID-${groupUUID}`]
+          }
+        }));
+
+        // Send emails in batches
+        console.log(`[Newsletter] Sending ${emails.length} emails for newsletter ${id}`);
+        const result = await enhancedEmailService.sendBatchEmails(emails, {
+          batchSize: 10,
+          delayBetweenBatches: 1000 // 1 second delay between batches
+        });
+
+        console.log(`[Newsletter] Batch sending complete for ${id}:`, {
+          queued: result.queued.length,
+          errors: result.errors.length
+        });
+
+        // Update newsletter status based on results
+        const successful = result.queued.length;
+        const failed = result.errors.length;
+        const totalSent = successful + failed;
+
+        await db.update(newsletters)
+          .set({
+            status: 'sent',
+            recipientCount: totalSent,
+            updatedAt: new Date(),
+          })
+          .where(eq(newsletters.id, id));
+
+        res.json({
+          message: 'Newsletter sent successfully (direct mode)',
+          newsletterId: id,
+          status: 'sent',
+          successful,
+          failed,
+          total: totalSent,
+          groupUUID,
+          note: 'Go-server was unavailable, sent directly'
+        });
+      }
 
     } catch (sendError) {
       console.error(`[Newsletter] Failed to send newsletter ${id}:`, sendError);
@@ -640,7 +712,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
         .where(eq(newsletters.id, id));
 
       res.status(500).json({ 
-        message: 'Failed to send newsletter',
+        message: 'Failed to create temporal task for email sending',
         error: sendError instanceof Error ? sendError.message : 'Unknown error'
       });
     }
