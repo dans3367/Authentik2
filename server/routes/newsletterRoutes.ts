@@ -510,14 +510,22 @@ newsletterRoutes.post("/:id/initialize-tasks", authenticateToken, requireTenant,
   }
 });
 
-// Send newsletter
+// Send newsletter - Updated to follow the flowchart
 newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
     const { testEmail } = req.body;
 
+    // Execute Auth Ver checks (from flowchart)
+    if (!req.user || !req.user.tenantId) {
+      return res.status(401).json({ message: 'Authentication verification failed' });
+    }
+
     const newsletter = await db.query.newsletters.findFirst({
-      where: eq(newsletters.id, id),
+      where: and(
+        eq(newsletters.id, id),
+        eq(newsletters.tenantId, req.user.tenantId)
+      ),
       with: {
         user: true
       }
@@ -546,7 +554,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
       return;
     }
 
-    // Update newsletter status to sending
+    // Save Newsletter to DB (update status)
     await db.update(newsletters)
       .set({
         status: 'sending',
