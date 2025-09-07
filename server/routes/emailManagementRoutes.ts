@@ -515,27 +515,27 @@ emailManagementRoutes.get("/bounced-emails", authenticateToken, requireTenant, a
     }
 
     if (reason) {
-      whereClause = sql`${whereClause} AND ${bouncedEmails.reason} = ${reason}`;
+      whereClause = sql`${whereClause} AND ${bouncedEmails.bounceReason} = ${reason}`;
     }
 
     if (startDate) {
-      whereClause = sql`${whereClause} AND ${bouncedEmails.bouncedAt} >= ${new Date(startDate as string)}`;
+      whereClause = sql`${whereClause} AND ${bouncedEmails.firstBouncedAt} >= ${new Date(startDate as string)}`;
     }
 
     if (endDate) {
-      whereClause = sql`${whereClause} AND ${bouncedEmails.bouncedAt} <= ${new Date(endDate as string)}`;
+      whereClause = sql`${whereClause} AND ${bouncedEmails.lastBouncedAt} <= ${new Date(endDate as string)}`;
     }
 
     const bouncedEmailsData = await db.query.bouncedEmails.findMany({
       where: whereClause,
-      orderBy: sql`${bouncedEmails.bouncedAt} DESC`,
+      orderBy: sql`${bouncedEmails.lastBouncedAt} DESC`,
       limit: Number(limit),
       offset,
     });
 
     const totalCount = await db.select({
       count: sql<number>`count(*)`,
-    }).from(db.bouncedEmails).where(whereClause);
+    }).from(bouncedEmails).where(whereClause);
 
     res.json({
       bouncedEmails: bouncedEmailsData,
