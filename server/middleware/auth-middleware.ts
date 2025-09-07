@@ -69,7 +69,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
   }
 };
 
-export const requireRole = (requiredRole: string) => {
+export const requireRole = (requiredRole: string | string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Authentication required' });
@@ -84,11 +84,19 @@ export const requireRole = (requiredRole: string) => {
     };
 
     const userRoleLevel = roleHierarchy[req.user.role as keyof typeof roleHierarchy] || 0;
-    const requiredRoleLevel = roleHierarchy[requiredRole as keyof typeof roleHierarchy] || 0;
+    
+    // Handle both single role and array of roles
+    const requiredRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+    
+    // Check if user's role is in the list of required roles or has higher hierarchy
+    const hasAccess = requiredRoles.some(role => {
+      const requiredRoleLevel = roleHierarchy[role as keyof typeof roleHierarchy] || 0;
+      return userRoleLevel >= requiredRoleLevel;
+    });
 
-    if (userRoleLevel < requiredRoleLevel) {
+    if (!hasAccess) {
       return res.status(403).json({
-        message: `Insufficient permissions. Required role: ${requiredRole}, your role: ${req.user.role}`
+        message: `Insufficient permissions. Required role(s): ${requiredRoles.join(', ')}, your role: ${req.user.role}`
       });
     }
 

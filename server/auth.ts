@@ -48,6 +48,43 @@ const authInstance = betterAuth({
     "https://webx.zendwise.work",
     "https://2850dacc-d7a0-40e0-a90b-43f06888d139-00-18hp2u206zmhk.kirk.replit.dev"
   ],
+  // Add session callback to include custom user fields
+  session: {
+    updateAge: 24 * 60 * 60, // 24 hours
+    expiresIn: 60 * 60 * 24 * 7, // 7 days
+  },
+  user: {
+    additionalFields: {
+      role: {
+        type: "string",
+        defaultValue: "Employee",
+        required: false,
+      },
+      tenantId: {
+        type: "string",
+        defaultValue: "29c69b4f-3129-4aa4-a475-7bf892e5c5b9",
+        required: false,
+      },
+      firstName: {
+        type: "string",
+        required: false,
+      },
+      lastName: {
+        type: "string",
+        required: false,
+      },
+      theme: {
+        type: "string",
+        defaultValue: "light",
+        required: false,
+      },
+      menuExpanded: {
+        type: "boolean",
+        defaultValue: false,
+        required: false,
+      },
+    },
+  },
   // Better Auth hooks will be implemented separately to avoid type conflicts
   // Tenant synchronization will be handled by the registration endpoints
 });
