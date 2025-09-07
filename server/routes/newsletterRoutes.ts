@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, and, like, desc } from 'drizzle-orm';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
-import { createNewsletterSchema, updateNewsletterSchema, newsletters, betterAuthUser } from '@shared/schema';
+import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, betterAuthUser } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 import { emailService } from '../emailService';
 
@@ -108,9 +108,12 @@ newsletterRoutes.post("/", authenticateToken, requireTenant, async (req: any, re
       content,
       scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
       status: status || 'draft',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }).returning();
+      recipientType: 'all',
+      recipientCount: 0,
+      openCount: 0,
+      uniqueOpenCount: 0,
+      clickCount: 0,
+    } as any).returning();
 
     res.status(201).json(newNewsletter[0]);
   } catch (error) {
@@ -308,7 +311,7 @@ newsletterRoutes.get("/:id/task-status", authenticateToken, requireTenant, async
 });
 
 // Update newsletter task status
-newsletterRoutes.post("/:id/task-status", authenticateToken, async (req: any, res) => {
+newsletterRoutes.post("/:id/task-status", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
     const { status, progress, totalRecipients, processedRecipients, failedRecipients, error } = req.body;
@@ -345,7 +348,7 @@ newsletterRoutes.post("/:id/task-status", authenticateToken, async (req: any, re
 });
 
 // Update specific task status
-newsletterRoutes.put("/:newsletterId/task-status/:taskId", authenticateToken, async (req: any, res) => {
+newsletterRoutes.put("/:newsletterId/task-status/:taskId", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { newsletterId, taskId } = req.params;
     const { status, progress, error } = req.body;
@@ -376,7 +379,7 @@ newsletterRoutes.put("/:newsletterId/task-status/:taskId", authenticateToken, as
 });
 
 // Initialize newsletter tasks
-newsletterRoutes.post("/:id/initialize-tasks", authenticateToken, async (req: any, res) => {
+newsletterRoutes.post("/:id/initialize-tasks", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -425,7 +428,7 @@ newsletterRoutes.post("/:id/initialize-tasks", authenticateToken, async (req: an
 });
 
 // Send newsletter
-newsletterRoutes.post("/:id/send", authenticateToken, async (req: any, res) => {
+newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
     const { testEmail } = req.body;

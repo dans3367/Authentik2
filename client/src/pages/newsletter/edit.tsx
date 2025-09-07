@@ -4,8 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useLocation, useParams } from "wouter";
 import { ArrowLeft, Save, Send, Eye, Users, Tag, User, Edit, Server, CheckCircle, XCircle } from "lucide-react";
-import { useSelector } from "react-redux";
-import type { RootState } from "@/store";
+import { useSession } from "@/lib/betterAuthClient";
 import { CustomerSegmentationModal } from "@/components/CustomerSegmentationModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,7 +28,7 @@ export default function NewsletterEditPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const accessToken = useSelector((state: RootState) => state.auth.accessToken);
+  const { data: session, isPending: sessionLoading } = useSession();
   const [isSegmentationModalOpen, setIsSegmentationModalOpen] = useState(false);
   const [segmentationData, setSegmentationData] = useState({
     recipientType: 'all' as 'all' | 'selected' | 'tags',
@@ -177,7 +176,7 @@ export default function NewsletterEditPage() {
       return;
     }
 
-    if (!accessToken) {
+    if (!session) {
       toast({
         variant: "destructive",
         title: "Authentication Error",
