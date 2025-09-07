@@ -315,10 +315,15 @@ export class DatabaseStorage implements IStorage {
       }).returning();
 
       // Create the owner user
+      const name = ownerData.firstName && ownerData.lastName 
+        ? `${ownerData.firstName} ${ownerData.lastName}` 
+        : ownerData.firstName || ownerData.lastName || ownerData.email;
+
       const [owner] = await tx.insert(betterAuthUser).values({
+        id: crypto.randomUUID(),
         tenantId: tenant.id,
         email: ownerData.email,
-        password: ownerData.password, // This should be hashed before calling this method
+        name,
         firstName: ownerData.firstName,
         lastName: ownerData.lastName,
         role: 'Owner',
@@ -385,10 +390,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
+    // Construct name from firstName and lastName if not provided
+    const name = insertUser.name || 
+      (insertUser.firstName && insertUser.lastName 
+        ? `${insertUser.firstName} ${insertUser.lastName}` 
+        : insertUser.firstName || insertUser.lastName || insertUser.email);
+
     const [user] = await db
       .insert(betterAuthUser)
       .values({
         ...insertUser,
+        name,
         id: crypto.randomUUID(),
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -397,18 +409,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async deleteUser(id: string, tenantId: string): Promise<void> {
-    await db.delete(betterAuthUser).where(and(eq(betterAuthUser.id, id), eq(betterAuthUser.tenantId, tenantId)));
-  }
 
-  async toggleUserStatus(id: string, isActive: boolean, tenantId: string): Promise<User | undefined> {
-    const [user] = await db
-      .update(betterAuthUser)
-      .set({ isActive, updatedAt: new Date() })
-      .where(and(eq(betterAuthUser.id, id), eq(betterAuthUser.tenantId, tenantId)))
-      .returning();
-    return user;
-  }
 
   // User management methods (tenant-aware)
   async getAllUsers(tenantId: string, filters?: UserFilters): Promise<User[]> {
@@ -471,7 +472,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUserAsAdmin(userData: CreateUserData, tenantId: string): Promise<User> {
-    const [user] = await db.insert(betterAuthUser).values(userData).returning();
+    // Construct name from firstName and lastName
+    const name = userData.firstName && userData.lastName 
+      ? `${userData.firstName} ${userData.lastName}` 
+      : userData.firstName || userData.lastName || userData.email;
+
+    const [user] = await db.insert(betterAuthUser).values({
+       ...userData,
+       name,
+       tenantId,
+       id: crypto.randomUUID(),
+       emailVerified: true, // Admin-created users are automatically verified
+       createdAt: new Date(),
+       updatedAt: new Date(),
+     }).returning();
     return user;
   }
 
@@ -502,13 +516,7 @@ export class DatabaseStorage implements IStorage {
 
   async getManagerUsers(tenantId: string): Promise<User[]> {
     const result = await db
-      .select({
-        id: betterAuthUser.id,
-        name: betterAuthUser.name,
-        firstName: betterAuthUser.firstName,
-        lastName: betterAuthUser.lastName,
-        email: betterAuthUser.email,
-      })
+      .select()
       .from(betterAuthUser)
       .where(
         and(
@@ -624,9 +632,743 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // Additional methods would continue here...
-  // For brevity, I'm including just the key methods that had 'users' references
-  // The rest of the file would follow the same pattern
+  // Form management methods
+  async createForm(formData: CreateFormData, userId: string, tenantId: string): Promise<Form> {
+    const [form] = await db.insert(forms).values({
+      ...formData,
+      userId,
+      tenantId,
+      updatedAt: new Date(),
+    }).returning();
+    return form;
+  }
+
+  async getForm(id: string, tenantId: string): Promise<Form | undefined> {
+    const [form] = await db.select().from(forms)
+      .where(and(eq(forms.id, id), eq(forms.tenantId, tenantId)));
+    return form;
+  }
+
+  async getPublicForm(id: string): Promise<Form | undefined> {
+    const [form] = await db.select().from(forms).where(eq(forms.id, id));
+    return form;
+  }
+
+  async getUserForms(userId: string, tenantId: string): Promise<Form[]> {
+    return await db.select().from(forms)
+      .where(and(eq(forms.userId, userId), eq(forms.tenantId, tenantId)))
+      .orderBy(desc(forms.createdAt));
+  }
+
+  async getTenantForms(tenantId: string): Promise<FormWithDetails[]> {
+    return await db.select().from(forms)
+      .where(eq(forms.tenantId, tenantId))
+      .orderBy(desc(forms.createdAt)) as FormWithDetails[];
+  }
+
+  async updateForm(id: string, updates: UpdateFormData, tenantId: string): Promise<Form | undefined> {
+    const [form] = await db.update(forms)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(forms.id, id), eq(forms.tenantId, tenantId)))
+      .returning();
+    return form;
+  }
+
+  async deleteForm(id: string, tenantId: string): Promise<void> {
+    await db.delete(forms).where(and(eq(forms.id, id), eq(forms.tenantId, tenantId)));
+  }
+
+  // Form response methods
+  async submitFormResponse(responseData: SubmitFormResponseData, tenantId: string): Promise<FormResponse> {
+    const [response] = await db.insert(formResponses).values({
+      ...responseData,
+      tenantId,
+    }).returning();
+    return response;
+  }
+
+  async getFormResponses(formId: string, tenantId: string): Promise<FormResponse[]> {
+    return await db.select().from(formResponses)
+      .where(and(eq(formResponses.formId, formId), eq(formResponses.tenantId, tenantId)))
+      .orderBy(desc(formResponses.submittedAt));
+  }
+
+  async getFormResponseCount(formId: string, tenantId: string): Promise<number> {
+    const [result] = await db.select({ count: count() }).from(formResponses)
+      .where(and(eq(formResponses.formId, formId), eq(formResponses.tenantId, tenantId)));
+    return result.count;
+  }
+
+  // Subscription plan methods
+  async getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
+    return await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.isActive, true));
+  }
+
+  async getSubscriptionPlan(id: string): Promise<SubscriptionPlan | undefined> {
+    const [plan] = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, id));
+    return plan;
+  }
+
+  async createSubscriptionPlan(plan: InsertSubscriptionPlan): Promise<SubscriptionPlan> {
+    const [newPlan] = await db.insert(subscriptionPlans).values(plan).returning();
+    return newPlan;
+  }
+
+  // Subscription methods
+  async createSubscription(subscription: InsertSubscription): Promise<Subscription> {
+    const [newSubscription] = await db.insert(subscriptions).values(subscription).returning();
+    return newSubscription;
+  }
+
+  async getSubscription(id: string, tenantId?: string): Promise<Subscription | undefined> {
+    const conditions = [eq(subscriptions.id, id)];
+    if (tenantId) conditions.push(eq(subscriptions.tenantId, tenantId));
+    const [subscription] = await db.select().from(subscriptions).where(and(...conditions));
+    return subscription;
+  }
+
+  async getUserSubscription(userId: string, tenantId: string): Promise<Subscription | undefined> {
+    const [subscription] = await db.select().from(subscriptions)
+      .where(and(eq(subscriptions.userId, userId), eq(subscriptions.tenantId, tenantId)))
+      .orderBy(desc(subscriptions.createdAt));
+    return subscription;
+  }
+
+  async updateSubscription(id: string, updates: Partial<Subscription>, tenantId?: string): Promise<Subscription | undefined> {
+    const conditions = [eq(subscriptions.id, id)];
+    if (tenantId) conditions.push(eq(subscriptions.tenantId, tenantId));
+    const [subscription] = await db.update(subscriptions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(...conditions))
+      .returning();
+    return subscription;
+  }
+
+  async updateUserStripeInfo(userId: string, stripeCustomerId: string, stripeSubscriptionId: string, tenantId: string): Promise<void> {
+    await db.update(betterAuthUser)
+      .set({
+        stripeCustomerId,
+        stripeSubscriptionId,
+        subscriptionStatus: 'active',
+        updatedAt: new Date(),
+      })
+      .where(and(eq(betterAuthUser.id, userId), eq(betterAuthUser.tenantId, tenantId)));
+  }
+
+  // Shop limits and validation
+  async checkShopLimits(tenantId: string): Promise<{ canAddShop: boolean; currentShops: number; maxShops: number | null; planName: string }> {
+    const shopsResult = await db.select({ count: count() }).from(shops).where(eq(shops.tenantId, tenantId));
+    const currentShops = shopsResult[0]?.count || 0;
+    const subscription = await this.getTenantSubscription(tenantId);
+    
+    if (!subscription) {
+      return { canAddShop: currentShops < 10, currentShops, maxShops: 10, planName: 'Basic' };
+    }
+    
+    const maxShops = subscription.plan.maxShops;
+    return {
+      canAddShop: maxShops === null || currentShops < maxShops,
+      currentShops,
+      maxShops,
+      planName: subscription.plan.name
+    };
+  }
+
+  async validateShopCreation(tenantId: string): Promise<void> {
+    const limits = await this.checkShopLimits(tenantId);
+    if (!limits.canAddShop) {
+      throw new Error(`Shop limit reached. Current plan allows ${limits.maxShops} shops.`);
+    }
+  }
+
+  // Shop management methods
+  async getShop(id: string, tenantId: string): Promise<Shop | undefined> {
+    const [shop] = await db.select().from(shops)
+      .where(and(eq(shops.id, id), eq(shops.tenantId, tenantId)));
+    return shop;
+  }
+
+  async getShopWithManager(id: string, tenantId: string): Promise<ShopWithManager | undefined> {
+    const [shop] = await db.select().from(shops)
+      .where(and(eq(shops.id, id), eq(shops.tenantId, tenantId)));
+    return shop as ShopWithManager;
+  }
+
+  async getAllShops(tenantId: string, filters?: ShopFilters): Promise<ShopWithManager[]> {
+    const conditions = [eq(shops.tenantId, tenantId)];
+    if (filters?.status && filters.status !== 'all') {
+      conditions.push(eq(shops.status, filters.status));
+    }
+    return await db.select().from(shops)
+      .where(and(...conditions))
+      .orderBy(desc(shops.createdAt)) as ShopWithManager[];
+  }
+
+  async getShopsByManager(managerId: string, tenantId: string): Promise<Shop[]> {
+    return db.select().from(shops)
+      .where(and(eq(shops.managerId, managerId), eq(shops.tenantId, tenantId)));
+  }
+
+  async createShop(shopData: CreateShopData, tenantId: string): Promise<Shop> {
+    await this.validateShopCreation(tenantId);
+    const [shop] = await db.insert(shops).values({
+      ...shopData,
+      tenantId,
+      updatedAt: new Date(),
+    }).returning();
+    return shop;
+  }
+
+  async updateShop(id: string, updates: UpdateShopData, tenantId: string): Promise<Shop | undefined> {
+    const [shop] = await db.update(shops)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(shops.id, id), eq(shops.tenantId, tenantId)))
+      .returning();
+    return shop;
+  }
+
+  async deleteShop(id: string, tenantId: string): Promise<void> {
+    await db.delete(shops).where(and(eq(shops.id, id), eq(shops.tenantId, tenantId)));
+  }
+
+  async toggleShopStatus(id: string, isActive: boolean, tenantId: string): Promise<Shop | undefined> {
+    const [shop] = await db.update(shops)
+      .set({ isActive, status: isActive ? 'active' : 'inactive', updatedAt: new Date() })
+      .where(and(eq(shops.id, id), eq(shops.tenantId, tenantId)))
+      .returning();
+    return shop;
+  }
+
+  // Email contact methods
+  async getEmailContact(id: string, tenantId: string): Promise<EmailContact | undefined> {
+    const [contact] = await db.select().from(emailContacts)
+      .where(and(eq(emailContacts.id, id), eq(emailContacts.tenantId, tenantId)));
+    return contact;
+  }
+
+  async getEmailContactWithDetails(id: string, tenantId: string): Promise<EmailContactWithDetails | undefined> {
+    const contact = await this.getEmailContact(id, tenantId);
+    if (!contact) return undefined;
+    return contact as EmailContactWithDetails;
+  }
+
+  async getAllEmailContacts(tenantId: string, filters?: ContactFilters): Promise<EmailContactWithDetails[]> {
+    const conditions = [eq(emailContacts.tenantId, tenantId)];
+    if (filters?.search) {
+      conditions.push(or(
+        ilike(emailContacts.email, `%${filters.search}%`),
+        ilike(emailContacts.firstName, `%${filters.search}%`),
+        ilike(emailContacts.lastName, `%${filters.search}%`)
+      )!);
+    }
+    return await db.select().from(emailContacts)
+      .where(and(...conditions))
+      .orderBy(desc(emailContacts.createdAt)) as EmailContactWithDetails[];
+  }
+
+  async createEmailContact(contactData: CreateEmailContactData, tenantId: string): Promise<EmailContact> {
+    const [contact] = await db.insert(emailContacts).values({
+      ...contactData,
+      tenantId,
+    }).returning();
+    return contact;
+  }
+
+  async updateEmailContact(id: string, updates: UpdateEmailContactData, tenantId: string): Promise<EmailContact | undefined> {
+    const [contact] = await db.update(emailContacts)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(emailContacts.id, id), eq(emailContacts.tenantId, tenantId)))
+      .returning();
+    return contact;
+  }
+
+  async deleteEmailContact(id: string, tenantId: string): Promise<void> {
+    await db.delete(emailContacts)
+      .where(and(eq(emailContacts.id, id), eq(emailContacts.tenantId, tenantId)));
+  }
+
+  async bulkDeleteEmailContacts(ids: string[], tenantId: string): Promise<void> {
+    await db.delete(emailContacts)
+      .where(and(eq(emailContacts.tenantId, tenantId), inArray(emailContacts.id, ids)));
+  }
+
+  // Email list methods
+  async getEmailList(id: string, tenantId: string): Promise<EmailList | undefined> {
+    const [list] = await db.select().from(emailLists)
+      .where(and(eq(emailLists.id, id), eq(emailLists.tenantId, tenantId)));
+    return list;
+  }
+
+  async getAllEmailLists(tenantId: string): Promise<EmailListWithCount[]> {
+    return await db.select().from(emailLists)
+      .where(eq(emailLists.tenantId, tenantId))
+      .orderBy(emailLists.name) as EmailListWithCount[];
+  }
+
+  async createEmailList(listData: CreateEmailListData, tenantId: string): Promise<EmailList> {
+    const [list] = await db.insert(emailLists).values({
+      ...listData,
+      tenantId,
+    }).returning();
+    return list;
+  }
+
+  async updateEmailList(id: string, name: string, description: string | undefined, tenantId: string): Promise<EmailList | undefined> {
+    const [list] = await db.update(emailLists)
+      .set({ name, description, updatedAt: new Date() })
+      .where(and(eq(emailLists.id, id), eq(emailLists.tenantId, tenantId)))
+      .returning();
+    return list;
+  }
+
+  async deleteEmailList(id: string, tenantId: string): Promise<void> {
+    await db.delete(emailLists)
+      .where(and(eq(emailLists.id, id), eq(emailLists.tenantId, tenantId)));
+  }
+
+  // Contact tag methods
+  async getContactTag(id: string, tenantId: string): Promise<ContactTag | undefined> {
+    const [tag] = await db.select().from(contactTags)
+      .where(and(eq(contactTags.id, id), eq(contactTags.tenantId, tenantId)));
+    return tag;
+  }
+
+  async getAllContactTags(tenantId: string): Promise<ContactTag[]> {
+    return await db.select().from(contactTags)
+      .where(eq(contactTags.tenantId, tenantId))
+      .orderBy(contactTags.name);
+  }
+
+  async createContactTag(tagData: CreateContactTagData, tenantId: string): Promise<ContactTag> {
+    const [tag] = await db.insert(contactTags).values({
+      ...tagData,
+      tenantId,
+    }).returning();
+    return tag;
+  }
+
+  async updateContactTag(id: string, name: string, color: string, tenantId: string): Promise<ContactTag | undefined> {
+    const [tag] = await db.update(contactTags)
+      .set({ name, color })
+      .where(and(eq(contactTags.id, id), eq(contactTags.tenantId, tenantId)))
+      .returning();
+    return tag;
+  }
+
+  async deleteContactTag(id: string, tenantId: string): Promise<void> {
+    await db.delete(contactTags)
+      .where(and(eq(contactTags.id, id), eq(contactTags.tenantId, tenantId)));
+  }
+
+  // Contact list membership methods
+  async addContactToList(contactId: string, listId: string, tenantId: string): Promise<void> {
+    await db.insert(contactListMemberships).values({
+      contactId,
+      listId,
+      tenantId,
+    }).onConflictDoNothing();
+  }
+
+  async removeContactFromList(contactId: string, listId: string, tenantId: string): Promise<void> {
+    await db.delete(contactListMemberships)
+      .where(and(
+        eq(contactListMemberships.contactId, contactId),
+        eq(contactListMemberships.listId, listId),
+        eq(contactListMemberships.tenantId, tenantId)
+      ));
+  }
+
+  async getContactLists(contactId: string, tenantId: string): Promise<EmailList[]> {
+    const result = await db.select({
+      id: emailLists.id,
+      tenantId: emailLists.tenantId,
+      name: emailLists.name,
+      description: emailLists.description,
+      createdAt: emailLists.createdAt,
+      updatedAt: emailLists.updatedAt,
+    })
+    .from(contactListMemberships)
+    .innerJoin(emailLists, eq(contactListMemberships.listId, emailLists.id))
+    .where(and(
+      eq(contactListMemberships.contactId, contactId),
+      eq(contactListMemberships.tenantId, tenantId)
+    ));
+    return result;
+  }
+
+  async bulkAddContactsToList(contactIds: string[], listId: string, tenantId: string): Promise<void> {
+    const values = contactIds.map(contactId => ({ contactId, listId, tenantId }));
+    await db.insert(contactListMemberships).values(values).onConflictDoNothing();
+  }
+
+  // Contact tag assignment methods
+  async addTagToContact(contactId: string, tagId: string, tenantId: string): Promise<void> {
+    await db.insert(contactTagAssignments).values({
+      contactId,
+      tagId,
+      tenantId,
+    }).onConflictDoNothing();
+  }
+
+  async removeTagFromContact(contactId: string, tagId: string, tenantId: string): Promise<void> {
+    await db.delete(contactTagAssignments)
+      .where(and(
+        eq(contactTagAssignments.contactId, contactId),
+        eq(contactTagAssignments.tagId, tagId),
+        eq(contactTagAssignments.tenantId, tenantId)
+      ));
+  }
+
+  async getContactTags(contactId: string, tenantId: string): Promise<ContactTag[]> {
+    const result = await db.select({
+      id: contactTags.id,
+      tenantId: contactTags.tenantId,
+      name: contactTags.name,
+      color: contactTags.color,
+      createdAt: contactTags.createdAt,
+    })
+    .from(contactTagAssignments)
+    .innerJoin(contactTags, eq(contactTagAssignments.tagId, contactTags.id))
+    .where(and(
+      eq(contactTagAssignments.contactId, contactId),
+      eq(contactTagAssignments.tenantId, tenantId)
+    ));
+    return result;
+  }
+
+  async bulkAddTagToContacts(contactIds: string[], tagId: string, tenantId: string): Promise<void> {
+    const values = contactIds.map(contactId => ({ contactId, tagId, tenantId }));
+    await db.insert(contactTagAssignments).values(values).onConflictDoNothing();
+  }
+
+  // Statistics methods
+  async getEmailContactStats(tenantId: string): Promise<{
+    totalContacts: number;
+    activeContacts: number;
+    unsubscribedContacts: number;
+    bouncedContacts: number;
+    pendingContacts: number;
+    totalLists: number;
+    averageEngagementRate: number;
+  }> {
+    const [totalResult] = await db.select({ count: count() }).from(emailContacts).where(eq(emailContacts.tenantId, tenantId));
+    const [activeResult] = await db.select({ count: count() }).from(emailContacts).where(and(eq(emailContacts.tenantId, tenantId), eq(emailContacts.status, 'active')));
+    const [listsResult] = await db.select({ count: count() }).from(emailLists).where(eq(emailLists.tenantId, tenantId));
+    
+    return {
+      totalContacts: totalResult.count,
+      activeContacts: activeResult.count,
+      unsubscribedContacts: 0,
+      bouncedContacts: 0,
+      pendingContacts: 0,
+      totalLists: listsResult.count,
+      averageEngagementRate: 0,
+    };
+  }
+
+  async getShopStats(tenantId: string): Promise<{ totalShops: number; activeShops: number; shopsByCategory: Record<string, number> }> {
+    const [totalResult] = await db.select({ count: count() }).from(shops).where(eq(shops.tenantId, tenantId));
+    const [activeResult] = await db.select({ count: count() }).from(shops).where(and(eq(shops.tenantId, tenantId), eq(shops.isActive, true)));
+    
+    return {
+      totalShops: totalResult.count,
+      activeShops: activeResult.count,
+      shopsByCategory: {},
+    };
+  }
+
+  // Newsletter methods
+  async getNewsletter(id: string, tenantId: string): Promise<Newsletter | undefined> {
+    const [newsletter] = await db.select().from(newsletters)
+      .where(and(eq(newsletters.id, id), eq(newsletters.tenantId, tenantId)));
+    return newsletter;
+  }
+
+  async getNewsletterById(id: string): Promise<Newsletter | undefined> {
+    const [newsletter] = await db.select().from(newsletters).where(eq(newsletters.id, id));
+    return newsletter;
+  }
+
+  async getAllEmailContactsDebug(): Promise<{ email: string; tenantId: string; id: string }[]> {
+    return await db.select({
+      id: emailContacts.id,
+      email: emailContacts.email,
+      tenantId: emailContacts.tenantId,
+    }).from(emailContacts).limit(50);
+  }
+
+  async getNewsletterWithUser(id: string, tenantId: string): Promise<NewsletterWithUser | undefined> {
+    const newsletter = await this.getNewsletter(id, tenantId);
+    if (!newsletter) return undefined;
+    return newsletter as NewsletterWithUser;
+  }
+
+  async getAllNewsletters(tenantId: string): Promise<NewsletterWithUser[]> {
+    return await db.select().from(newsletters)
+      .where(eq(newsletters.tenantId, tenantId))
+      .orderBy(desc(newsletters.createdAt)) as NewsletterWithUser[];
+  }
+
+  async createNewsletter(newsletterData: CreateNewsletterData, userId: string, tenantId: string): Promise<Newsletter> {
+    const [newsletter] = await db.insert(newsletters).values({
+      ...newsletterData,
+      userId,
+      tenantId,
+    }).returning();
+    return newsletter;
+  }
+
+  async updateNewsletter(id: string, updates: UpdateNewsletterData, tenantId: string): Promise<Newsletter | undefined> {
+    const [newsletter] = await db.update(newsletters)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(newsletters.id, id), eq(newsletters.tenantId, tenantId)))
+      .returning();
+    return newsletter;
+  }
+
+  async deleteNewsletter(id: string, tenantId: string): Promise<void> {
+    await db.delete(newsletters)
+      .where(and(eq(newsletters.id, id), eq(newsletters.tenantId, tenantId)));
+  }
+
+  async getNewsletterStats(tenantId: string): Promise<{
+    totalNewsletters: number;
+    draftNewsletters: number;
+    scheduledNewsletters: number;
+    sentNewsletters: number;
+  }> {
+    const [totalResult] = await db.select({ count: count() }).from(newsletters).where(eq(newsletters.tenantId, tenantId));
+    return {
+      totalNewsletters: totalResult.count,
+      draftNewsletters: 0,
+      scheduledNewsletters: 0,
+      sentNewsletters: 0,
+    };
+  }
+
+  // Newsletter task status methods
+  async getNewsletterTaskStatuses(newsletterId: string, tenantId: string): Promise<NewsletterTaskStatus[]> {
+    return await db.select().from(newsletterTaskStatus)
+      .where(and(
+        eq(newsletterTaskStatus.newsletterId, newsletterId),
+        eq(newsletterTaskStatus.tenantId, tenantId)
+      ));
+  }
+
+  async createNewsletterTaskStatus(newsletterId: string, taskData: CreateNewsletterTaskStatusData, tenantId: string): Promise<NewsletterTaskStatus> {
+    const [taskStatus] = await db.insert(newsletterTaskStatus).values({
+      ...taskData,
+      newsletterId,
+      tenantId,
+    }).returning();
+    return taskStatus;
+  }
+
+  async updateNewsletterTaskStatus(id: string, updates: UpdateNewsletterTaskStatusData, tenantId: string): Promise<NewsletterTaskStatus | undefined> {
+    const [taskStatus] = await db.update(newsletterTaskStatus)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(newsletterTaskStatus.id, id), eq(newsletterTaskStatus.tenantId, tenantId)))
+      .returning();
+    return taskStatus;
+  }
+
+  async deleteNewsletterTaskStatus(id: string, tenantId: string): Promise<void> {
+    await db.delete(newsletterTaskStatus)
+      .where(and(eq(newsletterTaskStatus.id, id), eq(newsletterTaskStatus.tenantId, tenantId)));
+  }
+
+  async initializeNewsletterTasks(newsletterId: string, tenantId: string): Promise<NewsletterTaskStatus[]> {
+    const defaultTasks = [
+      { taskType: 'validation' as const, taskName: 'Content Validation', status: 'completed' as const, progress: 100 },
+      { taskType: 'processing' as const, taskName: 'Template Processing', status: 'pending' as const, progress: 0 },
+      { taskType: 'sending' as const, taskName: 'Email Delivery', status: 'pending' as const, progress: 0 },
+      { taskType: 'analytics' as const, taskName: 'Analytics Collection', status: 'pending' as const, progress: 0 },
+    ];
+    
+    const tasks: NewsletterTaskStatus[] = [];
+    for (const task of defaultTasks) {
+      const [createdTask] = await db.insert(newsletterTaskStatus).values({
+        ...task,
+        newsletterId,
+        tenantId,
+      }).returning();
+      tasks.push(createdTask);
+    }
+    return tasks;
+  }
+
+  // Campaign methods
+  async getCampaign(id: string, tenantId: string): Promise<Campaign | undefined> {
+    const [campaign] = await db.select().from(campaigns)
+      .where(and(eq(campaigns.id, id), eq(campaigns.tenantId, tenantId)));
+    return campaign;
+  }
+
+  async getAllCampaigns(tenantId: string): Promise<Campaign[]> {
+    return await db.select().from(campaigns)
+      .where(eq(campaigns.tenantId, tenantId))
+      .orderBy(desc(campaigns.createdAt));
+  }
+
+  async createCampaign(campaignData: CreateCampaignData, userId: string, tenantId: string): Promise<Campaign> {
+    const [campaign] = await db.insert(campaigns).values({
+      ...campaignData,
+      userId,
+      tenantId,
+    }).returning();
+    return campaign;
+  }
+
+  async updateCampaign(id: string, updates: UpdateCampaignData, tenantId: string): Promise<Campaign | undefined> {
+    const [campaign] = await db.update(campaigns)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(campaigns.id, id), eq(campaigns.tenantId, tenantId)))
+      .returning();
+    return campaign;
+  }
+
+  async deleteCampaign(id: string, tenantId: string): Promise<void> {
+    await db.delete(campaigns)
+      .where(and(eq(campaigns.id, id), eq(campaigns.tenantId, tenantId)));
+  }
+
+  async getCampaignStats(tenantId: string): Promise<{
+    totalCampaigns: number;
+    activeCampaigns: number;
+    draftCampaigns: number;
+    completedCampaigns: number;
+  }> {
+    const [totalResult] = await db.select({ count: count() }).from(campaigns).where(eq(campaigns.tenantId, tenantId));
+    return {
+      totalCampaigns: totalResult.count,
+      activeCampaigns: 0,
+      draftCampaigns: 0,
+      completedCampaigns: 0,
+    };
+  }
+
+  // Email activity methods
+  async createEmailActivity(activityData: CreateEmailActivityData, tenantId: string): Promise<EmailActivity> {
+    const [activity] = await db.insert(emailActivity).values({
+      ...activityData,
+      tenantId,
+    }).returning();
+    return activity;
+  }
+
+  async getEmailActivity(id: string, tenantId: string): Promise<EmailActivity | undefined> {
+    const [activity] = await db.select().from(emailActivity)
+      .where(and(eq(emailActivity.id, id), eq(emailActivity.tenantId, tenantId)));
+    return activity;
+  }
+
+  async getContactActivity(contactId: string, tenantId: string, limit?: number, fromDate?: Date, toDate?: Date): Promise<EmailActivity[]> {
+    const conditions = [eq(emailActivity.contactId, contactId), eq(emailActivity.tenantId, tenantId)];
+    if (fromDate) conditions.push(gte(emailActivity.occurredAt, fromDate));
+    if (toDate) conditions.push(lte(emailActivity.occurredAt, toDate));
+    
+    let query = db.select().from(emailActivity)
+      .where(and(...conditions))
+      .orderBy(desc(emailActivity.occurredAt));
+    
+    if (limit) query = query.limit(limit);
+    return await query;
+  }
+
+  async getActivityByWebhookId(webhookId: string, tenantId: string): Promise<EmailActivity | undefined> {
+    const [activity] = await db.select().from(emailActivity)
+      .where(and(eq(emailActivity.webhookId, webhookId), eq(emailActivity.tenantId, tenantId)));
+    return activity;
+  }
+
+  async hasContactOpenedNewsletter(contactId: string, newsletterId: string, tenantId: string): Promise<boolean> {
+    const [activity] = await db.select().from(emailActivity)
+      .where(and(
+        eq(emailActivity.activityType, 'opened'),
+        eq(emailActivity.contactId, contactId),
+        eq(emailActivity.newsletterId, newsletterId),
+        eq(emailActivity.tenantId, tenantId)
+      ))
+      .limit(1);
+    return !!activity;
+  }
+
+  async findEmailContactByEmail(email: string): Promise<{ contact: EmailContact; tenantId: string } | undefined> {
+    const [result] = await db.select().from(emailContacts)
+      .where(eq(emailContacts.email, email.toLowerCase().trim()))
+      .limit(1);
+    
+    if (!result) return undefined;
+    return { contact: result, tenantId: result.tenantId };
+  }
+
+  // Bounced email methods
+  async addBouncedEmail(bouncedEmailData: CreateBouncedEmailData): Promise<BouncedEmail> {
+    const [bouncedEmail] = await db.insert(bouncedEmails).values({
+      ...bouncedEmailData,
+      email: bouncedEmailData.email.toLowerCase().trim(),
+    }).returning();
+    return bouncedEmail;
+  }
+
+  async updateBouncedEmail(email: string, updates: UpdateBouncedEmailData): Promise<BouncedEmail | undefined> {
+    const [updated] = await db.update(bouncedEmails)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(bouncedEmails.email, email.toLowerCase().trim()))
+      .returning();
+    return updated;
+  }
+
+  async getBouncedEmail(email: string): Promise<BouncedEmail | undefined> {
+    const [bouncedEmail] = await db.select().from(bouncedEmails)
+      .where(eq(bouncedEmails.email, email.toLowerCase().trim()));
+    return bouncedEmail;
+  }
+
+  async isEmailBounced(email: string): Promise<boolean> {
+    const [result] = await db.select({ id: bouncedEmails.id }).from(bouncedEmails)
+      .where(and(
+        eq(bouncedEmails.email, email.toLowerCase().trim()),
+        eq(bouncedEmails.isActive, true)
+      ))
+      .limit(1);
+    return !!result;
+  }
+
+  async getAllBouncedEmails(filters?: BouncedEmailFilters): Promise<BouncedEmail[]> {
+    const conditions = [];
+    if (filters?.search) conditions.push(ilike(bouncedEmails.email, `%${filters.search}%`));
+    if (filters?.bounceType && filters.bounceType !== 'all') conditions.push(eq(bouncedEmails.bounceType, filters.bounceType));
+    if (filters?.isActive !== undefined) conditions.push(eq(bouncedEmails.isActive, filters.isActive));
+    
+    return await db.select().from(bouncedEmails)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(bouncedEmails.lastBouncedAt));
+  }
+
+  async removeBouncedEmail(email: string): Promise<void> {
+    await db.delete(bouncedEmails)
+      .where(eq(bouncedEmails.email, email.toLowerCase().trim()));
+  }
+
+  async getBouncedEmailAddresses(): Promise<string[]> {
+    const results = await db.select({ email: bouncedEmails.email }).from(bouncedEmails)
+      .where(eq(bouncedEmails.isActive, true));
+    return results.map(result => result.email);
+  }
+
+  async incrementBounceCount(email: string, lastBouncedAt: Date, bounceReason?: string): Promise<BouncedEmail | undefined> {
+    const [updated] = await db.update(bouncedEmails)
+      .set({
+        bounceCount: sql`${bouncedEmails.bounceCount} + 1`,
+        lastBouncedAt,
+        bounceReason: bounceReason || bouncedEmails.bounceReason,
+        updatedAt: new Date(),
+      })
+      .where(eq(bouncedEmails.email, email.toLowerCase().trim()))
+      .returning();
+    return updated;
+  }
 }
 
 export const storage = new DatabaseStorage();
