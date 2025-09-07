@@ -30,7 +30,7 @@ export default function EditForm() {
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/forms/${formId}`);
       const result = await response.json();
-      return result.form as FormData;
+      return result as FormData;
     },
     enabled: isAuthenticated && isInitialized && !!formId,
   });

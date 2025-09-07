@@ -180,22 +180,65 @@ export function FormPreviewModal({ isOpen, onClose, form, formSettings = {} }: F
 
   // Parse form data and theme on mount
   useEffect(() => {
-    if (!form) return;
+    if (!form) {
+      console.log('FormPreviewModal: No form data received');
+      return;
+    }
+
+    // Validate form structure
+    if (!form.formData) {
+      console.error('FormPreviewModal: Form is missing formData field');
+      setElements([]);
+      setSelectedTheme(fallbackThemes[0]);
+      return;
+    }
+
+    console.log('FormPreviewModal: Received form data:', form);
 
     try {
       // Parse form data
-      const parsedFormData = JSON.parse(form.formData);
-      setElements(parsedFormData.elements || []);
+      let parsedFormData;
+      console.log('FormPreviewModal: Raw form.formData type:', typeof form.formData);
+      console.log('FormPreviewModal: Raw form.formData value:', form.formData);
       
+      try {
+        // Check if formData is already an object or needs parsing
+        if (typeof form.formData === 'string') {
+          parsedFormData = JSON.parse(form.formData);
+          console.log('FormPreviewModal: Parsed formData from string:', parsedFormData);
+        } else {
+          parsedFormData = form.formData;
+          console.log('FormPreviewModal: Using formData as object:', parsedFormData);
+        }
+      } catch (parseError) {
+        console.error('FormPreviewModal: Failed to parse formData:', parseError, 'Raw formData:', form.formData);
+        parsedFormData = { elements: [], settings: {} };
+      }
+
+      const elements = parsedFormData.elements || [];
+      console.log('FormPreviewModal: parsedFormData.elements:', parsedFormData.elements);
+      console.log('FormPreviewModal: elements type:', typeof elements, 'isArray:', Array.isArray(elements));
+      console.log('FormPreviewModal: elements value before setState:', elements);
+      setElements(elements);
+      console.log('FormPreviewModal: Extracted elements:', elements.length, 'elements');
+
       // Parse and store form settings from the database
       const storedSettings = parsedFormData.settings || {};
       setParsedFormSettings(storedSettings);
+      console.log('FormPreviewModal: Parsed settings:', storedSettings);
+
+      // Check if we have any elements
+      if (elements.length === 0) {
+        console.warn('FormPreviewModal: No form elements found in parsed data');
+      }
 
       // Parse theme
       let themeData: { id: string; name: string; customColors?: CustomColors } = { id: 'minimal', name: 'Minimal' };
       try {
         themeData = JSON.parse(form.theme);
-      } catch (e) {
+        console.log('FormPreviewModal: Parsed theme:', themeData);
+      } catch (themeParseError) {
+        console.warn('FormPreviewModal: Failed to parse theme, using fallback:', themeParseError, 'Raw theme:', form.theme);
         // If theme parsing fails, use string as theme ID
         themeData = { id: form.theme || 'minimal', name: form.theme || 'Minimal' };
       }
@@ -216,13 +259,22 @@ export function FormPreviewModal({ isOpen, onClose, form, formSettings = {} }: F
     } catch (error) {
       console.error('Error parsing form data:', error);
       // Fallback to minimal theme
-      setSelectedTheme(getDefaultThemes()[0]);
+      setSelectedTheme(fallbackThemes[0]);
     }
   }, [form]);
 
+  // Debug: Monitor elements state changes
+  useEffect(() => {
+    console.log('FormPreviewModal: Elements state changed:', elements, 'length:', elements.length);
+  }, [elements]);
+
   // Create enhanced elements list with automatic buttons
   const elementsWithButtons: PreviewFormElement[] = useMemo(() => {
-    if (!elements.length) return [];
+    console.log('FormPreviewModal: Creating elementsWithButtons, elements:', elements, 'length:', elements.length);
+    if (!elements.length) {
+      console.log('FormPreviewModal: No elements found, returning empty array');
+      return [];
+    }
 
     const baseTimestamp = Date.now();
     return [
@@ -582,4 +634,4 @@ export function FormPreviewModal({ isOpen, onClose, form, formSettings = {} }: F
       </DialogContent>
     </Dialog>
   );
-}
+};

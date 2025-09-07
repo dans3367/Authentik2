@@ -84,7 +84,7 @@ campaignRoutes.post("/", authenticateToken, requireTenant, async (req: any, res)
 
     const newCampaign = await db.insert(campaigns).values({
       tenantId: req.user.tenantId,
-      userId: req.user.userId,
+      userId: req.user.id,
       name: sanitizedName,
       description: sanitizedDescription,
       type,

@@ -199,7 +199,7 @@ userRoutes.patch("/:userId/status", authenticateToken, requireRole(['Owner', 'Ad
     }
 
     // Prevent deactivating the current user
-    if (userId === req.user.userId && !isActive) {
+    if (userId === req.user.id && !isActive) {
       return res.status(400).json({ message: 'Cannot deactivate your own account' });
     }
 
@@ -258,7 +258,7 @@ userRoutes.delete("/:userId", authenticateToken, requireRole(['Owner', 'Administ
     }
 
     // Prevent deleting the current user
-    if (user.id === req.user.userId) {
+    if (user.id === req.user.id) {
       return res.status(400).json({ message: 'Cannot delete your own account' });
     }
 

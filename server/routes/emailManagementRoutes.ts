@@ -357,7 +357,7 @@ emailManagementRoutes.delete("/email-contacts/:id", authenticateToken, requireTe
     const { id } = req.params;
 
     const contact = await db.query.emailContacts.findFirst({
-      where: sql`${emailContacts.id} = ${id}`,
+      where: sql`${emailContacts.id} = ${id} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!contact) {
@@ -366,7 +366,7 @@ emailManagementRoutes.delete("/email-contacts/:id", authenticateToken, requireTe
 
     // Delete contact (this will cascade to related records)
     await db.delete(emailContacts)
-      .where(sql`${emailContacts.id} = ${id}`);
+      .where(sql`${emailContacts.id} = ${id} AND ${emailContacts.tenantId} = ${req.user.tenantId}`);
 
     res.json({ message: 'Contact deleted successfully' });
   } catch (error) {
@@ -378,14 +378,34 @@ emailManagementRoutes.delete("/email-contacts/:id", authenticateToken, requireTe
 // Bulk delete email contacts
 emailManagementRoutes.delete("/email-contacts", authenticateToken, requireTenant, async (req: any, res) => {
   try {
-    const { contactIds } = req.body;
+    const { contactIds, ids } = req.body;
 
-    if (!Array.isArray(contactIds) || contactIds.length === 0) {
+    // Handle both formats for backward compatibility
+    const contactIdsArray = contactIds || ids;
+
+    if (!Array.isArray(contactIdsArray) || contactIdsArray.length === 0) {
       return res.status(400).json({ message: 'Contact IDs array is required' });
     }
 
+    // First verify all contacts belong to the current tenant
+    const contactsToDelete = await db.query.emailContacts.findMany({
+      where: sql`${emailContacts.id} IN (${sql.join(contactIdsArray, sql`, `)}) AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
+      columns: {
+        id: true,
+      },
+    });
+
+    if (contactsToDelete.length === 0) {
+      return res.status(404).json({ message: 'No contacts found to delete' });
+    }
+
+    // Check if all requested contacts were found (to ensure no cross-tenant access)
+    if (contactsToDelete.length !== contactIdsArray.length) {
+      return res.status(400).json({ message: 'Some contacts not found or access denied' });
+    }
+
     const deletedContacts = await db.delete(emailContacts)
-      .where(sql`${emailContacts.id} = ANY(${contactIds})`)
+      .where(sql`${emailContacts.id} IN (${sql.join(contactIdsArray, sql`, `)}) AND ${emailContacts.tenantId} = ${req.user.tenantId}`)
       .returning();
 
     res.json({

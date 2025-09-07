@@ -230,7 +230,7 @@ subscriptionRoutes.post("/create-checkout-session", authenticateToken, requireRo
         name: company.name,
         metadata: {
           companyId: company.id,
-          userId: req.user.userId,
+          userId: req.user.id,
         },
       });
       customerId = customer.id;

@@ -128,7 +128,7 @@ export function FormWizard({ editMode = false, formData: existingFormData }: For
       }
       
       // Extract form ID from response
-      const formId = editMode && existingFormData ? existingFormData.id : result.form?.id;
+      const formId = editMode && existingFormData ? existingFormData.id : result?.id;
       
       if (!formId) {
         throw new Error('Failed to get form ID from server response');

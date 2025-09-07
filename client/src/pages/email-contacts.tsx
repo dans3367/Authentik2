@@ -245,33 +245,10 @@ export default function EmailContacts() {
     return Math.round((opened / sent) * 100);
   };
 
-  // Delete individual contact mutation
-  const deleteContactMutation = useMutation({
-    mutationFn: async (contactId: string) => {
-      const response = await apiRequest('DELETE', `/api/email-contacts/${contactId}`);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/email-contacts'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/email-contacts-stats'] });
-      toast({
-        title: "Success",
-        description: "Contact deleted successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete contact",
-        variant: "destructive",
-      });
-    },
-  });
-
   // Bulk delete contacts mutation
   const bulkDeleteMutation = useMutation({
     mutationFn: async (contactIds: string[]) => {
-      const response = await apiRequest('DELETE', '/api/email-contacts', { ids: contactIds });
+      const response = await apiRequest('DELETE', '/api/email-contacts', { contactIds });
       return response.json();
     },
     onSuccess: (data, contactIds) => {
@@ -292,29 +269,22 @@ export default function EmailContacts() {
     },
   });
 
-  // Handle single contact delete
-  const handleDeleteContact = (contactId: string) => {
-    console.log('Delete contact clicked:', contactId);
-    if (window.confirm('Are you sure you want to delete this contact? This action cannot be undone.')) {
-      console.log('Deleting contact:', contactId);
-      deleteContactMutation.mutate(contactId);
-    }
-  };
-
   // Handle bulk delete
   const handleBulkDelete = () => {
     console.log('Bulk delete clicked, selected contacts:', selectedContacts);
     if (selectedContacts.length === 0) return;
-    
-    const confirmMessage = selectedContacts.length === 1 
+
+    const confirmMessage = selectedContacts.length === 1
       ? 'Are you sure you want to delete this contact? This action cannot be undone.'
       : `Are you sure you want to delete ${selectedContacts.length} contacts? This action cannot be undone.`;
-      
+
     if (window.confirm(confirmMessage)) {
       console.log('Bulk deleting contacts:', selectedContacts);
       bulkDeleteMutation.mutate(selectedContacts);
     }
   };
+
+
 
   // Show loading state
   if (contactsLoading) {
@@ -672,19 +642,6 @@ export default function EmailContacts() {
                                 </DropdownMenuItem>
                               }
                             />
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              className="text-red-600"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleDeleteContact(contact.id);
-                              }}
-                              disabled={deleteContactMutation.isPending}
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              {deleteContactMutation.isPending ? 'Deleting...' : 'Delete Contact'}
-                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

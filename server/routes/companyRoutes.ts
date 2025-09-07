@@ -52,7 +52,7 @@ companyRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator"
       website: sanitizedWebsite,
       industry: sanitizedIndustry,
       slug: sanitizedName.toLowerCase().replace(/\s+/g, '-'),
-      ownerId: req.user.userId,
+      ownerId: req.user.id,
       createdAt: new Date(),
     }).returning();
 
@@ -250,7 +250,7 @@ companyRoutes.patch("/users/:userId/role", authenticateToken, requireRole(["Owne
     }
 
     // Prevent users from demoting themselves
-    if (userId === req.user.userId) {
+    if (userId === req.user.id) {
       return res.status(400).json({ message: 'Cannot change your own role' });
     }
 
@@ -283,7 +283,7 @@ companyRoutes.delete("/users/:userId", authenticateToken, requireRole(["Owner", 
     }
 
     // Prevent users from removing themselves
-    if (userId === req.user.userId) {
+    if (userId === req.user.id) {
       return res.status(400).json({ message: 'Cannot remove yourself from the company' });
     }
 

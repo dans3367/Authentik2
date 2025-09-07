@@ -24,7 +24,7 @@ formsRoutes.get("/", authenticateToken, async (req: any, res) => {
     }
 
     if (published !== undefined) {
-      whereClause = sql`${whereClause} AND ${forms.published} = ${published === 'true'}`;
+      whereClause = sql`${whereClause} AND ${forms.isActive} = ${published === 'true'}`;
     }
 
     const formsList = await db.query.forms.findMany({
@@ -34,11 +34,13 @@ formsRoutes.get("/", authenticateToken, async (req: any, res) => {
       offset,
     });
 
+    console.log('FormsRoutes: Retrieved forms list:', formsList?.length || 0, 'forms');
+
     const totalCount = await db.select({
       count: sql<number>`count(*)`,
     }).from(forms).where(whereClause);
 
-    res.json({
+    const response = {
       forms: formsList,
       pagination: {
         page: Number(page),
@@ -46,7 +48,10 @@ formsRoutes.get("/", authenticateToken, async (req: any, res) => {
         total: totalCount[0].count,
         pages: Math.ceil(totalCount[0].count / Number(limit)),
       },
-    });
+    };
+
+    console.log('FormsRoutes: Sending response with', response.forms?.length || 0, 'forms');
+    res.json(response);
   } catch (error) {
     console.error('Get forms error:', error);
     res.status(500).json({ message: 'Failed to get forms' });
@@ -88,10 +93,10 @@ formsRoutes.post("/", authenticateToken, async (req: any, res) => {
     const newForm = await db.insert(forms).values({
       title: sanitizedTitle,
       description: sanitizedDescription,
-      formData: JSON.stringify(formData),
-      theme: theme || 'modern',
+      formData: formData, // Already a JSON string from client
+      theme: theme, // Already a string from client
       tenantId: req.user.tenantId,
-      userId: req.user.userId,
+      userId: req.user.id,
       isActive: true,
     }).returning();
 
@@ -138,7 +143,7 @@ formsRoutes.put("/:id", authenticateToken, async (req: any, res) => {
     }
 
     if (theme !== undefined) {
-      updateData.theme = theme ? JSON.stringify(theme) : null;
+      updateData.theme = theme; // Already a string from client
     }
 
     if (published !== undefined) {
@@ -258,11 +263,11 @@ formsRoutes.get("/public/:id", async (req: any, res) => {
     const { id } = req.params;
 
     const form = await db.query.forms.findFirst({
-      where: sql`${forms.id} = ${id} AND ${forms.published} = true`,
+      where: sql`${forms.id} = ${id} AND ${forms.isActive} = true`,
     });
 
     if (!form) {
-      return res.status(404).json({ message: 'Form not found or not published' });
+      return res.status(404).json({ message: 'Form not found or not active' });
     }
 
     // Return only the necessary data for public access
@@ -270,9 +275,8 @@ formsRoutes.get("/public/:id", async (req: any, res) => {
       id: form.id,
       title: form.title,
       description: form.description,
-      schema: JSON.parse(form.schema),
-      settings: form.settings ? JSON.parse(form.settings) : null,
-      theme: form.theme ? JSON.parse(form.theme) : null,
+      formData: form.formData ? JSON.parse(form.formData) : null,
+      theme: form.theme || 'modern',
     });
   } catch (error) {
     console.error('Get public form error:', error);
@@ -290,19 +294,20 @@ formsRoutes.post("/public/:id/submit", async (req: any, res) => {
       return res.status(400).json({ message: 'Form data is required' });
     }
 
-    // Check if form exists and is published
+    // Check if form exists and is active
     const form = await db.query.forms.findFirst({
-      where: sql`${forms.id} = ${id} AND ${forms.published} = true`,
+      where: sql`${forms.id} = ${id} AND ${forms.isActive} = true`,
     });
 
     if (!form) {
-      return res.status(404).json({ message: 'Form not found or not published' });
+      return res.status(404).json({ message: 'Form not found or not active' });
     }
 
     // Create form response
     const newResponse = await db.insert(formResponses).values({
+      tenantId: form.tenantId,
       formId: id,
-      data: JSON.stringify(data),
+      responseData: JSON.stringify(data),
       submittedAt: new Date(),
       ipAddress: req.ip,
       userAgent: req.get('User-Agent'),

@@ -201,7 +201,7 @@ BASE_URL=http://localhost:5000
 ```
 VITE_BETTER_AUTH_URL=http://localhost:5000
 VITE_STRIPE_PUBLIC_KEY=pk_test_your_stripe_public_key_here
-VITE_FORMS_URL=http://localhost:3003
+VITE_FORMS_URL=http://localhost:3004
 ```
 
 ## Compliance

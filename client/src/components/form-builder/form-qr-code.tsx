@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-// Note: QRCode removed - qrcode package was removed during JWT cleanup
-// TODO: Re-add QR code functionality if needed
+import QRCode from 'qrcode';
 import { Button } from '@/components/ui/button';
 import { Copy, Download, ExternalLink, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -15,14 +14,35 @@ export function FormQRCode({ formId, formTitle }: FormQRCodeProps) {
   const [isGenerating, setIsGenerating] = useState(true);
   const { toast } = useToast();
   
-  const formUrl = `${import.meta.env.VITE_FORMS_URL}/form/${formId}`;
+  // Use the form server URL - defaults to localhost:3004 if not configured
+  const formServerUrl = import.meta.env.VITE_FORMS_URL || 'http://localhost:3004';
+  const formUrl = `${formServerUrl}/form/${formId}`;
 
   useEffect(() => {
     const generateQRCode = async () => {
       try {
         setIsGenerating(true);
-        // TODO: Re-implement QR code generation
-        // For now, just set a placeholder
+
+        // Generate actual QR code using the qrcode library
+        const qrCodeDataUrl = await QRCode.toDataURL(formUrl, {
+          width: 256,
+          margin: 2,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF'
+          },
+          errorCorrectionLevel: 'M'
+        });
+
+        setQrCodeUrl(qrCodeDataUrl);
+      } catch (error) {
+        console.error('Error generating QR code:', error);
+        toast({
+          title: "Error",
+          description: "Failed to generate QR code",
+          variant: "destructive",
+        });
+        // Fallback to placeholder if QR generation fails
         setQrCodeUrl('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjZjNmNGY2Ii8+Cjx0ZXh0IHg9IjEyOCIgeT0iMTI4IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Y2E0YWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5RVIgQ29kZSBBdmFpbGFibGUgU29vbjwvdGV4dD4KPC9zdmc+');
       } finally {
         setIsGenerating(false);
@@ -32,7 +52,7 @@ export function FormQRCode({ formId, formTitle }: FormQRCodeProps) {
     if (formId) {
       generateQRCode();
     }
-  }, [formId, formUrl, toast]);
+  }, [formId, formServerUrl, toast]);
 
   const copyToClipboard = async () => {
     try {
@@ -144,4 +164,4 @@ export function FormQRCode({ formId, formTitle }: FormQRCodeProps) {
       </div>
     </div>
   );
-}
+};

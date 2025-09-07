@@ -10,7 +10,7 @@ import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { AppLayout } from "@/components/AppLayout";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { setGlobalNavigate } from "@/lib/authErrorHandler";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState, Component, ReactNode } from "react";
 import { useAuthErrorHandler, setGlobalAuthErrorHandler } from "@/hooks/useAuthErrorHandler";
 
 // Lazy load components for code splitting
@@ -58,6 +58,51 @@ const ContentLoader = () => (
     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
   </div>
 );
+
+// Error Boundary to catch React errors
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error?: Error; errorInfo?: any }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error('React Error Boundary caught an error:', error, errorInfo);
+    this.setState({ error, errorInfo });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-red-50 border border-red-200 rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-red-800 mb-4">
+              Something went wrong
+            </h2>
+            <p className="text-red-700 mb-4">
+              A React error occurred. Please check the console for details.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              Reload Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 
 // Component to handle route protection and redirection
@@ -139,84 +184,84 @@ function Router() {
 
   return (
     <ProtectedRoute>
-      <Switch>
-        {/* Routes that should be wrapped in AppLayout */}
-        {isAuthenticated && isEmailVerified === true ? (
-          <AppLayout>
-            <Suspense fallback={<ContentLoader />}>
-              <Switch>
-                <Route path="/" component={Dashboard} />
-                <Route path="/dashboard" component={Dashboard} />
-                <Route path="/newsletter" component={NewsletterPage} />
-                <Route path="/newsletters" component={NewsletterPage} />
-                <Route path="/newsletter/create" component={NewsletterCreatePage} />
-                <Route path="/newsletters/:id" component={NewsletterViewPage} />
-                <Route path="/company" component={CompanyPage} />
-                <Route path="/campaigns/create" component={CreateCampaignPage} />
-                <Route path="/email-campaigns" component={EmailCampaignsPage} />
-                <Route path="/email-campaigns/edit/:id" component={EditEmailCampaignPage} />
-                <Route path="/email-test" component={EmailTestPage} />
-                <Route path="/email-approvals" component={EmailApprovalsPage} />
-                <Route path="/email-contacts" component={EmailContactsPage} />
-                <Route path="/email-contacts/new" component={NewEmailContactPage} />
-                <Route path="/email-contacts/view/:id" component={ViewEmailContactPage} />
-                <Route path="/email-contacts/edit/:id" component={lazy(() => import("@/pages/email-contacts/edit"))} />
-                <Route path="/email-analytics" component={EmailAnalyticsPage} />
-                <Route path="/shops" component={ShopsPage} />
-                <Route path="/shops/new" component={NewShopPage} />
-                <Route path="/shops/:id" component={ShopDetailsPage} />
-                <Route path="/shops/:id/edit" component={EditShopPage} />
-                <Route path="/forms" component={FormsPage} />
-                <Route path="/forms/add" component={FormsAddPage} />
-                <Route path="/forms/:id/edit" component={FormsEditPage} />
-                <Route path="/profile" component={ProfilePage} />
-                <Route path="/sessions" component={SessionsPage} />
-                <Route path="/users" component={UsersPage} />
-                <Route path="/table-example" component={TableExamplePage} />
+      <Suspense fallback={<PageLoader />}>
+        <Switch>
+          {/* Routes that should NOT be wrapped in AppLayout */}
+          <Route path="/auth" component={AuthPage} />
+          <Route path="/pending-verification" component={PendingVerificationPage} />
+          <Route path="/verify-email" component={VerifyEmailPage} />
 
-                <Route component={NotFound} />
-              </Switch>
-            </Suspense>
-          </AppLayout>
-        ) : (
-          /* Routes that should NOT be wrapped in AppLayout */
-          <Suspense fallback={<PageLoader />}>
-            <Switch>
-              <Route path="/" component={isAuthenticated ? PendingVerificationPage : AuthPage} />
-              <Route path="/auth" component={AuthPage} />
-              <Route path="/pending-verification" component={PendingVerificationPage} />
-              <Route path="/verify-email" component={VerifyEmailPage} />
+          {/* Routes that should be wrapped in AppLayout */}
+          {isAuthenticated && isEmailVerified === true ? (
+            <AppLayout>
+              <Suspense fallback={<ContentLoader />}>
+                <Switch>
+                  <Route path="/" component={Dashboard} />
+                  <Route path="/dashboard" component={Dashboard} />
+                  <Route path="/newsletter" component={NewsletterPage} />
+                  <Route path="/newsletters" component={NewsletterPage} />
+                  <Route path="/newsletter/create" component={NewsletterCreatePage} />
+                  <Route path="/newsletters/:id" component={NewsletterViewPage} />
+                  <Route path="/company" component={CompanyPage} />
+                  <Route path="/campaigns/create" component={CreateCampaignPage} />
+                  <Route path="/email-campaigns" component={EmailCampaignsPage} />
+                  <Route path="/email-campaigns/edit/:id" component={EditEmailCampaignPage} />
+                  <Route path="/email-test" component={EmailTestPage} />
+                  <Route path="/email-approvals" component={EmailApprovalsPage} />
+                  <Route path="/email-contacts" component={EmailContactsPage} />
+                  <Route path="/email-contacts/new" component={NewEmailContactPage} />
+                  <Route path="/email-contacts/view/:id" component={ViewEmailContactPage} />
+                  <Route path="/email-contacts/edit/:id" component={lazy(() => import("@/pages/email-contacts/edit"))} />
+                  <Route path="/email-analytics" component={EmailAnalyticsPage} />
+                  <Route path="/shops" component={ShopsPage} />
+                  <Route path="/shops/new" component={NewShopPage} />
+                  <Route path="/shops/:id" component={ShopDetailsPage} />
+                  <Route path="/shops/:id/edit" component={EditShopPage} />
+                  <Route path="/forms" component={FormsPage} />
+                  <Route path="/forms/add" component={FormsAddPage} />
+                  <Route path="/forms/:id/edit" component={FormsEditPage} />
+                  <Route path="/profile" component={ProfilePage} />
+                  <Route path="/sessions" component={SessionsPage} />
+                  <Route path="/users" component={UsersPage} />
+                  <Route path="/table-example" component={TableExamplePage} />
 
-              <Route component={NotFound} />
-            </Switch>
-          </Suspense>
-        )}
-      </Switch>
+                  <Route component={NotFound} />
+                </Switch>
+              </Suspense>
+            </AppLayout>
+          ) : (
+            /* Default route for unauthenticated users */
+            <Route path="/" component={isAuthenticated ? PendingVerificationPage : AuthPage} />
+          )}
+        </Switch>
+      </Suspense>
     </ProtectedRoute>
   );
 }
 
 function App() {
   return (
-    <Provider store={store}>
-      <PersistGate
-        loading={
-          <div className="min-h-screen flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          </div>
-        }
-        persistor={persistor}
-      >
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            <ThemeProvider>
-              <Toaster />
-              <Router />
-            </ThemeProvider>
-          </TooltipProvider>
-        </QueryClientProvider>
-      </PersistGate>
-    </Provider>
+    <ErrorBoundary>
+      <Provider store={store}>
+        <PersistGate
+          loading={
+            <div className="min-h-screen flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          }
+          persistor={persistor}
+        >
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider>
+              <ThemeProvider>
+                <Toaster />
+                <Router />
+              </ThemeProvider>
+            </TooltipProvider>
+          </QueryClientProvider>
+        </PersistGate>
+      </Provider>
+    </ErrorBoundary>
   );
 }
 
