@@ -208,13 +208,36 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
 
     // Use a transaction for batch operations
     const result = await db.transaction(async (tx) => {
-      // Verify the user exists in betterAuthUser table before setting addedByUserId
+      // Ensure the user exists in betterAuthUser table before setting addedByUserId
       let userExists = false;
       try {
         const existingUser = await tx.query.betterAuthUser.findFirst({
           where: sql`${betterAuthUser.id} = ${req.user.id}`,
         });
-        userExists = !!existingUser;
+        
+        if (!existingUser) {
+          // User doesn't exist in betterAuthUser table, create a basic record
+          console.log('🔧 Creating missing betterAuthUser record for:', req.user.email);
+          try {
+            await tx.insert(betterAuthUser).values({
+              id: req.user.id,
+              email: req.user.email,
+              name: req.user.name || req.user.email,
+              emailVerified: true, // Assume verified since they can authenticate
+              role: req.user.role || 'Employee',
+              tenantId: req.user.tenantId,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+            userExists = true;
+            console.log('✅ Created betterAuthUser record successfully');
+          } catch (insertError) {
+            console.error('❌ Failed to create betterAuthUser record:', insertError);
+            userExists = false;
+          }
+        } else {
+          userExists = true;
+        }
       } catch (error) {
         console.warn('Could not verify user existence:', error);
         userExists = false;
