@@ -91,6 +91,9 @@ func main() {
 	// Update ResendID for existing tracking entry
 	apiRouter.HandleFunc("/email-tracking/{id}/resend-id", apiHandler.UpdateEmailTrackingResendID).Methods("PUT")
 
+	// Newsletter sending endpoint
+	apiRouter.HandleFunc("/send-newsletter", apiHandler.SendNewsletter).Methods("POST")
+
 	// Debug and maintenance endpoints
 	apiRouter.HandleFunc("/email-tracking/debug/resend-index-status", apiHandler.GetResendIdIndexStatus).Methods("GET")
 	apiRouter.HandleFunc("/email-tracking/debug/cleanup-resend-index", apiHandler.CleanupResendIdIndex).Methods("POST")

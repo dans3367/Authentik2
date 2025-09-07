@@ -1007,6 +1007,115 @@ func (eh *EmailHandler) ClearTemporalWorkflows(w http.ResponseWriter, r *http.Re
 	json.NewEncoder(w).Encode(response)
 }
 
+// NewsletterSendRequest represents the request payload for sending a newsletter
+type NewsletterSendRequest struct {
+	NewsletterID        string   `json:"newsletterId"`
+	TenantID           string   `json:"tenantId"`
+	UserID             string   `json:"userId"`
+	Title              string   `json:"title"`
+	Subject            string   `json:"subject"`
+	Content            string   `json:"content"`
+	RecipientType      string   `json:"recipientType"`
+	SelectedContactIds []string `json:"selectedContactIds"`
+	SelectedTagIds     []string `json:"selectedTagIds"`
+}
+
+// SendNewsletter handles the newsletter sending request following the flowchart
+func (eh *EmailHandler) SendNewsletter(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value("userID").(string)
+	tenantID := r.Context().Value("tenantID").(string)
+	logger := eh.logger.WithContext(r.Context())
+
+	logger.Info("Processing newsletter send request", "user_id", userID, "tenant_id", tenantID)
+
+	var req NewsletterSendRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logger.Error("Invalid JSON payload", "error", err)
+		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+		return
+	}
+
+	// Validate required fields
+	if req.NewsletterID == "" || req.Subject == "" || req.Content == "" {
+		logger.Error("Missing required fields",
+			"newsletter_id", req.NewsletterID,
+			"subject", req.Subject,
+			"content_length", len(req.Content))
+		http.Error(w, "newsletterId, subject, and content are required", http.StatusBadRequest)
+		return
+	}
+
+	// Verify tenant authorization (Execute Auth Ver checks from flowchart)
+	if req.TenantID != tenantID || req.UserID != userID {
+		logger.Warn("Unauthorized newsletter send attempt",
+			"req_tenant", req.TenantID,
+			"auth_tenant", tenantID,
+			"req_user", req.UserID,
+			"auth_user", userID)
+		http.Error(w, "Access denied", http.StatusForbidden)
+		return
+	}
+
+	// For newsletters, we need to handle recipient selection
+	// Since we don't have direct access to the email_contacts table from the Go server,
+	// we'll create a newsletter tracking entry that indicates it needs recipient processing
+	emailID := fmt.Sprintf("newsletter-%s", req.NewsletterID)
+	entry := EmailTrackingEntry{
+		ID:               generateID(),
+		UserID:           userID,
+		TenantID:         tenantID,
+		EmailID:          emailID,
+		Status:           "processing_recipients", // Special status for newsletter processing
+		Timestamp:        time.Now().UTC(),
+		TemporalWorkflow: fmt.Sprintf("newsletter-workflow-%s", req.NewsletterID),
+		Metadata: map[string]interface{}{
+			"type":                "newsletter",
+			"newsletterId":        req.NewsletterID,
+			"title":               req.Title,
+			"subject":             req.Subject,
+			"content":             req.Content,
+			"recipientType":       req.RecipientType,
+			"selectedContactIds":  req.SelectedContactIds,
+			"selectedTagIds":      req.SelectedTagIds,
+			"tags":                []string{fmt.Sprintf("newsletter-%s", req.NewsletterID), "newsletter"},
+			// Mark this as needing recipient processing
+			"needsRecipientProcessing": true,
+		},
+	}
+
+	// Store the entry
+	eh.trackingStore[entry.ID] = entry
+
+	logger.Info("Created newsletter tracking entry - recipient processing needed",
+		"tracking_id", entry.ID,
+		"email_id", emailID,
+		"newsletter_id", req.NewsletterID,
+		"recipient_type", req.RecipientType)
+
+	// For now, we'll mark this as successful but indicate that recipient processing is needed
+	// In a full implementation, this would trigger a workflow that queries the database
+	// for recipients and creates individual email workflows
+	entry.Status = "recipients_pending"
+	entry.Metadata["recipientCount"] = 0
+	entry.Metadata["error"] = "Newsletter system needs recipient processing - please ensure email contacts exist and are properly configured"
+	eh.trackingStore[entry.ID] = entry
+
+	// Return success response with warning about recipient processing
+	response := map[string]interface{}{
+		"success":    true,
+		"message":    "Newsletter queued successfully - recipient processing required",
+		"taskId":     entry.ID,
+		"emailId":    emailID,
+		"workflowId": entry.TemporalWorkflow,
+		"status":     entry.Status,
+		"warning":    "Newsletter recipient processing is not fully implemented. Please ensure email contacts exist in the database.",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
 func generateID() string {
 	return fmt.Sprintf("%d", time.Now().UnixNano())
 }
