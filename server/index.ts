@@ -18,8 +18,8 @@ import { toNodeHandler } from "better-auth/node";
 
 const app = express();
 
-// Trust proxy for Replit environment
-app.set('trust proxy', true);
+// Trust proxy for Replit environment - trust only the first proxy
+app.set('trust proxy', 1);
 
 // Security middleware
 app.use(helmetMiddleware);
@@ -87,7 +87,8 @@ app.all("/api/auth/*", (req, res, next) => {
   }
 
   // Handle with Better Auth
-  return toNodeHandler(auth)(req, res, next);
+  const authHandler = toNodeHandler(auth);
+  return authHandler(req, res);
 });
 
 // Body parsing with size limits - applied after auth handler
