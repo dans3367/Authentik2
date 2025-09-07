@@ -24,7 +24,7 @@ app.set('trust proxy', 1);
 // Security middleware
 app.use(helmetMiddleware);
 
-// Custom CORS and security headers for trusted domains
+// Custom CORS and security headers for all requests
 app.use((req, res, next) => {
   const origin = req.get('Origin');
   const host = req.get('Host');
@@ -42,11 +42,12 @@ app.use((req, res, next) => {
     origin?.includes(domain) || host?.includes(domain)
   );
   
-  if (isTrustedDomain) {
-    // Set CORS headers for trusted domains
-    res.header('Access-Control-Allow-Origin', origin || '*');
+  // Always set CORS headers for localhost development
+  if (isTrustedDomain || req.get('Host')?.includes('localhost') || req.get('Host')?.includes('127.0.0.1')) {
+    // Set CORS headers for trusted domains and localhost
+    res.header('Access-Control-Allow-Origin', origin || req.get('Origin') || '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma, Cookie, Set-Cookie');
     res.header('Access-Control-Allow-Credentials', 'true');
     
     // Set Cross-Origin-Opener-Policy to allow trusted domains
