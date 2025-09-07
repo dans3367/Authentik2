@@ -157,53 +157,94 @@ export default function NewsletterCreatePage() {
     });
   };
 
-  const handleSendNow = () => {
-    const data = form.getValues();
-    
-    // Validate required fields
-    if (!data.title || !data.subject || !data.content) {
-      toast({
-        variant: "destructive",
-        title: "Missing Information",
-        description: "Please fill in title, subject, and content fields.",
-      });
-      return;
-    }
-
-    if (!serverHealth) {
-      toast({
-        variant: "destructive",
-        title: "Server Unavailable",
-        description: "Go server must be online to send newsletters",
-      });
-      return;
-    }
-
-    if (!session) {
-      toast({
-        variant: "destructive",
-        title: "Authentication Error",
-        description: "Please make sure you are logged in.",
-      });
-      return;
-    }
-
-    // First create the newsletter, then send it
-    const newsletterData = {
-      ...data,
-      ...segmentationData,
-      status: "draft" as const, // Create as draft first
-    };
-    
-    createNewsletterMutation.mutate(newsletterData, {
-      onSuccess: (response) => {
-        // After creating, send the newsletter
-        sendNewsletterMutation.mutate(response.id);
-      },
-      onError: (error) => {
-        console.error('[Newsletter Frontend] Failed to create newsletter:', error);
+  // New handleCreateAndSend function following the flowchart
+  const handleCreateAndSend = async () => {
+    try {
+      const data = form.getValues();
+      
+      // Initial validation - Error path from flowchart
+      if (!data.title || !data.subject || !data.content) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Please fill in title, subject, and content fields.",
+        });
+        return;
       }
-    });
+
+      if (!serverHealth) {
+        toast({
+          variant: "destructive",
+          title: "Error", 
+          description: "Go server must be online to send newsletters",
+        });
+        return;
+      }
+
+      // Execute Auth Ver checks - as shown in flowchart
+      if (!session) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Authentication required. Please log in.",
+        });
+        return;
+      }
+
+      // Prepare newsletter data for backend
+      const newsletterData = {
+        ...data,
+        ...segmentationData,
+        status: "draft" as const,
+      };
+
+      // Send to backend - Save Newsletter to DB
+      const createResponse = await apiRequest('POST', '/api/newsletters', newsletterData);
+      const createdNewsletter = await createResponse.json();
+
+      if (!createResponse.ok) {
+        throw new Error(createdNewsletter.message || 'Failed to create newsletter');
+      }
+
+      // Send POST to go-server - Create temporal task so send email
+      const sendResponse = await apiRequest('POST', `/api/newsletters/${createdNewsletter.id}/send`);
+      const sendResult = await sendResponse.json();
+
+      if (!sendResponse.ok) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: sendResult.message || 'Failed to send newsletter',
+        });
+        return;
+      }
+
+      // Return success - Refresh Newsletter List
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
+      
+      // Success Toast
+      toast({
+        title: "Success",
+        description: "Newsletter sent successfully!",
+      });
+
+      // Navigate back to newsletter list
+      setLocation('/newsletter');
+
+    } catch (error: any) {
+      console.error('[Newsletter Frontend] Create and send failed:', error);
+      toast({
+        variant: "destructive", 
+        title: "Error",
+        description: error.message || "Failed to send newsletter",
+      });
+    }
+  };
+
+  // Legacy function for backward compatibility
+  const handleSendNow = () => {
+    handleCreateAndSend();
   };
 
   const handleSegmentationSave = (data: {
