@@ -20,6 +20,25 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createUserSchema, updateUserSchema, userRoles, nonOwnerRoles, type User, type CreateUserData, type UpdateUserData, type UserRole } from "@shared/schema";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
+
+// Extended user type to include custom fields from Better Auth
+interface ExtendedUser {
+  id: string;
+  email: string;
+  name: string;
+  role?: string;
+  firstName?: string;
+  lastName?: string;
+  theme?: string;
+  menuExpanded?: boolean;
+  tenantId?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+  emailVerified?: boolean;
+  image?: string | null;
+  isActive?: boolean;
+  lastLoginAt?: Date;
+}
 import { DataTable, DataTableColumnHeader, DataTableRowActions } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -56,7 +75,8 @@ function getUserInitials(firstName?: string, lastName?: string) {
 
 export default function UsersPage() {
   console.log("🔍 [UsersPage] Component rendered");
-  const { user: currentUser, isLoading: authLoading } = useReduxAuth();
+  const { user, isLoading: authLoading } = useReduxAuth();
+  const currentUser = user as ExtendedUser | null;
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
