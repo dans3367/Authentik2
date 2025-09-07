@@ -1,12 +1,95 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { sql, eq, and, like, desc } from 'drizzle-orm';
+import { sql, eq, and, like, desc, inArray } from 'drizzle-orm';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
-import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, betterAuthUser } from '@shared/schema';
+import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, betterAuthUser, emailContacts, contactTagAssignments } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
-import { emailService } from '../emailService';
+import { emailService, enhancedEmailService } from '../emailService';
+import crypto from 'crypto';
 
 export const newsletterRoutes = Router();
+
+// Helper function to get newsletter recipients based on segmentation
+async function getNewsletterRecipients(newsletter: any, tenantId: string) {
+  console.log(`[Newsletter] Getting recipients for newsletter ${newsletter.id}, type: ${newsletter.recipientType}`);
+  
+  try {
+    let recipients: Array<{ id: string; email: string; firstName?: string; lastName?: string }> = [];
+
+    switch (newsletter.recipientType) {
+      case 'all':
+        // Get all active email contacts for the tenant
+        recipients = await db.query.emailContacts.findMany({
+          where: and(
+            eq(emailContacts.tenantId, tenantId),
+            eq(emailContacts.status, 'active')
+          ),
+          columns: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          }
+        });
+        break;
+
+      case 'selected':
+        // Get specific contacts by IDs
+        if (newsletter.selectedContactIds && newsletter.selectedContactIds.length > 0) {
+          recipients = await db.query.emailContacts.findMany({
+            where: and(
+              eq(emailContacts.tenantId, tenantId),
+              inArray(emailContacts.id, newsletter.selectedContactIds),
+              eq(emailContacts.status, 'active')
+            ),
+            columns: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+            }
+          });
+        }
+        break;
+
+      case 'tags':
+        // Get contacts by tag IDs
+        if (newsletter.selectedTagIds && newsletter.selectedTagIds.length > 0) {
+          const contactIds = await db
+            .select({ contactId: contactTagAssignments.contactId })
+            .from(contactTagAssignments)
+            .where(inArray(contactTagAssignments.tagId, newsletter.selectedTagIds));
+
+          if (contactIds.length > 0) {
+            recipients = await db.query.emailContacts.findMany({
+              where: and(
+                eq(emailContacts.tenantId, tenantId),
+                inArray(emailContacts.id, contactIds.map(c => c.contactId)),
+                eq(emailContacts.status, 'active')
+              ),
+              columns: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+              }
+            });
+          }
+        }
+        break;
+
+      default:
+        console.warn(`[Newsletter] Unknown recipient type: ${newsletter.recipientType}`);
+        break;
+    }
+
+    console.log(`[Newsletter] Found ${recipients.length} recipients for newsletter ${newsletter.id}`);
+    return recipients;
+  } catch (error) {
+    console.error(`[Newsletter] Error getting recipients for newsletter ${newsletter.id}:`, error);
+    throw error;
+  }
+}
 
 // Get all newsletters
 newsletterRoutes.get("/", authenticateToken, requireTenant, async (req: any, res) => {
@@ -472,17 +555,95 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
       })
       .where(eq(newsletters.id, id));
 
-    // Here you would typically:
-    // 1. Get the email list
-    // 2. Queue the emails for sending
-    // 3. Process them in batches
-    // 4. Update the newsletter status to 'sent' when complete
+    try {
+      // Generate unique group UUID for tracking
+      const groupUUID = crypto.randomUUID();
+      console.log(`[Newsletter] Starting to send newsletter ${id} with groupUUID: ${groupUUID}`);
 
-    res.json({
-      message: 'Newsletter sending initiated successfully',
-      newsletterId: id,
-      status: 'sending',
-    });
+      // Get recipients based on newsletter segmentation
+      const recipients = await getNewsletterRecipients(newsletter, req.user.tenantId);
+      
+      if (recipients.length === 0) {
+        await db.update(newsletters)
+          .set({
+            status: 'draft',
+            updatedAt: new Date(),
+          })
+          .where(eq(newsletters.id, id));
+
+        return res.status(400).json({ 
+          message: 'No recipients found for newsletter. Please check your segmentation settings or add email contacts.' 
+        });
+      }
+
+      console.log(`[Newsletter] Found ${recipients.length} recipients for newsletter ${id}`);
+
+      // Prepare emails for batch sending
+      const emails = recipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => ({
+        to: contact.email,
+        subject: newsletter.subject,
+        html: newsletter.content,
+        text: newsletter.content.replace(/<[^>]*>/g, ''), // Strip HTML for text version
+        metadata: {
+          type: 'newsletter',
+          newsletterId: newsletter.id,
+          groupUUID,
+          recipientId: contact.id,
+          tags: [`newsletter-${newsletter.id}`, `groupUUID-${groupUUID}`]
+        }
+      }));
+
+      // Send emails in batches
+      console.log(`[Newsletter] Sending ${emails.length} emails for newsletter ${id}`);
+      const result = await enhancedEmailService.sendBatchEmails(emails, {
+        batchSize: 10,
+        delayBetweenBatches: 1000 // 1 second delay between batches
+      });
+
+      console.log(`[Newsletter] Batch sending complete for ${id}:`, {
+        queued: result.queued.length,
+        errors: result.errors.length
+      });
+
+      // Update newsletter status based on results
+      const successful = result.queued.length;
+      const failed = result.errors.length;
+      const totalSent = successful + failed;
+
+      await db.update(newsletters)
+        .set({
+          status: 'sent',
+          recipientCount: totalSent,
+          updatedAt: new Date(),
+        })
+        .where(eq(newsletters.id, id));
+
+      res.json({
+        message: 'Newsletter sent successfully',
+        newsletterId: id,
+        status: 'sent',
+        successful,
+        failed,
+        total: totalSent,
+        groupUUID
+      });
+
+    } catch (sendError) {
+      console.error(`[Newsletter] Failed to send newsletter ${id}:`, sendError);
+      
+      // Update newsletter status back to draft on failure
+      await db.update(newsletters)
+        .set({
+          status: 'draft',
+          updatedAt: new Date(),
+        })
+        .where(eq(newsletters.id, id));
+
+      res.status(500).json({ 
+        message: 'Failed to send newsletter',
+        error: sendError instanceof Error ? sendError.message : 'Unknown error'
+      });
+    }
   } catch (error) {
     console.error('Send newsletter error:', error);
     res.status(500).json({ message: 'Failed to send newsletter' });
