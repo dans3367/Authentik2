@@ -106,13 +106,27 @@ export const requireTenant = (req: AuthRequest, res: Response, next: NextFunctio
     return res.status(400).json({ message: 'Tenant ID is required' });
   }
 
-  // Validate tenant ID format (should be UUID or specific format)
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  if (!uuidRegex.test(req.user.tenantId) && req.user.tenantId !== '29c69b4f-3129-4aa4-a475-7bf892e5c5b9') {
-    return res.status(400).json({
-      message: 'Invalid tenant ID format',
-      tenantId: req.user.tenantId
-    });
+  // Validate tenant ID format (should be UUID or contain valid UUID)
+  const uuidRegexExact = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const uuidRegexExtract = /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i;
+
+  // Check if it's a perfect UUID or the default tenant ID
+  if (uuidRegexExact.test(req.user.tenantId) || req.user.tenantId === '29c69b4f-3129-4aa4-a475-7bf892e5c5b9') {
+    // Valid tenant ID, continue
+  } else {
+    // Check if tenant ID contains a valid UUID (e.g., "tenant-owner2-uuid-here")
+    const uuidMatch = req.user.tenantId.match(uuidRegexExtract);
+    if (uuidMatch) {
+      // Extract the valid UUID and update the request
+      const extractedUuid = uuidMatch[0];
+      console.log(`🔧 [Tenant Fix] Extracted valid UUID from malformed tenant ID: ${req.user.tenantId} -> ${extractedUuid}`);
+      req.user.tenantId = extractedUuid;
+    } else {
+      return res.status(400).json({
+        message: 'Invalid tenant ID format - no valid UUID found',
+        tenantId: req.user.tenantId
+      });
+    }
   }
 
   // Add tenant context to request for easier access in route handlers
@@ -140,12 +154,26 @@ export const requireValidTenant = async (req: AuthRequest, res: Response, next: 
   }
 
   // First, do basic format validation
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  if (!uuidRegex.test(req.user.tenantId) && req.user.tenantId !== '29c69b4f-3129-4aa4-a475-7bf892e5c5b9') {
-    return res.status(400).json({
-      message: 'Invalid tenant ID format',
-      tenantId: req.user.tenantId
-    });
+  const uuidRegexExact = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const uuidRegexExtract = /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i;
+
+  // Check if it's a perfect UUID or the default tenant ID
+  if (uuidRegexExact.test(req.user.tenantId) || req.user.tenantId === '29c69b4f-3129-4aa4-a475-7bf892e5c5b9') {
+    // Valid tenant ID, continue
+  } else {
+    // Check if tenant ID contains a valid UUID (e.g., "tenant-owner2-uuid-here")
+    const uuidMatch = req.user.tenantId.match(uuidRegexExtract);
+    if (uuidMatch) {
+      // Extract the valid UUID and update the request
+      const extractedUuid = uuidMatch[0];
+      console.log(`🔧 [Tenant Fix] Extracted valid UUID from malformed tenant ID: ${req.user.tenantId} -> ${extractedUuid}`);
+      req.user.tenantId = extractedUuid;
+    } else {
+      return res.status(400).json({
+        message: 'Invalid tenant ID format - no valid UUID found',
+        tenantId: req.user.tenantId
+      });
+    }
   }
 
   // Skip tenant existence check for default tenant (for development/testing)

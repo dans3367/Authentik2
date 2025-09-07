@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments } from '@shared/schema';
+import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser } from '@shared/schema';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { type ContactFilters, type BouncedEmailFilters } from '@shared/schema';
 import { sanitizeString, sanitizeEmail } from '../utils/sanitization';
@@ -182,10 +182,10 @@ emailManagementRoutes.get("/email-contacts/:id/stats", authenticateToken, requir
   }
 });
 
-// Create email contact
+// Create email contact with batch operations
 emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, async (req: any, res) => {
   try {
-    const { email, firstName, lastName, tags, lists, status } = req.body;
+    const { email, firstName, lastName, tags, lists, status, consentGiven, consentMethod, consentIpAddress, consentUserAgent } = req.body;
 
     if (!email) {
       return res.status(400).json({ message: 'Email is required' });
@@ -204,41 +204,67 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
       return res.status(400).json({ message: 'Contact already exists' });
     }
 
-    const newContact = await db.insert(emailContacts).values({
-      tenantId: req.user.tenantId,
-      email: sanitizedEmail,
-      firstName: sanitizedFirstName,
-      lastName: sanitizedLastName,
-      status: status || 'active',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }).returning();
+    const now = new Date();
 
-    // Add tags if provided
-    if (tags && Array.isArray(tags)) {
-      for (const tagId of tags) {
-        await db.insert(contactTagAssignments).values({
+    // Use a transaction for batch operations
+    const result = await db.transaction(async (tx) => {
+      // Verify the user exists in betterAuthUser table before setting addedByUserId
+      let userExists = false;
+      try {
+        const existingUser = await tx.query.betterAuthUser.findFirst({
+          where: sql`${betterAuthUser.id} = ${req.user.id}`,
+        });
+        userExists = !!existingUser;
+      } catch (error) {
+        console.warn('Could not verify user existence:', error);
+        userExists = false;
+      }
+
+      // Create the contact
+      const newContact = await tx.insert(emailContacts).values({
+        tenantId: req.user.tenantId,
+        email: sanitizedEmail,
+        firstName: sanitizedFirstName,
+        lastName: sanitizedLastName,
+        status: status || 'active',
+        consentGiven: consentGiven || false,
+        consentMethod: consentMethod || null,
+        consentDate: consentGiven ? now : null,
+        consentIpAddress: consentIpAddress || null,
+        consentUserAgent: consentUserAgent || null,
+        addedByUserId: userExists ? req.user.id : null,
+        createdAt: now,
+        updatedAt: now,
+      }).returning();
+
+      const contact = newContact[0];
+
+      // Batch insert tags if provided
+      if (tags && Array.isArray(tags) && tags.length > 0) {
+        const tagAssignments = tags.map(tagId => ({
           tenantId: req.user.tenantId,
-          contactId: newContact[0].id,
+          contactId: contact.id,
           tagId,
-          assignedAt: new Date(),
-        });
+          assignedAt: now,
+        }));
+        await tx.insert(contactTagAssignments).values(tagAssignments);
       }
-    }
 
-    // Add to lists if provided
-    if (lists && Array.isArray(lists)) {
-      for (const listId of lists) {
-        await db.insert(contactListMemberships).values({
+      // Batch insert list memberships if provided
+      if (lists && Array.isArray(lists) && lists.length > 0) {
+        const listMemberships = lists.map(listId => ({
           tenantId: req.user.tenantId,
-          contactId: newContact[0].id,
+          contactId: contact.id,
           listId,
-          addedAt: new Date(),
-        });
+          addedAt: now,
+        }));
+        await tx.insert(contactListMemberships).values(listMemberships);
       }
-    }
 
-    res.status(201).json(newContact[0]);
+      return contact;
+    });
+
+    res.status(201).json(result);
   } catch (error) {
     console.error('Create email contact error:', error);
     res.status(500).json({ message: 'Failed to create email contact' });
@@ -477,7 +503,7 @@ emailManagementRoutes.get("/bounced-emails", authenticateToken, requireTenant, a
       whereClause = sql`${whereClause} AND ${bouncedEmails.bouncedAt} <= ${new Date(endDate as string)}`;
     }
 
-    const bouncedEmails = await db.query.bouncedEmails.findMany({
+    const bouncedEmailsData = await db.query.bouncedEmails.findMany({
       where: whereClause,
       orderBy: sql`${bouncedEmails.bouncedAt} DESC`,
       limit: Number(limit),
@@ -489,7 +515,7 @@ emailManagementRoutes.get("/bounced-emails", authenticateToken, requireTenant, a
     }).from(db.bouncedEmails).where(whereClause);
 
     res.json({
-      bouncedEmails,
+      bouncedEmails: bouncedEmailsData,
       pagination: {
         page: Number(page),
         limit: Number(limit),
