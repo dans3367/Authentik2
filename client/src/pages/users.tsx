@@ -731,6 +731,26 @@ export default function UsersPage() {
                         </FormItem>
                       )}
                     />
+                    <FormField
+                      control={createForm.control}
+                      name="emailVerified"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-base">Email Verified</FormLabel>
+                            <div className="text-sm text-muted-foreground">
+                              Mark this user's email as verified
+                            </div>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value ?? true}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
                     <DialogFooter>
                       <Button 
                         type="submit" 

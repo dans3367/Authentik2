@@ -482,7 +482,7 @@ export class DatabaseStorage implements IStorage {
        name,
        tenantId,
        id: crypto.randomUUID(),
-       emailVerified: true, // Admin-created users are automatically verified
+       emailVerified: userData.emailVerified ?? true,
        createdAt: new Date(),
        updatedAt: new Date(),
      }).returning();
@@ -1213,6 +1213,7 @@ export class DatabaseStorage implements IStorage {
   async createCampaign(campaignData: CreateCampaignData, userId: string, tenantId: string): Promise<Campaign> {
     const [campaign] = await db.insert(campaigns).values({
       ...campaignData,
+      budget: campaignData.budget?.toString(),
       userId,
       tenantId,
     }).returning();
@@ -1221,7 +1222,11 @@ export class DatabaseStorage implements IStorage {
 
   async updateCampaign(id: string, updates: UpdateCampaignData, tenantId: string): Promise<Campaign | undefined> {
     const [campaign] = await db.update(campaigns)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({ 
+        ...updates, 
+        budget: updates.budget?.toString(),
+        updatedAt: new Date() 
+      })
       .where(and(eq(campaigns.id, id), eq(campaigns.tenantId, tenantId)))
       .returning();
     return campaign;
@@ -1271,7 +1276,9 @@ export class DatabaseStorage implements IStorage {
       .where(and(...conditions))
       .orderBy(desc(emailActivity.occurredAt));
     
-    if (limit) query = query.limit(limit);
+    if (limit) {
+      return await query.limit(limit);
+    }
     return await query;
   }
 
