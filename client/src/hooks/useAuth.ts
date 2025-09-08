@@ -1,4 +1,4 @@
-import { useSession, signIn, signOut, signUp } from "@/lib/betterAuthClient";
+import { useSession, signIn, signOut, signUp, type ExtendedUser } from "@/lib/betterAuthClient";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import type {
@@ -12,7 +12,7 @@ export function useAuth() {
   const session = useSession();
 
   return {
-    user: session.data?.user || null,
+    user: session.data?.user as ExtendedUser | null,
     isLoading: session.isPending,
     isAuthenticated: !!session.data?.user,
     hasInitialized: !session.isPending,
