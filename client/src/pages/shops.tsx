@@ -49,6 +49,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
@@ -127,6 +135,7 @@ export default function ShopsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'maintenance'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [deleteShopId, setDeleteShopId] = useState<string | null>(null);
+  const [showLimitModal, setShowLimitModal] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -520,15 +529,24 @@ export default function ShopsPage() {
                 </div>
               </div>
             </div>
-            <Link href="/shops/new">
+            {data?.limits && !data.limits.canAddShop ? (
               <Button 
-                disabled={data?.limits && !data.limits.canAddShop}
+                onClick={() => setShowLimitModal(true)}
                 className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Add Shop
               </Button>
-            </Link>
+            ) : (
+              <Link href="/shops/new">
+                <Button 
+                  className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Shop
+                </Button>
+              </Link>
+            )}
           </div>
         )}
 
@@ -621,25 +639,7 @@ export default function ShopsPage() {
         </div>
       )}
 
-      {/* Shop Limit Warning */}
-      {data?.limits && !data.limits.canAddShop && (
-        <Card className="bg-orange-50/70 dark:bg-orange-950/50 backdrop-blur-sm border border-orange-200/50 dark:border-orange-800/30">
-          <CardContent className="pt-6">
-            <div className="flex">
-              <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400 mr-3 flex-shrink-0 mt-0.5" />
-              <div>
-                <h3 className="text-sm font-semibold text-orange-900 dark:text-orange-100">
-                  Shop limit reached
-                </h3>
-                <p className="text-sm text-orange-700 dark:text-orange-300 mt-1">
-                  Your {data.limits.planName} plan allows up to {data.limits.maxShops} shops. 
-                  Please upgrade your plan to add more shops.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+
 
       {/* Filters */}
       {!isLoading && (
@@ -803,6 +803,44 @@ export default function ShopsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Shop Limit Modal */}
+      <Dialog open={showLimitModal} onOpenChange={setShowLimitModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-orange-600" />
+              Shop Limit Reached
+            </DialogTitle>
+            <DialogDescription>
+              Your {data?.limits?.planName} plan allows up to {data?.limits?.maxShops} shops. 
+              Please upgrade your plan to add more shops.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowLimitModal(false)}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                setShowLimitModal(false);
+                // TODO: Add navigation to upgrade page when available
+                toast({
+                  title: "Upgrade Plan",
+                  description: "Contact support to upgrade your plan and add more shops.",
+                });
+              }}
+              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
+            >
+              Upgrade Plan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
         </div>
       </div>
     </div>
