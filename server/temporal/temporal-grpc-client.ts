@@ -1,6 +1,8 @@
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 // GRPC client types (matching the proto definitions)
 export interface NewsletterRequest {
@@ -60,6 +62,10 @@ export class TemporalGrpcClient {
 
   private initializeClients(): void {
     try {
+      // Get current file directory (ES module equivalent of __dirname)
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = dirname(__filename);
+      
       // Load proto definitions
       const PROTO_PATH = path.join(__dirname, '../../temporal-server/proto/temporal-bridge.proto');
       

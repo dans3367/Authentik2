@@ -8,6 +8,60 @@ import { randomUUID } from 'crypto';
 
 export const devRoutes = Router();
 
+// Health check endpoint with temporal status
+devRoutes.get("/health", async (req, res) => {
+  try {
+    // Database health check
+    let dbStatus = 'disconnected';
+    try {
+      await db.execute(sql`SELECT 1`);
+      dbStatus = 'connected';
+    } catch (error) {
+      dbStatus = `error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    }
+
+    // Temporal service status
+    let temporalStatus = null;
+    try {
+      const { temporalService } = await import('../services/temporal-service');
+      temporalStatus = {
+        connected: temporalService.isServiceConnected(),
+        status: temporalService.getConnectionStatus(),
+        healthCheck: await temporalService.healthCheck()
+      };
+    } catch (error) {
+      temporalStatus = {
+        connected: false,
+        status: 'error importing service',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+
+    res.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      services: {
+        database: {
+          status: dbStatus,
+          connected: dbStatus === 'connected'
+        },
+        temporal: temporalStatus
+      },
+      environment: {
+        nodeEnv: process.env.NODE_ENV,
+        temporalGrpcServer: process.env.TEMPORAL_GRPC_SERVER || 'localhost:50051'
+      }
+    });
+  } catch (error) {
+    console.error('Health check error:', error);
+    res.status(500).json({ 
+      status: 'unhealthy',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Create test managers
 devRoutes.post("/create-test-managers", async (req, res) => {
   try {
