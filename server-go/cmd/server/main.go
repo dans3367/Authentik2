@@ -14,6 +14,7 @@ import (
 	"email-tracking-server/pkg/logger"
 
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 	"gopkg.in/yaml.v3"
 )
 
@@ -37,6 +38,13 @@ type Config struct {
 }
 
 func main() {
+	// Load environment variables from .env file
+	err := godotenv.Load()
+	if err != nil {
+		fmt.Printf("Warning: Error loading .env file: %v\n", err)
+		fmt.Printf("Continuing with environment variables from system...\n")
+	}
+
 	// Load configuration
 	config, err := loadConfig()
 	if err != nil {
@@ -47,6 +55,25 @@ func main() {
 	// Initialize logger
 	log := logger.New(config.Logging.Level, config.Logging.Format)
 	log.Info("Starting email tracking server")
+
+	// Verify .env file loading
+	verificationToken := os.Getenv("ENV_VERIFICATION_TOKEN")
+	if verificationToken != "" {
+		log.Info("✅ .env file successfully loaded", "verification_token", verificationToken)
+	} else {
+		log.Warn("⚠️ .env file may not be loaded properly", "verification_token", verificationToken)
+	}
+
+	log.Info("Temporal configuration",
+		"host_port", config.Temporal.HostPort,
+		"namespace", config.Temporal.Namespace,
+		"task_queue", config.Temporal.TaskQueue)
+
+	// Log environment variable sources for debugging
+	log.Info("Environment variable sources",
+		"TEMPORAL_HOST_source", getEnvSource("TEMPORAL_HOST", "127.0.0.1:7233"),
+		"TEMPORAL_NAMESPACE_source", getEnvSource("TEMPORAL_NAMESPACE", "default"),
+		"TEMPORAL_TASK_QUEUE_source", getEnvSource("TEMPORAL_TASK_QUEUE", "email-task-queue"))
 
 	// Initialize Temporal client
 	temporalClient, err := client.NewTemporalClient(client.Config{
@@ -214,7 +241,7 @@ func enableCORS(next http.Handler) http.Handler {
 			"http://localhost:3500",           // Local development (main app)
 			"https://app.zendwise.work",       // Production main app
 			"https://zendwise.work",           // Production main domain
-			"https://tenginex.zendwise.work",   // Go server subdomain
+			"https://tenginex.zendwise.work",  // Go server subdomain
 			"https://authentik.zendwise.work", // Authentik subdomain if exists
 			"https://637573c3-49ca-4c2a-a66f-8a199454d465-00-1y6orip6wcu6p.janeway.replit.dev", // Replit development domain
 		}
@@ -256,4 +283,11 @@ func getEnvOrDefault(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+func getEnvSource(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return fmt.Sprintf("environment_variable (%s)", value)
+	}
+	return fmt.Sprintf("default (%s)", defaultValue)
 }
