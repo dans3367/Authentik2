@@ -1,5 +1,5 @@
 import { proxyActivities } from '@temporalio/workflow';
-import type * as activities from '../activities/newsletter-activities';
+import type * as activities from '../activities';
 
 // Proxy activities to be used in workflows
 const { 
@@ -52,7 +52,7 @@ export interface NewsletterWorkflowResult {
 export async function newsletterSendingWorkflow(
   input: NewsletterWorkflowInput
 ): Promise<NewsletterWorkflowResult> {
-  console.log(`Starting newsletter sending workflow for newsletter ${input.newsletterId}`);
+  console.log(`🚀 Starting newsletter sending workflow for newsletter ${input.newsletterId}`);
 
   // Log workflow start
   await logNewsletterActivity(
@@ -61,7 +61,8 @@ export async function newsletterSendingWorkflow(
     {
       groupUUID: input.groupUUID,
       recipientCount: input.recipients.length,
-      tenantId: input.tenantId
+      tenantId: input.tenantId,
+      source: 'temporal-server'
     }
   );
 
@@ -73,23 +74,23 @@ export async function newsletterSendingWorkflow(
     });
 
     // Process newsletter sending in batches
-    const batchSize = 50; // Send 50 emails at a time
+    const batchSize = parseInt(process.env.NEWSLETTER_BATCH_SIZE || '50');
     const batches = [];
     
     for (let i = 0; i < input.recipients.length; i += batchSize) {
       batches.push(input.recipients.slice(i, i + batchSize));
     }
 
-    console.log(`Processing ${batches.length} batches for newsletter ${input.newsletterId}`);
+    console.log(`📦 Processing ${batches.length} batches for newsletter ${input.newsletterId} (batch size: ${batchSize})`);
 
     let totalSuccessful = 0;
     let totalFailed = 0;
 
-    // Process each batch
+    // Process each batch sequentially to avoid overwhelming email services
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
       const batch = batches[batchIndex];
       
-      console.log(`Processing batch ${batchIndex + 1}/${batches.length} with ${batch.length} recipients`);
+      console.log(`📬 Processing batch ${batchIndex + 1}/${batches.length} with ${batch.length} recipients`);
 
       try {
         const batchResult = await processNewsletterBatch({
@@ -115,12 +116,18 @@ export async function newsletterSendingWorkflow(
             totalBatches: batches.length,
             batchSuccessful: batchResult.successful,
             batchFailed: batchResult.failed,
-            runningTotal: { successful: totalSuccessful, failed: totalFailed }
+            runningTotal: { successful: totalSuccessful, failed: totalFailed },
+            emailResults: batchResult.results.map(r => ({
+              success: r.success,
+              messageId: r.messageId,
+              provider: r.provider,
+              error: r.error
+            }))
           }
         );
 
       } catch (batchError) {
-        console.error(`Batch ${batchIndex + 1} failed:`, batchError);
+        console.error(`❌ Batch ${batchIndex + 1} failed:`, batchError);
         
         // Log batch failure
         await logNewsletterActivity(
@@ -140,12 +147,13 @@ export async function newsletterSendingWorkflow(
     }
 
     // Update final newsletter status
-    const finalStatus = totalFailed === 0 ? 'sent' : 'partially_sent';
+    const finalStatus = totalFailed === 0 ? 'sent' : totalSuccessful > 0 ? 'partially_sent' : 'failed';
     await updateNewsletterStatus(input.newsletterId, finalStatus, {
       recipientCount: input.recipients.length,
       successfulCount: totalSuccessful,
       failedCount: totalFailed,
-      completedAt: new Date().toISOString()
+      completedAt: new Date().toISOString(),
+      successRate: ((totalSuccessful / input.recipients.length) * 100).toFixed(2) + '%'
     });
 
     // Log workflow completion
@@ -157,7 +165,8 @@ export async function newsletterSendingWorkflow(
         totalRecipients: input.recipients.length,
         successful: totalSuccessful,
         failed: totalFailed,
-        finalStatus
+        finalStatus,
+        successRate: ((totalSuccessful / input.recipients.length) * 100).toFixed(2) + '%'
       }
     );
 
@@ -170,11 +179,11 @@ export async function newsletterSendingWorkflow(
       completedAt: new Date().toISOString()
     };
 
-    console.log(`Newsletter workflow completed for ${input.newsletterId}:`, result);
+    console.log(`✅ Newsletter workflow completed for ${input.newsletterId}:`, result);
     return result;
 
   } catch (error) {
-    console.error(`Newsletter workflow failed for ${input.newsletterId}:`, error);
+    console.error(`❌ Newsletter workflow failed for ${input.newsletterId}:`, error);
 
     // Update newsletter status to failed
     await updateNewsletterStatus(input.newsletterId, 'failed', {
