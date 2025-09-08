@@ -859,7 +859,7 @@ export class DatabaseStorage implements IStorage {
         metadata: JSON.stringify(metadata || {})
       });
     } catch (error) {
-      storageLogger.error('Failed to log shop limit event:', error);
+      storageLogger.error('Failed to log shop limit event:', error instanceof Error ? error.message : String(error));
       // Don't throw - logging failures shouldn't break the main flow
     }
   }

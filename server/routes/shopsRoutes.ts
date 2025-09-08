@@ -111,6 +111,17 @@ shopsRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator", 
       }
     }
 
+    // Validate required fields
+    if (!sanitizedPhone || !sanitizedEmail) {
+      return res.status(400).json({ 
+        message: 'Phone and email are required fields',
+        missingFields: {
+          phone: !sanitizedPhone,
+          email: !sanitizedEmail
+        }
+      });
+    }
+
     const newShop = await db.insert(shops).values({
       name: sanitizedName,
       description: sanitizedDescription,
