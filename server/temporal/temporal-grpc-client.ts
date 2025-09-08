@@ -3,6 +3,7 @@ import * as protoLoader from '@grpc/proto-loader';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { temporalLogger } from '../logger';
 
 // GRPC client types (matching the proto definitions)
 export interface NewsletterRequest {
@@ -91,9 +92,9 @@ export class TemporalGrpcClient {
       );
 
       this.connected = true;
-      console.log(`✅ GRPC clients initialized for ${this.serverAddress}`);
+      temporalLogger.info(`✅ GRPC clients initialized for ${this.serverAddress}`);
     } catch (error) {
-      console.error('❌ Failed to initialize GRPC clients:', error);
+      temporalLogger.error('❌ Failed to initialize GRPC clients:', error);
       this.connected = false;
     }
   }
@@ -106,10 +107,10 @@ export class TemporalGrpcClient {
     return new Promise((resolve, reject) => {
       this.newsletterClient.sendNewsletter(request, (error: any, response: NewsletterResponse) => {
         if (error) {
-          console.error('❌ GRPC sendNewsletter error:', error);
+          temporalLogger.error('❌ GRPC sendNewsletter error:', error);
           reject(error);
         } else {
-          console.log(`✅ Newsletter workflow started via GRPC: ${response.workflow_id}`);
+          temporalLogger.info(`✅ Newsletter workflow started via GRPC: ${response.workflow_id}`);
           resolve(response);
         }
       });
@@ -126,7 +127,7 @@ export class TemporalGrpcClient {
         { workflow_id: workflowId },
         (error: any, response: any) => {
           if (error) {
-            console.error('❌ GRPC getNewsletterStatus error:', error);
+            temporalLogger.error('❌ GRPC getNewsletterStatus error:', error);
             reject(error);
           } else {
             resolve(response);
@@ -146,7 +147,7 @@ export class TemporalGrpcClient {
         { workflow_id: workflowId },
         (error: any, response: any) => {
           if (error) {
-            console.error('❌ GRPC cancelNewsletter error:', error);
+            temporalLogger.error('❌ GRPC cancelNewsletter error:', error);
             reject(error);
           } else {
             resolve(response);
@@ -164,10 +165,10 @@ export class TemporalGrpcClient {
     return new Promise((resolve, reject) => {
       this.workflowClient.startWorkflow(request, (error: any, response: WorkflowResponse) => {
         if (error) {
-          console.error('❌ GRPC startWorkflow error:', error);
+          temporalLogger.error('❌ GRPC startWorkflow error:', error);
           reject(error);
         } else {
-          console.log(`✅ Workflow started via GRPC: ${response.workflow_id}`);
+          temporalLogger.info(`✅ Workflow started via GRPC: ${response.workflow_id}`);
           resolve(response);
         }
       });
@@ -184,7 +185,7 @@ export class TemporalGrpcClient {
         { workflow_id: workflowId },
         (error: any, response: any) => {
           if (error) {
-            console.error('❌ GRPC getWorkflowResult error:', error);
+            temporalLogger.error('❌ GRPC getWorkflowResult error:', error);
             reject(error);
           } else {
             resolve(response);
@@ -208,7 +209,7 @@ export class TemporalGrpcClient {
     return new Promise((resolve, reject) => {
       this.workflowClient.signalWorkflow(request, (error: any, response: any) => {
         if (error) {
-          console.error('❌ GRPC signalWorkflow error:', error);
+          temporalLogger.error('❌ GRPC signalWorkflow error:', error);
           reject(error);
         } else {
           resolve(response);
@@ -227,7 +228,7 @@ export class TemporalGrpcClient {
         { workflow_id: workflowId },
         (error: any, response: any) => {
           if (error) {
-            console.error('❌ GRPC cancelWorkflow error:', error);
+            temporalLogger.error('❌ GRPC cancelWorkflow error:', error);
             reject(error);
           } else {
             resolve(response);
@@ -250,9 +251,9 @@ export class TemporalGrpcClient {
         this.workflowClient.close();
       }
       this.connected = false;
-      console.log('✅ GRPC clients disconnected');
+      temporalLogger.info('✅ GRPC clients disconnected');
     } catch (error) {
-      console.error('❌ Error disconnecting GRPC clients:', error);
+      temporalLogger.error('❌ Error disconnecting GRPC clients:', error);
     }
   }
 }

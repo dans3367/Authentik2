@@ -15,6 +15,7 @@ import {
 } from "./middleware/security";
 import { auth } from "./auth";
 import { toNodeHandler } from "better-auth/node";
+import { serverLogger } from "./logger";
 
 const app = express();
 
@@ -131,31 +132,31 @@ app.use((req, res, next) => {
   try {
     await initializeDatabase();
   } catch (error) {
-    console.error("Failed to initialize database:", error);
+    serverLogger.error("Failed to initialize database:", error);
     process.exit(1);
   }
 
   // Check server-node connectivity
-  console.log('🔄 Checking service connectivity...');
+  serverLogger.info('🔄 Checking service connectivity...');
   try {
-    console.log('📊 Service Architecture:');
-    console.log('   🌐 Main Server: localhost:3500 (Authentication & Proxy)');
-    console.log('   🤖 server-node: localhost:3502 (Temporal Client)');
-    console.log('   ⚡ temporal-server: localhost:50051 (GRPC Bridge)');
+    serverLogger.info('📊 Service Architecture:');
+    serverLogger.info('   🌐 Main Server: localhost:3500 (Authentication & Proxy)');
+    serverLogger.info('   🤖 server-node: localhost:3502 (Temporal Client)');
+    serverLogger.info('   ⚡ temporal-server: localhost:50051 (GRPC Bridge)');
     
     // Test connectivity to server-node
     try {
       const response = await fetch('http://localhost:3502/health');
       if (response.ok) {
-        console.log('   ✅ server-node: Connected');
+        serverLogger.info('   ✅ server-node: Connected');
       } else {
-        console.log('   ⚠️  server-node: Responding but not healthy');
+        serverLogger.warn('   ⚠️  server-node: Responding but not healthy');
       }
     } catch (error) {
-      console.log('   ❌ server-node: Disconnected (will proxy anyway)');
+      serverLogger.warn('   ❌ server-node: Disconnected (will proxy anyway)');
     }
   } catch (error) {
-    console.log('   🔧 Continuing with proxy setup...');
+    serverLogger.info('   🔧 Continuing with proxy setup...');
   }
 
   const server = await registerRoutes(app);
@@ -164,7 +165,7 @@ app.use((req, res, next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    console.error('Server error:', err);
+    serverLogger.error('Server error:', err);
     res.status(status).json({ message });
   });
 

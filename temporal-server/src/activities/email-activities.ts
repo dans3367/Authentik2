@@ -5,6 +5,7 @@ import { Resend } from 'resend';
 import dotenv from 'dotenv';
 import path from 'path';
 import { Client as PostmarkClient } from 'postmark';
+import { activityLogger } from '../logger';
 
 interface EmailProvider {
   name: 'resend' | 'postmark';
@@ -50,17 +51,17 @@ class EmailServiceManager {
     
     // In Replit, secrets are available directly in process.env
     // Log what we have for debugging
-    console.log(
+    activityLogger.debug(
       `🧪 [EmailEnv] Loaded local .env: ${localEnv.error ? 'no' : 'yes'} | loaded root .env (${rootEnvPath}): ${rootEnv.error ? 'no' : 'yes'}`
     );
-    console.log(
+    activityLogger.debug(
       `🧪 [EmailEnv] RESEND_API_KEY present: ${process.env.RESEND_API_KEY ? 'yes (from env)' : 'no'} | POSTMARK_API_KEY present: ${process.env.POSTMARK_API_KEY ? 'yes' : 'no'}`
     );
     
     // Debug: Check if we have the key
     if (process.env.RESEND_API_KEY) {
       const maskedKey = process.env.RESEND_API_KEY.substring(0, 10) + '...';
-      console.log(`✅ [EmailEnv] Found RESEND_API_KEY in environment: ${maskedKey}`);
+      activityLogger.info(`✅ [EmailEnv] Found RESEND_API_KEY in environment: ${maskedKey}`);
     }
 
     this.initializeProviders();
@@ -74,18 +75,18 @@ class EmailServiceManager {
       const masked = resendApiKey.length > 6
         ? `${resendApiKey.slice(0, 4)}...${resendApiKey.slice(-2)}`
         : '***';
-      console.log(`✅ Resend client initialized (key: ${masked})`);
+      activityLogger.info(`✅ Resend client initialized (key: ${masked})`);
     } else {
-      console.warn('⚠️ RESEND_API_KEY not found in environment');
+      activityLogger.warn('⚠️ RESEND_API_KEY not found in environment');
     }
 
     // Initialize Postmark
     const postmarkApiKey = process.env.POSTMARK_API_KEY;
     if (postmarkApiKey) {
       this.postmark = new PostmarkClient(postmarkApiKey);
-      console.log('✅ Postmark client initialized');
+      activityLogger.info('✅ Postmark client initialized');
     } else {
-      console.warn('⚠️ POSTMARK_API_KEY not found in environment');
+      activityLogger.warn('⚠️ POSTMARK_API_KEY not found in environment');
     }
 
     // Set primary provider based on configuration
@@ -100,7 +101,7 @@ class EmailServiceManager {
       throw new Error('No email providers configured. Set RESEND_API_KEY or POSTMARK_API_KEY.');
     }
 
-    console.log(
+    activityLogger.info(
       `📧 Primary email provider set to: ${this.primaryProvider} (configured=${configuredProvider || 'unset'})`
     );
   }
@@ -111,7 +112,7 @@ class EmailServiceManager {
     }
 
     try {
-      console.log(
+      activityLogger.debug(
         `➡️ [Resend] Sending email to=${request.to} from=${request.from} subject="${request.subject}" tags=${(request.tags || []).join(',')}`
       );
       const result = await this.resend.emails.send({
@@ -124,16 +125,16 @@ class EmailServiceManager {
         ...(request.metadata && { metadata: request.metadata }),
       });
 
-      console.log(result);
+      activityLogger.debug('Resend API result:', result);
 
-      console.log(`✅ [Resend] API response id=${result.data?.id} error=${result.error ? JSON.stringify(result.error) : 'none'}`);
+      activityLogger.info(`✅ [Resend] API response id=${result.data?.id} error=${result.error ? JSON.stringify(result.error) : 'none'}`);
       return {
         success: true,
         messageId: result.data?.id,
         provider: 'resend',
       };
     } catch (error: unknown) {
-      console.error('❌ [Resend] Send failed:', error);
+      activityLogger.error('❌ [Resend] Send failed:', error);
       return {
         success: false,
         error: getErrorMessage(error) || 'Unknown error occurred with Resend',
@@ -148,7 +149,7 @@ class EmailServiceManager {
     }
 
     try {
-      console.log(
+      activityLogger.debug(
         `➡️ [Postmark] Sending email to=${request.to} from=${request.from} subject="${request.subject}" tag=${request.tags?.[0] || ''}`
       );
       const result = await this.postmark.sendEmail({
@@ -161,14 +162,14 @@ class EmailServiceManager {
         Metadata: request.metadata,
       });
 
-      console.log(`✅ [Postmark] API response MessageID=${result.MessageID} ErrorCode=${result.ErrorCode}`);
+      activityLogger.info(`✅ [Postmark] API response MessageID=${result.MessageID} ErrorCode=${result.ErrorCode}`);
       return {
         success: true,
         messageId: result.MessageID,
         provider: 'postmark',
       };
     } catch (error: unknown) {
-      console.error('❌ [Postmark] Send failed:', error);
+      activityLogger.error('❌ [Postmark] Send failed:', error);
       return {
         success: false,
         error: getErrorMessage(error) || 'Unknown error occurred with Postmark',
@@ -181,18 +182,18 @@ class EmailServiceManager {
     const provider = this.primaryProvider;
     
     try {
-      console.log(`📤 [EmailService] Using provider=${provider} to=${request.to}`);
+      activityLogger.info(`📤 [EmailService] Using provider=${provider} to=${request.to}`);
       if (provider === 'resend') {
         return await this.sendViaResend(request);
       } else {
         return await this.sendViaPostmark(request);
       }
     } catch (error: unknown) {
-      console.error(`❌ Primary provider ${provider} failed:`, error);
+      activityLogger.error(`❌ Primary provider ${provider} failed:`, error);
       
       // Try fallback provider
       const fallbackProvider = provider === 'resend' ? 'postmark' : 'resend';
-      console.log(`🔄 Attempting fallback to ${fallbackProvider}`);
+      activityLogger.info(`🔄 Attempting fallback to ${fallbackProvider}`);
       
       try {
         if (fallbackProvider === 'resend' && this.resend) {
@@ -203,7 +204,7 @@ class EmailServiceManager {
           throw new Error(`Fallback provider ${fallbackProvider} not available`);
         }
       } catch (fallbackError: unknown) {
-        console.error(`❌ Fallback provider ${fallbackProvider} also failed:`, fallbackError);
+        activityLogger.error(`❌ Fallback provider ${fallbackProvider} also failed:`, fallbackError);
         throw new Error(
           `Both email providers failed. Primary: ${getErrorMessage(error)}, Fallback: ${getErrorMessage(fallbackError)}`
         );
@@ -234,7 +235,7 @@ export async function sendEmail(
   tags?: string[],
   metadata?: Record<string, any>
 ): Promise<SendEmailResult> {
-  console.log(`📧 Sending email to ${to} via ${emailManager.getAvailableProviders().join(', ')}`);
+  activityLogger.info(`📧 Sending email to ${to} via ${emailManager.getAvailableProviders().join(', ')}`);
 
   try {
     const result = await emailManager.sendEmail({
@@ -248,14 +249,14 @@ export async function sendEmail(
     });
 
     if (result.success) {
-      console.log(`✅ Email sent successfully to ${to} via ${result.provider} (ID: ${result.messageId})`);
+      activityLogger.info(`✅ Email sent successfully to ${to} via ${result.provider} (ID: ${result.messageId})`);
     } else {
-      console.error(`❌ Failed to send email to ${to}:`, result.error);
+      activityLogger.error(`❌ Failed to send email to ${to}:`, result.error);
     }
 
     return result;
   } catch (error: unknown) {
-    console.error(`❌ Email sending failed for ${to}:`, error);
+    activityLogger.error(`❌ Email sending failed for ${to}:`, error);
     return {
       success: false,
       error: getErrorMessage(error) || 'Unknown error occurred',
@@ -271,7 +272,7 @@ export async function sendBulkEmails(
   emails: SendEmailRequest[],
   rateLimitPerMinute: number = 100
 ): Promise<SendEmailResult[]> {
-  console.log(`📧 Sending ${emails.length} bulk emails with rate limit ${rateLimitPerMinute}/min`);
+  activityLogger.info(`📧 Sending ${emails.length} bulk emails with rate limit ${rateLimitPerMinute}/min`);
 
   const results: SendEmailResult[] = [];
   const delayBetweenEmails = (60 * 1000) / rateLimitPerMinute; // ms delay between emails
@@ -299,7 +300,7 @@ export async function sendBulkEmails(
   const successful = results.filter(r => r.success).length;
   const failed = results.length - successful;
   
-  console.log(`✅ Bulk email sending completed: ${successful} successful, ${failed} failed`);
+  activityLogger.info(`✅ Bulk email sending completed: ${successful} successful, ${failed} failed`);
   return results;
 }
 
@@ -316,7 +317,7 @@ export async function sendEmailViaResend(
   tags?: string[],
   metadata?: Record<string, any>
 ): Promise<SendEmailResult> {
-  console.log(`📧 [Activity] sendEmailViaResend to=${to}`);
+  activityLogger.debug(`📧 [Activity] sendEmailViaResend to=${to}`);
   try {
     return await emailManager.sendViaResend({
       to,
@@ -328,7 +329,7 @@ export async function sendEmailViaResend(
       metadata,
     });
   } catch (error: unknown) {
-    console.error('❌ [Activity] sendEmailViaResend failed:', error);
+    activityLogger.error('❌ [Activity] sendEmailViaResend failed:', error);
     return {
       success: false,
       error: getErrorMessage(error),
@@ -349,7 +350,7 @@ export async function sendEmailViaPostmark(
   tags?: string[],
   metadata?: Record<string, any>
 ): Promise<SendEmailResult> {
-  console.log(`📧 [Activity] sendEmailViaPostmark to=${to}`);
+  activityLogger.debug(`📧 [Activity] sendEmailViaPostmark to=${to}`);
   try {
     return await emailManager.sendViaPostmark({
       to,
@@ -361,7 +362,7 @@ export async function sendEmailViaPostmark(
       metadata,
     });
   } catch (error: unknown) {
-    console.error('❌ [Activity] sendEmailViaPostmark failed:', error);
+    activityLogger.error('❌ [Activity] sendEmailViaPostmark failed:', error);
     return {
       success: false,
       error: getErrorMessage(error),
@@ -375,7 +376,7 @@ export async function sendEmailViaPostmark(
  */
 export function getAvailableEmailProviders(): string[] {
   const providers = emailManager.getAvailableProviders();
-  console.log(`🔎 [Activity] Available email providers: ${providers.join(', ') || 'none'}`);
+  activityLogger.debug(`🔎 [Activity] Available email providers: ${providers.join(', ') || 'none'}`);
   return providers;
 }
 

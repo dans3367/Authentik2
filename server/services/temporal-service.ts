@@ -2,6 +2,7 @@
  * Temporal Service for GRPC communication with Temporal server
  */
 import { TemporalGrpcClient } from '../temporal/temporal-grpc-client';
+import { temporalLogger } from '../logger';
 
 export interface NewsletterRequest {
   newsletter_id: string;
@@ -40,13 +41,13 @@ class TemporalService {
   }
 
   private async initialize() {
-    console.log('🔄 [TemporalService] Initializing GRPC connection to Temporal server...');
+    temporalLogger.info('🔄 [TemporalService] Initializing GRPC connection to Temporal server...');
     
     try {
       // Get Temporal server address from environment or use default
       const temporalServerAddress = process.env.TEMPORAL_GRPC_SERVER || 'localhost:50051';
       
-      console.log(`🌐 [TemporalService] Connecting to Temporal GRPC server at: ${temporalServerAddress}`);
+      temporalLogger.info(`🌐 [TemporalService] Connecting to Temporal GRPC server at: ${temporalServerAddress}`);
       
       // Initialize actual GRPC client
       this.client = new TemporalGrpcClient(temporalServerAddress);
@@ -56,14 +57,14 @@ class TemporalService {
       
       this.isConnected = true;
       this.connectionStatus = 'connected';
-      console.log('✅ [TemporalService] GRPC connection to Temporal server established successfully');
+      temporalLogger.info('✅ [TemporalService] GRPC connection to Temporal server established successfully');
     } catch (error) {
-      console.error('❌ [TemporalService] Failed to establish GRPC connection to Temporal server:', error);
+      temporalLogger.error('❌ [TemporalService] Failed to establish GRPC connection to Temporal server:', error);
       this.isConnected = false;
       this.connectionStatus = `failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
       
       // Fallback to mock client for development
-      console.log('🔧 [TemporalService] Falling back to mock temporal client for development');
+      temporalLogger.warn('🔧 [TemporalService] Falling back to mock temporal client for development');
       this.client = {
         sendNewsletter: this.sendNewsletterMock.bind(this),
         isConnected: () => false
@@ -77,12 +78,12 @@ class TemporalService {
     }
 
     // Test the connection by calling a simple method
-    console.log('🔍 [TemporalService] Testing GRPC connection...');
+    temporalLogger.info('🔍 [TemporalService] Testing GRPC connection...');
     
     // Add a small delay to allow connection to establish
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    console.log('✅ [TemporalService] GRPC connection test completed');
+    temporalLogger.info('✅ [TemporalService] GRPC connection test completed');
   }
 
   public getClient() {
@@ -99,7 +100,7 @@ class TemporalService {
 
   private async sendNewsletterMock(request: NewsletterRequest): Promise<NewsletterResponse> {
     try {
-      console.log(`[TemporalService] Sending newsletter workflow request (MOCK) for: ${request.newsletter_id}`);
+      temporalLogger.info(`[TemporalService] Sending newsletter workflow request (MOCK) for: ${request.newsletter_id}`);
       
       // Simulate GRPC call to temporal server (development fallback)
       const workflowId = `newsletter-${request.newsletter_id}-${Date.now()}`;
@@ -116,14 +117,14 @@ class TemporalService {
         group_uuid: request.group_uuid
       };
       
-      console.log(`[TemporalService] Newsletter workflow created successfully (MOCK):`, {
+      temporalLogger.info(`[TemporalService] Newsletter workflow created successfully (MOCK):`, {
         workflowId: response.workflow_id,
         newsletterId: response.newsletter_id
       });
       
       return response;
     } catch (error) {
-      console.error(`[TemporalService] Failed to send newsletter workflow (MOCK):`, error);
+      temporalLogger.error(`[TemporalService] Failed to send newsletter workflow (MOCK):`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -143,7 +144,7 @@ class TemporalService {
       
       return this.isConnected;
     } catch (error) {
-      console.error('[TemporalService] Health check failed:', error);
+      temporalLogger.error('[TemporalService] Health check failed:', error);
       return false;
     }
   }

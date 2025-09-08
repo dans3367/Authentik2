@@ -99,6 +99,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gt, lt, gte, lte, desc, ne, or, ilike, count, sql, inArray, not, isNull } from "drizzle-orm";
+import { storageLogger } from "./logger";
 
 export interface IStorage {
   // Tenant management
@@ -858,7 +859,7 @@ export class DatabaseStorage implements IStorage {
         metadata: JSON.stringify(metadata || {})
       });
     } catch (error) {
-      console.error('Failed to log shop limit event:', error);
+      storageLogger.error('Failed to log shop limit event:', error);
       // Don't throw - logging failures shouldn't break the main flow
     }
   }

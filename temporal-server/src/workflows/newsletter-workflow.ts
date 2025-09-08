@@ -1,5 +1,6 @@
 import { proxyActivities } from '@temporalio/workflow';
 import type * as activities from '../activities';
+import { workflowLogger } from '../logger';
 
 // Proxy activities to be used in workflows
 const { 
@@ -53,7 +54,7 @@ export interface NewsletterWorkflowResult {
 export async function newsletterSendingWorkflow(
   input: NewsletterWorkflowInput
 ): Promise<NewsletterWorkflowResult> {
-  console.log(`🚀 Starting newsletter sending workflow for newsletter ${input.newsletterId}`);
+  workflowLogger.info(`🚀 Starting newsletter sending workflow for newsletter ${input.newsletterId}`);
 
   // Log workflow start
   await logNewsletterActivity(
@@ -83,7 +84,7 @@ export async function newsletterSendingWorkflow(
       batches.push(input.recipients.slice(i, i + batchSize));
     }
 
-    console.log(`📦 Processing ${batches.length} batches for newsletter ${input.newsletterId} (batch size: ${batchSize})`);
+    workflowLogger.info(`📦 Processing ${batches.length} batches for newsletter ${input.newsletterId} (batch size: ${batchSize})`);
 
     let totalSuccessful = 0;
     let totalFailed = 0;
@@ -92,7 +93,7 @@ export async function newsletterSendingWorkflow(
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
       const batch = batches[batchIndex];
       
-      console.log(`📬 Processing batch ${batchIndex + 1}/${batches.length} with ${batch.length} recipients`);
+      workflowLogger.info(`📬 Processing batch ${batchIndex + 1}/${batches.length} with ${batch.length} recipients`);
 
       try {
         const batchResult = await processNewsletterBatch({
@@ -129,7 +130,7 @@ export async function newsletterSendingWorkflow(
         );
 
       } catch (batchError) {
-        console.error(`❌ Batch ${batchIndex + 1} failed:`, batchError);
+        workflowLogger.error(`❌ Batch ${batchIndex + 1} failed:`, batchError);
         
         // Log batch failure
         await logNewsletterActivity(
@@ -181,11 +182,11 @@ export async function newsletterSendingWorkflow(
       completedAt: new Date().toISOString()
     };
 
-    console.log(`✅ Newsletter workflow completed for ${input.newsletterId}:`, result);
+    workflowLogger.info(`✅ Newsletter workflow completed for ${input.newsletterId}:`, result);
     return result;
 
   } catch (error) {
-    console.error(`❌ Newsletter workflow failed for ${input.newsletterId}:`, error);
+    workflowLogger.error(`❌ Newsletter workflow failed for ${input.newsletterId}:`, error);
 
     // Update newsletter status to failed
     await updateNewsletterStatus(input.newsletterId, 'failed', {

@@ -2,6 +2,7 @@ import { Client, Connection, WorkflowHandle } from '@temporalio/client';
 import { Worker, Runtime, DefaultLogger, LogEntry, NativeConnection } from '@temporalio/worker';
 import * as activities from '../activities';
 import * as workflows from '../workflows';
+import { workerLogger } from '../logger';
 
 export class TemporalWorkerService {
   private client: Client | null = null;
@@ -21,12 +22,12 @@ export class TemporalWorkerService {
       try {
         Runtime.install({
           logger: new DefaultLogger('DEBUG', (entry: LogEntry) => {
-            console.log(`[Temporal ${entry.level}] ${entry.message}`);
+            workerLogger.debug(`[Temporal ${entry.level}] ${entry.message}`);
           }),
         });
       } catch (e: unknown) {
         if (e instanceof Error && e.message.includes('already been instantiated')) {
-          console.warn('⚠️ Temporal Runtime already installed; continuing');
+          workerLogger.warn('⚠️ Temporal Runtime already installed; continuing');
         } else {
           throw e;
         }
@@ -42,10 +43,10 @@ export class TemporalWorkerService {
       this.client = new Client({ connection: this.connection, namespace: this.namespace });
 
       // Create worker
-      console.log(`🔧 Creating worker with configuration:`);
-      console.log(`   - Address: ${this.temporalAddress}`);
-      console.log(`   - Namespace: ${this.namespace}`);
-      console.log(`   - Task Queue: ${this.taskQueue}`);
+      workerLogger.info(`🔧 Creating worker with configuration:`);
+      workerLogger.info(`   - Address: ${this.temporalAddress}`);
+      workerLogger.info(`   - Namespace: ${this.namespace}`);
+      workerLogger.info(`   - Task Queue: ${this.taskQueue}`);
       
       this.worker = await Worker.create({
         connection: this.nativeConnection,
@@ -55,13 +56,13 @@ export class TemporalWorkerService {
         activities,
       });
 
-      console.log(`✅ Temporal connections established: ${this.temporalAddress}`);
-      console.log(`✅ Worker configured for task queue: ${this.taskQueue}`);
-      console.log(
+      workerLogger.info(`✅ Temporal connections established: ${this.temporalAddress}`);
+      workerLogger.info(`✅ Worker configured for task queue: ${this.taskQueue}`);
+      workerLogger.info(
         `🧩 Workflows loaded: ${Object.keys(workflows).join(', ') || 'none'} | Activities loaded: ${Object.keys(activities).join(', ') || 'none'}`
       );
     } catch (error) {
-      console.error('❌ Failed to initialize Temporal:', error);
+      workerLogger.error('❌ Failed to initialize Temporal:', error);
       throw error;
     }
   }
@@ -74,12 +75,12 @@ export class TemporalWorkerService {
     try {
       // Start the worker without awaiting (it runs indefinitely)
       this.worker.run().catch((error) => {
-        console.error('❌ Temporal Worker error:', error);
+        workerLogger.error('❌ Temporal Worker error:', error);
         process.exit(1);
       });
-      console.log('✅ Temporal Worker is running and polling for tasks');
+      workerLogger.info('✅ Temporal Worker is running and polling for tasks');
     } catch (error) {
-      console.error('❌ Failed to start Temporal Worker:', error);
+      workerLogger.error('❌ Failed to start Temporal Worker:', error);
       throw error;
     }
   }
@@ -102,9 +103,9 @@ export class TemporalWorkerService {
       }
 
       this.client = null;
-      console.log('✅ Temporal services shut down');
+      workerLogger.info('✅ Temporal services shut down');
     } catch (error) {
-      console.error('❌ Error during Temporal shutdown:', error);
+      workerLogger.error('❌ Error during Temporal shutdown:', error);
       throw error;
     }
   }
@@ -127,7 +128,7 @@ export class TemporalWorkerService {
 
       return handle;
     } catch (error) {
-      console.error(`❌ Failed to start workflow ${workflowType}:`, error);
+      workerLogger.error(`❌ Failed to start workflow ${workflowType}:`, error);
       throw error;
     }
   }
@@ -145,7 +146,7 @@ export class TemporalWorkerService {
       const handle = await this.getWorkflowHandle(workflowId);
       return await handle.result();
     } catch (error) {
-      console.error(`❌ Failed to get workflow result for ${workflowId}:`, error);
+      workerLogger.error(`❌ Failed to get workflow result for ${workflowId}:`, error);
       throw error;
     }
   }
@@ -155,7 +156,7 @@ export class TemporalWorkerService {
       const handle = await this.getWorkflowHandle(workflowId);
       await handle.signal(signalName, payload);
     } catch (error) {
-      console.error(`❌ Failed to signal workflow ${workflowId}:`, error);
+      workerLogger.error(`❌ Failed to signal workflow ${workflowId}:`, error);
       throw error;
     }
   }
@@ -165,7 +166,7 @@ export class TemporalWorkerService {
       const handle = await this.getWorkflowHandle(workflowId);
       await handle.cancel();
     } catch (error) {
-      console.error(`❌ Failed to cancel workflow ${workflowId}:`, error);
+      workerLogger.error(`❌ Failed to cancel workflow ${workflowId}:`, error);
       throw error;
     }
   }
