@@ -81,6 +81,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/auth", loginRoutes);
   app.use("/api/tenant-limits", tenantLimitsRoutes);
 
+  // Temporal workflow endpoints - proxy to server-node
+  app.post("/api/temporal/clear-workflows", authenticateToken, async (req: any, res) => {
+    try {
+      console.log('🧹 [Temporal Proxy] Forwarding workflow cleanup request to server-node for tenant:', req.user.tenantId);
+      
+      // Forward request to server-node with authentication
+      const response = await fetch('http://localhost:3502/api/temporal/clear-workflows', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': req.headers.authorization || '',
+        },
+        body: JSON.stringify({
+          tenantId: req.user.tenantId,
+          userId: req.user.id
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [Temporal Proxy] server-node returned error:', response.status, errorText);
+        return res.status(response.status).json({
+          success: false,
+          message: 'server-node request failed',
+          error: errorText
+        });
+      }
+
+      const result = await response.json();
+      console.log('✅ [Temporal Proxy] server-node response:', result);
+      res.json(result);
+    } catch (error) {
+      console.error('❌ [Temporal Proxy] Failed to communicate with server-node:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to communicate with temporal service',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Email tracking endpoints - proxy to server-node
+  app.get("/api/email-tracking", authenticateToken, async (req: any, res) => {
+    try {
+      console.log('📧 [Email Tracking Proxy] Forwarding GET request to server-node for tenant:', req.user.tenantId);
+      
+      // Forward request to server-node with authentication
+      const response = await fetch('http://localhost:3502/api/email-tracking', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': req.headers.authorization || '',
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [Email Tracking Proxy] server-node returned error:', response.status, errorText);
+        return res.status(response.status).json({
+          success: false,
+          message: 'server-node request failed',
+          error: errorText
+        });
+      }
+
+      const result = await response.json();
+      res.json(result);
+    } catch (error) {
+      console.error('❌ [Email Tracking Proxy] Failed to communicate with server-node:', error);
+      res.status(500).json({ message: 'Failed to get email tracking data' });
+    }
+  });
+
+  app.post("/api/email-tracking", authenticateToken, async (req: any, res) => {
+    try {
+      console.log('📧 [Email Tracking Proxy] Forwarding POST request to server-node for tenant:', req.user.tenantId);
+      
+      // Add user context to request body
+      const requestBody = {
+        ...req.body,
+        tenantId: req.user.tenantId,
+        userId: req.user.id
+      };
+
+      // Forward request to server-node with authentication
+      const sessionToken = req.cookies?.['better-auth.session_token'];
+      const response = await fetch('http://localhost:3502/api/email-tracking', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': sessionToken ? `Bearer ${sessionToken}` : '',
+          'Cookie': sessionToken ? `better-auth.session_token=${sessionToken}` : '',
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [Email Tracking Proxy] server-node returned error:', response.status, errorText);
+        return res.status(response.status).json({
+          success: false,
+          message: 'server-node request failed',
+          error: errorText
+        });
+      }
+
+      const result = await response.json();
+      console.log('✅ [Email Tracking Proxy] server-node response:', result);
+      res.json(result);
+    } catch (error) {
+      console.error('❌ [Email Tracking Proxy] Failed to communicate with server-node:', error);
+      res.status(500).json({ 
+        success: false,
+        message: 'Failed to process email request',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Legacy routes for backward compatibility (if needed)
   // These can be removed once all clients are updated
   // Note: Auth routes removed - better-auth handles authentication

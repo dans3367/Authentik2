@@ -60,7 +60,7 @@ export default function NewsletterCreatePage() {
   const { data: serverHealth, isLoading: healthLoading, error: healthError } = useQuery({
     queryKey: ['/go-server-health'],
     queryFn: async () => {
-      const response = await fetch('https://tenginex.zendwise.work/health');
+      const response = await fetch('/api/dev/health');
       if (!response.ok) throw new Error('Go server not available');
       return response.json();
     },

@@ -5,7 +5,7 @@ import { authenticateToken, requireTenant } from '../middleware/auth-middleware'
 import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, betterAuthUser, emailContacts, contactTagAssignments } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 import { emailService, enhancedEmailService } from '../emailService';
-import { temporalService } from '../services/temporal-service';
+// Temporal service removed - now using server-node proxy
 import crypto from 'crypto';
 
 export const newsletterRoutes = Router();
@@ -689,9 +689,30 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
           }
         };
 
-        // Send to temporal server via GRPC
-        const temporalClient = temporalService.getClient();
-        const temporalResponse = await temporalClient.sendNewsletter(temporalRequest);
+        // Send to server-node for temporal processing
+        console.log('📧 [Newsletter Proxy] Forwarding newsletter request to server-node');
+        
+        // Get the session token from cookies to forward to server-node
+        const sessionToken = req.cookies?.['better-auth.session_token'];
+        console.log('📧 [Newsletter Proxy] Session token found:', sessionToken ? 'Yes' : 'No');
+        
+        const response = await fetch('http://localhost:3502/api/newsletter/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': sessionToken ? `Bearer ${sessionToken}` : '',
+            'Cookie': sessionToken ? `better-auth.session_token=${sessionToken}` : '',
+          },
+          body: JSON.stringify(temporalRequest)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ [Newsletter Proxy] server-node returned error:', response.status, errorText);
+          throw new Error(`server-node request failed: ${errorText}`);
+        }
+
+        const temporalResponse = await response.json();
 
         if (!temporalResponse.success) {
           throw new Error(`Temporal server returned error: ${temporalResponse.error}`);

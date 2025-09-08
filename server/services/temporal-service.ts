@@ -149,6 +149,6 @@ class TemporalService {
   }
 }
 
-// Export singleton instance
-export const temporalService = new TemporalService();
+// Temporal service removed from main server - now using server-node proxy
+// export const temporalService = new TemporalService();
 

@@ -12,8 +12,8 @@ export class TemporalService {
 
   async connect(): Promise<void> {
     try {
-      const serverUrl = process.env.TEMPORAL_SERVER_URL || '100.125.36.104:7233';
-      const namespace = process.env.TEMPORAL_NAMESPACE || 'default';
+      const serverUrl = '100.125.36.104:7233';
+      const namespace = 'default';
 
       console.log(`Connecting to Temporal server at ${serverUrl}`);
 
@@ -66,12 +66,17 @@ export class TemporalService {
     workflowId: string,
     input?: any
   ): Promise<WorkflowHandle> {
+    console.log(`🚀 [TemporalService] Starting workflow: ${workflowType} with ID: ${workflowId}`);
+    console.log(`📋 [TemporalService] Input data:`, JSON.stringify(input, null, 2));
+    
     if (!this.client) {
+      console.error('❌ [TemporalService] Temporal client not connected');
       throw new Error('Temporal client not connected');
     }
 
     try {
       const taskQueue = process.env.TEMPORAL_TASK_QUEUE || 'authentik-tasks';
+      console.log(`📮 [TemporalService] Using task queue: ${taskQueue}`);
 
       const handle = await this.client.workflow.start(workflowType, {
         workflowId,
@@ -79,14 +84,14 @@ export class TemporalService {
         args: input ? [input] : [],
       });
 
-      console.log(`✅ Started workflow: ${workflowType} with ID: ${workflowId}`);
+      console.log(`✅ [TemporalService] Started workflow: ${workflowType} with ID: ${workflowId}`);
       return handle;
     } catch (error) {
       if (error instanceof WorkflowExecutionAlreadyStartedError) {
-        console.log(`⚠️ Workflow ${workflowId} already started, getting handle`);
+        console.log(`⚠️ [TemporalService] Workflow ${workflowId} already started, getting handle`);
         return this.client.workflow.getHandle(workflowId);
       }
-      console.error(`❌ Failed to start workflow ${workflowType}:`, error);
+      console.error(`❌ [TemporalService] Failed to start workflow ${workflowType}:`, error);
       throw error;
     }
   }

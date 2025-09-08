@@ -20,19 +20,29 @@ devRoutes.get("/health", async (req, res) => {
       dbStatus = `error: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
 
-    // Temporal service status
-    let temporalStatus = null;
+    // server-node service status
+    let serverNodeStatus = null;
     try {
-      const { temporalService } = await import('../services/temporal-service');
-      temporalStatus = {
-        connected: temporalService.isServiceConnected(),
-        status: temporalService.getConnectionStatus(),
-        healthCheck: await temporalService.healthCheck()
-      };
+      const response = await fetch('http://localhost:3502/health', { timeout: 2000 });
+      if (response.ok) {
+        const health = await response.json();
+        serverNodeStatus = {
+          connected: true,
+          status: 'connected',
+          healthCheck: true,
+          response: health
+        };
+      } else {
+        serverNodeStatus = {
+          connected: false,
+          status: `HTTP ${response.status}`,
+          healthCheck: false
+        };
+      }
     } catch (error) {
-      temporalStatus = {
+      serverNodeStatus = {
         connected: false,
-        status: 'error importing service',
+        status: 'connection failed',
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
@@ -45,11 +55,12 @@ devRoutes.get("/health", async (req, res) => {
           status: dbStatus,
           connected: dbStatus === 'connected'
         },
-        temporal: temporalStatus
+        serverNode: serverNodeStatus
       },
       environment: {
         nodeEnv: process.env.NODE_ENV,
-        temporalGrpcServer: process.env.TEMPORAL_GRPC_SERVER || 'localhost:50051'
+        temporalGrpcServer: process.env.TEMPORAL_GRPC_SERVER || 'localhost:50051',
+        serverNodeUrl: 'http://localhost:3502'
       }
     });
   } catch (error) {

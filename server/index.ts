@@ -135,27 +135,27 @@ app.use((req, res, next) => {
     process.exit(1);
   }
 
-  // Initialize Temporal service and show connection status
-  console.log('🔄 Initializing services...');
+  // Check server-node connectivity
+  console.log('🔄 Checking service connectivity...');
   try {
-    // Import temporal service to trigger initialization
-    const { temporalService } = await import('./services/temporal-service');
+    console.log('📊 Service Architecture:');
+    console.log('   🌐 Main Server: localhost:3500 (Authentication & Proxy)');
+    console.log('   🤖 server-node: localhost:3502 (Temporal Client)');
+    console.log('   ⚡ temporal-server: localhost:50051 (GRPC Bridge)');
     
-    // Wait a moment for initialization to complete
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    const isConnected = temporalService.isServiceConnected();
-    const connectionStatus = temporalService.getConnectionStatus();
-    
-    console.log('📊 Service Status:');
-    console.log(`   🤖 Temporal GRPC: ${isConnected ? '✅ Connected' : '❌ Disconnected'} (${connectionStatus})`);
-    
-    if (!isConnected) {
-      console.log('   ⚠️  Temporal server unavailable - using mock client for development');
+    // Test connectivity to server-node
+    try {
+      const response = await fetch('http://localhost:3502/health', { timeout: 1000 });
+      if (response.ok) {
+        console.log('   ✅ server-node: Connected');
+      } else {
+        console.log('   ⚠️  server-node: Responding but not healthy');
+      }
+    } catch (error) {
+      console.log('   ❌ server-node: Disconnected (will proxy anyway)');
     }
   } catch (error) {
-    console.error('❌ Failed to initialize Temporal service:', error);
-    console.log('   🔧 Continuing with mock Temporal client...');
+    console.log('   🔧 Continuing with proxy setup...');
   }
 
   const server = await registerRoutes(app);

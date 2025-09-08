@@ -34,7 +34,7 @@ export default function EmailApprovalsPage() {
     queryKey: ["/go-server-tracking", accessToken],
     queryFn: async () => {
       if (!accessToken) return { entries: [], count: 0 };
-      const response = await fetch("https://tenginex.zendwise.work/api/email-tracking", {
+      const response = await fetch("/api/email-tracking", {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
