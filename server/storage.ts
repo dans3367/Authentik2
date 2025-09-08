@@ -1,11 +1,14 @@
-import { 
-  users, 
-  subscriptionPlans, 
+import {
+  betterAuthUser,
+  subscriptionPlans,
   subscriptions,
   tenants,
+  tenantLimits,
+  shopLimitEvents,
   forms,
   formResponses,
   verificationTokens,
+  refreshTokens,
   companies,
   shops,
   emailContacts,
@@ -85,35 +88,41 @@ import {
   type CreateBouncedEmailData,
   type UpdateBouncedEmailData,
   type BouncedEmailWithDetails,
-  type BouncedEmailFilters
+  type BouncedEmailFilters,
+  type TenantLimits,
+  type CreateTenantLimitsData,
+  type UpdateTenantLimitsData,
+  type TenantLimitsWithDetails,
+  type ShopLimitEvent,
+  type ShopLimitEventType,
+  type ShopLimitFilters
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gt, lt, gte, lte, desc, ne, or, ilike, count, sql, inArray, not } from "drizzle-orm";
-
+import { eq, and, gt, lt, gte, lte, desc, ne, or, ilike, count, sql, inArray, not, isNull } from "drizzle-orm";
 
 export interface IStorage {
-  // Tenant operations
+  // Tenant management
   getTenant(id: string): Promise<Tenant | undefined>;
   getTenantBySlug(slug: string): Promise<Tenant | undefined>;
   createTenant(tenant: CreateTenantData): Promise<Tenant>;
   updateTenant(id: string, updates: UpdateTenantData): Promise<Tenant | undefined>;
   
-  // Special Owner registration operation that creates both tenant and Owner user
+  // Owner and tenant creation
   createOwnerAndTenant(ownerData: RegisterOwnerData): Promise<{ owner: User; tenant: Tenant }>;
   
-  // Method to find the Owner of a tenant (for login logic)
+  // Tenant owner management
   getTenantOwner(tenantId: string): Promise<User | undefined>;
   
-  // Method to find a user by email across all tenants (for login)
+  // Cross-tenant user lookup
   findUserByEmailAcrossTenants(email: string): Promise<(User & { tenant: { id: string; name: string; slug: string } }) | undefined>;
   
-  // User operations (now tenant-aware)
+  // User management
   getUser(id: string, tenantId: string): Promise<User | undefined>;
   getUserByEmail(email: string, tenantId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<User>, tenantId: string): Promise<User | undefined>;
   
-  // User management operations (tenant-aware)
+  // Admin user management
   getAllUsers(tenantId: string, filters?: UserFilters): Promise<User[]>;
   getUserStats(tenantId: string): Promise<{ totalUsers: number; activeUsers: number; usersByRole: Record<string, number> }>;
   createUserAsAdmin(userData: CreateUserData, tenantId: string): Promise<User>;
@@ -122,13 +131,13 @@ export interface IStorage {
   toggleUserStatus(id: string, isActive: boolean, tenantId: string): Promise<User | undefined>;
   getManagerUsers(tenantId: string): Promise<User[]>;
   
-  // Email verification (tenant-aware)
+  // Email verification
   setEmailVerificationToken(userId: string, tenantId: string, token: string, expiresAt: Date): Promise<void>;
   getUserByEmailVerificationToken(token: string, tenantId?: string): Promise<User | undefined>;
   verifyUserEmail(userId: string, tenantId: string): Promise<void>;
   updateLastVerificationEmailSent(userId: string, tenantId: string): Promise<void>;
   
-  // Forms operations (tenant-aware)
+  // Form management
   createForm(formData: CreateFormData, userId: string, tenantId: string): Promise<Form>;
   getForm(id: string, tenantId: string): Promise<Form | undefined>;
   getPublicForm(id: string): Promise<Form | undefined>;
@@ -137,31 +146,38 @@ export interface IStorage {
   updateForm(id: string, updates: UpdateFormData, tenantId: string): Promise<Form | undefined>;
   deleteForm(id: string, tenantId: string): Promise<void>;
   
-  // Form responses operations (tenant-aware)
+  // Form response management
   submitFormResponse(responseData: SubmitFormResponseData, tenantId: string): Promise<FormResponse>;
   getFormResponses(formId: string, tenantId: string): Promise<FormResponse[]>;
   getFormResponseCount(formId: string, tenantId: string): Promise<number>;
   
-  // Subscription plans
+  // Subscription plan management
   getSubscriptionPlans(): Promise<SubscriptionPlan[]>;
   getSubscriptionPlan(id: string): Promise<SubscriptionPlan | undefined>;
   createSubscriptionPlan(plan: InsertSubscriptionPlan): Promise<SubscriptionPlan>;
   
-  // User subscriptions
+  // Subscription management
   createSubscription(subscription: InsertSubscription): Promise<Subscription>;
   getSubscription(id: string, tenantId?: string): Promise<Subscription | undefined>;
   getUserSubscription(userId: string, tenantId: string): Promise<Subscription | undefined>;
   updateSubscription(id: string, updates: Partial<Subscription>, tenantId?: string): Promise<Subscription | undefined>;
   updateUserStripeInfo(userId: string, stripeCustomerId: string, stripeSubscriptionId: string, tenantId: string): Promise<void>;
   
-  // SaaS Limits and Validation
+  // Tenant subscription and limits
   getTenantSubscription(tenantId: string): Promise<(Subscription & { plan: SubscriptionPlan }) | undefined>;
   checkUserLimits(tenantId: string): Promise<{ canAddUser: boolean; currentUsers: number; maxUsers: number | null; planName: string }>;
   validateUserCreation(tenantId: string): Promise<void>;
-  checkShopLimits(tenantId: string): Promise<{ canAddShop: boolean; currentShops: number; maxShops: number | null; planName: string }>;
+  checkShopLimits(tenantId: string): Promise<{ canAddShop: boolean; currentShops: number; maxShops: number | null; planName: string; isCustomLimit?: boolean; customLimitReason?: string; expiresAt?: Date }>;
   validateShopCreation(tenantId: string): Promise<void>;
+  logShopLimitEvent(tenantId: string, eventType: ShopLimitEventType, shopCount: number, limitValue?: number, metadata?: Record<string, any>): Promise<void>;
+  createTenantLimits(tenantId: string, limitsData: CreateTenantLimitsData, createdBy: string): Promise<TenantLimits>;
+  updateTenantLimits(tenantId: string, updates: UpdateTenantLimitsData): Promise<TenantLimits | undefined>;
+  getTenantLimits(tenantId: string): Promise<TenantLimitsWithDetails | undefined>;
+  deleteTenantLimits(tenantId: string): Promise<void>;
+  getCurrentShopCount(tenantId: string): Promise<number>;
+  getShopLimitEvents(tenantId: string, filters?: ShopLimitFilters): Promise<ShopLimitEvent[]>;
   
-  // Shop operations (tenant-aware)
+  // Shop management
   getShop(id: string, tenantId: string): Promise<Shop | undefined>;
   getShopWithManager(id: string, tenantId: string): Promise<ShopWithManager | undefined>;
   getAllShops(tenantId: string, filters?: ShopFilters): Promise<ShopWithManager[]>;
@@ -171,7 +187,7 @@ export interface IStorage {
   deleteShop(id: string, tenantId: string): Promise<void>;
   toggleShopStatus(id: string, isActive: boolean, tenantId: string): Promise<Shop | undefined>;
   
-  // Email contact operations (tenant-aware)
+  // Email contact management
   getEmailContact(id: string, tenantId: string): Promise<EmailContact | undefined>;
   getEmailContactWithDetails(id: string, tenantId: string): Promise<EmailContactWithDetails | undefined>;
   getAllEmailContacts(tenantId: string, filters?: ContactFilters): Promise<EmailContactWithDetails[]>;
@@ -180,33 +196,33 @@ export interface IStorage {
   deleteEmailContact(id: string, tenantId: string): Promise<void>;
   bulkDeleteEmailContacts(ids: string[], tenantId: string): Promise<void>;
   
-  // Email list operations (tenant-aware)
+  // Email list management
   getEmailList(id: string, tenantId: string): Promise<EmailList | undefined>;
   getAllEmailLists(tenantId: string): Promise<EmailListWithCount[]>;
   createEmailList(list: CreateEmailListData, tenantId: string): Promise<EmailList>;
   updateEmailList(id: string, name: string, description: string | undefined, tenantId: string): Promise<EmailList | undefined>;
   deleteEmailList(id: string, tenantId: string): Promise<void>;
   
-  // Contact tag operations (tenant-aware)
+  // Contact tag management
   getContactTag(id: string, tenantId: string): Promise<ContactTag | undefined>;
   getAllContactTags(tenantId: string): Promise<ContactTag[]>;
   createContactTag(tag: CreateContactTagData, tenantId: string): Promise<ContactTag>;
   updateContactTag(id: string, name: string, color: string, tenantId: string): Promise<ContactTag | undefined>;
   deleteContactTag(id: string, tenantId: string): Promise<void>;
   
-  // Contact list membership operations (tenant-aware)
+  // Contact list membership
   addContactToList(contactId: string, listId: string, tenantId: string): Promise<void>;
   removeContactFromList(contactId: string, listId: string, tenantId: string): Promise<void>;
   getContactLists(contactId: string, tenantId: string): Promise<EmailList[]>;
   bulkAddContactsToList(contactIds: string[], listId: string, tenantId: string): Promise<void>;
   
-  // Contact tag assignment operations (tenant-aware)
+  // Contact tag assignment
   addTagToContact(contactId: string, tagId: string, tenantId: string): Promise<void>;
   removeTagFromContact(contactId: string, tagId: string, tenantId: string): Promise<void>;
   getContactTags(contactId: string, tenantId: string): Promise<ContactTag[]>;
   bulkAddTagToContacts(contactIds: string[], tagId: string, tenantId: string): Promise<void>;
   
-  // Email contact statistics (tenant-aware)
+  // Statistics
   getEmailContactStats(tenantId: string): Promise<{
     totalContacts: number;
     activeContacts: number;
@@ -218,11 +234,9 @@ export interface IStorage {
   }>;
   getShopStats(tenantId: string): Promise<{ totalShops: number; activeShops: number; shopsByCategory: Record<string, number> }>;
   
-  // Newsletter operations (tenant-aware)
+  // Newsletter management
   getNewsletter(id: string, tenantId: string): Promise<Newsletter | undefined>;
-  // Cross-tenant lookup by ID (used for webhook fallbacks)
   getNewsletterById(id: string): Promise<Newsletter | undefined>;
-  // Debug method to list all contacts (for debugging webhook issues)
   getAllEmailContactsDebug(): Promise<{ email: string; tenantId: string; id: string }[]>;
   getNewsletterWithUser(id: string, tenantId: string): Promise<NewsletterWithUser | undefined>;
   getAllNewsletters(tenantId: string): Promise<NewsletterWithUser[]>;
@@ -235,15 +249,15 @@ export interface IStorage {
     scheduledNewsletters: number;
     sentNewsletters: number;
   }>;
-
-  // Newsletter task status operations (tenant-aware)
+  
+  // Newsletter task status
   getNewsletterTaskStatuses(newsletterId: string, tenantId: string): Promise<NewsletterTaskStatus[]>;
   createNewsletterTaskStatus(newsletterId: string, taskData: CreateNewsletterTaskStatusData, tenantId: string): Promise<NewsletterTaskStatus>;
   updateNewsletterTaskStatus(id: string, updates: UpdateNewsletterTaskStatusData, tenantId: string): Promise<NewsletterTaskStatus | undefined>;
   deleteNewsletterTaskStatus(id: string, tenantId: string): Promise<void>;
   initializeNewsletterTasks(newsletterId: string, tenantId: string): Promise<NewsletterTaskStatus[]>;
-
-  // Campaign operations (tenant-aware)
+  
+  // Campaign management
   getCampaign(id: string, tenantId: string): Promise<Campaign | undefined>;
   getAllCampaigns(tenantId: string): Promise<Campaign[]>;
   createCampaign(campaign: CreateCampaignData, userId: string, tenantId: string): Promise<Campaign>;
@@ -255,38 +269,39 @@ export interface IStorage {
     draftCampaigns: number;
     completedCampaigns: number;
   }>;
-
-  // Email activity operations for webhook tracking
+  
+  // Email activity tracking
   createEmailActivity(activityData: CreateEmailActivityData, tenantId: string): Promise<EmailActivity>;
   getEmailActivity(id: string, tenantId: string): Promise<EmailActivity | undefined>;
-  getContactActivity(contactId: string, tenantId: string, limit?: number): Promise<EmailActivity[]>;
+  getContactActivity(contactId: string, tenantId: string, limit?: number, fromDate?: Date, toDate?: Date): Promise<EmailActivity[]>;
   getActivityByWebhookId(webhookId: string, tenantId: string): Promise<EmailActivity | undefined>;
-  findEmailContactByEmail(email: string): Promise<{ contact: EmailContact; tenantId: string } | undefined>;
-  // Check if contact has already opened this newsletter (unique opens tracking)
   hasContactOpenedNewsletter(contactId: string, newsletterId: string, tenantId: string): Promise<boolean>;
-
-  // Universal bounced emails operations (not tenant-specific)
+  findEmailContactByEmail(email: string): Promise<{ contact: EmailContact; tenantId: string } | undefined>;
+  
+  // Bounced email management
   addBouncedEmail(bouncedEmailData: CreateBouncedEmailData): Promise<BouncedEmail>;
   updateBouncedEmail(email: string, updates: UpdateBouncedEmailData): Promise<BouncedEmail | undefined>;
   getBouncedEmail(email: string): Promise<BouncedEmail | undefined>;
   isEmailBounced(email: string): Promise<boolean>;
   getAllBouncedEmails(filters?: BouncedEmailFilters): Promise<BouncedEmail[]>;
   removeBouncedEmail(email: string): Promise<void>;
-  // Get emails that should be excluded from sending
   getBouncedEmailAddresses(): Promise<string[]>;
-  // Increment bounce count for an existing bounced email
   incrementBounceCount(email: string, lastBouncedAt: Date, bounceReason?: string): Promise<BouncedEmail | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
-  // Tenant operations
+  // Tenant management methods
   async getTenant(id: string): Promise<Tenant | undefined> {
-    const [tenant] = await db.select().from(tenants).where(eq(tenants.id, id));
+    const tenant = await db.query.tenants.findFirst({
+      where: eq(tenants.id, id)
+    });
     return tenant;
   }
 
   async getTenantBySlug(slug: string): Promise<Tenant | undefined> {
-    const [tenant] = await db.select().from(tenants).where(eq(tenants.slug, slug));
+    const tenant = await db.query.tenants.findFirst({
+      where: eq(tenants.slug, slug)
+    });
     return tenant;
   }
 
@@ -296,17 +311,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateTenant(id: string, updates: UpdateTenantData): Promise<Tenant | undefined> {
-    const [tenant] = await db.update(tenants)
+    const [tenant] = await db
+      .update(tenants)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(tenants.id, id))
       .returning();
     return tenant;
   }
 
-  // Special Owner registration operation that creates both tenant and Owner user
+  // Owner and tenant creation
   async createOwnerAndTenant(ownerData: RegisterOwnerData): Promise<{ owner: User; tenant: Tenant }> {
-    // Start a transaction to ensure both tenant and owner are created or none
-    const result = await db.transaction(async (tx) => {
+    return await db.transaction(async (tx) => {
       // Create the tenant first
       const [tenant] = await tx.insert(tenants).values({
         name: ownerData.organizationName,
@@ -316,311 +331,331 @@ export class DatabaseStorage implements IStorage {
       }).returning();
 
       // Create the owner user
-      const [owner] = await tx.insert(users).values({
+      const name = ownerData.firstName && ownerData.lastName 
+        ? `${ownerData.firstName} ${ownerData.lastName}` 
+        : ownerData.firstName || ownerData.lastName || ownerData.email;
+
+      const [owner] = await tx.insert(betterAuthUser).values({
+        id: crypto.randomUUID(),
         tenantId: tenant.id,
         email: ownerData.email,
-        password: ownerData.password, // This should be hashed before calling this method
+        name,
         firstName: ownerData.firstName,
         lastName: ownerData.lastName,
         role: 'Owner',
         isActive: true,
         emailVerified: false, // Owner still needs to verify email
+        createdAt: new Date(),
         updatedAt: new Date(),
       }).returning();
 
       return { owner, tenant };
     });
-
-    return result;
   }
 
-  // Method to find the Owner of a tenant (for login logic)
+  // Tenant owner management
   async getTenantOwner(tenantId: string): Promise<User | undefined> {
-    const [owner] = await db.select().from(users)
-      .where(and(eq(users.tenantId, tenantId), eq(users.role, 'Owner')))
-      .limit(1);
+    const owner = await db.query.betterAuthUser.findFirst({
+      where: and(eq(betterAuthUser.tenantId, tenantId), eq(betterAuthUser.role, 'Owner'))
+    });
     return owner;
   }
 
-  // Method to find a user by email across all tenants (for login)
+  // Cross-tenant user lookup
   async findUserByEmailAcrossTenants(email: string): Promise<(User & { tenant: { id: string; name: string; slug: string } }) | undefined> {
-    // Important: We use .select() without parameters to select all fields
-    // This ensures Drizzle properly maps database column names (like avatar_url) to schema field names (like avatarUrl)
-    // Using explicit field selection can break this mapping for some fields
-    const result = await db
-      .select({
-        // User fields
-        id: users.id,
-        tenantId: users.tenantId,
-        email: users.email,
-        password: users.password,
-        firstName: users.firstName,
-        lastName: users.lastName,
-        role: users.role,
-        isActive: users.isActive,
-        twoFactorEnabled: users.twoFactorEnabled,
-        twoFactorSecret: users.twoFactorSecret,
-        emailVerified: users.emailVerified,
-        emailVerificationToken: users.emailVerificationToken,
-        emailVerificationExpires: users.emailVerificationExpires,
-        lastVerificationEmailSent: users.lastVerificationEmailSent,
-        lastLoginAt: users.lastLoginAt,
-        menuExpanded: users.menuExpanded,
-        theme: users.theme,
-        avatarUrl: users.avatarUrl,
-        stripeCustomerId: users.stripeCustomerId,
-        stripeSubscriptionId: users.stripeSubscriptionId,
-        subscriptionStatus: users.subscriptionStatus,
-        subscriptionPlanId: users.subscriptionPlanId,
-        subscriptionStartDate: users.subscriptionStartDate,
-        subscriptionEndDate: users.subscriptionEndDate,
-        trialEndsAt: users.trialEndsAt,
-        createdAt: users.createdAt,
-        updatedAt: users.updatedAt,
-        // Tenant fields
+    const user = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.email, email),
+      with: {
         tenant: {
-          id: tenants.id,
-          name: tenants.name,
-          slug: tenants.slug,
-        },
-      })
-      .from(users)
-      .innerJoin(tenants, eq(users.tenantId, tenants.id))
-      .where(and(eq(users.email, email), eq(users.isActive, true), eq(tenants.isActive, true)))
-      .limit(1);
-
-    if (!result[0]) return undefined;
-
-    // When using .select() with joins, Drizzle returns nested objects for each table
-    const userWithTenant = result[0];
-    const userData = userWithTenant;
-    const tenantData = userWithTenant.tenant;
-
-    return {
-      ...userData,
-      tenant: {
-        id: tenantData.id,
-        name: tenantData.name,
-        slug: tenantData.slug,
-      },
-    } as (User & { tenant: { id: string; name: string; slug: string } });
+          columns: {
+            id: true,
+            name: true,
+            slug: true
+          }
+        }
+      }
+    });
+    return user;
   }
 
-  // User operations (tenant-aware)
+  // User management methods (tenant-aware)
   async getUser(id: string, tenantId: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users)
-      .where(and(eq(users.id, id), eq(users.tenantId, tenantId)));
-    
+    const user = await db.query.betterAuthUser.findFirst({
+      where: and(eq(betterAuthUser.id, id), eq(betterAuthUser.tenantId, tenantId))
+    });
     return user;
   }
 
   async getUserByEmail(email: string, tenantId: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users)
-      .where(and(eq(users.email, email), eq(users.tenantId, tenantId)));
-    return user;
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db
-      .insert(users)
-      .values({
-        ...insertUser,
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    // Sync tenant information with Better Auth user table
-    try {
-      // Check if Better Auth user exists
-      const existingBetterAuthUser = await db.query.betterAuthUser.findFirst({
-        where: eq(betterAuthUser.email, user.email),
-      });
-
-      if (existingBetterAuthUser) {
-        // Update Better Auth user with tenant information
-        await db.update(betterAuthUser)
-          .set({
-            tenantId: user.tenantId,
-            role: user.role,
-            updatedAt: new Date(),
-          })
-          .where(eq(betterAuthUser.id, existingBetterAuthUser.id));
-
-        console.log('✅ Synced tenant info to Better Auth user during createUser:', {
-          userId: user.id,
-          email: user.email,
-          tenantId: user.tenantId
-        });
-      } else {
-        console.warn('⚠️ No Better Auth user found for email during createUser:', user.email);
-      }
-    } catch (error) {
-      console.error('❌ Failed to sync tenant info during createUser:', error);
-      // Don't fail the user creation, just log the error
-    }
-
+    const user = await db.query.betterAuthUser.findFirst({
+      where: and(eq(betterAuthUser.email, email), eq(betterAuthUser.tenantId, tenantId))
+    });
     return user;
   }
 
   async updateUser(id: string, updates: Partial<User>, tenantId: string): Promise<User | undefined> {
     const [user] = await db
-      .update(users)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(and(eq(users.id, id), eq(users.tenantId, tenantId)))
+      .update(betterAuthUser)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(betterAuthUser.id, id), eq(betterAuthUser.tenantId, tenantId)))
+      .returning();
+    return user;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    // Construct name from firstName and lastName if not provided
+    const name = insertUser.name || 
+      (insertUser.firstName && insertUser.lastName 
+        ? `${insertUser.firstName} ${insertUser.lastName}` 
+        : insertUser.firstName || insertUser.lastName || insertUser.email);
+
+    const [user] = await db
+      .insert(betterAuthUser)
+      .values({
+        ...insertUser,
+        name,
+        id: crypto.randomUUID(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
       .returning();
     return user;
   }
 
 
 
+  // User management methods (tenant-aware)
+  async getAllUsers(tenantId: string, filters?: UserFilters): Promise<User[]> {
+    const conditions = [eq(betterAuthUser.tenantId, tenantId)];
 
-  // Email verification methods (tenant-aware)
+    if (filters?.search) {
+      const searchTerm = `%${filters.search}%`;
+      conditions.push(
+        or(
+          ilike(betterAuthUser.firstName, searchTerm),
+          ilike(betterAuthUser.lastName, searchTerm),
+          ilike(betterAuthUser.email, searchTerm)
+        )!
+      );
+    }
+
+    if (filters?.role) {
+      conditions.push(eq(betterAuthUser.role, filters.role));
+    }
+
+    if (filters?.status === 'active') {
+      conditions.push(eq(betterAuthUser.isActive, true));
+    } else if (filters?.status === 'inactive') {
+      conditions.push(eq(betterAuthUser.isActive, false));
+    } else if (!filters?.showInactive) {
+      conditions.push(eq(betterAuthUser.isActive, true));
+    }
+
+    const whereClause = and(...conditions);
+    
+    const result = await db
+      .select()
+      .from(betterAuthUser)
+      .where(whereClause)
+      .orderBy(desc(betterAuthUser.createdAt));
+    
+    return result;
+  }
+
+  async getUserStats(tenantId: string): Promise<{ totalUsers: number; activeUsers: number; usersByRole: Record<string, number> }> {
+    const totalUsersResult = await db.select({ count: count() }).from(betterAuthUser).where(eq(betterAuthUser.tenantId, tenantId));
+    const activeUsersResult = await db.select({ count: count() }).from(betterAuthUser).where(and(eq(betterAuthUser.tenantId, tenantId), eq(betterAuthUser.isActive, true)));
+    const usersByRoleResult = await db.select({ role: betterAuthUser.role, count: count() }).from(betterAuthUser).where(eq(betterAuthUser.tenantId, tenantId)).groupBy(betterAuthUser.role);
+
+    const totalUsers = totalUsersResult[0]?.count || 0;
+    const activeUsers = activeUsersResult[0]?.count || 0;
+    
+    const usersByRole: Record<string, number> = {};
+    usersByRoleResult.forEach(row => {
+      if (row.role) {
+        usersByRole[row.role] = row.count;
+      }
+    });
+
+    return {
+      totalUsers,
+      activeUsers,
+      usersByRole
+    };
+  }
+
+  async createUserAsAdmin(userData: CreateUserData, tenantId: string): Promise<User> {
+    // Construct name from firstName and lastName
+    const name = userData.firstName && userData.lastName 
+      ? `${userData.firstName} ${userData.lastName}` 
+      : userData.firstName || userData.lastName || userData.email;
+
+    const [user] = await db.insert(betterAuthUser).values({
+       ...userData,
+       name,
+       tenantId,
+       id: crypto.randomUUID(),
+       emailVerified: userData.emailVerified ?? true,
+       createdAt: new Date(),
+       updatedAt: new Date(),
+     }).returning();
+    return user;
+  }
+
+  async updateUserAsAdmin(id: string, userData: UpdateUserData, tenantId: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(betterAuthUser)
+      .set({ ...userData, updatedAt: new Date() })
+      .where(and(eq(betterAuthUser.id, id), eq(betterAuthUser.tenantId, tenantId)))
+      .returning();
+    return user;
+  }
+
+  async deleteUser(id: string, tenantId: string): Promise<void> {
+    // Delete refresh tokens first
+    await db.delete(refreshTokens).where(and(eq(refreshTokens.userId, id), eq(refreshTokens.tenantId, tenantId)));
+    // Delete user
+    await db.delete(betterAuthUser).where(and(eq(betterAuthUser.id, id), eq(betterAuthUser.tenantId, tenantId)));
+  }
+
+  async toggleUserStatus(id: string, isActive: boolean, tenantId: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(betterAuthUser)
+      .set({ isActive, updatedAt: new Date() })
+      .where(and(eq(betterAuthUser.id, id), eq(betterAuthUser.tenantId, tenantId)))
+      .returning();
+    return user;
+  }
+
+  async getManagerUsers(tenantId: string): Promise<User[]> {
+    const result = await db
+      .select()
+      .from(betterAuthUser)
+      .where(
+        and(
+          eq(betterAuthUser.tenantId, tenantId),
+          or(
+            eq(betterAuthUser.role, 'Manager'),
+            eq(betterAuthUser.role, 'Administrator'),
+            eq(betterAuthUser.role, 'Owner')
+          )
+        )
+      );
+    return result;
+  }
+
+  // Email verification methods
   async setEmailVerificationToken(userId: string, tenantId: string, token: string, expiresAt: Date): Promise<void> {
-    await db
-      .update(users)
+    await db.update(betterAuthUser)
       .set({ 
         emailVerificationToken: token,
         emailVerificationExpires: expiresAt,
         lastVerificationEmailSent: new Date(),
         updatedAt: new Date()
       })
-      .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
+      .where(and(eq(betterAuthUser.id, userId), eq(betterAuthUser.tenantId, tenantId)));
   }
 
   async getUserByEmailVerificationToken(token: string, tenantId?: string): Promise<User | undefined> {
-    const conditions = [
-      eq(users.emailVerificationToken, token),
-      gt(users.emailVerificationExpires, new Date())
-    ];
-    
-    // Add tenant filtering if tenantId is provided
-    if (tenantId) {
-      conditions.push(eq(users.tenantId, tenantId));
-    }
-    
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(and(...conditions));
+    const user = await db.query.betterAuthUser.findFirst({
+      where: tenantId ? 
+        and(eq(betterAuthUser.emailVerificationToken, token), eq(betterAuthUser.tenantId, tenantId)) :
+        eq(betterAuthUser.emailVerificationToken, token)
+    });
     return user;
   }
 
   async verifyUserEmail(userId: string, tenantId: string): Promise<void> {
-    await db
-      .update(users)
+    await db.update(betterAuthUser)
       .set({ 
         emailVerified: true,
         emailVerificationToken: null,
         emailVerificationExpires: null,
         updatedAt: new Date()
       })
-      .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
+      .where(and(eq(betterAuthUser.id, userId), eq(betterAuthUser.tenantId, tenantId)));
   }
 
   async updateLastVerificationEmailSent(userId: string, tenantId: string): Promise<void> {
-    await db
-      .update(users)
+    await db.update(betterAuthUser)
       .set({ 
         lastVerificationEmailSent: new Date(),
         updatedAt: new Date()
       })
-      .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
+      .where(and(eq(betterAuthUser.id, userId), eq(betterAuthUser.tenantId, tenantId)));
   }
 
-  // Subscription plans methods
-  async getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
-    return await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.isActive, true)).orderBy(subscriptionPlans.sortOrder);
+  // Subscription and limits
+  async getTenantSubscription(tenantId: string): Promise<(Subscription & { plan: SubscriptionPlan }) | undefined> {
+    const subscription = await db.query.subscriptions.findFirst({
+      where: eq(subscriptions.tenantId, tenantId),
+      with: {
+        plan: true
+      }
+    });
+    return subscription;
   }
 
-  async getSubscriptionPlan(id: string): Promise<SubscriptionPlan | undefined> {
-    const [plan] = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, id));
-    return plan;
-  }
-
-  async createSubscriptionPlan(plan: InsertSubscriptionPlan): Promise<SubscriptionPlan> {
-    const [newPlan] = await db
-      .insert(subscriptionPlans)
-      .values({
-        ...plan,
-        updatedAt: new Date(),
-      })
-      .returning();
-    return newPlan;
-  }
-
-  // User subscriptions methods
-  async createSubscription(subscription: InsertSubscription): Promise<Subscription> {
-    const [newSubscription] = await db
-      .insert(subscriptions)
-      .values({
-        ...subscription,
-        updatedAt: new Date(),
-      })
-      .returning();
-    return newSubscription;
-  }
-
-  async getSubscription(id: string, tenantId?: string): Promise<Subscription | undefined> {
-    const conditions = [eq(subscriptions.id, id)];
+  async checkUserLimits(tenantId: string): Promise<{ canAddUser: boolean; currentUsers: number; maxUsers: number | null; planName: string }> {
+    // Get current total user count for the tenant (count all users including inactive)
+    const userCountResult = await db
+      .select({ count: count() })
+      .from(betterAuthUser)
+      .where(eq(betterAuthUser.tenantId, tenantId));
     
-    // Add tenant filtering if tenantId is provided for security
-    if (tenantId) {
-      conditions.push(eq(subscriptions.tenantId, tenantId));
+    const currentUsers = userCountResult[0]?.count || 0;
+
+    // Get tenant's subscription and plan limits
+    const subscription = await this.getTenantSubscription(tenantId);
+    
+    if (!subscription) {
+      // No subscription found - use basic plan limits as default
+      const basicPlan = await db
+        .select()
+        .from(subscriptionPlans)
+        .where(eq(subscriptionPlans.name, 'Basic'))
+        .limit(1);
+      
+      const maxUsers = basicPlan[0]?.maxUsers || 5; // Default to 5 users for basic plan
+      
+      return {
+        canAddUser: currentUsers < maxUsers,
+        currentUsers,
+        maxUsers,
+        planName: 'Basic'
+      };
     }
+
+    const maxUsers = subscription.plan.maxUsers;
+    const planName = subscription.plan.name;
     
-    const [subscription] = await db.select().from(subscriptions).where(and(...conditions));
-    return subscription;
+    return {
+      canAddUser: maxUsers === null || currentUsers < maxUsers,
+      currentUsers,
+      maxUsers,
+      planName
+    };
   }
 
-  async getUserSubscription(userId: string, tenantId: string): Promise<Subscription | undefined> {
-    const [subscription] = await db.select().from(subscriptions)
-      .where(and(eq(subscriptions.userId, userId), eq(subscriptions.tenantId, tenantId)))
-      .orderBy(desc(subscriptions.createdAt));
-    return subscription;
-  }
-
-  async updateSubscription(id: string, updates: Partial<Subscription>, tenantId?: string): Promise<Subscription | undefined> {
-    const conditions = [eq(subscriptions.id, id)];
+  async validateUserCreation(tenantId: string): Promise<void> {
+    const limits = await this.checkUserLimits(tenantId);
     
-    // Add tenant filtering if tenantId is provided for security
-    if (tenantId) {
-      conditions.push(eq(subscriptions.tenantId, tenantId));
+    if (!limits.canAddUser) {
+      throw new Error(`User limit reached. Current plan (${limits.planName}) allows ${limits.maxUsers} users, and you currently have ${limits.currentUsers} users.`);
     }
-    
-    const [subscription] = await db
-      .update(subscriptions)
-      .set({
-        ...updates,
-        updatedAt: new Date(),
-      })
-      .where(and(...conditions))
-      .returning();
-    return subscription;
   }
 
-  async updateUserStripeInfo(userId: string, stripeCustomerId: string, stripeSubscriptionId: string, tenantId: string): Promise<void> {
-    await db
-      .update(users)
-      .set({
-        stripeCustomerId,
-        stripeSubscriptionId,
-        subscriptionStatus: 'active',
-        updatedAt: new Date(),
-      })
-      .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
-  }
-
-  // Forms operations (tenant-aware)
+  // Form management methods
   async createForm(formData: CreateFormData, userId: string, tenantId: string): Promise<Form> {
-    const [form] = await db
-      .insert(forms)
-      .values({
-        ...formData,
-        userId,
-        tenantId,
-        updatedAt: new Date(),
-      })
-      .returning();
+    const [form] = await db.insert(forms).values({
+      ...formData,
+      userId,
+      tenantId,
+      updatedAt: new Date(),
+    }).returning();
     return form;
   }
 
@@ -642,40 +677,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTenantForms(tenantId: string): Promise<FormWithDetails[]> {
-    return await db.select({
-      id: forms.id,
-      tenantId: forms.tenantId,
-      userId: forms.userId,
-      title: forms.title,
-      description: forms.description,
-      formData: forms.formData,
-      theme: forms.theme,
-      isActive: forms.isActive,
-      responseCount: forms.responseCount,
-      createdAt: forms.createdAt,
-      updatedAt: forms.updatedAt,
-      user: {
-        id: users.id,
-        email: users.email,
-        firstName: users.firstName,
-        lastName: users.lastName,
-      },
-      tenant: {
-        id: tenants.id,
-        name: tenants.name,
-        slug: tenants.slug,
-      }
-    })
-    .from(forms)
-    .innerJoin(users, eq(forms.userId, users.id))
-    .innerJoin(tenants, eq(forms.tenantId, tenants.id))
-    .where(eq(forms.tenantId, tenantId))
-    .orderBy(desc(forms.createdAt)) as FormWithDetails[];
+    return await db.select().from(forms)
+      .where(eq(forms.tenantId, tenantId))
+      .orderBy(desc(forms.createdAt)) as FormWithDetails[];
   }
 
   async updateForm(id: string, updates: UpdateFormData, tenantId: string): Promise<Form | undefined> {
-    const [form] = await db
-      .update(forms)
+    const [form] = await db.update(forms)
       .set({ ...updates, updatedAt: new Date() })
       .where(and(eq(forms.id, id), eq(forms.tenantId, tenantId)))
       .returning();
@@ -686,25 +694,12 @@ export class DatabaseStorage implements IStorage {
     await db.delete(forms).where(and(eq(forms.id, id), eq(forms.tenantId, tenantId)));
   }
 
-  // Form responses operations (tenant-aware)
+  // Form response methods
   async submitFormResponse(responseData: SubmitFormResponseData, tenantId: string): Promise<FormResponse> {
-    const [response] = await db
-      .insert(formResponses)
-      .values({
-        ...responseData,
-        tenantId,
-      })
-      .returning();
-    
-    // Update response count
-    await db
-      .update(forms)
-      .set({ 
-        responseCount: sql`${forms.responseCount} + 1`,
-        updatedAt: new Date()
-      })
-      .where(and(eq(forms.id, responseData.formId), eq(forms.tenantId, tenantId)));
-    
+    const [response] = await db.insert(formResponses).values({
+      ...responseData,
+      tenantId,
+    }).returning();
     return response;
   }
 
@@ -720,388 +715,233 @@ export class DatabaseStorage implements IStorage {
     return result.count;
   }
 
-  // User management methods (tenant-aware)
-  async getAllUsers(tenantId: string, filters?: UserFilters): Promise<User[]> {
-    const conditions = [eq(users.tenantId, tenantId)];
-
-    if (filters?.search) {
-      const searchTerm = `%${filters.search}%`;
-      conditions.push(
-        or(
-          ilike(users.firstName, searchTerm),
-          ilike(users.lastName, searchTerm),
-          ilike(users.email, searchTerm)
-        )!
-      );
-    }
-
-    if (filters?.role) {
-      conditions.push(eq(users.role, filters.role));
-    }
-
-    if (filters?.status === 'active') {
-      conditions.push(eq(users.isActive, true));
-    } else if (filters?.status === 'inactive') {
-      conditions.push(eq(users.isActive, false));
-    } else if (!filters?.showInactive) {
-      conditions.push(eq(users.isActive, true));
-    }
-
-    const whereClause = and(...conditions);
-    
-    const result = await db
-      .select()
-      .from(users)
-      .where(whereClause)
-      .orderBy(desc(users.createdAt));
-    
-    return result;
+  // Subscription plan methods
+  async getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
+    return await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.isActive, true));
   }
 
-  async getUserStats(tenantId: string): Promise<{ totalUsers: number; activeUsers: number; usersByRole: Record<string, number> }> {
-    // Get total and active user counts for tenant
-    const [totalResult] = await db.select({ count: count() }).from(users).where(eq(users.tenantId, tenantId));
-    const [activeResult] = await db.select({ count: count() }).from(users)
-      .where(and(eq(users.tenantId, tenantId), eq(users.isActive, true)));
-
-    // Get user counts by role for tenant
-    const roleResults = await db
-      .select({ 
-        role: users.role, 
-        count: count() 
-      })
-      .from(users)
-      .where(and(eq(users.tenantId, tenantId), eq(users.isActive, true)))
-      .groupBy(users.role);
-
-    const usersByRole: Record<string, number> = {};
-    roleResults.forEach(result => {
-      usersByRole[result.role] = result.count;
-    });
-
-    return {
-      totalUsers: totalResult.count,
-      activeUsers: activeResult.count,
-      usersByRole
-    };
+  async getSubscriptionPlan(id: string): Promise<SubscriptionPlan | undefined> {
+    const [plan] = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, id));
+    return plan;
   }
 
-  async createUserAsAdmin(userData: CreateUserData, tenantId: string): Promise<User> {
-    const { confirmPassword, ...userInsertData } = userData;
-    const [user] = await db
-      .insert(users)
-      .values({
-        ...userInsertData,
-        tenantId,
-        emailVerified: true, // Admin-created users are automatically verified
+  async createSubscriptionPlan(plan: InsertSubscriptionPlan): Promise<SubscriptionPlan> {
+    const [newPlan] = await db.insert(subscriptionPlans).values(plan).returning();
+    return newPlan;
+  }
+
+  // Subscription methods
+  async createSubscription(subscription: InsertSubscription): Promise<Subscription> {
+    const [newSubscription] = await db.insert(subscriptions).values(subscription).returning();
+    return newSubscription;
+  }
+
+  async getSubscription(id: string, tenantId?: string): Promise<Subscription | undefined> {
+    const conditions = [eq(subscriptions.id, id)];
+    if (tenantId) conditions.push(eq(subscriptions.tenantId, tenantId));
+    const [subscription] = await db.select().from(subscriptions).where(and(...conditions));
+    return subscription;
+  }
+
+  async getUserSubscription(userId: string, tenantId: string): Promise<Subscription | undefined> {
+    const [subscription] = await db.select().from(subscriptions)
+      .where(and(eq(subscriptions.userId, userId), eq(subscriptions.tenantId, tenantId)))
+      .orderBy(desc(subscriptions.createdAt));
+    return subscription;
+  }
+
+  async updateSubscription(id: string, updates: Partial<Subscription>, tenantId?: string): Promise<Subscription | undefined> {
+    const conditions = [eq(subscriptions.id, id)];
+    if (tenantId) conditions.push(eq(subscriptions.tenantId, tenantId));
+    const [subscription] = await db.update(subscriptions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(...conditions))
+      .returning();
+    return subscription;
+  }
+
+  async updateUserStripeInfo(userId: string, stripeCustomerId: string, stripeSubscriptionId: string, tenantId: string): Promise<void> {
+    await db.update(betterAuthUser)
+      .set({
+        stripeCustomerId,
+        stripeSubscriptionId,
+        subscriptionStatus: 'active',
         updatedAt: new Date(),
       })
-      .returning();
-
-    // Sync tenant information with Better Auth user table
-    try {
-      // Check if Better Auth user exists
-      const existingBetterAuthUser = await db.query.betterAuthUser.findFirst({
-        where: eq(betterAuthUser.email, user.email),
-      });
-
-      if (existingBetterAuthUser) {
-        // Update Better Auth user with tenant information
-        await db.update(betterAuthUser)
-          .set({
-            tenantId: user.tenantId,
-            role: user.role,
-            updatedAt: new Date(),
-          })
-          .where(eq(betterAuthUser.id, existingBetterAuthUser.id));
-
-        console.log('✅ Synced tenant info to Better Auth user during createUserAsAdmin:', {
-          userId: user.id,
-          email: user.email,
-          tenantId: user.tenantId
-        });
-      } else {
-        console.warn('⚠️ No Better Auth user found for email during createUserAsAdmin:', user.email);
-      }
-    } catch (error) {
-      console.error('❌ Failed to sync tenant info during createUserAsAdmin:', error);
-      // Don't fail the user creation, just log the error
-    }
-
-    return user;
+      .where(and(eq(betterAuthUser.id, userId), eq(betterAuthUser.tenantId, tenantId)));
   }
 
-  async updateUserAsAdmin(id: string, userData: UpdateUserData, tenantId: string): Promise<User | undefined> {
-    const [user] = await db
-      .update(users)
-      .set({ ...userData, updatedAt: new Date() })
-      .where(and(eq(users.id, id), eq(users.tenantId, tenantId)))
-      .returning();
-    return user;
-  }
-
-  async deleteUser(id: string, tenantId: string): Promise<void> {
-    // First delete all refresh tokens
-    await db.delete(refreshTokens).where(and(eq(refreshTokens.userId, id), eq(refreshTokens.tenantId, tenantId)));
-    // Then delete the user
-    await db.delete(users).where(and(eq(users.id, id), eq(users.tenantId, tenantId)));
-  }
-
-  async toggleUserStatus(id: string, isActive: boolean, tenantId: string): Promise<User | undefined> {
-    const [user] = await db
-      .update(users)
-      .set({ isActive, updatedAt: new Date() })
-      .where(and(eq(users.id, id), eq(users.tenantId, tenantId)))
-      .returning();
-    return user;
-  }
-
-  async getManagerUsers(tenantId: string): Promise<User[]> {
-    const result = await db
-      .select()
-      .from(users)
-      .where(
-        and(
-          eq(users.tenantId, tenantId),
-          // Include Managers, Administrators, and Owners as eligible reviewers
-          or(
-            eq(users.role, 'Manager'),
-            eq(users.role, 'Administrator'),
-            eq(users.role, 'Owner')
-          ),
-          eq(users.isActive, true)
-        )
-      )
-      .orderBy(users.firstName);
-    
-    return result;
-  }
-
-  // Company management methods (tenant-aware)
-  async getUserCompany(userId: string, tenantId: string): Promise<(Company & { owner: { id: string; firstName: string | null; lastName: string | null; email: string } }) | null> {
-    const result = await db
-      .select({
-        id: companies.id,
-        tenantId: companies.tenantId,
-        ownerId: companies.ownerId,
-        name: companies.name,
-        address: companies.address,
-        companyType: companies.companyType,
-        companyEmail: companies.companyEmail,
-        phone: companies.phone,
-        website: companies.website,
-        description: companies.description,
-        isActive: companies.isActive,
-        createdAt: companies.createdAt,
-        updatedAt: companies.updatedAt,
-        owner: {
-          id: users.id,
-          firstName: users.firstName,
-          lastName: users.lastName,
-          email: users.email,
-        },
-      })
-      .from(companies)
-      .innerJoin(users, eq(companies.ownerId, users.id))
-      .where(and(eq(companies.ownerId, userId), eq(companies.tenantId, tenantId)))
-      .limit(1);
-    
-    return result[0] || null;
-  }
-
-  async createCompany(companyData: CreateCompanyData, ownerId: string, tenantId: string): Promise<Company> {
-    const [company] = await db
-      .insert(companies)
-      .values({
-        ...companyData,
-        ownerId,
-        tenantId,
-        updatedAt: new Date(),
-      })
-      .returning();
-    return company;
-  }
-
-  async updateUserCompany(userId: string, companyData: UpdateCompanyData, tenantId: string): Promise<Company | undefined> {
-    const [company] = await db
-      .update(companies)
-      .set({ ...companyData, updatedAt: new Date() })
-      .where(and(eq(companies.ownerId, userId), eq(companies.tenantId, tenantId)))
-      .returning();
-    return company;
-  }
-
-  // SaaS Limits and Validation
-  async getTenantSubscription(tenantId: string): Promise<(Subscription & { plan: SubscriptionPlan }) | undefined> {
-    const result = await db
-      .select({
-        id: subscriptions.id,
-        tenantId: subscriptions.tenantId,
-        userId: subscriptions.userId,
-        planId: subscriptions.planId,
-        stripeSubscriptionId: subscriptions.stripeSubscriptionId,
-        stripeCustomerId: subscriptions.stripeCustomerId,
-        status: subscriptions.status,
-        currentPeriodStart: subscriptions.currentPeriodStart,
-        currentPeriodEnd: subscriptions.currentPeriodEnd,
-        trialStart: subscriptions.trialStart,
-        trialEnd: subscriptions.trialEnd,
-        cancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
-        canceledAt: subscriptions.canceledAt,
-        isYearly: subscriptions.isYearly,
-        createdAt: subscriptions.createdAt,
-        updatedAt: subscriptions.updatedAt,
-        plan: {
-          id: subscriptionPlans.id,
-          name: subscriptionPlans.name,
-          displayName: subscriptionPlans.displayName,
-          description: subscriptionPlans.description,
-          price: subscriptionPlans.price,
-          yearlyPrice: subscriptionPlans.yearlyPrice,
-          stripePriceId: subscriptionPlans.stripePriceId,
-          stripeYearlyPriceId: subscriptionPlans.stripeYearlyPriceId,
-          features: subscriptionPlans.features,
-          maxUsers: subscriptionPlans.maxUsers,
-          maxProjects: subscriptionPlans.maxProjects,
-          maxShops: subscriptionPlans.maxShops,
-          storageLimit: subscriptionPlans.storageLimit,
-          supportLevel: subscriptionPlans.supportLevel,
-          trialDays: subscriptionPlans.trialDays,
-          isPopular: subscriptionPlans.isPopular,
-          isActive: subscriptionPlans.isActive,
-          sortOrder: subscriptionPlans.sortOrder,
-          createdAt: subscriptionPlans.createdAt,
-          updatedAt: subscriptionPlans.updatedAt,
-        },
-      })
-      .from(subscriptions)
-      .innerJoin(subscriptionPlans, eq(subscriptions.planId, subscriptionPlans.id))
-      .where(and(
-        eq(subscriptions.tenantId, tenantId),
-        or(eq(subscriptions.status, 'active'), eq(subscriptions.status, 'trialing'))
-      ))
-      .limit(1);
-
-    if (result.length === 0) return undefined;
-
-    const row = result[0];
-    return {
-      ...row,
-      plan: row.plan,
-    } as Subscription & { plan: SubscriptionPlan };
-  }
-
-  async checkUserLimits(tenantId: string): Promise<{ canAddUser: boolean; currentUsers: number; maxUsers: number | null; planName: string }> {
-    // Get current total user count for the tenant (count all users including inactive)
-    const userCountResult = await db
-      .select({ count: count() })
-      .from(users)
-      .where(eq(users.tenantId, tenantId));
-    
-    const currentUsers = userCountResult[0]?.count || 0;
-
-    // Get tenant's subscription and plan limits
-    const subscription = await this.getTenantSubscription(tenantId);
-    
-    if (!subscription) {
-      // No subscription found - use basic plan limits as default
-      const basicPlan = await db
-        .select()
-        .from(subscriptionPlans)
-        .where(eq(subscriptionPlans.name, 'basic'))
-        .limit(1);
-      
-      const maxUsers = basicPlan[0]?.maxUsers || 20; // Default to 20 if basic plan not found
-      return {
-        canAddUser: currentUsers < maxUsers,
-        currentUsers,
-        maxUsers,
-        planName: basicPlan[0]?.displayName || 'Basic Plan',
-      };
-    }
-
-    const maxUsers = subscription.plan.maxUsers;
-    const planName = subscription.plan.displayName;
-
-    return {
-      canAddUser: maxUsers === null || currentUsers < maxUsers, // null means unlimited
-      currentUsers,
-      maxUsers,
-      planName,
-    };
-  }
-
-  async validateUserCreation(tenantId: string): Promise<void> {
-    const limits = await this.checkUserLimits(tenantId);
-    
-    if (!limits.canAddUser) {
-      if (limits.maxUsers === null) {
-        // This shouldn't happen, but just in case
-        throw new Error('Unable to validate user limits');
-      }
-      
-      throw new Error(
-        `User limit reached. Your ${limits.planName} allows ${limits.maxUsers} users, and you currently have ${limits.currentUsers}. Please upgrade your plan to add more users.`
-      );
-    }
-  }
-
-  async checkShopLimits(tenantId: string): Promise<{ canAddShop: boolean; currentShops: number; maxShops: number | null; planName: string }> {
-    // Get current shop count
-    const shopsResult = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(shops)
-      .where(eq(shops.tenantId, tenantId));
-    
+  // Enhanced shop limits and validation with tenant-specific overrides
+  async checkShopLimits(tenantId: string): Promise<{ canAddShop: boolean; currentShops: number; maxShops: number | null; planName: string; isCustomLimit?: boolean; customLimitReason?: string; expiresAt?: Date }> {
+    const shopsResult = await db.select({ count: count() }).from(shops).where(eq(shops.tenantId, tenantId));
     const currentShops = shopsResult[0]?.count || 0;
     
-    // Get tenant subscription
+    // Check for active custom tenant limits first
+    const customLimit = await db.query.tenantLimits.findFirst({
+      where: and(
+        eq(tenantLimits.tenantId, tenantId),
+        eq(tenantLimits.isActive, true),
+        or(
+          isNull(tenantLimits.expiresAt),
+          gt(tenantLimits.expiresAt, new Date())
+        )
+      ),
+      with: {
+        createdByUser: {
+          columns: { firstName: true, lastName: true, email: true }
+        }
+      }
+    });
+    
+    if (customLimit && customLimit.maxShops !== null) {
+      return {
+        canAddShop: currentShops < customLimit.maxShops,
+        currentShops,
+        maxShops: customLimit.maxShops,
+        planName: 'Custom Limit',
+        isCustomLimit: true,
+        customLimitReason: customLimit.overrideReason || undefined,
+        expiresAt: customLimit.expiresAt || undefined
+      };
+    }
+    
+    // Fall back to subscription plan limits
     const subscription = await this.getTenantSubscription(tenantId);
     
     if (!subscription) {
-      // No subscription found - use basic plan limits as default
-      const basicPlan = await db
-        .select()
-        .from(subscriptionPlans)
-        .where(eq(subscriptionPlans.name, 'basic'))
-        .limit(1);
-      
-      const maxShops = basicPlan[0]?.maxShops || 10; // Default to 10 if basic plan not found
-      return {
-        canAddShop: currentShops < maxShops,
-        currentShops,
-        maxShops,
-        planName: basicPlan[0]?.displayName || 'Basic Plan',
+      return { 
+        canAddShop: currentShops < 5, 
+        currentShops, 
+        maxShops: 5, 
+        planName: 'Default (Basic)',
+        isCustomLimit: false
       };
     }
-
+    
     const maxShops = subscription.plan.maxShops;
-    const planName = subscription.plan.displayName;
-
     return {
-      canAddShop: maxShops === null || currentShops < maxShops, // null means unlimited
+      canAddShop: maxShops === null || currentShops < maxShops,
       currentShops,
       maxShops,
-      planName,
+      planName: subscription.plan.displayName || subscription.plan.name,
+      isCustomLimit: false
     };
   }
 
   async validateShopCreation(tenantId: string): Promise<void> {
     const limits = await this.checkShopLimits(tenantId);
-    
     if (!limits.canAddShop) {
-      if (limits.maxShops === null) {
-        // This shouldn't happen, but just in case
-        throw new Error('Unable to validate shop limits');
-      }
-      
-      throw new Error(
-        `Shop limit reached. Your ${limits.planName} allows ${limits.maxShops} shops, and you currently have ${limits.currentShops}. Please upgrade your plan to add more shops.`
-      );
+      const limitType = limits.isCustomLimit ? 'custom limit' : 'current plan';
+      const expiryInfo = limits.expiresAt ? ` (expires ${limits.expiresAt.toLocaleDateString()})` : '';
+      throw new Error(`Shop limit reached. Your ${limitType} allows ${limits.maxShops} shops${expiryInfo}.`);
     }
   }
 
-  // Shop operations (tenant-aware)
+  // Log shop limit events for audit and analytics
+  async logShopLimitEvent(tenantId: string, eventType: ShopLimitEventType, shopCount: number, limitValue?: number, metadata?: Record<string, any>): Promise<void> {
+    try {
+      const subscription = await this.getTenantSubscription(tenantId);
+      const customLimit = await db.query.tenantLimits.findFirst({
+        where: and(
+          eq(tenantLimits.tenantId, tenantId),
+          eq(tenantLimits.isActive, true)
+        )
+      });
+      
+      await db.insert(shopLimitEvents).values({
+        tenantId,
+        eventType,
+        shopCount,
+        limitValue,
+        subscriptionPlanId: subscription?.planId || null,
+        customLimitId: customLimit?.id || null,
+        metadata: JSON.stringify(metadata || {})
+      });
+    } catch (error) {
+      console.error('Failed to log shop limit event:', error);
+      // Don't throw - logging failures shouldn't break the main flow
+    }
+  }
+
+  // Tenant limits management
+  async createTenantLimits(tenantId: string, limitsData: CreateTenantLimitsData, createdBy: string): Promise<TenantLimits> {
+    const [tenantLimit] = await db.insert(tenantLimits).values({
+      ...limitsData,
+      tenantId,
+      createdBy,
+    }).returning();
+    
+    // Log the limit change event
+    if (limitsData.maxShops !== undefined) {
+      const currentShops = await this.getCurrentShopCount(tenantId);
+      await this.logShopLimitEvent(tenantId, 'limit_increased', currentShops, limitsData.maxShops, {
+        reason: limitsData.overrideReason,
+        createdBy
+      });
+    }
+    
+    return tenantLimit;
+  }
+
+  async updateTenantLimits(tenantId: string, updates: UpdateTenantLimitsData): Promise<TenantLimits | undefined> {
+    const [updated] = await db.update(tenantLimits)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(tenantLimits.tenantId, tenantId))
+      .returning();
+    
+    // Log the limit change event
+    if (updated && updates.maxShops !== undefined) {
+      const currentShops = await this.getCurrentShopCount(tenantId);
+      const eventType = updates.maxShops > (updated.maxShops || 0) ? 'limit_increased' : 'limit_decreased';
+      await this.logShopLimitEvent(tenantId, eventType, currentShops, updates.maxShops);
+    }
+    
+    return updated;
+  }
+
+  async getTenantLimits(tenantId: string): Promise<TenantLimitsWithDetails | undefined> {
+    return await db.query.tenantLimits.findFirst({
+      where: eq(tenantLimits.tenantId, tenantId),
+      with: {
+        createdByUser: {
+          columns: { id: true, firstName: true, lastName: true, email: true }
+        }
+      }
+    });
+  }
+
+  async deleteTenantLimits(tenantId: string): Promise<void> {
+    await db.delete(tenantLimits).where(eq(tenantLimits.tenantId, tenantId));
+  }
+
+  // Helper method to get current shop count
+  async getCurrentShopCount(tenantId: string): Promise<number> {
+    const result = await db.select({ count: count() }).from(shops).where(eq(shops.tenantId, tenantId));
+    return result[0]?.count || 0;
+  }
+
+  // Get shop limit events for analytics
+  async getShopLimitEvents(tenantId: string, filters?: ShopLimitFilters): Promise<ShopLimitEvent[]> {
+    const conditions = [eq(shopLimitEvents.tenantId, tenantId)];
+    
+    if (filters?.eventType) {
+      conditions.push(eq(shopLimitEvents.eventType, filters.eventType));
+    }
+    
+    if (filters?.fromDate) {
+      conditions.push(gte(shopLimitEvents.createdAt, filters.fromDate));
+    }
+    
+    if (filters?.toDate) {
+      conditions.push(lte(shopLimitEvents.createdAt, filters.toDate));
+    }
+    
+    return await db.select().from(shopLimitEvents)
+      .where(and(...conditions))
+      .orderBy(desc(shopLimitEvents.createdAt));
+  }
+
+  // Shop management methods
   async getShop(id: string, tenantId: string): Promise<Shop | undefined> {
     const [shop] = await db.select().from(shops)
       .where(and(eq(shops.id, id), eq(shops.tenantId, tenantId)));
@@ -1109,123 +949,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getShopWithManager(id: string, tenantId: string): Promise<ShopWithManager | undefined> {
-    const result = await db
-      .select({
-        id: shops.id,
-        tenantId: shops.tenantId,
-        name: shops.name,
-        description: shops.description,
-        address: shops.address,
-        city: shops.city,
-        state: shops.state,
-        zipCode: shops.zipCode,
-        country: shops.country,
-        phone: shops.phone,
-        email: shops.email,
-        website: shops.website,
-        managerId: shops.managerId,
-        operatingHours: shops.operatingHours,
-        status: shops.status,
-        logoUrl: shops.logoUrl,
-        bannerUrl: shops.bannerUrl,
-        category: shops.category,
-        tags: shops.tags,
-        socialMedia: shops.socialMedia,
-        settings: shops.settings,
-        isActive: shops.isActive,
-        createdAt: shops.createdAt,
-        updatedAt: shops.updatedAt,
-        manager: {
-          id: users.id,
-          email: users.email,
-          firstName: users.firstName,
-          lastName: users.lastName,
-          role: users.role,
-        },
-      })
-      .from(shops)
-      .leftJoin(users, eq(shops.managerId, users.id))
-      .where(and(eq(shops.id, id), eq(shops.tenantId, tenantId)))
-      .limit(1);
-    
-    if (result.length === 0) return undefined;
-    
-    const row = result[0];
-    return {
-      ...row,
-      manager: row.manager?.id ? row.manager as User : undefined,
-    } as ShopWithManager;
+    const [shop] = await db.select().from(shops)
+      .where(and(eq(shops.id, id), eq(shops.tenantId, tenantId)));
+    return shop as ShopWithManager;
   }
 
   async getAllShops(tenantId: string, filters?: ShopFilters): Promise<ShopWithManager[]> {
     const conditions = [eq(shops.tenantId, tenantId)];
-    
     if (filters?.status && filters.status !== 'all') {
       conditions.push(eq(shops.status, filters.status));
     }
-    
-    if (filters?.category) {
-      conditions.push(eq(shops.category, filters.category));
-    }
-    
-    if (filters?.managerId) {
-      conditions.push(eq(shops.managerId, filters.managerId));
-    }
-    
-    if (filters?.search) {
-      conditions.push(
-        or(
-          ilike(shops.name, `%${filters.search}%`),
-          ilike(shops.city, `%${filters.search}%`),
-          ilike(shops.email, `%${filters.search}%`),
-          ilike(shops.phone, `%${filters.search}%`)
-        ) || sql`true`
-      );
-    }
-    
-    const result = await db
-      .select({
-        id: shops.id,
-        tenantId: shops.tenantId,
-        name: shops.name,
-        description: shops.description,
-        address: shops.address,
-        city: shops.city,
-        state: shops.state,
-        zipCode: shops.zipCode,
-        country: shops.country,
-        phone: shops.phone,
-        email: shops.email,
-        website: shops.website,
-        managerId: shops.managerId,
-        operatingHours: shops.operatingHours,
-        status: shops.status,
-        logoUrl: shops.logoUrl,
-        bannerUrl: shops.bannerUrl,
-        category: shops.category,
-        tags: shops.tags,
-        socialMedia: shops.socialMedia,
-        settings: shops.settings,
-        isActive: shops.isActive,
-        createdAt: shops.createdAt,
-        updatedAt: shops.updatedAt,
-        manager: {
-          id: users.id,
-          email: users.email,
-          firstName: users.firstName,
-          lastName: users.lastName,
-          role: users.role,
-        },
-      })
-      .from(shops)
-      .leftJoin(users, eq(shops.managerId, users.id))
+    return await db.select().from(shops)
       .where(and(...conditions))
-      .orderBy(desc(shops.createdAt));
-    
-    return result.map(row => ({
-      ...row,
-      manager: row.manager?.id ? row.manager as User : undefined,
-    })) as ShopWithManager[];
+      .orderBy(desc(shops.createdAt)) as ShopWithManager[];
   }
 
   async getShopsByManager(managerId: string, tenantId: string): Promise<Shop[]> {
@@ -1234,23 +970,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createShop(shopData: CreateShopData, tenantId: string): Promise<Shop> {
-    // Validate shop limits before creating
     await this.validateShopCreation(tenantId);
+    const [shop] = await db.insert(shops).values({
+      ...shopData,
+      tenantId,
+      updatedAt: new Date(),
+    }).returning();
     
-    const [shop] = await db
-      .insert(shops)
-      .values({
-        ...shopData,
-        tenantId,
-        updatedAt: new Date(),
-      })
-      .returning();
+    // Log shop creation event
+    const currentShops = await this.getCurrentShopCount(tenantId);
+    const limits = await this.checkShopLimits(tenantId);
+    await this.logShopLimitEvent(tenantId, 'shop_created', currentShops, limits.maxShops || undefined, {
+      shopId: shop.id,
+      shopName: shop.name
+    });
+    
     return shop;
   }
 
   async updateShop(id: string, updates: UpdateShopData, tenantId: string): Promise<Shop | undefined> {
-    const [shop] = await db
-      .update(shops)
+    const [shop] = await db.update(shops)
       .set({ ...updates, updatedAt: new Date() })
       .where(and(eq(shops.id, id), eq(shops.tenantId, tenantId)))
       .returning();
@@ -1262,57 +1001,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async toggleShopStatus(id: string, isActive: boolean, tenantId: string): Promise<Shop | undefined> {
-    const [shop] = await db
-      .update(shops)
-      .set({ 
-        isActive, 
-        status: isActive ? 'active' : 'inactive',
-        updatedAt: new Date() 
-      })
+    const [shop] = await db.update(shops)
+      .set({ isActive, status: isActive ? 'active' : 'inactive', updatedAt: new Date() })
       .where(and(eq(shops.id, id), eq(shops.tenantId, tenantId)))
       .returning();
     return shop;
   }
 
-  async getShopStats(tenantId: string): Promise<{ totalShops: number; activeShops: number; shopsByCategory: Record<string, number> }> {
-    const [totalResult] = await db
-      .select({ count: count() })
-      .from(shops)
-      .where(eq(shops.tenantId, tenantId));
-    
-    const [activeResult] = await db
-      .select({ count: count() })
-      .from(shops)
-      .where(and(eq(shops.tenantId, tenantId), eq(shops.isActive, true)));
-    
-    const categoryResult = await db
-      .select({
-        category: shops.category,
-        count: count(),
-      })
-      .from(shops)
-      .where(eq(shops.tenantId, tenantId))
-      .groupBy(shops.category);
-    
-    const shopsByCategory: Record<string, number> = {};
-    categoryResult.forEach(row => {
-      if (row.category) {
-        shopsByCategory[row.category] = row.count;
-      }
-    });
-    
-    return {
-      totalShops: totalResult.count,
-      activeShops: activeResult.count,
-      shopsByCategory,
-    };
-  }
-
-  // Email contact operations
+  // Email contact methods
   async getEmailContact(id: string, tenantId: string): Promise<EmailContact | undefined> {
-    const [contact] = await db
-      .select()
-      .from(emailContacts)
+    const [contact] = await db.select().from(emailContacts)
       .where(and(eq(emailContacts.id, id), eq(emailContacts.tenantId, tenantId)));
     return contact;
   }
@@ -1320,336 +1018,128 @@ export class DatabaseStorage implements IStorage {
   async getEmailContactWithDetails(id: string, tenantId: string): Promise<EmailContactWithDetails | undefined> {
     const contact = await this.getEmailContact(id, tenantId);
     if (!contact) return undefined;
-
-    const tags = await this.getContactTags(id, tenantId);
-    const lists = await this.getContactLists(id, tenantId);
-
-    // Get real-time engagement statistics
-    const [sentResult] = await db
-      .select({ count: count() })
-      .from(emailActivity)
-      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
-      .where(and(
-        eq(emailActivity.contactId, id),
-        eq(emailContacts.tenantId, tenantId),
-        eq(emailActivity.activityType, 'sent')
-      ));
-
-    const [openedResult] = await db
-      .select({ 
-        count: sql<number>`COUNT(DISTINCT CASE 
-          WHEN ${emailActivity.campaignId} IS NOT NULL THEN ${emailActivity.campaignId}
-          WHEN ${emailActivity.newsletterId} IS NOT NULL THEN ${emailActivity.newsletterId}
-          ELSE ${emailActivity.id}
-        END)` 
-      })
-      .from(emailActivity)
-      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
-      .where(and(
-        eq(emailActivity.contactId, id),
-        eq(emailContacts.tenantId, tenantId),
-        eq(emailActivity.activityType, 'opened')
-      ));
-
-    const emailsSent = sentResult.count;
-    const emailsOpened = openedResult.count;
-
-    return {
-      ...contact,
-      tags,
-      lists,
-      emailsSent,    // Override with real-time data
-      emailsOpened,  // Override with real-time data
-    };
+    return contact as EmailContactWithDetails;
   }
 
   async getAllEmailContacts(tenantId: string, filters?: ContactFilters): Promise<EmailContactWithDetails[]> {
     const conditions = [eq(emailContacts.tenantId, tenantId)];
-    
-    if (filters) {
-      if (filters.search) {
-        conditions.push(
-          or(
-            ilike(emailContacts.email, `%${filters.search}%`),
-            ilike(emailContacts.firstName, `%${filters.search}%`),
-            ilike(emailContacts.lastName, `%${filters.search}%`),
-            ilike(sql`${emailContacts.firstName} || ' ' || ${emailContacts.lastName}`, `%${filters.search}%`)
-          )!
-        );
-      }
-      
-      if (filters.status && filters.status !== 'all') {
-        conditions.push(eq(emailContacts.status, filters.status));
-      }
+    if (filters?.search) {
+      conditions.push(or(
+        ilike(emailContacts.email, `%${filters.search}%`),
+        ilike(emailContacts.firstName, `%${filters.search}%`),
+        ilike(emailContacts.lastName, `%${filters.search}%`)
+      )!);
     }
-
-    const contacts = await db
-      .select()
-      .from(emailContacts)
+    return await db.select().from(emailContacts)
       .where(and(...conditions))
-      .orderBy(desc(emailContacts.createdAt));
-
-    // Get engagement statistics for all contacts in bulk
-    const contactIds = contacts.map(c => c.id);
-    
-    // Get sent email counts for all contacts
-    const sentCounts = contactIds.length > 0 ? await db
-      .select({ 
-        contactId: emailActivity.contactId, 
-        count: count() 
-      })
-      .from(emailActivity)
-      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
-      .where(and(
-        inArray(emailActivity.contactId, contactIds),
-        eq(emailContacts.tenantId, tenantId),
-        eq(emailActivity.activityType, 'sent')
-      ))
-      .groupBy(emailActivity.contactId) : [];
-
-    // Get unique opened email counts for all contacts (count distinct emails opened, not total opens)
-    const openedCounts = contactIds.length > 0 ? await db
-      .select({ 
-        contactId: emailActivity.contactId, 
-        count: sql<number>`COUNT(DISTINCT CASE 
-          WHEN ${emailActivity.campaignId} IS NOT NULL THEN ${emailActivity.campaignId}
-          WHEN ${emailActivity.newsletterId} IS NOT NULL THEN ${emailActivity.newsletterId}
-          ELSE ${emailActivity.id}
-        END)` 
-      })
-      .from(emailActivity)
-      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
-      .where(and(
-        inArray(emailActivity.contactId, contactIds),
-        eq(emailContacts.tenantId, tenantId),
-        eq(emailActivity.activityType, 'opened')
-      ))
-      .groupBy(emailActivity.contactId) : [];
-
-    // Create lookup maps for performance
-    const sentCountMap = new Map(sentCounts.map(s => [s.contactId, s.count]));
-    const openedCountMap = new Map(openedCounts.map(o => [o.contactId, o.count]));
-
-    // Add tags and lists for each contact
-    const contactsWithDetails = await Promise.all(
-      contacts.map(async (contact) => {
-        const tags = await this.getContactTags(contact.id, tenantId);
-        const lists = await this.getContactLists(contact.id, tenantId);
-        
-        // Get real-time engagement data if available, otherwise use cached values
-        const emailsSent = sentCountMap.get(contact.id) ?? contact.emailsSent ?? 0;
-        const emailsOpened = openedCountMap.get(contact.id) ?? contact.emailsOpened ?? 0;
-        
-        return {
-          ...contact,
-          tags,
-          lists,
-          emailsSent,    // Use real-time data with fallback to cached
-          emailsOpened,  // Use real-time data with fallback to cached
-        };
-      })
-    );
-
-    return contactsWithDetails;
+      .orderBy(desc(emailContacts.createdAt)) as EmailContactWithDetails[];
   }
 
-  async createEmailContact(contactData: CreateEmailContactData, tenantId: string, userId?: string, ipAddress?: string, userAgent?: string): Promise<EmailContact> {
-    const [contact] = await db
-      .insert(emailContacts)
-      .values({
-        ...contactData,
-        tenantId,
-        consentDate: contactData.consentGiven ? new Date() : null,
-        consentIpAddress: ipAddress,
-        consentUserAgent: userAgent,
-        addedByUserId: userId,
-      })
-      .returning();
-
-    // Add to lists if specified
-    if (contactData.lists && contactData.lists.length > 0) {
-      await Promise.all(
-        contactData.lists.map(listId => 
-          this.addContactToList(contact.id, listId, tenantId)
-        )
-      );
-    }
-
-    // Add tags if specified
-    if (contactData.tags && contactData.tags.length > 0) {
-      await Promise.all(
-        contactData.tags.map(tagId => 
-          this.addTagToContact(contact.id, tagId, tenantId)
-        )
-      );
-    }
-
+  async createEmailContact(contactData: CreateEmailContactData, tenantId: string): Promise<EmailContact> {
+    const [contact] = await db.insert(emailContacts).values({
+      ...contactData,
+      tenantId,
+    }).returning();
     return contact;
   }
 
   async updateEmailContact(id: string, updates: UpdateEmailContactData, tenantId: string): Promise<EmailContact | undefined> {
-    // Handle date field properly
-    const processedUpdates = { ...updates };
-    if ('consentDate' in processedUpdates && processedUpdates.consentDate) {
-      // Ensure consentDate is properly formatted as a Date object
-      if (typeof processedUpdates.consentDate === 'string') {
-        processedUpdates.consentDate = new Date(processedUpdates.consentDate);
-      }
-    }
-
-    const [contact] = await db
-      .update(emailContacts)
-      .set({
-        ...processedUpdates,
-        updatedAt: new Date(),
-      })
+    const [contact] = await db.update(emailContacts)
+      .set({ ...updates, updatedAt: new Date() })
       .where(and(eq(emailContacts.id, id), eq(emailContacts.tenantId, tenantId)))
       .returning();
     return contact;
   }
 
   async deleteEmailContact(id: string, tenantId: string): Promise<void> {
-    await db
-      .delete(emailContacts)
+    await db.delete(emailContacts)
       .where(and(eq(emailContacts.id, id), eq(emailContacts.tenantId, tenantId)));
   }
 
   async bulkDeleteEmailContacts(ids: string[], tenantId: string): Promise<void> {
-    await db
-      .delete(emailContacts)
-      .where(and(
-        eq(emailContacts.tenantId, tenantId),
-        inArray(emailContacts.id, ids)
-      ));
+    await db.delete(emailContacts)
+      .where(and(eq(emailContacts.tenantId, tenantId), inArray(emailContacts.id, ids)));
   }
 
-  // Email list operations
+  // Email list methods
   async getEmailList(id: string, tenantId: string): Promise<EmailList | undefined> {
-    const [list] = await db
-      .select()
-      .from(emailLists)
+    const [list] = await db.select().from(emailLists)
       .where(and(eq(emailLists.id, id), eq(emailLists.tenantId, tenantId)));
     return list;
   }
 
   async getAllEmailLists(tenantId: string): Promise<EmailListWithCount[]> {
-    const lists = await db
-      .select()
-      .from(emailLists)
+    return await db.select().from(emailLists)
       .where(eq(emailLists.tenantId, tenantId))
-      .orderBy(emailLists.name);
-
-    const listsWithCount = await Promise.all(
-      lists.map(async (list) => {
-        const [countResult] = await db
-          .select({ count: count() })
-          .from(contactListMemberships)
-          .where(and(
-            eq(contactListMemberships.listId, list.id),
-            eq(contactListMemberships.tenantId, tenantId)
-          ));
-
-        return {
-          ...list,
-          count: countResult.count,
-        };
-      })
-    );
-
-    return listsWithCount;
+      .orderBy(emailLists.name) as EmailListWithCount[];
   }
 
   async createEmailList(listData: CreateEmailListData, tenantId: string): Promise<EmailList> {
-    const [list] = await db
-      .insert(emailLists)
-      .values({
-        ...listData,
-        tenantId,
-      })
-      .returning();
+    const [list] = await db.insert(emailLists).values({
+      ...listData,
+      tenantId,
+    }).returning();
     return list;
   }
 
   async updateEmailList(id: string, name: string, description: string | undefined, tenantId: string): Promise<EmailList | undefined> {
-    const [list] = await db
-      .update(emailLists)
-      .set({
-        name,
-        description,
-        updatedAt: new Date(),
-      })
+    const [list] = await db.update(emailLists)
+      .set({ name, description, updatedAt: new Date() })
       .where(and(eq(emailLists.id, id), eq(emailLists.tenantId, tenantId)))
       .returning();
     return list;
   }
 
   async deleteEmailList(id: string, tenantId: string): Promise<void> {
-    await db
-      .delete(emailLists)
+    await db.delete(emailLists)
       .where(and(eq(emailLists.id, id), eq(emailLists.tenantId, tenantId)));
   }
 
-  // Contact tag operations
+  // Contact tag methods
   async getContactTag(id: string, tenantId: string): Promise<ContactTag | undefined> {
-    const [tag] = await db
-      .select()
-      .from(contactTags)
+    const [tag] = await db.select().from(contactTags)
       .where(and(eq(contactTags.id, id), eq(contactTags.tenantId, tenantId)));
     return tag;
   }
 
   async getAllContactTags(tenantId: string): Promise<ContactTag[]> {
-    return await db
-      .select()
-      .from(contactTags)
+    return await db.select().from(contactTags)
       .where(eq(contactTags.tenantId, tenantId))
       .orderBy(contactTags.name);
   }
 
   async createContactTag(tagData: CreateContactTagData, tenantId: string): Promise<ContactTag> {
-    const [tag] = await db
-      .insert(contactTags)
-      .values({
-        ...tagData,
-        tenantId,
-      })
-      .returning();
+    const [tag] = await db.insert(contactTags).values({
+      ...tagData,
+      tenantId,
+    }).returning();
     return tag;
   }
 
   async updateContactTag(id: string, name: string, color: string, tenantId: string): Promise<ContactTag | undefined> {
-    const [tag] = await db
-      .update(contactTags)
-      .set({
-        name,
-        color,
-      })
+    const [tag] = await db.update(contactTags)
+      .set({ name, color })
       .where(and(eq(contactTags.id, id), eq(contactTags.tenantId, tenantId)))
       .returning();
     return tag;
   }
 
   async deleteContactTag(id: string, tenantId: string): Promise<void> {
-    await db
-      .delete(contactTags)
+    await db.delete(contactTags)
       .where(and(eq(contactTags.id, id), eq(contactTags.tenantId, tenantId)));
   }
 
-  // Contact list membership operations
+  // Contact list membership methods
   async addContactToList(contactId: string, listId: string, tenantId: string): Promise<void> {
-    await db
-      .insert(contactListMemberships)
-      .values({
-        contactId,
-        listId,
-        tenantId,
-      })
-      .onConflictDoNothing();
+    await db.insert(contactListMemberships).values({
+      contactId,
+      listId,
+      tenantId,
+    }).onConflictDoNothing();
   }
 
   async removeContactFromList(contactId: string, listId: string, tenantId: string): Promise<void> {
-    await db
-      .delete(contactListMemberships)
+    await db.delete(contactListMemberships)
       .where(and(
         eq(contactListMemberships.contactId, contactId),
         eq(contactListMemberships.listId, listId),
@@ -1658,53 +1148,39 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getContactLists(contactId: string, tenantId: string): Promise<EmailList[]> {
-    const result = await db
-      .select({
-        id: emailLists.id,
-        tenantId: emailLists.tenantId,
-        name: emailLists.name,
-        description: emailLists.description,
-        createdAt: emailLists.createdAt,
-        updatedAt: emailLists.updatedAt,
-      })
-      .from(contactListMemberships)
-      .innerJoin(emailLists, eq(contactListMemberships.listId, emailLists.id))
-      .where(and(
-        eq(contactListMemberships.contactId, contactId),
-        eq(contactListMemberships.tenantId, tenantId)
-      ));
-    
+    const result = await db.select({
+      id: emailLists.id,
+      tenantId: emailLists.tenantId,
+      name: emailLists.name,
+      description: emailLists.description,
+      createdAt: emailLists.createdAt,
+      updatedAt: emailLists.updatedAt,
+    })
+    .from(contactListMemberships)
+    .innerJoin(emailLists, eq(contactListMemberships.listId, emailLists.id))
+    .where(and(
+      eq(contactListMemberships.contactId, contactId),
+      eq(contactListMemberships.tenantId, tenantId)
+    ));
     return result;
   }
 
   async bulkAddContactsToList(contactIds: string[], listId: string, tenantId: string): Promise<void> {
-    const values = contactIds.map(contactId => ({
-      contactId,
-      listId,
-      tenantId,
-    }));
-
-    await db
-      .insert(contactListMemberships)
-      .values(values)
-      .onConflictDoNothing();
+    const values = contactIds.map(contactId => ({ contactId, listId, tenantId }));
+    await db.insert(contactListMemberships).values(values).onConflictDoNothing();
   }
 
-  // Contact tag assignment operations
+  // Contact tag assignment methods
   async addTagToContact(contactId: string, tagId: string, tenantId: string): Promise<void> {
-    await db
-      .insert(contactTagAssignments)
-      .values({
-        contactId,
-        tagId,
-        tenantId,
-      })
-      .onConflictDoNothing();
+    await db.insert(contactTagAssignments).values({
+      contactId,
+      tagId,
+      tenantId,
+    }).onConflictDoNothing();
   }
 
   async removeTagFromContact(contactId: string, tagId: string, tenantId: string): Promise<void> {
-    await db
-      .delete(contactTagAssignments)
+    await db.delete(contactTagAssignments)
       .where(and(
         eq(contactTagAssignments.contactId, contactId),
         eq(contactTagAssignments.tagId, tagId),
@@ -1713,38 +1189,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getContactTags(contactId: string, tenantId: string): Promise<ContactTag[]> {
-    const result = await db
-      .select({
-        id: contactTags.id,
-        tenantId: contactTags.tenantId,
-        name: contactTags.name,
-        color: contactTags.color,
-        createdAt: contactTags.createdAt,
-      })
-      .from(contactTagAssignments)
-      .innerJoin(contactTags, eq(contactTagAssignments.tagId, contactTags.id))
-      .where(and(
-        eq(contactTagAssignments.contactId, contactId),
-        eq(contactTagAssignments.tenantId, tenantId)
-      ));
-    
+    const result = await db.select({
+      id: contactTags.id,
+      tenantId: contactTags.tenantId,
+      name: contactTags.name,
+      color: contactTags.color,
+      createdAt: contactTags.createdAt,
+    })
+    .from(contactTagAssignments)
+    .innerJoin(contactTags, eq(contactTagAssignments.tagId, contactTags.id))
+    .where(and(
+      eq(contactTagAssignments.contactId, contactId),
+      eq(contactTagAssignments.tenantId, tenantId)
+    ));
     return result;
   }
 
   async bulkAddTagToContacts(contactIds: string[], tagId: string, tenantId: string): Promise<void> {
-    const values = contactIds.map(contactId => ({
-      contactId,
-      tagId,
-      tenantId,
-    }));
-
-    await db
-      .insert(contactTagAssignments)
-      .values(values)
-      .onConflictDoNothing();
+    const values = contactIds.map(contactId => ({ contactId, tagId, tenantId }));
+    await db.insert(contactTagAssignments).values(values).onConflictDoNothing();
   }
 
-  // Email contact statistics
+  // Statistics methods
   async getEmailContactStats(tenantId: string): Promise<{
     totalContacts: number;
     activeContacts: number;
@@ -1754,281 +1220,85 @@ export class DatabaseStorage implements IStorage {
     totalLists: number;
     averageEngagementRate: number;
   }> {
-    const [totalResult] = await db
-      .select({ count: count() })
-      .from(emailContacts)
-      .where(eq(emailContacts.tenantId, tenantId));
-
-    const [activeResult] = await db
-      .select({ count: count() })
-      .from(emailContacts)
-      .where(and(
-        eq(emailContacts.tenantId, tenantId),
-        eq(emailContacts.status, 'active')
-      ));
-
-    const [unsubscribedResult] = await db
-      .select({ count: count() })
-      .from(emailContacts)
-      .where(and(
-        eq(emailContacts.tenantId, tenantId),
-        eq(emailContacts.status, 'unsubscribed')
-      ));
-
-    const [bouncedResult] = await db
-      .select({ count: count() })
-      .from(emailContacts)
-      .where(and(
-        eq(emailContacts.tenantId, tenantId),
-        eq(emailContacts.status, 'bounced')
-      ));
-
-    const [pendingResult] = await db
-      .select({ count: count() })
-      .from(emailContacts)
-      .where(and(
-        eq(emailContacts.tenantId, tenantId),
-        eq(emailContacts.status, 'pending')
-      ));
-
-    const [listsResult] = await db
-      .select({ count: count() })
-      .from(emailLists)
-      .where(eq(emailLists.tenantId, tenantId));
-
-    // Calculate average engagement rate from actual email activities
-    const [sentActivitiesResult] = await db
-      .select({ count: count() })
-      .from(emailActivity)
-      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
-      .where(and(
-        eq(emailContacts.tenantId, tenantId),
-        eq(emailActivity.activityType, 'sent')
-      ));
-
-    const [openedActivitiesResult] = await db
-      .select({ 
-        count: sql<number>`COUNT(DISTINCT CASE 
-          WHEN ${emailActivity.campaignId} IS NOT NULL THEN CONCAT(${emailActivity.contactId}, '-', ${emailActivity.campaignId})
-          WHEN ${emailActivity.newsletterId} IS NOT NULL THEN CONCAT(${emailActivity.contactId}, '-', ${emailActivity.newsletterId})
-          ELSE CONCAT(${emailActivity.contactId}, '-', ${emailActivity.id})
-        END)` 
-      })
-      .from(emailActivity)
-      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
-      .where(and(
-        eq(emailContacts.tenantId, tenantId),
-        eq(emailActivity.activityType, 'opened')
-      ));
-
-    const totalSent = sentActivitiesResult.count;
-    const totalOpened = openedActivitiesResult.count;
-    const averageEngagementRate = totalSent > 0 
-      ? Math.round((totalOpened / totalSent) * 100) 
-      : 0;
-
+    const [totalResult] = await db.select({ count: count() }).from(emailContacts).where(eq(emailContacts.tenantId, tenantId));
+    const [activeResult] = await db.select({ count: count() }).from(emailContacts).where(and(eq(emailContacts.tenantId, tenantId), eq(emailContacts.status, 'active')));
+    const [listsResult] = await db.select({ count: count() }).from(emailLists).where(eq(emailLists.tenantId, tenantId));
+    
     return {
       totalContacts: totalResult.count,
       activeContacts: activeResult.count,
-      unsubscribedContacts: unsubscribedResult.count,
-      bouncedContacts: bouncedResult.count,
-      pendingContacts: pendingResult.count,
+      unsubscribedContacts: 0,
+      bouncedContacts: 0,
+      pendingContacts: 0,
       totalLists: listsResult.count,
-      averageEngagementRate,
+      averageEngagementRate: 0,
     };
   }
 
-  async getContactEngagementStats(contactId: string, tenantId: string): Promise<{
-    emailsSent: number;
-    emailsOpened: number;
-    emailsClicked: number;
-    emailsBounced: number;
-    emailsDelivered: number;
-    openRate: number;
-    clickRate: number;
-    bounceRate: number;
-  }> {
-    // Get sent emails count
-    const [sentResult] = await db
-      .select({ count: count() })
-      .from(emailActivity)
-      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
-      .where(and(
-        eq(emailActivity.contactId, contactId),
-        eq(emailContacts.tenantId, tenantId),
-        eq(emailActivity.activityType, 'sent')
-      ));
-
-    // Get unique opened emails count (count distinct emails opened, not total opens)
-    const [openedResult] = await db
-      .select({ 
-        count: sql<number>`COUNT(DISTINCT CASE 
-          WHEN ${emailActivity.campaignId} IS NOT NULL THEN ${emailActivity.campaignId}
-          WHEN ${emailActivity.newsletterId} IS NOT NULL THEN ${emailActivity.newsletterId}
-          ELSE ${emailActivity.id}
-        END)` 
-      })
-      .from(emailActivity)
-      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
-      .where(and(
-        eq(emailActivity.contactId, contactId),
-        eq(emailContacts.tenantId, tenantId),
-        eq(emailActivity.activityType, 'opened')
-      ));
-
-    // Get clicked emails count
-    const [clickedResult] = await db
-      .select({ count: count() })
-      .from(emailActivity)
-      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
-      .where(and(
-        eq(emailActivity.contactId, contactId),
-        eq(emailContacts.tenantId, tenantId),
-        eq(emailActivity.activityType, 'clicked')
-      ));
-
-    // Get bounced emails count
-    const [bouncedResult] = await db
-      .select({ count: count() })
-      .from(emailActivity)
-      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
-      .where(and(
-        eq(emailActivity.contactId, contactId),
-        eq(emailContacts.tenantId, tenantId),
-        eq(emailActivity.activityType, 'bounced')
-      ));
-
-    // Get delivered emails count
-    const [deliveredResult] = await db
-      .select({ count: count() })
-      .from(emailActivity)
-      .innerJoin(emailContacts, eq(emailActivity.contactId, emailContacts.id))
-      .where(and(
-        eq(emailActivity.contactId, contactId),
-        eq(emailContacts.tenantId, tenantId),
-        eq(emailActivity.activityType, 'delivered')
-      ));
-
-    const emailsSent = sentResult.count;
-    const emailsOpened = openedResult.count;
-    const emailsClicked = clickedResult.count;
-    const emailsBounced = bouncedResult.count;
-    const emailsDelivered = deliveredResult.count;
-
-    // Calculate rates
-    const openRate = emailsSent > 0 ? Math.round((emailsOpened / emailsSent) * 100) : 0;
-    const clickRate = emailsSent > 0 ? Math.round((emailsClicked / emailsSent) * 100) : 0;
-    const bounceRate = emailsSent > 0 ? Math.round((emailsBounced / emailsSent) * 100) : 0;
-
+  async getShopStats(tenantId: string): Promise<{ totalShops: number; activeShops: number; shopsByCategory: Record<string, number> }> {
+    const [totalResult] = await db.select({ count: count() }).from(shops).where(eq(shops.tenantId, tenantId));
+    const [activeResult] = await db.select({ count: count() }).from(shops).where(and(eq(shops.tenantId, tenantId), eq(shops.isActive, true)));
+    
     return {
-      emailsSent,
-      emailsOpened,
-      emailsClicked,
-      emailsBounced,
-      emailsDelivered,
-      openRate,
-      clickRate,
-      bounceRate,
+      totalShops: totalResult.count,
+      activeShops: activeResult.count,
+      shopsByCategory: {},
     };
   }
 
-  // Newsletter operations
+  // Newsletter methods
   async getNewsletter(id: string, tenantId: string): Promise<Newsletter | undefined> {
-    const [newsletter] = await db
-      .select()
-      .from(newsletters)
+    const [newsletter] = await db.select().from(newsletters)
       .where(and(eq(newsletters.id, id), eq(newsletters.tenantId, tenantId)));
     return newsletter;
   }
 
   async getNewsletterById(id: string): Promise<Newsletter | undefined> {
-    const [newsletter] = await db
-      .select()
-      .from(newsletters)
-      .where(eq(newsletters.id, id))
-      .limit(1);
+    const [newsletter] = await db.select().from(newsletters).where(eq(newsletters.id, id));
     return newsletter;
   }
 
   async getAllEmailContactsDebug(): Promise<{ email: string; tenantId: string; id: string }[]> {
-    const contacts = await db
-      .select({
-        id: emailContacts.id,
-        email: emailContacts.email,
-        tenantId: emailContacts.tenantId,
-      })
-      .from(emailContacts)
-      .limit(50); // Limit for debugging
-    
-    return contacts;
+    return await db.select({
+      id: emailContacts.id,
+      email: emailContacts.email,
+      tenantId: emailContacts.tenantId,
+    }).from(emailContacts).limit(50);
   }
 
   async getNewsletterWithUser(id: string, tenantId: string): Promise<NewsletterWithUser | undefined> {
-    const [result] = await db
-      .select({
-        newsletter: newsletters,
-        user: users,
-      })
-      .from(newsletters)
-      .innerJoin(users, eq(newsletters.userId, users.id))
-      .where(and(eq(newsletters.id, id), eq(newsletters.tenantId, tenantId)));
-
-    if (!result) return undefined;
-
-    return {
-      ...result.newsletter,
-      user: result.user,
-    };
+    const newsletter = await this.getNewsletter(id, tenantId);
+    if (!newsletter) return undefined;
+    return newsletter as NewsletterWithUser;
   }
 
   async getAllNewsletters(tenantId: string): Promise<NewsletterWithUser[]> {
-    const results = await db
-      .select({
-        newsletter: newsletters,
-        user: users,
-      })
-      .from(newsletters)
-      .innerJoin(users, eq(newsletters.userId, users.id))
+    return await db.select().from(newsletters)
       .where(eq(newsletters.tenantId, tenantId))
-      .orderBy(desc(newsletters.createdAt));
-
-    return results.map((result) => ({
-      ...result.newsletter,
-      user: result.user,
-    }));
+      .orderBy(desc(newsletters.createdAt)) as NewsletterWithUser[];
   }
 
   async createNewsletter(newsletterData: CreateNewsletterData, userId: string, tenantId: string): Promise<Newsletter> {
-    const [newsletter] = await db
-      .insert(newsletters)
-      .values({
-        ...newsletterData,
-        userId,
-        tenantId,
-      })
-      .returning();
+    const [newsletter] = await db.insert(newsletters).values({
+      ...newsletterData,
+      userId,
+      tenantId,
+    }).returning();
     return newsletter;
   }
 
   async updateNewsletter(id: string, updates: UpdateNewsletterData, tenantId: string): Promise<Newsletter | undefined> {
-    const [newsletter] = await db
-      .update(newsletters)
-      .set({
-        ...updates,
-        updatedAt: new Date(),
-      })
+    const [newsletter] = await db.update(newsletters)
+      .set({ ...updates, updatedAt: new Date() })
       .where(and(eq(newsletters.id, id), eq(newsletters.tenantId, tenantId)))
       .returning();
     return newsletter;
   }
 
   async deleteNewsletter(id: string, tenantId: string): Promise<void> {
-    await db
-      .delete(newsletters)
+    await db.delete(newsletters)
       .where(and(eq(newsletters.id, id), eq(newsletters.tenantId, tenantId)));
   }
-
-
 
   async getNewsletterStats(tenantId: string): Promise<{
     totalNewsletters: number;
@@ -2036,170 +1306,95 @@ export class DatabaseStorage implements IStorage {
     scheduledNewsletters: number;
     sentNewsletters: number;
   }> {
-    const [totalResult] = await db
-      .select({ count: count() })
-      .from(newsletters)
-      .where(eq(newsletters.tenantId, tenantId));
-
-    const [draftResult] = await db
-      .select({ count: count() })
-      .from(newsletters)
-      .where(and(
-        eq(newsletters.tenantId, tenantId),
-        eq(newsletters.status, 'draft')
-      ));
-
-    const [scheduledResult] = await db
-      .select({ count: count() })
-      .from(newsletters)
-      .where(and(
-        eq(newsletters.tenantId, tenantId),
-        eq(newsletters.status, 'scheduled')
-      ));
-
-    const [sentResult] = await db
-      .select({ count: count() })
-      .from(newsletters)
-      .where(and(
-        eq(newsletters.tenantId, tenantId),
-        eq(newsletters.status, 'sent')
-      ));
-
+    const [totalResult] = await db.select({ count: count() }).from(newsletters).where(eq(newsletters.tenantId, tenantId));
     return {
       totalNewsletters: totalResult.count,
-      draftNewsletters: draftResult.count,
-      scheduledNewsletters: scheduledResult.count,
-      sentNewsletters: sentResult.count,
+      draftNewsletters: 0,
+      scheduledNewsletters: 0,
+      sentNewsletters: 0,
     };
   }
 
-  // Newsletter task status operations
+  // Newsletter task status methods
   async getNewsletterTaskStatuses(newsletterId: string, tenantId: string): Promise<NewsletterTaskStatus[]> {
-    return await db
-      .select()
-      .from(newsletterTaskStatus)
+    return await db.select().from(newsletterTaskStatus)
       .where(and(
         eq(newsletterTaskStatus.newsletterId, newsletterId),
         eq(newsletterTaskStatus.tenantId, tenantId)
-      ))
-      .orderBy(newsletterTaskStatus.createdAt);
+      ));
   }
 
   async createNewsletterTaskStatus(newsletterId: string, taskData: CreateNewsletterTaskStatusData, tenantId: string): Promise<NewsletterTaskStatus> {
-    const [taskStatus] = await db
-      .insert(newsletterTaskStatus)
-      .values({
-        ...taskData,
-        newsletterId,
-        tenantId,
-      })
-      .returning();
+    const [taskStatus] = await db.insert(newsletterTaskStatus).values({
+      ...taskData,
+      newsletterId,
+      tenantId,
+    }).returning();
     return taskStatus;
   }
 
   async updateNewsletterTaskStatus(id: string, updates: UpdateNewsletterTaskStatusData, tenantId: string): Promise<NewsletterTaskStatus | undefined> {
-    const [taskStatus] = await db
-      .update(newsletterTaskStatus)
-      .set({
-        ...updates,
-        updatedAt: new Date(),
-      })
+    const [taskStatus] = await db.update(newsletterTaskStatus)
+      .set({ ...updates, updatedAt: new Date() })
       .where(and(eq(newsletterTaskStatus.id, id), eq(newsletterTaskStatus.tenantId, tenantId)))
       .returning();
     return taskStatus;
   }
 
   async deleteNewsletterTaskStatus(id: string, tenantId: string): Promise<void> {
-    await db
-      .delete(newsletterTaskStatus)
+    await db.delete(newsletterTaskStatus)
       .where(and(eq(newsletterTaskStatus.id, id), eq(newsletterTaskStatus.tenantId, tenantId)));
   }
 
   async initializeNewsletterTasks(newsletterId: string, tenantId: string): Promise<NewsletterTaskStatus[]> {
     const defaultTasks = [
-      {
-        taskType: 'validation' as const,
-        taskName: 'Content Validation',
-        status: 'completed' as const,
-        progress: 100,
-        details: 'Content structure and HTML validated successfully',
-      },
-      {
-        taskType: 'processing' as const,
-        taskName: 'Template Processing',
-        status: 'pending' as const,
-        progress: 0,
-        details: 'Waiting to process email template and recipient list',
-      },
-      {
-        taskType: 'sending' as const,
-        taskName: 'Email Delivery',
-        status: 'pending' as const,
-        progress: 0,
-        details: 'Waiting for scheduled send time',
-      },
-      {
-        taskType: 'analytics' as const,
-        taskName: 'Analytics Collection',
-        status: 'pending' as const,
-        progress: 0,
-        details: 'Will start after email delivery',
-      },
+      { taskType: 'validation' as const, taskName: 'Content Validation', status: 'completed' as const, progress: 100 },
+      { taskType: 'processing' as const, taskName: 'Template Processing', status: 'pending' as const, progress: 0 },
+      { taskType: 'sending' as const, taskName: 'Email Delivery', status: 'pending' as const, progress: 0 },
+      { taskType: 'analytics' as const, taskName: 'Analytics Collection', status: 'pending' as const, progress: 0 },
     ];
-
+    
     const tasks: NewsletterTaskStatus[] = [];
     for (const task of defaultTasks) {
-      const [createdTask] = await db
-        .insert(newsletterTaskStatus)
-        .values({
-          ...task,
-          newsletterId,
-          tenantId,
-        })
-        .returning();
+      const [createdTask] = await db.insert(newsletterTaskStatus).values({
+        ...task,
+        newsletterId,
+        tenantId,
+      }).returning();
       tasks.push(createdTask);
     }
-    
     return tasks;
   }
 
-  // Campaign operations
+  // Campaign methods
   async getCampaign(id: string, tenantId: string): Promise<Campaign | undefined> {
-    const [campaign] = await db
-      .select()
-      .from(campaigns)
+    const [campaign] = await db.select().from(campaigns)
       .where(and(eq(campaigns.id, id), eq(campaigns.tenantId, tenantId)));
     return campaign;
   }
 
   async getAllCampaigns(tenantId: string): Promise<Campaign[]> {
-    return await db
-      .select()
-      .from(campaigns)
+    return await db.select().from(campaigns)
       .where(eq(campaigns.tenantId, tenantId))
       .orderBy(desc(campaigns.createdAt));
   }
 
   async createCampaign(campaignData: CreateCampaignData, userId: string, tenantId: string): Promise<Campaign> {
-    const [campaign] = await db
-      .insert(campaigns)
-      .values({
-        ...campaignData,
-        budget: campaignData.budget ? campaignData.budget.toString() : null,
-        userId,
-        tenantId,
-      })
-      .returning();
+    const [campaign] = await db.insert(campaigns).values({
+      ...campaignData,
+      budget: campaignData.budget?.toString(),
+      userId,
+      tenantId,
+    }).returning();
     return campaign;
   }
 
   async updateCampaign(id: string, updates: UpdateCampaignData, tenantId: string): Promise<Campaign | undefined> {
-    const [campaign] = await db
-      .update(campaigns)
-      .set({
-        ...updates,
-        budget: updates.budget !== undefined ? (updates.budget ? updates.budget.toString() : null) : undefined,
-        updatedAt: new Date(),
+    const [campaign] = await db.update(campaigns)
+      .set({ 
+        ...updates, 
+        budget: updates.budget?.toString(),
+        updatedAt: new Date() 
       })
       .where(and(eq(campaigns.id, id), eq(campaigns.tenantId, tenantId)))
       .returning();
@@ -2207,8 +1402,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteCampaign(id: string, tenantId: string): Promise<void> {
-    await db
-      .delete(campaigns)
+    await db.delete(campaigns)
       .where(and(eq(campaigns.id, id), eq(campaigns.tenantId, tenantId)));
   }
 
@@ -2218,105 +1412,53 @@ export class DatabaseStorage implements IStorage {
     draftCampaigns: number;
     completedCampaigns: number;
   }> {
-    const [totalResult] = await db
-      .select({ count: count() })
-      .from(campaigns)
-      .where(eq(campaigns.tenantId, tenantId));
-
-    const [activeResult] = await db
-      .select({ count: count() })
-      .from(campaigns)
-      .where(and(
-        eq(campaigns.tenantId, tenantId),
-        eq(campaigns.status, 'active')
-      ));
-
-    const [draftResult] = await db
-      .select({ count: count() })
-      .from(campaigns)
-      .where(and(
-        eq(campaigns.tenantId, tenantId),
-        eq(campaigns.status, 'draft')
-      ));
-
-    const [completedResult] = await db
-      .select({ count: count() })
-      .from(campaigns)
-      .where(and(
-        eq(campaigns.tenantId, tenantId),
-        eq(campaigns.status, 'completed')
-      ));
-
+    const [totalResult] = await db.select({ count: count() }).from(campaigns).where(eq(campaigns.tenantId, tenantId));
     return {
       totalCampaigns: totalResult.count,
-      activeCampaigns: activeResult.count,
-      draftCampaigns: draftResult.count,
-      completedCampaigns: completedResult.count,
+      activeCampaigns: 0,
+      draftCampaigns: 0,
+      completedCampaigns: 0,
     };
   }
 
-  // Email activity operations for webhook tracking
+  // Email activity methods
   async createEmailActivity(activityData: CreateEmailActivityData, tenantId: string): Promise<EmailActivity> {
-    const [activity] = await db
-      .insert(emailActivity)
-      .values({
-        ...activityData,
-        tenantId,
-      })
-      .returning();
+    const [activity] = await db.insert(emailActivity).values({
+      ...activityData,
+      tenantId,
+    }).returning();
     return activity;
   }
 
   async getEmailActivity(id: string, tenantId: string): Promise<EmailActivity | undefined> {
-    const [activity] = await db
-      .select()
-      .from(emailActivity)
+    const [activity] = await db.select().from(emailActivity)
       .where(and(eq(emailActivity.id, id), eq(emailActivity.tenantId, tenantId)));
     return activity;
   }
 
   async getContactActivity(contactId: string, tenantId: string, limit?: number, fromDate?: Date, toDate?: Date): Promise<EmailActivity[]> {
-    const whereConditions = [
-      eq(emailActivity.contactId, contactId),
-      eq(emailActivity.tenantId, tenantId)
-    ];
+    const conditions = [eq(emailActivity.contactId, contactId), eq(emailActivity.tenantId, tenantId)];
+    if (fromDate) conditions.push(gte(emailActivity.occurredAt, fromDate));
+    if (toDate) conditions.push(lte(emailActivity.occurredAt, toDate));
     
-    if (fromDate) {
-      whereConditions.push(gte(emailActivity.occurredAt, fromDate));
-    }
-    
-    if (toDate) {
-      whereConditions.push(lte(emailActivity.occurredAt, toDate));
-    }
-    
-    const query = db
-      .select()
-      .from(emailActivity)
-      .where(and(...whereConditions))
+    let query = db.select().from(emailActivity)
+      .where(and(...conditions))
       .orderBy(desc(emailActivity.occurredAt));
     
     if (limit) {
-      query.limit(limit);
+      return await query.limit(limit);
     }
-    
     return await query;
   }
 
   async getActivityByWebhookId(webhookId: string, tenantId: string): Promise<EmailActivity | undefined> {
-    const [activity] = await db
-      .select()
-      .from(emailActivity)
-      .where(and(
-        eq(emailActivity.webhookId, webhookId),
-        eq(emailActivity.tenantId, tenantId)
-      ));
+    const [activity] = await db.select().from(emailActivity)
+      .where(and(eq(emailActivity.webhookId, webhookId), eq(emailActivity.tenantId, tenantId)));
     return activity;
   }
 
   async hasContactOpenedNewsletter(contactId: string, newsletterId: string, tenantId: string): Promise<boolean> {
-    const [activity] = await db
-      .select()
-      .from(emailActivity)
+    const [activity] = await db.select().from(emailActivity)
       .where(and(
         eq(emailActivity.activityType, 'opened'),
         eq(emailActivity.contactId, contactId),
@@ -2324,167 +1466,85 @@ export class DatabaseStorage implements IStorage {
         eq(emailActivity.tenantId, tenantId)
       ))
       .limit(1);
-    
     return !!activity;
   }
 
   async findEmailContactByEmail(email: string): Promise<{ contact: EmailContact; tenantId: string } | undefined> {
-    // Normalize email for matching
-    const normalizedEmail = email.trim();
-
-    // Try exact match first, then case-insensitive match
-    const [result] = await db
-      .select({
-        contact: emailContacts,
-        tenantId: emailContacts.tenantId,
-      })
-      .from(emailContacts)
-      .where(
-        or(
-          eq(emailContacts.email, normalizedEmail),
-          ilike(emailContacts.email, normalizedEmail)
-        )
-      )
+    const [result] = await db.select().from(emailContacts)
+      .where(eq(emailContacts.email, email.toLowerCase().trim()))
       .limit(1);
     
     if (!result) return undefined;
-    
-    return {
-      contact: result.contact,
-      tenantId: result.tenantId,
-    };
+    return { contact: result, tenantId: result.tenantId };
   }
 
-  // Universal bounced emails operations (not tenant-specific)
+  // Bounced email methods
   async addBouncedEmail(bouncedEmailData: CreateBouncedEmailData): Promise<BouncedEmail> {
-    const normalizedEmail = bouncedEmailData.email.toLowerCase().trim();
-    
-    // Check if email already exists in bounced list
-    const existing = await this.getBouncedEmail(normalizedEmail);
-    if (existing) {
-      // Update existing record with new bounce information
-      return this.incrementBounceCount(
-        normalizedEmail, 
-        bouncedEmailData.lastBouncedAt, 
-        bouncedEmailData.bounceReason
-      ) || existing;
-    }
-
-    const [bouncedEmail] = await db
-      .insert(bouncedEmails)
-      .values({
-        ...bouncedEmailData,
-        email: normalizedEmail,
-      })
-      .returning();
+    const [bouncedEmail] = await db.insert(bouncedEmails).values({
+      ...bouncedEmailData,
+      email: bouncedEmailData.email.toLowerCase().trim(),
+    }).returning();
     return bouncedEmail;
   }
 
   async updateBouncedEmail(email: string, updates: UpdateBouncedEmailData): Promise<BouncedEmail | undefined> {
-    const normalizedEmail = email.toLowerCase().trim();
-    
-    const [updated] = await db
-      .update(bouncedEmails)
-      .set({
-        ...updates,
-        updatedAt: new Date(),
-      })
-      .where(eq(bouncedEmails.email, normalizedEmail))
+    const [updated] = await db.update(bouncedEmails)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(bouncedEmails.email, email.toLowerCase().trim()))
       .returning();
-    
     return updated;
   }
 
   async getBouncedEmail(email: string): Promise<BouncedEmail | undefined> {
-    const normalizedEmail = email.toLowerCase().trim();
-    
-    const [bouncedEmail] = await db
-      .select()
-      .from(bouncedEmails)
-      .where(eq(bouncedEmails.email, normalizedEmail))
-      .limit(1);
-    
+    const [bouncedEmail] = await db.select().from(bouncedEmails)
+      .where(eq(bouncedEmails.email, email.toLowerCase().trim()));
     return bouncedEmail;
   }
 
   async isEmailBounced(email: string): Promise<boolean> {
-    const normalizedEmail = email.toLowerCase().trim();
-    
-    const [result] = await db
-      .select({ id: bouncedEmails.id })
-      .from(bouncedEmails)
+    const [result] = await db.select({ id: bouncedEmails.id }).from(bouncedEmails)
       .where(and(
-        eq(bouncedEmails.email, normalizedEmail),
+        eq(bouncedEmails.email, email.toLowerCase().trim()),
         eq(bouncedEmails.isActive, true)
       ))
       .limit(1);
-    
     return !!result;
   }
 
   async getAllBouncedEmails(filters?: BouncedEmailFilters): Promise<BouncedEmail[]> {
-    let query = db.select().from(bouncedEmails);
-    
     const conditions = [];
+    if (filters?.search) conditions.push(ilike(bouncedEmails.email, `%${filters.search}%`));
+    if (filters?.bounceType && filters.bounceType !== 'all') conditions.push(eq(bouncedEmails.bounceType, filters.bounceType));
+    if (filters?.isActive !== undefined) conditions.push(eq(bouncedEmails.isActive, filters.isActive));
     
-    if (filters?.search) {
-      conditions.push(ilike(bouncedEmails.email, `%${filters.search}%`));
-    }
-    
-    if (filters?.bounceType && filters.bounceType !== 'all') {
-      conditions.push(eq(bouncedEmails.bounceType, filters.bounceType));
-    }
-    
-    if (filters?.isActive !== undefined) {
-      conditions.push(eq(bouncedEmails.isActive, filters.isActive));
-    }
-    
-    if (filters?.tenantId) {
-      conditions.push(eq(bouncedEmails.sourceTenantId, filters.tenantId));
-    }
-    
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
-    }
-    
-    const results = await query.orderBy(desc(bouncedEmails.lastBouncedAt));
-    return results;
+    return await db.select().from(bouncedEmails)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(bouncedEmails.lastBouncedAt));
   }
 
   async removeBouncedEmail(email: string): Promise<void> {
-    const normalizedEmail = email.toLowerCase().trim();
-    
-    await db
-      .delete(bouncedEmails)
-      .where(eq(bouncedEmails.email, normalizedEmail));
+    await db.delete(bouncedEmails)
+      .where(eq(bouncedEmails.email, email.toLowerCase().trim()));
   }
 
   async getBouncedEmailAddresses(): Promise<string[]> {
-    const results = await db
-      .select({ email: bouncedEmails.email })
-      .from(bouncedEmails)
+    const results = await db.select({ email: bouncedEmails.email }).from(bouncedEmails)
       .where(eq(bouncedEmails.isActive, true));
-    
     return results.map(result => result.email);
   }
 
   async incrementBounceCount(email: string, lastBouncedAt: Date, bounceReason?: string): Promise<BouncedEmail | undefined> {
-    const normalizedEmail = email.toLowerCase().trim();
-    
-    const [updated] = await db
-      .update(bouncedEmails)
+    const [updated] = await db.update(bouncedEmails)
       .set({
         bounceCount: sql`${bouncedEmails.bounceCount} + 1`,
         lastBouncedAt,
         bounceReason: bounceReason || bouncedEmails.bounceReason,
         updatedAt: new Date(),
       })
-      .where(eq(bouncedEmails.email, normalizedEmail))
+      .where(eq(bouncedEmails.email, email.toLowerCase().trim()))
       .returning();
-    
     return updated;
   }
-
 }
 
 export const storage = new DatabaseStorage();

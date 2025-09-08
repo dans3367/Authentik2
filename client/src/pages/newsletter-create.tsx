@@ -4,8 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useLocation } from "wouter";
 import { ArrowLeft, Save, Send, Eye, Users, Tag, User, Edit, Server, CheckCircle, XCircle, Loader2, Clock } from "lucide-react";
-import { useSelector } from "react-redux";
-import type { RootState } from "@/store";
+import { useSession } from "@/lib/betterAuthClient";
 import { CustomerSegmentationModal } from "@/components/CustomerSegmentationModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,7 +35,7 @@ export default function NewsletterCreatePage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const accessToken = useSelector((state: RootState) => state.auth.accessToken);
+  const { data: session, isPending: sessionLoading } = useSession();
   const [isSegmentationModalOpen, setIsSegmentationModalOpen] = useState(false);
   const [segmentationData, setSegmentationData] = useState({
     recipientType: 'all' as 'all' | 'selected' | 'tags',
@@ -61,7 +60,7 @@ export default function NewsletterCreatePage() {
   const { data: serverHealth, isLoading: healthLoading, error: healthError } = useQuery({
     queryKey: ['/go-server-health'],
     queryFn: async () => {
-      const response = await fetch('https://tenginex.zendwise.work/health');
+      const response = await fetch('/api/dev/health');
       if (!response.ok) throw new Error('Go server not available');
       return response.json();
     },
@@ -158,53 +157,64 @@ export default function NewsletterCreatePage() {
     });
   };
 
-  const handleSendNow = () => {
+  // handleCreateAndSend - matches flowchart exactly
+  const handleCreateAndSend = () => {
     const data = form.getValues();
     
     // Validate required fields
     if (!data.title || !data.subject || !data.content) {
+      // Error path from flowchart - Show Toast
       toast({
         variant: "destructive",
-        title: "Missing Information",
+        title: "Error",
         description: "Please fill in title, subject, and content fields.",
       });
       return;
     }
 
+    // Execute Auth Ver checks (handled by backend authenticateToken)
+    if (!session) {
+      // Error path from flowchart - Show Toast
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Authentication required. Please log in.",
+      });
+      return;
+    }
+
+    // Check if go-server is available (for temporal task creation)
     if (!serverHealth) {
-      toast({
-        variant: "destructive",
-        title: "Server Unavailable",
-        description: "Go server must be online to send newsletters",
-      });
-      return;
+      console.warn('[Newsletter] Go-server offline, will use fallback mode');
     }
 
-    if (!accessToken) {
-      toast({
-        variant: "destructive",
-        title: "Authentication Error",
-        description: "Please make sure you are logged in.",
-      });
-      return;
-    }
-
-    // First create the newsletter, then send it
+    // Save Newsletter to DB (first step)
     const newsletterData = {
       ...data,
       ...segmentationData,
-      status: "draft" as const, // Create as draft first
+      status: "draft" as const, // Create as draft first as per flowchart
     };
     
     createNewsletterMutation.mutate(newsletterData, {
       onSuccess: (response) => {
-        // After creating, send the newsletter
+        // Send POST to go-server (via backend which handles temporal task creation)
         sendNewsletterMutation.mutate(response.id);
       },
       onError: (error) => {
-        console.error('[Newsletter Frontend] Failed to create newsletter:', error);
+        // Error path from flowchart - Send error back, Show Toast
+        console.error('[Newsletter Frontend] Create and send failed:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: error.message || "Failed to create newsletter",
+        });
       }
     });
+  };
+
+  // Legacy function for backward compatibility
+  const handleSendNow = () => {
+    handleCreateAndSend();
   };
 
   const handleSegmentationSave = (data: {
@@ -617,9 +627,9 @@ export default function NewsletterCreatePage() {
                   <TooltipTrigger asChild>
                     <Button
                       type="button"
-                      onClick={handleSendNow}
+                      onClick={handleCreateAndSend}
                       className="w-full h-11 shadow-lg"
-                      disabled={createNewsletterMutation.isPending || sendNewsletterMutation.isPending || !serverHealth}
+                      disabled={createNewsletterMutation.isPending || sendNewsletterMutation.isPending}
                     >
                       {createNewsletterMutation.isPending || sendNewsletterMutation.isPending ? (
                         <>

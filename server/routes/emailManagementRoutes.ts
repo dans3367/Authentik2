@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments } from '@shared/schema';
+import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser } from '@shared/schema';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { type ContactFilters, type BouncedEmailFilters } from '@shared/schema';
 import { sanitizeString, sanitizeEmail } from '../utils/sanitization';
@@ -182,10 +182,10 @@ emailManagementRoutes.get("/email-contacts/:id/stats", authenticateToken, requir
   }
 });
 
-// Create email contact
+// Create email contact with batch operations
 emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, async (req: any, res) => {
   try {
-    const { email, firstName, lastName, tags, lists, status } = req.body;
+    const { email, firstName, lastName, tags, lists, status, consentGiven, consentMethod, consentIpAddress, consentUserAgent } = req.body;
 
     if (!email) {
       return res.status(400).json({ message: 'Email is required' });
@@ -204,41 +204,90 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
       return res.status(400).json({ message: 'Contact already exists' });
     }
 
-    const newContact = await db.insert(emailContacts).values({
-      tenantId: req.user.tenantId,
-      email: sanitizedEmail,
-      firstName: sanitizedFirstName,
-      lastName: sanitizedLastName,
-      status: status || 'active',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }).returning();
+    const now = new Date();
 
-    // Add tags if provided
-    if (tags && Array.isArray(tags)) {
-      for (const tagId of tags) {
-        await db.insert(contactTagAssignments).values({
+    // Use a transaction for batch operations
+    const result = await db.transaction(async (tx) => {
+      // Ensure the user exists in betterAuthUser table before setting addedByUserId
+      let userExists = false;
+      try {
+        const existingUser = await tx.query.betterAuthUser.findFirst({
+          where: sql`${betterAuthUser.id} = ${req.user.id}`,
+        });
+        
+        if (!existingUser) {
+          // User doesn't exist in betterAuthUser table, create a basic record
+          console.log('🔧 Creating missing betterAuthUser record for:', req.user.email);
+          try {
+            await tx.insert(betterAuthUser).values({
+              id: req.user.id,
+              email: req.user.email,
+              name: req.user.name || req.user.email,
+              emailVerified: true, // Assume verified since they can authenticate
+              role: req.user.role || 'Employee',
+              tenantId: req.user.tenantId,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+            userExists = true;
+            console.log('✅ Created betterAuthUser record successfully');
+          } catch (insertError) {
+            console.error('❌ Failed to create betterAuthUser record:', insertError);
+            userExists = false;
+          }
+        } else {
+          userExists = true;
+        }
+      } catch (error) {
+        console.warn('Could not verify user existence:', error);
+        userExists = false;
+      }
+
+      // Create the contact
+      const newContact = await tx.insert(emailContacts).values({
+        tenantId: req.user.tenantId,
+        email: sanitizedEmail,
+        firstName: sanitizedFirstName,
+        lastName: sanitizedLastName,
+        status: status || 'active',
+        consentGiven: consentGiven || false,
+        consentMethod: consentMethod || null,
+        consentDate: consentGiven ? now : null,
+        consentIpAddress: consentIpAddress || null,
+        consentUserAgent: consentUserAgent || null,
+        addedByUserId: userExists ? req.user.id : null,
+        createdAt: now,
+        updatedAt: now,
+      }).returning();
+
+      const contact = newContact[0];
+
+      // Batch insert tags if provided
+      if (tags && Array.isArray(tags) && tags.length > 0) {
+        const tagAssignments = tags.map(tagId => ({
           tenantId: req.user.tenantId,
-          contactId: newContact[0].id,
+          contactId: contact.id,
           tagId,
-          assignedAt: new Date(),
-        });
+          assignedAt: now,
+        }));
+        await tx.insert(contactTagAssignments).values(tagAssignments);
       }
-    }
 
-    // Add to lists if provided
-    if (lists && Array.isArray(lists)) {
-      for (const listId of lists) {
-        await db.insert(contactListMemberships).values({
+      // Batch insert list memberships if provided
+      if (lists && Array.isArray(lists) && lists.length > 0) {
+        const listMemberships = lists.map(listId => ({
           tenantId: req.user.tenantId,
-          contactId: newContact[0].id,
+          contactId: contact.id,
           listId,
-          addedAt: new Date(),
-        });
+          addedAt: now,
+        }));
+        await tx.insert(contactListMemberships).values(listMemberships);
       }
-    }
 
-    res.status(201).json(newContact[0]);
+      return contact;
+    });
+
+    res.status(201).json(result);
   } catch (error) {
     console.error('Create email contact error:', error);
     res.status(500).json({ message: 'Failed to create email contact' });
@@ -308,7 +357,7 @@ emailManagementRoutes.delete("/email-contacts/:id", authenticateToken, requireTe
     const { id } = req.params;
 
     const contact = await db.query.emailContacts.findFirst({
-      where: sql`${emailContacts.id} = ${id}`,
+      where: sql`${emailContacts.id} = ${id} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!contact) {
@@ -317,7 +366,7 @@ emailManagementRoutes.delete("/email-contacts/:id", authenticateToken, requireTe
 
     // Delete contact (this will cascade to related records)
     await db.delete(emailContacts)
-      .where(sql`${emailContacts.id} = ${id}`);
+      .where(sql`${emailContacts.id} = ${id} AND ${emailContacts.tenantId} = ${req.user.tenantId}`);
 
     res.json({ message: 'Contact deleted successfully' });
   } catch (error) {
@@ -329,14 +378,34 @@ emailManagementRoutes.delete("/email-contacts/:id", authenticateToken, requireTe
 // Bulk delete email contacts
 emailManagementRoutes.delete("/email-contacts", authenticateToken, requireTenant, async (req: any, res) => {
   try {
-    const { contactIds } = req.body;
+    const { contactIds, ids } = req.body;
 
-    if (!Array.isArray(contactIds) || contactIds.length === 0) {
+    // Handle both formats for backward compatibility
+    const contactIdsArray = contactIds || ids;
+
+    if (!Array.isArray(contactIdsArray) || contactIdsArray.length === 0) {
       return res.status(400).json({ message: 'Contact IDs array is required' });
     }
 
+    // First verify all contacts belong to the current tenant
+    const contactsToDelete = await db.query.emailContacts.findMany({
+      where: sql`${emailContacts.id} IN (${sql.join(contactIdsArray, sql`, `)}) AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
+      columns: {
+        id: true,
+      },
+    });
+
+    if (contactsToDelete.length === 0) {
+      return res.status(404).json({ message: 'No contacts found to delete' });
+    }
+
+    // Check if all requested contacts were found (to ensure no cross-tenant access)
+    if (contactsToDelete.length !== contactIdsArray.length) {
+      return res.status(400).json({ message: 'Some contacts not found or access denied' });
+    }
+
     const deletedContacts = await db.delete(emailContacts)
-      .where(sql`${emailContacts.id} = ANY(${contactIds})`)
+      .where(sql`${emailContacts.id} IN (${sql.join(contactIdsArray, sql`, `)}) AND ${emailContacts.tenantId} = ${req.user.tenantId}`)
       .returning();
 
     res.json({
@@ -466,30 +535,30 @@ emailManagementRoutes.get("/bounced-emails", authenticateToken, requireTenant, a
     }
 
     if (reason) {
-      whereClause = sql`${whereClause} AND ${bouncedEmails.reason} = ${reason}`;
+      whereClause = sql`${whereClause} AND ${bouncedEmails.bounceReason} = ${reason}`;
     }
 
     if (startDate) {
-      whereClause = sql`${whereClause} AND ${bouncedEmails.bouncedAt} >= ${new Date(startDate as string)}`;
+      whereClause = sql`${whereClause} AND ${bouncedEmails.firstBouncedAt} >= ${new Date(startDate as string)}`;
     }
 
     if (endDate) {
-      whereClause = sql`${whereClause} AND ${bouncedEmails.bouncedAt} <= ${new Date(endDate as string)}`;
+      whereClause = sql`${whereClause} AND ${bouncedEmails.lastBouncedAt} <= ${new Date(endDate as string)}`;
     }
 
-    const bouncedEmails = await db.query.bouncedEmails.findMany({
+    const bouncedEmailsData = await db.query.bouncedEmails.findMany({
       where: whereClause,
-      orderBy: sql`${bouncedEmails.bouncedAt} DESC`,
+      orderBy: sql`${bouncedEmails.lastBouncedAt} DESC`,
       limit: Number(limit),
       offset,
     });
 
     const totalCount = await db.select({
       count: sql<number>`count(*)`,
-    }).from(db.bouncedEmails).where(whereClause);
+    }).from(bouncedEmails).where(whereClause);
 
     res.json({
-      bouncedEmails,
+      bouncedEmails: bouncedEmailsData,
       pagination: {
         page: Number(page),
         limit: Number(limit),

@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "./db";
-import { betterAuthUser, betterAuthSession, betterAuthAccount, betterAuthVerification, tenants, users } from "@shared/schema";
+import { betterAuthUser, betterAuthSession, betterAuthAccount, betterAuthVerification, tenants } from "@shared/schema";
 import { emailService } from "./emailService";
 import { eq, sql } from "drizzle-orm";
 
@@ -35,11 +35,10 @@ const authInstance = betterAuth({
     // Configure social providers as needed
     // Example: google, github, etc.
   },
-  baseURL: process.env.BASE_URL || "http://localhost:5000",
+  baseURL: process.env.BASE_URL || `http://localhost:${process.env.PORT || "3500"}`,
   secret: process.env.BETTER_AUTH_SECRET || "fallback-secret-key-change-in-production",
   trustedOrigins: [
-    "http://localhost:5000",
-    "http://localhost:5000",
+    `http://localhost:${process.env.PORT || "3500"}`,
     "http://localhost:5173",
     "https://weby.zendwise.work",
     "http://weby.zendwise.work:3001",
@@ -49,6 +48,43 @@ const authInstance = betterAuth({
     "https://webx.zendwise.work",
     "https://2850dacc-d7a0-40e0-a90b-43f06888d139-00-18hp2u206zmhk.kirk.replit.dev"
   ],
+  // Add session callback to include custom user fields
+  session: {
+    updateAge: 24 * 60 * 60, // 24 hours
+    expiresIn: 60 * 60 * 24 * 7, // 7 days
+  },
+  user: {
+    additionalFields: {
+      role: {
+        type: "string",
+        defaultValue: "Employee",
+        required: false,
+      },
+      tenantId: {
+        type: "string",
+        defaultValue: "29c69b4f-3129-4aa4-a475-7bf892e5c5b9",
+        required: false,
+      },
+      firstName: {
+        type: "string",
+        required: false,
+      },
+      lastName: {
+        type: "string",
+        required: false,
+      },
+      theme: {
+        type: "string",
+        defaultValue: "light",
+        required: false,
+      },
+      menuExpanded: {
+        type: "boolean",
+        defaultValue: false,
+        required: false,
+      },
+    },
+  },
   // Better Auth hooks will be implemented separately to avoid type conflicts
   // Tenant synchronization will be handled by the registration endpoints
 });

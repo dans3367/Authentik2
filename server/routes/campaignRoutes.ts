@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
-import { users, campaigns, emailTemplates, mailingLists, emails, emailStatistics, createCampaignSchema, updateCampaignSchema } from '@shared/schema';
+import { betterAuthUser, campaigns, emailTemplates, mailingLists, emails, emailStatistics, createCampaignSchema, updateCampaignSchema } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 
 export const campaignRoutes = Router();
@@ -84,7 +84,7 @@ campaignRoutes.post("/", authenticateToken, requireTenant, async (req: any, res)
 
     const newCampaign = await db.insert(campaigns).values({
       tenantId: req.user.tenantId,
-      userId: req.user.userId,
+      userId: req.user.id,
       name: sanitizedName,
       description: sanitizedDescription,
       type,
@@ -212,8 +212,8 @@ campaignRoutes.get("/campaign-stats", authenticateToken, requireTenant, async (r
 // Get managers list
 campaignRoutes.get("/managers", authenticateToken, requireTenant, async (req: any, res) => {
   try {
-    const managers = await db.query.users.findMany({
-      where: sql`${users.role} IN ('Manager', 'Administrator', 'Owner') AND ${users.tenantId} = ${req.user.tenantId}`,
+    const managers = await db.query.betterAuthUser.findMany({
+      where: sql`${betterAuthUser.role} IN ('Manager', 'Administrator', 'Owner') AND ${betterAuthUser.tenantId} = ${req.user.tenantId}`,
       columns: {
         id: true,
         email: true,
@@ -221,7 +221,7 @@ campaignRoutes.get("/managers", authenticateToken, requireTenant, async (req: an
         lastName: true,
         role: true,
       },
-      orderBy: sql`${users.firstName} ASC`,
+      orderBy: sql`${betterAuthUser.firstName} ASC`,
     });
 
     res.json(managers);

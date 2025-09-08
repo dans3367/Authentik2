@@ -116,14 +116,19 @@ export default function EmailContacts() {
 
 
 
-  // Fetch email contacts stats (independent of search/filters)
+  // Fetch email contacts stats (independent of search/filters) with enhanced caching
   const { data: statsData } = useQuery({
     queryKey: ['/api/email-contacts-stats'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/email-contacts?statsOnly=true');
       return response.json();
     },
-    staleTime: 5 * 60 * 1000, // Cache stats for 5 minutes
+    staleTime: 15 * 60 * 1000, // Cache stats for 15 minutes (increased)
+    gcTime: 60 * 60 * 1000, // Keep in cache for 1 hour (increased)
+    refetchOnWindowFocus: false,
+    // Background refetch for stats every 10 minutes
+    refetchInterval: 10 * 60 * 1000,
+    refetchIntervalInBackground: true,
   });
 
   // Initialize search params ref on first render
@@ -135,24 +140,28 @@ export default function EmailContacts() {
     };
   }, []);
 
-  // Fetch email contacts with stable query key - no search params in key
+  // Fetch email contacts with enhanced caching strategy
   const { data: contactsData, isLoading: contactsLoading, error: contactsError, isFetching, refetch } = useQuery({
-    queryKey: ['/api/email-contacts'],
+    queryKey: ['/api/email-contacts', searchQuery, statusFilter], // Include search params in key for better caching
     queryFn: async () => {
       const params = new URLSearchParams();
       const currentParams = searchParamsRef.current;
-      
+
       if (currentParams.search) params.append('search', currentParams.search);
       if (currentParams.status !== 'all') params.append('status', currentParams.status);
       if (currentParams.listId) params.append('listId', currentParams.listId);
-      
+
       const response = await apiRequest('GET', `/api/email-contacts?${params.toString()}`);
       return response.json();
     },
-    staleTime: 5 * 60 * 1000, // Cache results for 5 minutes
-    gcTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false, // Prevent refetch on window focus
+    staleTime: 10 * 60 * 1000, // Cache results for 10 minutes (increased)
+    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes (increased)
+    refetchOnWindowFocus: false,
     refetchInterval: false,
+    // Enable background refetching for better UX
+    refetchOnMount: false,
+    // Use network mode to prevent unnecessary refetches
+    networkMode: 'offlineFirst',
   });
 
   // Debounced search effect
@@ -190,9 +199,9 @@ export default function EmailContacts() {
 
     const config = statusConfig[status];
     const Icon = config.icon;
-    
+
     return (
-      <Badge className={`${config.color} flex items-center gap-1`}>
+      <Badge className={`${config.color} flex items-center gap-1 !px-1 !py-0 text-xs h-5 w-fit inline-flex`}>
         <Icon className="w-3 h-3" />
         {config.label}
       </Badge>
@@ -236,33 +245,10 @@ export default function EmailContacts() {
     return Math.round((opened / sent) * 100);
   };
 
-  // Delete individual contact mutation
-  const deleteContactMutation = useMutation({
-    mutationFn: async (contactId: string) => {
-      const response = await apiRequest('DELETE', `/api/email-contacts/${contactId}`);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/email-contacts'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/email-contacts-stats'] });
-      toast({
-        title: "Success",
-        description: "Contact deleted successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete contact",
-        variant: "destructive",
-      });
-    },
-  });
-
   // Bulk delete contacts mutation
   const bulkDeleteMutation = useMutation({
     mutationFn: async (contactIds: string[]) => {
-      const response = await apiRequest('DELETE', '/api/email-contacts', { ids: contactIds });
+      const response = await apiRequest('DELETE', '/api/email-contacts', { contactIds });
       return response.json();
     },
     onSuccess: (data, contactIds) => {
@@ -283,37 +269,32 @@ export default function EmailContacts() {
     },
   });
 
-  // Handle single contact delete
-  const handleDeleteContact = (contactId: string) => {
-    console.log('Delete contact clicked:', contactId);
-    if (window.confirm('Are you sure you want to delete this contact? This action cannot be undone.')) {
-      console.log('Deleting contact:', contactId);
-      deleteContactMutation.mutate(contactId);
-    }
-  };
-
   // Handle bulk delete
   const handleBulkDelete = () => {
     console.log('Bulk delete clicked, selected contacts:', selectedContacts);
     if (selectedContacts.length === 0) return;
-    
-    const confirmMessage = selectedContacts.length === 1 
+
+    const confirmMessage = selectedContacts.length === 1
       ? 'Are you sure you want to delete this contact? This action cannot be undone.'
       : `Are you sure you want to delete ${selectedContacts.length} contacts? This action cannot be undone.`;
-      
+
     if (window.confirm(confirmMessage)) {
       console.log('Bulk deleting contacts:', selectedContacts);
       bulkDeleteMutation.mutate(selectedContacts);
     }
   };
 
+
+
   // Show loading state
   if (contactsLoading) {
     return (
       <div className="p-6">
         <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span className="ml-4">Loading contacts...</span>
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span className="text-gray-600 dark:text-gray-400">Loading contacts...</span>
+          </div>
         </div>
       </div>
     );
@@ -508,7 +489,7 @@ export default function EmailContacts() {
           </div>
         )}
         {/* Table with smooth transition */}
-        <div className={`transition-opacity duration-200 ${isFetching ? 'opacity-50' : 'opacity-100'}`}>
+        <div className={`transition-all duration-300 ${isFetching ? 'opacity-70 scale-[0.995]' : 'opacity-100 scale-100'}`}>
                 <Table>
                 <TableHeader>
                   <TableRow>
@@ -543,11 +524,15 @@ export default function EmailContacts() {
                     </TableRow>
                   ) : (
                     contacts.map((contact) => (
-                    <TableRow key={contact.id}>
+                    <TableRow
+                      key={contact.id}
+                      className={`transition-all duration-500 ${contact.id.startsWith('temp-') ? 'bg-green-50 dark:bg-green-950/20 animate-pulse' : ''}`}
+                    >
                       <TableCell>
                         <Checkbox
                           checked={selectedContacts.includes(contact.id)}
                           onCheckedChange={() => toggleSelectContact(contact.id)}
+                          disabled={contact.id.startsWith('temp-')}
                         />
                       </TableCell>
                       <TableCell>
@@ -558,18 +543,31 @@ export default function EmailContacts() {
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <p 
-                              className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors"
-                              onClick={() => setLocation(`/email-contacts/view/${contact.id}`)}
+                            <p
+                              className={`font-medium hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors ${
+                                contact.id.startsWith('temp-')
+                                  ? 'text-green-700 dark:text-green-400'
+                                  : 'text-gray-900 dark:text-white'
+                              }`}
+                              onClick={() => !contact.id.startsWith('temp-') && setLocation(`/email-contacts/view/${contact.id}`)}
                             >
-                              {contact.firstName || contact.lastName 
+                              {contact.firstName || contact.lastName
                                 ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
                                 : contact.email.split('@')[0]
                               }
+                              {contact.id.startsWith('temp-') && (
+                                <span className="ml-2 text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-1.5 py-0.5 rounded-full">
+                                  New
+                                </span>
+                              )}
                             </p>
-                            <p 
-                              className="text-sm text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors"
-                              onClick={() => setLocation(`/email-contacts/view/${contact.id}`)}
+                            <p
+                              className={`text-sm hover:text-blue-600 dark:hover:text-blue-400 transition-colors ${
+                                contact.id.startsWith('temp-')
+                                  ? 'text-green-600 dark:text-green-500 cursor-default'
+                                  : 'text-gray-500 cursor-pointer'
+                              }`}
+                              onClick={() => !contact.id.startsWith('temp-') && setLocation(`/email-contacts/view/${contact.id}`)}
                             >
                               {contact.email}
                             </p>
@@ -644,19 +642,6 @@ export default function EmailContacts() {
                                 </DropdownMenuItem>
                               }
                             />
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              className="text-red-600"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleDeleteContact(contact.id);
-                              }}
-                              disabled={deleteContactMutation.isPending}
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              {deleteContactMutation.isPending ? 'Deleting...' : 'Delete Contact'}
-                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

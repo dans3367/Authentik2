@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 // Note: authManager removed - Better Auth handles authentication
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,25 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createUserSchema, updateUserSchema, userRoles, nonOwnerRoles, type User, type CreateUserData, type UpdateUserData, type UserRole } from "@shared/schema";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
+
+// Extended user type to include custom fields from Better Auth
+interface ExtendedUser {
+  id: string;
+  email: string;
+  name: string;
+  role?: string;
+  firstName?: string;
+  lastName?: string;
+  theme?: string;
+  menuExpanded?: boolean;
+  tenantId?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+  emailVerified?: boolean;
+  image?: string | null;
+  isActive?: boolean;
+  lastLoginAt?: Date;
+}
 import { DataTable, DataTableColumnHeader, DataTableRowActions } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -55,7 +75,8 @@ function getUserInitials(firstName?: string, lastName?: string) {
 
 export default function UsersPage() {
   console.log("🔍 [UsersPage] Component rendered");
-  const { user: currentUser, isLoading: authLoading } = useReduxAuth();
+  const { user, isLoading: authLoading } = useReduxAuth();
+  const currentUser = user as ExtendedUser | null;
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
@@ -707,6 +728,26 @@ export default function UsersPage() {
                             <Input type="password" {...field} />
                           </FormControl>
                           <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={createForm.control}
+                      name="emailVerified"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-base">Email Verified</FormLabel>
+                            <div className="text-sm text-muted-foreground">
+                              Mark this user's email as verified
+                            </div>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value ?? true}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
                         </FormItem>
                       )}
                     />

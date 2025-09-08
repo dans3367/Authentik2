@@ -4,8 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useLocation, useParams } from "wouter";
 import { ArrowLeft, Save, Send, Eye, Users, Tag, User, Edit, Server, CheckCircle, XCircle } from "lucide-react";
-import { useSelector } from "react-redux";
-import type { RootState } from "@/store";
+import { useSession } from "@/lib/betterAuthClient";
 import { CustomerSegmentationModal } from "@/components/CustomerSegmentationModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,7 +28,7 @@ export default function NewsletterEditPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const accessToken = useSelector((state: RootState) => state.auth.accessToken);
+  const { data: session, isPending: sessionLoading } = useSession();
   const [isSegmentationModalOpen, setIsSegmentationModalOpen] = useState(false);
   const [segmentationData, setSegmentationData] = useState({
     recipientType: 'all' as 'all' | 'selected' | 'tags',
@@ -88,7 +87,7 @@ export default function NewsletterEditPage() {
   const { data: serverHealth, isLoading: healthLoading, error: healthError } = useQuery({
     queryKey: ['/go-server-health'],
     queryFn: async () => {
-      const response = await fetch('https://tenginex.zendwise.work/health');
+      const response = await fetch('/api/dev/health');
       if (!response.ok) throw new Error('Go server not available');
       return response.json();
     },
@@ -155,54 +154,103 @@ export default function NewsletterEditPage() {
     updateNewsletterMutation.mutate(newsletterData);
   };
 
-  const handleSendNow = () => {
-    const data = form.getValues();
-    
-    // Validate required fields
-    if (!data.title || !data.subject || !data.content) {
-      toast({
-        variant: "destructive",
-        title: "Missing Information",
-        description: "Please fill in title, subject, and content fields.",
-      });
-      return;
-    }
-
-    if (!serverHealth) {
-      toast({
-        variant: "destructive",
-        title: "Server Unavailable",
-        description: "Go server must be online to send newsletters",
-      });
-      return;
-    }
-
-    if (!accessToken) {
-      toast({
-        variant: "destructive",
-        title: "Authentication Error",
-        description: "Please make sure you are logged in.",
-      });
-      return;
-    }
-
-    // First update the newsletter, then send it
-    const newsletterData = {
-      ...data,
-      ...segmentationData,
-    };
-    
-    updateNewsletterMutation.mutate(newsletterData, {
-      onSuccess: () => {
-        // After updating, send the newsletter
-        if (id) {
-          sendNewsletterMutation.mutate(id);
-        }
-      },
-      onError: (error) => {
-        console.error('[Newsletter Edit] Failed to update newsletter:', error);
+  // New handleUpdateAndSend function following the flowchart
+  const handleUpdateAndSend = async () => {
+    try {
+      const data = form.getValues();
+      
+      // Initial validation - Error path from flowchart
+      if (!data.title || !data.subject || !data.content) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Please fill in title, subject, and content fields.",
+        });
+        return;
       }
-    });
+
+      if (!serverHealth) {
+        toast({
+          variant: "destructive",
+          title: "Error", 
+          description: "Go server must be online to send newsletters",
+        });
+        return;
+      }
+
+      // Execute Auth Ver checks - as shown in flowchart
+      if (!session) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Authentication required. Please log in.",
+        });
+        return;
+      }
+
+      if (!id) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Newsletter ID not found.",
+        });
+        return;
+      }
+
+      // Prepare newsletter data for backend - Save Newsletter to DB
+      const newsletterData = {
+        ...data,
+        ...segmentationData,
+      };
+
+      // First update the newsletter
+      const updateResponse = await apiRequest('PUT', `/api/newsletters/${id}`, newsletterData);
+      const updatedNewsletter = await updateResponse.json();
+
+      if (!updateResponse.ok) {
+        throw new Error(updatedNewsletter.message || 'Failed to update newsletter');
+      }
+
+      // Send POST to go-server - Create temporal task so send email
+      const sendResponse = await apiRequest('POST', `/api/newsletters/${id}/send`);
+      const sendResult = await sendResponse.json();
+
+      if (!sendResponse.ok) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: sendResult.message || 'Failed to send newsletter',
+        });
+        return;
+      }
+
+      // Return success - Refresh Newsletter List
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
+      
+      // Success Toast
+      toast({
+        title: "Success",
+        description: "Newsletter updated and sent successfully!",
+      });
+
+      // Navigate back to newsletter list
+      setLocation('/newsletter');
+
+    } catch (error: any) {
+      console.error('[Newsletter Edit] Update and send failed:', error);
+      toast({
+        variant: "destructive", 
+        title: "Error",
+        description: error.message || "Failed to update and send newsletter",
+      });
+    }
+  };
+
+  // Legacy function for backward compatibility
+  const handleSendNow = () => {
+    handleUpdateAndSend();
   };
 
   const handleSegmentationSave = (data: {

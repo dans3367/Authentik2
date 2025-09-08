@@ -93,7 +93,7 @@ export default function EmailTestPage() {
     queryKey: ['/go-server-health'],
     queryFn: async () => {
       try {
-        const response = await fetch('https://tenginex.zendwise.work/health', {
+        const response = await fetch('/api/dev/health', {
           mode: 'cors',
           headers: {
             'Accept': 'application/json',
@@ -122,7 +122,7 @@ export default function EmailTestPage() {
         return { entries: [], count: 0 };
       }
       
-      const response = await fetch('https://tenginex.zendwise.work/api/email-tracking', {
+      const response = await fetch('/api/email-tracking', {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
@@ -157,7 +157,7 @@ export default function EmailTestPage() {
       
       console.log('🧹 [Cleanup] Starting temporal workflow cleanup');
       
-      const response = await fetch('https://tenginex.zendwise.work/api/temporal/clear-workflows', {
+      const response = await fetch('/api/temporal/clear-workflows', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -337,7 +337,7 @@ export default function EmailTestPage() {
       let response;
       
       console.log('🚀 [Campaign] Attempting to send via Go server:', {
-        url: 'https://tenginex.zendwise.work/api/email-tracking',
+        url: '/api/email-tracking',
         tokenLength: token.length,
         emailId: emailId,
         isScheduled: campaignData.isScheduled,
@@ -345,7 +345,7 @@ export default function EmailTestPage() {
       });
 
       try {
-        response = await fetch('https://tenginex.zendwise.work/api/email-tracking', {
+        response = await fetch('/api/email-tracking', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -898,7 +898,7 @@ export default function EmailTestPage() {
                   Go server is offline or unreachable
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Make sure the server is accessible at https://tenginex.zendwise.work
+                  Make sure the local server is running on port 3500
                 </p>
               </div>
             ) : serverHealth ? (

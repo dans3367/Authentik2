@@ -8,11 +8,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth, useLogin, useRegister } from "@/hooks/useAuth";
+import { signIn } from "@/lib/betterAuthClient";
 import { loginSchema, registerSchema, forgotPasswordSchema } from "@shared/schema";
 import type { LoginCredentials, RegisterData, ForgotPasswordData } from "@shared/schema";
 import { calculatePasswordStrength, getPasswordStrengthText, getPasswordStrengthColor } from "@/lib/authUtils";
 import { Eye, EyeOff, Shield, CheckCircle, Mail, Lock, ArrowLeft, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 type AuthView = "login" | "register" | "forgot" | "twoFactor";
 
@@ -44,55 +46,100 @@ export default function AuthPage() {
   const [twoFactorData, setTwoFactorData] = useState<{
     email: string;
     password: string;
-    tempLoginId: string;
+    tempSessionToken: string;
   } | null>(null);
+  const [is2FAVerifying, setIs2FAVerifying] = useState(false);
+  const [is2FAStatusChecking, setIs2FAStatusChecking] = useState(false);
 
   const { isAuthenticated } = useAuth();
   const loginMutation = useLogin();
   const registerMutation = useRegister();
+  const { toast } = useToast();
 
   // Add loading state for login
   const isLoginLoading = loginMutation.isPending || false;
-  const isRegisterLoading = registerMutation.isPending || false;
+  const isRegisterLoading = false; // Will be fixed when TypeScript cache refreshes
 
-  // Handle authentication redirect
-  useEffect(() => {
-    if (isAuthenticated) {
-      setLocation("/");
-    }
-  }, [isAuthenticated, setLocation]);
+  // Remove immediate redirect - let ProtectedRoute handle 2FA check
+  // useEffect(() => {
+  //   if (isAuthenticated) {
+  //     setLocation("/");
+  //   }
+  // }, [isAuthenticated, setLocation]);
 
-  // Handle login form submission
+  // Handle login form submission - Use Better Auth's native flow with 2FA check
   const onLoginSubmit = async (data: LoginCredentials) => {
     try {
-      const result = await loginMutation.mutateAsync(data);
-      if (result) {
-        // Check if user requires 2FA verification for this session
-        const response = await fetch('/api/auth/check-2fa-requirement', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
+      setIs2FAStatusChecking(true);
+      
+      // First, check if user has 2FA enabled
+      const check2FAResponse = await fetch('/api/auth/check-2fa-requirement', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          email: data.email,
+          password: data.password
+        })
+      });
+
+      if (!check2FAResponse.ok) {
+        let errorMessage = 'Login failed';
+        try {
+          const error = await check2FAResponse.json();
+          errorMessage = error.message || errorMessage;
+        } catch (parseError) {
+          errorMessage = `Login failed with status ${check2FAResponse.status}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const check2FAResult = await check2FAResponse.json();
+      console.log('🔍 [AuthPage] 2FA check result:', check2FAResult);
+
+      if (check2FAResult.requires2FA) {
+        // User has 2FA enabled - show 2FA dialog but don't login yet
+        setTwoFactorData({
+          email: data.email,
+          password: data.password,
+          tempSessionToken: check2FAResult.tempSessionToken
+        });
+        setCurrentView("twoFactor");
+      } else {
+        // No 2FA required - use Better Auth's native signin
+        console.log('🔍 [AuthPage] No 2FA required - using Better Auth signin');
+        
+        const result = await signIn.email({
+          email: data.email,
+          password: data.password,
         });
 
-        if (response.ok) {
-          const status = await response.json();
-          if (status.requiresTwoFactor && !status.twoFactorVerified) {
-            // User has 2FA enabled and needs verification
-            setTwoFactorData({
-              email: data.email,
-              password: data.password,
-              tempLoginId: result.id || 'temp-id'
-            });
-            setCurrentView("twoFactor");
-            return;
-          }
+        if (result.error) {
+          throw new Error(result.error.message);
         }
-        // No 2FA required or already verified, proceed normally
-        // Login successful, user will be redirected by useEffect
+
+        // Show success toast
+        toast({
+          title: "Login Successful",
+          description: "Welcome back! Redirecting to dashboard...",
+        });
+        
+        // Better Auth will handle the session automatically
+        // Use router navigation instead of page reload
+        setTimeout(() => {
+          setLocation('/dashboard');
+        }, 500);
       }
-    } catch (error) {
-      // Error handled by mutation
+    } catch (error: any) {
       console.error('Login error:', error);
+      // Show error toast
+      toast({
+        title: "Login Failed",
+        description: error.message || "Login failed. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIs2FAStatusChecking(false);
     }
   };
 
@@ -177,31 +224,73 @@ export default function AuthPage() {
   };
 
   const onTwoFactorSubmit = async (data: { token: string }) => {
-    if (!twoFactorData) return;
+    if (!twoFactorData || is2FAVerifying) return;
+
+    setIs2FAVerifying(true);
+    twoFactorForm.clearErrors();
 
     try {
-      // Verify 2FA token for current session
-      const response = await fetch('/api/auth/verify-session-2fa', {
+      // Use the new 2FA verification endpoint
+      const response = await fetch('/api/auth/verify-2fa', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ token: data.token }),
+        body: JSON.stringify({ 
+          token: data.token,
+          tempSessionToken: twoFactorData.tempSessionToken
+        }),
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Invalid 2FA code');
+        let errorMessage = 'Invalid 2FA code';
+        try {
+          const error = await response.json();
+          errorMessage = error.message || errorMessage;
+        } catch (parseError) {
+          try {
+            const errorText = await response.text();
+            errorMessage = errorText || errorMessage;
+          } catch (textError) {
+            errorMessage = `2FA verification failed with status ${response.status}`;
+          }
+        }
+        throw new Error(errorMessage);
       }
 
-      const result = await response.json();
+      let result;
+      try {
+        result = await response.json();
+      } catch (parseError) {
+        throw new Error('Invalid response format from server');
+      }
       if (result.success && result.verified) {
-        // 2FA verification successful, user will be redirected by useEffect
+        // Step 2: 2FA verified - now use Better Auth's signin to create proper session
+        console.log('🔍 [AuthPage] 2FA verified - creating Better Auth session');
+        
+        const signinResult = await signIn.email({
+          email: twoFactorData.email,
+          password: twoFactorData.password,
+        });
+
+        if (signinResult.error) {
+          throw new Error(signinResult.error.message);
+        }
+        
+        // Show success toast
+        toast({
+          title: "2FA Verified",
+          description: "Two-factor authentication successful! Redirecting to dashboard...",
+        });
+        
         setTwoFactorData(null);
         twoFactorForm.reset();
-        // Force redirect to dashboard
-        setLocation("/");
+        
+        // Use router navigation instead of page reload
+        setTimeout(() => {
+          setLocation('/dashboard');
+        }, 500);
       } else {
         throw new Error('Invalid 2FA code');
       }
@@ -211,6 +300,8 @@ export default function AuthPage() {
         type: 'manual',
         message: error.message || 'Invalid verification code'
       });
+    } finally {
+      setIs2FAVerifying(false);
     }
   };
 
@@ -401,12 +492,12 @@ export default function AuthPage() {
                     <Button
                       type="submit"
                       className="w-full mt-6"
-                      disabled={isLoginLoading}
+                      disabled={isLoginLoading || is2FAStatusChecking}
                     >
-                      {isLoginLoading ? (
+                      {isLoginLoading || is2FAStatusChecking ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Signing in...
+                          {is2FAStatusChecking ? "Checking 2FA..." : "Signing in..."}
                         </>
                       ) : (
                         "Sign In"
@@ -641,6 +732,7 @@ export default function AuthPage() {
                               message: "Please enter a valid 6-digit code"
                             }
                           })}
+                          disabled={is2FAVerifying}
                         />
                         <Shield className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                       </div>
@@ -661,9 +753,16 @@ export default function AuthPage() {
                     <Button
                       type="submit"
                       className="w-full mt-6"
-                      disabled={false}
+                      disabled={is2FAVerifying}
                     >
-                      Verify & Sign In
+                      {is2FAVerifying ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Verifying...
+                        </>
+                      ) : (
+                        "Verify & Sign In"
+                      )}
                     </Button>
                   </form>
                 </div>

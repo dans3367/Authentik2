@@ -1,0 +1,25 @@
+Temporal WARN] Workflow failed
+[newsletterSendingWorkflow(newsletter-6e6ae506-54c4-4968-9828-622aaa4c448a-1757310214427)] 🚀 Starting newsletter sending workflow for newsletter 6e6ae506-54c4-4968-9828-622aaa4c448a
+[newsletterSendingWorkflow(newsletter-6e6ae506-54c4-4968-9828-622aaa4c448a-1757310214427)] ❌ Newsletter workflow failed for 6e6ae506-54c4-4968-9828-622aaa4c448a: ReferenceError: process is not defined
+    at process (/app/Authentik/temporal-server/src/workflows/newsletter-workflow.ts:77:31)
+    at Script.runInContext (node:vm:149:12)
+    at Proxy.<anonymous> (/app/Authentik/temporal-server/node_modules/@temporalio/worker/lib/workflow/reusable-vm.js:150:45)
+    at ReusableVMWorkflow.activate (/app/Authentik/temporal-server/node_modules/@temporalio/worker/lib/workflow/vm-shared.js:348:37)
+    at handleRequest (/app/Authentik/temporal-server/node_modules/@temporalio/worker/lib/workflow/workflow-worker-thread.js:50:47)
+    at MessagePort.<anonymous> (/app/Authentik/temporal-server/node_modules/@temporalio/worker/lib/workflow/workflow-worker-thread.js:92:38)
+    at [nodejs.internal.kHybridDispatch] (node:internal/event_target:831:20)
+    at MessagePort.<anonymous> (node:internal/per_context/messageport:23:28)
+    at Activator.startWorkflowNextHandler (/app/Authentik/temporal-server/node_modules/@temporalio/workflow/src/internals.ts:537:11)
+[Temporal WARN] Workflow failed
+[newsletterSendingWorkflow(newsletter-57be1592-1dfa-42c3-a66b-311136172a5e-1757313353802)] 🚀 Starting newsletter sending workflow for newsletter 57be1592-1dfa-42c3-a66b-311136172a5e
+[newsletterSendingWorkflow(newsletter-57be1592-1dfa-42c3-a66b-311136172a5e-1757313353802)] ❌ Newsletter workflow failed for 57be1592-1dfa-42c3-a66b-311136172a5e: ReferenceError: process is not defined
+    at process (/app/Authentik/temporal-server/src/workflows/newsletter-workflow.ts:77:31)
+    at Script.runInContext (node:vm:149:12)
+    at Proxy.<anonymous> (/app/Authentik/temporal-server/node_modules/@temporalio/worker/lib/workflow/reusable-vm.js:150:45)
+    at ReusableVMWorkflow.activate (/app/Authentik/temporal-server/node_modules/@temporalio/worker/lib/workflow/vm-shared.js:348:37)
+    at handleRequest (/app/Authentik/temporal-server/node_modules/@temporalio/worker/lib/workflow/workflow-worker-thread.js:50:47)
+    at MessagePort.<anonymous> (/app/Authentik/temporal-server/node_modules/@temporalio/worker/lib/workflow/workflow-worker-thread.js:92:38)
+    at [nodejs.internal.kHybridDispatch] (node:internal/event_target:831:20)
+    at MessagePort.<anonymous> (node:internal/per_context/messageport:23:28)
+    at Activator.startWorkflowNextHandler (/app/Authentik/temporal-server/node_modules/@temporalio/workflow/src/internals.ts:537:11)
+[Temporal WARN] Workflow failed

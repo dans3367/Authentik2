@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import { users, tenants, companies, forms } from '@shared/schema';
+import { betterAuthUser, tenants, companies, forms } from '@shared/schema';
 import { authenticateToken, requireRole } from '../middleware/auth-middleware';
 
 export const adminRoutes = Router();
@@ -115,12 +115,12 @@ adminRoutes.get("/users/stats", authenticateToken, requireRole('Administrator'),
       activeUsers: sql<number>`count(*) filter (where is_active = true)`,
       verifiedUsers: sql<number>`count(*) filter (where email_verified = true)`,
       unverifiedUsers: sql<number>`count(*) filter (where email_verified = false)`,
-    }).from(users).where(sql`${users.tenantId} = ${req.user.tenantId}`);
+    }).from(betterAuthUser).where(sql`${betterAuthUser.tenantId} = ${req.user.tenantId}`);
 
     const userStatsByRole = await db.select({
-      role: users.role,
+      role: betterAuthUser.role,
       count: sql<number>`count(*)`,
-    }).from(users).where(sql`${users.tenantId} = ${req.user.tenantId}`).groupBy(users.role);
+    }).from(betterAuthUser).where(sql`${betterAuthUser.tenantId} = ${req.user.tenantId}`).groupBy(betterAuthUser.role);
 
     res.json({
       totalUsers: userStats[0].totalUsers,
@@ -144,7 +144,7 @@ adminRoutes.get("/users/limits", authenticateToken, requireRole('Administrator')
     // Get current user count for this tenant
     const userCount = await db.select({
       count: sql<number>`count(*)`,
-    }).from(users).where(sql`${users.tenantId} = ${req.user.tenantId}`);
+    }).from(betterAuthUser).where(sql`${betterAuthUser.tenantId} = ${req.user.tenantId}`);
 
     // For now, we'll use a simple limit system
     // In a real app, this would come from subscription data
@@ -170,25 +170,25 @@ adminRoutes.get("/users", authenticateToken, requireRole('Administrator'), async
     const { page = 1, limit = 50, role, emailVerified, search } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
-    let whereClause = sql`${users.tenantId} = ${req.user.tenantId}`;
+    let whereClause = sql`${betterAuthUser.tenantId} = ${req.user.tenantId}`;
 
     if (role) {
-      whereClause = sql`${whereClause} AND ${users.role} = ${role}`;
+      whereClause = sql`${whereClause} AND ${betterAuthUser.role} = ${role}`;
     }
 
     if (emailVerified !== undefined) {
-      whereClause = sql`${whereClause} AND ${users.emailVerified} = ${emailVerified === 'true'}`;
+      whereClause = sql`${whereClause} AND ${betterAuthUser.emailVerified} = ${emailVerified === 'true'}`;
     }
 
     if (search) {
       whereClause = sql`${whereClause} AND (
-        ${users.email} ILIKE ${`%${search}%`} OR
-        ${users.firstName} ILIKE ${`%${search}%`} OR
-        ${users.lastName} ILIKE ${`%${search}%`}
+        ${betterAuthUser.email} ILIKE ${`%${search}%`} OR
+        ${betterAuthUser.firstName} ILIKE ${`%${search}%`} OR
+        ${betterAuthUser.lastName} ILIKE ${`%${search}%`}
       )`;
     }
 
-    const userResults = await db.query.users.findMany({
+    const userResults = await db.query.betterAuthUser.findMany({
       where: whereClause,
       with: {
         tenant: {
@@ -199,14 +199,14 @@ adminRoutes.get("/users", authenticateToken, requireRole('Administrator'), async
           },
         },
       },
-      orderBy: sql`${users.createdAt} DESC`,
+      orderBy: sql`${betterAuthUser.createdAt} DESC`,
       limit: Number(limit),
       offset,
     });
 
     const totalCount = await db.select({
       count: sql<number>`count(*)`,
-    }).from(users).where(whereClause);
+    }).from(betterAuthUser).where(whereClause);
 
     res.json({
       users: userResults.map(user => ({
@@ -251,8 +251,8 @@ adminRoutes.put("/users/:userId", authenticateToken, requireRole('Administrator'
     }
 
     // Check if user exists
-    const existingUser = await db.query.users.findFirst({
-      where: sql`${users.id} = ${userId}`,
+    const existingUser = await db.query.betterAuthUser.findFirst({
+      where: sql`${betterAuthUser.id} = ${userId}`,
     });
 
     if (!existingUser) {
@@ -261,8 +261,8 @@ adminRoutes.put("/users/:userId", authenticateToken, requireRole('Administrator'
 
     // Check if email is already taken by another user
     if (email !== existingUser.email) {
-      const emailCheck = await db.query.users.findFirst({
-        where: sql`${users.email} = ${email}`,
+      const emailCheck = await db.query.betterAuthUser.findFirst({
+        where: sql`${betterAuthUser.email} = ${email}`,
       });
 
       if (emailCheck) {
@@ -274,7 +274,7 @@ adminRoutes.put("/users/:userId", authenticateToken, requireRole('Administrator'
     if (existingUser.role === 'Owner' && role !== 'Owner') {
       const ownerCount = await db.select({
         count: sql<number>`count(*)`,
-      }).from(users).where(sql`${users.role} = 'Owner'`);
+      }).from(betterAuthUser).where(sql`${betterAuthUser.role} = 'Owner'`);
 
       if (ownerCount[0].count <= 1) {
         return res.status(400).json({ message: 'Cannot demote the only owner' });
@@ -282,7 +282,7 @@ adminRoutes.put("/users/:userId", authenticateToken, requireRole('Administrator'
     }
 
     // Update user
-    await db.update(users)
+    await db.update(betterAuthUser)
       .set({
         firstName,
         lastName,
@@ -291,7 +291,7 @@ adminRoutes.put("/users/:userId", authenticateToken, requireRole('Administrator'
         isActive: isActive ?? true,
         updatedAt: new Date(),
       })
-      .where(sql`${users.id} = ${userId}`);
+      .where(sql`${betterAuthUser.id} = ${userId}`);
 
     res.json({ message: 'User updated successfully' });
   } catch (error) {
@@ -311,8 +311,8 @@ adminRoutes.patch("/users/:userId/status", authenticateToken, requireRole('Admin
     }
 
     // Check if user exists
-    const user = await db.query.users.findFirst({
-      where: sql`${users.id} = ${userId}`,
+    const user = await db.query.betterAuthUser.findFirst({
+      where: sql`${betterAuthUser.id} = ${userId}`,
     });
 
     if (!user) {
@@ -320,7 +320,7 @@ adminRoutes.patch("/users/:userId/status", authenticateToken, requireRole('Admin
     }
 
     // Prevent deactivating the current user
-    if (userId === req.user.userId && !isActive) {
+    if (userId === req.user.id && !isActive) {
       return res.status(400).json({ message: 'Cannot deactivate your own account' });
     }
 
@@ -328,7 +328,7 @@ adminRoutes.patch("/users/:userId/status", authenticateToken, requireRole('Admin
     if (user.role === 'Owner' && !isActive) {
       const ownerCount = await db.select({
         count: sql<number>`count(*)`,
-      }).from(users).where(sql`${users.role} = 'Owner' AND ${users.isActive} = true`);
+      }).from(betterAuthUser).where(sql`${betterAuthUser.role} = 'Owner' AND ${betterAuthUser.isActive} = true`);
 
       if (ownerCount[0].count <= 1) {
         return res.status(400).json({ message: 'Cannot deactivate the only active owner' });
@@ -336,12 +336,12 @@ adminRoutes.patch("/users/:userId/status", authenticateToken, requireRole('Admin
     }
 
     // Update user status
-    await db.update(users)
+    await db.update(betterAuthUser)
       .set({
         isActive,
         updatedAt: new Date(),
       })
-      .where(sql`${users.id} = ${userId}`);
+      .where(sql`${betterAuthUser.id} = ${userId}`);
 
     res.json({
       message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
@@ -365,8 +365,8 @@ adminRoutes.patch("/users/:userId/role", authenticateToken, requireRole('Adminis
     }
 
     // Check if user exists
-    const user = await db.query.users.findFirst({
-      where: sql`${users.id} = ${userId}`,
+    const user = await db.query.betterAuthUser.findFirst({
+      where: sql`${betterAuthUser.id} = ${userId}`,
     });
 
     if (!user) {
@@ -377,7 +377,7 @@ adminRoutes.patch("/users/:userId/role", authenticateToken, requireRole('Adminis
     if (user.role === 'Owner' && role !== 'Owner') {
       const ownerCount = await db.select({
         count: sql<number>`count(*)`,
-      }).from(users).where(sql`${users.role} = 'Owner'`);
+      }).from(betterAuthUser).where(sql`${betterAuthUser.role} = 'Owner'`);
 
       if (ownerCount[0].count <= 1) {
         return res.status(400).json({ message: 'Cannot demote the only owner' });
@@ -385,12 +385,12 @@ adminRoutes.patch("/users/:userId/role", authenticateToken, requireRole('Adminis
     }
 
     // Update user role
-    await db.update(users)
+    await db.update(betterAuthUser)
       .set({
         role,
         updatedAt: new Date(),
       })
-      .where(sql`${users.id} = ${userId}`);
+      .where(sql`${betterAuthUser.id} = ${userId}`);
 
     res.json({ message: 'User role updated successfully' });
   } catch (error) {
@@ -405,8 +405,8 @@ adminRoutes.delete("/users/:userId", authenticateToken, requireRole('Administrat
     const { userId } = req.params;
 
     // Check if user exists
-    const user = await db.query.users.findFirst({
-      where: sql`${users.id} = ${userId}`,
+    const user = await db.query.betterAuthUser.findFirst({
+      where: sql`${betterAuthUser.id} = ${userId}`,
     });
 
     if (!user) {
@@ -414,13 +414,13 @@ adminRoutes.delete("/users/:userId", authenticateToken, requireRole('Administrat
     }
 
     // Prevent deleting the current user
-    if (user.id === req.user.userId) {
+    if (user.id === req.user.id) {
       return res.status(400).json({ message: 'Cannot delete your own account' });
     }
 
     // Delete user (this will cascade to related records)
-    await db.delete(users)
-      .where(sql`${users.id} = ${userId}`);
+    await db.delete(betterAuthUser)
+      .where(sql`${betterAuthUser.id} = ${userId}`);
 
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
@@ -444,7 +444,7 @@ adminRoutes.get("/stats", authenticateToken, requireRole('Administrator'), async
         verifiedUsers: sql<number>`count(*) filter (where email_verified = true)`,
         unverifiedUsers: sql<number>`count(*) filter (where email_verified = false)`,
         twoFactorUsers: sql<number>`count(*) filter (where two_factor_enabled = true)`,
-      }).from(users),
+      }).from(betterAuthUser),
 
       // Session statistics
       db.select({
@@ -552,7 +552,7 @@ adminRoutes.get("/activity", authenticateToken, requireRole('Administrator'), as
 adminRoutes.get("/health", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
   try {
     // Database connectivity check
-    const dbCheck = await db.select({ count: sql<number>`count(*)` }).from(users);
+    const dbCheck = await db.select({ count: sql<number>`count(*)` }).from(betterAuthUser);
 
     const health = {
       database: {

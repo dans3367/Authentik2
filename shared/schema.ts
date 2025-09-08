@@ -15,6 +15,28 @@ export const betterAuthUser = pgTable("better_auth_user", {
   updatedAt: timestamp("updated_at").notNull(),
   role: text("role").default('Employee').notNull(), // Keep our existing role system
   tenantId: varchar("tenant_id").default(sql`'29c69b4f-3129-4aa4-a475-7bf892e5c5b9'`).notNull(), // Default value for multi-tenancy
+  // Additional fields from users table
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  isActive: boolean("is_active").default(true),
+  twoFactorEnabled: boolean("two_factor_enabled").default(false),
+  twoFactorSecret: text("two_factor_secret"),
+  emailVerificationToken: text("email_verification_token"),
+  emailVerificationExpires: timestamp("email_verification_expires"),
+  lastVerificationEmailSent: timestamp("last_verification_email_sent"),
+  lastLoginAt: timestamp("last_login_at"), // Track last login for user management
+  menuExpanded: boolean("menu_expanded").default(false), // New field for menu preference
+  theme: text("theme").default('light'), // Theme preference: 'light' or 'dark'
+  avatarUrl: text("avatar_url"), // User avatar URL from Cloudflare R2
+  tokenValidAfter: timestamp("token_valid_after").defaultNow(), // Tokens issued before this time are invalid
+  // Stripe fields for subscription management
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  subscriptionStatus: text("subscription_status").default('inactive'), // active, inactive, canceled, past_due
+  subscriptionPlanId: varchar("subscription_plan_id"),
+  subscriptionStartDate: timestamp("subscription_start_date"),
+  subscriptionEndDate: timestamp("subscription_end_date"),
+  trialEndsAt: timestamp("trial_ends_at"),
 });
 
 export const betterAuthSession = pgTable("better_auth_session", {
@@ -70,42 +92,11 @@ export const tenants = pgTable("tenants", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-  email: text("email").notNull().unique(),
-  password: text("password"), // Made nullable to support better-auth integration
-  firstName: text("first_name"),
-  lastName: text("last_name"),
-  role: text("role").default('Employee').notNull(), // User role for permissions
-  isActive: boolean("is_active").default(true),
-  twoFactorEnabled: boolean("two_factor_enabled").default(false),
-  twoFactorSecret: text("two_factor_secret"),
-  emailVerified: boolean("email_verified").default(false),
-  emailVerificationToken: text("email_verification_token"),
-  emailVerificationExpires: timestamp("email_verification_expires"),
-  lastVerificationEmailSent: timestamp("last_verification_email_sent"),
-  lastLoginAt: timestamp("last_login_at"), // Track last login for user management
-  menuExpanded: boolean("menu_expanded").default(false), // New field for menu preference
-  theme: text("theme").default('light'), // Theme preference: 'light' or 'dark'
-  avatarUrl: text("avatar_url"), // User avatar URL from Cloudflare R2
-  tokenValidAfter: timestamp("token_valid_after").defaultNow(), // Tokens issued before this time are invalid
-  // Stripe fields for subscription management
-  stripeCustomerId: text("stripe_customer_id"),
-  stripeSubscriptionId: text("stripe_subscription_id"),
-  subscriptionStatus: text("subscription_status").default('inactive'), // active, inactive, canceled, past_due
-  subscriptionPlanId: varchar("subscription_plan_id"),
-  subscriptionStartDate: timestamp("subscription_start_date"),
-  subscriptionEndDate: timestamp("subscription_end_date"),
-  trialEndsAt: timestamp("trial_ends_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
+// Users table removed - now using better_auth_user table only
 export const refreshTokens = pgTable("refresh_tokens", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
   token: text("token").notNull().unique(),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -146,7 +137,7 @@ export const shops = pgTable("shops", {
   phone: text("phone").notNull(),
   email: text("email").notNull(),
   website: text("website"),
-  managerId: varchar("manager_id").references(() => users.id, { onDelete: 'set null' }),
+  managerId: varchar("manager_id").references(() => betterAuthUser.id, { onDelete: 'set null' }),
   operatingHours: text("operating_hours"), // JSON string
   status: text("status").default('active'), // active, inactive, maintenance
   logoUrl: text("logo_url"),
@@ -188,7 +179,7 @@ export const subscriptionPlans = pgTable("subscription_plans", {
 export const subscriptions = pgTable("subscriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
   planId: varchar("plan_id").notNull().references(() => subscriptionPlans.id),
   stripeSubscriptionId: text("stripe_subscription_id").notNull().unique(),
   stripeCustomerId: text("stripe_customer_id").notNull(),
@@ -204,12 +195,51 @@ export const subscriptions = pgTable("subscriptions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Tenant-specific limit overrides
+export const tenantLimits = pgTable("tenant_limits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }).unique(),
+  maxShops: integer("max_shops"), // NULL means use subscription plan limit
+  maxUsers: integer("max_users"), // NULL means use subscription plan limit
+  maxStorageGb: integer("max_storage_gb"), // NULL means use subscription plan limit
+  customLimits: text("custom_limits").default('{}'), // JSON for future extensibility
+  overrideReason: text("override_reason"), // Why this tenant has custom limits
+  createdBy: varchar("created_by").references(() => betterAuthUser.id, { onDelete: 'set null' }),
+  expiresAt: timestamp("expires_at"), // NULL means no expiration
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Shop limit events for audit and analytics
+export const shopLimitEvents = pgTable("shop_limit_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  eventType: text("event_type").notNull(), // 'limit_reached', 'limit_exceeded', 'limit_increased', etc.
+  shopCount: integer("shop_count").notNull(),
+  limitValue: integer("limit_value"), // The limit at the time of the event
+  subscriptionPlanId: varchar("subscription_plan_id").references(() => subscriptionPlans.id, { onDelete: 'set null' }),
+  customLimitId: varchar("custom_limit_id").references(() => tenantLimits.id, { onDelete: 'set null' }),
+  metadata: text("metadata").default('{}'), // JSON for additional event data
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Email verification tokens table (missing from current schema)
 export const verificationTokens = pgTable("verification_tokens", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
   token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Temporary 2FA sessions table for managing 2FA verification flow
+export const temp2faSessions = pgTable("temp_2fa_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionToken: text("session_token").notNull().unique(), // Better Auth session token
+  userId: text("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -232,7 +262,7 @@ export const emailContacts = pgTable("email_contacts", {
   consentMethod: text("consent_method"), // 'manual_add', 'form_submission', 'import', 'api'
   consentIpAddress: text("consent_ip_address"),
   consentUserAgent: text("consent_user_agent"),
-  addedByUserId: varchar("added_by_user_id").references(() => users.id),
+  addedByUserId: varchar("added_by_user_id").references(() => betterAuthUser.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -275,7 +305,7 @@ export const contactTagAssignments = pgTable("contact_tag_assignments", {
 export const companies = pgTable("companies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-  ownerId: varchar("owner_id").notNull().references(() => users.id, { onDelete: 'cascade' }), // Links to account owner
+  ownerId: varchar("owner_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }), // Links to account owner
   name: text("name").notNull(),
   address: text("address"),
   companyType: text("company_type"), // e.g., Corporation, LLC, Partnership, etc.
@@ -292,7 +322,7 @@ export const companies = pgTable("companies", {
 export const forms = pgTable("forms", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
   title: text("title").notNull(),
   description: text("description"),
   formData: text("form_data").notNull(), // JSON string of form structure
@@ -319,7 +349,7 @@ export const formResponses = pgTable("form_responses", {
 export const newsletters = pgTable("newsletters", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
   title: text("title").notNull(),
   subject: text("subject").notNull(),
   content: text("content").notNull(), // HTML content of the newsletter
@@ -361,7 +391,7 @@ export const newsletterTaskStatus = pgTable("newsletter_task_status", {
 export const campaigns = pgTable("campaigns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
   name: text("name").notNull(),
   description: text("description"),
   type: text("type").notNull().default('email'), // email, sms, push, social
@@ -381,7 +411,7 @@ export const campaigns = pgTable("campaigns", {
   spent: decimal("spent", { precision: 10, scale: 2 }).default('0'),
   // Reviewer approval fields
   requiresReviewerApproval: boolean("requires_reviewer_approval").default(false),
-  reviewerId: varchar("reviewer_id").references(() => users.id),
+  reviewerId: varchar("reviewer_id").references(() => betterAuthUser.id),
   reviewStatus: text("review_status").default('pending'), // pending, approved, rejected
   reviewedAt: timestamp("reviewed_at"),
   reviewNotes: text("review_notes"),
@@ -434,7 +464,7 @@ export const bouncedEmails = pgTable("bounced_emails", {
 
 // Relations
 export const tenantRelations = relations(tenants, ({ many }) => ({
-  users: many(users),
+  users: many(betterAuthUser),
   stores: many(stores),
   shops: many(shops),
   forms: many(forms),
@@ -452,9 +482,9 @@ export const tenantRelations = relations(tenants, ({ many }) => ({
   bouncedEmails: many(bouncedEmails),
 }));
 
-export const userRelations = relations(users, ({ one, many }) => ({
+export const betterAuthUserRelations = relations(betterAuthUser, ({ one, many }) => ({
   tenant: one(tenants, {
-    fields: [users.tenantId],
+    fields: [betterAuthUser.tenantId],
     references: [tenants.id],
   }),
   refreshTokens: many(refreshTokens),
@@ -464,7 +494,7 @@ export const userRelations = relations(users, ({ one, many }) => ({
   newsletters: many(newsletters),
   campaigns: many(campaigns),
   subscription: one(subscriptions, {
-    fields: [users.id],
+    fields: [betterAuthUser.id],
     references: [subscriptions.userId],
   }),
 }));
@@ -474,9 +504,9 @@ export const companyRelations = relations(companies, ({ one }) => ({
     fields: [companies.tenantId],
     references: [tenants.id],
   }),
-  owner: one(users, {
+  owner: one(betterAuthUser, {
     fields: [companies.ownerId],
-    references: [users.id],
+    references: [betterAuthUser.id],
   }),
 }));
 
@@ -485,9 +515,9 @@ export const formRelations = relations(forms, ({ one, many }) => ({
     fields: [forms.tenantId],
     references: [tenants.id],
   }),
-  user: one(users, {
+  user: one(betterAuthUser, {
     fields: [forms.userId],
-    references: [users.id],
+    references: [betterAuthUser.id],
   }),
   responses: many(formResponses),
 }));
@@ -508,9 +538,9 @@ export const refreshTokenRelations = relations(refreshTokens, ({ one }) => ({
     fields: [refreshTokens.tenantId],
     references: [tenants.id],
   }),
-  user: one(users, {
+  user: one(betterAuthUser, {
     fields: [refreshTokens.userId],
-    references: [users.id],
+    references: [betterAuthUser.id],
   }),
 }));
 
@@ -519,16 +549,16 @@ export const verificationTokenRelations = relations(verificationTokens, ({ one }
     fields: [verificationTokens.tenantId],
     references: [tenants.id],
   }),
-  user: one(users, {
+  user: one(betterAuthUser, {
     fields: [verificationTokens.userId],
-    references: [users.id],
+    references: [betterAuthUser.id],
   }),
 }));
 
 export const subscriptionRelations = relations(subscriptions, ({ one }) => ({
-  user: one(users, {
+  user: one(betterAuthUser, {
     fields: [subscriptions.userId],
-    references: [users.id],
+    references: [betterAuthUser.id],
   }),
   plan: one(subscriptionPlans, {
     fields: [subscriptions.planId],
@@ -552,13 +582,13 @@ export const shopRelations = relations(shops, ({ one }) => ({
     fields: [shops.tenantId],
     references: [tenants.id],
   }),
-  manager: one(users, {
+  manager: one(betterAuthUser, {
     fields: [shops.managerId],
-    references: [users.id],
+    references: [betterAuthUser.id],
   }),
 }));
 
-export const insertUserSchema = createInsertSchema(users).omit({
+export const insertUserSchema = createInsertSchema(betterAuthUser).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
@@ -673,6 +703,7 @@ export const createUserSchema = z.object({
     .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
     .regex(/[0-9]/, "Password must contain at least one number"),
   confirmPassword: z.string(),
+  emailVerified: z.boolean().default(true),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
@@ -699,7 +730,7 @@ export const userFiltersSchema = z.object({
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export type User = typeof betterAuthUser.$inferSelect;
 export type LoginCredentials = z.infer<typeof loginSchema>;
 export type RegisterData = z.infer<typeof registerSchema>;
 export type RegisterOwnerData = z.infer<typeof registerOwnerSchema>;
@@ -1140,9 +1171,9 @@ export const newsletterRelations = relations(newsletters, ({ one, many }) => ({
     fields: [newsletters.tenantId],
     references: [tenants.id],
   }),
-  user: one(users, {
+  user: one(betterAuthUser, {
     fields: [newsletters.userId],
-    references: [users.id],
+    references: [betterAuthUser.id],
   }),
   taskStatuses: many(newsletterTaskStatus),
 }));
@@ -1243,13 +1274,13 @@ export const campaignRelations = relations(campaigns, ({ one }) => ({
     fields: [campaigns.tenantId],
     references: [tenants.id],
   }),
-  user: one(users, {
+  user: one(betterAuthUser, {
     fields: [campaigns.userId],
-    references: [users.id],
+    references: [betterAuthUser.id],
   }),
-  reviewer: one(users, {
+  reviewer: one(betterAuthUser, {
     fields: [campaigns.reviewerId],
-    references: [users.id],
+    references: [betterAuthUser.id],
   }),
 }));
 
@@ -1365,4 +1396,87 @@ export interface BouncedEmailFilters {
   bounceType?: 'hard' | 'soft' | 'complaint' | 'all';
   isActive?: boolean;
   tenantId?: string;
+}
+
+// Tenant Limits schemas and types
+export const createTenantLimitsSchema = z.object({
+  maxShops: z.number().int().positive().optional(),
+  maxUsers: z.number().int().positive().optional(),
+  maxStorageGb: z.number().int().positive().optional(),
+  customLimits: z.string().default('{}'),
+  overrideReason: z.string().optional(),
+  expiresAt: z.date().optional(),
+});
+
+export const updateTenantLimitsSchema = z.object({
+  maxShops: z.number().int().positive().optional(),
+  maxUsers: z.number().int().positive().optional(),
+  maxStorageGb: z.number().int().positive().optional(),
+  customLimits: z.string().optional(),
+  overrideReason: z.string().optional(),
+  expiresAt: z.date().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const insertTenantLimitsSchema = createInsertSchema(tenantLimits).omit({
+  id: true,
+  tenantId: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type TenantLimits = typeof tenantLimits.$inferSelect;
+export type InsertTenantLimits = z.infer<typeof insertTenantLimitsSchema>;
+export type CreateTenantLimitsData = z.infer<typeof createTenantLimitsSchema>;
+export type UpdateTenantLimitsData = z.infer<typeof updateTenantLimitsSchema>;
+
+// Shop Limit Events schemas and types
+export const createShopLimitEventSchema = z.object({
+  eventType: z.enum(['limit_reached', 'limit_exceeded', 'limit_increased', 'limit_decreased', 'shop_created', 'shop_deleted']),
+  shopCount: z.number().int().nonnegative(),
+  limitValue: z.number().int().positive().optional(),
+  subscriptionPlanId: z.string().uuid().optional(),
+  customLimitId: z.string().uuid().optional(),
+  metadata: z.string().default('{}'),
+});
+
+export const insertShopLimitEventSchema = createInsertSchema(shopLimitEvents).omit({
+  id: true,
+  tenantId: true,
+  createdAt: true,
+});
+
+export type ShopLimitEvent = typeof shopLimitEvents.$inferSelect;
+export type InsertShopLimitEvent = z.infer<typeof insertShopLimitEventSchema>;
+export type CreateShopLimitEventData = z.infer<typeof createShopLimitEventSchema>;
+
+// Enhanced shop limits interface
+export interface EnhancedShopLimits {
+  currentShops: number;
+  maxShops: number | null;
+  canAddShop: boolean;
+  planName: string;
+  isCustomLimit: boolean;
+  customLimitReason?: string;
+  expiresAt?: Date;
+  remainingShops?: number;
+}
+
+// Tenant limits with relationships
+export interface TenantLimitsWithDetails extends TenantLimits {
+  createdByUser?: User;
+  tenant?: Tenant;
+}
+
+// Shop limit event types
+export type ShopLimitEventType = 'limit_reached' | 'limit_exceeded' | 'limit_increased' | 'limit_decreased' | 'shop_created' | 'shop_deleted';
+
+// Enhanced shop limit filters
+export interface ShopLimitFilters {
+  tenantId?: string;
+  eventType?: ShopLimitEventType;
+  fromDate?: Date;
+  toDate?: Date;
+  includeMetadata?: boolean;
 }

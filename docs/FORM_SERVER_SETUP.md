@@ -6,8 +6,7 @@ The form server is a standalone frontend application that serves forms to custom
 
 ```
 Main Application (Port 5000)  ←→  Database
-Form Server API (Port 3001)   ←→  Database (forms only)
-Form Server UI (Port 3002)    ←→  Form Server API
+Form Server (Port 3004)       ←→  Database (forms only)
 ```
 
 ## Quick Start Options
@@ -18,16 +17,14 @@ Form Server UI (Port 3002)    ←→  Form Server API
 ```
 This starts:
 - Main application on port 5000
-- Form server API on port 3001
-- Form server frontend on port 3002
+- Form server on port 3004
 
 ### Option 2: Form Server Only
 ```bash
 ./start-forms-only.sh
 ```
 This starts only:
-- Form server API on port 3001
-- Form server frontend on port 3002
+- Form server on port 3004
 
 ### Option 3: Default (Main App Only)
 ```bash
@@ -41,24 +38,20 @@ Or use the Replit "Run" button - starts only main application on port 5000
 ```bash
 cd fserver
 
-# Start both API and frontend
-npm run dev
-
-# Or start individually
-npm run dev:server  # API only on port 3001
-npm run dev:client  # Frontend only on port 3002
+# Start the form server (single-server architecture)
+npm run dev  # Runs on port 3004
 ```
 
 ## Accessing Forms
 
 Once the form server is running, access forms at:
 ```
-http://localhost:3002/form/[FORM_UUID]
+http://localhost:3004/form/[FORM_UUID]
 ```
 
 Example with existing form:
 ```
-http://localhost:3002/form/dc1ebca2-8aeb-4057-ab32-4b4ce248eb04
+http://localhost:3004/form/dc1ebca2-8aeb-4057-ab32-4b4ce248eb04
 ```
 
 ## API Endpoints

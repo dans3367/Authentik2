@@ -1,12 +1,96 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { sql, eq, and, like, desc } from 'drizzle-orm';
+import { sql, eq, and, like, desc, inArray } from 'drizzle-orm';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
-import { createNewsletterSchema, updateNewsletterSchema, newsletters, users } from '@shared/schema';
+import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, betterAuthUser, emailContacts, contactTagAssignments } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
-import { emailService } from '../emailService';
+import { emailService, enhancedEmailService } from '../emailService';
+// Temporal service removed - now using server-node proxy
+import crypto from 'crypto';
 
 export const newsletterRoutes = Router();
+
+// Helper function to get newsletter recipients based on segmentation
+async function getNewsletterRecipients(newsletter: any, tenantId: string) {
+  console.log(`[Newsletter] Getting recipients for newsletter ${newsletter.id}, type: ${newsletter.recipientType}`);
+  
+  try {
+    let recipients: Array<{ id: string; email: string; firstName?: string; lastName?: string }> = [];
+
+    switch (newsletter.recipientType) {
+      case 'all':
+        // Get all active email contacts for the tenant
+        recipients = await db.query.emailContacts.findMany({
+          where: and(
+            eq(emailContacts.tenantId, tenantId),
+            eq(emailContacts.status, 'active')
+          ),
+          columns: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          }
+        });
+        break;
+
+      case 'selected':
+        // Get specific contacts by IDs
+        if (newsletter.selectedContactIds && newsletter.selectedContactIds.length > 0) {
+          recipients = await db.query.emailContacts.findMany({
+            where: and(
+              eq(emailContacts.tenantId, tenantId),
+              inArray(emailContacts.id, newsletter.selectedContactIds),
+              eq(emailContacts.status, 'active')
+            ),
+            columns: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+            }
+          });
+        }
+        break;
+
+      case 'tags':
+        // Get contacts by tag IDs
+        if (newsletter.selectedTagIds && newsletter.selectedTagIds.length > 0) {
+          const contactIds = await db
+            .select({ contactId: contactTagAssignments.contactId })
+            .from(contactTagAssignments)
+            .where(inArray(contactTagAssignments.tagId, newsletter.selectedTagIds));
+
+          if (contactIds.length > 0) {
+            recipients = await db.query.emailContacts.findMany({
+              where: and(
+                eq(emailContacts.tenantId, tenantId),
+                inArray(emailContacts.id, contactIds.map(c => c.contactId)),
+                eq(emailContacts.status, 'active')
+              ),
+              columns: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+              }
+            });
+          }
+        }
+        break;
+
+      default:
+        console.warn(`[Newsletter] Unknown recipient type: ${newsletter.recipientType}`);
+        break;
+    }
+
+    console.log(`[Newsletter] Found ${recipients.length} recipients for newsletter ${newsletter.id}`);
+    return recipients;
+  } catch (error) {
+    console.error(`[Newsletter] Error getting recipients for newsletter ${newsletter.id}:`, error);
+    throw error;
+  }
+}
 
 // Get all newsletters
 newsletterRoutes.get("/", authenticateToken, requireTenant, async (req: any, res) => {
@@ -89,14 +173,14 @@ newsletterRoutes.post("/", authenticateToken, requireTenant, async (req: any, re
     const sanitizedTitle = sanitizeString(title);
     const sanitizedSubject = sanitizeString(subject);
 
-    // Get the correct user ID from the users table based on email
-    // since authentication uses betterAuthUser but newsletters reference users table
-    const userRecord = await db.query.users.findFirst({
-      where: sql`${users.email} = ${req.user.email}`,
+    // Get the correct user ID from the betterAuthUser table based on email
+    // since authentication uses betterAuthUser and newsletters now reference betterAuthUser table
+    const userRecord = await db.query.betterAuthUser.findFirst({
+      where: sql`${betterAuthUser.email} = ${req.user.email}`,
     });
 
     if (!userRecord) {
-      console.error('User not found in users table for newsletter creation:', req.user.email);
+      console.error('User not found in betterAuthUser table for newsletter creation:', req.user.email);
       return res.status(404).json({ message: 'User account not found. Please contact support.' });
     }
 
@@ -108,9 +192,12 @@ newsletterRoutes.post("/", authenticateToken, requireTenant, async (req: any, re
       content,
       scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
       status: status || 'draft',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }).returning();
+      recipientType: 'all',
+      recipientCount: 0,
+      openCount: 0,
+      uniqueOpenCount: 0,
+      clickCount: 0,
+    } as any).returning();
 
     res.status(201).json(newNewsletter[0]);
   } catch (error) {
@@ -307,8 +394,87 @@ newsletterRoutes.get("/:id/task-status", authenticateToken, requireTenant, async
   }
 });
 
+// Update newsletter status (internal service endpoint for temporal server)
+newsletterRoutes.put("/:id/status", async (req: any, res) => {
+  try {
+    // Check for internal service authentication
+    const internalServiceHeader = req.headers['x-internal-service'];
+    if (internalServiceHeader !== 'temporal-server') {
+      return res.status(403).json({ message: 'Unauthorized: Internal service access only' });
+    }
+
+    const { id } = req.params;
+    const { status, metadata } = req.body;
+
+    console.log(`[Newsletter] Updating newsletter ${id} status to: ${status}`);
+
+    // Update newsletter status in database
+    const updatedNewsletter = await db.update(newsletters)
+      .set({
+        status,
+        ...(metadata && {
+          recipientCount: metadata.recipientCount,
+          updatedAt: new Date(),
+        }),
+        ...(status === 'sent' && metadata?.completedAt && {
+          sentAt: new Date(metadata.completedAt)
+        })
+      })
+      .where(eq(newsletters.id, id))
+      .returning();
+
+    if (updatedNewsletter.length === 0) {
+      return res.status(404).json({ message: 'Newsletter not found' });
+    }
+
+    console.log(`[Newsletter] Successfully updated newsletter ${id} status to: ${status}`);
+    res.json({ 
+      message: 'Newsletter status updated successfully',
+      newsletter: updatedNewsletter[0]
+    });
+
+  } catch (error) {
+    console.error('Update newsletter status error:', error);
+    res.status(500).json({ message: 'Failed to update newsletter status' });
+  }
+});
+
+// Log newsletter activity (internal service endpoint for temporal server)
+newsletterRoutes.post("/:id/log", async (req: any, res) => {
+  try {
+    // Check for internal service authentication
+    const internalServiceHeader = req.headers['x-internal-service'];
+    if (internalServiceHeader !== 'temporal-server') {
+      return res.status(403).json({ message: 'Unauthorized: Internal service access only' });
+    }
+
+    const { id } = req.params;
+    const { activity, details, timestamp } = req.body;
+
+    console.log(`[Newsletter Activity] ${id}: ${activity}`, {
+      details,
+      timestamp,
+      source: 'temporal-server'
+    });
+
+    // Here you could store activity logs in a separate table if needed
+    // For now, we just log to console and return success
+    
+    res.json({ 
+      message: 'Newsletter activity logged successfully',
+      newsletterId: id,
+      activity,
+      timestamp
+    });
+
+  } catch (error) {
+    console.error('Log newsletter activity error:', error);
+    res.status(500).json({ message: 'Failed to log newsletter activity' });
+  }
+});
+
 // Update newsletter task status
-newsletterRoutes.post("/:id/task-status", authenticateToken, async (req: any, res) => {
+newsletterRoutes.post("/:id/task-status", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
     const { status, progress, totalRecipients, processedRecipients, failedRecipients, error } = req.body;
@@ -345,7 +511,7 @@ newsletterRoutes.post("/:id/task-status", authenticateToken, async (req: any, re
 });
 
 // Update specific task status
-newsletterRoutes.put("/:newsletterId/task-status/:taskId", authenticateToken, async (req: any, res) => {
+newsletterRoutes.put("/:newsletterId/task-status/:taskId", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { newsletterId, taskId } = req.params;
     const { status, progress, error } = req.body;
@@ -376,7 +542,7 @@ newsletterRoutes.put("/:newsletterId/task-status/:taskId", authenticateToken, as
 });
 
 // Initialize newsletter tasks
-newsletterRoutes.post("/:id/initialize-tasks", authenticateToken, async (req: any, res) => {
+newsletterRoutes.post("/:id/initialize-tasks", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -424,14 +590,22 @@ newsletterRoutes.post("/:id/initialize-tasks", authenticateToken, async (req: an
   }
 });
 
-// Send newsletter
-newsletterRoutes.post("/:id/send", authenticateToken, async (req: any, res) => {
+// Send newsletter - Updated to follow the flowchart
+newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
     const { testEmail } = req.body;
 
+    // Execute Auth Ver checks (from flowchart)
+    if (!req.user || !req.user.tenantId) {
+      return res.status(401).json({ message: 'Authentication verification failed' });
+    }
+
     const newsletter = await db.query.newsletters.findFirst({
-      where: eq(newsletters.id, id),
+      where: and(
+        eq(newsletters.id, id),
+        eq(newsletters.tenantId, req.user.tenantId)
+      ),
       with: {
         user: true
       }
@@ -460,7 +634,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, async (req: any, res) => {
       return;
     }
 
-    // Update newsletter status to sending
+    // Save Newsletter to DB (update status)
     await db.update(newsletters)
       .set({
         status: 'sending',
@@ -469,19 +643,249 @@ newsletterRoutes.post("/:id/send", authenticateToken, async (req: any, res) => {
       })
       .where(eq(newsletters.id, id));
 
-    // Here you would typically:
-    // 1. Get the email list
-    // 2. Queue the emails for sending
-    // 3. Process them in batches
-    // 4. Update the newsletter status to 'sent' when complete
+    try {
+      // Generate unique group UUID for tracking
+      const groupUUID = crypto.randomUUID();
+      console.log(`[Newsletter] Starting to send newsletter ${id} with groupUUID: ${groupUUID}`);
 
-    res.json({
-      message: 'Newsletter sending initiated successfully',
-      newsletterId: id,
-      status: 'sending',
-    });
+      // Get recipients based on newsletter segmentation
+      const recipients = await getNewsletterRecipients(newsletter, req.user.tenantId);
+      
+      if (recipients.length === 0) {
+        await db.update(newsletters)
+          .set({
+            status: 'draft',
+            updatedAt: new Date(),
+          })
+          .where(eq(newsletters.id, id));
+
+        return res.status(400).json({ 
+          message: 'No recipients found for newsletter. Please check your segmentation settings or add email contacts.' 
+        });
+      }
+
+      console.log(`[Newsletter] Found ${recipients.length} recipients for newsletter ${id}`);
+
+      // Send to Temporal Server via GRPC to create newsletter workflow
+      try {
+        console.log(`[Newsletter] Sending to temporal server via GRPC for newsletter workflow creation`);
+        
+        // Prepare the request for temporal server
+        const temporalRequest = {
+          newsletter_id: newsletter.id,
+          tenant_id: req.user.tenantId,
+          user_id: req.user.id,
+          group_uuid: groupUUID,
+          subject: newsletter.subject,
+          content: newsletter.content,
+          recipients: recipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => ({
+            id: contact.id,
+            email: contact.email,
+            first_name: contact.firstName || '',
+            last_name: contact.lastName || ''
+          })),
+          metadata: {
+            tags: [`newsletter-${newsletter.id}`, `group-${groupUUID}`, `tenant-${req.user.tenantId}`]
+          },
+          batch_size: 50 // Add batch size configuration
+        };
+
+        // Send to server-node for temporal processing
+        console.log('📧 [Newsletter Proxy] Forwarding newsletter request to server-node');
+        
+        // Get the session token from cookies to forward to server-node
+        const sessionToken = req.cookies?.['better-auth.session_token'];
+        console.log('📧 [Newsletter Proxy] Session token found:', sessionToken ? 'Yes' : 'No');
+        
+        const response = await fetch('http://localhost:3502/api/newsletter/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': sessionToken ? `Bearer ${sessionToken}` : '',
+            'Cookie': sessionToken ? `better-auth.session_token=${sessionToken}` : '',
+          },
+          body: JSON.stringify(temporalRequest)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ [Newsletter Proxy] server-node returned error:', response.status, errorText);
+          throw new Error(`server-node request failed: ${errorText}`);
+        }
+
+        const temporalResponse = await response.json();
+
+        if (!temporalResponse.success) {
+          throw new Error(`Temporal server returned error: ${temporalResponse.error}`);
+        }
+
+        console.log(`[Newsletter] Temporal newsletter workflow created:`, {
+          workflowId: temporalResponse.workflow_id,
+          runId: temporalResponse.run_id,
+          newsletterId: temporalResponse.newsletter_id
+        });
+
+        // Update newsletter status to sent
+        await db.update(newsletters)
+          .set({
+            status: 'sent',
+            recipientCount: recipients.length,
+            updatedAt: new Date(),
+          })
+          .where(eq(newsletters.id, id));
+
+        // Return success response
+        res.json({
+          message: 'Newsletter workflow started successfully',
+          workflowId: temporalResponse.workflow_id,
+          runId: temporalResponse.run_id,
+          newsletterId: temporalResponse.newsletter_id,
+          groupUUID: temporalResponse.group_uuid,
+          recipientCount: recipients.length
+        });
+
+      } catch (temporalError: any) {
+        console.error(`[Newsletter] Failed to create temporal newsletter workflow:`, temporalError);
+        
+        // Fallback to direct sending if temporal server is unavailable
+        console.log(`[Newsletter] Falling back to direct email sending`);
+        
+        // Prepare emails for batch sending
+        const emails = recipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => ({
+          to: contact.email,
+          subject: newsletter.subject,
+          html: newsletter.content,
+          text: newsletter.content.replace(/<[^>]*>/g, ''), // Strip HTML for text version
+          metadata: {
+            type: 'newsletter',
+            newsletterId: newsletter.id,
+            groupUUID,
+            recipientId: contact.id,
+            tags: [`newsletter-${newsletter.id}`, `groupUUID-${groupUUID}`]
+          }
+        }));
+
+        // Send emails in batches
+        console.log(`[Newsletter] Sending ${emails.length} emails for newsletter ${id}`);
+        const result = await enhancedEmailService.sendBatchEmails(emails, {
+          batchSize: 10,
+          delayBetweenBatches: 1000 // 1 second delay between batches
+        });
+
+        console.log(`[Newsletter] Batch sending complete for ${id}:`, {
+          queued: result.queued.length,
+          errors: result.errors.length
+        });
+
+        // Update newsletter status based on results
+        const successful = result.queued.length;
+        const failed = result.errors.length;
+        const totalSent = successful + failed;
+
+        await db.update(newsletters)
+          .set({
+            status: 'sent',
+            recipientCount: totalSent,
+            updatedAt: new Date(),
+          })
+          .where(eq(newsletters.id, id));
+
+        res.json({
+          message: 'Newsletter sent successfully (direct mode)',
+          newsletterId: id,
+          status: 'sent',
+          successful,
+          failed,
+          total: totalSent,
+          groupUUID,
+          note: 'Temporal server was unavailable, sent directly'
+        });
+      }
+
+    } catch (sendError) {
+      console.error(`[Newsletter] Failed to send newsletter ${id}:`, sendError);
+      
+      // Update newsletter status back to draft on failure
+      await db.update(newsletters)
+        .set({
+          status: 'draft',
+          updatedAt: new Date(),
+        })
+        .where(eq(newsletters.id, id));
+
+      res.status(500).json({ 
+        message: 'Failed to create temporal workflow for newsletter sending',
+        error: sendError instanceof Error ? sendError.message : 'Unknown error'
+      });
+    }
   } catch (error) {
     console.error('Send newsletter error:', error);
     res.status(500).json({ message: 'Failed to send newsletter' });
+  }
+});
+
+// Endpoint for sending a single newsletter email (called by Temporal activities)
+newsletterRoutes.post('/:id/send-single', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { recipient, subject, content, groupUUID, tenantId } = req.body;
+
+    console.log(`[Newsletter] Sending single email for newsletter ${id} to ${recipient.email}`);
+
+    // Prepare the email message
+    const email = {
+      to: recipient.email,
+      subject: subject,
+      html: content,
+      from: process.env.EMAIL_FROM || 'noreply@saas-app.com',
+      tags: [
+        `newsletter-${id}`,
+        `groupUUID-${groupUUID}`,
+        `tenant-${tenantId}`,
+        `contact-${recipient.id}`
+      ]
+    };
+
+    // Send email using the enhanced email service
+    try {
+      const result = await enhancedEmailService.sendCustomEmail(
+        email.to,
+        email.subject,
+        email.html,
+        {
+          from: email.from,
+          tags: email.tags,
+          metadata: {
+            newsletterId: id,
+            groupUUID: groupUUID,
+            recipientId: recipient.id,
+            tenantId: tenantId
+          }
+        }
+      );
+
+      console.log(`[Newsletter] Email sent successfully to ${recipient.email}:`, result);
+
+      res.json({
+        success: true,
+        messageId: result.id || result.messageId,
+        recipient: recipient.email
+      });
+
+    } catch (sendError) {
+      console.error(`[Newsletter] Failed to send email to ${recipient.email}:`, sendError);
+      res.status(500).json({
+        success: false,
+        error: sendError instanceof Error ? sendError.message : 'Failed to send email',
+        recipient: recipient.email
+      });
+    }
+
+  } catch (error) {
+    console.error('[Newsletter] Send single email error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error instanceof Error ? error.message : 'Internal server error' 
+    });
   }
 });

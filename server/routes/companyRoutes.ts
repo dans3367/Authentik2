@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import { users, tenants, shops, stores } from '@shared/schema';
+import { betterAuthUser, tenants, shops, stores } from '@shared/schema';
 import { authenticateToken, requireRole } from '../middleware/auth-middleware';
 import { createCompanySchema, updateCompanySchema } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
@@ -52,7 +52,7 @@ companyRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator"
       website: sanitizedWebsite,
       industry: sanitizedIndustry,
       slug: sanitizedName.toLowerCase().replace(/\s+/g, '-'),
-      ownerId: req.user.userId,
+      ownerId: req.user.id,
       createdAt: new Date(),
     }).returning();
 
@@ -134,7 +134,7 @@ companyRoutes.get("/stats", authenticateToken, async (req: any, res) => {
         totalUsers: sql<number>`count(*)`,
         activeUsers: sql<number>`count(*) filter (where last_login > current_date - interval '30 days')`,
         newUsers: sql<number>`count(*) filter (where created_at > current_date - interval '30 days')`,
-      }).from(db.users).where(sql`${users.tenantId} = ${req.user.tenantId}`),
+      }).from(betterAuthUser).where(sql`${betterAuthUser.tenantId} = ${req.user.tenantId}`),
 
       // Form statistics
       db.select({
@@ -173,22 +173,22 @@ companyRoutes.get("/users", authenticateToken, async (req: any, res) => {
     const { page = 1, limit = 50, role, search } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
-    let whereClause = sql`${users.tenantId} = ${req.user.tenantId}`;
+    let whereClause = sql`${betterAuthUser.tenantId} = ${req.user.tenantId}`;
 
     if (role) {
-      whereClause = sql`${whereClause} AND ${users.role} = ${role}`;
+      whereClause = sql`${whereClause} AND ${betterAuthUser.role} = ${role}`;
     }
 
     if (search) {
       const sanitizedSearch = sanitizeString(search as string);
       whereClause = sql`${whereClause} AND (
-        ${users.email} ILIKE ${`%${sanitizedSearch}%`} OR
-        ${users.firstName} ILIKE ${`%${sanitizedSearch}%`} OR
-        ${users.lastName} ILIKE ${`%${sanitizedSearch}%`}
+        ${betterAuthUser.email} ILIKE ${`%${sanitizedSearch}%`} OR
+        ${betterAuthUser.firstName} ILIKE ${`%${sanitizedSearch}%`} OR
+        ${betterAuthUser.lastName} ILIKE ${`%${sanitizedSearch}%`}
       )`;
     }
 
-    const users = await db.query.users.findMany({
+    const userList = await db.query.betterAuthUser.findMany({
       where: whereClause,
       columns: {
         id: true,
@@ -201,17 +201,17 @@ companyRoutes.get("/users", authenticateToken, async (req: any, res) => {
         lastLogin: true,
         createdAt: true,
       },
-      orderBy: sql`${users.createdAt} DESC`,
+      orderBy: sql`${betterAuthUser.createdAt} DESC`,
       limit: Number(limit),
       offset,
     });
 
     const totalCount = await db.select({
       count: sql<number>`count(*)`,
-    }).from(db.users).where(whereClause);
+    }).from(betterAuthUser).where(whereClause);
 
     res.json({
-      users,
+      users: userList,
       pagination: {
         page: Number(page),
         limit: Number(limit),
@@ -236,8 +236,8 @@ companyRoutes.patch("/users/:userId/role", authenticateToken, requireRole(["Owne
     }
 
     // Check if user exists and belongs to the same company
-    const user = await db.query.users.findFirst({
-      where: sql`${users.id} = ${userId} AND ${users.tenantId} = ${req.user.tenantId}`,
+    const user = await db.query.betterAuthUser.findFirst({
+      where: sql`${betterAuthUser.id} = ${userId} AND ${betterAuthUser.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!user) {
@@ -250,16 +250,16 @@ companyRoutes.patch("/users/:userId/role", authenticateToken, requireRole(["Owne
     }
 
     // Prevent users from demoting themselves
-    if (userId === req.user.userId) {
+    if (userId === req.user.id) {
       return res.status(400).json({ message: 'Cannot change your own role' });
     }
 
-    await db.update(users)
+    await db.update(betterAuthUser)
       .set({
         role,
         updatedAt: new Date(),
       })
-      .where(sql`${users.id} = ${userId}`);
+      .where(sql`${betterAuthUser.id} = ${userId}`);
 
     res.json({ message: 'User role updated successfully' });
   } catch (error) {
@@ -274,8 +274,8 @@ companyRoutes.delete("/users/:userId", authenticateToken, requireRole(["Owner", 
     const { userId } = req.params;
 
     // Check if user exists and belongs to the same company
-    const user = await db.query.users.findFirst({
-      where: sql`${users.id} = ${userId} AND ${users.tenantId} = ${req.user.tenantId}`,
+    const user = await db.query.betterAuthUser.findFirst({
+      where: sql`${betterAuthUser.id} = ${userId} AND ${betterAuthUser.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!user) {
@@ -283,7 +283,7 @@ companyRoutes.delete("/users/:userId", authenticateToken, requireRole(["Owner", 
     }
 
     // Prevent users from removing themselves
-    if (userId === req.user.userId) {
+    if (userId === req.user.id) {
       return res.status(400).json({ message: 'Cannot remove yourself from the company' });
     }
 
@@ -293,8 +293,8 @@ companyRoutes.delete("/users/:userId", authenticateToken, requireRole(["Owner", 
     }
 
     // Delete user (this will cascade to related records)
-    await db.delete(users)
-      .where(sql`${users.id} = ${userId}`);
+    await db.delete(betterAuthUser)
+      .where(sql`${betterAuthUser.id} = ${userId}`);
 
     res.json({ message: 'User removed from company successfully' });
   } catch (error) {

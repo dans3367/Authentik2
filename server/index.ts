@@ -18,13 +18,13 @@ import { toNodeHandler } from "better-auth/node";
 
 const app = express();
 
-// Trust proxy for Replit environment
-app.set('trust proxy', true);
+// Trust proxy for Replit environment - trust only the first proxy
+app.set('trust proxy', 1);
 
 // Security middleware
 app.use(helmetMiddleware);
 
-// Custom CORS and security headers for trusted domains
+// Custom CORS and security headers for all requests
 app.use((req, res, next) => {
   const origin = req.get('Origin');
   const host = req.get('Host');
@@ -42,11 +42,12 @@ app.use((req, res, next) => {
     origin?.includes(domain) || host?.includes(domain)
   );
   
-  if (isTrustedDomain) {
-    // Set CORS headers for trusted domains
-    res.header('Access-Control-Allow-Origin', origin || '*');
+  // Always set CORS headers for localhost development
+  if (isTrustedDomain || req.get('Host')?.includes('localhost') || req.get('Host')?.includes('127.0.0.1')) {
+    // Set CORS headers for trusted domains and localhost
+    res.header('Access-Control-Allow-Origin', origin || req.get('Origin') || '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma, Cookie, Set-Cookie');
     res.header('Access-Control-Allow-Credentials', 'true');
     
     // Set Cross-Origin-Opener-Policy to allow trusted domains
@@ -76,7 +77,20 @@ app.use(sanitizeMiddleware);
 
 // Better Auth middleware for authentication
 // Note: better-auth uses toNodeHandler for Express integration
-app.all("/api/auth/*", toNodeHandler(auth));
+// Only handle standard better-auth routes, exclude custom routes like verify-login
+app.all("/api/auth/*", (req, res, next) => {
+  // Skip custom auth routes that should be handled by our custom routes
+  const customRoutes = ['verify-login', 'verify-2fa', 'check-2fa-requirement', 'verify-session-2fa', '2fa-status'];
+  const path = req.path.replace('/api/auth/', '');
+
+  if (customRoutes.includes(path)) {
+    return next();
+  }
+
+  // Handle with Better Auth
+  const authHandler = toNodeHandler(auth);
+  return authHandler(req, res);
+});
 
 // Body parsing with size limits - applied after auth handler
 app.use(express.json(requestSizeLimiter.json));
@@ -119,6 +133,29 @@ app.use((req, res, next) => {
   } catch (error) {
     console.error("Failed to initialize database:", error);
     process.exit(1);
+  }
+
+  // Check server-node connectivity
+  console.log('🔄 Checking service connectivity...');
+  try {
+    console.log('📊 Service Architecture:');
+    console.log('   🌐 Main Server: localhost:3500 (Authentication & Proxy)');
+    console.log('   🤖 server-node: localhost:3502 (Temporal Client)');
+    console.log('   ⚡ temporal-server: localhost:50051 (GRPC Bridge)');
+    
+    // Test connectivity to server-node
+    try {
+      const response = await fetch('http://localhost:3502/health');
+      if (response.ok) {
+        console.log('   ✅ server-node: Connected');
+      } else {
+        console.log('   ⚠️  server-node: Responding but not healthy');
+      }
+    } catch (error) {
+      console.log('   ❌ server-node: Disconnected (will proxy anyway)');
+    }
+  } catch (error) {
+    console.log('   🔧 Continuing with proxy setup...');
   }
 
   const server = await registerRoutes(app);

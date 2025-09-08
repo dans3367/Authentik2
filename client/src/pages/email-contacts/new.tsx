@@ -108,31 +108,95 @@ export default function NewEmailContact() {
   const lists: EmailList[] = listsData?.lists || [];
   const tags: ContactTag[] = tagsData?.tags || [];
 
-  // Create contact mutation
+  // Create contact mutation with optimistic updates
   const createContactMutation = useMutation({
     mutationFn: async (data: AddContactForm) => {
       const payload = {
         ...data,
         tags: selectedTags,
         lists: selectedLists,
+        consentIpAddress: window.location.hostname, // Get IP-like info from client
+        consentUserAgent: navigator.userAgent,
       };
       const response = await apiRequest('POST', '/api/email-contacts', payload);
       return response.json();
     },
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Email contact created successfully",
+    onMutate: async (newContact) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['/api/email-contacts'] });
+
+      // Snapshot the previous value
+      const previousContacts = queryClient.getQueryData(['/api/email-contacts']);
+
+      // Optimistically update the cache with the new contact
+      const optimisticContact = {
+        id: `temp-${Date.now()}`, // Temporary ID
+        email: newContact.email,
+        firstName: newContact.firstName || null,
+        lastName: newContact.lastName || null,
+        status: newContact.status || 'active',
+        tags: tags.filter(tag => selectedTags.includes(tag.id)),
+        lists: lists.filter(list => selectedLists.includes(list.id)),
+        addedDate: new Date(),
+        lastActivity: null,
+        emailsSent: 0,
+        emailsOpened: 0,
+      };
+
+      queryClient.setQueryData(['/api/email-contacts'], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          contacts: [optimisticContact, ...old.contacts],
+        };
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/email-contacts'] });
-      setLocation('/email-contacts');
+
+      // Update stats optimistically
+      queryClient.setQueryData(['/api/email-contacts-stats'], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          stats: {
+            ...old.stats,
+            totalContacts: old.stats.totalContacts + 1,
+            activeContacts: newContact.status === 'active' ? old.stats.activeContacts + 1 : old.stats.activeContacts,
+            pendingContacts: newContact.status === 'pending' ? old.stats.pendingContacts + 1 : old.stats.pendingContacts,
+          },
+        };
+      });
+
+      // Return a context object with the snapshotted value
+      return { previousContacts };
     },
-    onError: (error: any) => {
+    onError: (err, newContact, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousContacts) {
+        queryClient.setQueryData(['/api/email-contacts'], context.previousContacts);
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/email-contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/email-contacts-stats'] });
+
       toast({
         title: "Error",
-        description: error.message || "Failed to create contact",
+        description: err?.message || "Failed to create contact",
         variant: "destructive",
       });
+    },
+    onSuccess: (data, variables) => {
+      toast({
+        title: "Success",
+        description: `Contact "${variables.firstName || variables.lastName || variables.email.split('@')[0]}" has been created and added to your list!`,
+        duration: 3000,
+      });
+
+      // Invalidate and refetch to get the real data with correct ID
+      queryClient.invalidateQueries({ queryKey: ['/api/email-contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/email-contacts-stats'] });
+
+      // Add a small delay before redirecting to show the success state
+      setTimeout(() => {
+        setLocation('/email-contacts');
+      }, 500);
     },
   });
 

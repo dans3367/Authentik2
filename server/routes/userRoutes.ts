@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticateToken, requireRole } from '../middleware/auth-middleware';
 import { storage } from '../storage';
 import { db } from '../db';
-import { users, subscriptionPlans } from '@shared/schema';
+import { betterAuthUser, subscriptionPlans } from '@shared/schema';
 import { sql, eq, and, count } from 'drizzle-orm';
 
 export const userRoutes = Router();
@@ -59,15 +59,15 @@ userRoutes.get("/stats", authenticateToken, requireRole(['Owner', 'Administrator
     const stats = await db
       .select({
         totalUsers: sql<number>`count(*)::int`,
-        activeUsers: sql<number>`count(*) filter (where ${users.isActive} = true)::int`,
-        inactiveUsers: sql<number>`count(*) filter (where ${users.isActive} = false)::int`,
-        ownerCount: sql<number>`count(*) filter (where ${users.role} = 'Owner')::int`,
-        adminCount: sql<number>`count(*) filter (where ${users.role} = 'Administrator')::int`,
-        managerCount: sql<number>`count(*) filter (where ${users.role} = 'Manager')::int`,
-        employeeCount: sql<number>`count(*) filter (where ${users.role} = 'Employee')::int`,
+        activeUsers: sql<number>`count(*) filter (where ${betterAuthUser.isActive} = true)::int`,
+        inactiveUsers: sql<number>`count(*) filter (where ${betterAuthUser.isActive} = false)::int`,
+        ownerCount: sql<number>`count(*) filter (where ${betterAuthUser.role} = 'Owner')::int`,
+        adminCount: sql<number>`count(*) filter (where ${betterAuthUser.role} = 'Administrator')::int`,
+        managerCount: sql<number>`count(*) filter (where ${betterAuthUser.role} = 'Manager')::int`,
+        employeeCount: sql<number>`count(*) filter (where ${betterAuthUser.role} = 'Employee')::int`,
       })
-      .from(users)
-      .where(eq(users.tenantId, tenantId));
+      .from(betterAuthUser)
+      .where(eq(betterAuthUser.tenantId, tenantId));
 
     const result = stats[0];
     
@@ -115,10 +115,10 @@ userRoutes.put("/:userId", authenticateToken, requireRole(['Owner', 'Administrat
     }
 
     // Check if user exists and belongs to the same tenant
-    const existingUser = await db.query.users.findFirst({
+    const existingUser = await db.query.betterAuthUser.findFirst({
       where: and(
-        eq(users.id, userId),
-        eq(users.tenantId, req.user.tenantId)
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
       ),
     });
 
@@ -128,10 +128,10 @@ userRoutes.put("/:userId", authenticateToken, requireRole(['Owner', 'Administrat
 
     // Check if email is already taken by another user in the same tenant
     if (email !== existingUser.email) {
-      const emailCheck = await db.query.users.findFirst({
+      const emailCheck = await db.query.betterAuthUser.findFirst({
         where: and(
-          eq(users.email, email),
-          eq(users.tenantId, req.user.tenantId)
+          eq(betterAuthUser.email, email),
+          eq(betterAuthUser.tenantId, req.user.tenantId)
         ),
       });
 
@@ -144,9 +144,9 @@ userRoutes.put("/:userId", authenticateToken, requireRole(['Owner', 'Administrat
     if (existingUser.role === 'Owner' && role !== 'Owner') {
       const ownerCount = await db.select({
         count: sql<number>`count(*)`,
-      }).from(users).where(and(
-        eq(users.role, 'Owner'),
-        eq(users.tenantId, req.user.tenantId)
+      }).from(betterAuthUser).where(and(
+        eq(betterAuthUser.role, 'Owner'),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
       ));
 
       if (ownerCount[0].count <= 1) {
@@ -155,7 +155,7 @@ userRoutes.put("/:userId", authenticateToken, requireRole(['Owner', 'Administrat
     }
 
     // Update user
-    await db.update(users)
+    await db.update(betterAuthUser)
       .set({
         firstName,
         lastName,
@@ -165,8 +165,8 @@ userRoutes.put("/:userId", authenticateToken, requireRole(['Owner', 'Administrat
         updatedAt: new Date(),
       })
       .where(and(
-        eq(users.id, userId),
-        eq(users.tenantId, req.user.tenantId)
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
       ));
 
     res.json({ message: 'User updated successfully' });
@@ -187,10 +187,10 @@ userRoutes.patch("/:userId/status", authenticateToken, requireRole(['Owner', 'Ad
     }
 
     // Check if user exists and belongs to the same tenant
-    const user = await db.query.users.findFirst({
+    const user = await db.query.betterAuthUser.findFirst({
       where: and(
-        eq(users.id, userId),
-        eq(users.tenantId, req.user.tenantId)
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
       ),
     });
 
@@ -199,7 +199,7 @@ userRoutes.patch("/:userId/status", authenticateToken, requireRole(['Owner', 'Ad
     }
 
     // Prevent deactivating the current user
-    if (userId === req.user.userId && !isActive) {
+    if (userId === req.user.id && !isActive) {
       return res.status(400).json({ message: 'Cannot deactivate your own account' });
     }
 
@@ -207,10 +207,10 @@ userRoutes.patch("/:userId/status", authenticateToken, requireRole(['Owner', 'Ad
     if (user.role === 'Owner' && !isActive) {
       const ownerCount = await db.select({
         count: sql<number>`count(*)`,
-      }).from(users).where(and(
-        eq(users.role, 'Owner'),
-        eq(users.tenantId, req.user.tenantId),
-        eq(users.isActive, true)
+      }).from(betterAuthUser).where(and(
+        eq(betterAuthUser.role, 'Owner'),
+        eq(betterAuthUser.tenantId, req.user.tenantId),
+        eq(betterAuthUser.isActive, true)
       ));
 
       if (ownerCount[0].count <= 1) {
@@ -219,14 +219,14 @@ userRoutes.patch("/:userId/status", authenticateToken, requireRole(['Owner', 'Ad
     }
 
     // Update user status
-    await db.update(users)
+    await db.update(betterAuthUser)
       .set({
         isActive,
         updatedAt: new Date(),
       })
       .where(and(
-        eq(users.id, userId),
-        eq(users.tenantId, req.user.tenantId)
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
       ));
 
     res.json({
@@ -246,10 +246,10 @@ userRoutes.delete("/:userId", authenticateToken, requireRole(['Owner', 'Administ
     const { userId } = req.params;
 
     // Check if user exists and belongs to the same tenant
-    const user = await db.query.users.findFirst({
+    const user = await db.query.betterAuthUser.findFirst({
       where: and(
-        eq(users.id, userId),
-        eq(users.tenantId, req.user.tenantId)
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
       ),
     });
 
@@ -258,7 +258,7 @@ userRoutes.delete("/:userId", authenticateToken, requireRole(['Owner', 'Administ
     }
 
     // Prevent deleting the current user
-    if (user.id === req.user.userId) {
+    if (user.id === req.user.id) {
       return res.status(400).json({ message: 'Cannot delete your own account' });
     }
 
@@ -266,9 +266,9 @@ userRoutes.delete("/:userId", authenticateToken, requireRole(['Owner', 'Administ
     if (user.role === 'Owner') {
       const ownerCount = await db.select({
         count: sql<number>`count(*)`,
-      }).from(users).where(and(
-        eq(users.role, 'Owner'),
-        eq(users.tenantId, req.user.tenantId)
+      }).from(betterAuthUser).where(and(
+        eq(betterAuthUser.role, 'Owner'),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
       ));
 
       if (ownerCount[0].count <= 1) {
@@ -277,10 +277,10 @@ userRoutes.delete("/:userId", authenticateToken, requireRole(['Owner', 'Administ
     }
 
     // Delete user (this will cascade to related records)
-    await db.delete(users)
+    await db.delete(betterAuthUser)
       .where(and(
-        eq(users.id, userId),
-        eq(users.tenantId, req.user.tenantId)
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
       ));
 
     res.json({ message: 'User deleted successfully' });

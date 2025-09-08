@@ -170,8 +170,11 @@ export default function Forms2() {
   const { data: formsData, isLoading: formsLoading, error: formsError, refetch } = useQuery({
     queryKey: ['/api/forms'],
     queryFn: async () => {
+      console.log('Forms: Fetching forms from API...');
       const response = await apiRequest('GET', '/api/forms');
-      return response.json();
+      const data = await response.json();
+      console.log('Forms: Received forms data:', data);
+      return data;
     },
     enabled: isAuthenticated && isInitialized, // Wait for both authentication and initialization
     staleTime: 30000, // Cache for 30 seconds
@@ -204,10 +207,14 @@ export default function Forms2() {
   // Handle form actions
   const handleViewForm = (formId: string) => {
     const form = forms.find(f => f.id === formId);
+    console.log('Forms: handleViewForm called with formId:', formId);
+    console.log('Forms: Found form:', form);
+
     if (form) {
       setPreviewForm(form);
       setIsPreviewModalOpen(true);
     } else {
+      console.error('Forms: Form not found for ID:', formId);
       toast({
         title: "Error",
         description: "Form not found",

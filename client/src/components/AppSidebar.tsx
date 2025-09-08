@@ -52,6 +52,19 @@ import { useQuery } from "@tanstack/react-query";
 import type { UserSubscriptionResponse } from "@shared/schema";
 import { useState } from "react";
 
+// Extended user type to include custom fields
+interface ExtendedUser {
+  id: string;
+  email: string;
+  name: string;
+  role?: string;
+  firstName?: string;
+  lastName?: string;
+  theme?: string;
+  menuExpanded?: boolean;
+  tenantId?: string;
+}
+
 const getNavigation = (userRole?: string) => {
   const baseNavigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -78,7 +91,21 @@ export function AppSidebar() {
   const { user } = useReduxAuth();
   const { logout } = useReduxLogout();
   const { theme, toggleTheme } = useTheme();
-  const navigation = getNavigation(user?.role);
+  
+  // Cast user to extended type to access custom fields
+  const extendedUser = user as ExtendedUser | null;
+  
+  // Debug logging for user role
+  console.log('🔍 [AppSidebar] User data:', { 
+    user: extendedUser ? { 
+      id: extendedUser.id, 
+      email: extendedUser.email, 
+      role: extendedUser.role, 
+      name: extendedUser.name 
+    } : null 
+  });
+  
+  const navigation = getNavigation(extendedUser?.role);
   const updateThemeMutation = useUpdateTheme();
   const [isThemeChanging, setIsThemeChanging] = useState(false);
   const { state, isMobile, setOpenMobile } = useSidebar();
@@ -86,7 +113,7 @@ export function AppSidebar() {
   // Fetch subscription data for the user's plan
   const { data: subscriptionData } = useQuery<UserSubscriptionResponse>({
     queryKey: ["/api/my-subscription"],
-    enabled: !!user && user.role === "Owner",
+    enabled: !!extendedUser && extendedUser.role === "Owner",
   });
 
   const handleLogout = async () => {
@@ -100,13 +127,15 @@ export function AppSidebar() {
     toggleTheme();
     
     // Sync with backend using dedicated theme endpoint
-    if (user) {
-      updateThemeMutation.mutate({ theme: newTheme }, {
-        onSettled: () => {
-          // Allow theme sync again after mutation completes
-          setTimeout(() => setIsThemeChanging(false), 1000);
-        }
-      });
+    if (extendedUser) {
+      try {
+        await updateThemeMutation.mutateAsync({ theme: newTheme });
+        // Allow theme sync again after mutation completes
+        setTimeout(() => setIsThemeChanging(false), 1000);
+      } catch (error) {
+        console.error('Failed to update theme:', error);
+        setIsThemeChanging(false);
+      }
     } else {
       setIsThemeChanging(false);
     }
@@ -118,7 +147,7 @@ export function AppSidebar() {
     }
   };
 
-  if (!user) {
+  if (!extendedUser) {
     return null;
   }
 
@@ -230,16 +259,16 @@ export function AppSidebar() {
                   tooltip="User Menu"
                 >
                   <CustomAvatar 
-                    user={user}
+                    user={extendedUser}
                     size="sm"
                     className="w-8 h-8 flex-shrink-0"
                   />
                   <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                     <span className="truncate font-semibold">
-                      {user.firstName} {user.lastName}
+                      {extendedUser.firstName || extendedUser.name} {extendedUser.lastName || ''}
                     </span>
                     <span className="truncate text-xs">
-                      {user.email}
+                      {extendedUser.email}
                     </span>
                   </div>
                 </SidebarMenuButton>
@@ -253,13 +282,13 @@ export function AppSidebar() {
                 {/* User Profile Header */}
                 <div className="flex items-center gap-3 p-4 border-b border-gray-100 dark:border-gray-700">
                   <CustomAvatar 
-                    user={user}
+                    user={extendedUser}
                     size="sm"
                     className="w-10 h-10 ring-2 ring-gray-100 dark:ring-gray-700"
                   />
                   <div className="flex-1">
                     <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">
-                      {user.firstName} {user.lastName}
+                      {extendedUser.firstName || extendedUser.name} {extendedUser.lastName || ''}
                     </h3>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       {subscriptionData?.subscription?.plan?.displayName || 'Basic Plan'}
