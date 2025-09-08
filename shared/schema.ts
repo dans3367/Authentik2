@@ -577,16 +577,17 @@ export const storeRelations = relations(stores, ({ one }) => ({
   }),
 }));
 
-export const shopRelations = relations(shops, ({ one }) => ({
-  tenant: one(tenants, {
-    fields: [shops.tenantId],
-    references: [tenants.id],
-  }),
-  manager: one(betterAuthUser, {
-    fields: [shops.managerId],
-    references: [betterAuthUser.id],
-  }),
-}));
+// Temporarily disabled due to relation issues
+// export const shopRelations = relations(shops, ({ one }) => ({
+//   tenant: one(tenants, {
+//     fields: [shops.tenantId],
+//     references: [tenants.id],
+//   }),
+//   manager: one(betterAuthUser, {
+//     fields: [shops.managerId],
+//     references: [betterAuthUser.id],
+//   }),
+// }));
 
 export const insertUserSchema = createInsertSchema(betterAuthUser).omit({
   id: true,
