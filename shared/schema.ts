@@ -493,6 +493,7 @@ export const betterAuthUserRelations = relations(betterAuthUser, ({ one, many })
   ownedCompanies: many(companies),
   newsletters: many(newsletters),
   campaigns: many(campaigns),
+  managedShops: many(shops),
   subscription: one(subscriptions, {
     fields: [betterAuthUser.id],
     references: [subscriptions.userId],
@@ -577,17 +578,16 @@ export const storeRelations = relations(stores, ({ one }) => ({
   }),
 }));
 
-// Temporarily disabled due to relation issues
-// export const shopRelations = relations(shops, ({ one }) => ({
-//   tenant: one(tenants, {
-//     fields: [shops.tenantId],
-//     references: [tenants.id],
-//   }),
-//   manager: one(betterAuthUser, {
-//     fields: [shops.managerId],
-//     references: [betterAuthUser.id],
-//   }),
-// }));
+export const shopRelations = relations(shops, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [shops.tenantId],
+    references: [tenants.id],
+  }),
+  manager: one(betterAuthUser, {
+    fields: [shops.managerId],
+    references: [betterAuthUser.id],
+  }),
+}));
 
 export const insertUserSchema = createInsertSchema(betterAuthUser).omit({
   id: true,
