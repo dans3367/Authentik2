@@ -823,3 +823,69 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
     res.status(500).json({ message: 'Failed to send newsletter' });
   }
 });
+
+// Endpoint for sending a single newsletter email (called by Temporal activities)
+newsletterRoutes.post('/:id/send-single', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { recipient, subject, content, groupUUID, tenantId } = req.body;
+
+    console.log(`[Newsletter] Sending single email for newsletter ${id} to ${recipient.email}`);
+
+    // Prepare the email message
+    const email = {
+      to: recipient.email,
+      subject: subject,
+      html: content,
+      from: process.env.EMAIL_FROM || 'noreply@saas-app.com',
+      tags: [
+        `newsletter-${id}`,
+        `groupUUID-${groupUUID}`,
+        `tenant-${tenantId}`,
+        `contact-${recipient.id}`
+      ]
+    };
+
+    // Send email using the enhanced email service
+    try {
+      const result = await enhancedEmailService.sendCustomEmail(
+        email.to,
+        email.subject,
+        email.html,
+        {
+          from: email.from,
+          tags: email.tags,
+          metadata: {
+            newsletterId: id,
+            groupUUID: groupUUID,
+            recipientId: recipient.id,
+            tenantId: tenantId
+          }
+        }
+      );
+
+      console.log(`[Newsletter] Email sent successfully to ${recipient.email}:`, result);
+
+      res.json({
+        success: true,
+        messageId: result.id || result.messageId,
+        recipient: recipient.email
+      });
+
+    } catch (sendError) {
+      console.error(`[Newsletter] Failed to send email to ${recipient.email}:`, sendError);
+      res.status(500).json({
+        success: false,
+        error: sendError instanceof Error ? sendError.message : 'Failed to send email',
+        recipient: recipient.email
+      });
+    }
+
+  } catch (error) {
+    console.error('[Newsletter] Send single email error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error instanceof Error ? error.message : 'Internal server error' 
+    });
+  }
+});
