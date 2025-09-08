@@ -130,7 +130,7 @@ export async function newsletterSendingWorkflow(
           {
             batchIndex: batchIndex + 1,
             totalBatches: batches.length,
-            error: batchError.message,
+            error: batchError instanceof Error ? batchError.message : String(batchError),
             recipientCount: batch.length
           }
         );
@@ -179,7 +179,7 @@ export async function newsletterSendingWorkflow(
 
     // Update newsletter status to failed
     await updateNewsletterStatus(input.newsletterId, 'failed', {
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
       failedAt: new Date().toISOString()
     });
 
@@ -189,7 +189,7 @@ export async function newsletterSendingWorkflow(
       'workflow_failed',
       {
         groupUUID: input.groupUUID,
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         recipientCount: input.recipients.length
       }
     );
