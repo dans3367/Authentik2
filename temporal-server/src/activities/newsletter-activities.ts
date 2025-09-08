@@ -65,7 +65,7 @@ function personalizeContent(content: string, recipient: NewsletterRecipient): st
  * Generate unsubscribe link for a recipient
  */
 function generateUnsubscribeLink(newsletterId: string, recipientId: string, tenantId: string): string {
-  const baseUrl = process.env.FRONTEND_URL || 'https://app.authentik.com';
+  const baseUrl = process.env.FRONTEND_URL || 'https://app.zendwise.work';
   return `${baseUrl}/unsubscribe?newsletter=${newsletterId}&recipient=${recipientId}&tenant=${tenantId}`;
 }
 
@@ -97,7 +97,9 @@ export async function sendNewsletterEmail(
     `;
 
     // Determine sender email
-    const fromEmail = process.env.FROM_EMAIL || 'noreply@authentik.com';
+    const fromEmail = process.env.FROM_EMAIL || 'noreply@zendwise.work';
+    console.log(`🔍 [Debug] FROM_EMAIL env var: ${process.env.FROM_EMAIL || 'not set'}`);
+    console.log(`🔍 [Debug] Using fromEmail: ${fromEmail}`);
     
     // Generate text version (basic HTML to text conversion)
     const textContent = personalizedContent
@@ -135,9 +137,10 @@ export async function sendNewsletterEmail(
       };
     }
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error(`❌ Failed to send email to ${recipient.email}:`, error);
-    return { success: false, error: error.message };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -241,14 +244,16 @@ export async function updateNewsletterStatus(
     }
 
     console.log(`✅ Successfully updated newsletter ${newsletterId} status to ${status}`);
-  } catch (error) {
-    console.error(`❌ Failed to update newsletter status (non-blocking):`, error);
-    
-    // Check if it's a connection error
-    if (error.code === 'ECONNREFUSED' || error.message?.includes('fetch failed')) {
+    } catch (error: unknown) {
+      console.error(`❌ Failed to update newsletter status (non-blocking):`, error);
+      
+      // Check if it's a connection error
+      const errorCode = error && typeof error === 'object' && 'code' in error ? error.code : null;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorCode === 'ECONNREFUSED' || errorMessage?.includes('fetch failed')) {
       console.warn(`⚠️ Backend server not reachable at ${process.env.BACKEND_URL || 'http://localhost:3500'}. Continuing without status update.`);
     } else {
-      console.warn(`⚠️ Status update failed for newsletter ${newsletterId}:`, error.message);
+      console.warn(`⚠️ Status update failed for newsletter ${newsletterId}:`, errorMessage);
     }
     
     // Don't throw error - make this non-blocking so email sending can continue
@@ -296,11 +301,13 @@ export async function logNewsletterActivity(
       // Don't throw error for logging failures, just log it
       console.warn(`⚠️ Failed to log newsletter activity: ${response.status}`);
     }
-  } catch (error) {
-    if (error.code === 'ECONNREFUSED' || error.message?.includes('fetch failed')) {
+  } catch (error: unknown) {
+    const errorCode = error && typeof error === 'object' && 'code' in error ? error.code : null;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorCode === 'ECONNREFUSED' || errorMessage?.includes('fetch failed')) {
       console.warn(`⚠️ Backend server not reachable for logging. Activity logged locally only.`);
     } else {
-      console.warn(`⚠️ Failed to log newsletter activity:`, error.message);
+      console.warn(`⚠️ Failed to log newsletter activity:`, errorMessage);
     }
     // Don't throw - logging failures shouldn't break the workflow
   }

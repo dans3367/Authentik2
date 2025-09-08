@@ -40,7 +40,7 @@ RESEND_API_KEY=your_resend_api_key_here
 POSTMARK_API_KEY=your_postmark_api_key_here
 
 # Email Settings
-FROM_EMAIL=noreply@your-domain.com
+FROM_EMAIL=noreply@zendwise.work
 EMAIL_CONCURRENCY_LIMIT=5
 
 # Newsletter Settings
@@ -48,7 +48,7 @@ NEWSLETTER_BATCH_SIZE=50
 
 # Backend Integration
 BACKEND_URL=http://localhost:3501
-FRONTEND_URL=https://your-domain.com
+FRONTEND_URL=https://app.zendwise.work
 ```
 
 ### 3. Start the Server

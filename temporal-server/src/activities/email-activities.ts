@@ -21,7 +21,7 @@ interface SendEmailRequest {
   metadata?: Record<string, any>;
 }
 
-interface SendEmailResult {
+export interface SendEmailResult {
   success: boolean;
   messageId?: string;
   error?: string;
@@ -68,7 +68,7 @@ class EmailServiceManager {
 
   private initializeProviders(): void {
     // Initialize Resend
-    const resendApiKey = process.env.RESEND_API_KEY;
+    const resendApiKey = "re_f27r7h2s_BYXi6aNpimSCfCLwMeec686Q";
     if (resendApiKey) {
       this.resend = new Resend(resendApiKey);
       const masked = resendApiKey.length > 6
@@ -123,6 +123,8 @@ class EmailServiceManager {
         tags: request.tags?.map(tag => ({ name: tag, value: 'true' })),
         ...(request.metadata && { metadata: request.metadata }),
       });
+
+      console.log(result);
 
       console.log(`✅ [Resend] API response id=${result.data?.id} error=${result.error ? JSON.stringify(result.error) : 'none'}`);
       return {
