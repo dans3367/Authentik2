@@ -686,7 +686,8 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
           })),
           metadata: {
             tags: [`newsletter-${newsletter.id}`, `group-${groupUUID}`, `tenant-${req.user.tenantId}`]
-          }
+          },
+          batch_size: 50 // Add batch size configuration
         };
 
         // Send to server-node for temporal processing

@@ -59,7 +59,8 @@ app.post('/api/newsletter/send', authenticateRequest, async (req: AuthenticatedR
       subject, 
       content, 
       recipients, 
-      metadata 
+      metadata,
+      batch_size: batchSize 
     } = req.body;
 
     console.log('🔍 [server-node] Extracted data:', {
@@ -92,7 +93,8 @@ app.post('/api/newsletter/send', authenticateRequest, async (req: AuthenticatedR
       subject,
       content,
       recipients,
-      metadata
+      metadata,
+      batchSize: batchSize || 50
     });
     
     console.log('✅ [server-node] Workflow started successfully:', {

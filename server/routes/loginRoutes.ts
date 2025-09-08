@@ -406,8 +406,7 @@ loginRoutes.post('/verify-2fa', async (req, res) => {
           email: userEmail, 
           password: 'bypass' // We already validated credentials, this is just for session creation
         },
-        headers: req.headers as any,
-        skipPasswordValidation: true // If this option exists
+        headers: req.headers as any
       });
       
       if (loginResult && loginResult.token) {

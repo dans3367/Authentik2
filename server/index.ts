@@ -145,7 +145,7 @@ app.use((req, res, next) => {
     
     // Test connectivity to server-node
     try {
-      const response = await fetch('http://localhost:3502/health', { timeout: 1000 });
+      const response = await fetch('http://localhost:3502/health');
       if (response.ok) {
         console.log('   ✅ server-node: Connected');
       } else {

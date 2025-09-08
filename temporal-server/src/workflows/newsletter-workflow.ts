@@ -34,6 +34,7 @@ export interface NewsletterWorkflowInput {
   metadata: {
     tags: string[];
   };
+  batchSize?: number; // Add batch size as optional parameter
 }
 
 export interface NewsletterWorkflowResult {
@@ -74,7 +75,8 @@ export async function newsletterSendingWorkflow(
     });
 
     // Process newsletter sending in batches
-    const batchSize = parseInt(process.env.NEWSLETTER_BATCH_SIZE || '50');
+    // Use batch size from input or default to 50
+    const batchSize = input.batchSize || 50;
     const batches = [];
     
     for (let i = 0; i < input.recipients.length; i += batchSize) {
@@ -117,7 +119,7 @@ export async function newsletterSendingWorkflow(
             batchSuccessful: batchResult.successful,
             batchFailed: batchResult.failed,
             runningTotal: { successful: totalSuccessful, failed: totalFailed },
-            emailResults: batchResult.results.map(r => ({
+            emailResults: batchResult.results.map((r: any) => ({
               success: r.success,
               messageId: r.messageId,
               provider: r.provider,
@@ -136,7 +138,7 @@ export async function newsletterSendingWorkflow(
           {
             batchIndex: batchIndex + 1,
             totalBatches: batches.length,
-            error: batchError.message,
+            error: batchError instanceof Error ? batchError.message : String(batchError),
             recipientCount: batch.length
           }
         );
@@ -187,7 +189,7 @@ export async function newsletterSendingWorkflow(
 
     // Update newsletter status to failed
     await updateNewsletterStatus(input.newsletterId, 'failed', {
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
       failedAt: new Date().toISOString()
     });
 
@@ -197,7 +199,7 @@ export async function newsletterSendingWorkflow(
       'workflow_failed',
       {
         groupUUID: input.groupUUID,
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         recipientCount: input.recipients.length
       }
     );

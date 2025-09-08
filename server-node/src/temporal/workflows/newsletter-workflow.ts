@@ -34,6 +34,7 @@ export interface NewsletterWorkflowInput {
   metadata: {
     tags: string[];
   };
+  batchSize?: number;
 }
 
 export interface NewsletterWorkflowResult {
@@ -73,7 +74,7 @@ export async function newsletterSendingWorkflow(
     });
 
     // Process newsletter sending in batches
-    const batchSize = 50; // Send 50 emails at a time
+    const batchSize = input.batchSize || 50; // Use input batch size or default to 50
     const batches = [];
     
     for (let i = 0; i < input.recipients.length; i += batchSize) {
