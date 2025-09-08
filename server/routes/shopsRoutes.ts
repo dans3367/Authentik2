@@ -12,10 +12,28 @@ export const shopsRoutes = Router();
 // Get all shops for the company
 shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
   try {
+    console.log('🏪 [Shops API] GET /api/shops - Request received');
+    console.log('🔑 [Shops API] User info:', {
+      userId: req.user?.id,
+      tenantId: req.user?.tenantId,
+      userEmail: req.user?.email,
+      userRole: req.user?.role
+    });
+    
     const { page = 1, limit = 50, search, status, managerId } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
+    
+    console.log('🔍 [Shops API] Query parameters:', {
+      page: Number(page),
+      limit: Number(limit),
+      offset,
+      search,
+      status,
+      managerId
+    });
 
     let whereClause = sql`${shops.tenantId} = ${req.user.tenantId}`;
+    console.log('🎯 [Shops API] Base where clause for tenantId:', req.user.tenantId);
 
     if (search) {
       const sanitizedSearch = sanitizeString(search as string);
@@ -34,21 +52,34 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
       whereClause = sql`${whereClause} AND ${shops.managerId} = ${managerId}`;
     }
 
+    console.log('🔄 [Shops API] Executing shops query...');
     const shopsData = await db.select().from(shops)
       .where(whereClause)
       .orderBy(sql`${shops.createdAt} DESC`)
       .limit(Number(limit))
       .offset(offset);
+    
+    console.log('📊 [Shops API] Shops query result:', {
+      shopsFound: shopsData.length,
+      shopIds: shopsData.map(s => s.id),
+      shopNames: shopsData.map(s => s.name)
+    });
 
+    console.log('🔢 [Shops API] Executing count query...');
     const [totalCountResult] = await db.select({
       count: sql<number>`count(*)`,
     }).from(shops).where(whereClause);
+    
+    console.log('📈 [Shops API] Total count result:', totalCountResult.count);
 
+    console.log('📋 [Shops API] Calculating limits and stats...');
     // Get shop limits and stats - temporarily simplified
     const limits = { currentShops: shopsData.length, maxShops: null, canAddShop: true, planName: "Basic" };
     const stats = { totalShops: shopsData.length, activeShops: shopsData.filter(s => s.status === 'active').length, shopsByCategory: {} };
+    
+    console.log('📊 [Shops API] Calculated stats:', { limits, stats });
 
-    res.json({
+    const response = {
       shops: shopsData,
       pagination: {
         page: Number(page),
@@ -58,10 +89,38 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
       },
       limits,
       stats,
+    };
+    
+    console.log('✅ [Shops API] Sending successful response:', {
+      shopsCount: response.shops.length,
+      pagination: response.pagination,
+      hasLimits: !!response.limits,
+      hasStats: !!response.stats
     });
+    
+    res.json(response);
   } catch (error) {
-    console.error('Get shops error:', error);
-    res.status(500).json({ message: 'Failed to get shops' });
+    console.error('❌ [Shops API] Get shops error occurred:');
+    console.error('❌ [Shops API] Error details:', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined,
+      userId: req.user?.id,
+      tenantId: req.user?.tenantId
+    });
+    
+    const errorResponse = {
+      message: 'Failed to get shops',
+      debug: {
+        errorMessage: error instanceof Error ? error.message : String(error),
+        tenantId: req.user?.tenantId,
+        userId: req.user?.id,
+        timestamp: new Date().toISOString()
+      }
+    };
+    
+    console.error('❌ [Shops API] Sending error response:', errorResponse);
+    res.status(500).json(errorResponse);
   }
 });
 
