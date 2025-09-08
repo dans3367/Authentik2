@@ -25,77 +25,27 @@ app.set('trust proxy', 1);
 // Security middleware
 app.use(helmetMiddleware);
 
-// Custom CORS and security headers for all requests
+// Static CORS and security headers
 app.use((req, res, next) => {
-  const origin = req.get('Origin');
-  const host = req.get('Host');
-  
-  // Debug CORS requests
-  console.log('🌐 [CORS] Request details:', {
-    origin,
-    host,
-    method: req.method,
-    path: req.path,
-    userAgent: req.get('User-Agent')?.slice(0, 50)
-  });
-  
-  // List of trusted domains (includes Replit domains)
-  const trustedDomains = [
-    'weby.zendwise.work',
-    'websy.zendwise.work',
-    'localhost',
-    '127.0.0.1',
-    '.replit.dev',
-    '.repl.co',
-    '.replit.app',
-    'janeway.replit.dev'
-  ];
-  
-  // Check if the origin or host is trusted
-  const isTrustedDomain = trustedDomains.some(domain => 
-    origin?.includes(domain) || host?.includes(domain)
-  );
-  
-  // For development, be more permissive with CORS
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  const isLocalhost = req.get('Host')?.includes('localhost') || req.get('Host')?.includes('127.0.0.1');
-  const shouldAllowCORS = isDevelopment || isTrustedDomain || isLocalhost;
-  
-  console.log('🔒 [CORS] Access decision:', {
-    isDevelopment,
-    isTrustedDomain, 
-    isLocalhost,
-    shouldAllowCORS
-  });
-  
-  if (shouldAllowCORS) {
-    // Set CORS headers for trusted domains and development
-    res.header('Access-Control-Allow-Origin', origin || '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma, Cookie, Set-Cookie');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    
-    // Set Cross-Origin-Opener-Policy to allow trusted domains
-    res.header('Cross-Origin-Opener-Policy', 'unsafe-none');
-    res.header('Cross-Origin-Embedder-Policy', 'unsafe-none');
-    
-    // Additional security headers for trusted domains
-    res.header('X-Frame-Options', 'SAMEORIGIN');
-    res.header('X-Content-Type-Options', 'nosniff');
-    res.header('Referrer-Policy', 'strict-origin-when-cross-origin');
-    
-    console.log('✅ [CORS] Headers set successfully');
-  } else {
-    console.log('❌ [CORS] Request blocked - untrusted origin');
-  }
-  
-  // Handle preflight requests
+  const allowedOrigin = process.env.CORS_ORIGIN || '*';
+  res.header('Access-Control-Allow-Origin', allowedOrigin);
+  res.header('Vary', 'Origin');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma, Cookie, Set-Cookie');
+  res.header('Access-Control-Allow-Credentials', 'true');
+
+  // Keep existing security headers (static)
+  res.header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  res.header('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  res.header('X-Frame-Options', 'SAMEORIGIN');
+  res.header('X-Content-Type-Options', 'nosniff');
+  res.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+
   if (req.method === 'OPTIONS') {
-    console.log('🔄 [CORS] Handling OPTIONS preflight request');
     res.sendStatus(200);
     return;
   }
-  
+
   next();
 });
 

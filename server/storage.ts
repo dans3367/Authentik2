@@ -859,7 +859,7 @@ export class DatabaseStorage implements IStorage {
         metadata: JSON.stringify(metadata || {})
       });
     } catch (error) {
-      storageLogger.error('Failed to log shop limit event:', error instanceof Error ? error.message : String(error));
+      console.error('Failed to log shop limit event:', error);
       // Don't throw - logging failures shouldn't break the main flow
     }
   }
@@ -901,14 +901,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTenantLimits(tenantId: string): Promise<TenantLimitsWithDetails | undefined> {
-    return await db.query.tenantLimits.findFirst({
+    const result = await db.query.tenantLimits.findFirst({
       where: eq(tenantLimits.tenantId, tenantId),
       with: {
-        createdByUser: {
-          columns: { id: true, firstName: true, lastName: true, email: true }
-        }
+        createdByUser: true
       }
     });
+
+    // Transform the result to match the expected type
+    if (result) {
+      return {
+        ...result,
+        createdByUser: result.createdByUser || undefined
+      } as TenantLimitsWithDetails;
+    }
+
+    return result;
   }
 
   async deleteTenantLimits(tenantId: string): Promise<void> {
