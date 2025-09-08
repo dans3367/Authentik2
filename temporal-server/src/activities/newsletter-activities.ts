@@ -2,7 +2,8 @@
  * Newsletter-related activity functions for Temporal workflows
  */
 import { sendEmail, SendEmailResult } from './email-activities';
-import { activityLogger, newsletterLogger } from '../logger';
+import { activityLogger, newsletterLogger } from '../workflow-logger';
+import { getActivityConfig } from '../activity-config';
 
 export interface BatchResult {
   successful: number;
@@ -66,7 +67,8 @@ function personalizeContent(content: string, recipient: NewsletterRecipient): st
  * Generate unsubscribe link for a recipient
  */
 function generateUnsubscribeLink(newsletterId: string, recipientId: string, tenantId: string): string {
-  const baseUrl = process.env.FRONTEND_URL || 'https://app.zendwise.work';
+  const config = getActivityConfig();
+  const baseUrl = config.frontendUrl;
   return `${baseUrl}/unsubscribe?newsletter=${newsletterId}&recipient=${recipientId}&tenant=${tenantId}`;
 }
 
@@ -98,8 +100,8 @@ export async function sendNewsletterEmail(
     `;
 
     // Determine sender email
-    const fromEmail = process.env.FROM_EMAIL || 'noreply@zendwise.work';
-    newsletterLogger.debug(`🔍 [Debug] FROM_EMAIL env var: ${process.env.FROM_EMAIL || 'not set'}`);
+    const config = getActivityConfig();
+    const fromEmail = config.fromEmail;
     newsletterLogger.debug(`🔍 [Debug] Using fromEmail: ${fromEmail}`);
     
     // Generate text version (basic HTML to text conversion)
@@ -156,7 +158,8 @@ export async function processNewsletterBatch(input: NewsletterBatchInput): Promi
   let failed = 0;
 
   // Process emails with controlled concurrency
-  const concurrencyLimit = parseInt(process.env.EMAIL_CONCURRENCY_LIMIT || '5');
+  const config = getActivityConfig();
+  const concurrencyLimit = config.emailConcurrencyLimit;
   
   for (let i = 0; i < input.recipients.length; i += concurrencyLimit) {
     const batch = input.recipients.slice(i, i + concurrencyLimit);
@@ -218,7 +221,8 @@ export async function updateNewsletterStatus(
   activityLogger.info(`📊 Updating newsletter ${newsletterId} status to: ${status}`);
   
   try {
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3500';
+    const config = getActivityConfig();
+    const backendUrl = config.backendUrl;
     activityLogger.debug(`🔗 Attempting to connect to backend at: ${backendUrl}`);
     
     const controller = new AbortController();
@@ -252,7 +256,8 @@ export async function updateNewsletterStatus(
       const errorCode = error && typeof error === 'object' && 'code' in error ? error.code : null;
       const errorMessage = error instanceof Error ? error.message : String(error);
       if (errorCode === 'ECONNREFUSED' || errorMessage?.includes('fetch failed')) {
-      activityLogger.warn(`⚠️ Backend server not reachable at ${process.env.BACKEND_URL || 'http://localhost:3500'}. Continuing without status update.`);
+      const config = getActivityConfig();
+      activityLogger.warn(`⚠️ Backend server not reachable at ${config.backendUrl}. Continuing without status update.`);
     } else {
       activityLogger.warn(`⚠️ Status update failed for newsletter ${newsletterId}:`, errorMessage);
     }
@@ -281,7 +286,8 @@ export async function logNewsletterActivity(
   activityLogger.debug(`📝 [Newsletter Activity] ${newsletterId}: ${activity}`, details);
   
   try {
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3500';
+    const config = getActivityConfig();
+    const backendUrl = config.backendUrl;
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout for logging

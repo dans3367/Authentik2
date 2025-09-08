@@ -3,6 +3,7 @@ import { Worker, Runtime, DefaultLogger, LogEntry, NativeConnection } from '@tem
 import * as activities from '../activities';
 import * as workflows from '../workflows';
 import { workerLogger } from '../logger';
+import { initializeActivityConfigFromEnv } from '../activity-config';
 
 export class TemporalWorkerService {
   private client: Client | null = null;
@@ -18,6 +19,17 @@ export class TemporalWorkerService {
 
   async initialize(): Promise<void> {
     try {
+      // Initialize activity configuration from environment variables
+      // This must be done before creating the worker since activities need config
+      const config = initializeActivityConfigFromEnv();
+      workerLogger.info(`🔧 Initialized activity configuration:`, {
+        backendUrl: config.backendUrl,
+        primaryEmailProvider: config.primaryEmailProvider,
+        fromEmail: config.fromEmail,
+        hasResendKey: config.resendApiKey ? 'yes' : 'no',
+        hasPostmarkToken: config.postmarkApiToken ? 'yes' : 'no'
+      });
+      
       // Install Temporal Runtime once; ignore if already installed
       try {
         Runtime.install({

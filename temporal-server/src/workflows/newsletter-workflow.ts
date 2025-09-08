@@ -1,6 +1,6 @@
 import { proxyActivities } from '@temporalio/workflow';
 import type * as activities from '../activities';
-import { workflowLogger } from '../logger';
+import { workflowLogger } from '../workflow-logger';
 
 // Proxy activities to be used in workflows
 const { 
@@ -11,7 +11,7 @@ const {
 } = proxyActivities<typeof activities>({
   startToCloseTimeout: '10 minutes',
   heartbeatTimeout: '30 seconds',
-  retryPolicy: {
+  retry: {
     initialInterval: '1 second',
     maximumInterval: '30 seconds',
     backoffCoefficient: 2,

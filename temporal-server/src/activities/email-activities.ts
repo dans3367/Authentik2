@@ -5,7 +5,8 @@ import { Resend } from 'resend';
 import dotenv from 'dotenv';
 import path from 'path';
 import { Client as PostmarkClient } from 'postmark';
-import { activityLogger } from '../logger';
+import { activityLogger } from '../workflow-logger';
+import { getActivityConfig } from '../activity-config';
 
 interface EmailProvider {
   name: 'resend' | 'postmark';
@@ -44,32 +45,14 @@ class EmailServiceManager {
   private primaryProvider: 'resend' | 'postmark' = 'resend';
 
   constructor() {
-    // Ensure environment is loaded even when worker is spawned without prior dotenv.config()
-    const localEnv = dotenv.config();
-    const rootEnvPath = path.resolve(__dirname, '../../../.env');
-    const rootEnv = dotenv.config({ path: rootEnvPath });
-    
-    // In Replit, secrets are available directly in process.env
-    // Log what we have for debugging
-    activityLogger.debug(
-      `🧪 [EmailEnv] Loaded local .env: ${localEnv.error ? 'no' : 'yes'} | loaded root .env (${rootEnvPath}): ${rootEnv.error ? 'no' : 'yes'}`
-    );
-    activityLogger.debug(
-      `🧪 [EmailEnv] RESEND_API_KEY present: ${process.env.RESEND_API_KEY ? 'yes (from env)' : 'no'} | POSTMARK_API_KEY present: ${process.env.POSTMARK_API_KEY ? 'yes' : 'no'}`
-    );
-    
-    // Debug: Check if we have the key
-    if (process.env.RESEND_API_KEY) {
-      const maskedKey = process.env.RESEND_API_KEY.substring(0, 10) + '...';
-      activityLogger.info(`✅ [EmailEnv] Found RESEND_API_KEY in environment: ${maskedKey}`);
-    }
-
     this.initializeProviders();
   }
 
   private initializeProviders(): void {
+    const config = getActivityConfig();
+    
     // Initialize Resend
-    const resendApiKey = "re_f27r7h2s_BYXi6aNpimSCfCLwMeec686Q";
+    const resendApiKey = config.resendApiKey;
     if (resendApiKey) {
       this.resend = new Resend(resendApiKey);
       const masked = resendApiKey.length > 6
@@ -77,20 +60,20 @@ class EmailServiceManager {
         : '***';
       activityLogger.info(`✅ Resend client initialized (key: ${masked})`);
     } else {
-      activityLogger.warn('⚠️ RESEND_API_KEY not found in environment');
+      activityLogger.warn('⚠️ RESEND_API_KEY not found in configuration');
     }
 
     // Initialize Postmark
-    const postmarkApiKey = process.env.POSTMARK_API_KEY;
+    const postmarkApiKey = config.postmarkApiToken;
     if (postmarkApiKey) {
       this.postmark = new PostmarkClient(postmarkApiKey);
       activityLogger.info('✅ Postmark client initialized');
     } else {
-      activityLogger.warn('⚠️ POSTMARK_API_KEY not found in environment');
+      activityLogger.warn('⚠️ POSTMARK_API_TOKEN not found in configuration');
     }
 
     // Set primary provider based on configuration
-    const configuredProvider = process.env.PRIMARY_EMAIL_PROVIDER as 'resend' | 'postmark';
+    const configuredProvider = config.primaryEmailProvider as 'resend' | 'postmark';
     if (configuredProvider === 'postmark' && this.postmark) {
       this.primaryProvider = 'postmark';
     } else if (this.resend) {
@@ -220,8 +203,15 @@ class EmailServiceManager {
   }
 }
 
-// Singleton instance
-const emailManager = new EmailServiceManager();
+// Lazy-loaded singleton instance
+let emailManager: EmailServiceManager | null = null;
+
+function getEmailManager(): EmailServiceManager {
+  if (!emailManager) {
+    emailManager = new EmailServiceManager();
+  }
+  return emailManager;
+}
 
 /**
  * Send a single email using the configured email provider
@@ -235,10 +225,10 @@ export async function sendEmail(
   tags?: string[],
   metadata?: Record<string, any>
 ): Promise<SendEmailResult> {
-  activityLogger.info(`📧 Sending email to ${to} via ${emailManager.getAvailableProviders().join(', ')}`);
+  activityLogger.info(`📧 Sending email to ${to} via ${getEmailManager().getAvailableProviders().join(', ')}`);
 
   try {
-    const result = await emailManager.sendEmail({
+    const result = await getEmailManager().sendEmail({
       to,
       from,
       subject,
@@ -281,7 +271,7 @@ export async function sendBulkEmails(
     const email = emails[i];
     
     try {
-      const result = await emailManager.sendEmail(email);
+      const result = await getEmailManager().sendEmail(email);
       results.push(result);
       
       // Rate limiting delay
@@ -319,7 +309,7 @@ export async function sendEmailViaResend(
 ): Promise<SendEmailResult> {
   activityLogger.debug(`📧 [Activity] sendEmailViaResend to=${to}`);
   try {
-    return await emailManager.sendViaResend({
+    return await getEmailManager().sendViaResend({
       to,
       from,
       subject,
@@ -352,7 +342,7 @@ export async function sendEmailViaPostmark(
 ): Promise<SendEmailResult> {
   activityLogger.debug(`📧 [Activity] sendEmailViaPostmark to=${to}`);
   try {
-    return await emailManager.sendViaPostmark({
+    return await getEmailManager().sendViaPostmark({
       to,
       from,
       subject,
@@ -375,7 +365,7 @@ export async function sendEmailViaPostmark(
  * Activity: List available email providers in this worker
  */
 export function getAvailableEmailProviders(): string[] {
-  const providers = emailManager.getAvailableProviders();
+  const providers = getEmailManager().getAvailableProviders();
   activityLogger.debug(`🔎 [Activity] Available email providers: ${providers.join(', ') || 'none'}`);
   return providers;
 }

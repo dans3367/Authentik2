@@ -10,11 +10,13 @@ const loggerConfig: pino.LoggerOptions = {
   transport: !isProduction ? {
     target: 'pino-pretty',
     options: {
-      colorize: false,
+      colorize: true,
+      customColors: 'err:red,info:blue',
+      colorizeObjects: true,
       translateTime: '[HH:MM:ss.l]',
       ignore: 'hostname',
       singleLine: false,
-      messageFormat: '{levelLabel} ({pid}) [{context}]: {msg}',
+      messageFormat: '{levelLabel}: {msg}',
       hideObject: true,
       levelFirst: false,
       messageKey: 'msg',
