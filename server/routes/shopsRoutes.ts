@@ -73,8 +73,8 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
     console.log('📈 [Shops API] Total count result:', totalCountResult.count);
 
     console.log('📋 [Shops API] Calculating limits and stats...');
-    // Get shop limits and stats - temporarily simplified
-    const limits = { currentShops: shopsData.length, maxShops: null, canAddShop: true, planName: "Basic" };
+    // Get shop limits and stats using proper storage method
+    const limits = await storage.checkShopLimits(req.user.tenantId);
     const stats = { totalShops: shopsData.length, activeShops: shopsData.filter(s => s.status === 'active').length, shopsByCategory: {} };
     
     console.log('📊 [Shops API] Calculated stats:', { limits, stats });
@@ -153,11 +153,23 @@ shopsRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator", 
     const validatedData = createShopSchema.parse(req.body);
     const { name, description, address, phone, email, managerId, status } = validatedData;
 
-    const sanitizedName = sanitizeString(name);
+    const sanitizedName = sanitizeString(name) || name;
     const sanitizedDescription = description ? sanitizeString(description) : null;
     const sanitizedAddress = address ? sanitizeString(address) : null;
-    const sanitizedPhone = phone ? sanitizeString(phone) : null;
-    const sanitizedEmail = email ? sanitizeString(email) : null;
+    const sanitizedPhone = phone ? sanitizeString(phone) || phone : null;
+    const sanitizedEmail = email ? sanitizeString(email) || email : null;
+
+    // Validate required fields
+    if (!sanitizedName || !sanitizedPhone || !sanitizedEmail) {
+      return res.status(400).json({ 
+        message: 'Name, phone and email are required fields',
+        missingFields: {
+          name: !sanitizedName,
+          phone: !sanitizedPhone,
+          email: !sanitizedEmail
+        }
+      });
+    }
 
     // Verify manager belongs to the same company
     if (managerId) {
@@ -168,17 +180,6 @@ shopsRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator", 
       if (!manager) {
         return res.status(400).json({ message: 'Manager not found or does not belong to your company' });
       }
-    }
-
-    // Validate required fields
-    if (!sanitizedPhone || !sanitizedEmail) {
-      return res.status(400).json({ 
-        message: 'Phone and email are required fields',
-        missingFields: {
-          phone: !sanitizedPhone,
-          email: !sanitizedEmail
-        }
-      });
     }
 
     const newShop = await db.insert(shops).values({

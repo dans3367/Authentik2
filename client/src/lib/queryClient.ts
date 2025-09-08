@@ -28,10 +28,11 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  // Use relative URLs for same-domain requests or environment variable for different domains
+  const baseURL = import.meta.env.VITE_BETTER_AUTH_URL || "";
+  const fullUrl = url.startsWith('http') ? url : baseURL ? `${baseURL}${url}` : url;
+  
   try {
-    // Use relative URLs for same-domain requests or environment variable for different domains
-    const baseURL = import.meta.env.VITE_BETTER_AUTH_URL || "";
-    const fullUrl = url.startsWith('http') ? url : baseURL ? `${baseURL}${url}` : url;
     
     console.log('🌐 [API Request] Making request:', {
       method,

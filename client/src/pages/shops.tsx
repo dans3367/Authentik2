@@ -254,6 +254,17 @@ export default function ShopsPage() {
     }
   }, [isLoading, isFetching, error, data]);
 
+  // Debug modal state and limits
+  useEffect(() => {
+    console.log('🔧 [Frontend] Modal state changed:', {
+      showLimitModal,
+      limits: data?.limits,
+      canAddShop: data?.limits?.canAddShop,
+      currentShops: data?.limits?.currentShops,
+      maxShops: data?.limits?.maxShops
+    });
+  }, [showLimitModal, data?.limits]);
+
   // Debounce search and filter changes
   useEffect(() => {
     const timer = setTimeout(() => {
