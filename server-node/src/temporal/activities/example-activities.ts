@@ -51,3 +51,5 @@ export async function logActivity(workflowId: string, activity: string, details?
   
   console.log('Activity logged successfully');
 }
+
+

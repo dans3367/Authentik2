@@ -17,3 +17,5 @@ echo "📡 Connecting to Temporal at $TEMPORAL_SERVER_URL"
 echo "🏃 Starting server on port $PORT"
 
 npm run dev
+
+

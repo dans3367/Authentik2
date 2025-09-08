@@ -5,6 +5,7 @@ import { authenticateToken, requireTenant } from '../middleware/auth-middleware'
 import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, betterAuthUser, emailContacts, contactTagAssignments } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 import { emailService, enhancedEmailService } from '../emailService';
+import { temporalService } from '../services/temporal-service';
 import crypto from 'crypto';
 
 export const newsletterRoutes = Router();
@@ -393,6 +394,85 @@ newsletterRoutes.get("/:id/task-status", authenticateToken, requireTenant, async
   }
 });
 
+// Update newsletter status (internal service endpoint for temporal server)
+newsletterRoutes.put("/:id/status", async (req: any, res) => {
+  try {
+    // Check for internal service authentication
+    const internalServiceHeader = req.headers['x-internal-service'];
+    if (internalServiceHeader !== 'temporal-server') {
+      return res.status(403).json({ message: 'Unauthorized: Internal service access only' });
+    }
+
+    const { id } = req.params;
+    const { status, metadata } = req.body;
+
+    console.log(`[Newsletter] Updating newsletter ${id} status to: ${status}`);
+
+    // Update newsletter status in database
+    const updatedNewsletter = await db.update(newsletters)
+      .set({
+        status,
+        ...(metadata && {
+          recipientCount: metadata.recipientCount,
+          updatedAt: new Date(),
+        }),
+        ...(status === 'sent' && metadata?.completedAt && {
+          sentAt: new Date(metadata.completedAt)
+        })
+      })
+      .where(eq(newsletters.id, id))
+      .returning();
+
+    if (updatedNewsletter.length === 0) {
+      return res.status(404).json({ message: 'Newsletter not found' });
+    }
+
+    console.log(`[Newsletter] Successfully updated newsletter ${id} status to: ${status}`);
+    res.json({ 
+      message: 'Newsletter status updated successfully',
+      newsletter: updatedNewsletter[0]
+    });
+
+  } catch (error) {
+    console.error('Update newsletter status error:', error);
+    res.status(500).json({ message: 'Failed to update newsletter status' });
+  }
+});
+
+// Log newsletter activity (internal service endpoint for temporal server)
+newsletterRoutes.post("/:id/log", async (req: any, res) => {
+  try {
+    // Check for internal service authentication
+    const internalServiceHeader = req.headers['x-internal-service'];
+    if (internalServiceHeader !== 'temporal-server') {
+      return res.status(403).json({ message: 'Unauthorized: Internal service access only' });
+    }
+
+    const { id } = req.params;
+    const { activity, details, timestamp } = req.body;
+
+    console.log(`[Newsletter Activity] ${id}: ${activity}`, {
+      details,
+      timestamp,
+      source: 'temporal-server'
+    });
+
+    // Here you could store activity logs in a separate table if needed
+    // For now, we just log to console and return success
+    
+    res.json({ 
+      message: 'Newsletter activity logged successfully',
+      newsletterId: id,
+      activity,
+      timestamp
+    });
+
+  } catch (error) {
+    console.error('Log newsletter activity error:', error);
+    res.status(500).json({ message: 'Failed to log newsletter activity' });
+  }
+});
+
 // Update newsletter task status
 newsletterRoutes.post("/:id/task-status", authenticateToken, requireTenant, async (req: any, res) => {
   try {
@@ -586,48 +666,42 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
 
       console.log(`[Newsletter] Found ${recipients.length} recipients for newsletter ${id}`);
 
-      // Send POST to go-server to create temporal task for email sending
-      const goServerUrl = process.env.GO_SERVER_URL || 'http://localhost:3501';
-      
+      // Send to Temporal Server via GRPC to create newsletter workflow
       try {
-        console.log(`[Newsletter] Sending to go-server for temporal task creation`);
+        console.log(`[Newsletter] Sending to temporal server via GRPC for newsletter workflow creation`);
         
-        // Prepare the request to go-server
-        const goServerRequest = {
-          newsletterId: newsletter.id,
-          tenantId: req.user.tenantId,
-          userId: req.user.id,
-          groupUUID,
+        // Prepare the request for temporal server
+        const temporalRequest = {
+          newsletter_id: newsletter.id,
+          tenant_id: req.user.tenantId,
+          user_id: req.user.id,
+          group_uuid: groupUUID,
           subject: newsletter.subject,
           content: newsletter.content,
           recipients: recipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => ({
             id: contact.id,
             email: contact.email,
-            firstName: contact.firstName || '',
-            lastName: contact.lastName || ''
+            first_name: contact.firstName || '',
+            last_name: contact.lastName || ''
           })),
           metadata: {
-            tags: [`newsletter-${newsletter.id}`, `groupUUID-${groupUUID}`]
+            tags: [`newsletter-${newsletter.id}`, `group-${groupUUID}`, `tenant-${req.user.tenantId}`]
           }
         };
 
-        // Send to go-server endpoint
-        const goResponse = await fetch(`${goServerUrl}/api/email-tracking`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': req.headers.authorization || ''
-          },
-          body: JSON.stringify(goServerRequest)
-        });
+        // Send to temporal server via GRPC
+        const temporalClient = temporalService.getClient();
+        const temporalResponse = await temporalClient.sendNewsletter(temporalRequest);
 
-        if (!goResponse.ok) {
-          const errorText = await goResponse.text();
-          throw new Error(`Go-server returned ${goResponse.status}: ${errorText}`);
+        if (!temporalResponse.success) {
+          throw new Error(`Temporal server returned error: ${temporalResponse.error}`);
         }
 
-        const goResult = await goResponse.json();
-        console.log(`[Newsletter] Go-server temporal task created:`, goResult);
+        console.log(`[Newsletter] Temporal newsletter workflow created:`, {
+          workflowId: temporalResponse.workflow_id,
+          runId: temporalResponse.run_id,
+          newsletterId: temporalResponse.newsletter_id
+        });
 
         // Update newsletter status to sent
         await db.update(newsletters)
@@ -640,17 +714,18 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
 
         // Return success response
         res.json({
-          message: 'Newsletter sent successfully',
-          successful: recipients.length,
-          failed: 0,
-          total: recipients.length,
-          groupUUID
+          message: 'Newsletter workflow started successfully',
+          workflowId: temporalResponse.workflow_id,
+          runId: temporalResponse.run_id,
+          newsletterId: temporalResponse.newsletter_id,
+          groupUUID: temporalResponse.group_uuid,
+          recipientCount: recipients.length
         });
 
-      } catch (goServerError: any) {
-        console.error(`[Newsletter] Failed to create temporal task via go-server:`, goServerError);
+      } catch (temporalError: any) {
+        console.error(`[Newsletter] Failed to create temporal newsletter workflow:`, temporalError);
         
-        // Fallback to direct sending if go-server is unavailable
+        // Fallback to direct sending if temporal server is unavailable
         console.log(`[Newsletter] Falling back to direct email sending`);
         
         // Prepare emails for batch sending
@@ -701,7 +776,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
           failed,
           total: totalSent,
           groupUUID,
-          note: 'Go-server was unavailable, sent directly'
+          note: 'Temporal server was unavailable, sent directly'
         });
       }
 
@@ -717,7 +792,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
         .where(eq(newsletters.id, id));
 
       res.status(500).json({ 
-        message: 'Failed to create temporal task for email sending',
+        message: 'Failed to create temporal workflow for newsletter sending',
         error: sendError instanceof Error ? sendError.message : 'Unknown error'
       });
     }

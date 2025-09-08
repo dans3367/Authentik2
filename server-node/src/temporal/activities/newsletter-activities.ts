@@ -194,3 +194,5 @@ export async function logNewsletterActivity(
     // Don't throw - logging failures shouldn't break the workflow
   }
 }
+
+

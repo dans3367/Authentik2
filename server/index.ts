@@ -135,6 +135,29 @@ app.use((req, res, next) => {
     process.exit(1);
   }
 
+  // Initialize Temporal service and show connection status
+  console.log('🔄 Initializing services...');
+  try {
+    // Import temporal service to trigger initialization
+    const { temporalService } = await import('./services/temporal-service');
+    
+    // Wait a moment for initialization to complete
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const isConnected = temporalService.isServiceConnected();
+    const connectionStatus = temporalService.getConnectionStatus();
+    
+    console.log('📊 Service Status:');
+    console.log(`   🤖 Temporal GRPC: ${isConnected ? '✅ Connected' : '❌ Disconnected'} (${connectionStatus})`);
+    
+    if (!isConnected) {
+      console.log('   ⚠️  Temporal server unavailable - using mock client for development');
+    }
+  } catch (error) {
+    console.error('❌ Failed to initialize Temporal service:', error);
+    console.log('   🔧 Continuing with mock Temporal client...');
+  }
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
