@@ -641,13 +641,10 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
         // Return success response
         res.json({
           message: 'Newsletter sent successfully',
-          newsletterId: id,
-          status: 'sent',
           successful: recipients.length,
           failed: 0,
           total: recipients.length,
-          groupUUID,
-          temporalTask: goResult
+          groupUUID
         });
 
       } catch (goServerError: any) {
