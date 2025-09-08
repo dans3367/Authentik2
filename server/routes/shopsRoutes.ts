@@ -36,16 +36,6 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
 
     const shopsData = await db.query.shops.findMany({
       where: whereClause,
-      with: {
-        manager: {
-          columns: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
       orderBy: sql`${shops.createdAt} DESC`,
       limit: Number(limit),
       offset,
@@ -83,16 +73,6 @@ shopsRoutes.get("/:id", authenticateToken, async (req: any, res) => {
 
     const shop = await db.query.shops.findFirst({
       where: sql`${shops.id} = ${id} AND ${shops.tenantId} = ${req.user.tenantId}`,
-      with: {
-        manager: {
-          columns: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
     });
 
     if (!shop) {
