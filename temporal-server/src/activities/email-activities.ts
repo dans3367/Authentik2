@@ -47,12 +47,21 @@ class EmailServiceManager {
     const localEnv = dotenv.config();
     const rootEnvPath = path.resolve(__dirname, '../../../.env');
     const rootEnv = dotenv.config({ path: rootEnvPath });
+    
+    // In Replit, secrets are available directly in process.env
+    // Log what we have for debugging
     console.log(
       `🧪 [EmailEnv] Loaded local .env: ${localEnv.error ? 'no' : 'yes'} | loaded root .env (${rootEnvPath}): ${rootEnv.error ? 'no' : 'yes'}`
     );
     console.log(
-      `🧪 [EmailEnv] RESEND_API_KEY present: ${process.env.RESEND_API_KEY ? 'yes' : 'no'} | POSTMARK_API_KEY present: ${process.env.POSTMARK_API_KEY ? 'yes' : 'no'}`
+      `🧪 [EmailEnv] RESEND_API_KEY present: ${process.env.RESEND_API_KEY ? 'yes (from env)' : 'no'} | POSTMARK_API_KEY present: ${process.env.POSTMARK_API_KEY ? 'yes' : 'no'}`
     );
+    
+    // Debug: Check if we have the key
+    if (process.env.RESEND_API_KEY) {
+      const maskedKey = process.env.RESEND_API_KEY.substring(0, 10) + '...';
+      console.log(`✅ [EmailEnv] Found RESEND_API_KEY in environment: ${maskedKey}`);
+    }
 
     this.initializeProviders();
   }
