@@ -29,9 +29,17 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   try {
-    // Use direct fetch to the correct server port to bypass Vite proxy issues
-    const baseURL = import.meta.env.VITE_BETTER_AUTH_URL || "http://localhost:5000";
-    const fullUrl = url.startsWith('http') ? url : `${baseURL}${url}`;
+    // Use relative URLs for same-domain requests or environment variable for different domains
+    const baseURL = import.meta.env.VITE_BETTER_AUTH_URL || "";
+    const fullUrl = url.startsWith('http') ? url : baseURL ? `${baseURL}${url}` : url;
+    
+    console.log('🌐 [API Request] Making request:', {
+      method,
+      originalUrl: url,
+      baseURL: baseURL || 'relative',
+      fullUrl,
+      hasData: !!data
+    });
 
     const headers: Record<string, string> = {
       ...(data ? { "Content-Type": "application/json" } : {}),
@@ -44,9 +52,27 @@ export async function apiRequest(
       credentials: "include",
     });
 
+    console.log('📨 [API Response] Received response:', {
+      status: res.status,
+      statusText: res.statusText,
+      ok: res.ok,
+      url: res.url,
+      headers: {
+        contentType: res.headers.get('content-type'),
+        accessControlAllowOrigin: res.headers.get('access-control-allow-origin')
+      }
+    });
+
     await throwIfResNotOk(res);
     return res;
   } catch (error) {
+    console.error('❌ [API Request] Failed:', {
+      error,
+      message: error instanceof Error ? error.message : String(error),
+      url: fullUrl,
+      method,
+      stack: error instanceof Error ? error.stack : undefined
+    });
     throw error;
   }
 }
