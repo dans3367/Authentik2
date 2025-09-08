@@ -148,24 +148,111 @@ export default function ShopsPage() {
   const { data, isLoading, error, isFetching, refetch } = useQuery<ShopsResponse>({
     queryKey: ['/api/shops'],
     queryFn: async () => {
+      console.log('🏪 [Frontend] Starting shops query...');
+      
       const params = new URLSearchParams();
       const currentParams = searchParamsRef.current;
+      
+      console.log('🔍 [Frontend] Search parameters:', currentParams);
       
       if (currentParams.search) params.append('search', currentParams.search);
       if (currentParams.status !== 'all') params.append('status', currentParams.status);
       if (currentParams.category !== 'all') params.append('category', currentParams.category);
       
-      const response = await apiRequest('GET', `/api/shops?${params}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch shops');
+      const queryString = params.toString();
+      const requestUrl = `/api/shops${queryString ? '?' + queryString : ''}`;
+      
+      console.log('🌐 [Frontend] Making API request to:', requestUrl);
+      console.log('📤 [Frontend] Request details:', {
+        method: 'GET',
+        url: requestUrl,
+        timestamp: new Date().toISOString()
+      });
+      
+      try {
+        const response = await apiRequest('GET', requestUrl);
+        
+        console.log('📥 [Frontend] API response received:', {
+          status: response.status,
+          ok: response.ok,
+          statusText: response.statusText,
+          headers: {
+            contentType: response.headers.get('content-type'),
+            contentLength: response.headers.get('content-length')
+          }
+        });
+        
+        if (!response.ok) {
+          console.error('❌ [Frontend] API request failed:', {
+            status: response.status,
+            statusText: response.statusText,
+            url: requestUrl
+          });
+          
+          // Try to get error details from response
+          let errorDetails;
+          try {
+            errorDetails = await response.text();
+            console.error('❌ [Frontend] Error response body:', errorDetails);
+          } catch (parseError) {
+            console.error('❌ [Frontend] Could not parse error response:', parseError);
+          }
+          
+          throw new Error(`Failed to fetch shops: ${response.status} ${response.statusText}`);
+        }
+        
+        const responseData = await response.json();
+        
+        console.log('✅ [Frontend] Shops data received:', {
+          shopsCount: responseData.shops?.length || 0,
+          hasStats: !!responseData.stats,
+          hasLimits: !!responseData.limits,
+          hasPagination: !!responseData.pagination,
+          firstShop: responseData.shops?.[0]?.name || 'No shops'
+        });
+        
+        return responseData;
+      } catch (fetchError) {
+        console.error('❌ [Frontend] Network or parsing error:', {
+          error: fetchError,
+          message: fetchError instanceof Error ? fetchError.message : String(fetchError),
+          stack: fetchError instanceof Error ? fetchError.stack : undefined,
+          url: requestUrl
+        });
+        throw fetchError;
       }
-      return response.json();
     },
   });
+
+  // Debug logging for query state changes
+  useEffect(() => {
+    console.log('🔄 [Frontend] Query state changed:', {
+      isLoading,
+      isFetching,
+      hasError: !!error,
+      errorMessage: error instanceof Error ? error.message : String(error || 'No error'),
+      dataReceived: !!data,
+      shopsCount: data?.shops?.length || 0
+    });
+    
+    if (error) {
+      console.error('❌ [Frontend] Shops query error details:', {
+        error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, [isLoading, isFetching, error, data]);
 
   // Debounce search and filter changes
   useEffect(() => {
     const timer = setTimeout(() => {
+      console.log('🔍 [Frontend] Triggering refetch due to parameter change:', {
+        searchTerm,
+        statusFilter,
+        categoryFilter
+      });
       refetch();
     }, 300);
 
