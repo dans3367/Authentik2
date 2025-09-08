@@ -5,6 +5,7 @@ import { betterAuthUser, shops } from '@shared/schema';
 import { authenticateToken, requireRole } from '../middleware/auth-middleware';
 import { createShopSchema, updateShopSchema, type ShopFilters } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
+import { storage } from '../storage';
 
 export const shopsRoutes = Router();
 
@@ -54,6 +55,10 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
       count: sql<number>`count(*)`,
     }).from(shops).where(whereClause);
 
+    // Get shop limits and stats
+    const limits = await storage.checkShopLimits(req.user.tenantId);
+    const stats = await storage.getShopStats(req.user.tenantId);
+
     res.json({
       shops: shopsData,
       pagination: {
@@ -62,6 +67,8 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
         total: totalCountResult.count,
         pages: Math.ceil(totalCountResult.count / Number(limit)),
       },
+      limits,
+      stats,
     });
   } catch (error) {
     console.error('Get shops error:', error);
@@ -102,6 +109,9 @@ shopsRoutes.get("/:id", authenticateToken, async (req: any, res) => {
 // Create new shop
 shopsRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator", "Manager"]), async (req: any, res) => {
   try {
+    // Check shop limits before creating
+    await storage.validateShopCreation(req.user.tenantId);
+
     const validatedData = createShopSchema.parse(req.body);
     const { name, description, address, phone, email, managerId, status } = validatedData;
 
@@ -128,16 +138,18 @@ shopsRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator", 
       address: sanitizedAddress,
       phone: sanitizedPhone,
       email: sanitizedEmail,
-      managerId,
+      managerId: managerId || null,
       status: status || 'active',
       tenantId: req.user.tenantId,
       country: 'United States',
-      updatedAt: new Date(),
     }).returning();
 
     res.status(201).json(newShop[0]);
   } catch (error) {
     console.error('Create shop error:', error);
+    if (error instanceof Error && error.message.includes('Shop limit reached')) {
+      return res.status(400).json({ message: error.message });
+    }
     res.status(500).json({ message: 'Failed to create shop' });
   }
 });
@@ -334,6 +346,17 @@ shopsRoutes.get("/managers/list", authenticateToken, async (req: any, res) => {
   } catch (error) {
     console.error('Get managers list error:', error);
     res.status(500).json({ message: 'Failed to get managers list' });
+  }
+});
+
+// Get shop limits and current usage
+shopsRoutes.get("/limits", authenticateToken, async (req: any, res) => {
+  try {
+    const limits = await storage.checkShopLimits(req.user.tenantId);
+    res.json(limits);
+  } catch (error) {
+    console.error('Get shop limits error:', error);
+    res.status(500).json({ message: 'Failed to get shop limits' });
   }
 });
 

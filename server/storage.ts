@@ -3,6 +3,8 @@ import {
   subscriptionPlans,
   subscriptions,
   tenants,
+  tenantLimits,
+  shopLimitEvents,
   forms,
   formResponses,
   verificationTokens,
@@ -86,10 +88,17 @@ import {
   type CreateBouncedEmailData,
   type UpdateBouncedEmailData,
   type BouncedEmailWithDetails,
-  type BouncedEmailFilters
+  type BouncedEmailFilters,
+  type TenantLimits,
+  type CreateTenantLimitsData,
+  type UpdateTenantLimitsData,
+  type TenantLimitsWithDetails,
+  type ShopLimitEvent,
+  type ShopLimitEventType,
+  type ShopLimitFilters
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gt, lt, gte, lte, desc, ne, or, ilike, count, sql, inArray, not } from "drizzle-orm";
+import { eq, and, gt, lt, gte, lte, desc, ne, or, ilike, count, sql, inArray, not, isNull } from "drizzle-orm";
 
 export interface IStorage {
   // Tenant management
@@ -158,8 +167,15 @@ export interface IStorage {
   getTenantSubscription(tenantId: string): Promise<(Subscription & { plan: SubscriptionPlan }) | undefined>;
   checkUserLimits(tenantId: string): Promise<{ canAddUser: boolean; currentUsers: number; maxUsers: number | null; planName: string }>;
   validateUserCreation(tenantId: string): Promise<void>;
-  checkShopLimits(tenantId: string): Promise<{ canAddShop: boolean; currentShops: number; maxShops: number | null; planName: string }>;
+  checkShopLimits(tenantId: string): Promise<{ canAddShop: boolean; currentShops: number; maxShops: number | null; planName: string; isCustomLimit?: boolean; customLimitReason?: string; expiresAt?: Date }>;
   validateShopCreation(tenantId: string): Promise<void>;
+  logShopLimitEvent(tenantId: string, eventType: ShopLimitEventType, shopCount: number, limitValue?: number, metadata?: Record<string, any>): Promise<void>;
+  createTenantLimits(tenantId: string, limitsData: CreateTenantLimitsData, createdBy: string): Promise<TenantLimits>;
+  updateTenantLimits(tenantId: string, updates: UpdateTenantLimitsData): Promise<TenantLimits | undefined>;
+  getTenantLimits(tenantId: string): Promise<TenantLimitsWithDetails | undefined>;
+  deleteTenantLimits(tenantId: string): Promise<void>;
+  getCurrentShopCount(tenantId: string): Promise<number>;
+  getShopLimitEvents(tenantId: string, filters?: ShopLimitFilters): Promise<ShopLimitEvent[]>;
   
   // Shop management
   getShop(id: string, tenantId: string): Promise<Shop | undefined>;
@@ -755,14 +771,51 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(betterAuthUser.id, userId), eq(betterAuthUser.tenantId, tenantId)));
   }
 
-  // Shop limits and validation
-  async checkShopLimits(tenantId: string): Promise<{ canAddShop: boolean; currentShops: number; maxShops: number | null; planName: string }> {
+  // Enhanced shop limits and validation with tenant-specific overrides
+  async checkShopLimits(tenantId: string): Promise<{ canAddShop: boolean; currentShops: number; maxShops: number | null; planName: string; isCustomLimit?: boolean; customLimitReason?: string; expiresAt?: Date }> {
     const shopsResult = await db.select({ count: count() }).from(shops).where(eq(shops.tenantId, tenantId));
     const currentShops = shopsResult[0]?.count || 0;
+    
+    // Check for active custom tenant limits first
+    const customLimit = await db.query.tenantLimits.findFirst({
+      where: and(
+        eq(tenantLimits.tenantId, tenantId),
+        eq(tenantLimits.isActive, true),
+        or(
+          isNull(tenantLimits.expiresAt),
+          gt(tenantLimits.expiresAt, new Date())
+        )
+      ),
+      with: {
+        createdByUser: {
+          columns: { firstName: true, lastName: true, email: true }
+        }
+      }
+    });
+    
+    if (customLimit && customLimit.maxShops !== null) {
+      return {
+        canAddShop: currentShops < customLimit.maxShops,
+        currentShops,
+        maxShops: customLimit.maxShops,
+        planName: 'Custom Limit',
+        isCustomLimit: true,
+        customLimitReason: customLimit.overrideReason || undefined,
+        expiresAt: customLimit.expiresAt || undefined
+      };
+    }
+    
+    // Fall back to subscription plan limits
     const subscription = await this.getTenantSubscription(tenantId);
     
     if (!subscription) {
-      return { canAddShop: currentShops < 10, currentShops, maxShops: 10, planName: 'Basic' };
+      return { 
+        canAddShop: currentShops < 5, 
+        currentShops, 
+        maxShops: 5, 
+        planName: 'Default (Basic)',
+        isCustomLimit: false
+      };
     }
     
     const maxShops = subscription.plan.maxShops;
@@ -770,15 +823,122 @@ export class DatabaseStorage implements IStorage {
       canAddShop: maxShops === null || currentShops < maxShops,
       currentShops,
       maxShops,
-      planName: subscription.plan.name
+      planName: subscription.plan.displayName || subscription.plan.name,
+      isCustomLimit: false
     };
   }
 
   async validateShopCreation(tenantId: string): Promise<void> {
     const limits = await this.checkShopLimits(tenantId);
     if (!limits.canAddShop) {
-      throw new Error(`Shop limit reached. Current plan allows ${limits.maxShops} shops.`);
+      const limitType = limits.isCustomLimit ? 'custom limit' : 'current plan';
+      const expiryInfo = limits.expiresAt ? ` (expires ${limits.expiresAt.toLocaleDateString()})` : '';
+      throw new Error(`Shop limit reached. Your ${limitType} allows ${limits.maxShops} shops${expiryInfo}.`);
     }
+  }
+
+  // Log shop limit events for audit and analytics
+  async logShopLimitEvent(tenantId: string, eventType: ShopLimitEventType, shopCount: number, limitValue?: number, metadata?: Record<string, any>): Promise<void> {
+    try {
+      const subscription = await this.getTenantSubscription(tenantId);
+      const customLimit = await db.query.tenantLimits.findFirst({
+        where: and(
+          eq(tenantLimits.tenantId, tenantId),
+          eq(tenantLimits.isActive, true)
+        )
+      });
+      
+      await db.insert(shopLimitEvents).values({
+        tenantId,
+        eventType,
+        shopCount,
+        limitValue,
+        subscriptionPlanId: subscription?.planId || null,
+        customLimitId: customLimit?.id || null,
+        metadata: JSON.stringify(metadata || {})
+      });
+    } catch (error) {
+      console.error('Failed to log shop limit event:', error);
+      // Don't throw - logging failures shouldn't break the main flow
+    }
+  }
+
+  // Tenant limits management
+  async createTenantLimits(tenantId: string, limitsData: CreateTenantLimitsData, createdBy: string): Promise<TenantLimits> {
+    const [tenantLimit] = await db.insert(tenantLimits).values({
+      ...limitsData,
+      tenantId,
+      createdBy,
+    }).returning();
+    
+    // Log the limit change event
+    if (limitsData.maxShops !== undefined) {
+      const currentShops = await this.getCurrentShopCount(tenantId);
+      await this.logShopLimitEvent(tenantId, 'limit_increased', currentShops, limitsData.maxShops, {
+        reason: limitsData.overrideReason,
+        createdBy
+      });
+    }
+    
+    return tenantLimit;
+  }
+
+  async updateTenantLimits(tenantId: string, updates: UpdateTenantLimitsData): Promise<TenantLimits | undefined> {
+    const [updated] = await db.update(tenantLimits)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(tenantLimits.tenantId, tenantId))
+      .returning();
+    
+    // Log the limit change event
+    if (updated && updates.maxShops !== undefined) {
+      const currentShops = await this.getCurrentShopCount(tenantId);
+      const eventType = updates.maxShops > (updated.maxShops || 0) ? 'limit_increased' : 'limit_decreased';
+      await this.logShopLimitEvent(tenantId, eventType, currentShops, updates.maxShops);
+    }
+    
+    return updated;
+  }
+
+  async getTenantLimits(tenantId: string): Promise<TenantLimitsWithDetails | undefined> {
+    return await db.query.tenantLimits.findFirst({
+      where: eq(tenantLimits.tenantId, tenantId),
+      with: {
+        createdByUser: {
+          columns: { id: true, firstName: true, lastName: true, email: true }
+        }
+      }
+    });
+  }
+
+  async deleteTenantLimits(tenantId: string): Promise<void> {
+    await db.delete(tenantLimits).where(eq(tenantLimits.tenantId, tenantId));
+  }
+
+  // Helper method to get current shop count
+  async getCurrentShopCount(tenantId: string): Promise<number> {
+    const result = await db.select({ count: count() }).from(shops).where(eq(shops.tenantId, tenantId));
+    return result[0]?.count || 0;
+  }
+
+  // Get shop limit events for analytics
+  async getShopLimitEvents(tenantId: string, filters?: ShopLimitFilters): Promise<ShopLimitEvent[]> {
+    const conditions = [eq(shopLimitEvents.tenantId, tenantId)];
+    
+    if (filters?.eventType) {
+      conditions.push(eq(shopLimitEvents.eventType, filters.eventType));
+    }
+    
+    if (filters?.fromDate) {
+      conditions.push(gte(shopLimitEvents.createdAt, filters.fromDate));
+    }
+    
+    if (filters?.toDate) {
+      conditions.push(lte(shopLimitEvents.createdAt, filters.toDate));
+    }
+    
+    return await db.select().from(shopLimitEvents)
+      .where(and(...conditions))
+      .orderBy(desc(shopLimitEvents.createdAt));
   }
 
   // Shop management methods
@@ -816,6 +976,15 @@ export class DatabaseStorage implements IStorage {
       tenantId,
       updatedAt: new Date(),
     }).returning();
+    
+    // Log shop creation event
+    const currentShops = await this.getCurrentShopCount(tenantId);
+    const limits = await this.checkShopLimits(tenantId);
+    await this.logShopLimitEvent(tenantId, 'shop_created', currentShops, limits.maxShops || undefined, {
+      shopId: shop.id,
+      shopName: shop.name
+    });
+    
     return shop;
   }
 

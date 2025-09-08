@@ -195,6 +195,35 @@ export const subscriptions = pgTable("subscriptions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Tenant-specific limit overrides
+export const tenantLimits = pgTable("tenant_limits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }).unique(),
+  maxShops: integer("max_shops"), // NULL means use subscription plan limit
+  maxUsers: integer("max_users"), // NULL means use subscription plan limit
+  maxStorageGb: integer("max_storage_gb"), // NULL means use subscription plan limit
+  customLimits: text("custom_limits").default('{}'), // JSON for future extensibility
+  overrideReason: text("override_reason"), // Why this tenant has custom limits
+  createdBy: varchar("created_by").references(() => betterAuthUser.id, { onDelete: 'set null' }),
+  expiresAt: timestamp("expires_at"), // NULL means no expiration
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Shop limit events for audit and analytics
+export const shopLimitEvents = pgTable("shop_limit_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  eventType: text("event_type").notNull(), // 'limit_reached', 'limit_exceeded', 'limit_increased', etc.
+  shopCount: integer("shop_count").notNull(),
+  limitValue: integer("limit_value"), // The limit at the time of the event
+  subscriptionPlanId: varchar("subscription_plan_id").references(() => subscriptionPlans.id, { onDelete: 'set null' }),
+  customLimitId: varchar("custom_limit_id").references(() => tenantLimits.id, { onDelete: 'set null' }),
+  metadata: text("metadata").default('{}'), // JSON for additional event data
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Email verification tokens table (missing from current schema)
 export const verificationTokens = pgTable("verification_tokens", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1367,4 +1396,87 @@ export interface BouncedEmailFilters {
   bounceType?: 'hard' | 'soft' | 'complaint' | 'all';
   isActive?: boolean;
   tenantId?: string;
+}
+
+// Tenant Limits schemas and types
+export const createTenantLimitsSchema = z.object({
+  maxShops: z.number().int().positive().optional(),
+  maxUsers: z.number().int().positive().optional(),
+  maxStorageGb: z.number().int().positive().optional(),
+  customLimits: z.string().default('{}'),
+  overrideReason: z.string().optional(),
+  expiresAt: z.date().optional(),
+});
+
+export const updateTenantLimitsSchema = z.object({
+  maxShops: z.number().int().positive().optional(),
+  maxUsers: z.number().int().positive().optional(),
+  maxStorageGb: z.number().int().positive().optional(),
+  customLimits: z.string().optional(),
+  overrideReason: z.string().optional(),
+  expiresAt: z.date().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const insertTenantLimitsSchema = createInsertSchema(tenantLimits).omit({
+  id: true,
+  tenantId: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type TenantLimits = typeof tenantLimits.$inferSelect;
+export type InsertTenantLimits = z.infer<typeof insertTenantLimitsSchema>;
+export type CreateTenantLimitsData = z.infer<typeof createTenantLimitsSchema>;
+export type UpdateTenantLimitsData = z.infer<typeof updateTenantLimitsSchema>;
+
+// Shop Limit Events schemas and types
+export const createShopLimitEventSchema = z.object({
+  eventType: z.enum(['limit_reached', 'limit_exceeded', 'limit_increased', 'limit_decreased', 'shop_created', 'shop_deleted']),
+  shopCount: z.number().int().nonnegative(),
+  limitValue: z.number().int().positive().optional(),
+  subscriptionPlanId: z.string().uuid().optional(),
+  customLimitId: z.string().uuid().optional(),
+  metadata: z.string().default('{}'),
+});
+
+export const insertShopLimitEventSchema = createInsertSchema(shopLimitEvents).omit({
+  id: true,
+  tenantId: true,
+  createdAt: true,
+});
+
+export type ShopLimitEvent = typeof shopLimitEvents.$inferSelect;
+export type InsertShopLimitEvent = z.infer<typeof insertShopLimitEventSchema>;
+export type CreateShopLimitEventData = z.infer<typeof createShopLimitEventSchema>;
+
+// Enhanced shop limits interface
+export interface EnhancedShopLimits {
+  currentShops: number;
+  maxShops: number | null;
+  canAddShop: boolean;
+  planName: string;
+  isCustomLimit: boolean;
+  customLimitReason?: string;
+  expiresAt?: Date;
+  remainingShops?: number;
+}
+
+// Tenant limits with relationships
+export interface TenantLimitsWithDetails extends TenantLimits {
+  createdByUser?: User;
+  tenant?: Tenant;
+}
+
+// Shop limit event types
+export type ShopLimitEventType = 'limit_reached' | 'limit_exceeded' | 'limit_increased' | 'limit_decreased' | 'shop_created' | 'shop_deleted';
+
+// Enhanced shop limit filters
+export interface ShopLimitFilters {
+  tenantId?: string;
+  eventType?: ShopLimitEventType;
+  fromDate?: Date;
+  toDate?: Date;
+  includeMetadata?: boolean;
 }

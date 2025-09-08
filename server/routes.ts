@@ -23,6 +23,7 @@ import { userRoutes } from "./routes/userRoutes";
 import { authRoutes } from "./routes/authRoutes";
 import { twoFactorRoutes } from "./routes/twoFactorRoutes";
 import { loginRoutes } from "./routes/loginRoutes";
+import { tenantLimitsRoutes } from "./routes/tenantLimitsRoutes";
 
 // Import middleware
 import { authRateLimiter, apiRateLimiter, jwtTokenRateLimiter } from "./middleware/security";
@@ -78,6 +79,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/users", userRoutes);
   app.use("/api/2fa", twoFactorRoutes);
   app.use("/api/auth", loginRoutes);
+  app.use("/api/tenant-limits", tenantLimitsRoutes);
 
   // Legacy routes for backward compatibility (if needed)
   // These can be removed once all clients are updated
