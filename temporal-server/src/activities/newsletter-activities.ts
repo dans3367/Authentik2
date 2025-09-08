@@ -214,7 +214,11 @@ export async function updateNewsletterStatus(
   console.log(`📊 Updating newsletter ${newsletterId} status to: ${status}`);
   
   try {
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3501';
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3500';
+    console.log(`🔗 Attempting to connect to backend at: ${backendUrl}`);
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
     
     const response = await fetch(`${backendUrl}/api/newsletters/${newsletterId}/status`, {
       method: 'PUT',
@@ -225,8 +229,11 @@ export async function updateNewsletterStatus(
       body: JSON.stringify({
         status,
         metadata
-      })
+      }),
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -235,8 +242,17 @@ export async function updateNewsletterStatus(
 
     console.log(`✅ Successfully updated newsletter ${newsletterId} status to ${status}`);
   } catch (error) {
-    console.error(`❌ Failed to update newsletter status:`, error);
-    throw error;
+    console.error(`❌ Failed to update newsletter status (non-blocking):`, error);
+    
+    // Check if it's a connection error
+    if (error.code === 'ECONNREFUSED' || error.message?.includes('fetch failed')) {
+      console.warn(`⚠️ Backend server not reachable at ${process.env.BACKEND_URL || 'http://localhost:3500'}. Continuing without status update.`);
+    } else {
+      console.warn(`⚠️ Status update failed for newsletter ${newsletterId}:`, error.message);
+    }
+    
+    // Don't throw error - make this non-blocking so email sending can continue
+    // The newsletter can still be sent even if we can't update the status in the backend
   }
 }
 
@@ -259,7 +275,10 @@ export async function logNewsletterActivity(
   console.log(`📝 [Newsletter Activity] ${newsletterId}: ${activity}`, details);
   
   try {
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3501';
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3500';
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout for logging
     
     const response = await fetch(`${backendUrl}/api/newsletters/${newsletterId}/log`, {
       method: 'POST',
@@ -267,15 +286,22 @@ export async function logNewsletterActivity(
         'Content-Type': 'application/json',
         'X-Internal-Service': 'temporal-server',
       },
-      body: JSON.stringify(logEntry)
+      body: JSON.stringify(logEntry),
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       // Don't throw error for logging failures, just log it
       console.warn(`⚠️ Failed to log newsletter activity: ${response.status}`);
     }
   } catch (error) {
-    console.warn(`⚠️ Failed to log newsletter activity:`, error);
+    if (error.code === 'ECONNREFUSED' || error.message?.includes('fetch failed')) {
+      console.warn(`⚠️ Backend server not reachable for logging. Activity logged locally only.`);
+    } else {
+      console.warn(`⚠️ Failed to log newsletter activity:`, error.message);
+    }
     // Don't throw - logging failures shouldn't break the workflow
   }
 }

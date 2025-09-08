@@ -10,7 +10,7 @@ export class TemporalWorker {
   async start(): Promise<void> {
     try {
       const serverUrl = process.env.TEMPORAL_SERVER_URL || '100.125.36.104:7233';
-      const taskQueue = process.env.TEMPORAL_TASK_QUEUE || 'authentik-tasks';
+      const taskQueue = process.env.TEMPORAL_TASK_QUEUE || 'newsletterSendingWorkflow';
       const namespace = process.env.TEMPORAL_NAMESPACE || 'default';
 
       console.log(`Starting Temporal worker for task queue: ${taskQueue}`);
