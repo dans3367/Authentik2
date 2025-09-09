@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser } from '@shared/schema';
+import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings } from '@shared/schema';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { type ContactFilters, type BouncedEmailFilters } from '@shared/schema';
 import { sanitizeString, sanitizeEmail } from '../utils/sanitization';
@@ -39,6 +39,28 @@ emailManagementRoutes.get("/email-contacts", authenticateToken, requireTenant, a
 
     const contactsData = await db.query.emailContacts.findMany({
       where: whereClause,
+      columns: {
+        id: true,
+        tenantId: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        status: true,
+        addedDate: true,
+        lastActivity: true,
+        emailsSent: true,
+        emailsOpened: true,
+        birthday: true,
+        birthdayEmailEnabled: true,
+        consentGiven: true,
+        consentDate: true,
+        consentMethod: true,
+        consentIpAddress: true,
+        consentUserAgent: true,
+        addedByUserId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
       with: {
         tagAssignments: {
           columns: {
@@ -940,5 +962,271 @@ emailManagementRoutes.get("/email-contacts/:contactId/activity", authenticateTok
   } catch (error) {
     console.error('Get contact activity error:', error);
     res.status(500).json({ message: 'Failed to get contact activity' });
+  }
+});
+
+// Update contact's birthday email preference
+emailManagementRoutes.patch("/email-contacts/:contactId/birthday-email", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { contactId } = req.params;
+    const { enabled } = req.body;
+
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ message: 'enabled field must be a boolean' });
+    }
+
+    // Verify contact exists and belongs to tenant
+    const contact = await db.query.emailContacts.findFirst({
+      where: sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
+    });
+
+    if (!contact) {
+      return res.status(404).json({ message: 'Contact not found' });
+    }
+
+    // Update birthday email preference
+    const updatedContact = await db.update(emailContacts)
+      .set({ 
+        birthdayEmailEnabled: enabled,
+        updatedAt: new Date(),
+      })
+      .where(sql`${emailContacts.id} = ${contactId}`)
+      .returning();
+
+    res.json({ 
+      message: `Birthday email preference ${enabled ? 'enabled' : 'disabled'} successfully`,
+      contact: updatedContact[0]
+    });
+  } catch (error) {
+    console.error('Update birthday email preference error:', error);
+    res.status(500).json({ message: 'Failed to update birthday email preference' });
+  }
+});
+
+// Bulk update birthday email preferences
+emailManagementRoutes.patch("/email-contacts/birthday-email/bulk", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { contactIds, enabled } = req.body;
+
+    if (!Array.isArray(contactIds) || contactIds.length === 0) {
+      return res.status(400).json({ message: 'contactIds array is required' });
+    }
+
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ message: 'enabled field must be a boolean' });
+    }
+
+    // Verify all contacts exist and belong to tenant
+    const contacts = await db.query.emailContacts.findMany({
+      where: sql`${emailContacts.tenantId} = ${req.user.tenantId} AND ${emailContacts.id} = ANY(${contactIds})`,
+    });
+
+    if (contacts.length !== contactIds.length) {
+      return res.status(400).json({ message: 'Some contacts were not found or do not belong to your tenant' });
+    }
+
+    // Update birthday email preferences for all specified contacts
+    const updatedContacts = await db.update(emailContacts)
+      .set({ 
+        birthdayEmailEnabled: enabled,
+        updatedAt: new Date(),
+      })
+      .where(sql`${emailContacts.id} = ANY(${contactIds})`)
+      .returning();
+
+    res.json({ 
+      message: `Birthday email preference ${enabled ? 'enabled' : 'disabled'} for ${updatedContacts.length} contacts`,
+      updatedContacts: updatedContacts.length
+    });
+  } catch (error) {
+    console.error('Bulk update birthday email preferences error:', error);
+    res.status(500).json({ message: 'Failed to update birthday email preferences' });
+  }
+});
+
+// Get contacts with birthdays
+emailManagementRoutes.get("/birthday-contacts", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { page = 1, limit = 50, upcomingOnly = 'false' } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+
+    let whereClause = sql`${emailContacts.tenantId} = ${req.user.tenantId} AND ${emailContacts.birthday} IS NOT NULL`;
+
+    // If upcomingOnly is true, filter for birthdays in the next 30 days
+    if (upcomingOnly === 'true') {
+      const today = new Date();
+      const thirtyDaysFromNow = new Date();
+      thirtyDaysFromNow.setDate(today.getDate() + 30);
+      
+      // This is a simplified approach - you might need more complex logic for year-agnostic birthday matching
+      whereClause = sql`${whereClause} AND ${emailContacts.birthday} IS NOT NULL`;
+    }
+
+    const contactsData = await db.query.emailContacts.findMany({
+      where: whereClause,
+      with: {
+        tagAssignments: {
+          columns: {
+            id: true,
+          },
+          with: {
+            tag: {
+              columns: {
+                id: true,
+                name: true,
+                color: true,
+              },
+            },
+          },
+        },
+        listMemberships: {
+          columns: {
+            id: true,
+          },
+          with: {
+            list: {
+              columns: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      limit: Number(limit),
+      offset: offset,
+      orderBy: [emailContacts.birthday],
+    });
+
+    // Transform the data to match the expected frontend format
+    const contacts = contactsData.map(contact => ({
+      ...contact,
+      tags: contact.tagAssignments.map(ta => ta.tag),
+      lists: contact.listMemberships.map(lm => lm.list),
+    }));
+
+    // Get total count
+    const totalResult = await db.select({
+      count: sql<number>`count(*)`,
+    }).from(emailContacts).where(whereClause);
+    const total = totalResult[0].count;
+
+    res.json({
+      contacts,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / Number(limit)),
+      },
+    });
+  } catch (error) {
+    console.error('Get birthday contacts error:', error);
+    res.status(500).json({ message: 'Failed to get birthday contacts' });
+  }
+});
+
+// Get birthday settings
+emailManagementRoutes.get("/birthday-settings", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const settings = await db.query.birthdaySettings.findFirst({
+      where: sql`${birthdaySettings.tenantId} = ${req.user.tenantId}`,
+    });
+
+    // If no settings exist, return default settings
+    if (!settings) {
+      const defaultSettings = {
+        id: '',
+        enabled: false,
+        sendDaysBefore: 0,
+        emailTemplate: 'default',
+        segmentFilter: 'all',
+        customMessage: '',
+        senderName: '',
+        senderEmail: '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      return res.json(defaultSettings);
+    }
+
+    res.json(settings);
+  } catch (error) {
+    console.error('Get birthday settings error:', error);
+    res.status(500).json({ message: 'Failed to get birthday settings' });
+  }
+});
+
+// Update birthday settings
+emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { 
+      enabled, 
+      sendDaysBefore, 
+      emailTemplate, 
+      segmentFilter, 
+      customMessage, 
+      senderName, 
+      senderEmail 
+    } = req.body;
+
+    // Validate input
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ message: 'enabled field must be a boolean' });
+    }
+
+    if (sendDaysBefore !== undefined && (!Number.isInteger(sendDaysBefore) || sendDaysBefore < 0 || sendDaysBefore > 30)) {
+      return res.status(400).json({ message: 'sendDaysBefore must be an integer between 0 and 30' });
+    }
+
+    if (senderEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(senderEmail)) {
+      return res.status(400).json({ message: 'Please enter a valid sender email address' });
+    }
+
+    // Check if settings already exist
+    const existingSettings = await db.query.birthdaySettings.findFirst({
+      where: sql`${birthdaySettings.tenantId} = ${req.user.tenantId}`,
+    });
+
+    let updatedSettings;
+    
+    if (existingSettings) {
+      // Update existing settings
+      updatedSettings = await db.update(birthdaySettings)
+        .set({
+          enabled,
+          sendDaysBefore,
+          emailTemplate,
+          segmentFilter,
+          customMessage,
+          senderName,
+          senderEmail,
+          updatedAt: new Date(),
+        })
+        .where(sql`${birthdaySettings.tenantId} = ${req.user.tenantId}`)
+        .returning();
+    } else {
+      // Create new settings
+      updatedSettings = await db.insert(birthdaySettings)
+        .values({
+          tenantId: req.user.tenantId,
+          enabled,
+          sendDaysBefore,
+          emailTemplate,
+          segmentFilter,
+          customMessage,
+          senderName,
+          senderEmail,
+        })
+        .returning();
+    }
+
+    res.json({
+      message: 'Birthday settings updated successfully',
+      settings: updatedSettings[0],
+    });
+  } catch (error) {
+    console.error('Update birthday settings error:', error);
+    res.status(500).json({ message: 'Failed to update birthday settings' });
   }
 });

@@ -268,6 +268,9 @@ export const emailContacts = pgTable("email_contacts", {
   lastActivity: timestamp("last_activity"),
   emailsSent: integer("emails_sent").default(0),
   emailsOpened: integer("emails_opened").default(0),
+  // Birthday tracking fields
+  birthday: text("birthday"), // Date in YYYY-MM-DD format
+  birthdayEmailEnabled: boolean("birthday_email_enabled").default(false), // Whether user wants birthday emails
   // Consent tracking fields
   consentGiven: boolean("consent_given").notNull().default(false),
   consentDate: timestamp("consent_date"),
@@ -492,6 +495,7 @@ export const tenantRelations = relations(tenants, ({ many }) => ({
   campaigns: many(campaigns),
   emailActivities: many(emailActivity),
   bouncedEmails: many(bouncedEmails),
+  birthdaySettings: many(birthdaySettings),
 }));
 
 export const betterAuthUserRelations = relations(betterAuthUser, ({ one, many }) => ({
@@ -1094,6 +1098,8 @@ export const createEmailContactSchema = z.object({
   status: z.enum(['active', 'unsubscribed', 'bounced', 'pending']).default('active'),
   tags: z.array(z.string()).optional(),
   lists: z.array(z.string()).optional(),
+  birthday: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Birthday must be in YYYY-MM-DD format").optional(),
+  birthdayEmailEnabled: z.boolean().default(false),
   consentGiven: z.boolean().refine(val => val === true, {
     message: "You must acknowledge consent before adding this contact"
   }),
@@ -1107,6 +1113,8 @@ export const updateEmailContactSchema = z.object({
   status: z.enum(['active', 'unsubscribed', 'bounced', 'pending']).optional(),
   emailsOpened: z.number().optional(),
   lastActivity: z.date().optional(),
+  birthday: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Birthday must be in YYYY-MM-DD format").optional(),
+  birthdayEmailEnabled: z.boolean().optional(),
 });
 
 export const createEmailListSchema = z.object({
@@ -1397,6 +1405,21 @@ export type InsertBouncedEmail = z.infer<typeof insertBouncedEmailSchema>;
 export type CreateBouncedEmailData = z.infer<typeof createBouncedEmailSchema>;
 export type UpdateBouncedEmailData = z.infer<typeof updateBouncedEmailSchema>;
 
+// Birthday settings table for managing birthday email campaigns
+export const birthdaySettings = pgTable("birthday_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  enabled: boolean("enabled").default(false),
+  sendDaysBefore: integer("send_days_before").default(0), // How many days before birthday to send
+  emailTemplate: text("email_template").default('default'), // Email template to use
+  segmentFilter: text("segment_filter").default('all'), // Which contacts to include
+  customMessage: text("custom_message").default(''), // Custom birthday message
+  senderName: text("sender_name").default(''),
+  senderEmail: text("sender_email").default(''),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Extended types for bounced emails with relations
 export interface BouncedEmailWithDetails extends BouncedEmail {
   sourceTenant?: Tenant;
@@ -1493,3 +1516,45 @@ export interface ShopLimitFilters {
   toDate?: Date;
   includeMetadata?: boolean;
 }
+
+// Birthday settings relations
+export const birthdaySettingsRelations = relations(birthdaySettings, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [birthdaySettings.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+// Birthday settings schemas
+export const createBirthdaySettingsSchema = z.object({
+  enabled: z.boolean().default(false),
+  sendDaysBefore: z.number().int().min(0).max(30).default(0),
+  emailTemplate: z.string().default('default'),
+  segmentFilter: z.string().default('all'),
+  customMessage: z.string().default(''),
+  senderName: z.string().default(''),
+  senderEmail: z.string().email("Please enter a valid email address").default(''),
+});
+
+export const updateBirthdaySettingsSchema = z.object({
+  enabled: z.boolean().optional(),
+  sendDaysBefore: z.number().int().min(0).max(30).optional(),
+  emailTemplate: z.string().optional(),
+  segmentFilter: z.string().optional(),
+  customMessage: z.string().optional(),
+  senderName: z.string().optional(),
+  senderEmail: z.string().email("Please enter a valid email address").optional(),
+});
+
+export const insertBirthdaySettingsSchema = createInsertSchema(birthdaySettings).omit({
+  id: true,
+  tenantId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Birthday settings types
+export type BirthdaySettings = typeof birthdaySettings.$inferSelect;
+export type InsertBirthdaySettings = z.infer<typeof insertBirthdaySettingsSchema>;
+export type CreateBirthdaySettingsData = z.infer<typeof createBirthdaySettingsSchema>;
+export type UpdateBirthdaySettingsData = z.infer<typeof updateBirthdaySettingsSchema>;

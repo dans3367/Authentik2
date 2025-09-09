@@ -214,10 +214,9 @@ export default function BirthdaysPage() {
   // Toggle customer birthday email enabled status
   const toggleBirthdayEmailMutation = useMutation({
     mutationFn: async ({ contactId, enabled }: { contactId: string; enabled: boolean }) => {
-      const response = await apiRequest('PUT', `/api/email-contacts/${contactId}`, {
-        birthdayEmailEnabled: enabled,
+      return apiRequest('PATCH', `/api/email-contacts/${contactId}/birthday-email`, {
+        enabled,
       });
-      return response.json();
     },
     onSuccess: () => {
       toast({
@@ -238,12 +237,10 @@ export default function BirthdaysPage() {
   // Bulk update birthday email preferences
   const bulkUpdateBirthdayEmailMutation = useMutation({
     mutationFn: async ({ contactIds, enabled }: { contactIds: string[]; enabled: boolean }) => {
-      const promises = contactIds.map(contactId => 
-        apiRequest('PUT', `/api/email-contacts/${contactId}`, {
-          birthdayEmailEnabled: enabled,
-        })
-      );
-      await Promise.all(promises);
+      return apiRequest('PATCH', `/api/email-contacts/birthday-email/bulk`, {
+        contactIds,
+        enabled,
+      });
     },
     onSuccess: (_, variables) => {
       toast({
