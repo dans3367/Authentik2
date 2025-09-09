@@ -111,7 +111,7 @@ app.use((req, res, next) => {
   try {
     await initializeDatabase();
   } catch (error) {
-    serverLogger.error("Failed to initialize database:", error);
+    console.error("Failed to initialize database:", error);
     process.exit(1);
   }
 
