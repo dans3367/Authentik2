@@ -211,6 +211,18 @@ export const tenantLimits = pgTable("tenant_limits", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Relations for tenant limits (used by relational queries with `with:`)
+export const tenantLimitsRelations = relations(tenantLimits, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [tenantLimits.tenantId],
+    references: [tenants.id],
+  }),
+  createdByUser: one(betterAuthUser, {
+    fields: [tenantLimits.createdBy],
+    references: [betterAuthUser.id],
+  }),
+}));
+
 // Shop limit events for audit and analytics
 export const shopLimitEvents = pgTable("shop_limit_events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -493,6 +505,7 @@ export const betterAuthUserRelations = relations(betterAuthUser, ({ one, many })
   ownedCompanies: many(companies),
   newsletters: many(newsletters),
   campaigns: many(campaigns),
+  managedShops: many(shops),
   subscription: one(subscriptions, {
     fields: [betterAuthUser.id],
     references: [subscriptions.userId],

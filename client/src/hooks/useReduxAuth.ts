@@ -1,5 +1,8 @@
 import { useAuth, useLogin, useLogout } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useSelector, useDispatch } from "react-redux";
+import { setError, clearAuth } from "@/store/authSlice";
+import type { RootState } from "@/store/index";
 
 // Main authentication hook - now uses better-auth
 export function useReduxAuth() {
@@ -82,11 +85,11 @@ export function useReduxUpdateProfile() {
 
 // Auth error management hook
 export function useAuthError() {
-  const dispatch = useAppDispatch();
-  const error = useAppSelector((state) => state.auth.error);
+  const dispatch = useDispatch();
+  const error = useSelector((state: RootState) => state.auth.error);
 
   const clearAuthError = () => {
-    dispatch(clearError());
+    dispatch(setError(null));
   };
 
   const setAuthError = (message: string) => {
@@ -102,7 +105,7 @@ export function useAuthError() {
 
 // Force logout (for when token refresh fails definitively)
 export function useForceLogout() {
-  const dispatch = useAppDispatch();
+  const dispatch = useDispatch();
 
   const forceLogout = () => {
     dispatch(clearAuth());

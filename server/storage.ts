@@ -99,6 +99,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gt, lt, gte, lte, desc, ne, or, ilike, count, sql, inArray, not, isNull } from "drizzle-orm";
+import { storageLogger } from "./logger";
 
 export interface IStorage {
   // Tenant management
@@ -900,14 +901,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTenantLimits(tenantId: string): Promise<TenantLimitsWithDetails | undefined> {
-    return await db.query.tenantLimits.findFirst({
+    const result = await db.query.tenantLimits.findFirst({
       where: eq(tenantLimits.tenantId, tenantId),
       with: {
-        createdByUser: {
-          columns: { id: true, firstName: true, lastName: true, email: true }
-        }
+        createdByUser: true
       }
     });
+
+    // Transform the result to match the expected type
+    if (result) {
+      return {
+        ...result,
+        createdByUser: result.createdByUser || undefined
+      } as TenantLimitsWithDetails;
+    }
+
+    return result;
   }
 
   async deleteTenantLimits(tenantId: string): Promise<void> {

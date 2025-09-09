@@ -5,16 +5,17 @@ import { TemporalWorkerService } from './services/temporal-worker';
 import { NewsletterGrpcService } from './services/newsletter-grpc-service';
 import { WorkflowGrpcService } from './services/workflow-grpc-service';
 import { loadProtoDefinitions } from './utils/proto-loader';
+import { serverLogger } from './logger';
 
 // Load environment variables (local .env and monorepo root .env)
 const localEnv = dotenv.config();
 const rootEnvPath = path.resolve(__dirname, '../../.env');
 const rootEnv = dotenv.config({ path: rootEnvPath });
 
-console.log(
+serverLogger.info(
   `🧪 [Env] Loaded local .env: ${localEnv.error ? 'no' : 'yes'} | loaded root .env (${rootEnvPath}): ${rootEnv.error ? 'no' : 'yes'}`
 );
-console.log(
+serverLogger.info(
   `🧪 [Env] RESEND_API_KEY present: ${process.env.RESEND_API_KEY ? 'yes' : 'no'}, PRIMARY_EMAIL_PROVIDER: ${process.env.PRIMARY_EMAIL_PROVIDER || 'unset'}`
 );
 
@@ -24,7 +25,7 @@ const TEMPORAL_NAMESPACE = process.env.TEMPORAL_NAMESPACE || 'default';
 const TEMPORAL_TASK_QUEUE = process.env.TEMPORAL_TASK_QUEUE || 'newsletterSendingWorkflow';
 
 async function startServer() {
-  console.log('🚀 Starting Authentik Temporal Server...');
+  serverLogger.info('🚀 Starting Authentik Temporal Server...');
 
   try {
     // Initialize Temporal Worker Service
@@ -34,12 +35,12 @@ async function startServer() {
       TEMPORAL_TASK_QUEUE
     );
     await temporalWorker.initialize();
-    console.log('✅ Temporal Worker initialized');
-    console.log(`📮 Task queue: ${TEMPORAL_TASK_QUEUE}`);
+    serverLogger.info('✅ Temporal Worker initialized');
+    serverLogger.info(`📮 Task queue: ${TEMPORAL_TASK_QUEUE}`);
 
     // Load proto definitions
     const protoDefinitions = loadProtoDefinitions();
-    console.log('✅ Proto definitions loaded');
+    serverLogger.info('✅ Proto definitions loaded');
 
     // Create GRPC services
     const newsletterService = new NewsletterGrpcService(temporalWorker);
@@ -68,35 +69,35 @@ async function startServer() {
       ServerCredentials.createInsecure(),
       (err, port) => {
         if (err) {
-          console.error('❌ Failed to bind server:', err);
+          serverLogger.error('❌ Failed to bind server:', err);
           process.exit(1);
         }
 
         server.start();
-        console.log(`🎯 GRPC Server running on port ${port}`);
-        console.log(`📡 Temporal connection: ${TEMPORAL_ADDRESS}`);
-        console.log(`🌐 Namespace: ${TEMPORAL_NAMESPACE}`);
+        serverLogger.info(`🎯 GRPC Server running on port ${port}`);
+        serverLogger.info(`📡 Temporal connection: ${TEMPORAL_ADDRESS}`);
+        serverLogger.info(`🌐 Namespace: ${TEMPORAL_NAMESPACE}`);
       }
     );
 
     // Start Temporal Worker
     await temporalWorker.start();
-    console.log('✅ Temporal Worker started');
+    serverLogger.info('✅ Temporal Worker started');
 
     // Graceful shutdown
     const shutdown = async () => {
-      console.log('\n🛑 Shutting down Temporal Server...');
+      serverLogger.info('\n🛑 Shutting down Temporal Server...');
       
       server.tryShutdown((err) => {
         if (err) {
-          console.error('❌ Error during GRPC server shutdown:', err);
+          serverLogger.error('❌ Error during GRPC server shutdown:', err);
           server.forceShutdown();
         }
-        console.log('✅ GRPC Server shut down');
+        serverLogger.info('✅ GRPC Server shut down');
       });
 
       await temporalWorker.shutdown();
-      console.log('✅ Temporal Worker shut down');
+      serverLogger.info('✅ Temporal Worker shut down');
       
       process.exit(0);
     };
@@ -104,22 +105,22 @@ async function startServer() {
     process.on('SIGINT', shutdown);
     process.on('SIGTERM', shutdown);
     process.on('uncaughtException', (err) => {
-      console.error('❌ Uncaught Exception:', err);
+      serverLogger.error('❌ Uncaught Exception:', err);
       shutdown();
     });
     process.on('unhandledRejection', (reason, promise) => {
-      console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+      serverLogger.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
       shutdown();
     });
 
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    serverLogger.error('❌ Failed to start server:', error);
     process.exit(1);
   }
 }
 
 startServer().catch((error) => {
-  console.error('❌ Fatal error:', error);
+  serverLogger.error('❌ Fatal error:', error);
   process.exit(1);
 });
 

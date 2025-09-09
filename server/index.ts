@@ -15,6 +15,7 @@ import {
 } from "./middleware/security";
 import { auth } from "./auth";
 import { toNodeHandler } from "better-auth/node";
+import { serverLogger } from "./logger";
 
 const app = express();
 
@@ -24,48 +25,27 @@ app.set('trust proxy', 1);
 // Security middleware
 app.use(helmetMiddleware);
 
-// Custom CORS and security headers for all requests
+// Static CORS and security headers
 app.use((req, res, next) => {
-  const origin = req.get('Origin');
-  const host = req.get('Host');
-  
-  // List of trusted domains
-  const trustedDomains = [
-    'weby.zendwise.work',
-    'websy.zendwise.work',
-    'localhost',
-    '127.0.0.1'
-  ];
-  
-  // Check if the origin or host is trusted
-  const isTrustedDomain = trustedDomains.some(domain => 
-    origin?.includes(domain) || host?.includes(domain)
-  );
-  
-  // Always set CORS headers for localhost development
-  if (isTrustedDomain || req.get('Host')?.includes('localhost') || req.get('Host')?.includes('127.0.0.1')) {
-    // Set CORS headers for trusted domains and localhost
-    res.header('Access-Control-Allow-Origin', origin || req.get('Origin') || '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma, Cookie, Set-Cookie');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    
-    // Set Cross-Origin-Opener-Policy to allow trusted domains
-    res.header('Cross-Origin-Opener-Policy', 'unsafe-none');
-    res.header('Cross-Origin-Embedder-Policy', 'unsafe-none');
-    
-    // Additional security headers for trusted domains
-    res.header('X-Frame-Options', 'SAMEORIGIN');
-    res.header('X-Content-Type-Options', 'nosniff');
-    res.header('Referrer-Policy', 'strict-origin-when-cross-origin');
-  }
-  
-  // Handle preflight requests
+  const allowedOrigin = process.env.CORS_ORIGIN || '*';
+  res.header('Access-Control-Allow-Origin', allowedOrigin);
+  res.header('Vary', 'Origin');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma, Cookie, Set-Cookie');
+  res.header('Access-Control-Allow-Credentials', 'true');
+
+  // Keep existing security headers (static)
+  res.header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  res.header('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  res.header('X-Frame-Options', 'SAMEORIGIN');
+  res.header('X-Content-Type-Options', 'nosniff');
+  res.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+
   if (req.method === 'OPTIONS') {
     res.sendStatus(200);
     return;
   }
-  
+
   next();
 });
 
@@ -136,26 +116,26 @@ app.use((req, res, next) => {
   }
 
   // Check server-node connectivity
-  console.log('🔄 Checking service connectivity...');
+  serverLogger.info('🔄 Checking service connectivity...');
   try {
-    console.log('📊 Service Architecture:');
-    console.log('   🌐 Main Server: localhost:3500 (Authentication & Proxy)');
-    console.log('   🤖 server-node: localhost:3502 (Temporal Client)');
-    console.log('   ⚡ temporal-server: localhost:50051 (GRPC Bridge)');
+    serverLogger.info('📊 Service Architecture:');
+    serverLogger.info('   🌐 Main Server: localhost:3500 (Authentication & Proxy)');
+    serverLogger.info('   🤖 server-node: localhost:3502 (Temporal Client)');
+    serverLogger.info('   ⚡ temporal-server: localhost:50051 (GRPC Bridge)');
     
     // Test connectivity to server-node
     try {
       const response = await fetch('http://localhost:3502/health');
       if (response.ok) {
-        console.log('   ✅ server-node: Connected');
+        serverLogger.info('   ✅ server-node: Connected');
       } else {
-        console.log('   ⚠️  server-node: Responding but not healthy');
+        serverLogger.warn('   ⚠️  server-node: Responding but not healthy');
       }
     } catch (error) {
-      console.log('   ❌ server-node: Disconnected (will proxy anyway)');
+      serverLogger.warn('   ❌ server-node: Disconnected (will proxy anyway)');
     }
   } catch (error) {
-    console.log('   🔧 Continuing with proxy setup...');
+    serverLogger.info('   🔧 Continuing with proxy setup...');
   }
 
   const server = await registerRoutes(app);
@@ -164,7 +144,7 @@ app.use((req, res, next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    console.error('Server error:', err);
+    serverLogger.error('Server error:', err);
     res.status(status).json({ message });
   });
 

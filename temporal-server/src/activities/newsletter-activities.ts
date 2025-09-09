@@ -2,6 +2,8 @@
  * Newsletter-related activity functions for Temporal workflows
  */
 import { sendEmail, SendEmailResult } from './email-activities';
+import { activityLogger, newsletterLogger } from '../workflow-logger';
+import { getActivityConfig } from '../activity-config';
 
 export interface BatchResult {
   successful: number;
@@ -65,7 +67,8 @@ function personalizeContent(content: string, recipient: NewsletterRecipient): st
  * Generate unsubscribe link for a recipient
  */
 function generateUnsubscribeLink(newsletterId: string, recipientId: string, tenantId: string): string {
-  const baseUrl = process.env.FRONTEND_URL || 'https://app.zendwise.work';
+  const config = getActivityConfig();
+  const baseUrl = config.frontendUrl;
   return `${baseUrl}/unsubscribe?newsletter=${newsletterId}&recipient=${recipientId}&tenant=${tenantId}`;
 }
 
@@ -80,7 +83,7 @@ export async function sendNewsletterEmail(
   tenantId: string,
   groupUUID: string
 ): Promise<{ success: boolean; error?: string; messageId?: string }> {
-  console.log(`📧 Sending newsletter email to ${recipient.email} for newsletter ${newsletterId}`);
+  newsletterLogger.info(`📧 Sending newsletter email to ${recipient.email} for newsletter ${newsletterId}`);
   
   try {
     // Personalize the content
@@ -97,9 +100,9 @@ export async function sendNewsletterEmail(
     `;
 
     // Determine sender email
-    const fromEmail = process.env.FROM_EMAIL || 'noreply@zendwise.work';
-    console.log(`🔍 [Debug] FROM_EMAIL env var: ${process.env.FROM_EMAIL || 'not set'}`);
-    console.log(`🔍 [Debug] Using fromEmail: ${fromEmail}`);
+    const config = getActivityConfig();
+    const fromEmail = config.fromEmail;
+    newsletterLogger.debug(`🔍 [Debug] Using fromEmail: ${fromEmail}`);
     
     // Generate text version (basic HTML to text conversion)
     const textContent = personalizedContent
@@ -124,13 +127,13 @@ export async function sendNewsletterEmail(
     );
 
     if (result.success) {
-      console.log(`✅ Successfully sent email to ${recipient.email} (ID: ${result.messageId})`);
+      newsletterLogger.info(`✅ Successfully sent email to ${recipient.email} (ID: ${result.messageId})`);
       return { 
         success: true, 
         messageId: result.messageId 
       };
     } else {
-      console.error(`❌ Failed to send email to ${recipient.email}:`, result.error);
+      newsletterLogger.error(`❌ Failed to send email to ${recipient.email}:`, result.error);
       return { 
         success: false, 
         error: result.error 
@@ -138,7 +141,7 @@ export async function sendNewsletterEmail(
     }
 
   } catch (error: unknown) {
-    console.error(`❌ Failed to send email to ${recipient.email}:`, error);
+    newsletterLogger.error(`❌ Failed to send email to ${recipient.email}:`, error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     return { success: false, error: errorMessage };
   }
@@ -148,14 +151,15 @@ export async function sendNewsletterEmail(
  * Process a batch of newsletter emails
  */
 export async function processNewsletterBatch(input: NewsletterBatchInput): Promise<BatchResult> {
-  console.log(`📬 Processing batch ${input.batchIndex}/${input.totalBatches} with ${input.recipients.length} recipients`);
+  activityLogger.info(`📬 Processing batch ${input.batchIndex}/${input.totalBatches} with ${input.recipients.length} recipients`);
   
   const results: SendEmailResult[] = [];
   let successful = 0;
   let failed = 0;
 
   // Process emails with controlled concurrency
-  const concurrencyLimit = parseInt(process.env.EMAIL_CONCURRENCY_LIMIT || '5');
+  const config = getActivityConfig();
+  const concurrencyLimit = config.emailConcurrencyLimit;
   
   for (let i = 0; i < input.recipients.length; i += concurrencyLimit) {
     const batch = input.recipients.slice(i, i + concurrencyLimit);
@@ -196,7 +200,7 @@ export async function processNewsletterBatch(input: NewsletterBatchInput): Promi
     }
   }
 
-  console.log(`✅ Batch ${input.batchIndex} completed: ${successful} successful, ${failed} failed`);
+  activityLogger.info(`✅ Batch ${input.batchIndex} completed: ${successful} successful, ${failed} failed`);
 
   return {
     successful,
@@ -214,11 +218,12 @@ export async function updateNewsletterStatus(
   status: string,
   metadata?: any
 ): Promise<void> {
-  console.log(`📊 Updating newsletter ${newsletterId} status to: ${status}`);
+  activityLogger.info(`📊 Updating newsletter ${newsletterId} status to: ${status}`);
   
   try {
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3500';
-    console.log(`🔗 Attempting to connect to backend at: ${backendUrl}`);
+    const config = getActivityConfig();
+    const backendUrl = config.backendUrl;
+    activityLogger.debug(`🔗 Attempting to connect to backend at: ${backendUrl}`);
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
@@ -243,17 +248,18 @@ export async function updateNewsletterStatus(
       throw new Error(`Failed to update newsletter status: ${response.status} ${errorText}`);
     }
 
-    console.log(`✅ Successfully updated newsletter ${newsletterId} status to ${status}`);
+    activityLogger.info(`✅ Successfully updated newsletter ${newsletterId} status to ${status}`);
     } catch (error: unknown) {
-      console.error(`❌ Failed to update newsletter status (non-blocking):`, error);
+      activityLogger.error(`❌ Failed to update newsletter status (non-blocking):`, error);
       
       // Check if it's a connection error
       const errorCode = error && typeof error === 'object' && 'code' in error ? error.code : null;
       const errorMessage = error instanceof Error ? error.message : String(error);
       if (errorCode === 'ECONNREFUSED' || errorMessage?.includes('fetch failed')) {
-      console.warn(`⚠️ Backend server not reachable at ${process.env.BACKEND_URL || 'http://localhost:3500'}. Continuing without status update.`);
+      const config = getActivityConfig();
+      activityLogger.warn(`⚠️ Backend server not reachable at ${config.backendUrl}. Continuing without status update.`);
     } else {
-      console.warn(`⚠️ Status update failed for newsletter ${newsletterId}:`, errorMessage);
+      activityLogger.warn(`⚠️ Status update failed for newsletter ${newsletterId}:`, errorMessage);
     }
     
     // Don't throw error - make this non-blocking so email sending can continue
@@ -277,10 +283,11 @@ export async function logNewsletterActivity(
     source: 'temporal-server'
   };
 
-  console.log(`📝 [Newsletter Activity] ${newsletterId}: ${activity}`, details);
+  activityLogger.debug(`📝 [Newsletter Activity] ${newsletterId}: ${activity}`, details);
   
   try {
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3500';
+    const config = getActivityConfig();
+    const backendUrl = config.backendUrl;
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout for logging
@@ -299,15 +306,15 @@ export async function logNewsletterActivity(
 
     if (!response.ok) {
       // Don't throw error for logging failures, just log it
-      console.warn(`⚠️ Failed to log newsletter activity: ${response.status}`);
+      activityLogger.warn(`⚠️ Failed to log newsletter activity: ${response.status}`);
     }
   } catch (error: unknown) {
     const errorCode = error && typeof error === 'object' && 'code' in error ? error.code : null;
     const errorMessage = error instanceof Error ? error.message : String(error);
     if (errorCode === 'ECONNREFUSED' || errorMessage?.includes('fetch failed')) {
-      console.warn(`⚠️ Backend server not reachable for logging. Activity logged locally only.`);
+      activityLogger.warn(`⚠️ Backend server not reachable for logging. Activity logged locally only.`);
     } else {
-      console.warn(`⚠️ Failed to log newsletter activity:`, errorMessage);
+      activityLogger.warn(`⚠️ Failed to log newsletter activity:`, errorMessage);
     }
     // Don't throw - logging failures shouldn't break the workflow
   }

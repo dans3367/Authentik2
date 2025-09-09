@@ -49,6 +49,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
@@ -127,6 +135,7 @@ export default function ShopsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'maintenance'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [deleteShopId, setDeleteShopId] = useState<string | null>(null);
+  const [showLimitModal, setShowLimitModal] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -148,24 +157,122 @@ export default function ShopsPage() {
   const { data, isLoading, error, isFetching, refetch } = useQuery<ShopsResponse>({
     queryKey: ['/api/shops'],
     queryFn: async () => {
+      console.log('🏪 [Frontend] Starting shops query...');
+      
       const params = new URLSearchParams();
       const currentParams = searchParamsRef.current;
+      
+      console.log('🔍 [Frontend] Search parameters:', currentParams);
       
       if (currentParams.search) params.append('search', currentParams.search);
       if (currentParams.status !== 'all') params.append('status', currentParams.status);
       if (currentParams.category !== 'all') params.append('category', currentParams.category);
       
-      const response = await apiRequest('GET', `/api/shops?${params}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch shops');
+      const queryString = params.toString();
+      const requestUrl = `/api/shops${queryString ? '?' + queryString : ''}`;
+      
+      console.log('🌐 [Frontend] Making API request to:', requestUrl);
+      console.log('📤 [Frontend] Request details:', {
+        method: 'GET',
+        url: requestUrl,
+        timestamp: new Date().toISOString()
+      });
+      
+      try {
+        const response = await apiRequest('GET', requestUrl);
+        
+        console.log('📥 [Frontend] API response received:', {
+          status: response.status,
+          ok: response.ok,
+          statusText: response.statusText,
+          headers: {
+            contentType: response.headers.get('content-type'),
+            contentLength: response.headers.get('content-length')
+          }
+        });
+        
+        if (!response.ok) {
+          console.error('❌ [Frontend] API request failed:', {
+            status: response.status,
+            statusText: response.statusText,
+            url: requestUrl
+          });
+          
+          // Try to get error details from response
+          let errorDetails;
+          try {
+            errorDetails = await response.text();
+            console.error('❌ [Frontend] Error response body:', errorDetails);
+          } catch (parseError) {
+            console.error('❌ [Frontend] Could not parse error response:', parseError);
+          }
+          
+          throw new Error(`Failed to fetch shops: ${response.status} ${response.statusText}`);
+        }
+        
+        const responseData = await response.json();
+        
+        console.log('✅ [Frontend] Shops data received:', {
+          shopsCount: responseData.shops?.length || 0,
+          hasStats: !!responseData.stats,
+          hasLimits: !!responseData.limits,
+          hasPagination: !!responseData.pagination,
+          firstShop: responseData.shops?.[0]?.name || 'No shops'
+        });
+        
+        return responseData;
+      } catch (fetchError) {
+        console.error('❌ [Frontend] Network or parsing error:', {
+          error: fetchError,
+          message: fetchError instanceof Error ? fetchError.message : String(fetchError),
+          stack: fetchError instanceof Error ? fetchError.stack : undefined,
+          url: requestUrl
+        });
+        throw fetchError;
       }
-      return response.json();
     },
   });
+
+  // Debug logging for query state changes
+  useEffect(() => {
+    console.log('🔄 [Frontend] Query state changed:', {
+      isLoading,
+      isFetching,
+      hasError: !!error,
+      errorMessage: error instanceof Error ? error.message : String(error || 'No error'),
+      dataReceived: !!data,
+      shopsCount: data?.shops?.length || 0
+    });
+    
+    if (error) {
+      console.error('❌ [Frontend] Shops query error details:', {
+        error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, [isLoading, isFetching, error, data]);
+
+  // Debug modal state and limits
+  useEffect(() => {
+    console.log('🔧 [Frontend] Modal state changed:', {
+      showLimitModal,
+      limits: data?.limits,
+      canAddShop: data?.limits?.canAddShop,
+      currentShops: data?.limits?.currentShops,
+      maxShops: data?.limits?.maxShops
+    });
+  }, [showLimitModal, data?.limits]);
 
   // Debounce search and filter changes
   useEffect(() => {
     const timer = setTimeout(() => {
+      console.log('🔍 [Frontend] Triggering refetch due to parameter change:', {
+        searchTerm,
+        statusFilter,
+        categoryFilter
+      });
       refetch();
     }, 300);
 
@@ -433,15 +540,24 @@ export default function ShopsPage() {
                 </div>
               </div>
             </div>
-            <Link href="/shops/new">
+            {data?.limits && !data.limits.canAddShop ? (
               <Button 
-                disabled={data?.limits && !data.limits.canAddShop}
+                onClick={() => setShowLimitModal(true)}
                 className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Add Shop
               </Button>
-            </Link>
+            ) : (
+              <Link href="/shops/new">
+                <Button 
+                  className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Shop
+                </Button>
+              </Link>
+            )}
           </div>
         )}
 
@@ -534,25 +650,7 @@ export default function ShopsPage() {
         </div>
       )}
 
-      {/* Shop Limit Warning */}
-      {data?.limits && !data.limits.canAddShop && (
-        <Card className="bg-orange-50/70 dark:bg-orange-950/50 backdrop-blur-sm border border-orange-200/50 dark:border-orange-800/30">
-          <CardContent className="pt-6">
-            <div className="flex">
-              <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400 mr-3 flex-shrink-0 mt-0.5" />
-              <div>
-                <h3 className="text-sm font-semibold text-orange-900 dark:text-orange-100">
-                  Shop limit reached
-                </h3>
-                <p className="text-sm text-orange-700 dark:text-orange-300 mt-1">
-                  Your {data.limits.planName} plan allows up to {data.limits.maxShops} shops. 
-                  Please upgrade your plan to add more shops.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+
 
       {/* Filters */}
       {!isLoading && (
@@ -716,6 +814,44 @@ export default function ShopsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Shop Limit Modal */}
+      <Dialog open={showLimitModal} onOpenChange={setShowLimitModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-orange-600" />
+              Shop Limit Reached
+            </DialogTitle>
+            <DialogDescription>
+              Your {data?.limits?.planName} plan allows up to {data?.limits?.maxShops} shops. 
+              Please upgrade your plan to add more shops.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowLimitModal(false)}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                setShowLimitModal(false);
+                // TODO: Add navigation to upgrade page when available
+                toast({
+                  title: "Upgrade Plan",
+                  description: "Contact support to upgrade your plan and add more shops.",
+                });
+              }}
+              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
+            >
+              Upgrade Plan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
         </div>
       </div>
     </div>

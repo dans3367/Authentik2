@@ -1,6 +1,7 @@
 import { sendUnaryData, ServerUnaryCall } from '@grpc/grpc-js';
 import { v4 as uuidv4 } from 'uuid';
 import { TemporalWorkerService } from './temporal-worker';
+import { grpcLogger, newsletterLogger } from '../logger';
 
 // GRPC message types (we'll define these based on our proto)
 export interface NewsletterRequest {
@@ -68,7 +69,7 @@ export class NewsletterGrpcService {
   ): Promise<void> {
     try {
       const request = call.request;
-      console.log(`📧 Starting newsletter workflow for ${request.newsletter_id}`);
+      newsletterLogger.info(`📧 Starting newsletter workflow for ${request.newsletter_id}`);
 
       // Generate unique workflow ID
       const workflowId = `newsletter-${request.newsletter_id}-${Date.now()}-${uuidv4().substring(0, 8)}`;
@@ -107,11 +108,11 @@ export class NewsletterGrpcService {
         group_uuid: request.group_uuid,
       };
 
-      console.log(`✅ Newsletter workflow started: ${workflowId}`);
+      newsletterLogger.info(`✅ Newsletter workflow started: ${workflowId}`);
       callback(null, response);
 
     } catch (error) {
-      console.error('❌ Failed to send newsletter:', error);
+      newsletterLogger.error('❌ Failed to send newsletter:', error);
       
       const response: NewsletterResponse = {
         success: false,
@@ -132,7 +133,7 @@ export class NewsletterGrpcService {
   ): Promise<void> {
     try {
       const request = call.request;
-      console.log(`📊 Getting newsletter status for workflow ${request.workflow_id}`);
+      grpcLogger.info(`📊 Getting newsletter status for workflow ${request.workflow_id}`);
 
       // Get workflow result
       const result = await this.temporalWorker.getWorkflowResult(request.workflow_id);
@@ -148,11 +149,11 @@ export class NewsletterGrpcService {
         status: 'completed',
       };
 
-      console.log(`✅ Newsletter status retrieved for ${request.workflow_id}`);
+      grpcLogger.info(`✅ Newsletter status retrieved for ${request.workflow_id}`);
       callback(null, response);
 
     } catch (error) {
-      console.error('❌ Failed to get newsletter status:', error);
+      grpcLogger.error('❌ Failed to get newsletter status:', error);
 
       const response: NewsletterStatusResponse = {
         success: false,
@@ -176,7 +177,7 @@ export class NewsletterGrpcService {
   ): Promise<void> {
     try {
       const request = call.request;
-      console.log(`🛑 Cancelling newsletter workflow ${request.workflow_id}`);
+      newsletterLogger.info(`🛑 Cancelling newsletter workflow ${request.workflow_id}`);
 
       await this.temporalWorker.cancelWorkflow(request.workflow_id);
 
@@ -184,11 +185,11 @@ export class NewsletterGrpcService {
         success: true,
       };
 
-      console.log(`✅ Newsletter workflow cancelled: ${request.workflow_id}`);
+      newsletterLogger.info(`✅ Newsletter workflow cancelled: ${request.workflow_id}`);
       callback(null, response);
 
     } catch (error) {
-      console.error('❌ Failed to cancel newsletter:', error);
+      newsletterLogger.error('❌ Failed to cancel newsletter:', error);
 
       const response: CancelNewsletterResponse = {
         success: false,

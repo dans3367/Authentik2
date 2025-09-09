@@ -1,5 +1,6 @@
 import { sendUnaryData, ServerUnaryCall } from '@grpc/grpc-js';
 import { TemporalWorkerService } from './temporal-worker';
+import { grpcLogger, workflowLogger } from '../logger';
 
 // GRPC message types for generic workflows
 export interface WorkflowRequest {
@@ -54,7 +55,7 @@ export class WorkflowGrpcService {
   ): Promise<void> {
     try {
       const request = call.request;
-      console.log(`🔄 Starting workflow ${request.workflow_type} with ID ${request.workflow_id}`);
+      workflowLogger.info(`🔄 Starting workflow ${request.workflow_type} with ID ${request.workflow_id}`);
 
       // Parse input if provided
       let input: any = undefined;
@@ -79,11 +80,11 @@ export class WorkflowGrpcService {
         run_id: handle.firstExecutionRunId,
       };
 
-      console.log(`✅ Workflow started: ${request.workflow_id}`);
+      workflowLogger.info(`✅ Workflow started: ${request.workflow_id}`);
       callback(null, response);
 
     } catch (error) {
-      console.error('❌ Failed to start workflow:', error);
+      workflowLogger.error('❌ Failed to start workflow:', error);
       
       const response: WorkflowResponse = {
         success: false,
@@ -102,7 +103,7 @@ export class WorkflowGrpcService {
   ): Promise<void> {
     try {
       const request = call.request;
-      console.log(`📊 Getting workflow result for ${request.workflow_id}`);
+      grpcLogger.info(`📊 Getting workflow result for ${request.workflow_id}`);
 
       const result = await this.temporalWorker.getWorkflowResult(request.workflow_id);
 
@@ -111,11 +112,11 @@ export class WorkflowGrpcService {
         result: JSON.stringify(result),
       };
 
-      console.log(`✅ Workflow result retrieved for ${request.workflow_id}`);
+      grpcLogger.info(`✅ Workflow result retrieved for ${request.workflow_id}`);
       callback(null, response);
 
     } catch (error) {
-      console.error('❌ Failed to get workflow result:', error);
+      grpcLogger.error('❌ Failed to get workflow result:', error);
 
       const response: WorkflowResultResponse = {
         success: false,
@@ -133,7 +134,7 @@ export class WorkflowGrpcService {
   ): Promise<void> {
     try {
       const request = call.request;
-      console.log(`📡 Sending signal ${request.signal_name} to workflow ${request.workflow_id}`);
+      grpcLogger.info(`📡 Sending signal ${request.signal_name} to workflow ${request.workflow_id}`);
 
       // Parse payload if provided
       let payload: any = undefined;
@@ -155,11 +156,11 @@ export class WorkflowGrpcService {
         success: true,
       };
 
-      console.log(`✅ Signal sent to workflow: ${request.workflow_id}`);
+      grpcLogger.info(`✅ Signal sent to workflow: ${request.workflow_id}`);
       callback(null, response);
 
     } catch (error) {
-      console.error('❌ Failed to signal workflow:', error);
+      grpcLogger.error('❌ Failed to signal workflow:', error);
 
       const response: WorkflowSignalResponse = {
         success: false,
@@ -176,7 +177,7 @@ export class WorkflowGrpcService {
   ): Promise<void> {
     try {
       const request = call.request;
-      console.log(`🛑 Cancelling workflow ${request.workflow_id}`);
+      workflowLogger.info(`🛑 Cancelling workflow ${request.workflow_id}`);
 
       await this.temporalWorker.cancelWorkflow(request.workflow_id);
 
@@ -184,11 +185,11 @@ export class WorkflowGrpcService {
         success: true,
       };
 
-      console.log(`✅ Workflow cancelled: ${request.workflow_id}`);
+      workflowLogger.info(`✅ Workflow cancelled: ${request.workflow_id}`);
       callback(null, response);
 
     } catch (error) {
-      console.error('❌ Failed to cancel workflow:', error);
+      workflowLogger.error('❌ Failed to cancel workflow:', error);
 
       const response: WorkflowCancelResponse = {
         success: false,

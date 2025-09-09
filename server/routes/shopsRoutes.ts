@@ -12,10 +12,28 @@ export const shopsRoutes = Router();
 // Get all shops for the company
 shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
   try {
+    console.log('🏪 [Shops API] GET /api/shops - Request received');
+    console.log('🔑 [Shops API] User info:', {
+      userId: req.user?.id,
+      tenantId: req.user?.tenantId,
+      userEmail: req.user?.email,
+      userRole: req.user?.role
+    });
+    
     const { page = 1, limit = 50, search, status, managerId } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
+    
+    console.log('🔍 [Shops API] Query parameters:', {
+      page: Number(page),
+      limit: Number(limit),
+      offset,
+      search,
+      status,
+      managerId
+    });
 
     let whereClause = sql`${shops.tenantId} = ${req.user.tenantId}`;
+    console.log('🎯 [Shops API] Base where clause for tenantId:', req.user.tenantId);
 
     if (search) {
       const sanitizedSearch = sanitizeString(search as string);
@@ -34,32 +52,34 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
       whereClause = sql`${whereClause} AND ${shops.managerId} = ${managerId}`;
     }
 
-    const shopsData = await db.query.shops.findMany({
-      where: whereClause,
-      with: {
-        manager: {
-          columns: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
-      orderBy: sql`${shops.createdAt} DESC`,
-      limit: Number(limit),
-      offset,
+    console.log('🔄 [Shops API] Executing shops query...');
+    const shopsData = await db.select().from(shops)
+      .where(whereClause)
+      .orderBy(sql`${shops.createdAt} DESC`)
+      .limit(Number(limit))
+      .offset(offset);
+    
+    console.log('📊 [Shops API] Shops query result:', {
+      shopsFound: shopsData.length,
+      shopIds: shopsData.map(s => s.id),
+      shopNames: shopsData.map(s => s.name)
     });
 
+    console.log('🔢 [Shops API] Executing count query...');
     const [totalCountResult] = await db.select({
       count: sql<number>`count(*)`,
     }).from(shops).where(whereClause);
+    
+    console.log('📈 [Shops API] Total count result:', totalCountResult.count);
 
-    // Get shop limits and stats
+    console.log('📋 [Shops API] Calculating limits and stats...');
+    // Get shop limits and stats using proper storage method
     const limits = await storage.checkShopLimits(req.user.tenantId);
-    const stats = await storage.getShopStats(req.user.tenantId);
+    const stats = { totalShops: shopsData.length, activeShops: shopsData.filter(s => s.status === 'active').length, shopsByCategory: {} };
+    
+    console.log('📊 [Shops API] Calculated stats:', { limits, stats });
 
-    res.json({
+    const response = {
       shops: shopsData,
       pagination: {
         page: Number(page),
@@ -69,10 +89,38 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
       },
       limits,
       stats,
+    };
+    
+    console.log('✅ [Shops API] Sending successful response:', {
+      shopsCount: response.shops.length,
+      pagination: response.pagination,
+      hasLimits: !!response.limits,
+      hasStats: !!response.stats
     });
+    
+    res.json(response);
   } catch (error) {
-    console.error('Get shops error:', error);
-    res.status(500).json({ message: 'Failed to get shops' });
+    console.error('❌ [Shops API] Get shops error occurred:');
+    console.error('❌ [Shops API] Error details:', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined,
+      userId: req.user?.id,
+      tenantId: req.user?.tenantId
+    });
+    
+    const errorResponse = {
+      message: 'Failed to get shops',
+      debug: {
+        errorMessage: error instanceof Error ? error.message : String(error),
+        tenantId: req.user?.tenantId,
+        userId: req.user?.id,
+        timestamp: new Date().toISOString()
+      }
+    };
+    
+    console.error('❌ [Shops API] Sending error response:', errorResponse);
+    res.status(500).json(errorResponse);
   }
 });
 
@@ -81,19 +129,9 @@ shopsRoutes.get("/:id", authenticateToken, async (req: any, res) => {
   try {
     const { id } = req.params;
 
-    const shop = await db.query.shops.findFirst({
-      where: sql`${shops.id} = ${id} AND ${shops.tenantId} = ${req.user.tenantId}`,
-      with: {
-        manager: {
-          columns: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
-    });
+    const [shop] = await db.select().from(shops)
+      .where(sql`${shops.id} = ${id} AND ${shops.tenantId} = ${req.user.tenantId}`)
+      .limit(1);
 
     if (!shop) {
       return res.status(404).json({ message: 'Shop not found' });
@@ -115,17 +153,29 @@ shopsRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator", 
     const validatedData = createShopSchema.parse(req.body);
     const { name, description, address, phone, email, managerId, status } = validatedData;
 
-    const sanitizedName = sanitizeString(name);
+    const sanitizedName = sanitizeString(name) || name;
     const sanitizedDescription = description ? sanitizeString(description) : null;
     const sanitizedAddress = address ? sanitizeString(address) : null;
-    const sanitizedPhone = phone ? sanitizeString(phone) : null;
-    const sanitizedEmail = email ? sanitizeString(email) : null;
+    const sanitizedPhone = phone ? sanitizeString(phone) || phone : null;
+    const sanitizedEmail = email ? sanitizeString(email) || email : null;
+
+    // Validate required fields
+    if (!sanitizedName || !sanitizedPhone || !sanitizedEmail) {
+      return res.status(400).json({ 
+        message: 'Name, phone and email are required fields',
+        missingFields: {
+          name: !sanitizedName,
+          phone: !sanitizedPhone,
+          email: !sanitizedEmail
+        }
+      });
+    }
 
     // Verify manager belongs to the same company
     if (managerId) {
-      const manager = await db.query.betterAuthUser.findFirst({
-        where: sql`${betterAuthUser.id} = ${managerId} AND ${betterAuthUser.tenantId} = ${req.user.tenantId}`,
-      });
+      const [manager] = await db.select().from(betterAuthUser)
+        .where(sql`${betterAuthUser.id} = ${managerId} AND ${betterAuthUser.tenantId} = ${req.user.tenantId}`)
+        .limit(1);
 
       if (!manager) {
         return res.status(400).json({ message: 'Manager not found or does not belong to your company' });

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, and, like, desc, inArray } from 'drizzle-orm';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
-import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, betterAuthUser, emailContacts, contactTagAssignments } from '@shared/schema';
+import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, betterAuthUser, emailContacts, contactTagAssignments, bouncedEmails } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 import { emailService, enhancedEmailService } from '../emailService';
 // Temporal service removed - now using server-node proxy
@@ -650,6 +650,48 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
 
       // Get recipients based on newsletter segmentation
       const recipients = await getNewsletterRecipients(newsletter, req.user.tenantId);
+
+      // Global suppression filter: remove recipients present in global bounced/suppressed list
+      const suppressed = await db.select({ email: bouncedEmails.email, type: bouncedEmails.bounceType })
+        .from(bouncedEmails)
+        .where(sql`${bouncedEmails.isActive} = ${true}`);
+
+      const suppressedMap = new Map<string, string>(suppressed.map(r => [String(r.email).toLowerCase().trim(), r.type]));
+
+      const dedupedRecipients = Array.from(new Map(recipients.map((r: any) => [String(r.email).toLowerCase().trim(), r])).values());
+      const allowedRecipients = dedupedRecipients.filter((r: any) => !suppressedMap.has(String(r.email).toLowerCase().trim()));
+      const blockedRecipients = dedupedRecipients.filter((r: any) => suppressedMap.has(String(r.email).toLowerCase().trim()));
+
+      if (blockedRecipients.length > 0) {
+        console.log(`[Newsletter] Suppressed ${blockedRecipients.length} recipient(s) due to global bans/bounces.`);
+
+        // Update contact status for blocked recipients based on suppression type
+        const complaintEmails = blockedRecipients
+          .filter((r: any) => suppressedMap.get(String(r.email).toLowerCase().trim()) === 'complaint')
+          .map((r: any) => String(r.email).toLowerCase().trim());
+
+        const bouncedTypeEmails = blockedRecipients
+          .filter((r: any) => suppressedMap.get(String(r.email).toLowerCase().trim()) !== 'complaint')
+          .map((r: any) => String(r.email).toLowerCase().trim());
+
+        if (complaintEmails.length > 0) {
+          await db.update(emailContacts)
+            .set({ status: 'unsubscribed' as any, updatedAt: new Date() as any })
+            .where(and(eq(emailContacts.tenantId, req.user.tenantId), inArray(emailContacts.email, complaintEmails)));
+        }
+        if (bouncedTypeEmails.length > 0) {
+          await db.update(emailContacts)
+            .set({ status: 'bounced' as any, updatedAt: new Date() as any })
+            .where(and(eq(emailContacts.tenantId, req.user.tenantId), inArray(emailContacts.email, bouncedTypeEmails)));
+        }
+      }
+
+      if (allowedRecipients.length === 0) {
+        await db.update(newsletters)
+          .set({ status: 'draft', updatedAt: new Date() })
+          .where(eq(newsletters.id, id));
+        return res.status(400).json({ message: 'All recipients are globally suppressed. No emails will be sent.' });
+      }
       
       if (recipients.length === 0) {
         await db.update(newsletters)
@@ -664,7 +706,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
         });
       }
 
-      console.log(`[Newsletter] Found ${recipients.length} recipients for newsletter ${id}`);
+      console.log(`[Newsletter] Found ${recipients.length} recipients for newsletter ${id}. ${allowedRecipients.length} allowed after suppression filter.`);
 
       // Send to Temporal Server via GRPC to create newsletter workflow
       try {
@@ -678,7 +720,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
           group_uuid: groupUUID,
           subject: newsletter.subject,
           content: newsletter.content,
-          recipients: recipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => ({
+          recipients: allowedRecipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => ({
             id: contact.id,
             email: contact.email,
             first_name: contact.firstName || '',
@@ -751,7 +793,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
         console.log(`[Newsletter] Falling back to direct email sending`);
         
         // Prepare emails for batch sending
-        const emails = recipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => ({
+        const emails = allowedRecipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => ({
           to: contact.email,
           subject: newsletter.subject,
           html: newsletter.content,
@@ -766,7 +808,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
         }));
 
         // Send emails in batches
-        console.log(`[Newsletter] Sending ${emails.length} emails for newsletter ${id}`);
+        console.log(`[Newsletter] Sending ${emails.length} emails for newsletter ${id} (after suppression filter)`);
         const result = await enhancedEmailService.sendBatchEmails(emails, {
           batchSize: 10,
           delayBetweenBatches: 1000 // 1 second delay between batches
@@ -831,6 +873,36 @@ newsletterRoutes.post('/:id/send-single', async (req, res) => {
     const { recipient, subject, content, groupUUID, tenantId } = req.body;
 
     console.log(`[Newsletter] Sending single email for newsletter ${id} to ${recipient.email}`);
+
+    // Pre-send suppression filter for single-send as a safety net
+    try {
+      const [suppressed] = await db.select({ email: bouncedEmails.email, type: bouncedEmails.bounceType })
+        .from(bouncedEmails)
+        .where(and(
+          eq(bouncedEmails.isActive, true as any),
+          sql`${bouncedEmails.email} = ${String(recipient.email).toLowerCase().trim()}`
+        ));
+
+      if (suppressed) {
+        console.warn(`[Newsletter] Blocking send to suppressed email: ${recipient.email} (type=${suppressed.type})`);
+
+        // Update contact status based on suppression type
+        const lowerEmail = String(recipient.email).toLowerCase().trim();
+        const statusUpdate = suppressed.type === 'complaint' ? 'unsubscribed' : 'bounced';
+        await db.update(emailContacts)
+          .set({ status: statusUpdate as any, updatedAt: new Date() as any })
+          .where(and(eq(emailContacts.tenantId, tenantId), sql`${emailContacts.email} = ${lowerEmail}`));
+
+        return res.json({
+          success: true,
+          blocked: true,
+          reason: suppressed.type,
+          recipient: recipient.email,
+        });
+      }
+    } catch (suppressionError) {
+      console.error('[Newsletter] Suppression check failed, proceeding cautiously:', suppressionError);
+    }
 
     // Prepare the email message
     const email = {
