@@ -10,20 +10,19 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import EmailActivityTimeline from "@/components/EmailActivityTimeline";
 import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
-import { 
+import {
   ArrowLeft,
-  Mail, 
-  Calendar, 
-  CheckCircle2, 
-  XCircle, 
-  AlertCircle, 
+  Mail,
+  Calendar,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
   AlertTriangle as AlertTriangleIcon,
-  Edit, 
+  Edit,
   Trash2,
   Tag,
   Users,
   BarChart3,
-  Clock,
   UserCheck,
   Eye,
   Send,
@@ -585,7 +584,10 @@ export default function ViewContact() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Clock className="w-5 h-5" />
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12,6 12,12 16,14"></polyline>
+                </svg>
                 Activity Timeline
               </CardTitle>
             </CardHeader>

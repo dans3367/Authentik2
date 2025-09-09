@@ -1,7 +1,6 @@
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
-  Gift,
   User,
   LogOut,
   Activity,
@@ -73,7 +72,6 @@ const getNavigation = (userRole?: string) => {
     { name: "Forms", href: "/forms", icon: ClipboardList },
     { name: "Email Campaigns", href: "/email-campaigns", icon: Mail },
     { name: "Email Test", href: "/email-test", icon: Settings },
-    { name: "Birthdays", href: "/birthdays", icon: Gift },
     { name: "Templates", href: "/email-templates", icon: FileText },
     { name: "Contacts", href: "/email-contacts", icon: UserCheck },
     { name: "Analytics", href: "/email-analytics", icon: BarChart3 },

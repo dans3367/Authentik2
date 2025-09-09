@@ -19,7 +19,6 @@ import {
   CalendarDays,
   X
 } from "lucide-react";
-import ActivityIcon from "@assets/28_new.svg";
 import { useEffect, useState } from "react";
 import { addDays, format } from "date-fns";
 
@@ -486,7 +485,10 @@ export default function EmailActivityTimeline({ contactId, limit = 50 }: EmailAc
           </div>
         </CardHeader>
         <CardContent>
-          <img src={ActivityIcon} className="w-[200px] h-auto text-gray-400 mx-auto mb-2" alt="Activity Timeline Icon" />
+          <svg className="w-8 h-8 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12,6 12,12 16,14"></polyline>
+          </svg>
           <div className="text-center py-8">
             <p className="text-gray-600 dark:text-gray-400">
               {hasDateFilter ? "No activities found for the selected date range" : "No activity recorded yet"}

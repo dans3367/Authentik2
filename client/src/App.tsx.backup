@@ -43,7 +43,6 @@ const EmailContactsPage = lazy(() => import("@/pages/email-contacts"));
 const NewEmailContactPage = lazy(() => import("@/pages/email-contacts/new"));
 const ViewEmailContactPage = lazy(() => import("@/pages/email-contacts/view"));
 const EmailAnalyticsPage = lazy(() => import("@/pages/email-analytics"));
-const BirthdaysPage = lazy(() => import("@/pages/birthdays"));
 const EditEmailCampaignPage = lazy(() => import("@/pages/email-campaigns/edit"));
 
 // Loading component for Suspense fallback
@@ -214,7 +213,6 @@ function Router() {
                   <Route path="/email-contacts/view/:id" component={ViewEmailContactPage} />
                   <Route path="/email-contacts/edit/:id" component={lazy(() => import("@/pages/email-contacts/edit"))} />
                   <Route path="/email-analytics" component={EmailAnalyticsPage} />
-                  <Route path="/birthdays" component={BirthdaysPage} />
                   <Route path="/shops" component={ShopsPage} />
                   <Route path="/shops/new" component={NewShopPage} />
                   <Route path="/shops/:id" component={ShopDetailsPage} />
