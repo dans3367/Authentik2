@@ -34,6 +34,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Card, CardContent } from "@/components/ui/card"
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -43,6 +44,7 @@ interface DataTableProps<TData, TValue> {
   showColumnVisibility?: boolean
   showPagination?: boolean
   pageSize?: number
+  enableResponsiveCards?: boolean
 }
 
 export function DataTable<TData, TValue>({
@@ -53,6 +55,7 @@ export function DataTable<TData, TValue>({
   showColumnVisibility = true,
   showPagination = true,
   pageSize = 10,
+  enableResponsiveCards = true,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -127,7 +130,11 @@ export function DataTable<TData, TValue>({
           )}
         </div>
       )}
-      <div className="w-full overflow-hidden border border-gray-200 dark:border-gray-700 rounded-lg">
+      {/* Desktop Table View */}
+      <div className={cn(
+        "w-full overflow-hidden border border-gray-200 dark:border-gray-700 rounded-lg",
+        enableResponsiveCards ? "hidden md:block" : ""
+      )}>
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -177,6 +184,74 @@ export function DataTable<TData, TValue>({
           </TableBody>
         </Table>
       </div>
+
+      {/* Mobile Card View */}
+      {enableResponsiveCards && (
+        <div className="md:hidden space-y-3">
+          {table.getRowModel().rows?.length ? (
+            table.getRowModel().rows.map((row) => (
+              <Card key={row.id} className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30" data-testid={`card-row-${row.id}`}>
+                <CardContent className="p-4">
+                  <div className="space-y-3">
+                    {row.getVisibleCells().map((cell) => {
+                      const columnDef = cell.column.columnDef;
+                      const header = typeof columnDef.header === 'string' 
+                        ? columnDef.header 
+                        : columnDef.id?.toUpperCase() || 'DATA';
+                      
+                      // Skip rendering if this is an actions column, we'll handle it separately
+                      if (columnDef.id === 'actions') {
+                        return null;
+                      }
+                      
+                      return (
+                        <div key={cell.id} className="flex justify-between items-start">
+                          <div className="text-sm font-medium text-gray-500 dark:text-gray-400 min-w-0 mr-4">
+                            {header}
+                          </div>
+                          <div className="text-sm text-right flex-1 min-w-0">
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext()
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    
+                    {/* Actions row for mobile cards */}
+                    {(() => {
+                      const actionsCell = row.getVisibleCells().find(cell => cell.column.columnDef.id === 'actions');
+                      if (actionsCell) {
+                        return (
+                          <div className="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-700">
+                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                              ACTIONS
+                            </div>
+                            <div>
+                              {flexRender(
+                                actionsCell.column.columnDef.cell,
+                                actionsCell.getContext()
+                              )}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()} 
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+              <CardContent className="p-8 text-center text-gray-500 dark:text-gray-400">
+                No results.
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
       {showPagination && (
         <div className="flex items-center justify-end space-x-2 py-4 px-6">
           <div className="flex-1 text-sm text-muted-foreground">
