@@ -894,6 +894,7 @@ export default function UsersPage() {
             showPagination={true}
             pageSize={10}
             showColumnVisibility={false}
+            enableResponsiveCards={true}
           />
         </div>
 
