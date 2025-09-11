@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, Calendar, Megaphone, MoreVertical, Eye, Edit, Trash2, Mail, Gift, FileText, Users, TrendingUp, Target } from 'lucide-react';
+import { Plus, Calendar, Megaphone, MoreVertical, Eye, Edit, Trash2, Mail, Gift, FileText, Users, TrendingUp, Target, Settings } from 'lucide-react';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
@@ -11,12 +11,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 
 interface Promotion {
   id: string;
@@ -27,6 +21,10 @@ interface Promotion {
   targetAudience: string;
   isActive: boolean;
   usageCount: number;
+  maxUses?: number;
+  validFrom?: string;
+  validTo?: string;
+  promotionalCodes?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -124,170 +122,18 @@ function PromotionStats() {
   );
 }
 
-function CreatePromotionDialog() {
-  const [open, setOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    content: '',
-    type: 'newsletter' as const,
-    targetAudience: 'all',
-    isActive: true,
-  });
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
+function CreatePromotionButton() {
+  const [, setLocation] = useLocation();
 
-  const createPromotionMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
-      return apiRequest('/api/promotions', {
-        method: 'POST',
-        body: JSON.stringify(data),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/promotions'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/promotion-stats'] });
-      toast({
-        title: "Success",
-        description: "Promotion created successfully",
-      });
-      setOpen(false);
-      setFormData({
-        title: '',
-        description: '',
-        content: '',
-        type: 'newsletter',
-        targetAudience: 'all',
-        isActive: true,
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create promotion",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.title.trim() || !formData.content.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
-    }
-    createPromotionMutation.mutate(formData);
+  const handleCreatePromotion = () => {
+    setLocation('/promotions/create');
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Create Promotion
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Create New Promotion</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">Title *</Label>
-              <Input
-                id="title"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="Enter promotion title"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="type">Type</Label>
-              <Select value={formData.type} onValueChange={(value: any) => setFormData({ ...formData, type: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="newsletter">Newsletter</SelectItem>
-                  <SelectItem value="survey">Survey</SelectItem>
-                  <SelectItem value="birthday">Birthday</SelectItem>
-                  <SelectItem value="announcement">Announcement</SelectItem>
-                  <SelectItem value="sale">Sale</SelectItem>
-                  <SelectItem value="event">Event</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Input
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Brief description of the promotion"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="content">Content *</Label>
-            <Textarea
-              id="content"
-              value={formData.content}
-              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-              placeholder="Enter the promotional content (HTML supported)"
-              rows={8}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="targetAudience">Target Audience</Label>
-            <Select value={formData.targetAudience} onValueChange={(value) => setFormData({ ...formData, targetAudience: value })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Contacts</SelectItem>
-                <SelectItem value="subscribers">Subscribers Only</SelectItem>
-                <SelectItem value="customers">Customers</SelectItem>
-                <SelectItem value="prospects">Prospects</SelectItem>
-                <SelectItem value="vip">VIP Customers</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="isActive"
-              checked={formData.isActive}
-              onCheckedChange={(checked) => setFormData({ ...formData, isActive: !!checked })}
-            />
-            <Label htmlFor="isActive">Active (available for use)</Label>
-          </div>
-
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={createPromotionMutation.isPending}>
-              {createPromotionMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Create Promotion
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <Button onClick={handleCreatePromotion}>
+      <Plus className="h-4 w-4 mr-2" />
+      Create Promotion
+    </Button>
   );
 }
 
@@ -296,15 +142,15 @@ export default function PromotionsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: promotions, isLoading, error } = useQuery({
+  const { data: promotionsData, isLoading, error } = useQuery({
     queryKey: ['/api/promotions'],
   });
 
+  const promotions = (promotionsData as any)?.promotions || [];
+
   const deletePromotionMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/promotions/${id}`, {
-        method: 'DELETE',
-      });
+      return apiRequest('DELETE', `/api/promotions/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/promotions'] });
@@ -325,13 +171,7 @@ export default function PromotionsPage() {
 
   const togglePromotionMutation = useMutation({
     mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-      return apiRequest(`/api/promotions/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ isActive }),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      return apiRequest('PATCH', `/api/promotions/${id}`, { isActive });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/promotions'] });
@@ -376,7 +216,7 @@ export default function PromotionsPage() {
             Create and manage promotional content for your email campaigns
           </p>
         </div>
-        <CreatePromotionDialog />
+        <CreatePromotionButton />
       </div>
 
       {/* Stats Cards */}
@@ -440,10 +280,32 @@ export default function PromotionsPage() {
                           </p>
                         )}
                         <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                          <span>Used {promotion.usageCount} times</span>
+                          <span>Used {promotion.usageCount}{promotion.maxUses ? `/${promotion.maxUses}` : ''} times</span>
                           <span>Created {format(new Date(promotion.createdAt), 'MMM d, yyyy')}</span>
                           <span>Target: {promotion.targetAudience}</span>
                         </div>
+                        {(promotion.validFrom || promotion.validTo || promotion.maxUses) && (
+                          <div className="flex items-center gap-4 text-xs text-blue-600 dark:text-blue-400 mt-1">
+                            {promotion.maxUses && (
+                              <span className="flex items-center gap-1">
+                                <Settings className="h-3 w-3" />
+                                Max: {promotion.maxUses} uses
+                              </span>
+                            )}
+                            {promotion.validFrom && (
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                From: {format(new Date(promotion.validFrom), 'MMM d, yyyy')}
+                              </span>
+                            )}
+                            {promotion.validTo && (
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                Until: {format(new Date(promotion.validTo), 'MMM d, yyyy')}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -513,7 +375,7 @@ export default function PromotionsPage() {
               <p className="text-gray-600 dark:text-gray-400 mb-6">
                 Create your first promotional template to get started with email marketing campaigns.
               </p>
-              <CreatePromotionDialog />
+              <CreatePromotionButton />
             </div>
           )}
         </CardContent>

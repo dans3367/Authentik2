@@ -1581,14 +1581,36 @@ export class DatabaseStorage implements IStorage {
         eq(promotions.id, id),
         eq(promotions.tenantId, tenantId)
       ));
+    
+    // Parse promotional codes from JSON
+    if (promotion && promotion.promotionalCodes) {
+      try {
+        (promotion as any).promotionalCodes = JSON.parse(promotion.promotionalCodes);
+      } catch (e) {
+        (promotion as any).promotionalCodes = [];
+      }
+    }
+    
     return promotion;
   }
 
   async getAllPromotions(tenantId: string): Promise<Promotion[]> {
-    return await db.select()
+    const result = await db.select()
       .from(promotions)
       .where(eq(promotions.tenantId, tenantId))
       .orderBy(desc(promotions.createdAt));
+    
+    // Parse promotional codes from JSON for each promotion
+    return result.map(promotion => {
+      if (promotion.promotionalCodes) {
+        try {
+          (promotion as any).promotionalCodes = JSON.parse(promotion.promotionalCodes);
+        } catch (e) {
+          (promotion as any).promotionalCodes = [];
+        }
+      }
+      return promotion;
+    });
   }
 
   async createPromotion(promotion: CreatePromotionData, userId: string, tenantId: string): Promise<Promotion> {
@@ -1597,22 +1619,50 @@ export class DatabaseStorage implements IStorage {
         ...promotion,
         userId,
         tenantId,
+        promotionalCodes: promotion.promotionalCodes ? JSON.stringify(promotion.promotionalCodes) : null,
       })
       .returning();
+    
+    // Parse promotional codes back to array for return
+    if (created.promotionalCodes) {
+      try {
+        (created as any).promotionalCodes = JSON.parse(created.promotionalCodes);
+      } catch (e) {
+        (created as any).promotionalCodes = [];
+      }
+    }
+    
     return created;
   }
 
   async updatePromotion(id: string, updates: UpdatePromotionData, tenantId: string): Promise<Promotion | undefined> {
+    const updateData = {
+      ...updates,
+      updatedAt: new Date(),
+    };
+    
+    // Handle promotional codes JSON serialization
+    if (updates.promotionalCodes !== undefined) {
+      (updateData as any).promotionalCodes = updates.promotionalCodes ? JSON.stringify(updates.promotionalCodes) : null;
+    }
+    
     const [updated] = await db.update(promotions)
-      .set({
-        ...updates,
-        updatedAt: new Date(),
-      })
+      .set(updateData)
       .where(and(
         eq(promotions.id, id),
         eq(promotions.tenantId, tenantId)
       ))
       .returning();
+    
+    // Parse promotional codes back to array for return
+    if (updated && updated.promotionalCodes) {
+      try {
+        (updated as any).promotionalCodes = JSON.parse(updated.promotionalCodes);
+      } catch (e) {
+        (updated as any).promotionalCodes = [];
+      }
+    }
+    
     return updated;
   }
 

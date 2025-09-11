@@ -1571,6 +1571,10 @@ export const promotions = pgTable("promotions", {
   targetAudience: text("target_audience").notNull().default('all'), // all, subscribers, customers, prospects, vip
   isActive: boolean("is_active").default(true),
   usageCount: integer("usage_count").default(0), // Track how many times this promotion has been used
+  maxUses: integer("max_uses"), // Maximum times this promotion can be used (null = unlimited)
+  validFrom: timestamp("valid_from"), // Promotion becomes available from this date
+  validTo: timestamp("valid_to"), // Promotion expires after this date
+  promotionalCodes: text("promotional_codes"), // JSON array of promotional codes
   metadata: text("metadata"), // JSON string for additional settings
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -1596,6 +1600,10 @@ export const createPromotionSchema = z.object({
   type: z.enum(['newsletter', 'survey', 'birthday', 'announcement', 'sale', 'event']).default('newsletter'),
   targetAudience: z.enum(['all', 'subscribers', 'customers', 'prospects', 'vip']).default('all'),
   isActive: z.boolean().default(true),
+  maxUses: z.number().int().positive().optional(),
+  validFrom: z.date().optional(),
+  validTo: z.date().optional(),
+  promotionalCodes: z.array(z.string()).optional(),
   metadata: z.string().optional(),
 });
 
@@ -1606,6 +1614,10 @@ export const updatePromotionSchema = z.object({
   type: z.enum(['newsletter', 'survey', 'birthday', 'announcement', 'sale', 'event']).optional(),
   targetAudience: z.enum(['all', 'subscribers', 'customers', 'prospects', 'vip']).optional(),
   isActive: z.boolean().optional(),
+  maxUses: z.number().int().positive().optional(),
+  validFrom: z.date().optional(),
+  validTo: z.date().optional(),
+  promotionalCodes: z.array(z.string()).optional(),
   metadata: z.string().optional(),
 });
 

@@ -19,6 +19,10 @@ interface Promotion {
   targetAudience: string;
   isActive: boolean;
   usageCount: number;
+  maxUses?: number;
+  validFrom?: string;
+  validTo?: string;
+  promotionalCodes?: string[];
   createdAt: string;
   updatedAt: string;
 }
