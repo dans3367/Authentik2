@@ -1635,3 +1635,159 @@ export type Promotion = typeof promotions.$inferSelect;
 export type InsertPromotion = z.infer<typeof insertPromotionSchema>;
 export type CreatePromotionData = z.infer<typeof createPromotionSchema>;
 export type UpdatePromotionData = z.infer<typeof updatePromotionSchema>;
+
+// Appointments table for managing appointments and reminders
+export const appointments = pgTable("appointments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  customerId: varchar("customer_id").notNull().references(() => emailContacts.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }), // Who created the appointment
+  title: text("title").notNull(),
+  description: text("description"),
+  appointmentDate: timestamp("appointment_date").notNull(),
+  duration: integer("duration").default(60), // Duration in minutes
+  location: text("location"),
+  serviceType: text("service_type"), // e.g., "consultation", "meeting", "service"
+  status: text("status").notNull().default('scheduled'), // scheduled, confirmed, cancelled, completed, no_show
+  notes: text("notes"),
+  reminderSent: boolean("reminder_sent").default(false),
+  reminderSentAt: timestamp("reminder_sent_at"),
+  confirmationReceived: boolean("confirmation_received").default(false),
+  confirmationReceivedAt: timestamp("confirmation_received_at"),
+  confirmationToken: text("confirmation_token"), // Unique token for confirmation links
+  reminderSettings: text("reminder_settings"), // JSON: when to send reminders
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Appointment reminders table for tracking reminder history
+export const appointmentReminders = pgTable("appointment_reminders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  appointmentId: varchar("appointment_id").notNull().references(() => appointments.id, { onDelete: 'cascade' }),
+  customerId: varchar("customer_id").notNull().references(() => emailContacts.id, { onDelete: 'cascade' }),
+  reminderType: text("reminder_type").notNull(), // 'email', 'sms', 'push'
+  reminderTiming: text("reminder_timing").notNull(), // '24h', '1h', '30m', 'custom'
+  scheduledFor: timestamp("scheduled_for").notNull(),
+  sentAt: timestamp("sent_at"),
+  status: text("status").notNull().default('pending'), // pending, sent, failed, cancelled
+  content: text("content"), // The reminder message content
+  errorMessage: text("error_message"), // If failed, what was the error
+  metadata: text("metadata"), // JSON for additional data
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Appointment relations
+export const appointmentRelations = relations(appointments, ({ one, many }) => ({
+  tenant: one(tenants, {
+    fields: [appointments.tenantId],
+    references: [tenants.id],
+  }),
+  customer: one(emailContacts, {
+    fields: [appointments.customerId],
+    references: [emailContacts.id],
+  }),
+  user: one(betterAuthUser, {
+    fields: [appointments.userId],
+    references: [betterAuthUser.id],
+  }),
+  reminders: many(appointmentReminders),
+}));
+
+export const appointmentReminderRelations = relations(appointmentReminders, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [appointmentReminders.tenantId],
+    references: [tenants.id],
+  }),
+  appointment: one(appointments, {
+    fields: [appointmentReminders.appointmentId],
+    references: [appointments.id],
+  }),
+  customer: one(emailContacts, {
+    fields: [appointmentReminders.customerId],
+    references: [emailContacts.id],
+  }),
+}));
+
+// Update tenant relations to include appointments
+export const tenantRelationsUpdated = relations(tenants, ({ many }) => ({
+  users: many(betterAuthUser),
+  stores: many(stores),
+  shops: many(shops),
+  forms: many(forms),
+  refreshTokens: many(refreshTokens),
+  verificationTokens: many(verificationTokens),
+  formResponses: many(formResponses),
+  emailContacts: many(emailContacts),
+  emailLists: many(emailLists),
+  contactTags: many(contactTags),
+  contactListMemberships: many(contactListMemberships),
+  contactTagAssignments: many(contactTagAssignments),
+  newsletters: many(newsletters),
+  campaigns: many(campaigns),
+  emailActivities: many(emailActivity),
+  bouncedEmails: many(bouncedEmails),
+  birthdaySettings: many(birthdaySettings),
+  appointments: many(appointments),
+  appointmentReminders: many(appointmentReminders),
+}));
+
+// Appointment schemas
+export const createAppointmentSchema = z.object({
+  customerId: z.string().uuid("Please select a valid customer"),
+  title: z.string().min(1, "Appointment title is required"),
+  description: z.string().optional(),
+  appointmentDate: z.date(),
+  duration: z.number().int().positive().default(60),
+  location: z.string().optional(),
+  serviceType: z.string().optional(),
+  notes: z.string().optional(),
+  reminderSettings: z.string().optional(), // JSON string
+});
+
+export const updateAppointmentSchema = z.object({
+  title: z.string().min(1, "Appointment title is required").optional(),
+  description: z.string().optional(),
+  appointmentDate: z.date().optional(),
+  duration: z.number().int().positive().optional(),
+  location: z.string().optional(),
+  serviceType: z.string().optional(),
+  status: z.enum(['scheduled', 'confirmed', 'cancelled', 'completed', 'no_show']).optional(),
+  notes: z.string().optional(),
+  reminderSettings: z.string().optional(),
+});
+
+export const createAppointmentReminderSchema = z.object({
+  appointmentId: z.string().uuid(),
+  reminderType: z.enum(['email', 'sms', 'push']).default('email'),
+  reminderTiming: z.enum(['24h', '1h', '30m', 'custom']).default('24h'),
+  scheduledFor: z.date(),
+  content: z.string().optional(),
+});
+
+// Appointment types
+export type Appointment = typeof appointments.$inferSelect;
+export type InsertAppointment = typeof appointments.$inferInsert;
+export type CreateAppointmentData = z.infer<typeof createAppointmentSchema>;
+export type UpdateAppointmentData = z.infer<typeof updateAppointmentSchema>;
+
+export type AppointmentReminder = typeof appointmentReminders.$inferSelect;
+export type InsertAppointmentReminder = typeof appointmentReminders.$inferInsert;
+export type CreateAppointmentReminderData = z.infer<typeof createAppointmentReminderSchema>;
+
+// Extended appointment types with relationships
+export interface AppointmentWithDetails extends Appointment {
+  customer: EmailContact;
+  user: User;
+  reminders?: AppointmentReminder[];
+}
+
+export interface AppointmentFilters {
+  search?: string;
+  status?: 'scheduled' | 'confirmed' | 'cancelled' | 'completed' | 'no_show' | 'all';
+  customerId?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+  serviceType?: string;
+}

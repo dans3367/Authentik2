@@ -19,6 +19,7 @@ import {
   ClipboardList,
   X,
   Megaphone,
+  Bell,
 } from "lucide-react";
 import logoUrl from "@assets/logo.png";
 import { cn } from "@/lib/utils";
@@ -76,6 +77,7 @@ const getNavigation = (userRole?: string) => {
     { name: "Email Campaigns", href: "/email-campaigns", icon: Mail },
     { name: "Email Test", href: "/email-test", icon: Settings },
     { name: "Birthdays", href: "/birthdays", icon: Gift },
+    { name: "Reminders", href: "/reminders", icon: Bell },
     { name: "Templates", href: "/email-templates", icon: FileText },
     { name: "Contacts", href: "/email-contacts", icon: UserCheck },
     { name: "Analytics", href: "/email-analytics", icon: BarChart3 },

@@ -25,6 +25,8 @@ import { twoFactorRoutes } from "./routes/twoFactorRoutes";
 import { loginRoutes } from "./routes/loginRoutes";
 import { tenantLimitsRoutes } from "./routes/tenantLimitsRoutes";
 import { promotionRoutes } from "./routes/promotionRoutes";
+import appointmentRoutes from "./routes/appointmentRoutes";
+import appointmentRemindersRoutes from "./routes/appointmentRemindersRoutes";
 
 // Import middleware
 import { authRateLimiter, apiRateLimiter, jwtTokenRateLimiter } from "./middleware/security";
@@ -51,6 +53,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", emailManagementRoutes);
   app.use("/api/newsletters", newsletterRoutes);
   app.use("/api/promotions", promotionRoutes);
+  app.use("/api/appointments", appointmentRoutes);
+  app.use("/api/appointment-reminders", appointmentRemindersRoutes);
 
   // Newsletter stats endpoint
   app.get("/api/newsletter-stats", authenticateToken, requireTenant, async (req: any, res) => {

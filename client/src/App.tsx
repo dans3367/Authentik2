@@ -45,6 +45,8 @@ const ViewEmailContactPage = lazy(() => import("@/pages/email-contacts/view"));
 const EditEmailContactPage = lazy(() => import("@/pages/email-contacts/edit"));
 const EmailAnalyticsPage = lazy(() => import("@/pages/email-analytics"));
 const BirthdaysPage = lazy(() => import("@/pages/birthdays"));
+const RemindersPage = lazy(() => import("@/pages/reminders"));
+const ConfirmAppointmentPage = lazy(() => import("@/pages/confirm-appointment"));
 const PromotionsPage = lazy(() => import("@/pages/promotions"));
 const CreatePromotionPage = lazy(() => import("@/pages/promotions/create"));
 const EditEmailCampaignPage = lazy(() => import("@/pages/email-campaigns/edit"));
@@ -194,6 +196,7 @@ function Router() {
           <Route path="/auth" component={AuthPage} />
           <Route path="/pending-verification" component={PendingVerificationPage} />
           <Route path="/verify-email" component={VerifyEmailPage} />
+          <Route path="/confirm-appointment/:id" component={ConfirmAppointmentPage} />
 
           {/* Routes that should be wrapped in AppLayout */}
           {isAuthenticated && isEmailVerified === true ? (
@@ -220,6 +223,7 @@ function Router() {
                   <Route path="/email-contacts/edit/:id" component={EditEmailContactPage} />
                   <Route path="/email-analytics" component={EmailAnalyticsPage} />
                   <Route path="/birthdays" component={BirthdaysPage} />
+                  <Route path="/reminders" component={RemindersPage} />
                   <Route path="/shops" component={ShopsPage} />
                   <Route path="/shops/new" component={NewShopPage} />
                   <Route path="/shops/:id" component={ShopDetailsPage} />
