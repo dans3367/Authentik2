@@ -133,7 +133,7 @@ export function DataTable<TData, TValue>({
       {/* Desktop Table View */}
       <div className={cn(
         "w-full overflow-hidden border border-gray-200 dark:border-gray-700 rounded-lg",
-        enableResponsiveCards ? "hidden md:block" : ""
+        enableResponsiveCards ? "hidden lg:block" : ""
       )}>
         <Table>
           <TableHeader>
@@ -187,7 +187,7 @@ export function DataTable<TData, TValue>({
 
       {/* Mobile Card View */}
       {enableResponsiveCards && (
-        <div className="md:hidden space-y-3">
+        <div className="lg:hidden space-y-3">
           {table.getRowModel().rows?.length ? (
             table.getRowModel().rows.map((row) => (
               <Card key={row.id} className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30" data-testid={`card-row-${row.id}`}>
