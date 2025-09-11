@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { betterAuthUser, betterAuthSession, temp2faSessions } from '@shared/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, lt } from 'drizzle-orm';
 import { authenticator } from 'otplib';
 import { z } from 'zod';
 import { authenticateToken } from '../middleware/auth-middleware';
@@ -188,8 +188,9 @@ setInterval(() => {
 setInterval(async () => {
   try {
     const now = new Date();
+    // Use drizzle's lt() function instead of raw SQL to properly handle Date objects
     const result = await db.delete(temp2faSessions)
-      .where(sql`${temp2faSessions.expiresAt} < ${now}`);
+      .where(lt(temp2faSessions.expiresAt, now));
     
     if (result.rowCount && result.rowCount > 0) {
       console.log(`🧹 [Cleanup] Removed ${result.rowCount} expired temporary 2FA sessions`);

@@ -1,0 +1,23 @@
+server:
+  port: "3501"
+  host: "0.0.0.0"
+
+temporal:
+  host_port: "100.125.36.104:7233"
+  namespace: "default"
+  task_queue: "authentik-tasks"
+
+email:
+  resend_api_key: "re_f27r7h2s_BYXi6aNpimSCfCLwMeec686Q"
+  from_email: "noreply@zendwise.work"
+  retry_attempts: 5
+  retry_interval: "1m"
+
+jwt:
+  secret: "Cvgii9bYKF1HtfD8TODRyZFTmFP4vu70oR59YrjGVpS2fXzQ41O3UPRaR8u9uAqNhwK5ZxZPbX5rAOlMrqe8ag=="
+
+logging:
+  level: "info"
+  format: "json"
+
+

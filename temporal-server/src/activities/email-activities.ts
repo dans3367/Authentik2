@@ -95,10 +95,12 @@ class EmailServiceManager {
     }
 
     try {
-      activityLogger.debug(
+      activityLogger.info(
         `➡️ [Resend] Sending email to=${request.to} from=${request.from} subject="${request.subject}" tags=${(request.tags || []).join(',')}`
       );
-      const result = await this.resend.emails.send({
+      
+      // Prepare the payload for Resend
+      const emailPayload = {
         from: request.from,
         to: request.to,
         subject: request.subject,
@@ -106,18 +108,39 @@ class EmailServiceManager {
         text: request.text,
         tags: request.tags?.map(tag => ({ name: tag, value: 'true' })),
         ...(request.metadata && { metadata: request.metadata }),
+      };
+      
+      activityLogger.info(`📤 [Resend] Email payload prepared:`, {
+        to: emailPayload.to,
+        from: emailPayload.from,
+        subject: emailPayload.subject,
+        hasHtml: !!emailPayload.html,
+        hasText: !!emailPayload.text,
+        tagsCount: emailPayload.tags?.length || 0,
+        hasMetadata: !!request.metadata
       });
+      
+      const result = await this.resend.emails.send(emailPayload);
 
-      activityLogger.debug('Resend API result:', result);
+      activityLogger.debug('📨 [Resend] Raw API result:', result);
 
-      activityLogger.info(`✅ [Resend] API response id=${result.data?.id} error=${result.error ? JSON.stringify(result.error) : 'none'}`);
+      if (result.error) {
+        activityLogger.error(`❌ [Resend] API returned error:`, result.error);
+        return {
+          success: false,
+          error: `Resend API error: ${result.error.name || 'Unknown'} - ${result.error.message || 'No message'}`,
+          provider: 'resend',
+        };
+      }
+
+      activityLogger.info(`✅ [Resend] Email sent successfully - ID: ${result.data?.id}`);
       return {
         success: true,
         messageId: result.data?.id,
         provider: 'resend',
       };
     } catch (error: unknown) {
-      activityLogger.error('❌ [Resend] Send failed:', error);
+      activityLogger.error('❌ [Resend] Send failed with exception:', error);
       return {
         success: false,
         error: getErrorMessage(error) || 'Unknown error occurred with Resend',
@@ -225,6 +248,17 @@ export async function sendEmail(
   tags?: string[],
   metadata?: Record<string, any>
 ): Promise<SendEmailResult> {
+  // Validate email format before sending
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(to)) {
+    activityLogger.error(`❌ Invalid email format: ${to}`);
+    return {
+      success: false,
+      error: `Invalid email format: ${to}`,
+      provider: 'validation' as any,
+    };
+  }
+
   activityLogger.info(`📧 Sending email to ${to} via ${getEmailManager().getAvailableProviders().join(', ')}`);
 
   try {

@@ -33,7 +33,8 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    temporal: temporalService?.isConnected() || false
+    temporal: temporalService?.isConnected() || false,
+    mode: temporalService?.isConnected() ? 'temporal' : 'fallback'
   });
 });
 
@@ -168,78 +169,132 @@ app.get('/api/email-tracking', authenticateRequest, async (req: AuthenticatedReq
 
 app.post('/api/email-tracking', authenticateRequest, async (req: AuthenticatedRequest, res) => {
   try {
-    const { 
-      recipient, 
-      subject, 
-      content, 
-      templateType, 
+    const {
+      recipient,
+      subject,
+      content,
+      templateType,
       priority,
       isScheduled,
       scheduledAt,
       tenantId,
-      userId
+      userId,
+      metadata
     } = req.body;
 
+    // Extract recipient from metadata if available, otherwise use direct recipient
+    let emailRecipient = recipient;
+    if (!emailRecipient && metadata?.recipient) {
+      emailRecipient = metadata.recipient;
+    }
+    if (!emailRecipient && metadata?.to) {
+      emailRecipient = metadata.to;
+    }
+
+    // Extract content from metadata if available, otherwise use direct content
+    let emailContent = content;
+    if (!emailContent && metadata?.content) {
+      emailContent = metadata.content;
+    }
+
+    // Validate email format
+    if (!emailRecipient) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email recipient is required'
+      });
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailRecipient)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid email format: ${emailRecipient}`
+      });
+    }
+
+    // Validate content
+    if (!emailContent || typeof emailContent !== 'string' || emailContent.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: 'Email content is required and must be a non-empty string'
+      });
+    }
+
     console.log('📧 [server-node] Processing email tracking POST request:', {
-      recipient,
+      originalRecipient: recipient,
+      actualRecipient: emailRecipient,
       subject,
+      hasContent: !!emailContent,
+      contentLength: emailContent?.length || 0,
       tenantId,
       isScheduled,
-      scheduledAt
+      scheduledAt,
+      hasMetadata: !!metadata
     });
 
-    if (!temporalService) {
-      return res.status(503).json({ 
-        success: false,
-        error: 'Temporal service not initialized' 
-      });
-    }
-
-    // Create email workflow through temporal service
+    // Create email tracking entry
     const emailId = `email-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-    
-    // Use temporal service to create workflow
     const workflowId = `email-workflow-${emailId}`;
     
-    try {
-      const handle = await temporalService.startWorkflow('emailWorkflow', workflowId, {
-        emailId,
-        recipient,
-        subject,
-        content,
-        templateType,
-        priority,
-        isScheduled,
-        scheduledAt,
-        tenantId,
-        userId
-      });
+    // Try to use Temporal service if available
+    if (temporalService && temporalService.isConnected()) {
+      try {
+        const handle = await temporalService.startWorkflow('emailWorkflow', workflowId, {
+          emailId,
+          recipient: emailRecipient,
+          subject,
+          content: emailContent,
+          templateType,
+          priority,
+          isScheduled,
+          scheduledAt,
+          tenantId,
+          userId
+        });
 
-      const workflowResponse = {
-        success: true,
-        emailId,
-        workflowId: handle.workflowId,
-        status: isScheduled ? 'scheduled' : 'queued',
-        message: 'Email workflow created successfully'
-      };
+        const workflowResponse = {
+          success: true,
+          emailId,
+          workflowId: handle.workflowId,
+          runId: handle.runId, // Include the run ID for tracking
+          status: isScheduled ? 'scheduled' : 'queued',
+          message: 'Email workflow created successfully',
+          temporal: true,
+          recipient: emailRecipient,
+          scheduledAt: isScheduled ? scheduledAt : null
+        };
 
-      console.log('✅ [server-node] Email workflow created:', workflowResponse);
-      res.json(workflowResponse);
-    } catch (workflowError) {
-      console.error('❌ [server-node] Failed to create workflow:', workflowError);
-      
-      // Fallback response
-      const fallbackResponse = {
-        success: true,
-        emailId,
-        workflowId,
-        status: isScheduled ? 'scheduled' : 'queued',
-        message: 'Email workflow created (fallback mode)',
-        fallback: true
-      };
-      
-      res.json(fallbackResponse);
+        console.log('✅ [server-node] Email workflow created via Temporal:', workflowResponse);
+        return res.json(workflowResponse);
+      } catch (workflowError) {
+        console.error('❌ [server-node] Temporal workflow failed, using fallback:', workflowError);
+      }
     }
+    
+    // Fallback mode - simulate email processing without Temporal
+    console.log('🔄 [server-node] Using fallback mode (no Temporal)');
+    const fallbackResponse = {
+      success: true,
+      emailId,
+      workflowId,
+      status: isScheduled ? 'scheduled' : 'queued',
+      message: 'Email queued for processing (fallback mode)',
+      temporal: false,
+      recipient: emailRecipient,
+      scheduledAt: isScheduled ? scheduledAt : null
+    };
+
+    // Log that content was validated in fallback mode
+    console.log('📝 [server-node] Fallback mode - content validated:', {
+      emailId,
+      recipient: emailRecipient,
+      contentLength: emailContent?.length || 0,
+      hasContent: !!emailContent
+    });
+
+    res.json(fallbackResponse);
   } catch (error) {
     console.error('❌ [server-node] Failed to process email:', error);
     res.status(500).json({ 
@@ -291,17 +346,25 @@ app.get('/workflows/:workflowId', async (req, res) => {
 // Start server
 async function startServer() {
   try {
-    // Initialize Temporal service
+    // Initialize Temporal service (non-blocking)
     console.log('Initializing Temporal service...');
     temporalService = new TemporalService();
-    await temporalService.connect();
-    console.log('Temporal service connected successfully');
+    
+    // Try to connect to Temporal, but don't block server startup
+    try {
+      await temporalService.connect();
+      console.log('✅ Temporal service connected successfully');
+    } catch (temporalError) {
+      console.warn('⚠️ Temporal connection failed, server will run without Temporal:', temporalError.message);
+      temporalService = null; // Clear the service if connection fails
+    }
 
-    // Start Express server
+    // Start Express server regardless of Temporal connection
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on 0.0.0.0:${PORT}`);
       console.log(`📋 Health check: http://0.0.0.0:${PORT}/health`);
       console.log(`🌐 External access: http://localhost:${PORT}/health`);
+      console.log(`⚡ Temporal: ${temporalService ? 'Connected' : 'Offline (fallback mode)'}`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

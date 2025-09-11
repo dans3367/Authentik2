@@ -32,7 +32,7 @@ async function createTestUser() {
       .insert(users)
       .values({
         tenantId: defaultTenant.id,
-        email: "testuser@example.com",
+        email: "beats@zendwise.com",
         // Note: password field removed - Better Auth handles authentication
         firstName: "Test",
         lastName: "User",

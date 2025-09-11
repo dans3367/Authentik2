@@ -1,0 +1,40 @@
+# Email Tracking Go Server Configuration
+
+server:
+  port: 3501
+  host: "0.0.0.0"
+  
+temporal:
+  host_port: "127.0.0.1:7233"
+  namespace: "default"
+  task_queue: "email-task-queue"
+  retry_attempts: 5
+  retry_delay: "2s"
+  connection_timeout: "10s"
+
+security:
+  jwt:
+    secret_env: "JWT_SECRET"
+    algorithm: "HS256"
+  
+  cors:
+    allowed_origins: 
+      - "http://localhost:5173"                 # Local development (Vite)
+      - "http://localhost:3500"                 # Local development (main app)
+      - "https://app.zendwise.work"             # Production main app
+      - "https://zendwise.work"                 # Production main domain
+      - "https://tenginex.zendwise.work"         # Go server subdomain
+      - "https://authentik.zendwise.work"       # Authentik subdomain
+      - "https://637573c3-49ca-4c2a-a66f-8a199454d465-00-1y6orip6wcu6p.janeway.replit.dev" # Replit development domain
+    allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allowed_headers: ["Content-Type", "Authorization"]
+    allow_credentials: true
+    max_age: 86400  # 24 hours
+
+logging:
+  level: "info"
+  format: "json"
+
+email_tracking:
+  storage: "memory" # In production, this would be "database"
+  retention_days: 30

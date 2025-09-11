@@ -13,7 +13,8 @@
     "db:push": "drizzle-kit push",
     "db:init": "tsx server/init-db.ts",
     "user:set-owner": "tsx server/update-user-role.ts",
-    "db:fix-foreign-keys": "tsx server/migrate-users.ts"
+    "db:fix-foreign-keys": "tsx server/migrate-users.ts",
+    "seed:owner-company": "tsx seeders/create-owner-company-seeder.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.855.0",

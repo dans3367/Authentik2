@@ -1,0 +1,24 @@
+server:
+  port: "8096"
+  host: "0.0.0.0"
+
+temporal:
+  host_port: "100.125.36.104:7233"
+  namespace: "default"
+  task_queue: "postmark-email-task-queue"
+
+email:
+  postmark_api_key: "8ee3fc3d-c242-47e3-a252-9d832d9ca942"
+  from_email: "dan@zendwise.com"
+  retry_attempts: 5
+  retry_interval: "1m"
+
+jwt:
+  secret: "Cvgii9bYKF1HtfD8TODRyZFTmFP4vu70oR59YrjGVpS2fXzQ41O3UPRaR8u9uAqNhwK5ZxZPbX5rAOlMrqe8ag=="
+
+approvals:
+  approve_base_url: "https://tenginex.zendwise.work"
+
+logging:
+  level: "info"
+  format: "json"
