@@ -154,6 +154,76 @@
       "remindersSent": "Reminders Sent"
     }
   },
+  "birthdays": {
+    "title": "Birthday Management",
+    "subtitle": "Manage customer birthdays and automated birthday campaigns",
+    "hero": {
+      "celebration": "Celebrate Their Special",
+      "dayWith": "Day With a Thoughtful",
+      "ecard": "Birthday e-Card!",
+      "description": "Choose your contacts and we will send them a personalized birthday greeting straight to their inbox. It only takes a few clicks to brighten someone's day!"
+    },
+    "overview": {
+      "title": "Overview",
+      "totalCustomers": "Total Customers",
+      "withBirthdays": "With Birthdays",
+      "campaignsEnabled": "Campaigns Enabled",
+      "upcomingBirthdays": "Upcoming Birthdays"
+    },
+    "templates": {
+      "title": "Birthday Email Templates",
+      "confetti": "Confetti",
+      "balloons": "Balloons",
+      "selectTemplate": "Select a template for birthday emails",
+      "previewSubject": "🎉 Happy Birthday!"
+    },
+    "table": {
+      "name": "NAME",
+      "status": "STATUS",
+      "birthday": "BIRTHDAY",
+      "lists": "LISTS",
+      "activity": "ACTIVITY",
+      "campaigns": "CAMPAIGNS",
+      "actions": "ACTIONS",
+      "sent": "Sent",
+      "opened": "Opened",
+      "notSet": "use client",
+      "na": "N/A"
+    },
+    "filters": {
+      "searchPlaceholder": "Search customers...",
+      "allStatuses": "All Statuses",
+      "active": "active",
+      "inactive": "inactive",
+      "pending": "pending",
+      "subscribed": "subscribed",
+      "unsubscribed": "unsubscribed"
+    },
+    "actions": {
+      "enableSelected": "Enable Birthday Emails",
+      "disableSelected": "Disable Birthday Emails",
+      "exportBirthdays": "Export Birthdays",
+      "importBirthdays": "Import Birthdays"
+    },
+    "modal": {
+      "addTitle": "Add Birthday",
+      "editTitle": "Edit Birthday",
+      "addDescription": "Select a date to save as the contact's birthday.",
+      "editDescription": "Update the contact's birthday date.",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "toasts": {
+      "birthdayUpdated": "Birthday updated successfully",
+      "birthdayUpdateError": "Failed to update birthday",
+      "campaignEnabled": "Birthday campaign enabled",
+      "campaignDisabled": "Birthday campaign disabled",
+      "noActionNeeded": "No Action Needed",
+      "noBirthdaysSelected": "Selected customers don't have birthday dates set.",
+      "bulkUpdateSuccess": "Birthday campaigns updated successfully",
+      "bulkUpdateError": "Failed to update birthday campaigns"
+    }
+  },
   "toast": {
     "profileUpdated": "Profile updated successfully",
     "passwordChanged": "Password changed successfully",

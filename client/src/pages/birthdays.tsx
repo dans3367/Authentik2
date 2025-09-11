@@ -1,4 +1,7 @@
+"use client"
+
 import { useState, useEffect } from "react";
+import { useLanguage } from "@/hooks/useLanguage";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -13,13 +16,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { 
-  Gift, 
-  Users, 
-  Mail, 
-  Calendar, 
-  Settings, 
-  Filter, 
+import {
+  Gift,
+  Users,
+  Mail,
+  Settings,
+  Filter,
   Plus,
   Trash2,
   Edit,
@@ -33,8 +35,7 @@ import {
   CakeIcon,
   MoreVertical,
   Download,
-  Upload
-  ,
+  Upload,
   Palette
 } from "lucide-react";
 import {
@@ -45,7 +46,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calendar as DateCalendar } from "@/components/ui/calendar";
+import { Calendar } from "@/components/ui/calendar";
 
 interface BirthdaySettings {
   id: string;
@@ -100,6 +101,7 @@ interface Contact {
 export default function BirthdaysPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const { t, currentLanguage } = useLanguage();
   const [activeTab, setActiveTab] = useState<"themes" | "settings" | "segments" | "customers">("themes");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -107,7 +109,6 @@ export default function BirthdaysPage() {
   const [birthdayModalOpen, setBirthdayModalOpen] = useState(false);
   const [birthdayDraft, setBirthdayDraft] = useState<Date | undefined>(undefined);
   const [birthdayContactId, setBirthdayContactId] = useState<string | null>(null);
-  const [birthdayInput, setBirthdayInput] = useState<string>("");
 
   // Handler to navigate to add customer page
   const handleAddCustomer = () => {
@@ -321,8 +322,8 @@ export default function BirthdaysPage() {
     
     if (contactsWithBirthdays.length === 0) {
       toast({
-        title: "No Action Needed",
-        description: "Selected customers don't have birthday dates set.",
+        title: t('birthdays.toasts.noActionNeeded'),
+        description: t('birthdays.toasts.noBirthdaysSelected'),
         variant: "default",
       });
       return;
@@ -342,8 +343,8 @@ export default function BirthdaysPage() {
 
     if (contactsWithBirthdays.length === 0) {
       toast({
-        title: "No Action Needed",
-        description: "Selected customers don't have birthday dates set.",
+        title: t('birthdays.toasts.noActionNeeded'),
+        description: t('birthdays.toasts.noBirthdaysSelected'),
         variant: "default",
       });
       return;
@@ -361,21 +362,28 @@ export default function BirthdaysPage() {
       return apiRequest('PUT', `/api/email-contacts/${contactId}`, { birthday });
     },
     onSuccess: () => {
-      toast({ title: "Birthday updated" });
+      toast({ title: t('birthdays.toasts.birthdayUpdated') });
       setBirthdayModalOpen(false);
       setBirthdayDraft(undefined);
       setBirthdayContactId(null);
       refetchContacts();
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error?.message || "Failed to update birthday", variant: "destructive" });
+      toast({ title: t('common.error'), description: error?.message || t('birthdays.toasts.birthdayUpdateError'), variant: "destructive" });
     },
   });
 
   const openBirthdayModal = (contactId: string) => {
     setBirthdayContactId(contactId);
-    setBirthdayDraft(undefined);
-    setBirthdayInput("");
+    
+    // Pre-populate the calendar with existing birthday if available
+    const contact = contacts.find(c => c.id === contactId);
+    if (contact && contact.birthday) {
+      setBirthdayDraft(new Date(contact.birthday));
+    } else {
+      setBirthdayDraft(undefined);
+    }
+    
     setBirthdayModalOpen(true);
   };
 
@@ -389,33 +397,6 @@ export default function BirthdaysPage() {
 
   const onCalendarSelect = (date?: Date) => {
     setBirthdayDraft(date);
-    if (date) {
-      const y = date.getFullYear();
-      const m = `${date.getMonth() + 1}`.padStart(2, '0');
-      const d = `${date.getDate()}`.padStart(2, '0');
-      setBirthdayInput(`${y}-${m}-${d}`);
-    } else {
-      setBirthdayInput("");
-    }
-  };
-
-  const onBirthdayInputChange = (val: string) => {
-    setBirthdayInput(val);
-    const re = /^\d{4}-\d{2}-\d{2}$/;
-    if (re.test(val)) {
-      const [yy, mm, dd] = val.split('-').map(Number);
-      const candidate = new Date(yy, mm - 1, dd);
-      if (!isNaN(candidate.getTime())) {
-        // Prevent future dates
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        if (candidate.getTime() <= today.getTime()) {
-          setBirthdayDraft(candidate);
-          return;
-        }
-      }
-    }
-    setBirthdayDraft(undefined);
   };
 
   const upcomingBirthdays = customersWithBirthdays.filter(contact => {
@@ -466,7 +447,7 @@ export default function BirthdaysPage() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div key={currentLanguage} className="min-h-screen">
     <div className="mx-auto max-w-7xl p-6 space-y-8">
       {/* Greeting Header Card */}
       <Card className="rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -477,20 +458,18 @@ export default function BirthdaysPage() {
                 <div className="flex items-baseline gap-4">
                   <span className="text-4xl md:text-5xl">🎉</span>
                   <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight">
-                    Celebrate Their Special
+                    {t('birthdays.hero.celebration')}
                   </h1>
                 </div>
                 <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight">
-                  Day With a Thoughtful
+                  {t('birthdays.hero.dayWith')}
                 </h1>
                 <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight">
-                  Birthday e-Card!
+                  {t('birthdays.hero.ecard')}
                 </h1>
               </div>
               <p className="text-gray-600 dark:text-gray-400 text-lg leading-relaxed max-w-3xl md:max-w-4xl">
-                Choose your contacts and we will send them a personalized birthday
-                greeting straight to their inbox. It only takes a few clicks to brighten
-                someone's day!
+                {t('birthdays.hero.description')}
               </p>
             </div>
             <div className="justify-self-center lg:justify-self-end lg:col-span-4">
@@ -860,11 +839,11 @@ export default function BirthdaysPage() {
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                Customer Birthday Management
+                {t('birthdays.title')}
               </CardTitle>
               <Button onClick={handleAddCustomer}>
                 <UserPlus className="h-4 w-4 mr-2" />
-                Add Customer
+                {t('common.add')} Customer
               </Button>
             </div>
           </CardHeader>
@@ -874,7 +853,7 @@ export default function BirthdaysPage() {
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Search customers..."
+                  placeholder={t('birthdays.filters.searchPlaceholder')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -885,11 +864,11 @@ export default function BirthdaysPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="unsubscribed">Unsubscribed</SelectItem>
+                  <SelectItem value="all">{t('birthdays.filters.allStatuses')}</SelectItem>
+                  <SelectItem value="active">{t('birthdays.filters.active')}</SelectItem>
+                  <SelectItem value="unsubscribed">{t('birthdays.filters.unsubscribed')}</SelectItem>
                   <SelectItem value="bounced">Bounced</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="pending">{t('birthdays.filters.pending')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -974,13 +953,13 @@ export default function BirthdaysPage() {
                           aria-label="Select all customers"
                         />
                       </TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Birthday</TableHead>
-                      <TableHead>Lists</TableHead>
-                      <TableHead>Activity</TableHead>
-                      <TableHead>Birthday Email</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead>{t('birthdays.table.name')}</TableHead>
+                      <TableHead>{t('birthdays.table.status')}</TableHead>
+                      <TableHead>{t('birthdays.table.birthday')}</TableHead>
+                      <TableHead>{t('birthdays.table.lists')}</TableHead>
+                      <TableHead>{t('birthdays.table.activity')}</TableHead>
+                      <TableHead>{t('birthdays.table.campaigns')}</TableHead>
+                      <TableHead>{t('birthdays.table.actions')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1006,17 +985,21 @@ export default function BirthdaysPage() {
                         </TableCell>
                         <TableCell>
                           {contact.birthday ? (
-                            <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openBirthdayModal(contact.id)}
+                              className="flex items-center gap-2 text-left hover:bg-gray-50 p-1 rounded transition-colors"
+                            >
                               <CakeIcon className="h-4 w-4 text-pink-500" />
                               <span className="text-sm">{new Date(contact.birthday).toLocaleDateString()}</span>
-                            </div>
+                            </button>
                           ) : (
                             <button
                               type="button"
                               onClick={() => openBirthdayModal(contact.id)}
                               className="text-gray-400 text-sm underline underline-offset-2 hover:text-gray-600"
                             >
-                              Not set
+                              {t('birthdays.table.notSet')}
                             </button>
                           )}
                         </TableCell>
@@ -1031,8 +1014,8 @@ export default function BirthdaysPage() {
                         </TableCell>
                         <TableCell>
                           <div className="text-sm">
-                            <p>Sent: {contact.emailsSent}</p>
-                            <p>Opened: {contact.emailsOpened}</p>
+                            <p>{t('birthdays.table.sent')}: {contact.emailsSent}</p>
+                            <p>{t('birthdays.table.opened')}: {contact.emailsOpened}</p>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -1043,7 +1026,7 @@ export default function BirthdaysPage() {
                               disabled={toggleBirthdayEmailMutation.isPending}
                             />
                           ) : (
-                            <span className="text-gray-400 text-sm">N/A</span>
+                            <span className="text-gray-400 text-sm">{t('birthdays.table.na')}</span>
                           )}
                         </TableCell>
                         <TableCell>
@@ -1069,31 +1052,28 @@ export default function BirthdaysPage() {
       <Dialog open={birthdayModalOpen} onOpenChange={setBirthdayModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Birthday</DialogTitle>
-            <DialogDescription>Select a date to save as the contact's birthday.</DialogDescription>
+            <DialogTitle>
+              {birthdayContactId && contacts.find(c => c.id === birthdayContactId)?.birthday 
+                ? t('birthdays.modal.editTitle')
+                : t('birthdays.modal.addTitle')}
+            </DialogTitle>
+            <DialogDescription>
+              {birthdayContactId && contacts.find(c => c.id === birthdayContactId)?.birthday 
+                ? t('birthdays.modal.editDescription')
+                : t('birthdays.modal.addDescription')}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label className="text-sm">Birthday (YYYY-MM-DD)</Label>
-              <Input
-                placeholder="e.g. 1990-07-15"
-                value={birthdayInput}
-                onChange={(e) => onBirthdayInputChange(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">Dates in the future are not allowed.</p>
-            </div>
-            <DateCalendar
-              mode="single"
+            <Calendar
               selected={birthdayDraft}
               onSelect={onCalendarSelect}
-              captionLayout="dropdown-buttons"
+              disabled={{ after: new Date() }}
               fromYear={1900}
               toYear={new Date().getFullYear()}
-              disabled={{ after: new Date() }}
             />
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setBirthdayModalOpen(false)}>Cancel</Button>
-              <Button onClick={saveBirthday} disabled={!birthdayDraft || !birthdayContactId || updateContactBirthdayMutation.isPending}>Save</Button>
+              <Button variant="outline" onClick={() => setBirthdayModalOpen(false)}>{t('birthdays.modal.cancel')}</Button>
+              <Button onClick={saveBirthday} disabled={!birthdayDraft || !birthdayContactId || updateContactBirthdayMutation.isPending}>{t('birthdays.modal.save')}</Button>
             </div>
           </div>
         </DialogContent>

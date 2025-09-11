@@ -27,6 +27,8 @@ import { tenantLimitsRoutes } from "./routes/tenantLimitsRoutes";
 import { promotionRoutes } from "./routes/promotionRoutes";
 import appointmentRoutes from "./routes/appointmentRoutes";
 import appointmentRemindersRoutes from "./routes/appointmentRemindersRoutes";
+import newsletterWorkerRoutes from "./routes/newsletterWorkerRoutes";
+import suppressionManagementRoutes from "./routes/suppressionManagementRoutes";
 
 // Import middleware
 import { authRateLimiter, apiRateLimiter, jwtTokenRateLimiter } from "./middleware/security";
@@ -55,6 +57,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/promotions", promotionRoutes);
   app.use("/api/appointments", appointmentRoutes);
   app.use("/api/appointment-reminders", appointmentRemindersRoutes);
+  app.use("/api/newsletter-worker", newsletterWorkerRoutes);
+  app.use("/api/suppression", suppressionManagementRoutes);
 
   // Newsletter stats endpoint
   app.get("/api/newsletter-stats", authenticateToken, requireTenant, async (req: any, res) => {

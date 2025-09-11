@@ -154,6 +154,76 @@
       "remindersSent": "Recordatorios Enviados"
     }
   },
+  "birthdays": {
+    "title": "Gestión de Cumpleaños",
+    "subtitle": "Administra los cumpleaños de clientes y campañas automáticas de cumpleaños",
+    "hero": {
+      "celebration": "Celebra Su Día",
+      "dayWith": "Especial Con Una",
+      "ecard": "¡Tarjeta de Cumpleaños!",
+      "description": "Elige tus contactos y les enviaremos un saludo personalizado de cumpleaños directamente a su bandeja de entrada. ¡Solo toma unos clics alegrar el día de alguien!"
+    },
+    "overview": {
+      "title": "Resumen",
+      "totalCustomers": "Total de Clientes",
+      "withBirthdays": "Con Cumpleaños",
+      "campaignsEnabled": "Campañas Activadas",
+      "upcomingBirthdays": "Próximos Cumpleaños"
+    },
+    "templates": {
+      "title": "Plantillas de Email de Cumpleaños",
+      "confetti": "Confeti",
+      "balloons": "Globos",
+      "selectTemplate": "Selecciona una plantilla para emails de cumpleaños",
+      "previewSubject": "🎉 ¡Feliz Cumpleaños!"
+    },
+    "table": {
+      "name": "NOMBRE",
+      "status": "ESTADO",
+      "birthday": "CUMPLEAÑOS",
+      "lists": "LISTAS",
+      "activity": "ACTIVIDAD",
+      "campaigns": "CAMPAÑAS",
+      "actions": "ACCIONES",
+      "sent": "Enviados",
+      "opened": "Abiertos",
+      "notSet": "usar cliente",
+      "na": "N/A"
+    },
+    "filters": {
+      "searchPlaceholder": "Buscar clientes...",
+      "allStatuses": "Todos los Estados",
+      "active": "activo",
+      "inactive": "inactivo",
+      "pending": "pendiente",
+      "subscribed": "suscrito",
+      "unsubscribed": "desuscrito"
+    },
+    "actions": {
+      "enableSelected": "Habilitar Emails de Cumpleaños",
+      "disableSelected": "Deshabilitar Emails de Cumpleaños",
+      "exportBirthdays": "Exportar Cumpleaños",
+      "importBirthdays": "Importar Cumpleaños"
+    },
+    "modal": {
+      "addTitle": "Agregar Cumpleaños",
+      "editTitle": "Editar Cumpleaños",
+      "addDescription": "Selecciona una fecha para guardar como cumpleaños del contacto.",
+      "editDescription": "Actualiza la fecha de cumpleaños del contacto.",
+      "save": "Guardar",
+      "cancel": "Cancelar"
+    },
+    "toasts": {
+      "birthdayUpdated": "Cumpleaños actualizado exitosamente",
+      "birthdayUpdateError": "Error al actualizar cumpleaños",
+      "campaignEnabled": "Campaña de cumpleaños habilitada",
+      "campaignDisabled": "Campaña de cumpleaños deshabilitada",
+      "noActionNeeded": "No se Requiere Acción",
+      "noBirthdaysSelected": "Los clientes seleccionados no tienen fechas de cumpleaños configuradas.",
+      "bulkUpdateSuccess": "Campañas de cumpleaños actualizadas exitosamente",
+      "bulkUpdateError": "Error al actualizar campañas de cumpleaños"
+    }
+  },
   "toast": {
     "profileUpdated": "Perfil actualizado exitosamente",
     "passwordChanged": "Contraseña cambiada exitosamente",

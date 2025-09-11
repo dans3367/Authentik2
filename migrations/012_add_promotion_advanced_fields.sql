@@ -12,3 +12,4 @@ CREATE INDEX IF NOT EXISTS "promotions_max_uses_idx" ON "promotions" ("max_uses"
 
 -- Create a composite index for checking promotion validity
 CREATE INDEX IF NOT EXISTS "promotions_validity_idx" ON "promotions" ("valid_from", "valid_to", "is_active");
+

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Tag, Users, X, Check, User } from "lucide-react";
+import { Search, Tag, Users, X, Check, User, CheckCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -85,6 +85,13 @@ export function CustomerSegmentationModal({
       setSearchTerm("");
     }
   }, [isOpen, recipientType, selectedContactIds, selectedTagIds]);
+
+  // Auto-select all contacts when switching to "selected" tab if none are selected
+  useEffect(() => {
+    if (activeTab === 'selected' && tempSelectedContacts.length === 0 && contacts.length > 0) {
+      setTempSelectedContacts(contacts.map(contact => contact.id));
+    }
+  }, [activeTab, contacts, tempSelectedContacts.length]);
 
   const handleContactToggle = (contactId: string) => {
     setTempSelectedContacts(prev =>
@@ -174,6 +181,15 @@ export function CustomerSegmentationModal({
 
             <TabsContent value="selected" className="space-y-4">
               <div className="space-y-4">
+                {tempSelectedContacts.length === contacts.length && contacts.length > 0 && (
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-3">
+                    <div className="flex items-center text-sm text-green-700 dark:text-green-300">
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      All {contacts.length} contacts are selected by default. You can uncheck any you don't want to include.
+                    </div>
+                  </div>
+                )}
+                
                 <div className="flex items-center space-x-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -184,17 +200,34 @@ export function CustomerSegmentationModal({
                       className="pl-10"
                     />
                   </div>
-                  <Button
-                    variant="outline"
-                    onClick={() => setTempSelectedContacts([])}
-                    disabled={tempSelectedContacts.length === 0}
-                  >
-                    Clear All
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setTempSelectedContacts(contacts.map(contact => contact.id))}
+                      disabled={tempSelectedContacts.length === contacts.length}
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setTempSelectedContacts([])}
+                      disabled={tempSelectedContacts.length === 0}
+                    >
+                      Clear All
+                    </Button>
+                  </div>
                 </div>
 
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                  {tempSelectedContacts.length} of {filteredContacts.length} customers selected
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    {tempSelectedContacts.length} of {filteredContacts.length} customers selected
+                  </div>
+                  {tempSelectedContacts.length === contacts.length && contacts.length > 0 && (
+                    <div className="flex items-center text-sm text-green-600 dark:text-green-400">
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      All contacts selected
+                    </div>
+                  )}
                 </div>
 
                 <div className="max-h-96 overflow-y-auto border rounded-lg">

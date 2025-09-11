@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -252,6 +252,18 @@ export default function NewsletterCreatePage() {
 
   const contacts = (contactsData as any)?.contacts || [];
   const tags = (tagsData as any)?.tags || [];
+
+  // Auto-select all contacts when segmentation changes to 'selected' with no contacts selected
+  useEffect(() => {
+    if (segmentationData.recipientType === 'selected' && 
+        segmentationData.selectedContactIds.length === 0 && 
+        contacts.length > 0) {
+      setSegmentationData(prev => ({
+        ...prev,
+        selectedContactIds: contacts.map((contact: any) => contact.id)
+      }));
+    }
+  }, [segmentationData.recipientType, contacts, segmentationData.selectedContactIds.length]);
 
   const getSegmentationSummary = () => {
     switch (segmentationData.recipientType) {

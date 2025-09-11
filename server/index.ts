@@ -16,6 +16,7 @@ import {
 import { auth } from "./auth";
 import { toNodeHandler } from "better-auth/node";
 import { serverLogger } from "./logger";
+import { newsletterWorkerService } from "./services/NewsletterWorkerService";
 
 const app = express();
 
@@ -113,6 +114,16 @@ app.use((req, res, next) => {
   } catch (error) {
     console.error("Failed to initialize database:", error);
     process.exit(1);
+  }
+
+  // Initialize Newsletter Worker Service
+  try {
+    serverLogger.info('🏭 Starting Newsletter Worker Service...');
+    await newsletterWorkerService.start();
+    serverLogger.info('✅ Newsletter Worker Service started');
+  } catch (error) {
+    serverLogger.error("Failed to initialize Newsletter Worker Service:", error);
+    // Don't exit - continue without worker service
   }
 
   // Check server-node connectivity

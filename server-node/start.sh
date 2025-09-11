@@ -38,6 +38,42 @@ check_port() {
     fi
 }
 
+# Function to kill process using a specific port
+kill_port_process() {
+    local port=$1
+    print_warning "Port $port is in use, searching for process..."
+
+    # Find the PID of the process using the port
+    local pid=$(lsof -ti:$port)
+
+    if [ ! -z "$pid" ]; then
+        print_warning "Found process $pid using port $port"
+
+        # Get process information for logging
+        local process_info=$(ps -p $pid -o pid,ppid,cmd | tail -1)
+        print_warning "Process details: $process_info"
+
+        # Kill the process
+        print_warning "Terminating process $pid..."
+        kill -9 $pid 2>/dev/null
+
+        # Wait a moment for the process to die
+        sleep 2
+
+        # Check if the port is now free
+        if check_port $port; then
+            print_error "Failed to kill process on port $port"
+            return 1
+        else
+            print_success "Successfully killed process on port $port"
+            return 0
+        fi
+    else
+        print_warning "No process found using port $port"
+        return 1
+    fi
+}
+
 # Set environment variables for both services
 export PORT=3502
 export NODE_ENV=${NODE_ENV:-development}
@@ -56,13 +92,23 @@ print_status "Temporal Server Port: $TEMPORAL_SERVER_PORT"
 # Check required ports
 print_status "Checking required ports..."
 if check_port $PORT; then
-    print_error "Server-node port $PORT is already in use"
-    exit 1
+    print_warning "Server-node port $PORT is already in use"
+    if kill_port_process $PORT; then
+        print_success "Port $PORT is now available"
+    else
+        print_error "Failed to free port $PORT"
+        exit 1
+    fi
 fi
 
 if check_port $TEMPORAL_SERVER_PORT; then
-    print_error "Temporal server port $TEMPORAL_SERVER_PORT is already in use"
-    exit 1
+    print_warning "Temporal server port $TEMPORAL_SERVER_PORT is already in use"
+    if kill_port_process $TEMPORAL_SERVER_PORT; then
+        print_success "Port $TEMPORAL_SERVER_PORT is now available"
+    else
+        print_error "Failed to free port $TEMPORAL_SERVER_PORT"
+        exit 1
+    fi
 fi
 print_success "All required ports are available"
 
