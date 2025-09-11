@@ -102,19 +102,10 @@ export default function EmailContacts() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  // Store search params in a ref to use in query function without changing dependencies
-  const searchParamsRef = useRef({
-    search: "",
-    status: "all",
-    listId: undefined as string | undefined
-  });
-
   // Handle search changes from ContactSearch component
   const handleSearchChange = useCallback((search: string) => {
     setSearchQuery(search);
   }, []);
-
-
 
   // Fetch email contacts stats (independent of search/filters) with enhanced caching
   const { data: statsData } = useQuery({
@@ -131,25 +122,15 @@ export default function EmailContacts() {
     refetchIntervalInBackground: true,
   });
 
-  // Initialize search params ref on first render
-  useEffect(() => {
-    searchParamsRef.current = {
-      search: "",
-      status: "all",
-      listId: undefined
-    };
-  }, []);
 
   // Fetch email contacts with enhanced caching strategy
-  const { data: contactsData, isLoading: contactsLoading, error: contactsError, isFetching, refetch } = useQuery({
+  const { data: contactsData, isLoading: contactsLoading, error: contactsError, isFetching } = useQuery({
     queryKey: ['/api/email-contacts', searchQuery, statusFilter], // Include search params in key for better caching
     queryFn: async () => {
       const params = new URLSearchParams();
-      const currentParams = searchParamsRef.current;
 
-      if (currentParams.search) params.append('search', currentParams.search);
-      if (currentParams.status !== 'all') params.append('status', currentParams.status);
-      if (currentParams.listId) params.append('listId', currentParams.listId);
+      if (searchQuery) params.append('search', searchQuery);
+      if (statusFilter !== 'all') params.append('status', statusFilter);
 
       const response = await apiRequest('GET', `/api/email-contacts?${params.toString()}`);
       return response.json();
@@ -164,19 +145,7 @@ export default function EmailContacts() {
     networkMode: 'offlineFirst',
   });
 
-  // Debounced search effect
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      searchParamsRef.current = {
-        search: searchQuery,
-        status: statusFilter,
-        listId: undefined
-      };
-      refetch();
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [searchQuery, statusFilter, refetch]);
+  // Remove the manual refetch useEffect - TanStack Query will automatically refetch when queryKey changes
 
   const contacts: Contact[] = (contactsData as any)?.contacts || [];
   const stats: ContactStats = (statsData as any)?.stats || {
