@@ -33,6 +33,8 @@ import {
   MoreVertical,
   Download,
   Upload
+  ,
+  Palette
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -41,6 +43,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Calendar as DateCalendar } from "@/components/ui/calendar";
 
 interface BirthdaySettings {
   id: string;
@@ -94,10 +98,14 @@ interface Contact {
 
 export default function BirthdaysPage() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"settings" | "segments" | "customers">("settings");
+  const [activeTab, setActiveTab] = useState<"themes" | "settings" | "segments" | "customers">("themes");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
+  const [birthdayModalOpen, setBirthdayModalOpen] = useState(false);
+  const [birthdayDraft, setBirthdayDraft] = useState<Date | undefined>(undefined);
+  const [birthdayContactId, setBirthdayContactId] = useState<string | null>(null);
+  const [birthdayInput, setBirthdayInput] = useState<string>("");
 
   // Fetch birthday settings
   const { 
@@ -340,6 +348,69 @@ export default function BirthdaysPage() {
     });
   };
 
+  // Mutation: update a contact's birthday
+  const updateContactBirthdayMutation = useMutation({
+    mutationFn: async ({ contactId, birthday }: { contactId: string; birthday: string }) => {
+      return apiRequest('PUT', `/api/email-contacts/${contactId}`, { birthday });
+    },
+    onSuccess: () => {
+      toast({ title: "Birthday updated" });
+      setBirthdayModalOpen(false);
+      setBirthdayDraft(undefined);
+      setBirthdayContactId(null);
+      refetchContacts();
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error?.message || "Failed to update birthday", variant: "destructive" });
+    },
+  });
+
+  const openBirthdayModal = (contactId: string) => {
+    setBirthdayContactId(contactId);
+    setBirthdayDraft(undefined);
+    setBirthdayInput("");
+    setBirthdayModalOpen(true);
+  };
+
+  const saveBirthday = () => {
+    if (!birthdayContactId || !birthdayDraft) return;
+    const y = birthdayDraft.getFullYear();
+    const m = `${birthdayDraft.getMonth() + 1}`.padStart(2, '0');
+    const d = `${birthdayDraft.getDate()}`.padStart(2, '0');
+    updateContactBirthdayMutation.mutate({ contactId: birthdayContactId, birthday: `${y}-${m}-${d}` });
+  };
+
+  const onCalendarSelect = (date?: Date) => {
+    setBirthdayDraft(date);
+    if (date) {
+      const y = date.getFullYear();
+      const m = `${date.getMonth() + 1}`.padStart(2, '0');
+      const d = `${date.getDate()}`.padStart(2, '0');
+      setBirthdayInput(`${y}-${m}-${d}`);
+    } else {
+      setBirthdayInput("");
+    }
+  };
+
+  const onBirthdayInputChange = (val: string) => {
+    setBirthdayInput(val);
+    const re = /^\d{4}-\d{2}-\d{2}$/;
+    if (re.test(val)) {
+      const [yy, mm, dd] = val.split('-').map(Number);
+      const candidate = new Date(yy, mm - 1, dd);
+      if (!isNaN(candidate.getTime())) {
+        // Prevent future dates
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        if (candidate.getTime() <= today.getTime()) {
+          setBirthdayDraft(candidate);
+          return;
+        }
+      }
+    }
+    setBirthdayDraft(undefined);
+  };
+
   const upcomingBirthdays = customersWithBirthdays.filter(contact => {
     if (!contact.birthday) return false;
     const birthday = new Date(contact.birthday);
@@ -393,24 +464,33 @@ export default function BirthdaysPage() {
       {/* Greeting Header Card */}
       <Card className="rounded-2xl border border-gray-200 bg-white shadow-sm">
         <CardContent className="p-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-            <div className="space-y-5">
-              <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 leading-tight tracking-tight text-balance">
-                <span className="inline-flex items-center gap-7">
-                  <span className="text-4xl sm:text-5xl">🎉</span>
-                  <span>Celebrate Their Special Day</span>
-                </span>
-                <span className="block">with a Thoughtful Birthday e-Card</span>
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 text-lg max-w-3xl">
-                Choose your contacts and we will send them a personalized birthday greeting straight to their inbox. It only takes a few clicks to brighten someone’s day!
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            <div className="space-y-8 pr-6 xl:pr-12 lg:col-span-8">
+              <div className="space-y-3">
+                <div className="flex items-baseline gap-4">
+                  <span className="text-4xl md:text-5xl">🎉</span>
+                  <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight">
+                    Celebrate Their Special
+                  </h1>
+                </div>
+                <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight">
+                  Day With a Thoughtful
+                </h1>
+                <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight">
+                  Birthday e-Card!
+                </h1>
+              </div>
+              <p className="text-gray-600 dark:text-gray-400 text-lg leading-relaxed max-w-3xl md:max-w-4xl">
+                Choose your contacts and we will send them a personalized birthday
+                greeting straight to their inbox. It only takes a few clicks to brighten
+                someone's day!
               </p>
             </div>
-            <div className="justify-self-center lg:justify-self-end">
+            <div className="justify-self-center lg:justify-self-end lg:col-span-4">
               <img
                 src="/guy_present.svg"
                 alt="Person with birthday present illustration"
-                className="w-[360px] max-w-full h-auto"
+                className="w-[360px] xl:w-[420px] max-w-full h-auto"
               />
             </div>
           </div>
@@ -419,6 +499,15 @@ export default function BirthdaysPage() {
 
       {/* Navigation Tabs */}
       <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg w-fit">
+        <Button
+          variant={activeTab === "themes" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setActiveTab("themes")}
+          className="flex items-center gap-2"
+        >
+          <Palette className="h-4 w-4" />
+          Themes
+        </Button>
         <Button
           variant={activeTab === "settings" ? "default" : "ghost"}
           size="sm"
@@ -452,6 +541,74 @@ export default function BirthdaysPage() {
           )}
         </Button>
       </div>
+
+      {/* Themes Tab */}
+      {activeTab === "themes" && (
+        <Card className="w-11/12">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Palette className="h-5 w-5" />
+              Themes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div>
+              <Label className="text-sm">Choose a Template</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
+                {[
+                  { id: 'default', name: 'Default' },
+                  { id: 'confetti', name: 'Confetti' },
+                  { id: 'balloons', name: 'Balloons' },
+                ].map((tpl) => {
+                  const isSelected = (birthdaySettings?.emailTemplate || 'default') === tpl.id;
+                  return (
+                    <button
+                      key={tpl.id}
+                      type="button"
+                      onClick={() => handleSettingsUpdate('emailTemplate', tpl.id)}
+                      disabled={updateSettingsMutation.isPending}
+                      className={`relative rounded-xl border p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${isSelected ? 'ring-2 ring-blue-600 border-blue-600' : 'border-gray-200 hover:border-gray-300'}`}
+                    >
+                      <div className="relative h-40 rounded-lg overflow-hidden">
+                        {tpl.id === 'default' && (
+                          <div className="absolute inset-0 bg-white" />
+                        )}
+                        {tpl.id === 'confetti' && (
+                          <div className="absolute inset-0 bg-gradient-to-br from-rose-50 via-pink-50 to-purple-50" />
+                        )}
+                        {tpl.id === 'balloons' && (
+                          <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-cyan-50 to-indigo-50" />
+                        )}
+
+                        {tpl.id !== 'default' && (
+                          <>
+                            <span className="absolute left-3 top-3 text-2xl opacity-70">{tpl.id === 'confetti' ? '🎉' : '🎈'}</span>
+                            <span className="absolute right-4 top-6 text-xl opacity-60">{tpl.id === 'confetti' ? '🎁' : '🎈'}</span>
+                            <span className="absolute left-8 bottom-6 text-xl opacity-60">{tpl.id === 'confetti' ? '🎂' : '🎈'}</span>
+                          </>
+                        )}
+
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="text-center">
+                            <div className="font-bold text-gray-900">Happy Birthday!</div>
+                            <div className="text-xs text-gray-500">{tpl.name} preview</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-900">{tpl.name}</span>
+                        {isSelected && (
+                          <span className="text-xs font-semibold text-blue-600">Selected</span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Settings Tab */}
       {activeTab === "settings" && (
@@ -527,6 +684,7 @@ export default function BirthdaysPage() {
                         disabled={updateSettingsMutation.isPending}
                       />
                     </div>
+                    
                   </div>
                 </div>
 
@@ -846,7 +1004,13 @@ export default function BirthdaysPage() {
                               <span className="text-sm">{new Date(contact.birthday).toLocaleDateString()}</span>
                             </div>
                           ) : (
-                            <span className="text-gray-400 text-sm">Not set</span>
+                            <button
+                              type="button"
+                              onClick={() => openBirthdayModal(contact.id)}
+                              className="text-gray-400 text-sm underline underline-offset-2 hover:text-gray-600"
+                            >
+                              Not set
+                            </button>
                           )}
                         </TableCell>
                         <TableCell>
@@ -894,6 +1058,39 @@ export default function BirthdaysPage() {
           </CardContent>
         </Card>
       )}
+      {/* Birthday Modal */}
+      <Dialog open={birthdayModalOpen} onOpenChange={setBirthdayModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Birthday</DialogTitle>
+            <DialogDescription>Select a date to save as the contact's birthday.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm">Birthday (YYYY-MM-DD)</Label>
+              <Input
+                placeholder="e.g. 1990-07-15"
+                value={birthdayInput}
+                onChange={(e) => onBirthdayInputChange(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Dates in the future are not allowed.</p>
+            </div>
+            <DateCalendar
+              mode="single"
+              selected={birthdayDraft}
+              onSelect={onCalendarSelect}
+              captionLayout="dropdown-buttons"
+              fromYear={1900}
+              toYear={new Date().getFullYear()}
+              disabled={{ after: new Date() }}
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setBirthdayModalOpen(false)}>Cancel</Button>
+              <Button onClick={saveBirthday} disabled={!birthdayDraft || !birthdayContactId || updateContactBirthdayMutation.isPending}>Save</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
     </div>
   );

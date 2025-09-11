@@ -320,7 +320,7 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
 emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
-    const { email, firstName, lastName, status } = req.body;
+    const { email, firstName, lastName, status, birthday } = req.body;
 
     const contact = await db.query.emailContacts.findFirst({
       where: sql`${emailContacts.id} = ${id}`,
@@ -359,6 +359,16 @@ emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenan
 
     if (status !== undefined) {
       updateData.status = status;
+    }
+
+    // Optional birthday update in YYYY-MM-DD format
+    if (birthday !== undefined) {
+      // Minimal validation: YYYY-MM-DD
+      const isValid = typeof birthday === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(birthday);
+      if (!isValid) {
+        return res.status(400).json({ message: 'Birthday must be in YYYY-MM-DD format' });
+      }
+      updateData.birthday = birthday || null;
     }
 
     const updatedContact = await db.update(emailContacts)
