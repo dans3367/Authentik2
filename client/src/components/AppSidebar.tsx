@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard,
   Gift,
@@ -68,25 +69,25 @@ interface ExtendedUser {
   tenantId?: string;
 }
 
-const getNavigation = (userRole?: string) => {
+const getNavigation = (userRole?: string, t?: any) => {
   const baseNavigation = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Newsletter", href: "/newsletter", icon: Newspaper },
-    { name: "Promotions", href: "/promotions", icon: Megaphone },
-    { name: "Forms", href: "/forms", icon: ClipboardList },
-    { name: "Email Campaigns", href: "/email-campaigns", icon: Mail },
-    { name: "Email Test", href: "/email-test", icon: Settings },
-    { name: "Birthdays", href: "/birthdays", icon: Gift },
-    { name: "Reminders", href: "/reminders", icon: Bell },
-    { name: "Templates", href: "/email-templates", icon: FileText },
-    { name: "Contacts", href: "/email-contacts", icon: UserCheck },
-    { name: "Analytics", href: "/email-analytics", icon: BarChart3 },
-    { name: "Shops", href: "/shops", icon: Store },
+    { name: t?.('navigation.dashboard') || "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: t?.('navigation.newsletter') || "Newsletter", href: "/newsletter", icon: Newspaper },
+    { name: t?.('navigation.promotions') || "Promotions", href: "/promotions", icon: Megaphone },
+    { name: t?.('navigation.forms') || "Forms", href: "/forms", icon: ClipboardList },
+    { name: t?.('navigation.emailCampaigns') || "Email Campaigns", href: "/email-campaigns", icon: Mail },
+    { name: t?.('navigation.emailTest') || "Email Test", href: "/email-test", icon: Settings },
+    { name: t?.('navigation.birthdays') || "Birthdays", href: "/birthdays", icon: Gift },
+    { name: t?.('navigation.reminders') || "Reminders", href: "/reminders", icon: Bell },
+    { name: t?.('navigation.templates') || "Templates", href: "/email-templates", icon: FileText },
+    { name: t?.('navigation.contacts') || "Contacts", href: "/email-contacts", icon: UserCheck },
+    { name: t?.('navigation.analytics') || "Analytics", href: "/email-analytics", icon: BarChart3 },
+    { name: t?.('navigation.shops') || "Shops", href: "/shops", icon: Store },
   ];
 
   // Add Users management for Owner, Admin and Manager roles
   if (userRole === "Owner" || userRole === "Administrator" || userRole === "Manager") {
-    baseNavigation.push({ name: "Users", href: "/users", icon: Users });
+    baseNavigation.push({ name: t?.('navigation.users') || "Users", href: "/users", icon: Users });
   }
 
   return baseNavigation;
@@ -97,6 +98,7 @@ export function AppSidebar() {
   const { user } = useReduxAuth();
   const { logout } = useReduxLogout();
   const { theme, toggleTheme } = useTheme();
+  const { t } = useTranslation();
   
   // Cast user to extended type to access custom fields
   const extendedUser = user as ExtendedUser | null;
@@ -111,7 +113,7 @@ export function AppSidebar() {
     } : null 
   });
   
-  const navigation = getNavigation(extendedUser?.role);
+  const navigation = getNavigation(extendedUser?.role, t);
   const updateThemeMutation = useUpdateTheme();
   const [isThemeChanging, setIsThemeChanging] = useState(false);
   const { state, isMobile, setOpenMobile } = useSidebar();

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useTranslation } from 'react-i18next';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,6 +96,7 @@ interface AppointmentReminder {
 export default function RemindersPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<"appointments" | "reminders" | "settings">("appointments");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -322,18 +324,14 @@ export default function RemindersPage() {
                 <div className="space-y-3">
                   <div className="flex items-baseline gap-4">
                     <span className="text-4xl md:text-5xl">🔔</span>
-                    <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight">
-                      Never Miss an
-                    </h1>
-                  </div>
                   <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight">
-                    Appointment Again!
+                    {t('reminders.title')}
                   </h1>
                 </div>
-                <p className="text-gray-600 dark:text-gray-400 text-lg leading-relaxed max-w-3xl md:max-w-4xl">
-                  Manage your appointments and send automated reminders to your customers. 
-                  Keep everyone informed and reduce no-shows with our smart reminder system.
-                </p>
+              </div>
+              <p className="text-gray-600 dark:text-gray-400 text-lg leading-relaxed max-w-3xl md:max-w-4xl">
+                {t('reminders.subtitle')}
+              </p>
               </div>
               <div className="justify-self-center lg:justify-self-end lg:col-span-4">
                 <div className="w-[360px] xl:w-[420px] max-w-full h-auto bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl p-8 flex items-center justify-center">

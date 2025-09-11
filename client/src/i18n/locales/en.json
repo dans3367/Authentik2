@@ -1,0 +1,171 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "loading": "Loading",
+    "error": "Error",
+    "success": "Success",
+    "confirm": "Confirm",
+    "close": "Close",
+    "settings": "Settings",
+    "preferences": "Preferences",
+    "language": "Language",
+    "search": "Search",
+    "filter": "Filter",
+    "add": "Add",
+    "remove": "Remove",
+    "create": "Create",
+    "update": "Update",
+    "view": "View",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "submit": "Submit",
+    "reset": "Reset",
+    "clear": "Clear",
+    "select": "Select",
+    "all": "All",
+    "none": "None",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "newsletter": "Newsletter",
+    "promotions": "Promotions",
+    "forms": "Forms",
+    "emailCampaigns": "Email Campaigns",
+    "emailTest": "Email Test",
+    "birthdays": "Birthdays",
+    "reminders": "Reminders",
+    "templates": "Templates",
+    "contacts": "Contacts",
+    "analytics": "Analytics",
+    "shops": "Shops",
+    "users": "Users"
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout",
+    "signup": "Sign Up",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "forgotPassword": "Forgot Password",
+    "rememberMe": "Remember Me",
+    "signInWith": "Sign in with",
+    "orContinueWith": "Or continue with",
+    "alreadyHaveAccount": "Already have an account?",
+    "dontHaveAccount": "Don't have an account?",
+    "signIn": "Sign In",
+    "createAccount": "Create Account"
+  },
+  "profile": {
+    "title": "Account Settings",
+    "subtitle": "Manage your account information and security settings",
+    "tabs": {
+      "profile": "Profile",
+      "preferences": "Preferences",
+      "security": "Security",
+      "twoFactor": "2FA",
+      "subscription": "Subscription",
+      "danger": "Danger"
+    },
+    "personalInfo": {
+      "title": "Personal Information",
+      "updateAvatar": "Click to update your profile picture",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email Address",
+      "saveChanges": "Save Changes",
+      "updating": "Updating..."
+    },
+    "preferences": {
+      "title": "Application Preferences",
+      "expandedMenu": {
+        "title": "Expanded Navigation Menu",
+        "description": "Show navigation menu expanded by default with labels visible"
+      },
+      "language": {
+        "title": "Language",
+        "description": "Choose your preferred language for the interface",
+        "english": "English",
+        "spanish": "Spanish"
+      }
+    },
+    "security": {
+      "title": "Change Password",
+      "currentPassword": "Current Password",
+      "newPassword": "New Password",
+      "confirmNewPassword": "Confirm New Password",
+      "passwordStrength": "Password strength",
+      "changing": "Changing...",
+      "changePassword": "Change Password"
+    },
+    "twoFactor": {
+      "title": "Two-Factor Authentication",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "enableDescription": "Add an extra layer of security to your account",
+      "disableDescription": "Your account is protected with two-factor authentication",
+      "setUp": "Set up 2FA",
+      "disable": "Disable 2FA",
+      "settingUp": "Setting up...",
+      "enabling": "Enabling...",
+      "disabling": "Disabling..."
+    },
+    "dangerZone": {
+      "title": "Danger Zone",
+      "deleteAccount": "Delete Account",
+      "deleteDescription": "Once you delete your account, there is no going back. This will permanently deactivate your account and remove all your data including your profile, settings, and all associated information.",
+      "deleteConfirmation": "Are you absolutely sure you want to delete your account? This action cannot be undone and will permanently remove all your data.",
+      "deleting": "Deleting..."
+    }
+  },
+  "reminders": {
+    "title": "Never Miss an Appointment Again!",
+    "subtitle": "Manage your appointments and send automated reminders to your customers. Keep everyone informed and reduce no-shows with our smart reminder system.",
+    "tabs": {
+      "appointments": "Appointments",
+      "reminders": "Reminders", 
+      "settings": "Settings"
+    },
+    "appointments": {
+      "newAppointment": "New Appointment",
+      "createAppointment": "Create Appointment",
+      "customer": "Customer",
+      "title": "Title",
+      "dateTime": "Date & Time",
+      "duration": "Duration (minutes)",
+      "location": "Location",
+      "status": "Status",
+      "sendReminders": "Send Reminders",
+      "noAppointments": "No appointments found",
+      "createFirst": "Create your first appointment to get started"
+    },
+    "overview": {
+      "total": "Total Appointments",
+      "upcoming": "Upcoming",
+      "confirmed": "Confirmed",
+      "remindersSent": "Reminders Sent"
+    }
+  },
+  "toast": {
+    "profileUpdated": "Profile updated successfully",
+    "passwordChanged": "Password changed successfully",
+    "languageChanged": "Language changed successfully",
+    "error": "An error occurred",
+    "success": "Operation completed successfully"
+  },
+  "validation": {
+    "required": "This field is required",
+    "invalidEmail": "Please enter a valid email address",
+    "passwordTooShort": "Password must be at least 8 characters",
+    "passwordsDoNotMatch": "Passwords don't match",
+    "invalidFormat": "Invalid format"
+  }
+}

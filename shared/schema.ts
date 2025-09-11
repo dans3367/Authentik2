@@ -27,6 +27,7 @@ export const betterAuthUser = pgTable("better_auth_user", {
   lastLoginAt: timestamp("last_login_at"), // Track last login for user management
   menuExpanded: boolean("menu_expanded").default(false), // New field for menu preference
   theme: text("theme").default('light'), // Theme preference: 'light' or 'dark'
+  language: text("language").default('en'), // Language preference: 'en' or 'es'
   avatarUrl: text("avatar_url"), // User avatar URL from Cloudflare R2
   tokenValidAfter: timestamp("token_valid_after").defaultNow(), // Tokens issued before this time are invalid
   // Stripe fields for subscription management
@@ -663,6 +664,7 @@ export const updateProfileSchema = z.object({
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Please enter a valid email address"),
   theme: z.enum(['light', 'dark']).optional(),
+  language: z.enum(['en', 'es']).optional(),
 });
 
 export const verifyEmailSchema = z.object({

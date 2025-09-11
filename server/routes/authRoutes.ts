@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { betterAuthSession, betterAuthUser } from '@shared/schema';
+import { betterAuthSession, betterAuthUser, updateProfileSchema } from '@shared/schema';
 import { eq, and, not } from 'drizzle-orm';
 import { authenticateToken } from '../middleware/auth-middleware';
 
@@ -160,5 +160,37 @@ authRoutes.post("/logout-all", authenticateToken, async (req: any, res) => {
   } catch (error) {
     console.error('Logout all sessions error:', error);
     res.status(500).json({ message: 'Failed to logout other sessions' });
+  }
+});
+
+// Update user profile (language, theme, menu preferences)
+authRoutes.patch("/user/profile", authenticateToken, async (req: any, res) => {
+  try {
+    const userId = req.user.id;
+    const updateData = req.body;
+
+    // Validate the update data
+    const validatedData = updateProfileSchema.partial().parse(updateData);
+
+    // Update the user's profile
+    const updatedUser = await db.update(betterAuthUser)
+      .set({
+        ...validatedData,
+        updatedAt: new Date(),
+      })
+      .where(eq(betterAuthUser.id, userId))
+      .returning();
+
+    if (updatedUser.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      message: 'Profile updated successfully',
+      user: updatedUser[0],
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ message: 'Failed to update profile' });
   }
 });
