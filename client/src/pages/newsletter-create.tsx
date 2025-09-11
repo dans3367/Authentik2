@@ -3,9 +3,10 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useLocation } from "wouter";
-import { ArrowLeft, Save, Send, Eye, Users, Tag, User, Edit, Server, CheckCircle, XCircle, Loader2, Clock } from "lucide-react";
+import { ArrowLeft, Save, Send, Eye, Users, Tag, User, Edit, Server, CheckCircle, XCircle, Loader2, Clock, Megaphone } from "lucide-react";
 import { useSession } from "@/lib/betterAuthClient";
 import { CustomerSegmentationModal } from "@/components/CustomerSegmentationModal";
+import { PromotionSelector } from "@/components/PromotionSelector";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +43,13 @@ export default function NewsletterCreatePage() {
     selectedContactIds: [] as string[],
     selectedTagIds: [] as string[],
   });
+  const [selectedPromotions, setSelectedPromotions] = useState<string[]>([]);
+
+  const handlePromotionContentInsert = (content: string) => {
+    const currentContent = form.getValues("content");
+    const newContent = currentContent ? `${currentContent}\n\n${content}` : content;
+    form.setValue("content", newContent);
+  };
 
   const form = useForm<CreateNewsletterData>({
     resolver: zodResolver(createNewsletterSchema),
@@ -384,6 +392,34 @@ export default function NewsletterCreatePage() {
                     <Edit className="h-4 w-4 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">
                       You can use HTML tags for rich formatting in your newsletter content.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Promotions Card */}
+            <Card className="group transition-all duration-200 hover:shadow-lg hover:shadow-orange-500/5 border-border/50 hover:border-orange-200/30">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-orange-100 to-orange-50 dark:from-orange-950/30 dark:to-orange-950/10 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <Megaphone className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <span className="text-xl font-semibold tracking-tight">Promotional Content</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <PromotionSelector
+                    selectedPromotions={selectedPromotions}
+                    onPromotionsChange={setSelectedPromotions}
+                    onPromotionContentInsert={handlePromotionContentInsert}
+                    campaignType="newsletter"
+                  />
+                  <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border border-border/50">
+                    <Megaphone className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      Add promotional content from your saved templates to enhance your newsletter.
                     </p>
                   </div>
                 </div>

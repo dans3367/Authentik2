@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,6 +99,7 @@ interface Contact {
 
 export default function BirthdaysPage() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<"themes" | "settings" | "segments" | "customers">("themes");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -106,6 +108,11 @@ export default function BirthdaysPage() {
   const [birthdayDraft, setBirthdayDraft] = useState<Date | undefined>(undefined);
   const [birthdayContactId, setBirthdayContactId] = useState<string | null>(null);
   const [birthdayInput, setBirthdayInput] = useState<string>("");
+
+  // Handler to navigate to add customer page
+  const handleAddCustomer = () => {
+    setLocation('/email-contacts/new');
+  };
 
   // Fetch birthday settings
   const { 
@@ -855,7 +862,7 @@ export default function BirthdaysPage() {
                 <Users className="h-5 w-5" />
                 Customer Birthday Management
               </CardTitle>
-              <Button>
+              <Button onClick={handleAddCustomer}>
                 <UserPlus className="h-4 w-4 mr-2" />
                 Add Customer
               </Button>
@@ -950,7 +957,7 @@ export default function BirthdaysPage() {
                 <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                 <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">No customers found</p>
                 <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">Start by adding your first customer to begin managing birthday emails</p>
-                <Button>
+                <Button onClick={handleAddCustomer}>
                   <UserPlus className="h-4 w-4 mr-2" />
                   Add Your First Customer
                 </Button>

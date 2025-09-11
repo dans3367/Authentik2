@@ -1558,3 +1558,68 @@ export type BirthdaySettings = typeof birthdaySettings.$inferSelect;
 export type InsertBirthdaySettings = z.infer<typeof insertBirthdaySettingsSchema>;
 export type CreateBirthdaySettingsData = z.infer<typeof createBirthdaySettingsSchema>;
 export type UpdateBirthdaySettingsData = z.infer<typeof updateBirthdaySettingsSchema>;
+
+// Promotions table for managing promotional content templates
+export const promotions = pgTable("promotions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
+  title: text("title").notNull(),
+  description: text("description"),
+  content: text("content").notNull(), // HTML content of the promotion
+  type: text("type").notNull().default('newsletter'), // newsletter, survey, birthday, announcement, sale, event
+  targetAudience: text("target_audience").notNull().default('all'), // all, subscribers, customers, prospects, vip
+  isActive: boolean("is_active").default(true),
+  usageCount: integer("usage_count").default(0), // Track how many times this promotion has been used
+  metadata: text("metadata"), // JSON string for additional settings
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Promotion relations
+export const promotionRelations = relations(promotions, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [promotions.tenantId],
+    references: [tenants.id],
+  }),
+  user: one(betterAuthUser, {
+    fields: [promotions.userId],
+    references: [betterAuthUser.id],
+  }),
+}));
+
+// Promotion schemas
+export const createPromotionSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
+  content: z.string().min(1, "Content is required"),
+  type: z.enum(['newsletter', 'survey', 'birthday', 'announcement', 'sale', 'event']).default('newsletter'),
+  targetAudience: z.enum(['all', 'subscribers', 'customers', 'prospects', 'vip']).default('all'),
+  isActive: z.boolean().default(true),
+  metadata: z.string().optional(),
+});
+
+export const updatePromotionSchema = z.object({
+  title: z.string().min(1, "Title is required").optional(),
+  description: z.string().optional(),
+  content: z.string().min(1, "Content is required").optional(),
+  type: z.enum(['newsletter', 'survey', 'birthday', 'announcement', 'sale', 'event']).optional(),
+  targetAudience: z.enum(['all', 'subscribers', 'customers', 'prospects', 'vip']).optional(),
+  isActive: z.boolean().optional(),
+  metadata: z.string().optional(),
+});
+
+export const insertPromotionSchema = createInsertSchema(promotions).omit({
+  id: true,
+  tenantId: true,
+  userId: true,
+  usageCount: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Promotion types
+export type Promotion = typeof promotions.$inferSelect;
+export type InsertPromotion = z.infer<typeof insertPromotionSchema>;
+export type CreatePromotionData = z.infer<typeof createPromotionSchema>;
+export type UpdatePromotionData = z.infer<typeof updatePromotionSchema>;

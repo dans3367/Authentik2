@@ -24,6 +24,7 @@ import { authRoutes } from "./routes/authRoutes";
 import { twoFactorRoutes } from "./routes/twoFactorRoutes";
 import { loginRoutes } from "./routes/loginRoutes";
 import { tenantLimitsRoutes } from "./routes/tenantLimitsRoutes";
+import { promotionRoutes } from "./routes/promotionRoutes";
 
 // Import middleware
 import { authRateLimiter, apiRateLimiter, jwtTokenRateLimiter } from "./middleware/security";
@@ -49,6 +50,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/shops", shopsRoutes);
   app.use("/api", emailManagementRoutes);
   app.use("/api/newsletters", newsletterRoutes);
+  app.use("/api/promotions", promotionRoutes);
 
   // Newsletter stats endpoint
   app.get("/api/newsletter-stats", authenticateToken, requireTenant, async (req: any, res) => {
@@ -69,6 +71,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Get newsletter stats error:', error);
       res.status(500).json({ message: 'Failed to get newsletter statistics' });
+    }
+  });
+
+  // Promotion stats endpoint
+  app.get("/api/promotion-stats", authenticateToken, requireTenant, async (req: any, res) => {
+    try {
+      const { storage } = await import('./storage');
+      const stats = await storage.getPromotionStats(req.user.tenantId);
+      res.json(stats);
+    } catch (error) {
+      console.error('Get promotion stats error:', error);
+      res.status(500).json({ message: 'Failed to get promotion statistics' });
     }
   });
 

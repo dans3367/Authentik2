@@ -42,8 +42,10 @@ const EmailApprovalsPage = lazy(() => import("@/pages/email-approvals"));
 const EmailContactsPage = lazy(() => import("@/pages/email-contacts"));
 const NewEmailContactPage = lazy(() => import("@/pages/email-contacts/new"));
 const ViewEmailContactPage = lazy(() => import("@/pages/email-contacts/view"));
+const EditEmailContactPage = lazy(() => import("@/pages/email-contacts/edit"));
 const EmailAnalyticsPage = lazy(() => import("@/pages/email-analytics"));
 const BirthdaysPage = lazy(() => import("@/pages/birthdays"));
+const PromotionsPage = lazy(() => import("@/pages/promotions"));
 const EditEmailCampaignPage = lazy(() => import("@/pages/email-campaigns/edit"));
 
 // Loading component for Suspense fallback
@@ -203,6 +205,7 @@ function Router() {
                   <Route path="/newsletters" component={NewsletterPage} />
                   <Route path="/newsletter/create" component={NewsletterCreatePage} />
                   <Route path="/newsletters/:id" component={NewsletterViewPage} />
+                  <Route path="/promotions" component={PromotionsPage} />
                   <Route path="/company" component={CompanyPage} />
                   <Route path="/campaigns/create" component={CreateCampaignPage} />
                   <Route path="/email-campaigns" component={EmailCampaignsPage} />
@@ -212,7 +215,7 @@ function Router() {
                   <Route path="/email-contacts" component={EmailContactsPage} />
                   <Route path="/email-contacts/new" component={NewEmailContactPage} />
                   <Route path="/email-contacts/view/:id" component={ViewEmailContactPage} />
-                  <Route path="/email-contacts/edit/:id" component={lazy(() => import("@/pages/email-contacts/edit"))} />
+                  <Route path="/email-contacts/edit/:id" component={EditEmailContactPage} />
                   <Route path="/email-analytics" component={EmailAnalyticsPage} />
                   <Route path="/birthdays" component={BirthdaysPage} />
                   <Route path="/shops" component={ShopsPage} />
