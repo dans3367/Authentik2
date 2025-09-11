@@ -445,54 +445,54 @@ export default function EmailContacts() {
         </Card>
       )}
 
-      {/* Contacts Table */}
-      <Card className="relative">
-      <CardContent className="p-0">
-        {/* Search Loading Indicator */}
-        {isFetching && (
-          <div className="absolute right-4 top-4 z-10">
-            <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full text-sm">
-              <div className="animate-spin rounded-full h-3 w-3 border border-blue-600 border-t-transparent"></div>
-              Searching...
+      {/* Desktop Table View */}
+      <Card className="relative hidden lg:block">
+        <CardContent className="p-0">
+          {/* Search Loading Indicator */}
+          {isFetching && (
+            <div className="absolute right-4 top-4 z-10">
+              <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full text-sm">
+                <div className="animate-spin rounded-full h-3 w-3 border border-blue-600 border-t-transparent"></div>
+                Searching...
+              </div>
             </div>
-          </div>
-        )}
-        {/* Table with smooth transition */}
-        <div className={`transition-all duration-300 ${isFetching ? 'opacity-70 scale-[0.995]' : 'opacity-100 scale-100'}`}>
-                <Table>
-                <TableHeader>
+          )}
+          {/* Table with smooth transition */}
+          <div className={`transition-all duration-300 ${isFetching ? 'opacity-70 scale-[0.995]' : 'opacity-100 scale-100'}`}>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={selectedContacts.length === contacts.length && contacts.length > 0}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Tags</TableHead>
+                  <TableHead>Engagement</TableHead>
+                  <TableHead>Added</TableHead>
+                  <TableHead className="w-12"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {contacts.length === 0 ? (
                   <TableRow>
-                    <TableHead className="w-12">
-                      <Checkbox
-                        checked={selectedContacts.length === contacts.length && contacts.length > 0}
-                        onCheckedChange={toggleSelectAll}
-                      />
-                    </TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Tags</TableHead>
-                    <TableHead>Engagement</TableHead>
-                    <TableHead>Added</TableHead>
-                    <TableHead className="w-12"></TableHead>
+                    <TableCell colSpan={7} className="text-center py-8">
+                      <div className="flex flex-col items-center gap-2 text-gray-500 dark:text-gray-400">
+                        <Search className="h-8 w-8" />
+                        <p>
+                          {searchQuery ? 
+                            `No contacts found matching "${searchQuery}"` : 
+                            'No contacts found'
+                          }
+                        </p>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {contacts.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8">
-                        <div className="flex flex-col items-center gap-2 text-gray-500 dark:text-gray-400">
-                          <Search className="h-8 w-8" />
-                          <p>
-                            {searchQuery ? 
-                              `No contacts found matching "${searchQuery}"` : 
-                              'No contacts found'
-                            }
-                          </p>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    contacts.map((contact) => (
+                ) : (
+                  contacts.map((contact) => (
                     <TableRow
                       key={contact.id}
                       className={`transition-all duration-500 ${contact.id.startsWith('temp-') ? 'bg-green-50 dark:bg-green-950/20 animate-pulse' : ''}`}
@@ -615,13 +615,221 @@ export default function EmailContacts() {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                    ))
-                  )}
-                </TableBody>
-        </Table>
-        </div>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
+      
+      {/* Mobile/Tablet Card View */}
+      <div className="lg:hidden space-y-4">
+        {/* Search Loading Indicator */}
+        {isFetching && (
+          <div className="flex items-center justify-center py-4">
+            <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-2 rounded-full text-sm">
+              <div className="animate-spin rounded-full h-3 w-3 border border-blue-600 border-t-transparent"></div>
+              Searching...
+            </div>
+          </div>
+        )}
+        
+        {contacts.length === 0 ? (
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+            <CardContent className="p-8 text-center text-gray-500 dark:text-gray-400">
+              <div className="flex flex-col items-center gap-2">
+                <Search className="h-8 w-8" />
+                <p>
+                  {searchQuery ? 
+                    `No contacts found matching "${searchQuery}"` : 
+                    'No contacts found'
+                  }
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className={`space-y-4 transition-all duration-300 ${isFetching ? 'opacity-70 scale-[0.995]' : 'opacity-100 scale-100'}`}>
+            {contacts.map((contact) => (
+              <Card 
+                key={contact.id} 
+                className={`bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 shadow-sm transition-all duration-500 ${
+                  contact.id.startsWith('temp-') ? 'bg-green-50 dark:bg-green-950/20 animate-pulse border-green-200/50' : ''
+                }`}
+                data-testid={`card-contact-${contact.id}`}
+              >
+                <CardContent className="p-6">
+                  {/* Contact Header */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center space-x-3 min-w-0 flex-1">
+                      <div className="flex-shrink-0">
+                        <Checkbox
+                          checked={selectedContacts.includes(contact.id)}
+                          onCheckedChange={() => toggleSelectContact(contact.id)}
+                          disabled={contact.id.startsWith('temp-')}
+                          data-testid={`checkbox-contact-${contact.id}`}
+                        />
+                      </div>
+                      <div className="relative flex-shrink-0">
+                        <Avatar className="h-12 w-12">
+                          <AvatarFallback className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-sm font-medium">
+                            {getInitials(contact.firstName, contact.lastName)}
+                          </AvatarFallback>
+                        </Avatar>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p 
+                          className={`font-semibold truncate cursor-pointer transition-colors ${
+                            contact.id.startsWith('temp-')
+                              ? 'text-green-700 dark:text-green-400'
+                              : 'text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400'
+                          }`}
+                          onClick={() => !contact.id.startsWith('temp-') && setLocation(`/email-contacts/view/${contact.id}`)}
+                          data-testid={`text-name-${contact.id}`}
+                          title={contact.firstName || contact.lastName
+                            ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
+                            : contact.email.split('@')[0]
+                          }
+                        >
+                          {contact.firstName || contact.lastName
+                            ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
+                            : contact.email.split('@')[0]
+                          }
+                          {contact.id.startsWith('temp-') && (
+                            <span className="ml-2 text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-1.5 py-0.5 rounded-full">
+                              New
+                            </span>
+                          )}
+                        </p>
+                        <p 
+                          className={`text-sm truncate cursor-pointer transition-colors ${
+                            contact.id.startsWith('temp-')
+                              ? 'text-green-600 dark:text-green-500 cursor-default'
+                              : 'text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400'
+                          }`}
+                          onClick={() => !contact.id.startsWith('temp-') && setLocation(`/email-contacts/view/${contact.id}`)}
+                          data-testid={`text-email-${contact.id}`}
+                          title={contact.email}
+                        >
+                          {contact.email}
+                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          {getStatusBadge(contact.status)}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Actions */}
+                    <div className="flex items-center space-x-2 ml-2 flex-shrink-0">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="h-8 w-8 text-gray-600 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
+                            data-testid={`button-menu-${contact.id}`}
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setLocation(`/email-contacts/view/${contact.id}`)}>
+                            <UserCheck className="w-4 h-4 mr-2" />
+                            View Contact
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setLocation(`/email-contacts/edit/${contact.id}`)}>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit Contact
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Mail className="w-4 h-4 mr-2" />
+                            Send Email
+                          </DropdownMenuItem>
+                          <EmailActivityTimelineModal
+                            contactId={contact.id}
+                            contactEmail={contact.email}
+                            contactName={`${contact.firstName || ''} ${contact.lastName || ''}`.trim() || undefined}
+                            trigger={
+                              <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                <Calendar className="w-4 h-4 mr-2" />
+                                View Activity Timeline
+                              </DropdownMenuItem>
+                            }
+                          />
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                  
+                  {/* Tags Section */}
+                  {contact.tags.length > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {contact.tags.slice(0, 3).map((tag) => (
+                          <Badge 
+                            key={tag.id} 
+                            variant="outline" 
+                            className="text-xs" 
+                            style={{ backgroundColor: tag.color + '20', borderColor: tag.color }}
+                          >
+                            {tag.name}
+                          </Badge>
+                        ))}
+                        {contact.tags.length > 3 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{contact.tags.length - 3}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Contact Details */}
+                  <div className="space-y-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
+                        <Mail className="h-4 w-4" />
+                        <span className="text-sm font-medium">Engagement</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {getEngagementRate(contact.emailsSent, contact.emailsOpened)}% open rate
+                        </span>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {contact.emailsOpened}/{contact.emailsSent} emails
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
+                        <Calendar className="h-4 w-4" />
+                        <span className="text-sm font-medium">Added</span>
+                      </div>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        {formatDate(contact.addedDate)}
+                      </span>
+                    </div>
+                    
+                    {contact.lastActivity && (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
+                          <UserCheck className="h-4 w-4" />
+                          <span className="text-sm font-medium">Last Activity</span>
+                        </div>
+                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                          {formatDate(contact.lastActivity)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
       </div>
     </div>
   );
