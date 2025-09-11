@@ -419,7 +419,9 @@ export default function UsersPage() {
                   {getUserInitials(user.firstName || undefined, user.lastName || undefined)}
                 </AvatarFallback>
               </Avatar>
-              <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-white"></div>
+              {user.isActive && (
+                <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-white dark:border-gray-900"></div>
+              )}
             </div>
             <div>
               <div className="font-medium text-gray-900">
@@ -887,15 +889,151 @@ export default function UsersPage() {
         </div>
 
         {/* Users Table */}
-        <div className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-lg shadow-sm">
+        {/* Desktop Table View */}
+        <div className="hidden lg:block bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-lg shadow-sm">
           <DataTable
             columns={columns}
             data={filteredUsers}
             showPagination={true}
             pageSize={10}
             showColumnVisibility={false}
-            enableResponsiveCards={true}
+            enableResponsiveCards={false}
           />
+        </div>
+
+        {/* Mobile/Tablet Card View */}
+        <div className="lg:hidden space-y-4">
+          {filteredUsers.length === 0 ? (
+            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+              <CardContent className="p-8 text-center text-gray-500 dark:text-gray-400">
+                <div className="flex flex-col items-center gap-2">
+                  <Search className="h-8 w-8" />
+                  <p>
+                    {searchTerm || roleFilter || statusFilter ? 
+                      `No users found matching your filters` : 
+                      'No users found'
+                    }
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            filteredUsers.map((user: User) => (
+              <Card 
+                key={user.id} 
+                className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 shadow-sm"
+                data-testid={`card-user-${user.id}`}
+              >
+                <CardContent className="p-6">
+                  {/* User Header */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="relative">
+                        <Avatar className="h-12 w-12">
+                          <AvatarImage src="" />
+                          <AvatarFallback className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-sm font-medium">
+                            {getUserInitials(user.firstName || undefined, user.lastName || undefined)}
+                          </AvatarFallback>
+                        </Avatar>
+                        {user.isActive && (
+                          <div className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-green-500 border-2 border-white dark:border-gray-800"></div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-gray-900 dark:text-white truncate">
+                          {user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'No name'}
+                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge 
+                            variant="secondary" 
+                            className={`${
+                              user.role === 'Owner' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' :
+                              user.role === 'Administrator' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                              user.role === 'Manager' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
+                              'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                            } hover:bg-opacity-80 font-normal border-0 text-xs`}
+                          >
+                            {user.role}
+                          </Badge>
+                          {user.isActive ? (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700 text-xs">
+                              <UserCheck className="h-3 w-3 mr-1" />
+                              Active
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700 text-xs">
+                              <UserX className="h-3 w-3 mr-1" />
+                              Inactive
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Actions - Only show for admins and not current user */}
+                    {isAdmin && user.id !== currentUser.id && (
+                      <div className="flex items-center space-x-2 ml-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/20"
+                          onClick={() => handleEditUser(user)}
+                          data-testid={`button-edit-${user.id}`}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                          onClick={() => {
+                            if (confirm(`Are you sure you want to delete ${user.firstName} ${user.lastName}?`)) {
+                              handleDeleteUser(user.id);
+                            }
+                          }}
+                          data-testid={`button-delete-${user.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* User Details */}
+                  <div className="space-y-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
+                        <MapPin className="h-4 w-4" />
+                        <span className="text-sm font-medium">Location</span>
+                      </div>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">—</span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
+                        <Calendar className="h-4 w-4" />
+                        <span className="text-sm font-medium">Last Login</span>
+                      </div>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        {user.lastLoginAt ? format(new Date(user.lastLoginAt), "MMM d, yyyy") : 'Never'}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
+                        <UserCheck className="h-4 w-4" />
+                        <span className="text-sm font-medium">Joined</span>
+                      </div>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        {user.createdAt ? format(new Date(user.createdAt), "MMM d, yyyy") : 'Unknown'}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
 
         {/* Edit User Dialog */}
