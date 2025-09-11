@@ -23,14 +23,12 @@ if (dbType === 'neon') {
   pool = new Pool({ connectionString: process.env.DATABASE_URL });
   db = drizzleNeon({ client: pool, schema, logger: true });
 } else {
-  // Use standard PostgreSQL (non-SSL by default)
-  const ssl = process.env.DB_SSL === 'true' ? true : false;
-  const connectionString = ssl
-    ? process.env.DATABASE_URL
-    : process.env.DATABASE_URL?.replace('?sslmode=require', '');
-
-  pool = postgres(connectionString || process.env.DATABASE_URL!, {
-    ssl: ssl ? 'require' : false,
+  // Use standard PostgreSQL with SSL detection from DATABASE_URL
+  const databaseUrl = process.env.DATABASE_URL!;
+  const requiresSSL = databaseUrl.includes('sslmode=require') || databaseUrl.includes('neon.tech');
+  
+  pool = postgres(databaseUrl, {
+    ssl: requiresSSL ? 'require' : false,
     max: 10,
     idle_timeout: 20,
     connect_timeout: 10,
