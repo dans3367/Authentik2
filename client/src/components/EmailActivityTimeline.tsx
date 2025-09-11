@@ -31,6 +31,16 @@ interface EmailActivity {
   userAgent?: string;
   ipAddress?: string;
   webhookId?: string;
+  webhookData?: string;
+  campaign?: {
+    id: string;
+    name: string;
+  };
+  newsletter?: {
+    id: string;
+    name: string;
+  };
+  createdAt?: string;
 }
 
 interface EmailActivityTimelineProps {
@@ -692,7 +702,27 @@ export default function EmailActivityTimeline({ contactId, limit = 50 }: EmailAc
           <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-200 dark:bg-gray-700" />
           
           <div className="space-y-4">
-            {activities.map((activity, index) => {
+            {activities.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="text-gray-400 dark:text-gray-500 mb-2">
+                  <Mail className="w-12 h-12 mx-auto" />
+                </div>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">
+                  {hasDateFilter ? 'No email activity found for the selected date range.' : 'No email activity recorded yet.'}
+                </p>
+                {hasDateFilter && (
+                  <Button 
+                    variant="link" 
+                    size="sm" 
+                    onClick={clearDateFilter}
+                    className="mt-2"
+                  >
+                    Clear date filter to see all activities
+                  </Button>
+                )}
+              </div>
+            ) : (
+              activities.map((activity, index) => {
               const Icon = getActivityIcon(activity.activityType);
               const colorClass = getActivityColor(activity.activityType);
               const description = getActivityDescription(activity.activityType);
@@ -742,17 +772,32 @@ export default function EmailActivityTimeline({ contactId, limit = 50 }: EmailAc
                       </time>
                     </div>
                     
+                    {/* Campaign and Newsletter info */}
+                    {(activity.campaign || activity.newsletter) && (
+                      <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                        {activity.campaign && (
+                          <p><span className="font-medium">Campaign:</span> {activity.campaign.name}</p>
+                        )}
+                        {activity.newsletter && (
+                          <p><span className="font-medium">Newsletter:</span> {activity.newsletter.name}</p>
+                        )}
+                      </div>
+                    )}
+
                     {/* Additional details */}
                     {parsedActivityData && (
                       <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
                         {parsedActivityData.subject && (
                           <p><span className="font-medium">Subject:</span> {parsedActivityData.subject}</p>
                         )}
+                        {parsedActivityData.email_id && (
+                          <p><span className="font-medium">Email ID:</span> {parsedActivityData.email_id}</p>
+                        )}
+                        {parsedActivityData.from && (
+                          <p><span className="font-medium">From:</span> {parsedActivityData.from}</p>
+                        )}
                         {parsedActivityData.messageId && (
                           <p><span className="font-medium">Message ID:</span> {parsedActivityData.messageId}</p>
-                        )}
-                        {parsedActivityData.tags && parsedActivityData.tags.length > 0 && (
-                          <p><span className="font-medium">Tags:</span> {parsedActivityData.tags.join(', ')}</p>
                         )}
                       </div>
                     )}
@@ -768,10 +813,17 @@ export default function EmailActivityTimeline({ contactId, limit = 50 }: EmailAc
                         )}
                       </div>
                     )}
+
+                    {/* Webhook technical details */}
+                    {activity.webhookId && (
+                      <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        <p><span className="font-medium">Webhook ID:</span> {activity.webhookId}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
-            })}
+            }))}
           </div>
         </div>
 

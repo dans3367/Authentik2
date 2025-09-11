@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings } from '@shared/schema';
+import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, emailActivity } from '@shared/schema';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { type ContactFilters, type BouncedEmailFilters } from '@shared/schema';
 import { sanitizeString, sanitizeEmail } from '../utils/sanitization';
@@ -943,20 +943,97 @@ emailManagementRoutes.post("/contact-tags/:tagId/contacts", authenticateToken, r
 emailManagementRoutes.get("/email-contacts/:contactId/activity", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { contactId } = req.params;
-    const { page = 1, limit = 50 } = req.query;
+    const { page = 1, limit = 50, from, to } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
-    // This is a placeholder - you might have an activity log table
-    // For now, we'll return empty activity
-    const activity = [];
+    // Verify contact belongs to this tenant
+    const contact = await db.query.emailContacts.findFirst({
+      where: sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
+      columns: { id: true }
+    });
+
+    if (!contact) {
+      return res.status(404).json({ message: 'Contact not found' });
+    }
+
+    // Build the where clause for activity filtering
+    let whereClause = sql`${emailActivity.contactId} = ${contactId} AND ${emailActivity.tenantId} = ${req.user.tenantId}`;
+
+    // Add date range filtering if provided
+    if (from) {
+      const fromDate = new Date(from as string);
+      if (!isNaN(fromDate.getTime())) {
+        whereClause = sql`${whereClause} AND ${emailActivity.occurredAt} >= ${fromDate.toISOString()}`;
+      }
+    }
+
+    if (to) {
+      const toDate = new Date(to as string);
+      if (!isNaN(toDate.getTime())) {
+        whereClause = sql`${whereClause} AND ${emailActivity.occurredAt} <= ${toDate.toISOString()}`;
+      }
+    }
+
+    // Get the activity records with related data
+    const activities = await db.query.emailActivity.findMany({
+      where: whereClause,
+      columns: {
+        id: true,
+        activityType: true,
+        activityData: true,
+        userAgent: true,
+        ipAddress: true,
+        webhookId: true,
+        webhookData: true,
+        occurredAt: true,
+        createdAt: true,
+      },
+      with: {
+        campaign: {
+          columns: {
+            id: true,
+            name: true,
+          }
+        },
+        newsletter: {
+          columns: {
+            id: true,
+            name: true,
+          }
+        }
+      },
+      orderBy: sql`${emailActivity.occurredAt} DESC`,
+      limit: Number(limit),
+      offset,
+    });
+
+    // Get total count for pagination
+    const [totalCountResult] = await db.select({
+      count: sql<number>`count(*)`,
+    }).from(emailActivity).where(whereClause);
+
+    // Transform activities for frontend consumption
+    const transformedActivities = activities.map(activity => ({
+      id: activity.id,
+      activityType: activity.activityType,
+      occurredAt: activity.occurredAt,
+      activityData: activity.activityData,
+      userAgent: activity.userAgent,
+      ipAddress: activity.ipAddress,
+      webhookId: activity.webhookId,
+      webhookData: activity.webhookData,
+      campaign: activity.campaign,
+      newsletter: activity.newsletter,
+      createdAt: activity.createdAt,
+    }));
 
     res.json({
-      activity,
+      activities: transformedActivities,
       pagination: {
         page: Number(page),
         limit: Number(limit),
-        total: 0,
-        pages: 0,
+        total: totalCountResult.count,
+        pages: Math.ceil(totalCountResult.count / Number(limit)),
       },
     });
   } catch (error) {

@@ -140,9 +140,9 @@ export default function EmailContacts() {
     };
   }, []);
 
-  // Fetch email contacts with enhanced caching strategy
+  // Fetch email contacts with stable query key to prevent focus loss
   const { data: contactsData, isLoading: contactsLoading, error: contactsError, isFetching, refetch } = useQuery({
-    queryKey: ['/api/email-contacts', searchQuery, statusFilter], // Include search params in key for better caching
+    queryKey: ['/api/email-contacts'], // Stable key - no search params to prevent rerenders
     queryFn: async () => {
       const params = new URLSearchParams();
       const currentParams = searchParamsRef.current;
@@ -154,14 +154,12 @@ export default function EmailContacts() {
       const response = await apiRequest('GET', `/api/email-contacts?${params.toString()}`);
       return response.json();
     },
-    staleTime: 10 * 60 * 1000, // Cache results for 10 minutes (increased)
-    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes (increased)
+    staleTime: 5 * 60 * 1000, // Cache results for 5 minutes
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
     refetchOnWindowFocus: false,
     refetchInterval: false,
-    // Enable background refetching for better UX
+    // Disable refetchOnMount to prevent unnecessary requests
     refetchOnMount: false,
-    // Use network mode to prevent unnecessary refetches
-    networkMode: 'offlineFirst',
   });
 
   // Debounced search effect
@@ -412,7 +410,6 @@ export default function EmailContacts() {
       {/* Filters and Search */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
       <ContactSearch
-        key="contact-search"
         value={searchQuery}
         onSearchChange={handleSearchChange}
         placeholder="Search contacts..."
