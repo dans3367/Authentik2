@@ -1,6 +1,7 @@
 import { proxyActivities } from '@temporalio/workflow';
 import type * as activities from '../activities';
 import { workflowLogger } from '../workflow-logger';
+import { renderBirthdayTemplate } from '../templates';
 
 // Proxy activities to be used in workflows
 const {
@@ -86,12 +87,27 @@ export async function emailWorkflow(
       throw new Error(`Email content is required and must be a string. Received: ${typeof input.content}`);
     }
 
+    // Render birthday templates if requested
+    let htmlContent = input.content;
+    if ((input.templateType === 'birthday' || input.templateType === 'birthday-ecard') && typeof input.metadata?.birthdayTemplate === 'string') {
+      try {
+        htmlContent = renderBirthdayTemplate(input.metadata.birthdayTemplate, {
+          recipientName: input.metadata?.recipientName,
+          message: input.metadata?.message,
+          imageUrl: input.metadata?.imageUrl,
+        });
+        workflowLogger.info(`🎂 Rendered birthday template: ${input.metadata.birthdayTemplate}`);
+      } catch (e: any) {
+        workflowLogger.error(`❌ Failed to render birthday template: ${e?.message || String(e)}`);
+      }
+    }
+
     const emailContent = {
       to: input.recipient,
       from: input.fromEmail || 'noreply@zendwise.work', // Use provided from email or default
       subject: input.subject || 'No Subject',
-      html: input.content,
-      text: input.content.replace(/<[^>]*>/g, ''), // Strip HTML for text version
+      html: htmlContent,
+      text: htmlContent.replace(/<[^>]*>/g, ''), // Strip HTML for text version
       tags: [
         'authentik',
         input.tenantId ? `tenant-${input.tenantId}` : 'no-tenant',

@@ -109,6 +109,8 @@ export default function BirthdaysPage() {
   const [birthdayModalOpen, setBirthdayModalOpen] = useState(false);
   const [birthdayDraft, setBirthdayDraft] = useState<Date | undefined>(undefined);
   const [birthdayContactId, setBirthdayContactId] = useState<string | null>(null);
+  const [themePreviewOpen, setThemePreviewOpen] = useState(false);
+  const [themePreview, setThemePreview] = useState<{ id: string; name: string } | null>(null);
 
   // Handler to navigate to add customer page
   const handleAddCustomer = () => {
@@ -540,18 +542,24 @@ export default function BirthdaysPage() {
           <CardContent>
             <div>
               <Label className="text-sm">Choose a Template</Label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
                 {[
                   { id: 'default', name: 'Default' },
                   { id: 'confetti', name: 'Confetti' },
                   { id: 'balloons', name: 'Balloons' },
+                  { id: 'sparkle-cake', name: 'Sparkle Cake' },
                 ].map((tpl) => {
                   const isSelected = (birthdaySettings?.emailTemplate || 'default') === tpl.id;
                   return (
                     <button
                       key={tpl.id}
                       type="button"
-                      onClick={() => handleSettingsUpdate('emailTemplate', tpl.id)}
+                      onClick={() => {
+                        handleSettingsUpdate('emailTemplate', tpl.id);
+                        // Open a full preview modal for the selected theme
+                        setThemePreview({ id: tpl.id, name: tpl.name });
+                        setThemePreviewOpen(true);
+                      }}
                       disabled={updateSettingsMutation.isPending}
                       className={`relative rounded-xl border p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${isSelected ? 'ring-2 ring-blue-600 border-blue-600' : 'border-gray-200 hover:border-gray-300'}`}
                     >
@@ -565,8 +573,19 @@ export default function BirthdaysPage() {
                         {tpl.id === 'balloons' && (
                           <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-cyan-50 to-indigo-50" />
                         )}
+                        {tpl.id === 'sparkle-cake' && (
+                          <>
+                            {/* Drop the provided image at client/public/images/birthday-sparkle.jpg */}
+                            <img
+                              src="/images/birthday-sparkle.jpg"
+                              alt="Sparkle Cake"
+                              className="absolute inset-0 h-full w-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/10" />
+                          </>
+                        )}
 
-                        {tpl.id !== 'default' && (
+                        {tpl.id !== 'default' && tpl.id !== 'sparkle-cake' && (
                           <>
                             <span className="absolute left-3 top-3 text-2xl opacity-70">{tpl.id === 'confetti' ? '🎉' : '🎈'}</span>
                             <span className="absolute right-4 top-6 text-xl opacity-60">{tpl.id === 'confetti' ? '🎁' : '🎈'}</span>
@@ -576,8 +595,8 @@ export default function BirthdaysPage() {
 
                         <div className="absolute inset-0 flex items-center justify-center">
                           <div className="text-center">
-                            <div className="font-bold text-gray-900">Happy Birthday!</div>
-                            <div className="text-xs text-gray-500">{tpl.name} preview</div>
+                            <div className={`font-bold ${tpl.id === 'sparkle-cake' ? 'text-white drop-shadow' : 'text-gray-900'}`}>Happy Birthday!</div>
+                            <div className={`text-xs ${tpl.id === 'sparkle-cake' ? 'text-white/90 drop-shadow' : 'text-gray-500'}`}>{tpl.name} preview</div>
                           </div>
                         </div>
                       </div>
@@ -594,6 +613,29 @@ export default function BirthdaysPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Theme Preview Modal */}
+      {themePreviewOpen && themePreview && (
+        <Dialog open={themePreviewOpen} onOpenChange={setThemePreviewOpen}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>{themePreview.name} Preview</DialogTitle>
+            </DialogHeader>
+            <div className="rounded-xl overflow-hidden border bg-white">
+              {themePreview.id === 'sparkle-cake' ? (
+                <img src="/images/birthday-sparkle.jpg" alt="Sparkle Cake" className="w-full h-auto" />
+              ) : (
+                <div className="h-[420px] flex items-center justify-center text-gray-500">
+                  Preview not available yet
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setThemePreviewOpen(false)}>Close</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Settings Tab */}
