@@ -11,7 +11,7 @@ const NEWSLETTER_ID = '04cea272-c163-4f2a-9356-e6ab79fb8f32';
 // User data from database
 const testUser = {
   id: 'f5a5670b-c33e-4a64-be68-2e50c83afce9',
-  email: 'testuser@example.com',
+  email: 'beats@zendwise.com',
   tenant_id: 'c3fe612e-8a42-45de-a98e-a0b29be414df'
 };
 

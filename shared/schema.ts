@@ -27,6 +27,7 @@ export const betterAuthUser = pgTable("better_auth_user", {
   lastLoginAt: timestamp("last_login_at"), // Track last login for user management
   menuExpanded: boolean("menu_expanded").default(false), // New field for menu preference
   theme: text("theme").default('light'), // Theme preference: 'light' or 'dark'
+  language: text("language").default('en'), // Language preference: 'en' or 'es'
   avatarUrl: text("avatar_url"), // User avatar URL from Cloudflare R2
   tokenValidAfter: timestamp("token_valid_after").defaultNow(), // Tokens issued before this time are invalid
   // Stripe fields for subscription management
@@ -268,6 +269,9 @@ export const emailContacts = pgTable("email_contacts", {
   lastActivity: timestamp("last_activity"),
   emailsSent: integer("emails_sent").default(0),
   emailsOpened: integer("emails_opened").default(0),
+  // Birthday tracking fields
+  birthday: text("birthday"), // Date in YYYY-MM-DD format
+  birthdayEmailEnabled: boolean("birthday_email_enabled").default(false), // Whether user wants birthday emails
   // Consent tracking fields
   consentGiven: boolean("consent_given").notNull().default(false),
   consentDate: timestamp("consent_date"),
@@ -492,6 +496,7 @@ export const tenantRelations = relations(tenants, ({ many }) => ({
   campaigns: many(campaigns),
   emailActivities: many(emailActivity),
   bouncedEmails: many(bouncedEmails),
+  birthdaySettings: many(birthdaySettings),
 }));
 
 export const betterAuthUserRelations = relations(betterAuthUser, ({ one, many }) => ({
@@ -659,6 +664,7 @@ export const updateProfileSchema = z.object({
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Please enter a valid email address"),
   theme: z.enum(['light', 'dark']).optional(),
+  language: z.enum(['en', 'es']).optional(),
 });
 
 export const verifyEmailSchema = z.object({
@@ -1094,6 +1100,8 @@ export const createEmailContactSchema = z.object({
   status: z.enum(['active', 'unsubscribed', 'bounced', 'pending']).default('active'),
   tags: z.array(z.string()).optional(),
   lists: z.array(z.string()).optional(),
+  birthday: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Birthday must be in YYYY-MM-DD format").optional(),
+  birthdayEmailEnabled: z.boolean().default(false),
   consentGiven: z.boolean().refine(val => val === true, {
     message: "You must acknowledge consent before adding this contact"
   }),
@@ -1107,6 +1115,8 @@ export const updateEmailContactSchema = z.object({
   status: z.enum(['active', 'unsubscribed', 'bounced', 'pending']).optional(),
   emailsOpened: z.number().optional(),
   lastActivity: z.date().optional(),
+  birthday: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Birthday must be in YYYY-MM-DD format").optional(),
+  birthdayEmailEnabled: z.boolean().optional(),
 });
 
 export const createEmailListSchema = z.object({
@@ -1397,6 +1407,21 @@ export type InsertBouncedEmail = z.infer<typeof insertBouncedEmailSchema>;
 export type CreateBouncedEmailData = z.infer<typeof createBouncedEmailSchema>;
 export type UpdateBouncedEmailData = z.infer<typeof updateBouncedEmailSchema>;
 
+// Birthday settings table for managing birthday email campaigns
+export const birthdaySettings = pgTable("birthday_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  enabled: boolean("enabled").default(false),
+  sendDaysBefore: integer("send_days_before").default(0), // How many days before birthday to send
+  emailTemplate: text("email_template").default('default'), // Email template to use
+  segmentFilter: text("segment_filter").default('all'), // Which contacts to include
+  customMessage: text("custom_message").default(''), // Custom birthday message
+  senderName: text("sender_name").default(''),
+  senderEmail: text("sender_email").default(''),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Extended types for bounced emails with relations
 export interface BouncedEmailWithDetails extends BouncedEmail {
   sourceTenant?: Tenant;
@@ -1492,4 +1517,279 @@ export interface ShopLimitFilters {
   fromDate?: Date;
   toDate?: Date;
   includeMetadata?: boolean;
+}
+
+// Birthday settings relations
+export const birthdaySettingsRelations = relations(birthdaySettings, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [birthdaySettings.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+// Birthday settings schemas
+export const createBirthdaySettingsSchema = z.object({
+  enabled: z.boolean().default(false),
+  sendDaysBefore: z.number().int().min(0).max(30).default(0),
+  emailTemplate: z.string().default('default'),
+  segmentFilter: z.string().default('all'),
+  customMessage: z.string().default(''),
+  senderName: z.string().default(''),
+  senderEmail: z.string().email("Please enter a valid email address").default(''),
+});
+
+export const updateBirthdaySettingsSchema = z.object({
+  enabled: z.boolean().optional(),
+  sendDaysBefore: z.number().int().min(0).max(30).optional(),
+  emailTemplate: z.string().optional(),
+  segmentFilter: z.string().optional(),
+  customMessage: z.string().optional(),
+  senderName: z.string().optional(),
+  senderEmail: z.string().email("Please enter a valid email address").optional(),
+});
+
+export const insertBirthdaySettingsSchema = createInsertSchema(birthdaySettings).omit({
+  id: true,
+  tenantId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Birthday settings types
+export type BirthdaySettings = typeof birthdaySettings.$inferSelect;
+export type InsertBirthdaySettings = z.infer<typeof insertBirthdaySettingsSchema>;
+export type CreateBirthdaySettingsData = z.infer<typeof createBirthdaySettingsSchema>;
+export type UpdateBirthdaySettingsData = z.infer<typeof updateBirthdaySettingsSchema>;
+
+// Promotions table for managing promotional content templates
+export const promotions = pgTable("promotions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
+  title: text("title").notNull(),
+  description: text("description"),
+  content: text("content").notNull(), // HTML content of the promotion
+  type: text("type").notNull().default('newsletter'), // newsletter, survey, birthday, announcement, sale, event
+  targetAudience: text("target_audience").notNull().default('all'), // all, subscribers, customers, prospects, vip
+  isActive: boolean("is_active").default(true),
+  usageCount: integer("usage_count").default(0), // Track how many times this promotion has been used
+  maxUses: integer("max_uses"), // Maximum times this promotion can be used (null = unlimited)
+  validFrom: timestamp("valid_from"), // Promotion becomes available from this date
+  validTo: timestamp("valid_to"), // Promotion expires after this date
+  promotionalCodes: text("promotional_codes"), // JSON array of promotional codes
+  metadata: text("metadata"), // JSON string for additional settings
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Promotion relations
+export const promotionRelations = relations(promotions, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [promotions.tenantId],
+    references: [tenants.id],
+  }),
+  user: one(betterAuthUser, {
+    fields: [promotions.userId],
+    references: [betterAuthUser.id],
+  }),
+}));
+
+// Promotion schemas
+export const createPromotionSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
+  content: z.string().min(1, "Content is required"),
+  type: z.enum(['newsletter', 'survey', 'birthday', 'announcement', 'sale', 'event']).default('newsletter'),
+  targetAudience: z.enum(['all', 'subscribers', 'customers', 'prospects', 'vip']).default('all'),
+  isActive: z.boolean().default(true),
+  maxUses: z.number().int().positive().optional(),
+  validFrom: z.date().optional(),
+  validTo: z.date().optional(),
+  promotionalCodes: z.array(z.string()).optional(),
+  metadata: z.string().optional(),
+});
+
+export const updatePromotionSchema = z.object({
+  title: z.string().min(1, "Title is required").optional(),
+  description: z.string().optional(),
+  content: z.string().min(1, "Content is required").optional(),
+  type: z.enum(['newsletter', 'survey', 'birthday', 'announcement', 'sale', 'event']).optional(),
+  targetAudience: z.enum(['all', 'subscribers', 'customers', 'prospects', 'vip']).optional(),
+  isActive: z.boolean().optional(),
+  maxUses: z.number().int().positive().optional(),
+  validFrom: z.date().optional(),
+  validTo: z.date().optional(),
+  promotionalCodes: z.array(z.string()).optional(),
+  metadata: z.string().optional(),
+});
+
+export const insertPromotionSchema = createInsertSchema(promotions).omit({
+  id: true,
+  tenantId: true,
+  userId: true,
+  usageCount: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Promotion types
+export type Promotion = typeof promotions.$inferSelect;
+export type InsertPromotion = z.infer<typeof insertPromotionSchema>;
+export type CreatePromotionData = z.infer<typeof createPromotionSchema>;
+export type UpdatePromotionData = z.infer<typeof updatePromotionSchema>;
+
+// Appointments table for managing appointments and reminders
+export const appointments = pgTable("appointments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  customerId: varchar("customer_id").notNull().references(() => emailContacts.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }), // Who created the appointment
+  title: text("title").notNull(),
+  description: text("description"),
+  appointmentDate: timestamp("appointment_date").notNull(),
+  duration: integer("duration").default(60), // Duration in minutes
+  location: text("location"),
+  serviceType: text("service_type"), // e.g., "consultation", "meeting", "service"
+  status: text("status").notNull().default('scheduled'), // scheduled, confirmed, cancelled, completed, no_show
+  notes: text("notes"),
+  reminderSent: boolean("reminder_sent").default(false),
+  reminderSentAt: timestamp("reminder_sent_at"),
+  confirmationReceived: boolean("confirmation_received").default(false),
+  confirmationReceivedAt: timestamp("confirmation_received_at"),
+  confirmationToken: text("confirmation_token"), // Unique token for confirmation links
+  reminderSettings: text("reminder_settings"), // JSON: when to send reminders
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Appointment reminders table for tracking reminder history
+export const appointmentReminders = pgTable("appointment_reminders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  appointmentId: varchar("appointment_id").notNull().references(() => appointments.id, { onDelete: 'cascade' }),
+  customerId: varchar("customer_id").notNull().references(() => emailContacts.id, { onDelete: 'cascade' }),
+  reminderType: text("reminder_type").notNull(), // 'email', 'sms', 'push'
+  reminderTiming: text("reminder_timing").notNull(), // '24h', '1h', '30m', 'custom'
+  scheduledFor: timestamp("scheduled_for").notNull(),
+  sentAt: timestamp("sent_at"),
+  status: text("status").notNull().default('pending'), // pending, sent, failed, cancelled
+  content: text("content"), // The reminder message content
+  errorMessage: text("error_message"), // If failed, what was the error
+  metadata: text("metadata"), // JSON for additional data
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Appointment relations
+export const appointmentRelations = relations(appointments, ({ one, many }) => ({
+  tenant: one(tenants, {
+    fields: [appointments.tenantId],
+    references: [tenants.id],
+  }),
+  customer: one(emailContacts, {
+    fields: [appointments.customerId],
+    references: [emailContacts.id],
+  }),
+  user: one(betterAuthUser, {
+    fields: [appointments.userId],
+    references: [betterAuthUser.id],
+  }),
+  reminders: many(appointmentReminders),
+}));
+
+export const appointmentReminderRelations = relations(appointmentReminders, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [appointmentReminders.tenantId],
+    references: [tenants.id],
+  }),
+  appointment: one(appointments, {
+    fields: [appointmentReminders.appointmentId],
+    references: [appointments.id],
+  }),
+  customer: one(emailContacts, {
+    fields: [appointmentReminders.customerId],
+    references: [emailContacts.id],
+  }),
+}));
+
+// Update tenant relations to include appointments
+export const tenantRelationsUpdated = relations(tenants, ({ many }) => ({
+  users: many(betterAuthUser),
+  stores: many(stores),
+  shops: many(shops),
+  forms: many(forms),
+  refreshTokens: many(refreshTokens),
+  verificationTokens: many(verificationTokens),
+  formResponses: many(formResponses),
+  emailContacts: many(emailContacts),
+  emailLists: many(emailLists),
+  contactTags: many(contactTags),
+  contactListMemberships: many(contactListMemberships),
+  contactTagAssignments: many(contactTagAssignments),
+  newsletters: many(newsletters),
+  campaigns: many(campaigns),
+  emailActivities: many(emailActivity),
+  bouncedEmails: many(bouncedEmails),
+  birthdaySettings: many(birthdaySettings),
+  appointments: many(appointments),
+  appointmentReminders: many(appointmentReminders),
+}));
+
+// Appointment schemas
+export const createAppointmentSchema = z.object({
+  customerId: z.string().uuid("Please select a valid customer"),
+  title: z.string().min(1, "Appointment title is required"),
+  description: z.string().optional(),
+  appointmentDate: z.date(),
+  duration: z.number().int().positive().default(60),
+  location: z.string().optional(),
+  serviceType: z.string().optional(),
+  notes: z.string().optional(),
+  reminderSettings: z.string().optional(), // JSON string
+});
+
+export const updateAppointmentSchema = z.object({
+  title: z.string().min(1, "Appointment title is required").optional(),
+  description: z.string().optional(),
+  appointmentDate: z.date().optional(),
+  duration: z.number().int().positive().optional(),
+  location: z.string().optional(),
+  serviceType: z.string().optional(),
+  status: z.enum(['scheduled', 'confirmed', 'cancelled', 'completed', 'no_show']).optional(),
+  notes: z.string().optional(),
+  reminderSettings: z.string().optional(),
+});
+
+export const createAppointmentReminderSchema = z.object({
+  appointmentId: z.string().uuid(),
+  reminderType: z.enum(['email', 'sms', 'push']).default('email'),
+  reminderTiming: z.enum(['24h', '1h', '30m', 'custom']).default('24h'),
+  scheduledFor: z.date(),
+  content: z.string().optional(),
+});
+
+// Appointment types
+export type Appointment = typeof appointments.$inferSelect;
+export type InsertAppointment = typeof appointments.$inferInsert;
+export type CreateAppointmentData = z.infer<typeof createAppointmentSchema>;
+export type UpdateAppointmentData = z.infer<typeof updateAppointmentSchema>;
+
+export type AppointmentReminder = typeof appointmentReminders.$inferSelect;
+export type InsertAppointmentReminder = typeof appointmentReminders.$inferInsert;
+export type CreateAppointmentReminderData = z.infer<typeof createAppointmentReminderSchema>;
+
+// Extended appointment types with relationships
+export interface AppointmentWithDetails extends Appointment {
+  customer: EmailContact;
+  user: User;
+  reminders?: AppointmentReminder[];
+}
+
+export interface AppointmentFilters {
+  search?: string;
+  status?: 'scheduled' | 'confirmed' | 'cancelled' | 'completed' | 'no_show' | 'all';
+  customerId?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+  serviceType?: string;
 }

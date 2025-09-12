@@ -1,9 +1,9 @@
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import { Pool, neonConfig } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-serverless";
+import { drizzle as drizzleNeon } from "drizzle-orm/neon-serverless";
 import ws from "ws";
 import * as schema from "@shared/schema";
-
-neonConfig.webSocketConstructor = ws;
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
@@ -11,5 +11,30 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle({ client: pool, schema, logger: true });
+// Check database type from environment variable (default to 'postgres')
+const dbType = process.env.DB_TYPE || 'postgres';
+
+let pool: any;
+let db: any;
+
+if (dbType === 'neon') {
+  // Use NeonDB with WebSocket support
+  neonConfig.webSocketConstructor = ws;
+  pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  db = drizzleNeon({ client: pool, schema, logger: true });
+} else {
+  // Use standard PostgreSQL with SSL detection from DATABASE_URL
+  const databaseUrl = process.env.DATABASE_URL!;
+  const requiresSSL = databaseUrl.includes('sslmode=require') || databaseUrl.includes('neon.tech');
+  
+  pool = postgres(databaseUrl, {
+    ssl: requiresSSL ? 'require' : false,
+    max: 10,
+    idle_timeout: 20,
+    connect_timeout: 10,
+  });
+
+  db = drizzle(pool, { schema, logger: true });
+}
+
+export { pool, db };

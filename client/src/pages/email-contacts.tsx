@@ -140,9 +140,9 @@ export default function EmailContacts() {
     };
   }, []);
 
-  // Fetch email contacts with enhanced caching strategy
+  // Fetch email contacts with stable query key to prevent focus loss
   const { data: contactsData, isLoading: contactsLoading, error: contactsError, isFetching, refetch } = useQuery({
-    queryKey: ['/api/email-contacts', searchQuery, statusFilter], // Include search params in key for better caching
+    queryKey: ['/api/email-contacts'], // Stable key - no search params to prevent rerenders
     queryFn: async () => {
       const params = new URLSearchParams();
       const currentParams = searchParamsRef.current;
@@ -154,14 +154,12 @@ export default function EmailContacts() {
       const response = await apiRequest('GET', `/api/email-contacts?${params.toString()}`);
       return response.json();
     },
-    staleTime: 10 * 60 * 1000, // Cache results for 10 minutes (increased)
-    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes (increased)
+    staleTime: 5 * 60 * 1000, // Cache results for 5 minutes
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
     refetchOnWindowFocus: false,
     refetchInterval: false,
-    // Enable background refetching for better UX
+    // Disable refetchOnMount to prevent unnecessary requests
     refetchOnMount: false,
-    // Use network mode to prevent unnecessary refetches
-    networkMode: 'offlineFirst',
   });
 
   // Debounced search effect
@@ -412,7 +410,6 @@ export default function EmailContacts() {
       {/* Filters and Search */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
       <ContactSearch
-        key="contact-search"
         value={searchQuery}
         onSearchChange={handleSearchChange}
         placeholder="Search contacts..."
@@ -488,42 +485,45 @@ export default function EmailContacts() {
             </div>
           </div>
         )}
-        {/* Table with smooth transition */}
+        {/* Responsive Layout with smooth transition */}
         <div className={`transition-all duration-300 ${isFetching ? 'opacity-70 scale-[0.995]' : 'opacity-100 scale-100'}`}>
-                <Table>
-                <TableHeader>
+          {/* Table View for Large Screens */}
+          <div className="hidden lg:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={selectedContacts.length === contacts.length && contacts.length > 0}
+                      onCheckedChange={toggleSelectAll}
+                      data-testid="checkbox-select-all-table"
+                    />
+                  </TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Tags</TableHead>
+                  <TableHead>Engagement</TableHead>
+                  <TableHead>Added</TableHead>
+                  <TableHead className="w-12"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {contacts.length === 0 ? (
                   <TableRow>
-                    <TableHead className="w-12">
-                      <Checkbox
-                        checked={selectedContacts.length === contacts.length && contacts.length > 0}
-                        onCheckedChange={toggleSelectAll}
-                      />
-                    </TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Tags</TableHead>
-                    <TableHead>Engagement</TableHead>
-                    <TableHead>Added</TableHead>
-                    <TableHead className="w-12"></TableHead>
+                    <TableCell colSpan={7} className="text-center py-8">
+                      <div className="flex flex-col items-center gap-2 text-gray-500 dark:text-gray-400">
+                        <Search className="h-8 w-8" />
+                        <p>
+                          {searchQuery ? 
+                            `No contacts found matching "${searchQuery}"` : 
+                            'No contacts found'
+                          }
+                        </p>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {contacts.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8">
-                        <div className="flex flex-col items-center gap-2 text-gray-500 dark:text-gray-400">
-                          <Search className="h-8 w-8" />
-                          <p>
-                            {searchQuery ? 
-                              `No contacts found matching "${searchQuery}"` : 
-                              'No contacts found'
-                            }
-                          </p>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    contacts.map((contact) => (
+                ) : (
+                  contacts.map((contact) => (
                     <TableRow
                       key={contact.id}
                       className={`transition-all duration-500 ${contact.id.startsWith('temp-') ? 'bg-green-50 dark:bg-green-950/20 animate-pulse' : ''}`}
@@ -533,6 +533,7 @@ export default function EmailContacts() {
                           checked={selectedContacts.includes(contact.id)}
                           onCheckedChange={() => toggleSelectContact(contact.id)}
                           disabled={contact.id.startsWith('temp-')}
+                          data-testid={`checkbox-contact-table-${contact.id}`}
                         />
                       </TableCell>
                       <TableCell>
@@ -550,6 +551,7 @@ export default function EmailContacts() {
                                   : 'text-gray-900 dark:text-white'
                               }`}
                               onClick={() => !contact.id.startsWith('temp-') && setLocation(`/email-contacts/view/${contact.id}`)}
+                              data-testid={`text-contact-name-table-${contact.id}`}
                             >
                               {contact.firstName || contact.lastName
                                 ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
@@ -568,6 +570,7 @@ export default function EmailContacts() {
                                   : 'text-gray-500 cursor-pointer'
                               }`}
                               onClick={() => !contact.id.startsWith('temp-') && setLocation(`/email-contacts/view/${contact.id}`)}
+                              data-testid={`text-contact-email-table-${contact.id}`}
                             >
                               {contact.email}
                             </p>
@@ -614,7 +617,7 @@ export default function EmailContacts() {
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" data-testid={`button-contact-menu-table-${contact.id}`}>
                               <MoreVertical className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
@@ -646,10 +649,201 @@ export default function EmailContacts() {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                    ))
-                  )}
-                </TableBody>
-        </Table>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Card View for Tablets and Smaller */}
+          <div className="lg:hidden">
+            {/* Select All Header for Card View */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={selectedContacts.length === contacts.length && contacts.length > 0}
+                  onCheckedChange={toggleSelectAll}
+                  data-testid="checkbox-select-all-cards"
+                />
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  <span className="hidden sm:inline">Select all contacts</span>
+                  <span className="sm:hidden">Select all</span>
+                </span>
+              </div>
+              {selectedContacts.length > 0 && (
+                <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                  {selectedContacts.length} selected
+                </span>
+              )}
+            </div>
+            
+            {contacts.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 text-gray-500 dark:text-gray-400 py-12">
+                <Search className="h-8 w-8" />
+                <p>
+                  {searchQuery ? 
+                    `No contacts found matching "${searchQuery}"` : 
+                    'No contacts found'
+                  }
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+                {contacts.map((contact) => (
+                  <Card
+                    key={contact.id}
+                    className={`transition-all duration-500 hover:shadow-md ${
+                      contact.id.startsWith('temp-') 
+                        ? 'bg-green-50 dark:bg-green-950/20 animate-pulse border-green-200 dark:border-green-800' 
+                        : 'hover:border-blue-200 dark:hover:border-blue-700'
+                    }`}
+                    data-testid={`card-contact-${contact.id}`}
+                  >
+                    <CardContent className="p-4">
+                      {/* Card Header */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3 flex-1">
+                          <Checkbox
+                            checked={selectedContacts.includes(contact.id)}
+                            onCheckedChange={() => toggleSelectContact(contact.id)}
+                            disabled={contact.id.startsWith('temp-')}
+                            data-testid={`checkbox-contact-card-${contact.id}`}
+                          />
+                          <Avatar className="h-10 w-10">
+                            <AvatarFallback className="text-sm font-medium">
+                              {getInitials(contact.firstName, contact.lastName)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p
+                              className={`font-medium truncate hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors ${
+                                contact.id.startsWith('temp-')
+                                  ? 'text-green-700 dark:text-green-400'
+                                  : 'text-gray-900 dark:text-white'
+                              }`}
+                              onClick={() => !contact.id.startsWith('temp-') && setLocation(`/email-contacts/view/${contact.id}`)}
+                              data-testid={`text-contact-name-card-${contact.id}`}
+                            >
+                              {contact.firstName || contact.lastName
+                                ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
+                                : contact.email.split('@')[0]
+                              }
+                              {contact.id.startsWith('temp-') && (
+                                <span className="ml-2 text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-1.5 py-0.5 rounded-full">
+                                  New
+                                </span>
+                              )}
+                            </p>
+                            <p
+                              className={`text-sm truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors ${
+                                contact.id.startsWith('temp-')
+                                  ? 'text-green-600 dark:text-green-500 cursor-default'
+                                  : 'text-gray-500 cursor-pointer'
+                              }`}
+                              onClick={() => !contact.id.startsWith('temp-') && setLocation(`/email-contacts/view/${contact.id}`)}
+                              data-testid={`text-contact-email-card-${contact.id}`}
+                            >
+                              {contact.email}
+                            </p>
+                          </div>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" data-testid={`button-contact-menu-card-${contact.id}`}>
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setLocation(`/email-contacts/view/${contact.id}`)}>
+                              <UserCheck className="w-4 h-4 mr-2" />
+                              View Contact
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setLocation(`/email-contacts/edit/${contact.id}`)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Contact
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Mail className="w-4 h-4 mr-2" />
+                              Send Email
+                            </DropdownMenuItem>
+                            <EmailActivityTimelineModal
+                              contactId={contact.id}
+                              contactEmail={contact.email}
+                              contactName={`${contact.firstName || ''} ${contact.lastName || ''}`.trim() || undefined}
+                              trigger={
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                  <Calendar className="w-4 h-4 mr-2" />
+                                  View Activity Timeline
+                                </DropdownMenuItem>
+                              }
+                            />
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      {/* Status and Tags */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Status</span>
+                          {getStatusBadge(contact.status)}
+                        </div>
+
+                        {contact.tags.length > 0 && (
+                          <div>
+                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-2">Tags</span>
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {contact.tags.slice(0, 3).map((tag) => (
+                                <Badge 
+                                  key={tag.id} 
+                                  variant="outline" 
+                                  className="text-xs" 
+                                  style={{ backgroundColor: tag.color + '20', borderColor: tag.color }}
+                                  data-testid={`badge-tag-card-${tag.id}`}
+                                >
+                                  {tag.name}
+                                </Badge>
+                              ))}
+                              {contact.tags.length > 3 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{contact.tags.length - 3}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Engagement */}
+                        <div>
+                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-2">Engagement</span>
+                          <div className="text-sm">
+                            <p className="font-medium" data-testid={`text-engagement-rate-card-${contact.id}`}>
+                              {getEngagementRate(contact.emailsSent, contact.emailsOpened)}% open rate
+                            </p>
+                            <p className="text-gray-500" data-testid={`text-email-stats-card-${contact.id}`}>
+                              {contact.emailsOpened}/{contact.emailsSent} emails
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Added Date */}
+                        <div>
+                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-2">Added</span>
+                          <div className="text-sm">
+                            <p data-testid={`text-added-date-card-${contact.id}`}>{formatDate(contact.addedDate)}</p>
+                            {contact.lastActivity && (
+                              <p className="text-gray-500" data-testid={`text-last-activity-card-${contact.id}`}>
+                                Active {formatDate(contact.lastActivity)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         </CardContent>
       </Card>

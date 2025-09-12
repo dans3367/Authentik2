@@ -48,40 +48,46 @@ export function getActivityConfig(): ActivityConfig {
  */
 export function initializeActivityConfigFromEnv(): ActivityConfig {
   // Only access process.env from the non-sandboxed worker environment
-  if (typeof process !== 'undefined' && process.env) {
-    // Load environment variables using dotenv for the temporal server
+  // Check if we're in a Node.js environment with proper globals
+  if (typeof globalThis !== 'undefined' &&
+      typeof globalThis.process !== 'undefined' &&
+      typeof globalThis.process.env !== 'undefined' &&
+      typeof globalThis.require !== 'undefined') {
+
     try {
-      const dotenv = require('dotenv');
-      const path = require('path');
-      
+      // Load environment variables using dotenv for the temporal server
+      const dotenv = globalThis.require('dotenv');
+      const path = globalThis.require('path');
+
       // Load local .env file in temporal-server directory
       const localResult = dotenv.config();
-      
+
       // Load root .env file from main project
       const rootEnvPath = path.resolve(__dirname, '../../.env');
       const rootResult = dotenv.config({ path: rootEnvPath });
-      
+
       console.log(`[ActivityConfig] Local .env loaded: ${localResult.error ? 'no' : 'yes'}, Root .env loaded: ${rootResult.error ? 'no' : 'yes'}`);
-      console.log(`[ActivityConfig] RESEND_API_KEY available: ${process.env.RESEND_API_KEY ? 'yes' : 'no'}`);
-      console.log(`[ActivityConfig] POSTMARK_API_TOKEN available: ${process.env.POSTMARK_API_TOKEN ? 'yes' : 'no'}`);
+      console.log(`[ActivityConfig] RESEND_API_KEY available: ${globalThis.process.env.RESEND_API_KEY ? 'yes' : 'no'}`);
+      console.log(`[ActivityConfig] POSTMARK_API_TOKEN available: ${globalThis.process.env.POSTMARK_API_TOKEN ? 'yes' : 'no'}`);
     } catch (error) {
       console.warn('[ActivityConfig] Failed to load dotenv:', error);
     }
-    
+
     const config: ActivityConfig = {
-      backendUrl: process.env.BACKEND_URL || 'http://localhost:3500',
-      resendApiKey: process.env.RESEND_API_KEY || '',
-      postmarkApiToken: process.env.POSTMARK_API_TOKEN || process.env.POSTMARK_API_KEY || '',
-      primaryEmailProvider: process.env.PRIMARY_EMAIL_PROVIDER || 'resend',
-      frontendUrl: process.env.FRONTEND_URL || 'https://app.zendwise.work',
-      fromEmail: process.env.FROM_EMAIL || 'noreply@zendwise.work',
-      emailConcurrencyLimit: parseInt(process.env.EMAIL_CONCURRENCY_LIMIT || '5')
+      backendUrl: globalThis.process.env.BACKEND_URL || 'http://localhost:3500',
+      resendApiKey: globalThis.process.env.RESEND_API_KEY || '',
+      postmarkApiToken: globalThis.process.env.POSTMARK_API_TOKEN || globalThis.process.env.POSTMARK_API_KEY || '',
+      primaryEmailProvider: globalThis.process.env.PRIMARY_EMAIL_PROVIDER || 'resend',
+      frontendUrl: globalThis.process.env.FRONTEND_URL || 'https://app.zendwise.work',
+      fromEmail: globalThis.process.env.FROM_EMAIL || 'noreply@zendwise.work',
+      emailConcurrencyLimit: parseInt(globalThis.process.env.EMAIL_CONCURRENCY_LIMIT || '5')
     };
-    
+
     setActivityConfig(config);
     return config;
   }
-  
-  // Return defaults if process.env is not available
+
+  console.log('[ActivityConfig] Running in sandboxed environment, using default config');
+  // Return defaults if we're in a sandboxed environment (like workflow)
   return activityConfig;
 }

@@ -74,6 +74,7 @@ export default function EditEmailContact() {
     },
   });
 
+
   // Fetch available tags
   const { data: tagsData } = useQuery({
     queryKey: ["/api/contact-tags"],

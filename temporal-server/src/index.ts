@@ -22,7 +22,7 @@ serverLogger.info(
 const PORT = process.env.TEMPORAL_SERVER_PORT || 50051;
 const TEMPORAL_ADDRESS = process.env.TEMPORAL_ADDRESS || '100.125.36.104:7233';
 const TEMPORAL_NAMESPACE = process.env.TEMPORAL_NAMESPACE || 'default';
-const TEMPORAL_TASK_QUEUE = process.env.TEMPORAL_TASK_QUEUE || 'newsletterSendingWorkflow';
+const TEMPORAL_TASK_QUEUE = process.env.TEMPORAL_TASK_QUEUE || 'authentik-tasks';
 
 async function startServer() {
   serverLogger.info('🚀 Starting Authentik Temporal Server...');

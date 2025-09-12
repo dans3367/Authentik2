@@ -12,7 +12,7 @@ export class TemporalService {
 
   async connect(): Promise<void> {
     try {
-      const serverUrl = process.env.TEMPORAL_ADDRESS || '100.125.36.104:7233';
+      const serverUrl = process.env.TEMPORAL_ADDRESS || '172.18.0.4:7233';
       const namespace = process.env.TEMPORAL_NAMESPACE || 'default';
 
       console.log(`Connecting to Temporal server at ${serverUrl}`);
@@ -76,7 +76,7 @@ export class TemporalService {
     }
 
     try {
-      const taskQueue = process.env.TEMPORAL_TASK_QUEUE || 'newsletterSendingWorkflow';
+      const taskQueue = process.env.TEMPORAL_TASK_QUEUE || 'authentik-tasks';
       console.log(`📮 [TemporalService] Using task queue: ${taskQueue}`);
 
       const handle = await this.client.workflow.start(workflowType, {

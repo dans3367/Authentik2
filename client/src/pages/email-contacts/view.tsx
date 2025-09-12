@@ -7,21 +7,22 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import EmailActivityTimeline from "@/components/EmailActivityTimeline";
 import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
-import { 
+import {
   ArrowLeft,
-  Mail, 
-  Calendar, 
-  CheckCircle2, 
-  XCircle, 
-  AlertCircle, 
-  Edit, 
+  Mail,
+  Calendar,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  AlertTriangle as AlertTriangleIcon,
+  Edit,
   Trash2,
   Tag,
   Users,
   BarChart3,
-  Clock,
   UserCheck,
   Eye,
   Send,
@@ -102,6 +103,17 @@ export default function ViewContact() {
     enabled: !!id,
   });
 
+  // Global suppression check (bounced/spam complaints) for this email
+  const emailForCheck = response?.contact?.email as string | undefined;
+  const { data: bouncedCheck } = useQuery({
+    queryKey: ['/api/bounced-emails/check', emailForCheck],
+    enabled: !!emailForCheck,
+    queryFn: async ({ queryKey }) => {
+      const res = await apiRequest('GET', `/api/bounced-emails/check/${encodeURIComponent(String(queryKey[1]))}`);
+      return res.json();
+    },
+  });
+
   // Extract contact from response - the API returns { contact: ... }
   const contact: Contact | undefined = response?.contact;
   const engagementStats = statsResponse?.stats;
@@ -155,7 +167,7 @@ export default function ViewContact() {
     const Icon = config.icon;
     
     return (
-      <Badge className={`${config.color} flex items-center gap-1`}>
+      <Badge className={`${config.color} gap-1`}>
         <Icon className="w-3 h-3" />
         {config.label}
       </Badge>
@@ -306,18 +318,18 @@ export default function ViewContact() {
           Back to Contacts
         </Button>
         
-        <div className="flex items-start justify-between">
-          <div className="flex items-start gap-4">
-            <Avatar className="h-16 w-16">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+          <div className="flex items-start gap-4 min-w-0 flex-1">
+            <Avatar className="h-16 w-16 flex-shrink-0">
               <AvatarFallback className="text-lg font-semibold">
                 {getInitials(contact.firstName, contact.lastName)}
               </AvatarFallback>
             </Avatar>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white break-words">
                 {getFullName(contact)}
               </h1>
-              <p className="text-gray-600 dark:text-gray-400 text-lg">
+              <p className="text-gray-600 dark:text-gray-400 text-lg break-all">
                 {contact.email}
               </p>
               <div className="mt-2">
@@ -326,13 +338,14 @@ export default function ViewContact() {
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
-            <Button variant="outline">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 lg:flex-shrink-0">
+            <Button variant="outline" className="justify-center">
               <Send className="w-4 h-4 mr-2" />
               Send Email
             </Button>
             <Button 
               variant="outline"
+              className="justify-center"
               onClick={() => setLocation(`/email-contacts/edit/${contact.id}`)}
             >
               <Edit className="w-4 h-4 mr-2" />
@@ -345,6 +358,25 @@ export default function ViewContact() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Info */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Sending Disabled Alert */}
+          {(() => {
+            const isSuppressed = contact.status === 'unsubscribed' || contact.status === 'bounced' || !!bouncedCheck?.isBounced;
+            const dateRaw = bouncedCheck?.bouncedEmail?.lastBouncedAt || bouncedCheck?.bouncedEmail?.firstBouncedAt || bouncedCheck?.bouncedEmail?.bouncedAt;
+            const dateText = dateRaw ? formatDateShort(dateRaw as any) : null;
+            if (!isSuppressed) return null;
+            return (
+              <Alert className="border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-200 [&>svg]:text-yellow-600 dark:[&>svg]:text-yellow-400">
+                <AlertTriangleIcon className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <AlertTitle className="text-sm font-medium">Sending disabled</AlertTitle>
+                <AlertDescription className="text-yellow-700 dark:text-yellow-300 text-sm leading-relaxed">
+                  {dateText
+                    ? `We are unable to send to this address because it is marked as bounced or is on a global do-not-contact list as of ${dateText}. If you believe this is an error, please contact our support team.`
+                    : `We are unable to send to this address because it is marked as bounced or is on a global do-not-contact list. If you believe this is an error, please contact our support team.`}
+                </AlertDescription>
+              </Alert>
+            );
+          })()}
+
           {/* Contact Details */}
           <Card>
             <CardHeader>
@@ -552,7 +584,10 @@ export default function ViewContact() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Clock className="w-5 h-5" />
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12,6 12,12 16,14"></polyline>
+                </svg>
                 Activity Timeline
               </CardTitle>
             </CardHeader>

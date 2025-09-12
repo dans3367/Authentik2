@@ -1,0 +1,241 @@
+{
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "loading": "Cargando",
+    "error": "Error",
+    "success": "Éxito",
+    "confirm": "Confirmar",
+    "close": "Cerrar",
+    "settings": "Configuración",
+    "preferences": "Preferencias",
+    "language": "Idioma",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "add": "Agregar",
+    "remove": "Eliminar",
+    "create": "Crear",
+    "update": "Actualizar",
+    "view": "Ver",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "previous": "Anterior",
+    "submit": "Enviar",
+    "reset": "Restablecer",
+    "clear": "Limpiar",
+    "select": "Seleccionar",
+    "all": "Todos",
+    "none": "Ninguno",
+    "yes": "Sí",
+    "no": "No"
+  },
+  "navigation": {
+    "dashboard": "Panel de Control",
+    "newsletter": "Boletín",
+    "promotions": "Promociones",
+    "forms": "Formularios",
+    "emailCampaigns": "Campañas de Email",
+    "emailTest": "Prueba de Email",
+    "birthdays": "Cumpleaños",
+    "reminders": "Recordatorios",
+    "templates": "Plantillas",
+    "contacts": "Contactos",
+    "analytics": "Análisis",
+    "shops": "Tiendas",
+    "users": "Usuarios"
+  },
+  "auth": {
+    "login": "Iniciar Sesión",
+    "logout": "Cerrar Sesión",
+    "signup": "Registrarse",
+    "email": "Email",
+    "password": "Contraseña",
+    "confirmPassword": "Confirmar Contraseña",
+    "firstName": "Nombre",
+    "lastName": "Apellido",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "rememberMe": "Recordarme",
+    "signInWith": "Iniciar sesión con",
+    "orContinueWith": "O continuar con",
+    "alreadyHaveAccount": "¿Ya tienes una cuenta?",
+    "dontHaveAccount": "¿No tienes una cuenta?",
+    "signIn": "Iniciar Sesión",
+    "createAccount": "Crear Cuenta"
+  },
+  "profile": {
+    "title": "Configuración de Cuenta",
+    "subtitle": "Administra la información de tu cuenta y configuración de seguridad",
+    "tabs": {
+      "profile": "Perfil",
+      "preferences": "Preferencias",
+      "security": "Seguridad",
+      "twoFactor": "2FA",
+      "subscription": "Suscripción",
+      "danger": "Peligro"
+    },
+    "personalInfo": {
+      "title": "Información Personal",
+      "updateAvatar": "Haz clic para actualizar tu foto de perfil",
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "email": "Dirección de Email",
+      "saveChanges": "Guardar Cambios",
+      "updating": "Actualizando..."
+    },
+    "preferences": {
+      "title": "Preferencias de la Aplicación",
+      "expandedMenu": {
+        "title": "Menú de Navegación Expandido",
+        "description": "Mostrar el menú de navegación expandido por defecto con etiquetas visibles"
+      },
+      "language": {
+        "title": "Idioma",
+        "description": "Elige tu idioma preferido para la interfaz",
+        "english": "Inglés",
+        "spanish": "Español"
+      }
+    },
+    "security": {
+      "title": "Cambiar Contraseña",
+      "currentPassword": "Contraseña Actual",
+      "newPassword": "Nueva Contraseña",
+      "confirmNewPassword": "Confirmar Nueva Contraseña",
+      "passwordStrength": "Fuerza de la contraseña",
+      "changing": "Cambiando...",
+      "changePassword": "Cambiar Contraseña"
+    },
+    "twoFactor": {
+      "title": "Autenticación de Dos Factores",
+      "enabled": "Habilitado",
+      "disabled": "Deshabilitado",
+      "enableDescription": "Agrega una capa extra de seguridad a tu cuenta",
+      "disableDescription": "Tu cuenta está protegida con autenticación de dos factores",
+      "setUp": "Configurar 2FA",
+      "disable": "Deshabilitar 2FA",
+      "settingUp": "Configurando...",
+      "enabling": "Habilitando...",
+      "disabling": "Deshabilitando..."
+    },
+    "dangerZone": {
+      "title": "Zona de Peligro",
+      "deleteAccount": "Eliminar Cuenta",
+      "deleteDescription": "Una vez que elimines tu cuenta, no hay vuelta atrás. Esto desactivará permanentemente tu cuenta y eliminará todos tus datos incluyendo tu perfil, configuración y toda la información asociada.",
+      "deleteConfirmation": "¿Estás absolutamente seguro de que quieres eliminar tu cuenta? Esta acción no se puede deshacer y eliminará permanentemente todos tus datos.",
+      "deleting": "Eliminando..."
+    }
+  },
+  "reminders": {
+    "title": "¡Nunca Vuelvas a Perder una Cita!",
+    "subtitle": "Administra tus citas y envía recordatorios automáticos a tus clientes. Mantén a todos informados y reduce las ausencias con nuestro sistema inteligente de recordatorios.",
+    "tabs": {
+      "appointments": "Citas",
+      "reminders": "Recordatorios",
+      "settings": "Configuración"
+    },
+    "appointments": {
+      "newAppointment": "Nueva Cita",
+      "createAppointment": "Crear Cita",
+      "customer": "Cliente",
+      "title": "Título",
+      "dateTime": "Fecha y Hora",
+      "duration": "Duración (minutos)",
+      "location": "Ubicación",
+      "status": "Estado",
+      "sendReminders": "Enviar Recordatorios",
+      "noAppointments": "No se encontraron citas",
+      "createFirst": "Crea tu primera cita para comenzar"
+    },
+    "overview": {
+      "total": "Total de Citas",
+      "upcoming": "Próximas",
+      "confirmed": "Confirmadas",
+      "remindersSent": "Recordatorios Enviados"
+    }
+  },
+  "birthdays": {
+    "title": "Gestión de Cumpleaños",
+    "subtitle": "Administra los cumpleaños de clientes y campañas automáticas de cumpleaños",
+    "hero": {
+      "celebration": "Celebra Su Día",
+      "dayWith": "Especial Con Una",
+      "ecard": "¡Tarjeta de Cumpleaños!",
+      "description": "Elige tus contactos y les enviaremos un saludo personalizado de cumpleaños directamente a su bandeja de entrada. ¡Solo toma unos clics alegrar el día de alguien!"
+    },
+    "overview": {
+      "title": "Resumen",
+      "totalCustomers": "Total de Clientes",
+      "withBirthdays": "Con Cumpleaños",
+      "campaignsEnabled": "Campañas Activadas",
+      "upcomingBirthdays": "Próximos Cumpleaños"
+    },
+    "templates": {
+      "title": "Plantillas de Email de Cumpleaños",
+      "confetti": "Confeti",
+      "balloons": "Globos",
+      "selectTemplate": "Selecciona una plantilla para emails de cumpleaños",
+      "previewSubject": "🎉 ¡Feliz Cumpleaños!"
+    },
+    "table": {
+      "name": "NOMBRE",
+      "status": "ESTADO",
+      "birthday": "CUMPLEAÑOS",
+      "lists": "LISTAS",
+      "activity": "ACTIVIDAD",
+      "campaigns": "CAMPAÑAS",
+      "actions": "ACCIONES",
+      "sent": "Enviados",
+      "opened": "Abiertos",
+      "notSet": "usar cliente",
+      "na": "N/A"
+    },
+    "filters": {
+      "searchPlaceholder": "Buscar clientes...",
+      "allStatuses": "Todos los Estados",
+      "active": "activo",
+      "inactive": "inactivo",
+      "pending": "pendiente",
+      "subscribed": "suscrito",
+      "unsubscribed": "desuscrito"
+    },
+    "actions": {
+      "enableSelected": "Habilitar Emails de Cumpleaños",
+      "disableSelected": "Deshabilitar Emails de Cumpleaños",
+      "exportBirthdays": "Exportar Cumpleaños",
+      "importBirthdays": "Importar Cumpleaños"
+    },
+    "modal": {
+      "addTitle": "Agregar Cumpleaños",
+      "editTitle": "Editar Cumpleaños",
+      "addDescription": "Selecciona una fecha para guardar como cumpleaños del contacto.",
+      "editDescription": "Actualiza la fecha de cumpleaños del contacto.",
+      "save": "Guardar",
+      "cancel": "Cancelar"
+    },
+    "toasts": {
+      "birthdayUpdated": "Cumpleaños actualizado exitosamente",
+      "birthdayUpdateError": "Error al actualizar cumpleaños",
+      "campaignEnabled": "Campaña de cumpleaños habilitada",
+      "campaignDisabled": "Campaña de cumpleaños deshabilitada",
+      "noActionNeeded": "No se Requiere Acción",
+      "noBirthdaysSelected": "Los clientes seleccionados no tienen fechas de cumpleaños configuradas.",
+      "bulkUpdateSuccess": "Campañas de cumpleaños actualizadas exitosamente",
+      "bulkUpdateError": "Error al actualizar campañas de cumpleaños"
+    }
+  },
+  "toast": {
+    "profileUpdated": "Perfil actualizado exitosamente",
+    "passwordChanged": "Contraseña cambiada exitosamente",
+    "languageChanged": "Idioma cambiado exitosamente",
+    "error": "Ocurrió un error",
+    "success": "Operación completada exitosamente"
+  },
+  "validation": {
+    "required": "Este campo es obligatorio",
+    "invalidEmail": "Por favor ingresa una dirección de email válida",
+    "passwordTooShort": "La contraseña debe tener al menos 8 caracteres",
+    "passwordsDoNotMatch": "Las contraseñas no coinciden",
+    "invalidFormat": "Formato inválido"
+  }
+}

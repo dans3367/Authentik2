@@ -7,7 +7,7 @@ echo
 echo "1️⃣ Logging in..."
 LOGIN_RESPONSE=$(curl -s -X POST http://localhost:5000/api/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"owner@example.com","password":"password"}')
+  -d '{"email":"beats@zendwise.com","password":"password"}')
 
 echo "Login Response: $LOGIN_RESPONSE"
 

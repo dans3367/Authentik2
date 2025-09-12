@@ -8,9 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth, useUpdateTheme, useUpdateMenuPreference, useUpdateProfile, useChangePassword, useDeleteAccount, useSetup2FA, useEnable2FA, useDisable2FA } from "@/hooks/useAuth";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { use2FA } from "@/hooks/use2FA";
+import { useLanguage } from "@/hooks/useLanguage";
 import { updateProfileSchema, changePasswordSchema } from "@shared/schema";
 import type { UpdateProfileData, ChangePasswordData, SubscriptionPlan, UserSubscriptionResponse } from "@shared/schema";
 import { calculatePasswordStrength, getPasswordStrengthText, getPasswordStrengthColor } from "@/lib/authUtils";
@@ -34,7 +36,8 @@ import {
   QrCode,
   CreditCard,
   Check,
-  Star
+  Star,
+  Languages
 } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -315,6 +318,9 @@ export default function ProfilePage() {
   const enable2FAMutation = useEnable2FA();
   const disable2FAMutation = useDisable2FA();
   const updateMenuPreferenceMutation = useUpdateMenuPreference();
+
+  // Language management
+  const { currentLanguage, supportedLanguages, changeLanguage, isChanging, t } = useLanguage();
 
   // Get current 2FA status from the database
   const { twoFactorEnabled, loading: twoFALoading, check2FARequirement } = use2FA();
@@ -772,10 +778,10 @@ export default function ProfilePage() {
                       <div className="space-y-2">
                         <div className="flex items-center space-x-3">
                           <Menu className="w-5 h-5 text-green-600 dark:text-green-400" />
-                          <Label className="text-base font-medium text-gray-800 dark:text-gray-200">Expanded Navigation Menu</Label>
+                          <Label className="text-base font-medium text-gray-800 dark:text-gray-200">{t('profile.preferences.expandedMenu.title')}</Label>
                         </div>
                         <p className="text-sm text-gray-600 dark:text-gray-400 ml-8">
-                          Show navigation menu expanded by default with labels visible
+                          {t('profile.preferences.expandedMenu.description')}
                         </p>
                       </div>
                       <Switch
@@ -795,6 +801,44 @@ export default function ProfilePage() {
                         disabled={updateMenuPreferenceMutation.isPending}
                         className="data-[state=checked]:bg-green-600"
                       />
+                    </div>
+                  </div>
+
+                  {/* Language Preference */}
+                  <div className="bg-green-50/50 dark:bg-green-900/20 border border-green-200/50 dark:border-green-700/30 rounded-lg p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-3">
+                          <Languages className="w-5 h-5 text-green-600 dark:text-green-400" />
+                          <Label className="text-base font-medium text-gray-800 dark:text-gray-200">{t('profile.preferences.language.title')}</Label>
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 ml-8">
+                          {t('profile.preferences.language.description')}
+                        </p>
+                      </div>
+                      <div className="min-w-[140px]">
+                        <Select 
+                          value={currentLanguage} 
+                          onValueChange={changeLanguage}
+                          disabled={isChanging}
+                        >
+                          <SelectTrigger className="bg-white/70 dark:bg-gray-700/50 border-green-200 dark:border-green-700/50 focus:border-green-500 dark:focus:border-green-400">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(supportedLanguages).map(([code, name]) => (
+                              <SelectItem key={code} value={code}>
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-lg">
+                                    {code === 'en' ? '🇺🇸' : '🇪🇸'}
+                                  </span>
+                                  <span>{name}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   </div>
                 </div>

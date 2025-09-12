@@ -95,7 +95,11 @@ import {
   type TenantLimitsWithDetails,
   type ShopLimitEvent,
   type ShopLimitEventType,
-  type ShopLimitFilters
+  type ShopLimitFilters,
+  promotions,
+  type Promotion,
+  type CreatePromotionData,
+  type UpdatePromotionData,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gt, lt, gte, lte, desc, ne, or, ilike, count, sql, inArray, not, isNull } from "drizzle-orm";
@@ -288,6 +292,20 @@ export interface IStorage {
   removeBouncedEmail(email: string): Promise<void>;
   getBouncedEmailAddresses(): Promise<string[]>;
   incrementBounceCount(email: string, lastBouncedAt: Date, bounceReason?: string): Promise<BouncedEmail | undefined>;
+  
+  // Promotion management
+  getPromotion(id: string, tenantId: string): Promise<Promotion | undefined>;
+  getAllPromotions(tenantId: string): Promise<Promotion[]>;
+  createPromotion(promotion: CreatePromotionData, userId: string, tenantId: string): Promise<Promotion>;
+  updatePromotion(id: string, updates: UpdatePromotionData, tenantId: string): Promise<Promotion | undefined>;
+  deletePromotion(id: string, tenantId: string): Promise<void>;
+  getPromotionStats(tenantId: string): Promise<{
+    totalPromotions: number;
+    activePromotions: number;
+    monthlyUsage: number;
+    totalReach: number;
+  }>;
+  incrementPromotionUsage(id: string, tenantId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1553,6 +1571,142 @@ export class DatabaseStorage implements IStorage {
       .where(eq(bouncedEmails.email, email.toLowerCase().trim()))
       .returning();
     return updated;
+  }
+
+  // Promotion management methods
+  async getPromotion(id: string, tenantId: string): Promise<Promotion | undefined> {
+    const [promotion] = await db.select()
+      .from(promotions)
+      .where(and(
+        eq(promotions.id, id),
+        eq(promotions.tenantId, tenantId)
+      ));
+    
+    // Parse promotional codes from JSON
+    if (promotion && promotion.promotionalCodes) {
+      try {
+        (promotion as any).promotionalCodes = JSON.parse(promotion.promotionalCodes);
+      } catch (e) {
+        (promotion as any).promotionalCodes = [];
+      }
+    }
+    
+    return promotion;
+  }
+
+  async getAllPromotions(tenantId: string): Promise<Promotion[]> {
+    const result = await db.select()
+      .from(promotions)
+      .where(eq(promotions.tenantId, tenantId))
+      .orderBy(desc(promotions.createdAt));
+    
+    // Parse promotional codes from JSON for each promotion
+    return result.map(promotion => {
+      if (promotion.promotionalCodes) {
+        try {
+          (promotion as any).promotionalCodes = JSON.parse(promotion.promotionalCodes);
+        } catch (e) {
+          (promotion as any).promotionalCodes = [];
+        }
+      }
+      return promotion;
+    });
+  }
+
+  async createPromotion(promotion: CreatePromotionData, userId: string, tenantId: string): Promise<Promotion> {
+    const [created] = await db.insert(promotions)
+      .values({
+        ...promotion,
+        userId,
+        tenantId,
+        promotionalCodes: promotion.promotionalCodes ? JSON.stringify(promotion.promotionalCodes) : null,
+      })
+      .returning();
+    
+    // Parse promotional codes back to array for return
+    if (created.promotionalCodes) {
+      try {
+        (created as any).promotionalCodes = JSON.parse(created.promotionalCodes);
+      } catch (e) {
+        (created as any).promotionalCodes = [];
+      }
+    }
+    
+    return created;
+  }
+
+  async updatePromotion(id: string, updates: UpdatePromotionData, tenantId: string): Promise<Promotion | undefined> {
+    const updateData = {
+      ...updates,
+      updatedAt: new Date(),
+    };
+    
+    // Handle promotional codes JSON serialization
+    if (updates.promotionalCodes !== undefined) {
+      (updateData as any).promotionalCodes = updates.promotionalCodes ? JSON.stringify(updates.promotionalCodes) : null;
+    }
+    
+    const [updated] = await db.update(promotions)
+      .set(updateData)
+      .where(and(
+        eq(promotions.id, id),
+        eq(promotions.tenantId, tenantId)
+      ))
+      .returning();
+    
+    // Parse promotional codes back to array for return
+    if (updated && updated.promotionalCodes) {
+      try {
+        (updated as any).promotionalCodes = JSON.parse(updated.promotionalCodes);
+      } catch (e) {
+        (updated as any).promotionalCodes = [];
+      }
+    }
+    
+    return updated;
+  }
+
+  async deletePromotion(id: string, tenantId: string): Promise<void> {
+    await db.delete(promotions)
+      .where(and(
+        eq(promotions.id, id),
+        eq(promotions.tenantId, tenantId)
+      ));
+  }
+
+  async getPromotionStats(tenantId: string): Promise<{
+    totalPromotions: number;
+    activePromotions: number;
+    monthlyUsage: number;
+    totalReach: number;
+  }> {
+    const [stats] = await db.select({
+      totalPromotions: count(promotions.id),
+      activePromotions: sql<number>`COUNT(CASE WHEN ${promotions.isActive} = true THEN 1 END)`,
+      monthlyUsage: sql<number>`SUM(CASE WHEN ${promotions.createdAt} >= NOW() - INTERVAL '30 days' THEN ${promotions.usageCount} ELSE 0 END)`,
+      totalReach: sql<number>`SUM(${promotions.usageCount})`,
+    })
+    .from(promotions)
+    .where(eq(promotions.tenantId, tenantId));
+
+    return {
+      totalPromotions: stats.totalPromotions || 0,
+      activePromotions: Number(stats.activePromotions) || 0,
+      monthlyUsage: Number(stats.monthlyUsage) || 0,
+      totalReach: Number(stats.totalReach) || 0,
+    };
+  }
+
+  async incrementPromotionUsage(id: string, tenantId: string): Promise<void> {
+    await db.update(promotions)
+      .set({
+        usageCount: sql`${promotions.usageCount} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(promotions.id, id),
+        eq(promotions.tenantId, tenantId)
+      ));
   }
 }
 

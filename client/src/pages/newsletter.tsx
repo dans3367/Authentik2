@@ -36,6 +36,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { NewsletterWithUser } from "@shared/schema";
 import type { ColumnDef } from "@tanstack/react-table";
+import NewsletterWorkerProgress from "@/components/NewsletterWorkerProgress";
 // Status badge helper function
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -99,14 +100,19 @@ const createColumns = (
     accessorKey: "user",
     header: "Author",
     cell: ({ row }) => {
-      const user = row.getValue("user") as { firstName: string; lastName: string };
+      const user = row.getValue("user") as { firstName?: string; lastName?: string };
+      const firstName = user?.firstName || '';
+      const lastName = user?.lastName || '';
+      const initials = (firstName[0] || '') + (lastName[0] || '');
+      const displayName = firstName && lastName ? `${firstName} ${lastName}` : firstName || lastName || 'Unknown User';
+      
       return (
         <div className="flex items-center space-x-2">
           <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-sm font-medium">
-            {user.firstName[0]}{user.lastName[0]}
+            {initials || '?'}
           </div>
           <div className="text-sm text-gray-900 dark:text-gray-100">
-            {user.firstName} {user.lastName}
+            {displayName}
           </div>
         </div>
       );
@@ -773,6 +779,16 @@ export default function NewsletterPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Newsletter Worker Progress - Only show if there are active jobs */}
+        <div className="space-y-6">
+          <NewsletterWorkerProgress 
+            showWorkerStats={true}
+            autoRefresh={true}
+            refreshInterval={3000}
+          />
+        </div>
+
         {/* Delete Confirmation Dialog */}
       </div>
     </div>

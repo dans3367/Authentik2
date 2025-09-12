@@ -7,6 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Send, Mail, Server, Clock, CheckCircle, XCircle, Zap, BarChart3, Target, ShieldCheck, Trash2, AlertTriangle } from "lucide-react";
@@ -26,8 +33,17 @@ interface EmailTrackingEntry {
   metadata?: Record<string, any>;
 }
 
+interface Contact {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  status: "active" | "unsubscribed" | "bounced" | "pending";
+}
+
 interface EmailCampaignData {
   recipient: string;
+  selectedContactId?: string;
   subject: string;
   content: string;
   templateType: string;
@@ -76,9 +92,10 @@ export default function EmailTestPage() {
     tokenError: tokenError?.message
   });
   const [campaignData, setCampaignData] = useState<EmailCampaignData>({
-    recipient: "dan@zendwise.com",
+    recipient: "",
+    selectedContactId: "",
     subject: "Test Email Campaign",
-    content: "This is a test email sent through the Go backend and Temporal workflow system.",
+    content: "Hello {{recipientName}},\n\nThis is a test email sent through the Go backend and Temporal workflow system.\n\nBest regards,\nThe Team",
     templateType: "marketing",
     priority: "normal",
     isScheduled: false,
@@ -88,9 +105,9 @@ export default function EmailTestPage() {
     reviewerId: "",
   });
 
-  // Query to check Go server health
+  // Query to check server-node health
   const { data: serverHealth, isLoading: healthLoading, error: healthError } = useQuery({
-    queryKey: ['/go-server-health'],
+    queryKey: ['/server-node-health'],
     queryFn: async () => {
       try {
         const response = await fetch('/api/dev/health', {
@@ -100,22 +117,22 @@ export default function EmailTestPage() {
           }
         });
         if (!response.ok) {
-          console.error('❌ [Health] Go server health check failed:', response.status);
-          throw new Error(`Go server returned ${response.status}`);
+          console.error('❌ [Health] Server-node health check failed:', response.status);
+          throw new Error(`Server-node returned ${response.status}`);
         }
         return response.json();
       } catch (error) {
-        console.error('❌ [Health] Cannot connect to Go server:', error);
-        throw new Error('Go server not available - may be offline or blocked by CORS');
+        console.error('❌ [Health] Cannot connect to server-node:', error);
+        throw new Error('Server-node not available - may be offline or blocked by CORS');
       }
     },
     refetchInterval: 10000, // Check health every 10 seconds
     retry: false, // Don't retry failed health checks
   });
 
-  // Query to get email tracking entries from Go server
+  // Query to get email tracking entries from server-node
   const { data: trackingEntries, isLoading: entriesLoading } = useQuery({
-    queryKey: ['/go-server-tracking', accessToken],
+    queryKey: ['/server-node-tracking', accessToken],
     queryFn: async () => {
       if (!accessToken) {
         console.log('🔍 [Tracking] No access token available, skipping fetch');
@@ -145,6 +162,54 @@ export default function EmailTestPage() {
     staleTime: 60_000,
   });
   const managers = managersData?.managers || [];
+
+  // Fetch contacts for recipient dropdown
+  const { data: contactsData, isLoading: contactsLoading } = useQuery({
+    queryKey: ['/api/email-contacts'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/email-contacts?status=active');
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    refetchOnWindowFocus: false,
+  });
+  const contacts: Contact[] = contactsData?.contacts || [];
+
+  // Helper function to get full name of a contact
+  const getContactDisplayName = (contact: Contact) => {
+    const firstName = contact.firstName || '';
+    const lastName = contact.lastName || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+    return fullName || 'Unknown';
+  };
+
+  // Helper function to substitute placeholders in content
+  const substitutePlaceholders = (content: string, selectedContact: Contact | null) => {
+    if (!selectedContact) return content;
+    
+    const recipientName = getContactDisplayName(selectedContact);
+    return content.replace(/\{\{recipientName\}\}/g, recipientName);
+  };
+
+  // Get selected contact object
+  const selectedContact = contacts.find(contact => contact.id === campaignData.selectedContactId) || null;
+
+  // Handle contact selection
+  const handleContactSelect = (contactId: string) => {
+    // Ignore disabled placeholder values
+    if (contactId === "loading" || contactId === "no-contacts") {
+      return;
+    }
+    
+    const contact = contacts.find(c => c.id === contactId);
+    if (contact) {
+      setCampaignData(prev => ({
+        ...prev,
+        selectedContactId: contactId,
+        recipient: contact.email,
+      }));
+    }
+  };
 
   // Mutation to clear temporal workflows
   const clearTemporalMutation = useMutation({
@@ -181,7 +246,7 @@ export default function EmailTestPage() {
         description: `Successfully cleared ${data.clearedWorkflows || 0} workflows from Temporal`,
       });
       // Refresh tracking entries
-      queryClient.invalidateQueries({ queryKey: ['/go-server-tracking'] });
+      queryClient.invalidateQueries({ queryKey: ['/server-node-tracking'] });
     },
     onError: (error: any) => {
       toast({
@@ -318,10 +383,19 @@ export default function EmailTestPage() {
         temporalWorkflow: `email-workflow-${emailId}`,
         scheduledAt: scheduledAtISO,
         timezone: campaignData.timezone,
+        recipient: campaignData.recipient, // Add recipient at top level
+        subject: campaignData.subject, // Add subject at top level
+        content: substitutePlaceholders(campaignData.content, selectedContact), // Add content at top level
+        templateType: campaignData.templateType,
+        priority: campaignData.priority,
+        isScheduled: campaignData.isScheduled,
+        scheduledAt: scheduledAtISO,
+        tenantId: campaignData.tenantId,
+        userId: campaignData.userId,
         metadata: {
           recipient: campaignData.recipient,
           subject: campaignData.subject,
-          content: campaignData.content,
+          content: substitutePlaceholders(campaignData.content, selectedContact),
           templateType: campaignData.templateType,
           priority: campaignData.priority,
           requiresReviewerApproval: !!campaignData.requiresReviewerApproval,
@@ -332,11 +406,11 @@ export default function EmailTestPage() {
         }
       };
 
-      // Try Go server first, fall back to local processing if unavailable
+      // Try server-node first, then fallback to local processing
       let useLocalFallback = false;
       let response;
       
-      console.log('🚀 [Campaign] Attempting to send via Go server:', {
+      console.log('🚀 [Campaign] Attempting to send via server-node:', {
         url: '/api/email-tracking',
         tokenLength: token.length,
         emailId: emailId,
@@ -353,19 +427,25 @@ export default function EmailTestPage() {
           },
           body: JSON.stringify(payload),
         });
+        
+        // Check if server-node responded successfully
+        if (!response.ok) {
+          console.warn('⚠️ [Campaign] Server-node returned error:', response.status);
+          useLocalFallback = true;
+        }
       } catch (networkError) {
-        console.warn('⚠️ [Campaign] Go server unavailable, using local fallback:', networkError);
+        console.warn('⚠️ [Campaign] Server-node unavailable, using local fallback:', networkError);
         useLocalFallback = true;
       }
       
-      // If Go server is unavailable or returns error, use local fallback
-      if (useLocalFallback || (response && !response.ok && (response.status === 503 || response.status === 0))) {
+      // If server-node is unavailable or returns error, use local fallback
+      if (useLocalFallback) {
         console.log('🔄 [Campaign] Switching to local email processing');
         
         const localPayload = {
           recipient: campaignData.recipient,
           subject: campaignData.subject,
-          content: campaignData.content,
+          content: substitutePlaceholders(campaignData.content, selectedContact),
           templateType: campaignData.templateType,
           priority: campaignData.priority,
         };
@@ -393,9 +473,9 @@ export default function EmailTestPage() {
         });
         
         if (response.status === 401) {
-          throw new Error('Authentication failed with Go server. Token may be invalid or expired.');
+          throw new Error('Authentication failed with server-node. Token may be invalid or expired.');
         } else if (response.status === 503 || errorMessage.includes('unavailable')) {
-          throw new Error('Email service (Go server) is currently unavailable. Please try again later.');
+          throw new Error('Email service (server-node) is currently unavailable. Please try again later.');
         } else {
           throw new Error(`Failed to send campaign: ${errorMessage}`);
         }
@@ -406,12 +486,44 @@ export default function EmailTestPage() {
       return result;
     },
     onSuccess: async (data) => {
+      // Create success message with temporal information
+      let description = campaignData.isScheduled 
+        ? `Email campaign scheduled successfully`
+        : `Email campaign sent successfully`;
+      
+      if (data.recipient) {
+        description += ` to ${data.recipient}`;
+      }
+      
+      // Add temporal ID information
+      if (data.workflowId) {
+        description += `\nTemporal ID: ${data.workflowId}`;
+      }
+      if (data.runId) {
+        description += `\nRun ID: ${data.runId}`;
+      }
+      if (data.emailId) {
+        description += `\nEmail ID: ${data.emailId}`;
+      }
+      if (data.scheduledAt) {
+        description += `\nScheduled for: ${new Date(data.scheduledAt).toLocaleString()}`;
+      }
+      
       toast({
         title: campaignData.isScheduled ? "Campaign Scheduled Successfully" : "Campaign Sent Successfully",
-        description: campaignData.isScheduled 
-          ? `Email campaign scheduled with ID: ${data.id}`
-          : `Email campaign queued with ID: ${data.id}`,
+        description: description,
       });
+      
+      // Log temporal information for debugging
+      if (data.temporal && data.workflowId) {
+        console.log('✅ [Campaign] Temporal workflow created:', {
+          workflowId: data.workflowId,
+          runId: data.runId,
+          emailId: data.emailId,
+          recipient: data.recipient,
+          temporal: data.temporal
+        });
+      }
       // Reviewer notification is now handled automatically by the Temporal workflow
       if (campaignData.requiresReviewerApproval) {
         toast({
@@ -420,7 +532,7 @@ export default function EmailTestPage() {
         });
       }
       // Refresh tracking entries
-      queryClient.invalidateQueries({ queryKey: ['/go-server-tracking'] });
+      queryClient.invalidateQueries({ queryKey: ['/server-node-tracking'] });
     },
     onError: (error: any) => {
       toast({
@@ -432,11 +544,11 @@ export default function EmailTestPage() {
   });
 
   const handleSendCampaign = () => {
-    if (!campaignData.recipient || !campaignData.subject) {
+    if (!campaignData.selectedContactId || !campaignData.subject) {
       toast({
         variant: "destructive",
         title: "Missing Information",
-        description: "Please fill in recipient and subject fields.",
+        description: "Please select a recipient contact and enter a subject.",
       });
       return;
     }
@@ -510,13 +622,13 @@ export default function EmailTestPage() {
             Email Testing
           </h1>
           <p className="text-lg text-muted-foreground">
-            Test email campaigns through Go backend and Temporal workflows
+            Test email campaigns through server-node backend and Temporal workflows
           </p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-3 px-4 py-2 bg-card rounded-lg border shadow-sm">
             <Server className="h-5 w-5 text-blue-600" />
-            <span className="text-sm font-medium">Go Server:</span>
+            <span className="text-sm font-medium">Server-Node:</span>
             {healthLoading ? (
               <Badge variant="outline" className="gap-1">
                 <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600" />
@@ -603,7 +715,7 @@ export default function EmailTestPage() {
               <div className="flex items-center justify-center gap-2 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
                 <XCircle className="h-4 w-4 text-red-600" />
                 <p className="text-sm text-red-700 dark:text-red-300">
-                  Go server must be online to perform cleanup operations
+                  Server-node must be online to perform cleanup operations
                 </p>
               </div>
             )}
@@ -622,21 +734,42 @@ export default function EmailTestPage() {
               Campaign Composer
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Create and send test email campaigns through the Go backend
+              Create and send test email campaigns through the server-node backend
             </p>
           </CardHeader>
           <CardContent className="space-y-6 p-6">
             <div className="grid gap-6 md:grid-cols-2">
               <div className="space-y-3">
-                <Label htmlFor="recipient" className="text-sm font-semibold">Recipient Email</Label>
-                <Input
-                  id="recipient"
-                  type="email"
-                  value={campaignData.recipient}
-                  onChange={(e) => setCampaignData(prev => ({ ...prev, recipient: e.target.value }))}
-                  placeholder="Enter recipient email"
-                  className="h-11"
-                />
+                <Label htmlFor="recipient" className="text-sm font-semibold">Select Recipient</Label>
+                <Select
+                  value={campaignData.selectedContactId}
+                  onValueChange={handleContactSelect}
+                >
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder={contactsLoading ? "Loading contacts..." : "Select a contact"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {contactsLoading ? (
+                      <SelectItem value="loading" disabled>Loading contacts...</SelectItem>
+                    ) : contacts.length === 0 ? (
+                      <SelectItem value="no-contacts" disabled>No active contacts found</SelectItem>
+                    ) : (
+                      contacts.map((contact) => (
+                        <SelectItem key={contact.id} value={contact.id}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{getContactDisplayName(contact)}</span>
+                            <span className="text-sm text-muted-foreground">{contact.email}</span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {selectedContact && (
+                  <div className="text-xs text-muted-foreground">
+                    Email will be sent to: <span className="font-medium">{selectedContact.email}</span>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3">
@@ -657,9 +790,20 @@ export default function EmailTestPage() {
                 id="content"
                 value={campaignData.content}
                 onChange={(e) => setCampaignData(prev => ({ ...prev, content: e.target.value }))}
-                placeholder="Enter email content"
+                placeholder="Enter email content. Use {{recipientName}} to insert the recipient's name."
                 className="min-h-[140px] resize-none"
               />
+              <div className="text-xs text-muted-foreground">
+                <strong>Tip:</strong> Use <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">{"{{recipientName}}"}</code> as a placeholder for the recipient's name.
+              </div>
+              {selectedContact && (
+                <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <Label className="text-sm font-semibold text-blue-800 dark:text-blue-200">Preview with placeholders:</Label>
+                  <div className="mt-2 text-sm text-blue-700 dark:text-blue-300 whitespace-pre-wrap font-mono bg-white dark:bg-blue-900/20 p-2 rounded border">
+                    {substitutePlaceholders(campaignData.content, selectedContact)}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -862,7 +1006,7 @@ export default function EmailTestPage() {
                 <div className="flex items-center justify-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
                   <XCircle className="h-4 w-4 text-amber-600" />
                   <p className="text-sm text-amber-700 dark:text-amber-300">
-                    Go server must be online to send campaigns
+                    Server-node preferred for optimal email sending (fallback available)
                   </p>
                 </div>
               )}
@@ -880,7 +1024,7 @@ export default function EmailTestPage() {
               Backend Status
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Go server and Temporal connectivity
+              Server-node and Temporal connectivity
             </p>
           </CardHeader>
           <CardContent className="space-y-5 p-6">
@@ -895,10 +1039,10 @@ export default function EmailTestPage() {
                   <XCircle className="h-8 w-8 text-red-500 mx-auto" />
                 </div>
                 <p className="text-sm font-medium text-red-700 dark:text-red-300 mb-1">
-                  Go server is offline or unreachable
+                  Server-node is offline or unreachable
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Make sure the local server is running on port 3500
+                  Make sure the server-node is running on port 3502
                 </p>
               </div>
             ) : serverHealth ? (

@@ -14,7 +14,7 @@ export class TemporalWorkerService {
   constructor(
     private temporalAddress: string,
     private namespace: string,
-    private taskQueue: string = 'newsletterSendingWorkflow'
+    private taskQueue: string = 'authentik-tasks'
   ) {}
 
   async initialize(): Promise<void> {

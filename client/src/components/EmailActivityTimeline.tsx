@@ -5,21 +5,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import CustomCalendar from "./CustomCalendar";
-import { 
-  Mail, 
-  Eye, 
-  MousePointer, 
-  AlertTriangle, 
-  Ban, 
-  Shield, 
+import {
+  Mail,
+  Eye,
+  MousePointer,
+  AlertTriangle,
+  Ban,
+  Shield,
   UserMinus,
   Check,
-  Clock,
   Zap,
   RefreshCw,
   CalendarDays,
   X
 } from "lucide-react";
+import ActivityIcon from "@assets/28_new.svg";
 import { useEffect, useState } from "react";
 import { addDays, format } from "date-fns";
 
@@ -31,12 +31,30 @@ interface EmailActivity {
   userAgent?: string;
   ipAddress?: string;
   webhookId?: string;
+  webhookData?: string;
+  campaign?: {
+    id: string;
+    name: string;
+  };
+  newsletter?: {
+    id: string;
+    name: string;
+  };
+  createdAt?: string;
 }
 
 interface EmailActivityTimelineProps {
   contactId: string;
   limit?: number;
 }
+
+// Custom clock icon component for fallback
+const CustomClockIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="10"></circle>
+    <polyline points="12,6 12,12 16,14"></polyline>
+  </svg>
+);
 
 const getActivityIcon = (activityType: EmailActivity['activityType']) => {
   const iconMap = {
@@ -48,7 +66,7 @@ const getActivityIcon = (activityType: EmailActivity['activityType']) => {
     complained: Shield,
     unsubscribed: UserMinus,
   };
-  return iconMap[activityType] || Clock;
+  return iconMap[activityType] || CustomClockIcon;
 };
 
 const getActivityColor = (activityType: EmailActivity['activityType']) => {
@@ -478,13 +496,13 @@ export default function EmailActivityTimeline({ contactId, limit = 50 }: EmailAc
           </div>
         </CardHeader>
         <CardContent>
+          <img src={ActivityIcon} className="w-[200px] h-auto text-gray-400 mx-auto mb-2" alt="Activity Timeline Icon" />
           <div className="text-center py-8">
-            <Clock className="w-8 h-8 text-gray-400 mx-auto mb-2" />
             <p className="text-gray-600 dark:text-gray-400">
               {hasDateFilter ? "No activities found for the selected date range" : "No activity recorded yet"}
             </p>
             <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
-              {hasDateFilter 
+              {hasDateFilter
                 ? "Try adjusting the date range or clearing the filter to see more activities"
                 : "Email activities will appear here when emails are sent to this contact"
               }
@@ -684,7 +702,27 @@ export default function EmailActivityTimeline({ contactId, limit = 50 }: EmailAc
           <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-200 dark:bg-gray-700" />
           
           <div className="space-y-4">
-            {activities.map((activity, index) => {
+            {activities.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="text-gray-400 dark:text-gray-500 mb-2">
+                  <Mail className="w-12 h-12 mx-auto" />
+                </div>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">
+                  {hasDateFilter ? 'No email activity found for the selected date range.' : 'No email activity recorded yet.'}
+                </p>
+                {hasDateFilter && (
+                  <Button 
+                    variant="link" 
+                    size="sm" 
+                    onClick={clearDateFilter}
+                    className="mt-2"
+                  >
+                    Clear date filter to see all activities
+                  </Button>
+                )}
+              </div>
+            ) : (
+              activities.map((activity, index) => {
               const Icon = getActivityIcon(activity.activityType);
               const colorClass = getActivityColor(activity.activityType);
               const description = getActivityDescription(activity.activityType);
@@ -734,17 +772,32 @@ export default function EmailActivityTimeline({ contactId, limit = 50 }: EmailAc
                       </time>
                     </div>
                     
+                    {/* Campaign and Newsletter info */}
+                    {(activity.campaign || activity.newsletter) && (
+                      <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                        {activity.campaign && (
+                          <p><span className="font-medium">Campaign:</span> {activity.campaign.name}</p>
+                        )}
+                        {activity.newsletter && (
+                          <p><span className="font-medium">Newsletter:</span> {activity.newsletter.name}</p>
+                        )}
+                      </div>
+                    )}
+
                     {/* Additional details */}
                     {parsedActivityData && (
                       <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
                         {parsedActivityData.subject && (
                           <p><span className="font-medium">Subject:</span> {parsedActivityData.subject}</p>
                         )}
+                        {parsedActivityData.email_id && (
+                          <p><span className="font-medium">Email ID:</span> {parsedActivityData.email_id}</p>
+                        )}
+                        {parsedActivityData.from && (
+                          <p><span className="font-medium">From:</span> {parsedActivityData.from}</p>
+                        )}
                         {parsedActivityData.messageId && (
                           <p><span className="font-medium">Message ID:</span> {parsedActivityData.messageId}</p>
-                        )}
-                        {parsedActivityData.tags && parsedActivityData.tags.length > 0 && (
-                          <p><span className="font-medium">Tags:</span> {parsedActivityData.tags.join(', ')}</p>
                         )}
                       </div>
                     )}
@@ -760,10 +813,17 @@ export default function EmailActivityTimeline({ contactId, limit = 50 }: EmailAc
                         )}
                       </div>
                     )}
+
+                    {/* Webhook technical details */}
+                    {activity.webhookId && (
+                      <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        <p><span className="font-medium">Webhook ID:</span> {activity.webhookId}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
-            })}
+            }))}
           </div>
         </div>
 
