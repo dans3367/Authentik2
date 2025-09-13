@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff } from "lucide-react";
+import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Bold, AlignLeft, AlignCenter, AlignRight, Droplet } from "lucide-react";
 
 type DesignerData = {
   title: string;
@@ -14,6 +14,7 @@ type DesignerData = {
   imageUrl?: string | null;
   signature?: string;
   themeId?: string;
+  customImage?: boolean;
 };
 
 interface CardDesignerDialogProps {
@@ -30,15 +31,28 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   const [imageUrl, setImageUrl] = useState<string | null>(initialData?.imageUrl ?? 
     (initialThemeId === "sparkle-cake" ? "/images/birthday-sparkle.jpg" : null));
   const [signature, setSignature] = useState(initialData?.signature ?? "From Daniel S");
+  const [customImage, setCustomImage] = useState<boolean>(initialData?.customImage ?? false);
+  const editorRef = useRef<HTMLDivElement | null>(null);
 
+  // Initialize state on open
   useEffect(() => {
-    if (open) {
-      setTitle(initialData?.title ?? "Header");
-      setMessage(initialData?.message ?? "Content area\nContent area");
-      setImageUrl(initialData?.imageUrl ?? (initialThemeId === "sparkle-cake" ? "/images/birthday-sparkle.jpg" : null));
-      setSignature(initialData?.signature ?? "From Daniel S");
-    }
+    if (!open) return;
+    setTitle(initialData?.title ?? "Header");
+    setMessage(initialData?.message ?? "Content area\nContent area");
+    setSignature(initialData?.signature ?? "From Daniel S");
+    const themeDefault = initialThemeId === "sparkle-cake" ? "/images/birthday-sparkle.jpg" : null;
+    const isCustom = initialData?.customImage ?? customImage ?? false;
+    setCustomImage(isCustom);
+    setImageUrl(isCustom ? (initialData?.imageUrl ?? null) : themeDefault);
   }, [open, initialThemeId, initialData]);
+
+  // If theme changes while open and no custom image chosen, update header image to theme default
+  useEffect(() => {
+    if (!open) return;
+    if (customImage) return;
+    const themeDefault = initialThemeId === "sparkle-cake" ? "/images/birthday-sparkle.jpg" : null;
+    setImageUrl(themeDefault);
+  }, [initialThemeId, customImage, open]);
 
   // Persist draft locally so switching themes won't lose text
   useEffect(() => {
@@ -49,11 +63,12 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       imageUrl: imageUrl ?? undefined,
       signature,
       themeId: initialThemeId,
+      customImage,
     };
     try {
       localStorage.setItem("birthdayCardDesignerDraft", JSON.stringify(draft));
     } catch {}
-  }, [open, title, message, imageUrl, signature, initialThemeId]);
+  }, [open, title, message, imageUrl, signature, initialThemeId, customImage]);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -63,14 +78,37 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     if (file) {
       const url = URL.createObjectURL(file);
       setImageUrl(url);
+      setCustomImage(true);
     }
   };
 
-  const handleRemoveImage = () => setImageUrl(null);
+  const handleRemoveImage = () => { setImageUrl(null); setCustomImage(false); };
 
   const handleSave = () => {
-    onSave?.({ title, message, imageUrl, signature, themeId: initialThemeId });
+    onSave?.({ title, message, imageUrl, signature, themeId: initialThemeId, customImage } as DesignerData);
     onOpenChange(false);
+  };
+
+  // Simple execCommand wrapper for formatting
+  const exec = (command: string, value?: string) => {
+    // Focus editor to apply formatting to current selection
+    editorRef.current?.focus();
+    try {
+      document.execCommand(command, false, value);
+      // After formatting, sync HTML back to state
+      if (editorRef.current) setMessage(editorRef.current.innerHTML);
+    } catch {}
+  };
+
+  const onEditorInput = (e: React.FormEvent<HTMLDivElement>) => {
+    setMessage((e.currentTarget as HTMLDivElement).innerHTML);
+  };
+
+  const coerceHtml = (value: string) => {
+    if (!value) return "";
+    // If value looks like HTML, return as is; otherwise convert newlines to <br>
+    if (/[<][a-z][^>]*>/i.test(value)) return value;
+    return value.replace(/\n/g, "<br>");
   };
 
   return (
@@ -109,7 +147,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                     <ImageOff className="w-4 h-4 mr-2" />
                     Remove Image
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="text-red-600" onClick={() => { setTitle(""); setMessage(""); setImageUrl(null); }}>
+                  <DropdownMenuItem className="text-red-600" onClick={() => { setTitle(""); setMessage(""); setImageUrl(null); setCustomImage(false); }}>
                     <Trash2 className="w-4 h-4 mr-2" />
                     Delete post
                   </DropdownMenuItem>
@@ -126,10 +164,41 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
               className="text-3xl md:text-4xl font-extrabold border-0 shadow-none px-0 focus-visible:ring-0 text-center"
             />
 
-            <Textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              className="min-h-[120px] border-0 shadow-none px-0 focus-visible:ring-0 text-base text-gray-700 text-left"
+            {/* Content toolbar */}
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => exec('bold')} title="Bold">
+                <Bold className="w-4 h-4" />
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => exec('justifyLeft')} title="Align left">
+                <AlignLeft className="w-4 h-4" />
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => exec('justifyCenter')} title="Align center">
+                <AlignCenter className="w-4 h-4" />
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => exec('justifyRight')} title="Align right">
+                <AlignRight className="w-4 h-4" />
+              </Button>
+              <div className="relative">
+                <input
+                  type="color"
+                  aria-label="Text color"
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                  onChange={(e) => exec('foreColor', e.target.value)}
+                />
+                <Button type="button" variant="outline" size="sm" asChild>
+                  <span><Droplet className="w-4 h-4" /></span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Editable content area */}
+            <div
+              ref={editorRef}
+              className="min-h-[140px] border border-input bg-background px-3 py-3 text-base text-gray-700 rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              contentEditable
+              suppressContentEditableWarning
+              onInput={onEditorInput}
+              dangerouslySetInnerHTML={{ __html: coerceHtml(message) }}
             />
 
             <div className="flex items-center justify-end text-gray-500 text-sm">

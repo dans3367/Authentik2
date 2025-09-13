@@ -634,7 +634,7 @@ export default function BirthdaysPage() {
         })()}
         onSave={(data) => {
           try {
-            localStorage.setItem('birthdayCardDesignerDraft', JSON.stringify({ title: data.title, message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId }));
+            localStorage.setItem('birthdayCardDesignerDraft', JSON.stringify({ title: data.title, message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId, customImage: (data as any).customImage }));
           } catch {}
           handleSettingsUpdate('customMessage', data.message);
         }}
