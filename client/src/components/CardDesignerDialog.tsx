@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import RichTextEditor from "@/components/RichTextEditor";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Bold, AlignLeft, AlignCenter, AlignRight, Droplet } from "lucide-react";
 
@@ -32,7 +33,8 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     (initialThemeId === "sparkle-cake" ? "/images/birthday-sparkle.jpg" : null));
   const [signature, setSignature] = useState(initialData?.signature ?? "From Daniel S");
   const [customImage, setCustomImage] = useState<boolean>(initialData?.customImage ?? false);
-  const editorRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [isEditingContent, setIsEditingContent] = useState(false);
 
   // Initialize state on open
   useEffect(() => {
@@ -89,38 +91,58 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     onOpenChange(false);
   };
 
-  // Simple execCommand wrapper for formatting
-  const exec = (command: string, value?: string) => {
-    // Focus editor to apply formatting to current selection
-    editorRef.current?.focus();
-    try {
-      document.execCommand(command, false, value);
-      // After formatting, sync HTML back to state
-      if (editorRef.current) setMessage(editorRef.current.innerHTML);
-    } catch {}
+  // Simple text formatting for textarea
+  const wrapSelectedText = (prefix: string, suffix?: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = message.substring(start, end);
+    
+    if (selectedText) {
+      const beforeText = message.substring(0, start);
+      const afterText = message.substring(end);
+      const wrappedText = `${prefix}${selectedText}${suffix || prefix}`;
+      
+      setMessage(beforeText + wrappedText + afterText);
+      
+      // Restore focus and cursor position
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start + prefix.length, end + prefix.length);
+      }, 0);
+    }
   };
 
-  const onEditorInput = (e: React.FormEvent<HTMLDivElement>) => {
-    setMessage((e.currentTarget as HTMLDivElement).innerHTML);
+  const insertAtCursor = (text: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    
+    const start = textarea.selectionStart;
+    const beforeText = message.substring(0, start);
+    const afterText = message.substring(start);
+    
+    setMessage(beforeText + text + afterText);
+    
+    // Restore focus and cursor position
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + text.length, start + text.length);
+    }, 0);
   };
 
-  const coerceHtml = (value: string) => {
-    if (!value) return "";
-    // If value looks like HTML, return as is; otherwise convert newlines to <br>
-    if (/[<][a-z][^>]*>/i.test(value)) return value;
-    return value.replace(/\n/g, "<br>");
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[760px]">
+      <DialogContent className="max-w-[760px]" dir="ltr" style={{ direction: 'ltr' }}>
         <DialogHeader>
           <DialogTitle>Design your birthday card</DialogTitle>
           <DialogDescription>Customize the image, header and message.</DialogDescription>
         </DialogHeader>
 
-        {/* Designer Canvas - standard email width (600px) */}
-        <div className="mx-auto w-[600px] rounded-2xl overflow-hidden border bg-white">
+        {/* Designer Canvas - standard email width (600px) with forced LTR */}
+        <div className="mx-auto w-[600px] rounded-2xl overflow-hidden border bg-white" dir="ltr" style={{ direction: 'ltr' }}>
           {/* Image header */}
           <div className="relative bg-gray-100">
             {imageUrl ? (
@@ -164,41 +186,12 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
               className="text-3xl md:text-4xl font-extrabold border-0 shadow-none px-0 focus-visible:ring-0 text-center"
             />
 
-            {/* Content toolbar */}
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => exec('bold')} title="Bold">
-                <Bold className="w-4 h-4" />
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => exec('justifyLeft')} title="Align left">
-                <AlignLeft className="w-4 h-4" />
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => exec('justifyCenter')} title="Align center">
-                <AlignCenter className="w-4 h-4" />
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => exec('justifyRight')} title="Align right">
-                <AlignRight className="w-4 h-4" />
-              </Button>
-              <div className="relative">
-                <input
-                  type="color"
-                  aria-label="Text color"
-                  className="absolute inset-0 opacity-0 cursor-pointer"
-                  onChange={(e) => exec('foreColor', e.target.value)}
-                />
-                <Button type="button" variant="outline" size="sm" asChild>
-                  <span><Droplet className="w-4 h-4" /></span>
-                </Button>
-              </div>
-            </div>
-
-            {/* Editable content area */}
-            <div
-              ref={editorRef}
-              className="min-h-[140px] border border-input bg-background px-3 py-3 text-base text-gray-700 rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              contentEditable
-              suppressContentEditableWarning
-              onInput={onEditorInput}
-              dangerouslySetInnerHTML={{ __html: coerceHtml(message) }}
+            {/* Rich text editor with bubble (tooltip) menu */}
+            <RichTextEditor
+              value={typeof message === 'string' ? message : ''}
+              onChange={(html) => setMessage(html)}
+              placeholder="Start typing your message..."
+              className="text-base text-gray-800"
             />
 
             <div className="flex items-center justify-end text-gray-500 text-sm">
