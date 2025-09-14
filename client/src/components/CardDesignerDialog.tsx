@@ -239,26 +239,37 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   const searchUnsplash = async (query: string) => {
     if (!query.trim()) return;
     setLoading(true);
+    
+    const accessKey = import.meta.env.VITE_ACCESS_KEY;
+    const secretKey = import.meta.env.VITE_SECRET_KEY;
+    
     try {
-      // Using a free public Unsplash API endpoint
-      const response = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=12&client_id=YOUR_ACCESS_KEY_HERE`);
+      // Check if environment variables are configured
+      if (!accessKey) {
+        console.warn('VITE_ACCESS_KEY not configured, using fallback images');
+        throw new Error('Unsplash API key not configured');
+      }
+      
+      // Using Unsplash API with environment variables
+      const response = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=12&client_id=${accessKey}`);
+      
       if (response.ok) {
         const data = await response.json();
         setUnsplashImages(data.results || []);
       } else {
-        // Fallback to mock data for demo
-        setUnsplashImages([
-          { id: '1', urls: { small: 'https://picsum.photos/300/200?random=1', regular: 'https://picsum.photos/600/400?random=1' }, alt_description: 'Sample image 1' },
-          { id: '2', urls: { small: 'https://picsum.photos/300/200?random=2', regular: 'https://picsum.photos/600/400?random=2' }, alt_description: 'Sample image 2' },
-          { id: '3', urls: { small: 'https://picsum.photos/300/200?random=3', regular: 'https://picsum.photos/600/400?random=3' }, alt_description: 'Sample image 3' },
-          { id: '4', urls: { small: 'https://picsum.photos/300/200?random=4', regular: 'https://picsum.photos/600/400?random=4' }, alt_description: 'Sample image 4' },
-        ]);
+        console.error('Unsplash API error:', response.status, response.statusText);
+        throw new Error(`Unsplash API error: ${response.status}`);
       }
     } catch (error) {
-      // Fallback to mock data for demo
+      console.warn('Falling back to demo images:', error);
+      // Fallback to mock data when API is not available or configured
       setUnsplashImages([
-        { id: '1', urls: { small: 'https://picsum.photos/300/200?random=1', regular: 'https://picsum.photos/600/400?random=1' }, alt_description: 'Sample image 1' },
-        { id: '2', urls: { small: 'https://picsum.photos/300/200?random=2', regular: 'https://picsum.photos/600/400?random=2' }, alt_description: 'Sample image 2' },
+        { id: '1', urls: { small: 'https://picsum.photos/300/200?random=1', regular: 'https://picsum.photos/600/400?random=1' }, alt_description: 'Sample birthday image 1' },
+        { id: '2', urls: { small: 'https://picsum.photos/300/200?random=2', regular: 'https://picsum.photos/600/400?random=2' }, alt_description: 'Sample birthday image 2' },
+        { id: '3', urls: { small: 'https://picsum.photos/300/200?random=3', regular: 'https://picsum.photos/600/400?random=3' }, alt_description: 'Sample birthday image 3' },
+        { id: '4', urls: { small: 'https://picsum.photos/300/200?random=4', regular: 'https://picsum.photos/600/400?random=4' }, alt_description: 'Sample birthday image 4' },
+        { id: '5', urls: { small: 'https://picsum.photos/300/200?random=5', regular: 'https://picsum.photos/600/400?random=5' }, alt_description: 'Sample birthday image 5' },
+        { id: '6', urls: { small: 'https://picsum.photos/300/200?random=6', regular: 'https://picsum.photos/600/400?random=6' }, alt_description: 'Sample birthday image 6' },
       ]);
     }
     setLoading(false);

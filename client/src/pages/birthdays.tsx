@@ -46,7 +46,6 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calendar } from "@/components/ui/calendar";
 import { CardDesignerDialog } from "@/components/CardDesignerDialog";
 
 interface BirthdaySettings {
@@ -398,9 +397,6 @@ export default function BirthdaysPage() {
     updateContactBirthdayMutation.mutate({ contactId: birthdayContactId, birthday: `${y}-${m}-${d}` });
   };
 
-  const onCalendarSelect = (date?: Date) => {
-    setBirthdayDraft(date);
-  };
 
   const upcomingBirthdays = customersWithBirthdays.filter(contact => {
     if (!contact.birthday) return false;
@@ -782,7 +778,7 @@ export default function BirthdaysPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
+                  <CakeIcon className="h-5 w-5" />
                   Upcoming Birthdays
                 </CardTitle>
               </CardHeader>
@@ -1108,13 +1104,19 @@ export default function BirthdaysPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <Calendar
-              selected={birthdayDraft}
-              onSelect={onCalendarSelect}
-              disabled={{ after: new Date() }}
-              fromYear={1900}
-              toYear={new Date().getFullYear()}
-            />
+            <div className="space-y-2">
+              <Label htmlFor="birthday-date">Birthday Date</Label>
+              <Input
+                id="birthday-date"
+                type="date"
+                value={birthdayDraft ? birthdayDraft.toISOString().split('T')[0] : ''}
+                onChange={(e) => {
+                  const date = e.target.value ? new Date(e.target.value) : undefined;
+                  setBirthdayDraft(date);
+                }}
+                max={new Date().toISOString().split('T')[0]}
+              />
+            </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setBirthdayModalOpen(false)}>{t('birthdays.modal.cancel')}</Button>
               <Button onClick={saveBirthday} disabled={!birthdayDraft || !birthdayContactId || updateContactBirthdayMutation.isPending}>{t('birthdays.modal.save')}</Button>
