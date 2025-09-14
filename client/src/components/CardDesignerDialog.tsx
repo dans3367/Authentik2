@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import RichTextEditor from "@/components/RichTextEditor";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Search, ZoomIn, ZoomOut, Move, RotateCcw } from "lucide-react";
+import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Search, ZoomIn, ZoomOut, Move, RotateCcw, Smile, RefreshCw } from "lucide-react";
 import { uploadCardImage, validateCardImageFile } from "@/lib/cardImageUpload";
 
 type DesignerData = {
@@ -51,7 +51,9 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number; startX: number; startY: number } | null>(null);
   const [showImageControls, setShowImageControls] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const imageContainerRef = useRef<HTMLDivElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize state on open
   useEffect(() => {
@@ -217,6 +219,22 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     }
   }, [showImageControls]);
 
+  // Handle escape key to close emoji picker
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && showEmojiPicker) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    if (showEmojiPicker) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => {
+        document.removeEventListener('keydown', handleKeyDown);
+      };
+    }
+  }, [showEmojiPicker]);
+
   // Search Unsplash images
   const searchUnsplash = async (query: string) => {
     if (!query.trim()) return;
@@ -311,6 +329,64 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     e.preventDefault();
     const delta = e.deltaY > 0 ? -0.05 : 0.05; // Smaller increments for smoother control
     setImageScale(prev => Math.max(0.8, Math.min(2, prev + delta))); // Limited range for better quality
+  };
+
+  // Emoji functionality
+  const birthdayEmojis = [
+    '🎉', '🎂', '🎈', '🎁', '🎊', '🥳', '🍰', '🎀',
+    '✨', '🌟', '💝', '🎵', '🎶', '💫', '🌈', '🦄',
+    '🍾', '🥂', '🍭', '🍬', '🎪', '🎭', '🎨', '💐',
+    '🌺', '🌸', '🌻', '🌷', '🔥', '💖', '💕', '💗'
+  ];
+
+  const insertEmoji = (emoji: string) => {
+    if (titleInputRef.current) {
+      const input = titleInputRef.current;
+      const start = input.selectionStart || 0;
+      const end = input.selectionEnd || 0;
+      const newTitle = title.slice(0, start) + emoji + title.slice(end);
+      setTitle(newTitle);
+      setShowEmojiPicker(false);
+      
+      // Focus back to input and set cursor position after emoji
+      setTimeout(() => {
+        input.focus();
+        input.setSelectionRange(start + emoji.length, start + emoji.length);
+      }, 0);
+    }
+  };
+
+  // Reset functionality
+  const handleReset = () => {
+    const confirmed = confirm(
+      "Are you sure you want to reset the card? This will clear all content including the image, title, message, and signature."
+    );
+    
+    if (confirmed) {
+      // Clear all content
+      setTitle("");
+      setMessage("");
+      setSignature("");
+      
+      // Remove image and reset image controls
+      if (imageUrl && imageUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(imageUrl);
+      }
+      setImageUrl(initialThemeId === "sparkle-cake" ? "/images/birthday-sparkle.jpg" : null);
+      setCustomImage(false);
+      setImagePosition({ x: 0, y: 0 });
+      setImageScale(1);
+      setShowImageControls(false);
+      setShowEmojiPicker(false);
+      
+      // Clear any error states
+      setImageError(false);
+      
+      // Focus on title input for immediate editing
+      setTimeout(() => {
+        titleInputRef.current?.focus();
+      }, 100);
+    }
   };
 
   const handleSave = () => {
@@ -501,18 +577,56 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
 
           {/* Body */}
           <div className="p-8 space-y-6">
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="🎉 Happy Birthday! 🎂"
-              className="text-3xl md:text-4xl font-extrabold border-0 shadow-none px-0 focus-visible:ring-0 text-center placeholder:text-gray-400 placeholder:font-normal"
-            />
+            <div className="relative">
+              <Input
+                ref={titleInputRef}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="🎉 Happy Birthday! 🎂"
+                className="text-3xl md:text-4xl font-extrabold border-0 shadow-none px-0 pr-12 focus-visible:ring-0 text-center placeholder:text-gray-400 placeholder:font-normal"
+              />
+              <div className="absolute right-0 top-1/2 transform -translate-y-1/2">
+                <DropdownMenu open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
+                      onClick={() => setShowEmojiPicker(true)}
+                    >
+                      <Smile className="w-5 h-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent 
+                    align="end" 
+                    className="w-80 p-4"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="space-y-3">
+                      <div className="text-sm font-medium text-gray-700">Birthday Emojis</div>
+                      <div className="grid grid-cols-8 gap-2">
+                        {birthdayEmojis.map((emoji, index) => (
+                          <button
+                            key={index}
+                            onClick={() => insertEmoji(emoji)}
+                            className="w-8 h-8 text-lg hover:bg-gray-100 rounded transition-colors flex items-center justify-center"
+                            title={`Insert ${emoji}`}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
 
             {/* Rich text editor with bubble (tooltip) menu */}
             <RichTextEditor
               value={typeof message === 'string' ? message : ''}
               onChange={(html) => setMessage(html)}
-              placeholder="Wishing you a day filled with happiness and joy! May this special day bring you lots of wonderful memories and all your heart desires. Have an amazing birthday! 🎈✨"
+              placeholder="Type your birthday message here..."
               className="text-base text-gray-800"
             />
 
@@ -537,9 +651,19 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
         />
 
         {/* Footer actions */}
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
-          <Button onClick={handleSave}>Save</Button>
+        <div className="flex justify-between items-center">
+          <Button 
+            variant="outline" 
+            onClick={handleReset}
+            className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Reset Card
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+            <Button onClick={handleSave}>Save</Button>
+          </div>
         </div>
 
         {/* Unsplash Image Picker Modal */}

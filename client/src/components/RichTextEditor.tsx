@@ -30,7 +30,12 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
       TextStyle,
       Color,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
-      Placeholder.configure({ placeholder }),
+      Placeholder.configure({ 
+        placeholder,
+        showOnlyWhenEditable: true,
+        showOnlyCurrent: false,
+        includeChildren: true,
+      }),
       Image.configure({
         inline: true,
         allowBase64: true,
@@ -99,6 +104,17 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
 
   return (
     <div ref={containerRef} className="relative">
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          .ProseMirror p.is-editor-empty:first-child::before {
+            content: attr(data-placeholder);
+            float: left;
+            color: #9ca3af;
+            pointer-events: none;
+            height: 0;
+          }
+        `
+      }} />
       {toolbarPos.visible && (
         <div
           className="absolute z-10 bg-white border rounded-md shadow-sm p-1 flex items-center gap-1"
