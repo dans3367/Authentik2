@@ -14,6 +14,7 @@ import { companyRoutes } from "./routes/companyRoutes";
 import { shopsRoutes } from "./routes/shopsRoutes";
 import { emailManagementRoutes } from "./routes/emailManagementRoutes";
 import { newsletterRoutes } from "./routes/newsletterRoutes";
+import { cardImageRoutes } from "./routes/cardImageRoutes";
 import { authenticateToken, requireTenant } from "./middleware/auth-middleware";
 import { campaignRoutes } from "./routes/campaignRoutes";
 import { webhookRoutes } from "./routes/webhookRoutes";
@@ -54,6 +55,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/shops", shopsRoutes);
   app.use("/api", emailManagementRoutes);
   app.use("/api/newsletters", newsletterRoutes);
+  app.use("/api/card-images", cardImageRoutes);
   app.use("/api/promotions", promotionRoutes);
   app.use("/api/appointments", appointmentRoutes);
   app.use("/api/appointment-reminders", appointmentRemindersRoutes);

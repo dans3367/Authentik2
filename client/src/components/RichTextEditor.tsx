@@ -7,6 +7,7 @@ import { TextAlign } from "@tiptap/extension-text-align";
 import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import { Placeholder } from "@tiptap/extension-placeholder";
+import { Image } from "@tiptap/extension-image";
 import { Button } from "@/components/ui/button";
 import { Bold, AlignLeft, AlignCenter, AlignRight, Droplet } from "lucide-react";
 
@@ -30,6 +31,10 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
       Color,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Placeholder.configure({ placeholder }),
+      Image.configure({
+        inline: true,
+        allowBase64: true,
+      }),
     ],
     content: value || "",
     editorProps: {
@@ -47,12 +52,34 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
       const { from, to } = editor.state.selection;
       const hasSelection = from !== to;
       if (!containerRef.current) return;
+      
       const containerRect = containerRef.current.getBoundingClientRect();
       if (hasSelection) {
         const fromCoords = editor.view.coordsAtPos(from);
         const toCoords = editor.view.coordsAtPos(to);
-        const left = (fromCoords.left + toCoords.left) / 2 - containerRect.left;
-        const top = Math.min(fromCoords.top, toCoords.top) - containerRect.top - 8; // a bit above
+        
+        // Calculate initial position (centered between selection)
+        let left = (fromCoords.left + toCoords.left) / 2 - containerRect.left;
+        
+        // Position toolbar right at the top edge of selected text
+        let top = Math.min(fromCoords.top, toCoords.top) - containerRect.top;
+        
+        // Constrain to container bounds
+        const toolbarWidth = 200; // approximate toolbar width
+        const containerWidth = containerRect.width;
+        
+        // Keep toolbar within left/right bounds
+        if (left - toolbarWidth / 2 < 0) {
+          left = toolbarWidth / 2; // align to left edge + half toolbar width
+        } else if (left + toolbarWidth / 2 > containerWidth) {
+          left = containerWidth - toolbarWidth / 2; // align to right edge - half toolbar width
+        }
+        
+        // If toolbar would go above container, position it at the top
+        if (top < 0) {
+          top = 0;
+        }
+        
         setToolbarPos({ top, left, visible: true });
       } else {
         setToolbarPos((p) => ({ ...p, visible: false }));
@@ -66,6 +93,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
       editor.commands.setContent(value || "", false);
     }
   }, [value, editor]);
+
 
   if (!editor) return null;
 
