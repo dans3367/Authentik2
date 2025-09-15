@@ -10,7 +10,7 @@ if (!process.env.DATABASE_URL) {
 }
 
 const sql = neon(process.env.DATABASE_URL);
-const db = drizzle(sql, { logger: true });
+const db = drizzle(sql, { logger: false });
 
 async function checkEmailContacts() {
   try {

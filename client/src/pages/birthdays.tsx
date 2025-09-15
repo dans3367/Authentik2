@@ -446,36 +446,45 @@ export default function BirthdaysPage() {
   }
 
   return (
-    <div key={currentLanguage} className="min-h-screen">
-    <div className="mx-auto max-w-7xl p-6 space-y-8">
+    <div key={currentLanguage} className="min-h-screen overflow-x-hidden">
+    <div className="mx-auto max-w-7xl p-4 sm:p-6 space-y-6 sm:space-y-8">
       {/* Greeting Header Card */}
       <Card className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <CardContent className="p-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            <div className="space-y-8 pr-6 xl:pr-12 lg:col-span-8">
-              <div className="space-y-3">
-                <div className="flex items-baseline gap-4">
-                  <span className="text-4xl md:text-5xl">🎉</span>
-                  <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight">
+        <CardContent className="p-4 sm:p-6 lg:p-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
+            <div className="space-y-4 sm:space-y-6 lg:space-y-8 pr-0 sm:pr-4 lg:pr-6 xl:pr-12 lg:col-span-8">
+              <div className="birthday-header space-y-2 sm:space-y-3">
+                <div className="flex items-baseline gap-2 sm:gap-4 flex-wrap">
+                  <span className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl">🎉</span>
+                  <h1 
+                    tabIndex={-1}
+                    className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight break-words"
+                  >
                     {t('birthdays.hero.celebration')}
                   </h1>
                 </div>
-                <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight">
+                <h1 
+                  tabIndex={-1}
+                  className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight break-words"
+                >
                   {t('birthdays.hero.dayWith')}
                 </h1>
-                <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight">
+                <h1 
+                  tabIndex={-1}
+                  className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight break-words"
+                >
                   {t('birthdays.hero.ecard')}
                 </h1>
               </div>
-              <p className="text-gray-600 dark:text-gray-400 text-lg leading-relaxed max-w-3xl md:max-w-4xl">
+              <p className="text-gray-600 dark:text-gray-400 text-base sm:text-lg leading-relaxed max-w-full">
                 {t('birthdays.hero.description')}
               </p>
             </div>
-            <div className="justify-self-center lg:justify-self-end lg:col-span-4">
+            <div className="justify-self-center lg:justify-self-end lg:col-span-4 mt-4 lg:mt-0">
               <img
                 src="/guy_present.svg"
                 alt="Person with birthday present illustration"
-                className="w-[360px] xl:w-[420px] max-w-full h-auto"
+                className="w-[280px] sm:w-[320px] md:w-[360px] xl:w-[420px] max-w-full h-auto"
               />
             </div>
           </div>

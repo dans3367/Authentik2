@@ -241,27 +241,79 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     setLoading(true);
     
     const accessKey = import.meta.env.VITE_ACCESS_KEY;
-    const secretKey = import.meta.env.VITE_SECRET_KEY;
+    
+    console.log('🔍 Starting Unsplash search for:', query);
+    console.log('🔑 Access key available:', !!accessKey);
+    console.log('🔑 Access key (first 10 chars):', accessKey ? accessKey.substring(0, 10) + '...' : 'Not set');
     
     try {
       // Check if environment variables are configured
       if (!accessKey) {
-        console.warn('VITE_ACCESS_KEY not configured, using fallback images');
+        console.warn('❌ VITE_ACCESS_KEY not configured, using fallback images');
         throw new Error('Unsplash API key not configured');
       }
       
-      // Using Unsplash API with environment variables
-      const response = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=12&client_id=${accessKey}`);
+      // Simplify search query first to test basic functionality
+      const searchQuery = query.trim();
+      
+      console.log('📝 Search query:', searchQuery);
+      
+      // Using basic Unsplash API parameters for debugging
+      const apiUrl = `https://api.unsplash.com/search/photos`;
+      const searchParams = new URLSearchParams({
+        query: searchQuery,
+        per_page: '12',
+        client_id: accessKey
+      });
+      
+      const fullUrl = `${apiUrl}?${searchParams}`;
+      console.log('🌐 Full API URL:', fullUrl.replace(accessKey, 'ACCESS_KEY_HIDDEN'));
+      
+      const response = await fetch(fullUrl);
+      
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
       
       if (response.ok) {
         const data = await response.json();
-        setUnsplashImages(data.results || []);
+        console.log('✅ API Response received:', {
+          total: data.total,
+          total_pages: data.total_pages,
+          results_count: data.results?.length || 0
+        });
+        
+        const results = data.results || [];
+        
+        // Deduplicate results by image ID to prevent duplicate keys
+        const uniqueResults = results.filter((image: any, index: number, arr: any[]) => 
+          arr.findIndex(img => img.id === image.id) === index
+        );
+        
+        if (uniqueResults.length > 0) {
+          console.log('🖼️ First result sample:', {
+            id: uniqueResults[0].id,
+            description: uniqueResults[0].description,
+            alt_description: uniqueResults[0].alt_description,
+            urls: Object.keys(uniqueResults[0].urls || {})
+          });
+        }
+        
+        console.log(`📊 Deduplication: ${results.length} -> ${uniqueResults.length} images`);
+        
+        setUnsplashImages(uniqueResults);
       } else {
-        console.error('Unsplash API error:', response.status, response.statusText);
-        throw new Error(`Unsplash API error: ${response.status}`);
+        const errorText = await response.text();
+        console.error('❌ Unsplash API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorBody: errorText
+        });
+        throw new Error(`Unsplash API error: ${response.status} - ${errorText}`);
       }
     } catch (error) {
-      console.warn('Falling back to demo images:', error);
+      console.error('💥 Search error details:', error);
+      console.warn('🔄 Falling back to demo images');
+      
       // Fallback to mock data when API is not available or configured
       setUnsplashImages([
         { id: '1', urls: { small: 'https://picsum.photos/300/200?random=1', regular: 'https://picsum.photos/600/400?random=1' }, alt_description: 'Sample birthday image 1' },
@@ -708,8 +760,8 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
 
               {unsplashImages.length > 0 && (
                 <div className="grid grid-cols-3 gap-4 max-h-96 overflow-y-auto">
-                  {unsplashImages.map((image) => (
-                    <div key={image.id} className="cursor-pointer group" onClick={() => selectUnsplashImage(image.urls.regular)}>
+                  {unsplashImages.map((image, index) => (
+                    <div key={`unsplash-${image.id}-${index}`} className="cursor-pointer group" onClick={() => selectUnsplashImage(image.urls.regular)}>
                       <img 
                         src={image.urls.small} 
                         alt={image.alt_description || 'Unsplash image'} 
@@ -722,7 +774,16 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
 
               {!loading && unsplashImages.length === 0 && searchQuery && (
                 <div className="text-center py-8 text-gray-500">
-                  No images found. Try a different search term.
+                  <div className="space-y-2">
+                    <p>No images found. Try a different search term.</p>
+                    {!import.meta.env.VITE_ACCESS_KEY && (
+                      <div className="text-xs text-orange-600 bg-orange-50 p-3 rounded-md">
+                        <p className="font-medium">Unsplash API not configured</p>
+                        <p>Add VITE_ACCESS_KEY to your .env file to enable image search.</p>
+                        <p>Showing demo images instead.</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

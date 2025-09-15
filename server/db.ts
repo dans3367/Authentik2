@@ -21,7 +21,7 @@ if (dbType === 'neon') {
   // Use NeonDB with WebSocket support
   neonConfig.webSocketConstructor = ws;
   pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  db = drizzleNeon({ client: pool, schema, logger: true });
+  db = drizzleNeon(pool, { schema, logger: false });
 } else {
   // Use standard PostgreSQL with SSL detection from DATABASE_URL
   const databaseUrl = process.env.DATABASE_URL!;
@@ -34,7 +34,7 @@ if (dbType === 'neon') {
     connect_timeout: 10,
   });
 
-  db = drizzle(pool, { schema, logger: true });
+  db = drizzle(pool, { schema, logger: false });
 }
 
 export { pool, db };
