@@ -470,14 +470,18 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[760px]" dir="ltr" style={{ direction: 'ltr' }}>
-        <DialogHeader>
-          <DialogTitle>Design your birthday card</DialogTitle>
-          <DialogDescription>Customize the image, header and message.</DialogDescription>
+      <DialogContent 
+        className="max-w-[95vw] sm:max-w-[760px] max-h-[95vh] overflow-y-auto p-3 sm:p-6" 
+        dir="ltr" 
+        style={{ direction: 'ltr' }}
+      >
+        <DialogHeader className="space-y-2">
+          <DialogTitle className="text-lg sm:text-xl">Design your birthday card</DialogTitle>
+          <DialogDescription className="text-sm sm:text-base">Customize the image, header and message.</DialogDescription>
         </DialogHeader>
 
-        {/* Designer Canvas - standard email width (600px) with forced LTR */}
-        <div className="mx-auto w-[600px] rounded-2xl overflow-hidden border bg-white" dir="ltr" style={{ direction: 'ltr' }}>
+        {/* Designer Canvas - responsive width with forced LTR */}
+        <div className="mx-auto w-full max-w-[600px] rounded-2xl overflow-hidden border bg-white" dir="ltr" style={{ direction: 'ltr' }}>
           {/* Image header */}
           <div 
             ref={imageContainerRef}
@@ -494,15 +498,15 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
             onWheel={imageUrl && !imageError ? handleWheel : undefined}
             style={{ 
               cursor: isDragging ? 'grabbing' : (imageUrl && !imageError ? 'grab' : 'default'),
-              height: '300px',
+              height: 'clamp(200px, 40vw, 300px)',
               willChange: isDragging ? 'transform' : 'auto'
             }}
           >
             {uploading ? (
-              <div className="w-full h-[300px] flex items-center justify-center text-blue-500 bg-blue-50">
+              <div className="w-full h-full flex items-center justify-center text-blue-500 bg-blue-50">
                 <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                  <div className="text-sm">Uploading image...</div>
+                  <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                  <div className="text-xs sm:text-sm">Uploading image...</div>
                 </div>
               </div>
             ) : imageUrl && !imageError ? (
@@ -535,66 +539,70 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                 onDragStart={(e) => e.preventDefault()}
               />
             ) : imageUrl && imageError ? (
-              <div className="w-full h-[300px] flex items-center justify-center text-red-400 bg-red-50">
-                <div className="text-center">
-                  <ImageOff className="w-8 h-8 mx-auto mb-2" />
-                  <div className="text-sm">Failed to load image</div>
-                  <Button variant="outline" size="sm" className="mt-2" onClick={() => setImageError(false)}>
+              <div className="w-full h-full flex items-center justify-center text-red-400 bg-red-50">
+                <div className="text-center px-4">
+                  <ImageOff className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2" />
+                  <div className="text-xs sm:text-sm">Failed to load image</div>
+                  <Button variant="outline" size="sm" className="mt-2 text-xs" onClick={() => setImageError(false)}>
                     Retry
                   </Button>
                 </div>
               </div>
             ) : (
-              <div className="w-full h-[300px] flex items-center justify-center text-gray-400">
-                <div className="flex items-center gap-2 text-sm"><ImagePlus className="w-4 h-4" /> Add an image</div>
+              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                <div className="flex items-center gap-2 text-xs sm:text-sm">
+                  <ImagePlus className="w-3 h-3 sm:w-4 sm:h-4" /> 
+                  Add an image
+                </div>
               </div>
             )}
 
             {/* Image Overlay Controls - only show when focused */}
             {imageUrl && !imageError && !uploading && showImageControls && (
-              <div className="absolute top-3 right-3 flex flex-col gap-2 animate-in fade-in-0 duration-200">
-                <div className="bg-black/70 backdrop-blur-sm rounded-lg p-2 flex flex-col gap-1 shadow-lg">
+              <div className="absolute top-2 right-2 sm:top-3 sm:right-3 flex flex-col gap-1 sm:gap-2 animate-in fade-in-0 duration-200">
+                <div className="bg-black/70 backdrop-blur-sm rounded-lg p-1.5 sm:p-2 flex flex-col gap-0.5 sm:gap-1 shadow-lg">
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 text-white hover:bg-white/20 hover:text-white"
+                    className="h-6 w-6 sm:h-8 sm:w-8 text-white hover:bg-white/20 hover:text-white"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleZoomIn();
                     }}
                     title="Zoom In"
                   >
-                    <ZoomIn className="w-4 h-4" />
+                    <ZoomIn className="w-3 h-3 sm:w-4 sm:h-4" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 text-white hover:bg-white/20 hover:text-white"
+                    className="h-6 w-6 sm:h-8 sm:w-8 text-white hover:bg-white/20 hover:text-white"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleZoomOut();
                     }}
                     title="Zoom Out"
                   >
-                    <ZoomOut className="w-4 h-4" />
+                    <ZoomOut className="w-3 h-3 sm:w-4 sm:h-4" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 text-white hover:bg-white/20 hover:text-white"
+                    className="h-6 w-6 sm:h-8 sm:w-8 text-white hover:bg-white/20 hover:text-white"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleResetPosition();
                     }}
                     title="Reset Position & Zoom"
                   >
-                    <RotateCcw className="w-4 h-4" />
+                    <RotateCcw className="w-3 h-3 sm:w-4 sm:h-4" />
                   </Button>
                 </div>
-                <div className="bg-black/70 backdrop-blur-sm rounded-lg px-3 py-1 shadow-lg">
-                  <div className="flex items-center gap-2 text-white text-xs">
-                    <Move className="w-3 h-3" />
-                    <span>Drag to move • Scroll to zoom</span>
+                <div className="bg-black/70 backdrop-blur-sm rounded-lg px-2 py-1 sm:px-3 sm:py-1 shadow-lg">
+                  <div className="flex items-center gap-1 sm:gap-2 text-white text-xs">
+                    <Move className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                    <span className="hidden sm:inline">Drag to move • Scroll to zoom</span>
+                    <span className="sm:hidden">Drag • Scroll</span>
                   </div>
                 </div>
               </div>
@@ -603,8 +611,9 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
             {/* Click to focus hint - only show when not focused and image is present */}
             {imageUrl && !imageError && !uploading && !showImageControls && (
               <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-300">
-                <div className="bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white text-sm">
-                  Click to show controls
+                <div className="bg-black/50 backdrop-blur-sm rounded-lg px-3 py-2 sm:px-4 text-white text-xs sm:text-sm">
+                  <span className="hidden sm:inline">Click to show controls</span>
+                  <span className="sm:hidden">Tap for controls</span>
                 </div>
               </div>
             )}
@@ -629,9 +638,9 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                     <ImageOff className="w-4 h-4 mr-2" />
                     Remove Image
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="text-red-600" onClick={() => { setTitle(""); setMessage(""); setImageUrl(null); setCustomImage(false); }}>
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete post
+                  <DropdownMenuItem className="text-red-600" onClick={handleReset}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Reset Card
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -639,14 +648,14 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
           </div>
 
           {/* Body */}
-          <div className="p-8 space-y-6">
+          <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
             <div className="relative">
               <Input
                 ref={titleInputRef}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="🎉 Happy Birthday! 🎂"
-                className="text-3xl md:text-4xl font-extrabold border-0 shadow-none px-0 pr-12 focus-visible:ring-0 text-center placeholder:text-gray-400 placeholder:font-normal"
+                className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold border-0 shadow-none px-0 pr-8 sm:pr-12 focus-visible:ring-0 text-center placeholder:text-gray-400 placeholder:font-normal"
               />
               <div className="absolute right-0 top-1/2 transform -translate-y-1/2">
                 <DropdownMenu open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
@@ -654,25 +663,25 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
+                      className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-gray-400 hover:text-gray-600"
                       onClick={() => setShowEmojiPicker(true)}
                     >
-                      <Smile className="w-5 h-5" />
+                      <Smile className="w-4 h-4 sm:w-5 sm:h-5" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent 
                     align="end" 
-                    className="w-80 p-4"
+                    className="w-72 sm:w-80 p-3 sm:p-4"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="space-y-3">
-                      <div className="text-sm font-medium text-gray-700">Birthday Emojis</div>
-                      <div className="grid grid-cols-8 gap-2">
+                    <div className="space-y-2 sm:space-y-3">
+                      <div className="text-xs sm:text-sm font-medium text-gray-700">Birthday Emojis</div>
+                      <div className="grid grid-cols-6 sm:grid-cols-8 gap-1 sm:gap-2">
                         {birthdayEmojis.map((emoji, index) => (
                           <button
                             key={index}
                             onClick={() => insertEmoji(emoji)}
-                            className="w-8 h-8 text-lg hover:bg-gray-100 rounded transition-colors flex items-center justify-center"
+                            className="w-7 h-7 sm:w-8 sm:h-8 text-base sm:text-lg hover:bg-gray-100 rounded transition-colors flex items-center justify-center"
                             title={`Insert ${emoji}`}
                           >
                             {emoji}
@@ -690,15 +699,15 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
               value={typeof message === 'string' ? message : ''}
               onChange={(html) => setMessage(html)}
               placeholder="Type your birthday message here..."
-              className="text-base text-gray-800"
+              className="text-sm sm:text-base text-gray-800"
             />
 
-            <div className="flex items-center justify-end text-gray-500 text-sm">
+            <div className="flex items-center justify-end text-gray-500 text-xs sm:text-sm">
               <Input
                 value={signature}
                 onChange={(e) => setSignature(e.target.value)}
                 placeholder="From [Your Name]"
-                className="w-[220px] text-right border-0 shadow-none px-0 focus-visible:ring-0 placeholder:text-gray-400"
+                className="w-full max-w-[180px] sm:max-w-[220px] text-right border-0 shadow-none px-0 focus-visible:ring-0 placeholder:text-gray-400"
               />
             </div>
           </div>
@@ -714,58 +723,56 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
         />
 
         {/* Footer actions */}
-        <div className="flex justify-between items-center">
-          <Button 
-            variant="outline" 
-            onClick={handleReset}
-            className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Reset Card
+        <div className="flex justify-end gap-2 pt-4 border-t">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="text-sm">
+            Close
           </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
-            <Button onClick={handleSave}>Save</Button>
-          </div>
+          <Button onClick={handleSave} className="text-sm">
+            Save
+          </Button>
         </div>
 
         {/* Unsplash Image Picker Modal */}
         <Dialog open={unsplashOpen} onOpenChange={setUnsplashOpen}>
-          <DialogContent className="max-w-4xl">
+          <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Browse Images from Unsplash</DialogTitle>
-              <DialogDescription>Search for high-quality stock photos for your card header.</DialogDescription>
+              <DialogTitle className="text-lg sm:text-xl">Browse Images from Unsplash</DialogTitle>
+              <DialogDescription className="text-sm sm:text-base">Search for high-quality stock photos for your card header.</DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4">
-              <div className="flex gap-2">
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Input
                   placeholder="Search for images..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && searchUnsplash(searchQuery)}
-                  className="flex-1"
+                  className="flex-1 text-sm sm:text-base"
                 />
-                <Button onClick={() => searchUnsplash(searchQuery)} disabled={loading || !searchQuery.trim()}>
-                  <Search className="w-4 h-4 mr-2" />
+                <Button 
+                  onClick={() => searchUnsplash(searchQuery)} 
+                  disabled={loading || !searchQuery.trim()}
+                  className="w-full sm:w-auto text-sm"
+                >
+                  <Search className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
                   Search
                 </Button>
               </div>
 
               {loading && (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                <div className="flex items-center justify-center py-6 sm:py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-gray-900"></div>
                 </div>
               )}
 
               {unsplashImages.length > 0 && (
-                <div className="grid grid-cols-3 gap-4 max-h-96 overflow-y-auto">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4 max-h-64 sm:max-h-96 overflow-y-auto">
                   {unsplashImages.map((image, index) => (
                     <div key={`unsplash-${image.id}-${index}`} className="cursor-pointer group" onClick={() => selectUnsplashImage(image.urls.regular)}>
                       <img 
                         src={image.urls.small} 
                         alt={image.alt_description || 'Unsplash image'} 
-                        className="w-full h-32 object-cover rounded-md group-hover:opacity-80 transition-opacity"
+                        className="w-full h-24 sm:h-32 object-cover rounded-md group-hover:opacity-80 transition-opacity"
                       />
                     </div>
                   ))}
@@ -773,11 +780,11 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
               )}
 
               {!loading && unsplashImages.length === 0 && searchQuery && (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-6 sm:py-8 text-gray-500">
                   <div className="space-y-2">
-                    <p>No images found. Try a different search term.</p>
+                    <p className="text-sm sm:text-base">No images found. Try a different search term.</p>
                     {!import.meta.env.VITE_ACCESS_KEY && (
-                      <div className="text-xs text-orange-600 bg-orange-50 p-3 rounded-md">
+                      <div className="text-xs sm:text-sm text-orange-600 bg-orange-50 p-3 rounded-md mx-auto max-w-md">
                         <p className="font-medium">Unsplash API not configured</p>
                         <p>Add VITE_ACCESS_KEY to your .env file to enable image search.</p>
                         <p>Showing demo images instead.</p>
