@@ -77,7 +77,7 @@ kill_port_process() {
 # Set environment variables for both services
 export PORT=3502
 export NODE_ENV=${NODE_ENV:-development}
-export TEMPORAL_ADDRESS=${TEMPORAL_ADDRESS:-172.18.0.4:7233}
+export TEMPORAL_ADDRESS=${TEMPORAL_ADDRESS:-172.18.0.5:7233}
 export TEMPORAL_NAMESPACE=${TEMPORAL_NAMESPACE:-default}
 export TEMPORAL_TASK_QUEUE=${TEMPORAL_TASK_QUEUE:-authentik-tasks}
 export TEMPORAL_SERVER_PORT=${TEMPORAL_SERVER_PORT:-50051}

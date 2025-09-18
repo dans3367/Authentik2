@@ -4,15 +4,85 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
+import jwt from 'jsonwebtoken';
 import { TemporalService } from './temporal/temporal-service';
 import { authenticateRequest, type AuthenticatedRequest } from './middleware/auth';
 import './lib/auth'; // Ensure auth types are available
 
-// Load environment variables
-dotenv.config();
+// Load environment variables from parent directory
+dotenv.config({ path: '../.env' });
 
 const app = express();
 const PORT = 3502;
+
+// Helper function to generate birthday invitation HTML
+async function generateBirthdayInvitationHTML(input: any): Promise<string> {
+  const { contactFirstName, contactLastName, tenantName, baseUrl } = input;
+  
+  const contactName = contactFirstName 
+    ? `${contactFirstName}${contactLastName ? ` ${contactLastName}` : ''}` 
+    : 'Valued Customer';
+  
+  // Generate JWT token for profile update
+  const profileUpdateToken = jwt.sign(
+    { contactId: input.contactId, action: 'update_birthday' },
+    process.env.JWT_SECRET!,
+    { expiresIn: '30d' }
+  );
+  
+  const profileUpdateUrl = `${baseUrl || 'http://localhost:3500'}/update-profile?token=${profileUpdateToken}`;
+  
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Birthday Information Request</title>
+    </head>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="text-align: center; margin-bottom: 30px;">
+        <h1 style="color: #e91e63; margin: 0;">🎂 Birthday Celebration!</h1>
+      </div>
+      
+      <div style="background: #f9f9f9; padding: 25px; border-radius: 8px; margin-bottom: 20px;">
+        <p style="margin: 0 0 15px 0; font-size: 16px;">Hi ${contactName},</p>
+        
+        <p style="margin: 0 0 15px 0;">We'd love to make your birthday extra special! To ensure you don't miss out on exclusive birthday promotions, special offers, and personalized birthday surprises, we'd like to add your birthday to our records.</p>
+        
+        <p style="margin: 0 0 20px 0;">By sharing your birthday with us, you'll receive:</p>
+        
+        <ul style="margin: 0 0 20px 20px; padding: 0;">
+          <li>🎁 Exclusive birthday discounts and offers</li>
+          <li>🎉 Special birthday promotions</li>
+          <li>📧 Personalized birthday messages</li>
+          <li>🌟 Early access to birthday-themed content</li>
+        </ul>
+        
+        <div style="text-align: center; margin: 25px 0;">
+          <a href="${profileUpdateUrl}" 
+             style="background: linear-gradient(135deg, #e91e63, #f06292); 
+                    color: white; 
+                    padding: 12px 30px; 
+                    text-decoration: none; 
+                    border-radius: 25px; 
+                    font-weight: bold; 
+                    display: inline-block; 
+                    box-shadow: 0 4px 8px rgba(233, 30, 99, 0.3);">
+            🎂 Add My Birthday
+          </a>
+        </div>
+        
+        <p style="margin: 15px 0 0 0; font-size: 14px; color: #666;">This link will expire in 30 days. Your privacy is important to us - we'll only use your birthday to send you special offers and birthday wishes.</p>
+      </div>
+      
+      <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #888; text-align: center;">
+        <p style="margin: 0;">Best regards,<br>${tenantName || 'The Team'}</p>
+        <p style="margin: 10px 0 0 0;">This invitation was sent because you're a valued customer. If you'd prefer not to receive birthday-related communications, you can simply ignore this email.</p>
+      </div>
+    </body>
+    </html>
+  `;
+}
 
 // Middleware
 app.use(helmet());
@@ -300,6 +370,165 @@ app.post('/api/email-tracking', authenticateRequest, async (req: AuthenticatedRe
     res.status(500).json({ 
       success: false,
       message: 'Failed to process email request',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Birthday invitation endpoint
+app.post('/api/birthday-invitation', authenticateRequest, async (req: AuthenticatedRequest, res) => {
+  try {
+    const {
+      contactId,
+      contactEmail,
+      contactFirstName,
+      contactLastName,
+      tenantId,
+      tenantName,
+      userId,
+      fromEmail
+    } = req.body;
+
+    // Validate required fields
+    if (!contactId || !contactEmail || !tenantId) {
+      return res.status(400).json({
+        success: false,
+        error: 'contactId, contactEmail, and tenantId are required'
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(contactEmail)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid email format: ${contactEmail}`
+      });
+    }
+
+    console.log(`🎂 Starting birthday invitation workflow for contact ${contactId} (${contactEmail})`);
+
+    // If temporal service is available, use workflow; otherwise, send directly
+    if (temporalService) {
+      try {
+        // Generate unique workflow ID
+        const workflowId = `birthday-invitation-${contactId}-${Date.now()}`;
+
+        // Prepare workflow input
+        const workflowInput = {
+          contactId,
+          contactEmail,
+          contactFirstName,
+          contactLastName,
+          tenantId,
+          tenantName,
+          userId,
+          fromEmail,
+          baseUrl: process.env.BASE_URL || 'http://localhost:3500'
+        };
+
+        // Start the email workflow with birthday invitation content
+        const emailWorkflowInput = {
+          emailId: workflowId,
+          recipient: contactEmail,
+          subject: '🎂 Help us celebrate your special day!',
+          content: await generateBirthdayInvitationHTML(workflowInput),
+          templateType: 'birthday_invitation',
+          priority: 'normal' as const,
+          tenantId,
+          userId,
+          fromEmail: fromEmail || 'noreply@zendwise.work',
+          metadata: {
+            contactId,
+            invitationType: 'birthday',
+            tenantName,
+            baseUrl: process.env.BASE_URL || 'http://localhost:3500'
+          }
+        };
+
+        const handle = await temporalService.startWorkflow(
+          'emailWorkflow',
+          workflowId,
+          emailWorkflowInput
+        );
+
+        console.log(`✅ Birthday invitation workflow started: ${workflowId}`);
+
+        res.json({
+          success: true,
+          workflowId,
+          workflowRunId: handle.workflowId,
+          message: 'Birthday invitation workflow started successfully'
+        });
+
+      } catch (temporalError) {
+        console.error('❌ Temporal workflow failed, falling back to direct email:', temporalError);
+        // Fall through to direct email sending
+      }
+    }
+    
+    // Fallback: Send email directly via main server API
+    try {
+      console.log(`📧 Sending birthday invitation directly via main server API`);
+      
+      // Prepare workflow input for HTML generation
+      const workflowInput = {
+        contactId,
+        contactEmail,
+        contactFirstName,
+        contactLastName,
+        tenantId,
+        tenantName,
+        userId,
+        fromEmail,
+        baseUrl: process.env.BASE_URL || 'http://localhost:3500'
+      };
+
+      const htmlContent = await generateBirthdayInvitationHTML(workflowInput);
+
+      // Call the main server's internal birthday invitation API
+      const response = await fetch(`http://localhost:3500/api/internal/birthday-invitation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contactId,
+          contactEmail,
+          contactFirstName,
+          contactLastName,
+          tenantName,
+          htmlContent,
+          fromEmail: fromEmail || 'noreply@zendwise.work'
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to send email via main server');
+      }
+
+      const result = await response.json();
+
+      console.log(`✅ Birthday invitation sent successfully via main server: ${result.messageId}`);
+
+      res.json({
+        success: true,
+        messageId: result.messageId,
+        method: temporalService ? 'temporal-fallback' : 'direct-api',
+        message: 'Birthday invitation sent successfully'
+      });
+
+    } catch (directError) {
+      console.error('❌ Direct email sending also failed:', directError);
+      throw directError;
+    }
+
+  } catch (error) {
+    console.error('❌ Birthday invitation workflow error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to start birthday invitation workflow',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
   }

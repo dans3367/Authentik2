@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, emailActivity } from '@shared/schema';
+import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, emailActivity, tenants } from '@shared/schema';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { type ContactFilters, type BouncedEmailFilters } from '@shared/schema';
 import { sanitizeString, sanitizeEmail } from '../utils/sanitization';
 import { storage } from '../storage';
+import jwt from 'jsonwebtoken';
 
 export const emailManagementRoutes = Router();
 
@@ -1315,5 +1316,295 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
   } catch (error) {
     console.error('Update birthday settings error:', error);
     res.status(500).json({ message: 'Failed to update birthday settings' });
+  }
+});
+
+// Send birthday invitation email to a contact
+emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { contactId } = req.params;
+    
+    // Find the contact
+    const contact = await db.query.emailContacts.findFirst({
+      where: sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
+    });
+
+    if (!contact) {
+      return res.status(404).json({ message: 'Contact not found' });
+    }
+
+    // Check if contact already has a birthday
+    if (contact.birthday) {
+      return res.status(400).json({ message: 'Contact already has a birthday set' });
+    }
+
+    // Get tenant information for the email
+    const tenant = await db.query.tenants.findFirst({
+      where: sql`${tenants.id} = ${req.user.tenantId}`,
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ message: 'Tenant not found' });
+    }
+
+    // Create profile update URL with token
+    const profileUpdateToken = jwt.sign(
+      { contactId, action: 'update_birthday' },
+      process.env.JWT_SECRET!,
+      { expiresIn: '30d' }
+    );
+    
+    const profileUpdateUrl = `${process.env.BASE_URL || 'http://localhost:3500'}/update-profile?token=${profileUpdateToken}`;
+    
+    // Create email content
+    const contactName = contact.firstName ? `${contact.firstName}${contact.lastName ? ` ${contact.lastName}` : ''}` : 'Valued Customer';
+    const subject = `🎂 Help us celebrate your special day!`;
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Birthday Information Request</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #e91e63; margin: 0;">🎂 Birthday Celebration!</h1>
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 25px; border-radius: 8px; margin-bottom: 20px;">
+          <p style="margin: 0 0 15px 0; font-size: 16px;">Hi ${contactName},</p>
+          
+          <p style="margin: 0 0 15px 0;">We'd love to make your birthday extra special! To ensure you don't miss out on exclusive birthday promotions, special offers, and personalized birthday surprises, we'd like to add your birthday to our records.</p>
+          
+          <p style="margin: 0 0 20px 0;">By sharing your birthday with us, you'll receive:</p>
+          
+          <ul style="margin: 0 0 20px 20px; padding: 0;">
+            <li>🎁 Exclusive birthday discounts and offers</li>
+            <li>🎉 Special birthday promotions</li>
+            <li>📧 Personalized birthday messages</li>
+            <li>🌟 Early access to birthday-themed content</li>
+          </ul>
+          
+          <div style="text-align: center; margin: 25px 0;">
+            <a href="${profileUpdateUrl}" 
+               style="background: linear-gradient(135deg, #e91e63, #f06292); 
+                      color: white; 
+                      padding: 12px 30px; 
+                      text-decoration: none; 
+                      border-radius: 25px; 
+                      font-weight: bold; 
+                      display: inline-block; 
+                      box-shadow: 0 4px 8px rgba(233, 30, 99, 0.3);">
+              🎂 Add My Birthday
+            </a>
+          </div>
+          
+          <p style="margin: 15px 0 0 0; font-size: 14px; color: #666;">This link will expire in 30 days. Your privacy is important to us - we'll only use your birthday to send you special offers and birthday wishes.</p>
+        </div>
+        
+        <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #888; text-align: center;">
+          <p style="margin: 0;">Best regards,<br>${tenant.name || 'The Team'}</p>
+          <p style="margin: 10px 0 0 0;">This invitation was sent because you're a valued customer. If you'd prefer not to receive birthday-related communications, you can simply ignore this email.</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    // Send the email using the email service
+    const { enhancedEmailService } = await import('../emailService');
+    
+    const result = await enhancedEmailService.sendCustomEmail(
+      contact.email,
+      subject,
+      htmlContent,
+      {
+        metadata: {
+          type: 'birthday_invitation',
+          contactId: contact.id,
+          tenantId: req.user.tenantId
+        }
+      }
+    );
+
+    if (result.success) {
+      res.json({ 
+        message: 'Birthday invitation sent successfully',
+        messageId: result.messageId
+      });
+    } else {
+      throw new Error('Failed to send email');
+    }
+
+  } catch (error) {
+    console.error('Send birthday invitation error:', error);
+    res.status(500).json({ message: 'Failed to send birthday invitation' });
+  }
+});
+
+// Update contact profile via token (for customers)
+emailManagementRoutes.post("/update-profile", async (req: any, res) => {
+  try {
+    const { token, birthday } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ message: 'Token is required' });
+    }
+
+    // Verify the token
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    } catch (error) {
+      return res.status(401).json({ message: 'Invalid or expired token' });
+    }
+
+    if (decoded.action !== 'update_birthday') {
+      return res.status(401).json({ message: 'Invalid token action' });
+    }
+
+    const { contactId } = decoded;
+
+    if (!birthday) {
+      return res.status(400).json({ message: 'Birthday is required' });
+    }
+
+    // Validate birthday format (YYYY-MM-DD)
+    const birthdayRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!birthdayRegex.test(birthday)) {
+      return res.status(400).json({ message: 'Invalid birthday format. Use YYYY-MM-DD' });
+    }
+
+    // Update the contact's birthday
+    const updatedContact = await db.update(emailContacts)
+      .set({ 
+        birthday,
+        birthdayEmailEnabled: true, // Enable birthday emails by default when they add their birthday
+        updatedAt: new Date()
+      })
+      .where(sql`${emailContacts.id} = ${contactId}`)
+      .returning();
+
+    if (updatedContact.length === 0) {
+      return res.status(404).json({ message: 'Contact not found' });
+    }
+
+    res.json({ 
+      message: 'Birthday updated successfully',
+      contact: {
+        id: updatedContact[0].id,
+        birthday: updatedContact[0].birthday,
+        birthdayEmailEnabled: updatedContact[0].birthdayEmailEnabled
+      }
+    });
+
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ message: 'Failed to update profile' });
+  }
+});
+
+// Get profile update form (for customers)
+emailManagementRoutes.get("/profile-form", async (req: any, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).json({ message: 'Token is required' });
+    }
+
+    // Verify the token
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    } catch (error) {
+      return res.status(401).json({ message: 'Invalid or expired token' });
+    }
+
+    if (decoded.action !== 'update_birthday') {
+      return res.status(401).json({ message: 'Invalid token action' });
+    }
+
+    const { contactId } = decoded;
+
+    // Get contact information
+    const contact = await db.query.emailContacts.findFirst({
+      where: sql`${emailContacts.id} = ${contactId}`,
+      columns: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        birthday: true
+      }
+    });
+
+    if (!contact) {
+      return res.status(404).json({ message: 'Contact not found' });
+    }
+
+    res.json({ 
+      contact: {
+        id: contact.id,
+        email: contact.email,
+        firstName: contact.firstName,
+        lastName: contact.lastName,
+        birthday: contact.birthday
+      }
+    });
+
+  } catch (error) {
+    console.error('Get profile form error:', error);
+    res.status(500).json({ message: 'Failed to get profile information' });
+  }
+});
+
+// Internal birthday invitation endpoint for server-node (no auth required)
+emailManagementRoutes.post("/internal/birthday-invitation", async (req: any, res) => {
+  try {
+    const { 
+      contactId,
+      contactEmail,
+      contactFirstName,
+      contactLastName,
+      tenantName,
+      htmlContent,
+      fromEmail
+    } = req.body;
+
+    if (!contactId || !contactEmail || !htmlContent) {
+      return res.status(400).json({ message: 'contactId, contactEmail, and htmlContent are required' });
+    }
+
+    // Send the email using the email service
+    const { enhancedEmailService } = await import('../emailService');
+    
+    const result = await enhancedEmailService.sendCustomEmail(
+      contactEmail,
+      '🎂 Help us celebrate your special day!',
+      htmlContent,
+      {
+        from: fromEmail || 'noreply@zendwise.work',
+        metadata: {
+          type: 'birthday_invitation',
+          contactId: contactId,
+          source: 'server-node-workflow'
+        }
+      }
+    );
+
+    if (result.success) {
+      res.json({ 
+        message: 'Birthday invitation sent successfully',
+        messageId: result.messageId,
+        success: true
+      });
+    } else {
+      throw new Error('Failed to send email');
+    }
+
+  } catch (error) {
+    console.error('Send internal birthday invitation error:', error);
+    res.status(500).json({ message: 'Failed to send birthday invitation' });
   }
 });

@@ -221,7 +221,12 @@
       "noActionNeeded": "No Action Needed",
       "noBirthdaysSelected": "Selected customers don't have birthday dates set.",
       "bulkUpdateSuccess": "Birthday campaigns updated successfully",
-      "bulkUpdateError": "Failed to update birthday campaigns"
+      "bulkUpdateError": "Failed to update birthday campaigns",
+      "invitationSent": "Birthday invitation sent successfully",
+      "invitationError": "Failed to send birthday invitation"
+    },
+    "buttons": {
+      "sendInvitation": "Send Birthday Invitation"
     }
   },
   "toast": {

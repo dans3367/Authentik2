@@ -375,6 +375,49 @@ export default function BirthdaysPage() {
     },
   });
 
+  // Mutation: send birthday invitation email via workflow
+  const sendInvitationMutation = useMutation({
+    mutationFn: async (contactId: string) => {
+      // Find the contact to get additional details
+      const contact = contacts.find(c => c.id === contactId);
+      if (!contact) {
+        throw new Error('Contact not found');
+      }
+
+      // Call the workflow-based API
+      const response = await fetch('http://localhost:3502/api/birthday-invitation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth-token')}`, // Assuming token is stored here
+        },
+        body: JSON.stringify({
+          contactId: contact.id,
+          contactEmail: contact.email,
+          contactFirstName: contact.firstName,
+          contactLastName: contact.lastName,
+          tenantId: 'current-tenant', // You might need to get this from context/auth
+          tenantName: 'Your Company', // You might need to get this from context/auth
+          userId: 'current-user', // You might need to get this from context/auth
+          fromEmail: 'noreply@zendwise.work'
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send birthday invitation');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: t('birthdays.toasts.invitationSent') });
+    },
+    onError: (error: any) => {
+      toast({ title: t('common.error'), description: error?.message || t('birthdays.toasts.invitationError'), variant: "destructive" });
+    },
+  });
+
   const openBirthdayModal = (contactId: string) => {
     setBirthdayContactId(contactId);
     
@@ -395,6 +438,10 @@ export default function BirthdaysPage() {
     const m = `${birthdayDraft.getMonth() + 1}`.padStart(2, '0');
     const d = `${birthdayDraft.getDate()}`.padStart(2, '0');
     updateContactBirthdayMutation.mutate({ contactId: birthdayContactId, birthday: `${y}-${m}-${d}` });
+  };
+
+  const handleSendBirthdayInvitation = (contactId: string) => {
+    sendInvitationMutation.mutate(contactId);
   };
 
 
@@ -1086,6 +1133,17 @@ export default function BirthdaysPage() {
                             <Button variant="ghost" size="sm">
                               <Eye className="h-4 w-4" />
                             </Button>
+                            {!contact.birthday && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => handleSendBirthdayInvitation(contact.id)}
+                                disabled={sendInvitationMutation.isPending}
+                                title={t('birthdays.buttons.sendInvitation')}
+                              >
+                                <Mail className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
