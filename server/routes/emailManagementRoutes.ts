@@ -1254,6 +1254,7 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
       emailTemplate, 
       segmentFilter, 
       customMessage, 
+      customThemeData,
       senderName, 
       senderEmail 
     } = req.body;
@@ -1271,6 +1272,27 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
       return res.status(400).json({ message: 'Please enter a valid sender email address' });
     }
 
+    // Validate custom theme data if provided
+    if (customThemeData !== undefined) {
+      try {
+        if (typeof customThemeData === 'string') {
+          JSON.parse(customThemeData);
+        } else if (typeof customThemeData === 'object' && customThemeData !== null) {
+          // Already an object, validate structure
+          const requiredFields = ['title', 'message', 'signature', 'customImage', 'imagePosition', 'imageScale'];
+          for (const field of requiredFields) {
+            if (!(field in customThemeData)) {
+              return res.status(400).json({ message: `customThemeData missing required field: ${field}` });
+            }
+          }
+        } else {
+          return res.status(400).json({ message: 'customThemeData must be a valid JSON string or object' });
+        }
+      } catch (error) {
+        return res.status(400).json({ message: 'customThemeData must be valid JSON' });
+      }
+    }
+
     // Check if settings already exist
     const existingSettings = await db.query.birthdaySettings.findFirst({
       where: sql`${birthdaySettings.tenantId} = ${req.user.tenantId}`,
@@ -1278,34 +1300,51 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
 
     let updatedSettings;
     
+    // Prepare custom theme data for storage
+    const customThemeDataStr = customThemeData ? 
+      (typeof customThemeData === 'string' ? customThemeData : JSON.stringify(customThemeData)) 
+      : undefined;
+
     if (existingSettings) {
       // Update existing settings
+      const updateData: any = {
+        enabled,
+        sendDaysBefore,
+        emailTemplate,
+        segmentFilter,
+        customMessage,
+        senderName,
+        senderEmail,
+        updatedAt: new Date(),
+      };
+      
+      if (customThemeDataStr !== undefined) {
+        updateData.customThemeData = customThemeDataStr;
+      }
+
       updatedSettings = await db.update(birthdaySettings)
-        .set({
-          enabled,
-          sendDaysBefore,
-          emailTemplate,
-          segmentFilter,
-          customMessage,
-          senderName,
-          senderEmail,
-          updatedAt: new Date(),
-        })
+        .set(updateData)
         .where(sql`${birthdaySettings.tenantId} = ${req.user.tenantId}`)
         .returning();
     } else {
       // Create new settings
+      const insertData: any = {
+        tenantId: req.user.tenantId,
+        enabled,
+        sendDaysBefore,
+        emailTemplate,
+        segmentFilter,
+        customMessage,
+        senderName,
+        senderEmail,
+      };
+
+      if (customThemeDataStr !== undefined) {
+        insertData.customThemeData = customThemeDataStr;
+      }
+
       updatedSettings = await db.insert(birthdaySettings)
-        .values({
-          tenantId: req.user.tenantId,
-          enabled,
-          sendDaysBefore,
-          emailTemplate,
-          segmentFilter,
-          customMessage,
-          senderName,
-          senderEmail,
-        })
+        .values(insertData)
         .returning();
     }
 

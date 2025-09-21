@@ -95,6 +95,7 @@ export async function emailWorkflow(
           recipientName: input.metadata?.recipientName,
           message: input.metadata?.message,
           imageUrl: input.metadata?.imageUrl,
+          customThemeData: input.metadata?.customThemeData,
         });
         workflowLogger.info(`🎂 Rendered birthday template: ${input.metadata.birthdayTemplate}`);
       } catch (e: any) {

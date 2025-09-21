@@ -534,6 +534,149 @@ app.post('/api/birthday-invitation', authenticateRequest, async (req: Authentica
   }
 });
 
+// Birthday test endpoint for sending test birthday cards to users
+app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedRequest, res) => {
+  try {
+    const {
+      userId,
+      userEmail,
+      userFirstName,
+      userLastName,
+      tenantId,
+      tenantName,
+      fromEmail,
+      isTest
+    } = req.body;
+
+    // Validate required fields
+    if (!userId || !userEmail || !tenantId) {
+      return res.status(400).json({
+        success: false,
+        error: 'userId, userEmail, and tenantId are required'
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(userEmail)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid email format: ${userEmail}`
+      });
+    }
+
+    console.log(`🎂 Starting test birthday card workflow for user ${userId} (${userEmail})`);
+
+    // Generate test birthday card HTML
+    const userName = userFirstName 
+      ? `${userFirstName}${userLastName ? ` ${userLastName}` : ''}` 
+      : 'Team Member';
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Test Birthday Card</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #e91e63; margin: 0;">🎉 Happy Birthday!</h1>
+        </div>
+        
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
+          <h2 style="color: white; margin: 0 0 15px 0; font-size: 24px;">Happy Birthday, ${userName}! 🎂</h2>
+          <p style="color: white; margin: 0; font-size: 18px;">Wishing you a day filled with joy and celebration!</p>
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 25px; border-radius: 8px; margin-bottom: 20px;">
+          <p style="margin: 0 0 15px 0; font-size: 16px;">Dear ${userName},</p>
+          
+          <p style="margin: 0 0 15px 0;">Today is your special day, and we wanted to take a moment to celebrate you! 🎈</p>
+          
+          <p style="margin: 0 0 15px 0;">This is a test birthday card to show how our birthday email system works. In a real scenario, this would be sent to customers on their special day.</p>
+          
+          <p style="margin: 0 0 20px 0;">Hope your day is as wonderful as you are!</p>
+          
+          <div style="text-align: center; margin: 20px 0;">
+            <span style="font-size: 48px;">🎂🎉🎈🎁</span>
+          </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+          <p style="margin: 0; font-size: 14px; color: #666;">
+            This is a test email from ${tenantName || 'Your Company'}<br>
+            Test Mode: Birthday Card System
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    try {
+      // Always send to beats@zendwise.com for test emails per memory
+      const testRecipient = 'beats@zendwise.com';
+      
+      console.log(`📧 Sending test birthday card to ${testRecipient} (original: ${userEmail})`);
+
+      // Send via main server
+      const response = await fetch('http://localhost:5000/api/email/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': req.headers.authorization || '',
+        },
+        body: JSON.stringify({
+          to: testRecipient,
+          subject: `🎉 Happy Birthday ${userName}! (Test)`,
+          html: htmlContent,
+          metadata: {
+            type: 'birthday-test',
+            originalRecipient: userEmail,
+            userId,
+            tenantId,
+            tenantName,
+            isTest: true
+          },
+          tenantId,
+          tenantName,
+          fromEmail: fromEmail || 'beats@zendwise.com'
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to send test email via main server');
+      }
+
+      const result = await response.json();
+
+      console.log(`✅ Test birthday card sent successfully: ${result.messageId}`);
+
+      res.json({
+        success: true,
+        messageId: result.messageId,
+        testRecipient,
+        originalRecipient: userEmail,
+        method: 'direct-api-test',
+        message: 'Test birthday card sent successfully'
+      });
+
+    } catch (error) {
+      console.error('❌ Test birthday card sending failed:', error);
+      throw error;
+    }
+
+  } catch (error) {
+    console.error('❌ Test birthday card workflow error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to send test birthday card',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 // Generic workflow endpoint for other workflows
 app.post('/workflows/:workflowType', async (req, res) => {
   try {

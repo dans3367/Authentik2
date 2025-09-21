@@ -61,20 +61,21 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     setTitle(initialData?.title ?? "");
     setMessage(initialData?.message ?? "");
     setSignature(initialData?.signature ?? "");
-    const themeDefault = initialThemeId === "sparkle-cake" ? "/images/birthday-sparkle.jpg" : null;
+    
+    // No default images for themes anymore - custom theme handles its own images
     const isCustom = initialData?.customImage ?? customImage ?? false;
     setCustomImage(isCustom);
-    setImageUrl(isCustom ? (initialData?.imageUrl ?? null) : themeDefault);
+    setImageUrl(isCustom ? (initialData?.imageUrl ?? null) : null);
     setImagePosition(initialData?.imagePosition ?? { x: 0, y: 0 });
     setImageScale(initialData?.imageScale ?? 1);
   }, [open, initialThemeId, initialData]);
 
-  // If theme changes while open and no custom image chosen, update header image to theme default
+  // If theme changes while open and no custom image chosen, clear image url
   useEffect(() => {
     if (!open) return;
     if (customImage) return;
-    const themeDefault = initialThemeId === "sparkle-cake" ? "/images/birthday-sparkle.jpg" : null;
-    setImageUrl(themeDefault);
+    // No default theme images anymore
+    setImageUrl(null);
   }, [initialThemeId, customImage, open]);
 
   // Persist draft locally so switching themes won't lose text

@@ -1416,6 +1416,7 @@ export const birthdaySettings = pgTable("birthday_settings", {
   emailTemplate: text("email_template").default('default'), // Email template to use
   segmentFilter: text("segment_filter").default('all'), // Which contacts to include
   customMessage: text("custom_message").default(''), // Custom birthday message
+  customThemeData: text("custom_theme_data"), // JSON data for custom theme
   senderName: text("sender_name").default(''),
   senderEmail: text("sender_email").default(''),
   createdAt: timestamp("created_at").defaultNow(),
@@ -1560,6 +1561,17 @@ export type BirthdaySettings = typeof birthdaySettings.$inferSelect;
 export type InsertBirthdaySettings = z.infer<typeof insertBirthdaySettingsSchema>;
 export type CreateBirthdaySettingsData = z.infer<typeof createBirthdaySettingsSchema>;
 export type UpdateBirthdaySettingsData = z.infer<typeof updateBirthdaySettingsSchema>;
+
+// Custom theme data structure for birthday cards
+export interface CustomThemeData {
+  title: string;
+  message: string;
+  signature: string;
+  imageUrl?: string | null;
+  customImage: boolean;
+  imagePosition: { x: number; y: number };
+  imageScale: number;
+}
 
 // Promotions table for managing promotional content templates
 export const promotions = pgTable("promotions", {
