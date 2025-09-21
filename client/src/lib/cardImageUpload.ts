@@ -8,6 +8,7 @@ export interface CardImageUploadResult {
 
 export interface CardImageUploadOptions {
   file: File
+  oldImageUrl?: string // URL of old image to replace/delete
   onProgress?: (progress: number) => void
 }
 
@@ -15,7 +16,7 @@ export interface CardImageUploadOptions {
  * Upload card image to R2 storage with tenant-based organization
  */
 export const uploadCardImage = async (options: CardImageUploadOptions): Promise<CardImageUploadResult> => {
-  const { file } = options
+  const { file, oldImageUrl } = options
 
   try {
     // Validate file
@@ -38,6 +39,11 @@ export const uploadCardImage = async (options: CardImageUploadOptions): Promise<
     // Create form data for upload
     const formData = new FormData()
     formData.append('file', file)
+    
+    // Include old image URL for cleanup if provided
+    if (oldImageUrl) {
+      formData.append('oldImageUrl', oldImageUrl)
+    }
 
     // Upload to backend endpoint for card images
     const response = await fetch('/api/card-images/upload', {
@@ -75,6 +81,54 @@ export const uploadCardImage = async (options: CardImageUploadOptions): Promise<
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Upload failed' 
+    }
+  }
+}
+
+/**
+ * Delete a card image from R2 storage
+ */
+export const deleteCardImage = async (imageUrl: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    if (!imageUrl || typeof imageUrl !== 'string') {
+      return { success: false, error: 'Invalid image URL' }
+    }
+
+    const response = await fetch('/api/card-images/cleanup', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ imageUrl }),
+      credentials: 'include', // Include cookies for authentication
+    })
+
+    if (!response.ok) {
+      console.error('Card image deletion failed:', response.status, response.statusText)
+      const errorData = await response.json().catch(() => ({}))
+      console.error('Error details:', errorData)
+      return { 
+        success: false, 
+        error: errorData.message || `Deletion failed: ${response.status} ${response.statusText}` 
+      }
+    }
+
+    const result = await response.json()
+    
+    if (result.success) {
+      return { success: true }
+    } else {
+      return { 
+        success: false, 
+        error: result.message || 'Deletion failed' 
+      }
+    }
+
+  } catch (error) {
+    console.error('Card image deletion error:', error)
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Deletion failed' 
     }
   }
 }

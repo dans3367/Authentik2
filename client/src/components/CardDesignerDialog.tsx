@@ -152,6 +152,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       // Upload to R2 via our API
       const result = await uploadCardImage({
         file,
+        oldImageUrl: imageUrl || undefined, // Pass current image URL for cleanup
         onProgress: (progress) => {
           console.log('📸 [Card Designer] Upload progress:', progress);
         }

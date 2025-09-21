@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, emailActivity, tenants } from '@shared/schema';
+import { deleteImageFromR2 } from '../config/r2';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { type ContactFilters, type BouncedEmailFilters } from '@shared/schema';
 import { sanitizeString, sanitizeEmail } from '../utils/sanitization';
@@ -1298,6 +1299,17 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
       where: sql`${birthdaySettings.tenantId} = ${req.user.tenantId}`,
     });
 
+    // Handle old image cleanup if custom theme data is being updated
+    let oldImageUrl: string | null = null;
+    if (customThemeData && existingSettings?.customThemeData) {
+      try {
+        const existingCustomData = JSON.parse(existingSettings.customThemeData);
+        oldImageUrl = existingCustomData?.imageUrl || null;
+      } catch (error) {
+        console.warn('Failed to parse existing custom theme data:', error);
+      }
+    }
+
     let updatedSettings;
     
     // Prepare custom theme data for storage
@@ -1346,6 +1358,25 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
       updatedSettings = await db.insert(birthdaySettings)
         .values(insertData)
         .returning();
+    }
+
+    // Clean up old image after successful database update
+    if (oldImageUrl && customThemeDataStr) {
+      try {
+        const newCustomData = typeof customThemeData === 'string' ? JSON.parse(customThemeData) : customThemeData;
+        const newImageUrl = newCustomData?.imageUrl || null;
+        
+        // Only delete old image if a new different image is being set or image is being removed
+        if (newImageUrl !== oldImageUrl) {
+          console.log('📸 [Birthday Settings] Cleaning up old image:', oldImageUrl);
+          // Delete old image asynchronously (don't wait for it to complete)
+          deleteImageFromR2(oldImageUrl).catch(error => {
+            console.error('📸 [Birthday Settings] Failed to delete old image:', oldImageUrl, error);
+          });
+        }
+      } catch (error) {
+        console.warn('Failed to compare image URLs for cleanup:', error);
+      }
     }
 
     res.json({
