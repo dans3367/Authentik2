@@ -47,7 +47,7 @@ type BirthdayTemplateId = 'default' | 'confetti' | 'balloons' | 'custom';
 
 function renderBirthdayTemplate(
   template: BirthdayTemplateId,
-  params: { recipientName?: string; message?: string; imageUrl?: string; brandName?: string; customThemeData?: any }
+  params: { recipientName?: string; message?: string; imageUrl?: string; brandName?: string; customThemeData?: any; senderName?: string }
 ): string {
   // Handle custom theme with rich styling
   if (template === 'custom' && params.customThemeData) {
@@ -58,25 +58,38 @@ function renderBirthdayTemplate(
     const title = customData.title || `Happy Birthday${params.recipientName ? ', ' + params.recipientName : ''}!`;
     const message = customData.message || params.message || 'Wishing you a wonderful day!';
     const signature = customData.signature || '';
+    const fromMessage = params.senderName || params.brandName || 'The Team';
     
     return `<html>
       <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
         <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
+          
+          <!-- 1. Header Image (standalone) -->
           ${customData.imageUrl ? `
-            <div style="position: relative; height: 200px; background-image: url('${customData.imageUrl}'); background-size: cover; background-position: center;">
-              <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.3);"></div>
-              <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;">
-                <h1 style="color: white; font-size: 2.5rem; margin: 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">${title}</h1>
-              </div>
+            <div style="height: 200px; background-image: url('${customData.imageUrl}'); background-size: cover; background-position: center; border-radius: 12px 12px 0 0;">
             </div>
           ` : `
-            <div style="background: linear-gradient(135deg, #a8e6cf 0%, #dcedc1 100%); padding: 40px; text-align: center;">
-              <h1 style="color: #2d3748; font-size: 2.5rem; margin: 0;">${title}</h1>
+            <div style="background: linear-gradient(135deg, #a8e6cf 0%, #dcedc1 100%); height: 200px; border-radius: 12px 12px 0 0;">
             </div>
           `}
+          
+          <!-- 2. Header Text (separate from image) -->
+          <div style="padding: 30px 30px 20px 30px; text-align: center; border-bottom: 1px solid #f0f0f0;">
+            <h1 style="color: #2d3748; font-size: 2.5rem; margin: 0; font-weight: bold;">${title}</h1>
+          </div>
+          
+          <!-- 3. Content Area (message) -->
           <div style="padding: 30px;">
-            <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; margin-bottom: 20px;">${message}</div>
-            ${signature ? `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-style: italic; color: #718096;">${signature}</div>` : ''}
+            <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">${message}</div>
+            ${signature ? `<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">${signature}</div>` : ''}
+          </div>
+          
+          <!-- 4. From Message -->
+          <div style="padding: 20px 30px 30px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
+            <div style="font-size: 0.9rem; color: #718096;">
+              <p style="margin: 0;">Best regards,</p>
+              <p style="margin: 5px 0 0 0; font-weight: 600; color: #4a5568;">${fromMessage}</p>
+            </div>
           </div>
         </div>
       </body>
@@ -99,18 +112,32 @@ function renderBirthdayTemplate(
   const headline = `Happy Birthday${params.recipientName ? ', ' + params.recipientName : ''}!`;
   const headerImage = themeHeaders[template as keyof typeof themeHeaders] || themeHeaders.default;
   const colors = themeColors[template as keyof typeof themeColors] || themeColors.default;
+  const fromMessage = params.senderName || params.brandName || 'The Team';
   
   return `<html>
     <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%);">
       <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
-        <div style="position: relative; height: 200px; background-image: url('${headerImage}'); background-size: cover; background-position: center;">
-          <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.3);"></div>
-          <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;">
-            <h1 style="color: white; font-size: 2.5rem; margin: 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); text-align: center;">${headline}</h1>
-          </div>
+        
+        <!-- 1. Header Image (standalone) -->
+        <div style="height: 200px; background-image: url('${headerImage}'); background-size: cover; background-position: center; border-radius: 12px 12px 0 0;">
         </div>
+        
+        <!-- 2. Header Text (separate from image) -->
+        <div style="padding: 30px 30px 20px 30px; text-align: center; border-bottom: 1px solid #f0f0f0;">
+          <h1 style="color: #2d3748; font-size: 2.5rem; margin: 0; font-weight: bold;">${headline}</h1>
+        </div>
+        
+        <!-- 3. Content Area (message) -->
         <div style="padding: 30px;">
           <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center;">${params.message || 'Wishing you a wonderful day!'}</div>
+        </div>
+        
+        <!-- 4. From Message -->
+        <div style="padding: 20px 30px 30px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
+          <div style="font-size: 0.9rem; color: #718096;">
+            <p style="margin: 0;">Best regards,</p>
+            <p style="margin: 5px 0 0 0; font-weight: 600; color: #4a5568;">${fromMessage}</p>
+          </div>
         </div>
       </div>
     </body>
@@ -765,7 +792,8 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
         recipientName: userName,
         message: customMessage,
         brandName: tenantName || 'Your Company',
-        customThemeData: selectedTemplate === 'custom' ? customThemeData : null
+        customThemeData: selectedTemplate === 'custom' ? customThemeData : null,
+        senderName: birthdaySettingsData?.senderName || 'Your Team'
       });
 
       // Send via main server

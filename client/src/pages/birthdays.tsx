@@ -22,7 +22,6 @@ import {
   Users,
   Mail,
   Settings,
-  Filter,
   Plus,
   Trash2,
   Edit,
@@ -73,14 +72,7 @@ interface CustomThemeData {
   imageScale: number;
 }
 
-interface CustomerSegment {
-  id: string;
-  name: string;
-  description: string;
-  filterCriteria: Record<string, any>;
-  customerCount: number;
-  enabled: boolean;
-}
+
 
 interface ContactTag {
   id: string;
@@ -128,7 +120,7 @@ export default function BirthdaysPage() {
   const [, setLocation] = useLocation();
   const { t, currentLanguage } = useLanguage();
   const { user: currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<"themes" | "settings" | "segments" | "customers" | "test">("themes");
+  const [activeTab, setActiveTab] = useState<"themes" | "settings" | "customers" | "test">("themes");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
@@ -189,23 +181,7 @@ export default function BirthdaysPage() {
     },
   });
 
-  // Fetch customer segments
-  const { 
-    data: segments = [], 
-    isLoading: segmentsLoading,
-    refetch: refetchSegments 
-  } = useQuery<CustomerSegment[]>({
-    queryKey: ['/api/customer-segments'],
-    queryFn: async () => {
-      try {
-        const response = await fetch('/api/customer-segments');
-        if (!response.ok) throw new Error('Failed to fetch segments');
-        return await response.json() || [];
-      } catch (error) {
-        return [];
-      }
-    },
-  });
+
 
   // Fetch contacts from the existing email-contacts endpoint
   const { 
@@ -490,7 +466,13 @@ export default function BirthdaysPage() {
           tenantId: currentUser?.tenantId || 'unknown-tenant',
           tenantName: currentUser?.name || 'Your Company',
           fromEmail: 'admin@zendwise.work', // Test emails go to the selected user's email
-          isTest: true
+          isTest: true,
+          // Include theme and custom content information
+          emailTemplate: birthdaySettings?.emailTemplate || 'default',
+          customMessage: birthdaySettings?.customMessage || '',
+          customThemeData: birthdaySettings?.customThemeData || null,
+          senderName: birthdaySettings?.senderName || '',
+          senderEmail: birthdaySettings?.senderEmail || ''
         }),
       });
 
@@ -738,15 +720,7 @@ export default function BirthdaysPage() {
           <Settings className="h-4 w-4" />
           Settings
         </Button>
-        <Button
-          variant={activeTab === "segments" ? "default" : "ghost"}
-          size="sm"
-          onClick={() => setActiveTab("segments")}
-          className="flex items-center gap-2"
-        >
-          <Filter className="h-4 w-4" />
-          Segments
-        </Button>
+
         <Button
           variant={activeTab === "customers" ? "default" : "ghost"}
           size="sm"
@@ -797,7 +771,6 @@ export default function BirthdaysPage() {
                       key={tpl.id}
                       type="button"
                       onClick={() => {
-                        handleSettingsUpdate('emailTemplate', tpl.id);
                         setDesignerThemeId(tpl.id);
                         
                         // Clear localStorage draft when switching themes to prevent cross-contamination
@@ -1003,6 +976,47 @@ export default function BirthdaysPage() {
             });
           }
         }}
+        onMakeActive={(data) => {
+          // Handle making the card active - this will set it as the current email template
+          const isDefaultTheme = ['default', 'confetti', 'balloons'].includes(designerThemeId || '');
+          
+          // Check if this is truly a custom theme (user uploaded custom image or made significant visual changes)
+          const hasSignificantCustomizations = (data as any).customImage === true || 
+                                              data.title !== '' || 
+                                              data.signature !== '';
+          
+          if (designerThemeId === 'custom' || (isDefaultTheme && hasSignificantCustomizations)) {
+            // Only save as custom if it's explicitly a custom theme or has significant customizations
+            const customThemeData: CustomThemeData = {
+              title: data.title,
+              message: data.message,
+              signature: data.signature || '',
+              imageUrl: data.imageUrl || null,
+              customImage: (data as any).customImage || false,
+              imagePosition: (data as any).imagePosition || { x: 0, y: 0 },
+              imageScale: (data as any).imageScale || 1,
+            };
+            
+            updateSettingsMutation.mutate({
+              ...birthdaySettings,
+              emailTemplate: 'custom',
+              customMessage: data.message,
+              customThemeData: JSON.stringify(customThemeData),
+            });
+          } else {
+            // For default themes, just set the template to the selected theme
+            // This preserves the theme selection (default, confetti, balloons) while saving the message
+            updateSettingsMutation.mutate({
+              ...birthdaySettings,
+              emailTemplate: designerThemeId || 'default',
+              customMessage: data.message,
+            });
+          }
+          
+          // Close the designer after making active
+          setDesignerOpen(false);
+        }}
+        isCurrentlyActive={birthdaySettings?.emailTemplate === (designerThemeId || 'default')}
       />
 
       {/* Settings Tab */}
@@ -1136,10 +1150,7 @@ export default function BirthdaysPage() {
                     {customersWithBirthdays.filter(c => c.birthdayEmailEnabled).length}
                   </Badge>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Segments</span>
-                  <Badge variant="outline">{segments.length}</Badge>
-                </div>
+
               </CardContent>
             </Card>
 
@@ -1184,62 +1195,7 @@ export default function BirthdaysPage() {
         </div>
       )}
 
-      {/* Segments Tab */}
-      {activeTab === "segments" && (
-        <Card className="w-11/12">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Filter className="h-5 w-5" />
-                Customer Segments
-              </CardTitle>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                New Segment
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {segmentsLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-300"></div>
-              </div>
-            ) : segments.length === 0 ? (
-              <div className="text-center py-12">
-                <Filter className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 dark:text-gray-400 mb-4">No segments created yet</p>
-                <Button variant="outline">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Your First Segment
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {segments.map((segment) => (
-                  <div key={segment.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h3 className="font-medium">{segment.name}</h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">{segment.description}</p>
-                      <Badge variant="outline" className="mt-2">
-                        {segment.customerCount} customers
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Switch checked={segment.enabled} />
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+
 
       {/* Customers Tab */}
       {activeTab === "customers" && (

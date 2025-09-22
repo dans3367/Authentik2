@@ -28,9 +28,11 @@ interface CardDesignerDialogProps {
   initialData?: Partial<DesignerData>;
   onSave?: (data: DesignerData) => void;
   onPreviewChange?: (data: DesignerData) => void;
+  onMakeActive?: (themeId: string, data: DesignerData) => void;
+  isCurrentlyActive?: boolean;
 }
 
-export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initialData, onSave, onPreviewChange }: CardDesignerDialogProps) {
+export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initialData, onSave, onPreviewChange, onMakeActive, isCurrentlyActive }: CardDesignerDialogProps) {
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [message, setMessage] = useState(initialData?.message ?? "");
   const [imageUrl, setImageUrl] = useState<string | null>(initialData?.imageUrl ?? 
@@ -782,13 +784,39 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
         />
 
         {/* Footer actions */}
-        <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="text-sm">
-            Close
-          </Button>
-          <Button onClick={handleSave} className="text-sm">
-            Save
-          </Button>
+        <div className="flex justify-between items-center pt-4 border-t">
+          <div className="flex gap-2">
+            {onMakeActive && (
+              <Button 
+                variant={isCurrentlyActive ? "secondary" : "default"}
+                onClick={() => {
+                  const currentData = {
+                    title,
+                    message,
+                    imageUrl,
+                    signature,
+                    themeId: initialThemeId,
+                    customImage,
+                    imagePosition,
+                    imageScale,
+                  };
+                  onMakeActive(initialThemeId || 'default', currentData);
+                }}
+                className="text-sm"
+                disabled={isCurrentlyActive}
+              >
+                {isCurrentlyActive ? 'Currently Active' : 'Make Active'}
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)} className="text-sm">
+              Close
+            </Button>
+            <Button onClick={handleSave} className="text-sm">
+              Save
+            </Button>
+          </div>
         </div>
 
         {/* Unsplash Image Picker Modal */}
