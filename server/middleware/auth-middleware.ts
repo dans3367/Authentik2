@@ -22,10 +22,15 @@ export interface AuthRequest extends Request {
 // Better Auth session verification middleware
 export const authenticateToken = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    console.log('🔍 [Auth] authenticateToken middleware called');
+    console.log('🔍 [Auth] Request headers:', Object.keys(req.headers));
+    
     // Use Better Auth's built-in session verification
     const session = await auth.api.getSession({ 
       headers: req.headers as any
     });
+    
+    console.log('🔍 [Auth] Session result:', !!session, session?.user?.id);
 
     if (!session) {
       return res.status(401).json({ message: 'No authentication token provided' });
@@ -62,6 +67,12 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     };
 
     req.user = authUser;
+    console.log('🔍 [Auth] Set req.user:', {
+      id: authUser.id,
+      email: authUser.email,
+      role: authUser.role,
+      tenantId: authUser.tenantId
+    });
     next();
   } catch (error) {
     console.error('Authentication middleware error:', error);
@@ -71,7 +82,11 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
 
 export const requireRole = (requiredRole: string | string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
+    console.log('🔍 [Role] requireRole middleware called, required:', requiredRole);
+    console.log('🔍 [Role] req.user exists:', !!req.user, 'role:', req.user?.role);
+    
     if (!req.user) {
+      console.error('❌ [Role] req.user is undefined in requireRole!');
       return res.status(401).json({ message: 'Authentication required' });
     }
 

@@ -40,21 +40,35 @@ export function renderBirthdayTemplate(
     </html>`;
   }
 
-  // Simple templates for default themes
-  const themeStyles = {
-    default: 'background: white; color: #333;',
-    confetti: 'background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #333;',
-    balloons: 'background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333;'
+  // Default theme header images
+  const themeHeaders = {
+    default: 'https://images.unsplash.com/photo-1588195538326-c5b1e9f80a1b?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+    confetti: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', // Party/confetti themed
+    balloons: 'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D' // Balloons themed
+  };
+
+  const themeColors = {
+    default: { primary: '#667eea', secondary: '#764ba2' },
+    confetti: { primary: '#ff6b6b', secondary: '#feca57' },
+    balloons: { primary: '#54a0ff', secondary: '#5f27cd' }
   };
   
   const headline = `Happy Birthday${params.recipientName ? ', ' + params.recipientName : ''}!`;
-  const style = themeStyles[template as keyof typeof themeStyles] || themeStyles.default;
+  const headerImage = themeHeaders[template as keyof typeof themeHeaders] || themeHeaders.default;
+  const colors = themeColors[template as keyof typeof themeColors] || themeColors.default;
   
   return `<html>
-    <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; ${style}">
-      <div style="max-width: 600px; margin: 0 auto; background: rgba(255,255,255,0.9); border-radius: 12px; padding: 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
-        <h1 style="font-size: 2.5rem; margin: 0 0 20px 0; text-align: center;">${headline}</h1>
-        <p style="font-size: 1.2rem; line-height: 1.6; margin: 0; text-align: center;">${params.message || 'Wishing you a wonderful day!'}</p>
+    <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%);">
+      <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
+        <div style="position: relative; height: 200px; background-image: url('${headerImage}'); background-size: cover; background-position: center;">
+          <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.3);"></div>
+          <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;">
+            <h1 style="color: white; font-size: 2.5rem; margin: 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); text-align: center;">${headline}</h1>
+          </div>
+        </div>
+        <div style="padding: 30px;">
+          <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center;">${params.message || 'Wishing you a wonderful day!'}</div>
+        </div>
       </div>
     </body>
   </html>`;

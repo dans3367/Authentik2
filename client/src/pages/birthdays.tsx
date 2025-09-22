@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -138,6 +138,9 @@ export default function BirthdaysPage() {
   const [birthdayContactId, setBirthdayContactId] = useState<string | null>(null);
   const [designerOpen, setDesignerOpen] = useState(false);
   const [designerThemeId, setDesignerThemeId] = useState<string | null>(null);
+  
+  // State for real-time custom theme preview
+  const [customThemePreview, setCustomThemePreview] = useState<CustomThemeData | null>(null);
 
   // Handler to navigate to add customer page
   const handleAddCustomer = () => {
@@ -506,6 +509,57 @@ export default function BirthdaysPage() {
     },
   });
 
+  // Initialize custom theme preview from birthday settings
+  useEffect(() => {
+    if (birthdaySettings?.customThemeData) {
+      try {
+        const customData = JSON.parse(birthdaySettings.customThemeData);
+        setCustomThemePreview(customData);
+      } catch (error) {
+        console.warn('Failed to parse custom theme data:', error);
+        setCustomThemePreview(null);
+      }
+    } else {
+      setCustomThemePreview(null);
+    }
+  }, [birthdaySettings?.customThemeData]);
+
+  // Callback for real-time preview updates
+  const handlePreviewChange = useCallback((previewData: {
+    title?: string;
+    message?: string;
+    signature?: string;
+    imageUrl?: string | null;
+    customImage?: boolean;
+    imagePosition?: { x: number; y: number };
+    imageScale?: number;
+  }) => {
+    // Update real-time preview as user makes changes (optional enhancement)
+    try {
+      if (!previewData) return;
+      
+      if (designerThemeId === 'custom' || ['default', 'confetti', 'balloons'].includes(designerThemeId || '')) {
+        const hasCustomizations = (previewData.title && previewData.title !== '') || 
+                                 (previewData.signature && previewData.signature !== '') || 
+                                 previewData.customImage === true;
+        
+        if (hasCustomizations) {
+          setCustomThemePreview({
+            title: previewData.title || '',
+            message: previewData.message || '',
+            signature: previewData.signature || '',
+            imageUrl: previewData.imageUrl || null,
+            customImage: previewData.customImage || false,
+            imagePosition: previewData.imagePosition || { x: 0, y: 0 },
+            imageScale: previewData.imageScale || 1,
+          });
+        }
+      }
+    } catch (error) {
+      console.warn('Error in onPreviewChange:', error);
+    }
+  }, [designerThemeId]);
+
   const openBirthdayModal = (contactId: string) => {
     setBirthdayContactId(contactId);
     
@@ -745,25 +799,62 @@ export default function BirthdaysPage() {
                       onClick={() => {
                         handleSettingsUpdate('emailTemplate', tpl.id);
                         setDesignerThemeId(tpl.id);
+                        
+                        // Clear localStorage draft when switching themes to prevent cross-contamination
+                        try {
+                          localStorage.removeItem('birthdayCardDesignerDraft');
+                        } catch {}
+                        
                         setDesignerOpen(true);
                       }}
                       disabled={updateSettingsMutation.isPending}
                       className={`relative rounded-xl border p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${isSelected ? 'ring-2 ring-blue-600 border-blue-600' : 'border-gray-200 hover:border-gray-300'}`}
                     >
                       <div className="relative h-40 rounded-lg overflow-hidden">
+                        {/* Default theme with header image */}
                         {tpl.id === 'default' && (
-                          <div className="absolute inset-0 bg-white" />
+                          <>
+                            <img
+                              src="https://images.unsplash.com/photo-1588195538326-c5b1e9f80a1b?q=80&w=600&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                              alt="Default birthday theme"
+                              className="absolute inset-0 h-full w-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/30" />
+                          </>
                         )}
+                        
+                        {/* Confetti theme with header image */}
                         {tpl.id === 'confetti' && (
-                          <div className="absolute inset-0 bg-gradient-to-br from-rose-50 via-pink-50 to-purple-50" />
+                          <>
+                            <img
+                              src="https://images.unsplash.com/photo-1530103862676-de8c9debad1d?q=80&w=600&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                              alt="Confetti birthday theme"
+                              className="absolute inset-0 h-full w-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/20" />
+                            <span className="absolute left-3 top-3 text-2xl opacity-90">🎉</span>
+                            <span className="absolute right-4 top-6 text-xl opacity-80">🎁</span>
+                          </>
                         )}
+                        
+                        {/* Balloons theme with header image */}
                         {tpl.id === 'balloons' && (
-                          <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-cyan-50 to-indigo-50" />
+                          <>
+                            <img
+                              src="https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?q=80&w=600&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                              alt="Balloons birthday theme"
+                              className="absolute inset-0 h-full w-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/20" />
+                            <span className="absolute left-3 top-3 text-2xl opacity-90">🎈</span>
+                            <span className="absolute right-4 top-6 text-xl opacity-80">🎈</span>
+                          </>
                         )}
+                        
+                        {/* Custom theme */}
                         {tpl.id === 'custom' && (() => {
-                          const customData = birthdaySettings?.customThemeData ? 
-                            (() => { try { return JSON.parse(birthdaySettings.customThemeData); } catch { return null; } })() 
-                            : null;
+                          // Use real-time preview state for immediate updates
+                          const customData = customThemePreview;
                           
                           if (customData?.imageUrl) {
                             return (
@@ -773,35 +864,28 @@ export default function BirthdaysPage() {
                                   alt="Custom theme"
                                   className="absolute inset-0 h-full w-full object-cover"
                                 />
-                                <div className="absolute inset-0 bg-black/10" />
+                                <div className="absolute inset-0 bg-black/30" />
                               </>
                             );
                           } else {
-                            return <div className="absolute inset-0 bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50" />;
+                            return (
+                              <>
+                                <div className="absolute inset-0 bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50" />
+                                <span className="absolute left-3 top-3 text-2xl opacity-70">✨</span>
+                              </>
+                            );
                           }
                         })()}
 
-                        {(tpl.id === 'confetti' || tpl.id === 'balloons') && (
-                          <>
-                            <span className="absolute left-3 top-3 text-2xl opacity-70">{tpl.id === 'confetti' ? '🎉' : '🎈'}</span>
-                            <span className="absolute right-4 top-6 text-xl opacity-60">{tpl.id === 'confetti' ? '🎁' : '🎈'}</span>
-                            <span className="absolute left-8 bottom-6 text-xl opacity-60">{tpl.id === 'confetti' ? '🎂' : '🎈'}</span>
-                          </>
-                        )}
-                        
-                        {tpl.id === 'custom' && (
-                          <span className="absolute left-3 top-3 text-2xl opacity-70">✨</span>
-                        )}
-
                         <div className="absolute inset-0 flex items-center justify-center">
                           <div className="text-center">
-                            <div className={`font-bold ${tpl.id === 'custom' && birthdaySettings?.customThemeData && JSON.parse(birthdaySettings.customThemeData)?.imageUrl ? 'text-white drop-shadow' : 'text-gray-900'}`}>
-                              {tpl.id === 'custom' && birthdaySettings?.customThemeData ? 
-                                (() => { try { const data = JSON.parse(birthdaySettings.customThemeData); return data.title || 'Happy Birthday!'; } catch { return 'Happy Birthday!'; } })()
+                            <div className="font-bold text-white drop-shadow-lg text-shadow">
+                              {tpl.id === 'custom' && customThemePreview ? 
+                                (customThemePreview.title || 'Happy Birthday!')
                                 : 'Happy Birthday!'
                               }
                             </div>
-                            <div className={`text-xs ${tpl.id === 'custom' && birthdaySettings?.customThemeData && JSON.parse(birthdaySettings.customThemeData)?.imageUrl ? 'text-white/90 drop-shadow' : 'text-gray-500'}`}>{tpl.name} preview</div>
+                            <div className="text-xs text-white/90 drop-shadow">{tpl.name} preview</div>
                           </div>
                         </div>
                       </div>
@@ -828,6 +912,7 @@ export default function BirthdaysPage() {
           // When closing, keep the text in localStorage already handled inside dialog
         }}
         initialThemeId={designerThemeId || undefined}
+        onPreviewChange={handlePreviewChange}
         initialData={(() => {
           // Load persistent draft first
           try {
@@ -853,32 +938,70 @@ export default function BirthdaysPage() {
             }
           }
           
-          // Fallback to settings.customMessage as message
-          return { message: birthdaySettings?.customMessage || '' };
+          // If default theme is selected, return clean initial data (no custom image)
+          if (['default', 'confetti', 'balloons'].includes(designerThemeId || '')) {
+            return {
+              title: '',
+              message: birthdaySettings?.customMessage || '',
+              signature: '',
+              imageUrl: null, // Let CardDesignerDialog load the default theme image
+              customImage: false, // This is key - tells the dialog it's NOT a custom image
+              imagePosition: { x: 0, y: 0 },
+              imageScale: 1,
+            };
+          }
+          
+          // Fallback for any other case
+          return { 
+            message: birthdaySettings?.customMessage || '',
+            customImage: false // Ensure we don't accidentally load custom images for default themes
+          };
         })()}
         onSave={(data) => {
           try {
             localStorage.setItem('birthdayCardDesignerDraft', JSON.stringify({ title: data.title, message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId, customImage: (data as any).customImage }));
           } catch {}
           
-          // When user modifies any theme, save it as custom theme and switch to custom
-          const customThemeData: CustomThemeData = {
-            title: data.title,
-            message: data.message,
-            signature: data.signature || '',
-            imageUrl: data.imageUrl || null,
-            customImage: (data as any).customImage || false,
-            imagePosition: (data as any).imagePosition || { x: 0, y: 0 },
-            imageScale: (data as any).imageScale || 1,
-          };
+          // Check if user made modifications to a default theme
+          const isDefaultTheme = ['default', 'confetti', 'balloons'].includes(designerThemeId || '');
+          const hasCustomizations = data.title !== '' || 
+                                   data.signature !== '' || 
+                                   (data as any).customImage === true;
           
-          // Update both the custom theme data and switch the email template to custom
-          updateSettingsMutation.mutate({
-            ...birthdaySettings,
-            emailTemplate: 'custom',
-            customMessage: data.message,
-            customThemeData: JSON.stringify(customThemeData),
-          });
+          // If user modified a default theme OR is working with custom theme, save as custom
+          const shouldSaveAsCustom = isDefaultTheme && hasCustomizations || designerThemeId === 'custom';
+          
+          if (shouldSaveAsCustom) {
+            console.log('🎨 [Birthday Cards] Saving modifications as custom theme');
+            
+            // When user modifies any theme, save it as custom theme and switch to custom
+            const customThemeData: CustomThemeData = {
+              title: data.title,
+              message: data.message,
+              signature: data.signature || '',
+              imageUrl: data.imageUrl || null,
+              customImage: (data as any).customImage || false,
+              imagePosition: (data as any).imagePosition || { x: 0, y: 0 },
+              imageScale: (data as any).imageScale || 1,
+            };
+            
+            // Update real-time preview immediately for instant visual feedback
+            setCustomThemePreview(customThemeData);
+            
+            // Update both the custom theme data and switch the email template to custom
+            updateSettingsMutation.mutate({
+              ...birthdaySettings,
+              emailTemplate: 'custom',
+              customMessage: data.message,
+              customThemeData: JSON.stringify(customThemeData),
+            });
+          } else {
+            // Just save the message for default themes without customizations
+            updateSettingsMutation.mutate({
+              ...birthdaySettings,
+              customMessage: data.message,
+            });
+          }
         }}
       />
 

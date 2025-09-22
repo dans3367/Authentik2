@@ -27,9 +27,10 @@ interface CardDesignerDialogProps {
   initialThemeId?: string;
   initialData?: Partial<DesignerData>;
   onSave?: (data: DesignerData) => void;
+  onPreviewChange?: (data: DesignerData) => void;
 }
 
-export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initialData, onSave }: CardDesignerDialogProps) {
+export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initialData, onSave, onPreviewChange }: CardDesignerDialogProps) {
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [message, setMessage] = useState(initialData?.message ?? "");
   const [imageUrl, setImageUrl] = useState<string | null>(initialData?.imageUrl ?? 
@@ -62,20 +63,46 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     setMessage(initialData?.message ?? "");
     setSignature(initialData?.signature ?? "");
     
-    // No default images for themes anymore - custom theme handles its own images
+    // Default theme header images
+    const defaultThemeImages = {
+      'default': 'https://images.unsplash.com/photo-1588195538326-c5b1e9f80a1b?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+      'confetti': 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+      'balloons': 'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'
+    };
+
     const isCustom = initialData?.customImage ?? customImage ?? false;
-    setCustomImage(isCustom);
-    setImageUrl(isCustom ? (initialData?.imageUrl ?? null) : null);
+    
+    // If it's a default theme, initialize with the theme's header image
+    if (!isCustom && initialThemeId && initialThemeId in defaultThemeImages) {
+      setImageUrl(defaultThemeImages[initialThemeId as keyof typeof defaultThemeImages]);
+      setCustomImage(false);
+    } else {
+      // Custom theme or custom image
+      setImageUrl(isCustom ? (initialData?.imageUrl ?? null) : null);
+      setCustomImage(isCustom);
+    }
+    
     setImagePosition(initialData?.imagePosition ?? { x: 0, y: 0 });
     setImageScale(initialData?.imageScale ?? 1);
   }, [open, initialThemeId, initialData]);
 
-  // If theme changes while open and no custom image chosen, clear image url
+  // If theme changes while open and no custom image chosen, update to theme's default image
   useEffect(() => {
     if (!open) return;
     if (customImage) return;
-    // No default theme images anymore
-    setImageUrl(null);
+    
+    // Default theme header images
+    const defaultThemeImages = {
+      'default': 'https://images.unsplash.com/photo-1588195538326-c5b1e9f80a1b?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+      'confetti': 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+      'balloons': 'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'
+    };
+    
+    if (initialThemeId && initialThemeId in defaultThemeImages) {
+      setImageUrl(defaultThemeImages[initialThemeId as keyof typeof defaultThemeImages]);
+    } else {
+      setImageUrl(null);
+    }
   }, [initialThemeId, customImage, open]);
 
   // Persist draft locally so switching themes won't lose text
@@ -95,6 +122,33 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       localStorage.setItem("birthdayCardDesignerDraft", JSON.stringify(draft));
     } catch {}
   }, [open, title, message, imageUrl, signature, initialThemeId, customImage, imagePosition, imageScale]);
+
+  // Call preview change callback for real-time updates
+  useEffect(() => {
+    if (!open || !onPreviewChange) return;
+    
+    const previewData: DesignerData = {
+      title,
+      message,
+      imageUrl: imageUrl ?? undefined,
+      signature,
+      themeId: initialThemeId,
+      customImage,
+      imagePosition,
+      imageScale,
+    };
+    
+    // Debounce the preview updates to avoid too many calls
+    const timeoutId = setTimeout(() => {
+      try {
+        onPreviewChange(previewData);
+      } catch (error) {
+        console.warn('Error calling onPreviewChange:', error);
+      }
+    }, 300);
+    
+    return () => clearTimeout(timeoutId);
+  }, [open, title, message, imageUrl, signature, initialThemeId, customImage, imagePosition, imageScale]); // Removed onPreviewChange from dependencies
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -161,9 +215,12 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       if (result.success && result.url) {
         console.log('📸 [Card Designer] Upload successful:', result.url);
         setImageUrl(result.url);
-        setCustomImage(true);
+        setCustomImage(true); // Mark as custom when user uploads new image
         setImageError(false);
         setShowImageControls(false);
+        
+        // Note: When user uploads a new image, the save function will automatically
+        // switch to custom theme since customImage is now true
       } else {
         console.error('📸 [Card Designer] Upload failed:', result.error);
         alert(result.error || 'Upload failed. Please try again.');

@@ -125,10 +125,34 @@ subscriptionRoutes.post("/free-trial-signup", async (req: any, res) => {
 // Get user's subscription
 subscriptionRoutes.get("/my-subscription", authenticateToken, requireRole(["Owner"]), async (req: any, res) => {
   try {
+    // Debug: Log user info
+    console.log('🔍 [Subscription] Debug req.user:', {
+      exists: !!req.user,
+      user: req.user,
+      tenantId: req.user?.tenantId,
+      role: req.user?.role
+    });
+
+    if (!req.user) {
+      console.error('❌ [Subscription] req.user is undefined!');
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+
+    if (!req.user.tenantId) {
+      console.error('❌ [Subscription] req.user.tenantId is undefined!', req.user);
+      return res.status(400).json({ message: 'User tenantId not found' });
+    }
+
+    // Get company info (companies table has tenantId field)
     const company = await db.query.companies.findFirst({
-      where: sql`${db.companies.id} = ${req.user.companyId}`,
+      where: sql`${db.companies.tenantId} = ${req.user.tenantId}`,
+    });
+
+    // Get subscription separately by tenantId
+    const subscription = await db.query.subscriptions.findFirst({
+      where: sql`${db.subscriptions.tenantId} = ${req.user.tenantId}`,
       with: {
-        subscription: true,
+        plan: true,
       },
     });
 
@@ -138,10 +162,10 @@ subscriptionRoutes.get("/my-subscription", authenticateToken, requireRole(["Owne
 
     let subscriptionDetails = null;
 
-    if (company.subscription && stripe) {
+    if (subscription && stripe) {
       try {
         // Get subscription details from Stripe
-        const stripeSubscription = await stripe.subscriptions.retrieve(company.subscription.stripeSubscriptionId);
+        const stripeSubscription = await stripe.subscriptions.retrieve(subscription.stripeSubscriptionId);
         
         subscriptionDetails = {
           id: stripeSubscription.id,
@@ -166,19 +190,20 @@ subscriptionRoutes.get("/my-subscription", authenticateToken, requireRole(["Owne
       company: {
         id: company.id,
         name: company.name,
-        slug: company.slug,
-        trialEndsAt: company.trialEndsAt,
-        isOnTrial: company.trialEndsAt ? company.trialEndsAt > new Date() : false,
+        // Note: companies table doesn't have slug or trialEndsAt fields in schema
       },
-      subscription: company.subscription ? {
-        id: company.subscription.id,
-        status: company.subscription.status,
-        planId: company.subscription.planId,
-        stripeCustomerId: company.subscription.stripeCustomerId,
-        stripeSubscriptionId: company.subscription.stripeSubscriptionId,
-        currentPeriodStart: company.subscription.currentPeriodStart,
-        currentPeriodEnd: company.subscription.currentPeriodEnd,
-        cancelAtPeriodEnd: company.subscription.cancelAtPeriodEnd,
+      subscription: subscription ? {
+        id: subscription.id,
+        status: subscription.status,
+        planId: subscription.planId,
+        stripeCustomerId: subscription.stripeCustomerId,
+        stripeSubscriptionId: subscription.stripeSubscriptionId,
+        currentPeriodStart: subscription.currentPeriodStart,
+        currentPeriodEnd: subscription.currentPeriodEnd,
+        cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+        trialStart: subscription.trialStart,
+        trialEnd: subscription.trialEnd,
+        isOnTrial: subscription.trialEnd ? subscription.trialEnd > new Date() : false,
         details: subscriptionDetails,
       } : null,
     };
@@ -214,7 +239,7 @@ subscriptionRoutes.post("/create-checkout-session", authenticateToken, requireRo
 
     // Get company
     const company = await db.query.companies.findFirst({
-      where: sql`${db.companies.id} = ${req.user.companyId}`,
+      where: sql`${db.companies.id} = ${req.user.tenantId}`,
     });
 
     if (!company) {
@@ -276,7 +301,7 @@ subscriptionRoutes.post("/create-portal-session", authenticateToken, requireRole
 
     // Get company
     const company = await db.query.companies.findFirst({
-      where: sql`${db.companies.id} = ${req.user.companyId}`,
+      where: sql`${db.companies.id} = ${req.user.tenantId}`,
       with: {
         subscription: true,
       },
@@ -312,7 +337,7 @@ subscriptionRoutes.post("/cancel", authenticateToken, requireRole(["Owner"]), as
 
     // Get company subscription
     const company = await db.query.companies.findFirst({
-      where: sql`${db.companies.id} = ${req.user.companyId}`,
+      where: sql`${db.companies.id} = ${req.user.tenantId}`,
       with: {
         subscription: true,
       },
@@ -357,7 +382,7 @@ subscriptionRoutes.post("/reactivate", authenticateToken, requireRole(["Owner"])
 
     // Get company subscription
     const company = await db.query.companies.findFirst({
-      where: sql`${db.companies.id} = ${req.user.companyId}`,
+      where: sql`${db.companies.id} = ${req.user.tenantId}`,
       with: {
         subscription: true,
       },
@@ -397,7 +422,7 @@ subscriptionRoutes.post("/reactivate", authenticateToken, requireRole(["Owner"])
 subscriptionRoutes.get("/usage", authenticateToken, requireRole(["Owner"]), async (req: any, res) => {
   try {
     const company = await db.query.companies.findFirst({
-      where: sql`${db.companies.id} = ${req.user.companyId}`,
+      where: sql`${db.companies.id} = ${req.user.tenantId}`,
       with: {
         subscription: true,
       },

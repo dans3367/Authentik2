@@ -120,7 +120,7 @@ export function AppSidebar() {
 
   // Fetch subscription data for the user's plan
   const { data: subscriptionData } = useQuery<UserSubscriptionResponse>({
-    queryKey: ["/api/my-subscription"],
+    queryKey: ["/api/subscription/my-subscription"],
     enabled: !!extendedUser && extendedUser.role === "Owner",
   });
 
