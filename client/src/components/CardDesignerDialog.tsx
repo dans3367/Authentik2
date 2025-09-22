@@ -79,20 +79,41 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       'balloons': 'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'
     };
 
-    const isCustom = initialData?.customImage ?? customImage ?? false;
+    // Determine if this should use custom image based on initialData
+    const hasCustomImageData = initialData?.customImage === true && initialData?.imageUrl;
+    const isCustomTheme = initialThemeId === 'custom';
     
-    // If it's a default theme, initialize with the theme's header image
-    if (!isCustom && initialThemeId && initialThemeId in defaultThemeImages) {
+    console.log('🎨 [Card Designer] Initializing with:', {
+      initialThemeId,
+      hasCustomImageData,
+      isCustomTheme,
+      initialImageUrl: initialData?.imageUrl,
+      initialCustomImage: initialData?.customImage
+    });
+    
+    // Set image state based on theme and data
+    if (hasCustomImageData) {
+      // Has explicit custom image data
+      console.log('📸 Setting custom image:', initialData.imageUrl);
+      setImageUrl(initialData.imageUrl);
+      setCustomImage(true);
+    } else if (!isCustomTheme && initialThemeId && initialThemeId in defaultThemeImages) {
+      // Default theme with its header image
+      console.log('🎭 Setting default theme image for:', initialThemeId);
       setImageUrl(defaultThemeImages[initialThemeId as keyof typeof defaultThemeImages]);
       setCustomImage(false);
     } else {
-      // Custom theme or custom image
-      setImageUrl(isCustom ? (initialData?.imageUrl ?? null) : null);
-      setCustomImage(isCustom);
+      // Custom theme without custom image or unknown theme
+      console.log('🎨 Custom theme without image - clearing state');
+      setImageUrl(null);
+      setCustomImage(isCustomTheme);
     }
     
     setImagePosition(initialData?.imagePosition ?? { x: 0, y: 0 });
     setImageScale(initialData?.imageScale ?? 1);
+    
+    // Reset image error state on initialization
+    setImageError(false);
 
     // Load persistent Unsplash search state
     try {
@@ -114,7 +135,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   // If theme changes while open and no custom image chosen, update to theme's default image
   useEffect(() => {
     if (!open) return;
-    if (customImage) return;
+    if (customImage) return; // Don't override custom images
     
     // Default theme header images
     const defaultThemeImages = {
@@ -123,10 +144,26 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       'balloons': 'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'
     };
     
+    console.log('🔄 [Card Designer] Theme change effect triggered:', {
+      initialThemeId,
+      customImage,
+      currentImageUrl: imageUrl
+    });
+    
     if (initialThemeId && initialThemeId in defaultThemeImages) {
+      console.log('🎭 Updating to default theme image for:', initialThemeId);
       setImageUrl(defaultThemeImages[initialThemeId as keyof typeof defaultThemeImages]);
-    } else {
+      setImageError(false); // Reset error state when switching themes
+    } else if (initialThemeId === 'custom') {
+      // For custom theme without custom image, show no image
+      console.log('🎨 Switching to custom theme - clearing default image');
       setImageUrl(null);
+      setImageError(false);
+    } else {
+      // Unknown theme
+      console.log('❓ Unknown theme, clearing image');
+      setImageUrl(null);
+      setImageError(false);
     }
   }, [initialThemeId, customImage, open]);
 
@@ -174,6 +211,19 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     
     return () => clearTimeout(timeoutId);
   }, [open, title, message, imageUrl, signature, initialThemeId, customImage, imagePosition, imageScale]); // Removed onPreviewChange from dependencies
+
+  // Debug effect to track image state changes
+  useEffect(() => {
+    if (open) {
+      console.log('🔍 [Card Designer] Image state changed:', {
+        imageUrl: imageUrl ? imageUrl.substring(0, 50) + '...' : null,
+        customImage,
+        imageError,
+        initialThemeId,
+        uploading
+      });
+    }
+  }, [open, imageUrl, customImage, imageError, initialThemeId, uploading]);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -266,16 +316,22 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   };
 
   const handleRemoveImage = () => { 
+    console.log('🗑️ [Card Designer] Removing image:', imageUrl);
+    
     // Clean up object URL if it exists (only for blob URLs, not R2 URLs)
     if (imageUrl && imageUrl.startsWith('blob:')) {
       URL.revokeObjectURL(imageUrl);
     }
+    
     setImageUrl(null);
     setCustomImage(false);
+    setImageError(false); // Clear any error state
     // Reset position and scale when image is removed
     setImagePosition({ x: 0, y: 0 });
     setImageScale(1);
     setShowImageControls(false);
+    
+    console.log('✅ [Card Designer] Image removal complete');
   };
 
   // Cleanup object URLs on unmount
@@ -476,14 +532,24 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   };
 
   const selectUnsplashImage = (imageUrl: string) => {
+    console.log('🖼️ [Card Designer] Selecting Unsplash image:', imageUrl);
+    
+    // Clean up previous blob URL if it exists (not for Unsplash URLs)
+    if (imageUrl && imageUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(imageUrl);
+    }
+    
     setImageUrl(imageUrl);
     setCustomImage(true);
+    setImageError(false); // Reset any previous error state
     setUnsplashOpen(false);
     // Don't clear search state - keep it persistent
     // Reset position and scale when new image is selected
     setImagePosition({ x: 0, y: 0 });
     setImageScale(1);
     setShowImageControls(false);
+    
+    console.log('✅ [Card Designer] Image selection complete, customImage set to true');
   };
 
   // Pagination helper functions
@@ -611,6 +677,8 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       
       // Only reset image for custom theme
       if (isCustomTheme) {
+        console.log('🔄 [Card Designer] Resetting custom theme');
+        
         // Remove image and reset image controls
         if (imageUrl && imageUrl.startsWith('blob:')) {
           URL.revokeObjectURL(imageUrl);
@@ -623,6 +691,8 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
         
         // Clear any error states
         setImageError(false);
+        
+        console.log('✅ [Card Designer] Custom theme reset complete');
       }
       
       // Always close emoji picker
@@ -694,6 +764,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
               </div>
             ) : imageUrl && !imageError ? (
               <img 
+                key={`card-image-${imageUrl}-${customImage}`} // Force re-render on image change
                 src={imageUrl} 
                 alt="Card header" 
                 className="w-full h-full object-cover select-none"
@@ -711,11 +782,11 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                   WebkitFilter: 'none'
                 }}
                 onLoad={() => {
-                  console.log('Image loaded successfully:', imageUrl);
+                  console.log('📸 [Card Designer] Image loaded successfully:', imageUrl);
                   setImageError(false);
                 }}
                 onError={(e) => {
-                  console.error('Image failed to load:', imageUrl);
+                  console.error('❌ [Card Designer] Image failed to load:', imageUrl);
                   console.error('Error event:', e);
                   setImageError(true);
                 }}
