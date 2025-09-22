@@ -716,7 +716,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="🎉 Happy Birthday! 🎂"
-                className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold border-0 shadow-none px-0 pr-8 sm:pr-12 focus-visible:ring-0 text-center placeholder:text-gray-400 placeholder:font-normal"
+                className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold border-0 shadow-none px-0 pr-8 sm:pr-12 focus-visible:ring-0 text-center placeholder:text-gray-400 placeholder:font-normal h-auto min-h-[3rem] sm:min-h-[4rem] md:min-h-[5rem] lg:min-h-[6rem] py-2 sm:py-3 md:py-4 leading-tight"
               />
               <div className="absolute right-0 top-1/2 transform -translate-y-1/2">
                 <DropdownMenu open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
