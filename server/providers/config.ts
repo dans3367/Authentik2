@@ -164,7 +164,7 @@ export class EmailProviderConfig {
   // Get configuration for environment-specific settings
   static getEnvironmentConfig() {
     return {
-      fromEmail: process.env.FROM_EMAIL || 'noreply@zendwise.work',
+      fromEmail: process.env.FROM_EMAIL || 'admin@zendwise.work',
       appName: process.env.APP_NAME || 'SaaS Auth App',
       baseUrl: process.env.BASE_URL || 'http://webx.zendwise.work',
       enableQueue: process.env.EMAIL_ENABLE_QUEUE === 'true',

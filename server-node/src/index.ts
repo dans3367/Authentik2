@@ -542,7 +542,7 @@ app.post('/api/birthday-invitation', authenticateRequest, async (req: Authentica
           priority: 'normal' as const,
           tenantId,
           userId,
-          fromEmail: fromEmail || 'noreply@zendwise.work',
+          fromEmail: fromEmail || 'admin@zendwise.work',
           metadata: {
             contactId,
             invitationType: 'birthday',
@@ -693,8 +693,8 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
 
     console.log(`🎨 Using template: ${selectedTemplate}${selectedTemplate === 'custom' ? ' with custom theme data' : ''}`);
 
-    // Always send to beats@zendwise.work for test emails per memory
-    const testRecipient = 'beats@zendwise.work';
+    // Always send to beats@zendwise.com for test emails per memory
+    const testRecipient = 'beats@zendwise.com';
     
     console.log(`📧 Sending test birthday card to ${testRecipient} (original: ${userEmail})`);
 
@@ -716,7 +716,7 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
           priority: 'normal' as const,
           tenantId,
           userId,
-          fromEmail: fromEmail || 'beats@zendwise.work',
+          fromEmail: fromEmail || 'admin@zendwise.work',
           metadata: {
             type: 'birthday-test',
             originalRecipient: userEmail,
@@ -792,7 +792,7 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
           },
           tenantId,
           tenantName,
-          fromEmail: fromEmail || 'beats@zendwise.work'
+          fromEmail: fromEmail || 'admin@zendwise.work'
         }),
       });
 

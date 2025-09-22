@@ -447,7 +447,7 @@ export default function BirthdaysPage() {
           tenantId: currentUser?.tenantId || 'unknown-tenant',
           tenantName: currentUser?.name || 'Your Company',
           userId: currentUser?.id || 'unknown-user',
-          fromEmail: 'noreply@zendwise.work'
+          fromEmail: 'admin@zendwise.work'
         }),
       });
 
@@ -489,7 +489,7 @@ export default function BirthdaysPage() {
           userLastName: user.lastName,
           tenantId: currentUser?.tenantId || 'unknown-tenant',
           tenantName: currentUser?.name || 'Your Company',
-          fromEmail: 'beats@zendwise.work', // Test emails go to beats@zendwise.work
+          fromEmail: 'admin@zendwise.work', // Test emails go to beats@zendwise.com
           isTest: true
         }),
       });
@@ -1488,7 +1488,7 @@ export default function BirthdaysPage() {
               </div>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Send test birthday cards to users in your system. Test emails will be sent to beats@zendwise.work instead of actual recipients.
+              Send test birthday cards to users in your system. Test emails will be sent to beats@zendwise.com instead of actual recipients.
             </p>
           </CardHeader>
           <CardContent className="p-0">

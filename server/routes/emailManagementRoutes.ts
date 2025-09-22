@@ -1654,7 +1654,7 @@ emailManagementRoutes.post("/internal/birthday-invitation", async (req: any, res
       '🎂 Help us celebrate your special day!',
       htmlContent,
       {
-        from: fromEmail || 'noreply@zendwise.work',
+        from: fromEmail || 'admin@zendwise.work',
         metadata: {
           type: 'birthday_invitation',
           contactId: contactId,

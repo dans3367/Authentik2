@@ -22,7 +22,7 @@ let activityConfig: ActivityConfig = {
   postmarkApiToken: '',
   primaryEmailProvider: 'resend',
   frontendUrl: 'https://app.zendwise.work',
-  fromEmail: 'noreply@zendwise.work',
+  fromEmail: 'admin@zendwise.work',
   emailConcurrencyLimit: 5
 };
 
@@ -85,7 +85,7 @@ export function initializeActivityConfigFromEnv(): ActivityConfig {
       postmarkApiToken: globalThis.process.env.POSTMARK_API_TOKEN || globalThis.process.env.POSTMARK_API_KEY || '',
       primaryEmailProvider: globalThis.process.env.PRIMARY_EMAIL_PROVIDER || 'resend',
       frontendUrl: globalThis.process.env.FRONTEND_URL || 'https://app.zendwise.work',
-      fromEmail: globalThis.process.env.FROM_EMAIL || 'noreply@zendwise.work',
+      fromEmail: globalThis.process.env.FROM_EMAIL || 'admin@zendwise.work',
       emailConcurrencyLimit: parseInt(globalThis.process.env.EMAIL_CONCURRENCY_LIMIT || '5')
     };
 

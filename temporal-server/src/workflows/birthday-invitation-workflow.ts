@@ -168,7 +168,7 @@ This invitation was sent because you're a valued customer. If you'd prefer not t
     workflowLogger.info(`📤 Sending birthday invitation email to ${input.contactEmail}`);
     const result = await sendEmail(
       input.contactEmail,
-      input.fromEmail || 'noreply@zendwise.work',
+      input.fromEmail || 'admin@zendwise.work',
       subject,
       htmlContent,
       textContent,

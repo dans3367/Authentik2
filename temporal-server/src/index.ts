@@ -27,7 +27,7 @@ const activityConfig: ActivityConfig = {
   postmarkApiToken: process.env.POSTMARK_API_TOKEN || '',
   primaryEmailProvider: process.env.PRIMARY_EMAIL_PROVIDER || 'resend',
   frontendUrl: process.env.FRONTEND_URL || 'https://app.zendwise.work',
-  fromEmail: process.env.FROM_EMAIL || 'noreply@zendwise.work',
+  fromEmail: process.env.FROM_EMAIL || 'admin@zendwise.work',
   emailConcurrencyLimit: parseInt(process.env.EMAIL_CONCURRENCY_LIMIT || '5')
 };
 

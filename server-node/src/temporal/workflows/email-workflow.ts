@@ -85,7 +85,7 @@ export async function emailWorkflow(
 
     const emailContent = {
       to: input.recipient,
-      from: input.fromEmail || 'noreply@zendwise.work',
+      from: input.fromEmail || 'admin@zendwise.work',
       subject: input.subject || 'No Subject',
       html: input.content,
       text: input.content.replace(/<[^>]*>/g, ''), // Strip HTML for text version

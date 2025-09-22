@@ -80,7 +80,7 @@ export async function birthdayInvitationWorkflow(
     // Step 3: Send the invitation email
     const sendResult = await sendBirthdayInvitationEmail({
       to: input.contactEmail,
-      from: input.fromEmail || 'noreply@zendwise.work',
+      from: input.fromEmail || 'admin@zendwise.work',
       subject: emailData.subject!,
       html: emailData.htmlContent!,
       text: emailData.textContent!,

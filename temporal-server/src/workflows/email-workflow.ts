@@ -105,7 +105,7 @@ export async function emailWorkflow(
 
     const emailContent = {
       to: input.recipient,
-      from: input.fromEmail || 'noreply@zendwise.work', // Use provided from email or default
+      from: input.fromEmail || 'admin@zendwise.work', // Use provided from email or default
       subject: input.subject || 'No Subject',
       html: htmlContent,
       text: htmlContent.replace(/<[^>]*>/g, ''), // Strip HTML for text version
