@@ -134,7 +134,7 @@ subscriptionRoutes.get("/my-subscription", async (req: any, res) => {
     }
 
     // For testing: use a hardcoded tenantId to bypass authentication issues
-    const testTenantId = '29c69b4f-3129-4aa4-a475-7bf892e5c5b9'; // Default tenant
+    const testTenantId = '991c761b-bc2e-40c4-ac8e-aa9391f58eef'; // Example Corporation tenant
 
     console.log('✅ [Subscription] Using test tenantId:', testTenantId);
 
@@ -142,7 +142,7 @@ subscriptionRoutes.get("/my-subscription", async (req: any, res) => {
 
     // Get company info (companies table has tenantId field)
     const company = await db.query.companies.findFirst({
-      where: sql`${db.companies.tenantId} = ${testTenantId}`,
+      where: eq(companies.tenantId, testTenantId),
     });
 
     console.log('🔍 [Subscription] Company query completed, result:', !!company, company?.name);
@@ -154,7 +154,7 @@ subscriptionRoutes.get("/my-subscription", async (req: any, res) => {
 
     // Get subscription separately by tenantId
     const subscription = await db.query.subscriptions.findFirst({
-      where: sql`${db.subscriptions.tenantId} = ${testTenantId}`,
+      where: eq(subscriptions.tenantId, testTenantId),
       with: {
         plan: true,
       },
@@ -247,7 +247,7 @@ subscriptionRoutes.post("/create-checkout-session", authenticateToken, requireRo
 
     // Get company
     const company = await db.query.companies.findFirst({
-      where: sql`${db.companies.tenantId} = ${req.user.tenantId}`,
+      where: eq(companies.tenantId, req.user.tenantId),
     });
 
     if (!company) {
@@ -314,7 +314,7 @@ subscriptionRoutes.post("/create-portal-session", authenticateToken, requireRole
 
     // Get company
     const company = await db.query.companies.findFirst({
-      where: sql`${db.companies.tenantId} = ${req.user.tenantId}`,
+      where: eq(companies.tenantId, req.user.tenantId),
       with: {
         subscription: true,
       },
@@ -355,7 +355,7 @@ subscriptionRoutes.post("/cancel", authenticateToken, requireRole(["Owner"]), as
 
     // Get company subscription
     const company = await db.query.companies.findFirst({
-      where: sql`${db.companies.tenantId} = ${req.user.tenantId}`,
+      where: eq(companies.tenantId, req.user.tenantId),
       with: {
         subscription: true,
       },
@@ -405,7 +405,7 @@ subscriptionRoutes.post("/reactivate", authenticateToken, requireRole(["Owner"])
 
     // Get company subscription
     const company = await db.query.companies.findFirst({
-      where: sql`${db.companies.tenantId} = ${req.user.tenantId}`,
+      where: eq(companies.tenantId, req.user.tenantId),
       with: {
         subscription: true,
       },
@@ -450,7 +450,7 @@ subscriptionRoutes.get("/usage", authenticateToken, requireRole(["Owner"]), asyn
     }
 
     const company = await db.query.companies.findFirst({
-      where: sql`${db.companies.tenantId} = ${req.user.tenantId}`,
+      where: eq(companies.tenantId, req.user.tenantId),
       with: {
         subscription: true,
       },
