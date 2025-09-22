@@ -693,10 +693,10 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
 
     console.log(`🎨 Using template: ${selectedTemplate}${selectedTemplate === 'custom' ? ' with custom theme data' : ''}`);
 
-    // Always send to beats@zendwise.com for test emails per memory
-    const testRecipient = 'beats@zendwise.com';
+    // Send test email to the actual user's email address
+    const testRecipient = userEmail;
     
-    console.log(`📧 Sending test birthday card to ${testRecipient} (original: ${userEmail})`);
+    console.log(`📧 Sending test birthday card to ${testRecipient}`);
 
     // Try to use Temporal service if available, otherwise fallback to direct sending
     if (temporalService && temporalService.isConnected()) {
@@ -719,7 +719,7 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
           fromEmail: fromEmail || 'admin@zendwise.work',
           metadata: {
             type: 'birthday-test',
-            originalRecipient: userEmail,
+            recipient: userEmail,
             isTest: true,
             birthdayTemplate: selectedTemplate,
             recipientName: userName,
@@ -743,8 +743,7 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
           success: true,
           workflowId,
           workflowRunId: handle.workflowId,
-          testRecipient,
-          originalRecipient: userEmail,
+          recipient: testRecipient,
           method: 'temporal-workflow',
           templateUsed: selectedTemplate,
           hasCustomTheme: selectedTemplate === 'custom' && customThemeData !== null,
@@ -782,7 +781,7 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
           html: htmlContent,
           metadata: {
             type: 'birthday-test',
-            originalRecipient: userEmail,
+            recipient: userEmail,
             userId,
             tenantId,
             tenantName,
@@ -808,12 +807,11 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
       res.json({
         success: true,
         messageId: result.messageId,
-        testRecipient,
-        originalRecipient: userEmail,
+        recipient: testRecipient,
         method: 'direct-fallback',
         templateUsed: selectedTemplate,
         hasCustomTheme: selectedTemplate === 'custom' && customThemeData !== null,
-        message: `Test birthday card sent successfully using ${selectedTemplate} template (fallback mode)`
+        message: `Test birthday card sent successfully using ${selectedTemplate} template`
       });
 
     } catch (error) {
