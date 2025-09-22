@@ -8,9 +8,28 @@ export function renderBirthdayTemplate(
 ): string {
   // Handle custom theme with rich styling
   if (template === 'custom' && params.customThemeData) {
-    const customData = typeof params.customThemeData === 'string' 
-      ? JSON.parse(params.customThemeData) 
-      : params.customThemeData;
+    let customData = null;
+    
+    try {
+      const parsedData = typeof params.customThemeData === 'string' 
+        ? JSON.parse(params.customThemeData) 
+        : params.customThemeData;
+      
+      // Check if it's the new structure (has themes property)
+      if (parsedData.themes && parsedData.themes.custom) {
+        customData = parsedData.themes.custom;
+      } else if (!parsedData.themes) {
+        // Old structure - use directly if no themes property
+        customData = parsedData;
+      }
+    } catch (e) {
+      console.warn('Failed to parse customThemeData for custom template:', e);
+      return `<html><body><p>Error loading custom theme</p></body></html>`;
+    }
+    
+    if (!customData) {
+      return `<html><body><p>No custom theme data found</p></body></html>`;
+    }
     
     const title = customData.title || `Happy Birthday${params.recipientName ? ', ' + params.recipientName : ''}!`;
     const message = customData.message || params.message || 'Wishing you a wonderful day!';
@@ -55,7 +74,43 @@ export function renderBirthdayTemplate(
     balloons: { primary: '#54a0ff', secondary: '#5f27cd' }
   };
   
-  const headline = `Happy Birthday${params.recipientName ? ', ' + params.recipientName : ''}!`;
+  // Check if there's custom theme data with custom title/signature for this specific theme
+  let headline = `Happy Birthday${params.recipientName ? ', ' + params.recipientName : ''}!`;
+  let signature = '';
+  
+  if (params.customThemeData) {
+    try {
+      const parsedData = typeof params.customThemeData === 'string' 
+        ? JSON.parse(params.customThemeData) 
+        : params.customThemeData;
+      
+      let themeSpecificData = null;
+      
+      // Check if it's the new structure (has themes property)
+      if (parsedData.themes && parsedData.themes[template]) {
+        themeSpecificData = parsedData.themes[template];
+      } else if (!parsedData.themes) {
+        // Old structure - use directly if no themes property
+        themeSpecificData = parsedData;
+      }
+      
+      if (themeSpecificData) {
+        // Use custom title if provided, otherwise use default
+        if (themeSpecificData.title) {
+          headline = themeSpecificData.title;
+        }
+        
+        // Use custom signature if provided
+        if (themeSpecificData.signature) {
+          signature = themeSpecificData.signature;
+        }
+      }
+    } catch (e) {
+      // If parsing fails, continue with defaults
+      console.warn('Failed to parse customThemeData for template:', template, e);
+    }
+  }
+  
   const headerImage = themeHeaders[template as keyof typeof themeHeaders] || themeHeaders.default;
   const colors = themeColors[template as keyof typeof themeColors] || themeColors.default;
   
@@ -71,7 +126,8 @@ export function renderBirthdayTemplate(
           <h1 style="color: #2d3748; font-size: 2.5rem; margin: 0; font-weight: bold;">${headline}</h1>
         </div>
         <div style="padding: 30px;">
-          <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center;">${params.message || 'Wishing you a wonderful day!'}</div>
+          <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">${params.message || 'Wishing you a wonderful day!'}</div>
+          ${signature ? `<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">${signature}</div>` : ''}
           ${params.senderName ? `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #718096; font-size: 0.9rem;">Best wishes from ${params.senderName}</div>` : ''}
         </div>
       </div>

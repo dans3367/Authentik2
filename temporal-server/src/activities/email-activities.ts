@@ -100,13 +100,16 @@ class EmailServiceManager {
       );
       
       // Prepare the payload for Resend
+      // Remove duplicate tags to prevent "category tag is duplicated" error
+      const uniqueTags = request.tags ? [...new Set(request.tags)] : [];
+      
       const emailPayload = {
         from: request.from,
         to: request.to,
         subject: request.subject,
         html: request.html,
         text: request.text,
-        tags: request.tags?.map(tag => ({ name: tag, value: 'true' })),
+        tags: uniqueTags.map(tag => ({ name: tag, value: 'true' })),
         ...(request.metadata && { metadata: request.metadata }),
       };
       

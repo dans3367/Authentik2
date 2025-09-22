@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import RichTextEditor from "@/components/RichTextEditor";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Search, ZoomIn, ZoomOut, Move, RotateCcw, Smile, RefreshCw } from "lucide-react";
+import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Search, ZoomIn, ZoomOut, Move, RotateCcw, Smile, RefreshCw, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { uploadCardImage, validateCardImageFile } from "@/lib/cardImageUpload";
 
 type DesignerData = {
@@ -43,6 +43,13 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   const [searchQuery, setSearchQuery] = useState("");
   const [unsplashImages, setUnsplashImages] = useState<Array<{ id: string; urls: { small: string; regular: string }; alt_description: string }>>([]);
   const [loading, setLoading] = useState(false);
+  
+  // Pagination state for Unsplash
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalResults, setTotalResults] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [uploading, setUploading] = useState(false);
   
@@ -86,6 +93,22 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     
     setImagePosition(initialData?.imagePosition ?? { x: 0, y: 0 });
     setImageScale(initialData?.imageScale ?? 1);
+
+    // Load persistent Unsplash search state
+    try {
+      const savedSearchState = localStorage.getItem("unsplashSearchState");
+      if (savedSearchState) {
+        const state = JSON.parse(savedSearchState);
+        setSearchQuery(state.query || "");
+        setUnsplashImages(state.images || []);
+        setCurrentPage(state.currentPage || 1);
+        setTotalPages(state.totalPages || 0);
+        setTotalResults(state.totalResults || 0);
+        setHasSearched(state.hasSearched || false);
+      }
+    } catch (error) {
+      console.warn('Error loading search state:', error);
+    }
   }, [open, initialThemeId, initialData]);
 
   // If theme changes while open and no custom image chosen, update to theme's default image
@@ -296,14 +319,20 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     }
   }, [showEmojiPicker]);
 
-  // Search Unsplash images
-  const searchUnsplash = async (query: string) => {
+  // Search Unsplash images with pagination support
+  const searchUnsplash = async (query: string, page: number = 1, append: boolean = false) => {
     if (!query.trim()) return;
-    setLoading(true);
+    
+    if (page === 1) {
+      setLoading(true);
+      setHasSearched(false);
+    } else {
+      setLoadingMore(true);
+    }
     
     const accessKey = import.meta.env.VITE_ACCESS_KEY;
     
-    console.log('🔍 Starting Unsplash search for:', query);
+    console.log('🔍 Starting Unsplash search for:', query, 'Page:', page);
     console.log('🔑 Access key available:', !!accessKey);
     console.log('🔑 Access key (first 10 chars):', accessKey ? accessKey.substring(0, 10) + '...' : 'Not set');
     
@@ -319,11 +348,12 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       
       console.log('📝 Search query:', searchQuery);
       
-      // Using basic Unsplash API parameters for debugging
+      // Using basic Unsplash API parameters with pagination
       const apiUrl = `https://api.unsplash.com/search/photos`;
       const searchParams = new URLSearchParams({
         query: searchQuery,
-        per_page: '12',
+        per_page: '15', // Increased per page for better UX
+        page: page.toString(),
         client_id: accessKey
       });
       
@@ -340,7 +370,8 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
         console.log('✅ API Response received:', {
           total: data.total,
           total_pages: data.total_pages,
-          results_count: data.results?.length || 0
+          results_count: data.results?.length || 0,
+          current_page: page
         });
         
         const results = data.results || [];
@@ -361,7 +392,41 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
         
         console.log(`📊 Deduplication: ${results.length} -> ${uniqueResults.length} images`);
         
-        setUnsplashImages(uniqueResults);
+        // Update images state
+        if (append && page > 1) {
+          setUnsplashImages(prev => {
+            // Deduplicate between existing and new results
+            const combined = [...prev, ...uniqueResults];
+            return combined.filter((image, index, arr) => 
+              arr.findIndex(img => img.id === image.id) === index
+            );
+          });
+        } else {
+          setUnsplashImages(uniqueResults);
+        }
+        
+        // Update pagination state
+        setCurrentPage(page);
+        setTotalPages(data.total_pages || 0);
+        setTotalResults(data.total || 0);
+        setHasSearched(true);
+        
+        // Save search state to localStorage
+        const searchState = {
+          query: searchQuery,
+          images: append && page > 1 ? [...(JSON.parse(localStorage.getItem("unsplashSearchState") || '{}').images || []), ...uniqueResults] : uniqueResults,
+          currentPage: page,
+          totalPages: data.total_pages || 0,
+          totalResults: data.total || 0,
+          hasSearched: true
+        };
+        
+        try {
+          localStorage.setItem("unsplashSearchState", JSON.stringify(searchState));
+        } catch (error) {
+          console.warn('Error saving search state:', error);
+        }
+        
       } else {
         const errorText = await response.text();
         console.error('❌ Unsplash API error:', {
@@ -376,28 +441,77 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       console.warn('🔄 Falling back to demo images');
       
       // Fallback to mock data when API is not available or configured
-      setUnsplashImages([
+      const mockResults = [
         { id: '1', urls: { small: 'https://picsum.photos/300/200?random=1', regular: 'https://picsum.photos/600/400?random=1' }, alt_description: 'Sample birthday image 1' },
         { id: '2', urls: { small: 'https://picsum.photos/300/200?random=2', regular: 'https://picsum.photos/600/400?random=2' }, alt_description: 'Sample birthday image 2' },
         { id: '3', urls: { small: 'https://picsum.photos/300/200?random=3', regular: 'https://picsum.photos/600/400?random=3' }, alt_description: 'Sample birthday image 3' },
         { id: '4', urls: { small: 'https://picsum.photos/300/200?random=4', regular: 'https://picsum.photos/600/400?random=4' }, alt_description: 'Sample birthday image 4' },
         { id: '5', urls: { small: 'https://picsum.photos/300/200?random=5', regular: 'https://picsum.photos/600/400?random=5' }, alt_description: 'Sample birthday image 5' },
         { id: '6', urls: { small: 'https://picsum.photos/300/200?random=6', regular: 'https://picsum.photos/600/400?random=6' }, alt_description: 'Sample birthday image 6' },
-      ]);
+        { id: '7', urls: { small: 'https://picsum.photos/300/200?random=7', regular: 'https://picsum.photos/600/400?random=7' }, alt_description: 'Sample birthday image 7' },
+        { id: '8', urls: { small: 'https://picsum.photos/300/200?random=8', regular: 'https://picsum.photos/600/400?random=8' }, alt_description: 'Sample birthday image 8' },
+        { id: '9', urls: { small: 'https://picsum.photos/300/200?random=9', regular: 'https://picsum.photos/600/400?random=9' }, alt_description: 'Sample birthday image 9' },
+        { id: '10', urls: { small: 'https://picsum.photos/300/200?random=10', regular: 'https://picsum.photos/600/400?random=10' }, alt_description: 'Sample birthday image 10' },
+        { id: '11', urls: { small: 'https://picsum.photos/300/200?random=11', regular: 'https://picsum.photos/600/400?random=11' }, alt_description: 'Sample birthday image 11' },
+        { id: '12', urls: { small: 'https://picsum.photos/300/200?random=12', regular: 'https://picsum.photos/600/400?random=12' }, alt_description: 'Sample birthday image 12' },
+        { id: '13', urls: { small: 'https://picsum.photos/300/200?random=13', regular: 'https://picsum.photos/600/400?random=13' }, alt_description: 'Sample birthday image 13' },
+        { id: '14', urls: { small: 'https://picsum.photos/300/200?random=14', regular: 'https://picsum.photos/600/400?random=14' }, alt_description: 'Sample birthday image 14' },
+        { id: '15', urls: { small: 'https://picsum.photos/300/200?random=15', regular: 'https://picsum.photos/600/400?random=15' }, alt_description: 'Sample birthday image 15' }
+      ];
+      
+      if (append && page > 1) {
+        setUnsplashImages(prev => [...prev, ...mockResults]);
+      } else {
+        setUnsplashImages(mockResults);
+      }
+      
+      setCurrentPage(page);
+      setTotalPages(5); // Mock pagination
+      setTotalResults(75); // Mock total results
+      setHasSearched(true);
     }
+    
     setLoading(false);
+    setLoadingMore(false);
   };
 
   const selectUnsplashImage = (imageUrl: string) => {
     setImageUrl(imageUrl);
     setCustomImage(true);
     setUnsplashOpen(false);
-    setSearchQuery("");
-    setUnsplashImages([]);
+    // Don't clear search state - keep it persistent
     // Reset position and scale when new image is selected
     setImagePosition({ x: 0, y: 0 });
     setImageScale(1);
     setShowImageControls(false);
+  };
+
+  // Pagination helper functions
+  const loadMoreResults = () => {
+    if (currentPage < totalPages && !loadingMore && searchQuery.trim()) {
+      searchUnsplash(searchQuery, currentPage + 1, true);
+    }
+  };
+
+  const startNewSearch = (query: string) => {
+    if (query.trim()) {
+      setCurrentPage(1);
+      searchUnsplash(query, 1, false);
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchQuery("");
+    setUnsplashImages([]);
+    setCurrentPage(1);
+    setTotalPages(0);
+    setTotalResults(0);
+    setHasSearched(false);
+    try {
+      localStorage.removeItem("unsplashSearchState");
+    } catch (error) {
+      console.warn('Error clearing search state:', error);
+    }
   };
 
   // Image manipulation functions
@@ -482,29 +596,37 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
 
   // Reset functionality
   const handleReset = () => {
-    const confirmed = confirm(
-      "Are you sure you want to reset the card? This will clear all content including the image, title, message, and signature."
-    );
+    const isCustomTheme = initialThemeId === 'custom';
+    const resetMessage = isCustomTheme 
+      ? "Are you sure you want to reset the card? This will clear all content including the image, title, message, and signature."
+      : "Are you sure you want to reset the text? This will clear the title, message, and signature.";
+    
+    const confirmed = confirm(resetMessage);
     
     if (confirmed) {
-      // Clear all content
+      // Always clear text content
       setTitle("");
       setMessage("");
       setSignature("");
       
-      // Remove image and reset image controls
-      if (imageUrl && imageUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(imageUrl);
+      // Only reset image for custom theme
+      if (isCustomTheme) {
+        // Remove image and reset image controls
+        if (imageUrl && imageUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(imageUrl);
+        }
+        setImageUrl(null);
+        setCustomImage(false);
+        setImagePosition({ x: 0, y: 0 });
+        setImageScale(1);
+        setShowImageControls(false);
+        
+        // Clear any error states
+        setImageError(false);
       }
-      setImageUrl(initialThemeId === "sparkle-cake" ? "/images/birthday-sparkle.jpg" : null);
-      setCustomImage(false);
-      setImagePosition({ x: 0, y: 0 });
-      setImageScale(1);
-      setShowImageControls(false);
-      setShowEmojiPicker(false);
       
-      // Clear any error states
-      setImageError(false);
+      // Always close emoji picker
+      setShowEmojiPicker(false);
       
       // Focus on title input for immediate editing
       setTimeout(() => {
@@ -687,21 +809,26 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
-                  <DropdownMenuItem onClick={handlePickImage} disabled={uploading}>
-                    <Edit className="w-4 h-4 mr-2" />
-                    {uploading ? 'Uploading...' : 'Upload Image'}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setUnsplashOpen(true)}>
-                    <Search className="w-4 h-4 mr-2" />
-                    Browse Unsplash
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleRemoveImage}>
-                    <ImageOff className="w-4 h-4 mr-2" />
-                    Remove Image
-                  </DropdownMenuItem>
+                  {/* Image controls only for custom theme */}
+                  {initialThemeId === 'custom' && (
+                    <>
+                      <DropdownMenuItem onClick={handlePickImage} disabled={uploading}>
+                        <Edit className="w-4 h-4 mr-2" />
+                        {uploading ? 'Uploading...' : 'Upload Image'}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setUnsplashOpen(true)}>
+                        <Search className="w-4 h-4 mr-2" />
+                        Browse Unsplash
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleRemoveImage}>
+                        <ImageOff className="w-4 h-4 mr-2" />
+                        Remove Image
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <DropdownMenuItem className="text-red-600" onClick={handleReset}>
                     <RefreshCw className="w-4 h-4 mr-2" />
-                    Reset Card
+                    Reset {initialThemeId === 'custom' ? 'Card' : 'Text'}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -829,15 +956,27 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
 
             <div className="space-y-3 sm:space-y-4">
               <div className="flex flex-col sm:flex-row gap-2">
-                <Input
-                  placeholder="Search for images..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && searchUnsplash(searchQuery)}
-                  className="flex-1 text-sm sm:text-base"
-                />
+                <div className="relative">
+                  <Input
+                    placeholder="Search for images..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && startNewSearch(searchQuery)}
+                    className="flex-1 text-sm sm:text-base pr-8"
+                  />
+                  {searchQuery && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 text-gray-400 hover:text-gray-600"
+                      onClick={clearSearch}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
                 <Button 
-                  onClick={() => searchUnsplash(searchQuery)} 
+                  onClick={() => startNewSearch(searchQuery)} 
                   disabled={loading || !searchQuery.trim()}
                   className="w-full sm:w-auto text-sm"
                 >
@@ -846,6 +985,20 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                 </Button>
               </div>
 
+              {/* Search Results Summary */}
+              {hasSearched && !loading && totalResults > 0 && (
+                <div className="flex items-center justify-between text-sm text-gray-600">
+                  <span>
+                    Showing {unsplashImages.length} of {totalResults.toLocaleString()} results for "{searchQuery}"
+                  </span>
+                  {currentPage < totalPages && (
+                    <span className="text-xs text-gray-500">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                  )}
+                </div>
+              )}
+
               {loading && (
                 <div className="flex items-center justify-center py-6 sm:py-8">
                   <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-gray-900"></div>
@@ -853,23 +1006,52 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
               )}
 
               {unsplashImages.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4 max-h-64 sm:max-h-96 overflow-y-auto">
-                  {unsplashImages.map((image, index) => (
-                    <div key={`unsplash-${image.id}-${index}`} className="cursor-pointer group" onClick={() => selectUnsplashImage(image.urls.regular)}>
-                      <img 
-                        src={image.urls.small} 
-                        alt={image.alt_description || 'Unsplash image'} 
-                        className="w-full h-24 sm:h-32 object-cover rounded-md group-hover:opacity-80 transition-opacity"
-                      />
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4 max-h-64 sm:max-h-96 overflow-y-auto">
+                    {unsplashImages.map((image, index) => (
+                      <div key={`unsplash-${image.id}-${index}`} className="cursor-pointer group" onClick={() => selectUnsplashImage(image.urls.regular)}>
+                        <img 
+                          src={image.urls.small} 
+                          alt={image.alt_description || 'Unsplash image'} 
+                          className="w-full h-24 sm:h-32 object-cover rounded-md group-hover:opacity-80 transition-opacity"
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Load More Button */}
+                  {currentPage < totalPages && (
+                    <div className="flex flex-col items-center gap-2">
+                      {loadingMore ? (
+                        <div className="flex items-center gap-2 text-gray-600">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                          <span className="text-sm">Loading more images...</span>
+                        </div>
+                      ) : (
+                        <Button 
+                          onClick={loadMoreResults}
+                          variant="outline"
+                          className="text-sm"
+                          disabled={loadingMore}
+                        >
+                          <ChevronRight className="w-4 h-4 mr-1" />
+                          Load More ({(totalPages - currentPage) > 0 ? `${Math.min(15, totalResults - unsplashImages.length)} more` : 'No more'})
+                        </Button>
+                      )}
+                      
+                      {/* Progress indicator */}
+                      <div className="text-xs text-gray-500">
+                        Loaded {unsplashImages.length} of {totalResults.toLocaleString()} images
+                      </div>
                     </div>
-                  ))}
+                  )}
                 </div>
               )}
 
-              {!loading && unsplashImages.length === 0 && searchQuery && (
+              {!loading && unsplashImages.length === 0 && hasSearched && searchQuery && (
                 <div className="text-center py-6 sm:py-8 text-gray-500">
                   <div className="space-y-2">
-                    <p className="text-sm sm:text-base">No images found. Try a different search term.</p>
+                    <p className="text-sm sm:text-base">No images found for "{searchQuery}". Try a different search term.</p>
                     {!import.meta.env.VITE_ACCESS_KEY && (
                       <div className="text-xs sm:text-sm text-orange-600 bg-orange-50 p-3 rounded-md mx-auto max-w-md">
                         <p className="font-medium">Unsplash API not configured</p>
@@ -877,6 +1059,21 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                         <p>Showing demo images instead.</p>
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {!loading && !hasSearched && (
+                <div className="text-center py-8 sm:py-12 text-gray-500">
+                  <div className="space-y-3">
+                    <Search className="w-12 h-12 mx-auto text-gray-300" />
+                    <div>
+                      <p className="text-sm sm:text-base font-medium">Search for beautiful images</p>
+                      <p className="text-xs sm:text-sm">Enter a search term above to find high-quality photos from Unsplash</p>
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      Try searches like: "birthday party", "celebration", "cake", "balloons"
+                    </div>
                   </div>
                 </div>
               )}

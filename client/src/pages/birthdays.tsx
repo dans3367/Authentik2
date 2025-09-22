@@ -920,41 +920,49 @@ export default function BirthdaysPage() {
             if (raw) return JSON.parse(raw);
           } catch {}
           
-          // If custom theme is selected, load custom theme data
-          if (designerThemeId === 'custom' && birthdaySettings?.customThemeData) {
+          // Parse existing customThemeData and load theme-specific data
+          if (birthdaySettings?.customThemeData) {
             try {
-              const customData = JSON.parse(birthdaySettings.customThemeData);
-              return {
-                title: customData.title || '',
-                message: customData.message || '',
-                signature: customData.signature || '',
-                imageUrl: customData.imageUrl || null,
-                customImage: customData.customImage || false,
-                imagePosition: customData.imagePosition || { x: 0, y: 0 },
-                imageScale: customData.imageScale || 1,
-              };
+              const parsed = JSON.parse(birthdaySettings.customThemeData);
+              const currentThemeId = designerThemeId || 'default';
+              
+              let themeSpecificData = null;
+              
+              // Check if it's the new structure (has themes property)
+              if (parsed.themes && parsed.themes[currentThemeId]) {
+                themeSpecificData = parsed.themes[currentThemeId];
+              } else if (!parsed.themes) {
+                // Old structure - assume it's for custom theme if we're loading custom
+                if (currentThemeId === 'custom') {
+                  themeSpecificData = parsed;
+                }
+              }
+              
+              if (themeSpecificData) {
+                return {
+                  title: themeSpecificData.title || '',
+                  message: themeSpecificData.message || birthdaySettings?.customMessage || '',
+                  signature: themeSpecificData.signature || '',
+                  imageUrl: currentThemeId === 'custom' ? (themeSpecificData.imageUrl || null) : null,
+                  customImage: currentThemeId === 'custom' ? (themeSpecificData.customImage || false) : false,
+                  imagePosition: themeSpecificData.imagePosition || { x: 0, y: 0 },
+                  imageScale: themeSpecificData.imageScale || 1,
+                };
+              }
             } catch {
-              // Fall through to default
+              // Fall through to default if parsing fails
             }
           }
           
-          // If default theme is selected, return clean initial data (no custom image)
-          if (['default', 'confetti', 'balloons'].includes(designerThemeId || '')) {
-            return {
-              title: '',
-              message: birthdaySettings?.customMessage || '',
-              signature: '',
-              imageUrl: null, // Let CardDesignerDialog load the default theme image
-              customImage: false, // This is key - tells the dialog it's NOT a custom image
-              imagePosition: { x: 0, y: 0 },
-              imageScale: 1,
-            };
-          }
-          
-          // Fallback for any other case
-          return { 
+          // Default data if no theme-specific customizations found
+          return {
+            title: '',
             message: birthdaySettings?.customMessage || '',
-            customImage: false // Ensure we don't accidentally load custom images for default themes
+            signature: '',
+            imageUrl: null, // Let CardDesignerDialog load the default theme image
+            customImage: false, // This is key - tells the dialog it's NOT a custom image
+            imagePosition: { x: 0, y: 0 },
+            imageScale: 1,
           };
         })()}
         onSave={(data) => {
@@ -979,8 +987,43 @@ export default function BirthdaysPage() {
             [designerThemeId || 'default']: themeData
           }));
           
-          // Save button should preserve current theme selection and only save the message
-          // Don't automatically switch to custom theme unless explicitly working with custom theme
+          // Parse existing customThemeData or create new structure
+          let existingThemeData: Record<string, any> = {};
+          if (birthdaySettings?.customThemeData) {
+            try {
+              const parsed = JSON.parse(birthdaySettings.customThemeData);
+              // Check if it's the new structure (has themes property) or old structure
+              if (parsed.themes) {
+                existingThemeData = parsed;
+              } else {
+                // Migrate old structure to new structure
+                existingThemeData = {
+                  themes: {
+                    custom: parsed // Assume old data was for custom theme
+                  }
+                };
+              }
+            } catch {
+              existingThemeData = { themes: {} };
+            }
+          } else {
+            existingThemeData = { themes: {} };
+          }
+          
+          // Update the specific theme's data
+          const currentThemeId = designerThemeId || 'default';
+          const updatedThemeData = {
+            ...existingThemeData,
+            themes: {
+              ...existingThemeData.themes,
+              [currentThemeId]: themeData
+            }
+          };
+          
+          // Check if user has made any text customizations (title or signature)
+          const hasTextCustomizations = data.title !== '' || data.signature !== '';
+          
+          // Save button should preserve current theme selection and only save theme-specific data
           if (designerThemeId === 'custom') {
             console.log('🎨 [Birthday Cards] Saving custom theme data');
             
@@ -992,11 +1035,20 @@ export default function BirthdaysPage() {
               ...birthdaySettings,
               emailTemplate: 'custom',
               customMessage: data.message,
-              customThemeData: JSON.stringify(themeData),
+              customThemeData: JSON.stringify(updatedThemeData),
+            });
+          } else if (hasTextCustomizations || data.message !== (birthdaySettings?.customMessage || '')) {
+            // For default themes with any customizations, save the theme-specific data
+            console.log('🎨 [Birthday Cards] Saving theme-specific customizations for', currentThemeId);
+            const currentTemplate = birthdaySettings?.emailTemplate || 'default';
+            updateSettingsMutation.mutate({
+              ...birthdaySettings,
+              emailTemplate: currentTemplate, // Preserve current theme selection
+              customMessage: data.message,
+              customThemeData: JSON.stringify(updatedThemeData), // Save theme-specific data
             });
           } else {
-            // For default themes (default, confetti, balloons), just save the message
-            // and preserve the current theme selection
+            // For default themes with no customizations, just save the message
             const currentTemplate = birthdaySettings?.emailTemplate || 'default';
             updateSettingsMutation.mutate({
               ...birthdaySettings,
@@ -1009,10 +1061,11 @@ export default function BirthdaysPage() {
           // Handle making the card active - this will set it as the current email template
           const isDefaultTheme = ['default', 'confetti', 'balloons'].includes(themeId || '');
           
-          // Check if this is truly a custom theme (user uploaded custom image or made significant visual changes)
-          const hasSignificantCustomizations = (data as any).customImage === true || 
-                                              data.title !== '' || 
-                                              data.signature !== '';
+          // Check if user has uploaded custom image (makes it truly custom)
+          const hasCustomImage = (data as any).customImage === true;
+          
+          // Check if user has made text customizations (title or signature)
+          const hasTextCustomizations = data.title !== '' || data.signature !== '';
           
           // Create theme data for preview updates
           const themeData: CustomThemeData = {
@@ -1031,19 +1084,62 @@ export default function BirthdaysPage() {
             [themeId || 'default']: themeData
           }));
           
-          if (themeId === 'custom' || (isDefaultTheme && hasSignificantCustomizations)) {
-            // Only save as custom if it's explicitly a custom theme or has significant customizations
+          // Parse existing customThemeData or create new structure
+          let existingThemeData: Record<string, any> = {};
+          if (birthdaySettings?.customThemeData) {
+            try {
+              const parsed = JSON.parse(birthdaySettings.customThemeData);
+              // Check if it's the new structure (has themes property) or old structure
+              if (parsed.themes) {
+                existingThemeData = parsed;
+              } else {
+                // Migrate old structure to new structure
+                existingThemeData = {
+                  themes: {
+                    custom: parsed // Assume old data was for custom theme
+                  }
+                };
+              }
+            } catch {
+              existingThemeData = { themes: {} };
+            }
+          } else {
+            existingThemeData = { themes: {} };
+          }
+          
+          // Update the specific theme's data
+          const currentThemeId = themeId || 'default';
+          const updatedThemeData = {
+            ...existingThemeData,
+            themes: {
+              ...existingThemeData.themes,
+              [currentThemeId]: themeData
+            }
+          };
+          
+          if (themeId === 'custom' || (isDefaultTheme && hasCustomImage)) {
+            // Save as custom theme if explicitly custom or if default theme with custom image
+            console.log('🎨 [Birthday Cards] Making custom theme active');
             setCustomThemePreview(themeData);
             
             updateSettingsMutation.mutate({
               ...birthdaySettings,
               emailTemplate: 'custom',
               customMessage: data.message,
-              customThemeData: JSON.stringify(themeData),
+              customThemeData: JSON.stringify(updatedThemeData),
+            });
+          } else if (isDefaultTheme && (hasTextCustomizations || data.message !== (birthdaySettings?.customMessage || ''))) {
+            // For default themes with customizations, save theme-specific data but keep original theme template
+            console.log('🎨 [Birthday Cards] Making default theme with customizations active:', currentThemeId);
+            updateSettingsMutation.mutate({
+              ...birthdaySettings,
+              emailTemplate: themeId || 'default', // Keep the default theme selection
+              customMessage: data.message,
+              customThemeData: JSON.stringify(updatedThemeData), // Save theme-specific data
             });
           } else {
-            // For default themes, just set the template to the selected theme
-            // This preserves the theme selection (default, confetti, balloons) while saving the message
+            // For default themes with no customizations, just set the template
+            console.log('🎨 [Birthday Cards] Making default theme active');
             updateSettingsMutation.mutate({
               ...birthdaySettings,
               emailTemplate: themeId || 'default',
@@ -1146,30 +1242,7 @@ export default function BirthdaysPage() {
                   </div>
                 </div>
 
-                <Separator />
 
-                {/* Segment Filter */}
-                <div className="space-y-4">
-                  <Label className="text-base font-medium">Customer Segmentation</Label>
-                  <div>
-                    <Label className="text-sm">Default Segment Filter</Label>
-                    <Select
-                      value={birthdaySettings?.segmentFilter || 'all'}
-                      onValueChange={(value) => handleSettingsUpdate('segmentFilter', value)}
-                      disabled={updateSettingsMutation.isPending}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Customers</SelectItem>
-                        <SelectItem value="active">Active Customers Only</SelectItem>
-                        <SelectItem value="premium">Premium Customers</SelectItem>
-                        <SelectItem value="custom">Custom Segment</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           </div>
