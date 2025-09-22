@@ -133,6 +133,9 @@ export default function BirthdaysPage() {
   
   // State for real-time custom theme preview
   const [customThemePreview, setCustomThemePreview] = useState<CustomThemeData | null>(null);
+  
+  // State for real-time preview of all themes (including default themes with customizations)
+  const [themePreviewData, setThemePreviewData] = useState<{[key: string]: CustomThemeData}>({});
 
   // Handler to navigate to add customer page
   const handleAddCustomer = () => {
@@ -516,26 +519,29 @@ export default function BirthdaysPage() {
     imagePosition?: { x: number; y: number };
     imageScale?: number;
   }) => {
-    // Update real-time preview as user makes changes (optional enhancement)
+    // Update real-time preview as user makes changes
     try {
-      if (!previewData) return;
+      if (!previewData || !designerThemeId) return;
       
-      if (designerThemeId === 'custom' || ['default', 'confetti', 'balloons'].includes(designerThemeId || '')) {
-        const hasCustomizations = (previewData.title && previewData.title !== '') || 
-                                 (previewData.signature && previewData.signature !== '') || 
-                                 previewData.customImage === true;
-        
-        if (hasCustomizations) {
-          setCustomThemePreview({
-            title: previewData.title || '',
-            message: previewData.message || '',
-            signature: previewData.signature || '',
-            imageUrl: previewData.imageUrl || null,
-            customImage: previewData.customImage || false,
-            imagePosition: previewData.imagePosition || { x: 0, y: 0 },
-            imageScale: previewData.imageScale || 1,
-          });
-        }
+      const previewThemeData: CustomThemeData = {
+        title: previewData.title || '',
+        message: previewData.message || '',
+        signature: previewData.signature || '',
+        imageUrl: previewData.imageUrl || null,
+        customImage: previewData.customImage || false,
+        imagePosition: previewData.imagePosition || { x: 0, y: 0 },
+        imageScale: previewData.imageScale || 1,
+      };
+      
+      // Update preview data for the current theme being edited
+      setThemePreviewData(prev => ({
+        ...prev,
+        [designerThemeId]: previewThemeData
+      }));
+      
+      // Also update customThemePreview for backward compatibility
+      if (designerThemeId === 'custom') {
+        setCustomThemePreview(previewThemeData);
       }
     } catch (error) {
       console.warn('Error in onPreviewChange:', error);
@@ -778,6 +784,10 @@ export default function BirthdaysPage() {
                           localStorage.removeItem('birthdayCardDesignerDraft');
                         } catch {}
                         
+                        // Don't clear preview data - preserve it so users can see their changes
+                        // Only clear if we're switching from one theme to another different theme
+                        // This preserves the preview state when reopening the same theme
+                        
                         setDesignerOpen(true);
                       }}
                       disabled={updateSettingsMutation.isPending}
@@ -827,7 +837,7 @@ export default function BirthdaysPage() {
                         {/* Custom theme */}
                         {tpl.id === 'custom' && (() => {
                           // Use real-time preview state for immediate updates
-                          const customData = customThemePreview;
+                          const customData = themePreviewData['custom'] || customThemePreview;
                           
                           if (customData?.imageUrl) {
                             return (
@@ -853,10 +863,20 @@ export default function BirthdaysPage() {
                         <div className="absolute inset-0 flex items-center justify-center">
                           <div className="text-center">
                             <div className="font-bold text-white drop-shadow-lg text-shadow">
-                              {tpl.id === 'custom' && customThemePreview ? 
-                                (customThemePreview.title || 'Happy Birthday!')
-                                : 'Happy Birthday!'
-                              }
+                              {(() => {
+                                // Get preview data for the current theme
+                                const previewData = themePreviewData[tpl.id];
+                                
+                                if (tpl.id === 'custom') {
+                                  const customData = previewData || customThemePreview;
+                                  return customData?.title || 'Happy Birthday!';
+                                } else if (previewData?.title) {
+                                  // Show custom title for default themes if set
+                                  return previewData.title;
+                                } else {
+                                  return 'Happy Birthday!';
+                                }
+                              })()}
                             </div>
                             <div className="text-xs text-white/90 drop-shadow">{tpl.name} preview</div>
                           </div>
@@ -882,7 +902,14 @@ export default function BirthdaysPage() {
         open={designerOpen}
         onOpenChange={(open) => {
           setDesignerOpen(open);
-          // When closing, keep the text in localStorage already handled inside dialog
+          // When closing, preserve preview data so users can see their changes
+          // Only clear preview data if the user explicitly cancels without saving
+          // The preview data will be useful for showing real-time updates
+          if (!open && designerThemeId) {
+            // We'll keep the preview data to maintain the visual state
+            // This allows users to see their changes even after closing the designer
+            console.log('🎨 [Birthday Cards] Designer closed, preserving preview data for theme:', designerThemeId);
+          }
         }}
         initialThemeId={designerThemeId || undefined}
         onPreviewChange={handlePreviewChange}
@@ -935,31 +962,37 @@ export default function BirthdaysPage() {
             localStorage.setItem('birthdayCardDesignerDraft', JSON.stringify({ title: data.title, message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId, customImage: (data as any).customImage }));
           } catch {}
           
+          // Create theme data for preview updates
+          const themeData: CustomThemeData = {
+            title: data.title,
+            message: data.message,
+            signature: data.signature || '',
+            imageUrl: data.imageUrl || null,
+            customImage: (data as any).customImage || false,
+            imagePosition: (data as any).imagePosition || { x: 0, y: 0 },
+            imageScale: (data as any).imageScale || 1,
+          };
+          
+          // Update preview state immediately for instant visual feedback
+          setThemePreviewData(prev => ({
+            ...prev,
+            [designerThemeId || 'default']: themeData
+          }));
+          
           // Save button should preserve current theme selection and only save the message
           // Don't automatically switch to custom theme unless explicitly working with custom theme
           if (designerThemeId === 'custom') {
             console.log('🎨 [Birthday Cards] Saving custom theme data');
             
-            // Only when explicitly working with custom theme, save as custom
-            const customThemeData: CustomThemeData = {
-              title: data.title,
-              message: data.message,
-              signature: data.signature || '',
-              imageUrl: data.imageUrl || null,
-              customImage: (data as any).customImage || false,
-              imagePosition: (data as any).imagePosition || { x: 0, y: 0 },
-              imageScale: (data as any).imageScale || 1,
-            };
-            
             // Update real-time preview immediately for instant visual feedback
-            setCustomThemePreview(customThemeData);
+            setCustomThemePreview(themeData);
             
             // Update both the custom theme data and keep the email template as custom
             updateSettingsMutation.mutate({
               ...birthdaySettings,
               emailTemplate: 'custom',
               customMessage: data.message,
-              customThemeData: JSON.stringify(customThemeData),
+              customThemeData: JSON.stringify(themeData),
             });
           } else {
             // For default themes (default, confetti, balloons), just save the message
@@ -981,23 +1014,32 @@ export default function BirthdaysPage() {
                                               data.title !== '' || 
                                               data.signature !== '';
           
+          // Create theme data for preview updates
+          const themeData: CustomThemeData = {
+            title: data.title,
+            message: data.message,
+            signature: data.signature || '',
+            imageUrl: data.imageUrl || null,
+            customImage: (data as any).customImage || false,
+            imagePosition: (data as any).imagePosition || { x: 0, y: 0 },
+            imageScale: (data as any).imageScale || 1,
+          };
+          
+          // Update preview state immediately
+          setThemePreviewData(prev => ({
+            ...prev,
+            [themeId || 'default']: themeData
+          }));
+          
           if (themeId === 'custom' || (isDefaultTheme && hasSignificantCustomizations)) {
             // Only save as custom if it's explicitly a custom theme or has significant customizations
-            const customThemeData: CustomThemeData = {
-              title: data.title,
-              message: data.message,
-              signature: data.signature || '',
-              imageUrl: data.imageUrl || null,
-              customImage: (data as any).customImage || false,
-              imagePosition: (data as any).imagePosition || { x: 0, y: 0 },
-              imageScale: (data as any).imageScale || 1,
-            };
+            setCustomThemePreview(themeData);
             
             updateSettingsMutation.mutate({
               ...birthdaySettings,
               emailTemplate: 'custom',
               customMessage: data.message,
-              customThemeData: JSON.stringify(customThemeData),
+              customThemeData: JSON.stringify(themeData),
             });
           } else {
             // For default themes, just set the template to the selected theme
@@ -1534,11 +1576,6 @@ export default function BirthdaysPage() {
                         </TableCell>
                         <TableCell>
                           <span className="text-sm">{user.email}</span>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs">
-                            {user.role}
-                          </Badge>
                         </TableCell>
                         <TableCell>
                           {user.emailVerified ? (
