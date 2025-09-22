@@ -935,19 +935,12 @@ export default function BirthdaysPage() {
             localStorage.setItem('birthdayCardDesignerDraft', JSON.stringify({ title: data.title, message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId, customImage: (data as any).customImage }));
           } catch {}
           
-          // Check if user made modifications to a default theme
-          const isDefaultTheme = ['default', 'confetti', 'balloons'].includes(designerThemeId || '');
-          const hasCustomizations = data.title !== '' || 
-                                   data.signature !== '' || 
-                                   (data as any).customImage === true;
-          
-          // If user modified a default theme OR is working with custom theme, save as custom
-          const shouldSaveAsCustom = isDefaultTheme && hasCustomizations || designerThemeId === 'custom';
-          
-          if (shouldSaveAsCustom) {
-            console.log('🎨 [Birthday Cards] Saving modifications as custom theme');
+          // Save button should preserve current theme selection and only save the message
+          // Don't automatically switch to custom theme unless explicitly working with custom theme
+          if (designerThemeId === 'custom') {
+            console.log('🎨 [Birthday Cards] Saving custom theme data');
             
-            // When user modifies any theme, save it as custom theme and switch to custom
+            // Only when explicitly working with custom theme, save as custom
             const customThemeData: CustomThemeData = {
               title: data.title,
               message: data.message,
@@ -961,7 +954,7 @@ export default function BirthdaysPage() {
             // Update real-time preview immediately for instant visual feedback
             setCustomThemePreview(customThemeData);
             
-            // Update both the custom theme data and switch the email template to custom
+            // Update both the custom theme data and keep the email template as custom
             updateSettingsMutation.mutate({
               ...birthdaySettings,
               emailTemplate: 'custom',
@@ -969,23 +962,26 @@ export default function BirthdaysPage() {
               customThemeData: JSON.stringify(customThemeData),
             });
           } else {
-            // Just save the message for default themes without customizations
+            // For default themes (default, confetti, balloons), just save the message
+            // and preserve the current theme selection
+            const currentTemplate = birthdaySettings?.emailTemplate || 'default';
             updateSettingsMutation.mutate({
               ...birthdaySettings,
+              emailTemplate: currentTemplate, // Preserve current theme selection
               customMessage: data.message,
             });
           }
         }}
-        onMakeActive={(data) => {
+        onMakeActive={(themeId, data) => {
           // Handle making the card active - this will set it as the current email template
-          const isDefaultTheme = ['default', 'confetti', 'balloons'].includes(designerThemeId || '');
+          const isDefaultTheme = ['default', 'confetti', 'balloons'].includes(themeId || '');
           
           // Check if this is truly a custom theme (user uploaded custom image or made significant visual changes)
           const hasSignificantCustomizations = (data as any).customImage === true || 
                                               data.title !== '' || 
                                               data.signature !== '';
           
-          if (designerThemeId === 'custom' || (isDefaultTheme && hasSignificantCustomizations)) {
+          if (themeId === 'custom' || (isDefaultTheme && hasSignificantCustomizations)) {
             // Only save as custom if it's explicitly a custom theme or has significant customizations
             const customThemeData: CustomThemeData = {
               title: data.title,
@@ -1008,7 +1004,7 @@ export default function BirthdaysPage() {
             // This preserves the theme selection (default, confetti, balloons) while saving the message
             updateSettingsMutation.mutate({
               ...birthdaySettings,
-              emailTemplate: designerThemeId || 'default',
+              emailTemplate: themeId || 'default',
               customMessage: data.message,
             });
           }
@@ -1016,7 +1012,18 @@ export default function BirthdaysPage() {
           // Close the designer after making active
           setDesignerOpen(false);
         }}
-        isCurrentlyActive={birthdaySettings?.emailTemplate === (designerThemeId || 'default')}
+        isCurrentlyActive={(() => {
+          const currentTemplate = birthdaySettings?.emailTemplate || 'default';
+          const selectedTheme = designerThemeId || 'default';
+          
+          // For custom theme, check if current template is 'custom' and we're viewing custom
+          if (selectedTheme === 'custom') {
+            return currentTemplate === 'custom';
+          }
+          
+          // For default themes, check exact match
+          return currentTemplate === selectedTheme;
+        })()}
       />
 
       {/* Settings Tab */}
