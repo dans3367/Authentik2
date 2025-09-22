@@ -677,7 +677,13 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
       tenantId,
       tenantName,
       fromEmail,
-      isTest
+      isTest,
+      // Extract template data from frontend
+      emailTemplate,
+      customMessage,
+      customThemeData,
+      senderName,
+      senderEmail
     } = req.body;
 
     // Validate required fields
@@ -714,9 +720,11 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
       ? `${userFirstName}${userLastName ? ` ${userLastName}` : ''}` 
       : 'Team Member';
 
-    const selectedTemplate = (birthdaySettingsData?.emailTemplate as BirthdayTemplateId) || 'default';
-    const customMessage = birthdaySettingsData?.customMessage || 'This is a test birthday card to show how our birthday email system works. In a real scenario, this would be sent to customers on their special day. Hope your day is as wonderful as you are!';
-    const customThemeData = birthdaySettingsData?.customThemeData ? JSON.parse(birthdaySettingsData.customThemeData) : null;
+    // Use frontend-provided template data if available, otherwise fall back to database values
+    const selectedTemplate = (emailTemplate as BirthdayTemplateId) || (birthdaySettingsData?.emailTemplate as BirthdayTemplateId) || 'default';
+    const finalCustomMessage = customMessage || birthdaySettingsData?.customMessage || 'This is a test birthday card to show how our birthday email system works. In a real scenario, this would be sent to customers on their special day. Hope your day is as wonderful as you are!';
+    const finalCustomThemeData = customThemeData || (birthdaySettingsData?.customThemeData ? JSON.parse(birthdaySettingsData.customThemeData) : null);
+    const finalSenderName = senderName || birthdaySettingsData?.senderName || 'Your Team';
 
     console.log(`🎨 Using template: ${selectedTemplate}${selectedTemplate === 'custom' ? ' with custom theme data' : ''}`);
 
@@ -750,11 +758,12 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
             isTest: true,
             birthdayTemplate: selectedTemplate,
             recipientName: userName,
-            message: customMessage,
+            message: finalCustomMessage,
             brandName: tenantName || 'Your Company',
-            customThemeData: selectedTemplate === 'custom' ? customThemeData : null,
+            customThemeData: selectedTemplate === 'custom' ? finalCustomThemeData : null,
+            senderName: finalSenderName,
             templateUsed: selectedTemplate,
-            hasCustomTheme: selectedTemplate === 'custom' && customThemeData !== null
+            hasCustomTheme: selectedTemplate === 'custom' && finalCustomThemeData !== null
           }
         };
 
@@ -773,7 +782,7 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
           recipient: testRecipient,
           method: 'temporal-workflow',
           templateUsed: selectedTemplate,
-          hasCustomTheme: selectedTemplate === 'custom' && customThemeData !== null,
+          hasCustomTheme: selectedTemplate === 'custom' && finalCustomThemeData !== null,
           message: `Test birthday card workflow started using ${selectedTemplate} template`
         });
         return; // Exit early since we successfully used temporal
@@ -790,10 +799,10 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
     try {
       const htmlContent = renderBirthdayTemplate(selectedTemplate, {
         recipientName: userName,
-        message: customMessage,
+        message: finalCustomMessage,
         brandName: tenantName || 'Your Company',
-        customThemeData: selectedTemplate === 'custom' ? customThemeData : null,
-        senderName: birthdaySettingsData?.senderName || 'Your Team'
+        customThemeData: selectedTemplate === 'custom' ? finalCustomThemeData : null,
+        senderName: finalSenderName
       });
 
       // Send via main server
@@ -815,7 +824,7 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
             tenantName,
             isTest: true,
             templateUsed: selectedTemplate,
-            hasCustomTheme: selectedTemplate === 'custom' && customThemeData !== null
+            hasCustomTheme: selectedTemplate === 'custom' && finalCustomThemeData !== null
           },
           tenantId,
           tenantName,
@@ -838,7 +847,7 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
         recipient: testRecipient,
         method: 'direct-fallback',
         templateUsed: selectedTemplate,
-        hasCustomTheme: selectedTemplate === 'custom' && customThemeData !== null,
+        hasCustomTheme: selectedTemplate === 'custom' && finalCustomThemeData !== null,
         message: `Test birthday card sent successfully using ${selectedTemplate} template`
       });
 

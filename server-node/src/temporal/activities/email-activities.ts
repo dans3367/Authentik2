@@ -75,7 +75,7 @@ ${cleanHtml}
       subject: subject.trim(),
       html: cleanHtml,
       text: text || cleanHtml.replace(/<[^>]*>/g, '').trim(), // Strip HTML for text version
-      tags: (tags || ['authentik']).map(tag => ({ name: 'category', value: tag })),
+      tags: (tags || ['authentik']).map((tag, index) => ({ name: `tag-${index}`, value: tag })),
     };
 
     // Log email data for debugging (without sensitive content)
