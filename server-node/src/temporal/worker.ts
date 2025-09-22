@@ -1,5 +1,6 @@
 import { Worker, NativeConnection } from '@temporalio/worker';
 import * as activities from './activities/example-activities';
+import * as emailActivities from './activities/email-activities';
 
 /**
  * Worker configuration and startup
@@ -9,16 +10,20 @@ export class TemporalWorker {
 
   async start(): Promise<void> {
     try {
-      const serverUrl = process.env.TEMPORAL_SERVER_URL || '100.125.36.104:7233';
+      const serverUrl = process.env.TEMPORAL_ADDRESS || process.env.TEMPORAL_SERVER_URL || 'localhost:7233';
       const taskQueue = process.env.TEMPORAL_TASK_QUEUE || 'authentik-tasks';
       const namespace = process.env.TEMPORAL_NAMESPACE || 'default';
 
       console.log(`Starting Temporal worker for task queue: ${taskQueue}`);
+      console.log(`Connecting to Temporal server at: ${serverUrl}`);
+      console.log(`Using namespace: ${namespace}`);
 
       // Create native connection
       const connection = await NativeConnection.connect({
         address: serverUrl,
       });
+
+      console.log('✅ Connected to Temporal server successfully');
 
       // Create and configure worker
       this.worker = await Worker.create({
@@ -28,6 +33,7 @@ export class TemporalWorker {
         workflowsPath: require.resolve('./workflows'),
         activities: {
           ...activities,
+          ...emailActivities,
           ...require('./activities/newsletter-activities')
         },
         // Worker options

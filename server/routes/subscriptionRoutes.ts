@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { sql } from 'drizzle-orm';
-import { betterAuthUser, subscriptionPlans, forms, formResponses, companies, subscriptions, subscriptionPlanRelations } from '@shared/schema';
+import { sql, eq } from 'drizzle-orm';
+import { betterAuthUser, subscriptionPlans, forms, formResponses, companies, subscriptions, subscriptionPlanRelations, tenants } from '@shared/schema';
 import { authenticateToken, requireRole } from '../middleware/auth-middleware';
 import Stripe from 'stripe';
 
@@ -127,19 +127,25 @@ subscriptionRoutes.get("/my-subscription", async (req: any, res) => {
   try {
     console.log('🔍 [Subscription] Route handler entered - testing without auth');
     console.log('🔍 [Subscription] db object keys:', Object.keys(db));
-    console.log('🔍 [Subscription] db.companies exists:', !!db.companies);
+    console.log('🔍 [Subscription] db.query exists:', !!db.query);
+    if (db.query) {
+      console.log('🔍 [Subscription] db.query keys:', Object.keys(db.query));
+      console.log('🔍 [Subscription] db.query.companies exists:', !!db.query.companies);
+    }
 
     // For testing: use a hardcoded tenantId to bypass authentication issues
     const testTenantId = '29c69b4f-3129-4aa4-a475-7bf892e5c5b9'; // Default tenant
 
     console.log('✅ [Subscription] Using test tenantId:', testTenantId);
 
+    console.log('🔍 [Subscription] About to query database...');
+
     // Get company info (companies table has tenantId field)
     const company = await db.query.companies.findFirst({
       where: sql`${db.companies.tenantId} = ${testTenantId}`,
     });
 
-    console.log('🔍 [Subscription] Company query result:', !!company, company?.name);
+    console.log('🔍 [Subscription] Company query completed, result:', !!company, company?.name);
 
     if (!company) {
       console.log('❌ [Subscription] No company found for tenantId:', testTenantId);
@@ -225,6 +231,11 @@ subscriptionRoutes.post("/create-checkout-session", authenticateToken, requireRo
       return res.status(400).json({ message: 'Plan ID, success URL, and cancel URL are required' });
     }
 
+    // Validate authentication
+    if (!req.user || !req.user.tenantId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
     // Get plan details
     const plan = await db.query.subscriptionPlans.findFirst({
       where: sql`${subscriptionPlans.id} = ${planId}`,
@@ -236,7 +247,7 @@ subscriptionRoutes.post("/create-checkout-session", authenticateToken, requireRo
 
     // Get company
     const company = await db.query.companies.findFirst({
-      where: sql`${db.companies.id} = ${req.user.tenantId}`,
+      where: sql`${db.companies.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!company) {
@@ -296,9 +307,14 @@ subscriptionRoutes.post("/create-portal-session", authenticateToken, requireRole
       return res.status(500).json({ message: 'Stripe is not configured' });
     }
 
+    // Validate authentication
+    if (!req.user || !req.user.tenantId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
     // Get company
     const company = await db.query.companies.findFirst({
-      where: sql`${db.companies.id} = ${req.user.tenantId}`,
+      where: sql`${db.companies.tenantId} = ${req.user.tenantId}`,
       with: {
         subscription: true,
       },
@@ -332,9 +348,14 @@ subscriptionRoutes.post("/cancel", authenticateToken, requireRole(["Owner"]), as
       return res.status(500).json({ message: 'Stripe is not configured' });
     }
 
+    // Validate authentication
+    if (!req.user || !req.user.tenantId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
     // Get company subscription
     const company = await db.query.companies.findFirst({
-      where: sql`${db.companies.id} = ${req.user.tenantId}`,
+      where: sql`${db.companies.tenantId} = ${req.user.tenantId}`,
       with: {
         subscription: true,
       },
@@ -377,9 +398,14 @@ subscriptionRoutes.post("/reactivate", authenticateToken, requireRole(["Owner"])
       return res.status(500).json({ message: 'Stripe is not configured' });
     }
 
+    // Validate authentication
+    if (!req.user || !req.user.tenantId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
     // Get company subscription
     const company = await db.query.companies.findFirst({
-      where: sql`${db.companies.id} = ${req.user.tenantId}`,
+      where: sql`${db.companies.tenantId} = ${req.user.tenantId}`,
       with: {
         subscription: true,
       },
@@ -418,8 +444,13 @@ subscriptionRoutes.post("/reactivate", authenticateToken, requireRole(["Owner"])
 // Get subscription usage
 subscriptionRoutes.get("/usage", authenticateToken, requireRole(["Owner"]), async (req: any, res) => {
   try {
+    // Validate authentication
+    if (!req.user || !req.user.tenantId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
     const company = await db.query.companies.findFirst({
-      where: sql`${db.companies.id} = ${req.user.tenantId}`,
+      where: sql`${db.companies.tenantId} = ${req.user.tenantId}`,
       with: {
         subscription: true,
       },

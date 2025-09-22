@@ -337,7 +337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         users: "/api/users/*",
         twoFactor: "/api/2fa/*",
       },
-      documentation: "https://docs.zendwise.com/api",
+      documentation: "https://docs.zendwise.work/api",
     });
   });
 

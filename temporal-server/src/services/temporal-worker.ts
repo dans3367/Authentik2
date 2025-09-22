@@ -3,7 +3,7 @@ import { Worker, Runtime, DefaultLogger, LogEntry, NativeConnection } from '@tem
 import * as activities from '../activities';
 import * as workflows from '../workflows';
 import { workerLogger } from '../logger';
-import { initializeActivityConfigFromEnv } from '../activity-config';
+import { ActivityConfig, setActivityConfig } from '../activity-config';
 
 export class TemporalWorkerService {
   private client: Client | null = null;
@@ -14,21 +14,19 @@ export class TemporalWorkerService {
   constructor(
     private temporalAddress: string,
     private namespace: string,
-    private taskQueue: string = 'authentik-tasks'
+    private taskQueue: string = 'authentik-tasks',
+    private activityConfig?: ActivityConfig
   ) {}
 
   async initialize(): Promise<void> {
     try {
-      // Initialize activity configuration from environment variables
-      // This must be done before creating the worker since activities need config
-      const config = initializeActivityConfigFromEnv();
-      workerLogger.info(`🔧 Initialized activity configuration:`, {
-        backendUrl: config.backendUrl,
-        primaryEmailProvider: config.primaryEmailProvider,
-        fromEmail: config.fromEmail,
-        hasResendKey: config.resendApiKey ? 'yes' : 'no',
-        hasPostmarkToken: config.postmarkApiToken ? 'yes' : 'no'
-      });
+      // Set activity configuration if provided
+      if (this.activityConfig) {
+        setActivityConfig(this.activityConfig);
+        workerLogger.info(`🔧 Initialized activity configuration: Provider=${this.activityConfig.primaryEmailProvider}, Backend=${this.activityConfig.backendUrl}`);
+      } else {
+        workerLogger.warn('⚠️ No activity configuration provided');
+      }
       
       // Install Temporal Runtime once; ignore if already installed
       try {
@@ -74,7 +72,7 @@ export class TemporalWorkerService {
         `🧩 Workflows loaded: ${Object.keys(workflows).join(', ') || 'none'} | Activities loaded: ${Object.keys(activities).join(', ') || 'none'}`
       );
     } catch (error) {
-      workerLogger.error('❌ Failed to initialize Temporal:', error);
+      workerLogger.error(`❌ Failed to initialize Temporal: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
     }
   }
@@ -87,12 +85,12 @@ export class TemporalWorkerService {
     try {
       // Start the worker without awaiting (it runs indefinitely)
       this.worker.run().catch((error) => {
-        workerLogger.error('❌ Temporal Worker error:', error);
+        workerLogger.error(`❌ Temporal Worker error: ${error instanceof Error ? error.message : String(error)}`);
         process.exit(1);
       });
       workerLogger.info('✅ Temporal Worker is running and polling for tasks');
     } catch (error) {
-      workerLogger.error('❌ Failed to start Temporal Worker:', error);
+      workerLogger.error(`❌ Failed to start Temporal Worker: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
     }
   }
@@ -117,7 +115,7 @@ export class TemporalWorkerService {
       this.client = null;
       workerLogger.info('✅ Temporal services shut down');
     } catch (error) {
-      workerLogger.error('❌ Error during Temporal shutdown:', error);
+      workerLogger.error(`❌ Error during Temporal shutdown: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
     }
   }
@@ -140,7 +138,7 @@ export class TemporalWorkerService {
 
       return handle;
     } catch (error) {
-      workerLogger.error(`❌ Failed to start workflow ${workflowType}:`, error);
+      workerLogger.error(`❌ Failed to start workflow ${workflowType}: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
     }
   }
@@ -158,7 +156,7 @@ export class TemporalWorkerService {
       const handle = await this.getWorkflowHandle(workflowId);
       return await handle.result();
     } catch (error) {
-      workerLogger.error(`❌ Failed to get workflow result for ${workflowId}:`, error);
+      workerLogger.error(`❌ Failed to get workflow result for ${workflowId}: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
     }
   }
@@ -168,7 +166,7 @@ export class TemporalWorkerService {
       const handle = await this.getWorkflowHandle(workflowId);
       await handle.signal(signalName, payload);
     } catch (error) {
-      workerLogger.error(`❌ Failed to signal workflow ${workflowId}:`, error);
+      workerLogger.error(`❌ Failed to signal workflow ${workflowId}: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
     }
   }
@@ -178,7 +176,7 @@ export class TemporalWorkerService {
       const handle = await this.getWorkflowHandle(workflowId);
       await handle.cancel();
     } catch (error) {
-      workerLogger.error(`❌ Failed to cancel workflow ${workflowId}:`, error);
+      workerLogger.error(`❌ Failed to cancel workflow ${workflowId}: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
     }
   }

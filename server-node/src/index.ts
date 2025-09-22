@@ -5,12 +5,117 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import { sql, eq } from 'drizzle-orm';
+import { pgTable, varchar, boolean, integer, text, timestamp } from 'drizzle-orm/pg-core';
+
+// Define birthday settings table schema
+const birthdaySettings = pgTable("birthday_settings", {
+  id: varchar("id").primaryKey(),
+  tenantId: varchar("tenant_id").notNull(),
+  enabled: boolean("enabled").default(false),
+  sendDaysBefore: integer("send_days_before").default(0),
+  emailTemplate: text("email_template").default('default'),
+  segmentFilter: text("segment_filter").default('all'),
+  customMessage: text("custom_message").default(''),
+  customThemeData: text("custom_theme_data"),
+  senderName: text("sender_name").default(''),
+  senderEmail: text("sender_email").default(''),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
 import { TemporalService } from './temporal/temporal-service';
 import { authenticateRequest, type AuthenticatedRequest } from './middleware/auth';
 import './lib/auth'; // Ensure auth types are available
 
 // Load environment variables from parent directory
 dotenv.config({ path: '../.env' });
+
+// Initialize database connection
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL must be set. Did you forget to provision a database?");
+}
+
+const pool = postgres(process.env.DATABASE_URL!, {
+  ssl: process.env.DATABASE_URL!.includes('sslmode=require') ? 'require' : false,
+});
+const db = drizzle(pool);
+
+// Birthday template types and renderer
+type BirthdayTemplateId = 'default' | 'confetti' | 'balloons' | 'custom';
+
+function renderBirthdayTemplate(
+  template: BirthdayTemplateId,
+  params: { recipientName?: string; message?: string; imageUrl?: string; brandName?: string; customThemeData?: any }
+): string {
+  // Handle custom theme with rich styling
+  if (template === 'custom' && params.customThemeData) {
+    const customData = typeof params.customThemeData === 'string' 
+      ? JSON.parse(params.customThemeData) 
+      : params.customThemeData;
+    
+    const title = customData.title || `Happy Birthday${params.recipientName ? ', ' + params.recipientName : ''}!`;
+    const message = customData.message || params.message || 'Wishing you a wonderful day!';
+    const signature = customData.signature || '';
+    
+    return `<html>
+      <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+        <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
+          ${customData.imageUrl ? `
+            <div style="position: relative; height: 200px; background-image: url('${customData.imageUrl}'); background-size: cover; background-position: center;">
+              <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.3);"></div>
+              <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;">
+                <h1 style="color: white; font-size: 2.5rem; margin: 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">${title}</h1>
+              </div>
+            </div>
+          ` : `
+            <div style="background: linear-gradient(135deg, #a8e6cf 0%, #dcedc1 100%); padding: 40px; text-align: center;">
+              <h1 style="color: #2d3748; font-size: 2.5rem; margin: 0;">${title}</h1>
+            </div>
+          `}
+          <div style="padding: 30px;">
+            <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; margin-bottom: 20px;">${message}</div>
+            ${signature ? `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-style: italic; color: #718096;">${signature}</div>` : ''}
+          </div>
+        </div>
+      </body>
+    </html>`;
+  }
+
+  // Default theme header images
+  const themeHeaders = {
+    default: 'https://images.unsplash.com/photo-1588195538326-c5b1e9f80a1b?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+    confetti: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', // Party/confetti themed
+    balloons: 'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D' // Balloons themed
+  };
+
+  const themeColors = {
+    default: { primary: '#667eea', secondary: '#764ba2' },
+    confetti: { primary: '#ff6b6b', secondary: '#feca57' },
+    balloons: { primary: '#54a0ff', secondary: '#5f27cd' }
+  };
+  
+  const headline = `Happy Birthday${params.recipientName ? ', ' + params.recipientName : ''}!`;
+  const headerImage = themeHeaders[template as keyof typeof themeHeaders] || themeHeaders.default;
+  const colors = themeColors[template as keyof typeof themeColors] || themeColors.default;
+  
+  return `<html>
+    <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%);">
+      <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
+        <div style="position: relative; height: 200px; background-image: url('${headerImage}'); background-size: cover; background-position: center;">
+          <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.3);"></div>
+          <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;">
+            <h1 style="color: white; font-size: 2.5rem; margin: 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); text-align: center;">${headline}</h1>
+          </div>
+        </div>
+        <div style="padding: 30px;">
+          <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center;">${params.message || 'Wishing you a wonderful day!'}</div>
+        </div>
+      </div>
+    </body>
+  </html>`;
+}
 
 const app = express();
 const PORT = 3502;
@@ -567,57 +672,102 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
 
     console.log(`🎂 Starting test birthday card workflow for user ${userId} (${userEmail})`);
 
-    // Generate test birthday card HTML
+    // Fetch birthday settings for the tenant to get selected template
+    let birthdaySettingsData;
+    try {
+      const settings = await db.select().from(birthdaySettings).where(eq(birthdaySettings.tenantId, tenantId)).limit(1);
+      birthdaySettingsData = settings.length > 0 ? settings[0] : null;
+    } catch (error) {
+      console.warn('Failed to fetch birthday settings, using defaults:', error);
+      birthdaySettingsData = null;
+    }
+
+    // Prepare template parameters
     const userName = userFirstName 
       ? `${userFirstName}${userLastName ? ` ${userLastName}` : ''}` 
       : 'Team Member';
 
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <title>Test Birthday Card</title>
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #e91e63; margin: 0;">🎉 Happy Birthday!</h1>
-        </div>
-        
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
-          <h2 style="color: white; margin: 0 0 15px 0; font-size: 24px;">Happy Birthday, ${userName}! 🎂</h2>
-          <p style="color: white; margin: 0; font-size: 18px;">Wishing you a day filled with joy and celebration!</p>
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 25px; border-radius: 8px; margin-bottom: 20px;">
-          <p style="margin: 0 0 15px 0; font-size: 16px;">Dear ${userName},</p>
-          
-          <p style="margin: 0 0 15px 0;">Today is your special day, and we wanted to take a moment to celebrate you! 🎈</p>
-          
-          <p style="margin: 0 0 15px 0;">This is a test birthday card to show how our birthday email system works. In a real scenario, this would be sent to customers on their special day.</p>
-          
-          <p style="margin: 0 0 20px 0;">Hope your day is as wonderful as you are!</p>
-          
-          <div style="text-align: center; margin: 20px 0;">
-            <span style="font-size: 48px;">🎂🎉🎈🎁</span>
-          </div>
-        </div>
-        
-        <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
-          <p style="margin: 0; font-size: 14px; color: #666;">
-            This is a test email from ${tenantName || 'Your Company'}<br>
-            Test Mode: Birthday Card System
-          </p>
-        </div>
-      </body>
-      </html>
-    `;
+    const selectedTemplate = (birthdaySettingsData?.emailTemplate as BirthdayTemplateId) || 'default';
+    const customMessage = birthdaySettingsData?.customMessage || 'This is a test birthday card to show how our birthday email system works. In a real scenario, this would be sent to customers on their special day. Hope your day is as wonderful as you are!';
+    const customThemeData = birthdaySettingsData?.customThemeData ? JSON.parse(birthdaySettingsData.customThemeData) : null;
 
+    console.log(`🎨 Using template: ${selectedTemplate}${selectedTemplate === 'custom' ? ' with custom theme data' : ''}`);
+
+    // Always send to beats@zendwise.work for test emails per memory
+    const testRecipient = 'beats@zendwise.work';
+    
+    console.log(`📧 Sending test birthday card to ${testRecipient} (original: ${userEmail})`);
+
+    // Try to use Temporal service if available, otherwise fallback to direct sending
+    if (temporalService && temporalService.isConnected()) {
+      try {
+        console.log('🚀 Routing birthday test through Temporal workflow...');
+        
+        // Generate unique workflow ID
+        const workflowId = `birthday-test-${userId}-${Date.now()}`;
+
+        // Prepare email workflow input for temporal with birthday template metadata
+        const emailWorkflowInput = {
+          emailId: workflowId,
+          recipient: testRecipient,
+          subject: `🎉 Happy Birthday ${userName}! (Test - ${selectedTemplate} template)`,
+          content: 'placeholder', // Will be replaced by template rendering in temporal
+          templateType: 'birthday-ecard',
+          priority: 'normal' as const,
+          tenantId,
+          userId,
+          fromEmail: fromEmail || 'beats@zendwise.work',
+          metadata: {
+            type: 'birthday-test',
+            originalRecipient: userEmail,
+            isTest: true,
+            birthdayTemplate: selectedTemplate,
+            recipientName: userName,
+            message: customMessage,
+            brandName: tenantName || 'Your Company',
+            customThemeData: selectedTemplate === 'custom' ? customThemeData : null,
+            templateUsed: selectedTemplate,
+            hasCustomTheme: selectedTemplate === 'custom' && customThemeData !== null
+          }
+        };
+
+        const handle = await temporalService.startWorkflow(
+          'emailWorkflow',
+          workflowId,
+          emailWorkflowInput
+        );
+
+        console.log(`✅ Birthday test workflow started via Temporal: ${workflowId}`);
+
+        res.json({
+          success: true,
+          workflowId,
+          workflowRunId: handle.workflowId,
+          testRecipient,
+          originalRecipient: userEmail,
+          method: 'temporal-workflow',
+          templateUsed: selectedTemplate,
+          hasCustomTheme: selectedTemplate === 'custom' && customThemeData !== null,
+          message: `Test birthday card workflow started using ${selectedTemplate} template`
+        });
+        return; // Exit early since we successfully used temporal
+
+      } catch (temporalError) {
+        console.error('❌ Temporal workflow failed for birthday test, falling back to direct sending:', temporalError);
+        // Fall through to direct sending
+      }
+    } else {
+      console.log('⚠️ Temporal service not available, using direct sending fallback');
+    }
+
+    // Fallback: Generate birthday card HTML and send directly
     try {
-      // Always send to beats@zendwise.com for test emails per memory
-      const testRecipient = 'beats@zendwise.com';
-      
-      console.log(`📧 Sending test birthday card to ${testRecipient} (original: ${userEmail})`);
+      const htmlContent = renderBirthdayTemplate(selectedTemplate, {
+        recipientName: userName,
+        message: customMessage,
+        brandName: tenantName || 'Your Company',
+        customThemeData: selectedTemplate === 'custom' ? customThemeData : null
+      });
 
       // Send via main server
       const response = await fetch('http://localhost:5000/api/email/send', {
@@ -628,7 +778,7 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
         },
         body: JSON.stringify({
           to: testRecipient,
-          subject: `🎉 Happy Birthday ${userName}! (Test)`,
+          subject: `🎉 Happy Birthday ${userName}! (Test - ${selectedTemplate} template)`,
           html: htmlContent,
           metadata: {
             type: 'birthday-test',
@@ -636,11 +786,13 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
             userId,
             tenantId,
             tenantName,
-            isTest: true
+            isTest: true,
+            templateUsed: selectedTemplate,
+            hasCustomTheme: selectedTemplate === 'custom' && customThemeData !== null
           },
           tenantId,
           tenantName,
-          fromEmail: fromEmail || 'beats@zendwise.com'
+          fromEmail: fromEmail || 'beats@zendwise.work'
         }),
       });
 
@@ -651,15 +803,17 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
 
       const result = await response.json();
 
-      console.log(`✅ Test birthday card sent successfully: ${result.messageId}`);
+      console.log(`✅ Test birthday card sent successfully (fallback): ${result.messageId} (using ${selectedTemplate} template)`);
 
       res.json({
         success: true,
         messageId: result.messageId,
         testRecipient,
         originalRecipient: userEmail,
-        method: 'direct-api-test',
-        message: 'Test birthday card sent successfully'
+        method: 'direct-fallback',
+        templateUsed: selectedTemplate,
+        hasCustomTheme: selectedTemplate === 'custom' && customThemeData !== null,
+        message: `Test birthday card sent successfully using ${selectedTemplate} template (fallback mode)`
       });
 
     } catch (error) {

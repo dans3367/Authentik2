@@ -125,6 +125,11 @@ cleanup() {
         kill $SERVER_NODE_PID 2>/dev/null
         wait $SERVER_NODE_PID 2>/dev/null
     fi
+    if [ ! -z "$WORKER_PID" ]; then
+        print_status "Stopping temporal worker (PID: $WORKER_PID)"
+        kill $WORKER_PID 2>/dev/null
+        wait $WORKER_PID 2>/dev/null
+    fi
     print_success "All services stopped"
     exit 0
 }
@@ -218,6 +223,23 @@ fi
 
 print_success "Server-node started (PID: $SERVER_NODE_PID)"
 
+# Start Temporal worker
+print_status "Starting Temporal worker for authentik-tasks queue..."
+npm run worker &
+WORKER_PID=$!
+
+# Give worker time to start
+sleep 3
+
+# Check if worker is running
+if ! kill -0 $WORKER_PID 2>/dev/null; then
+    print_error "Temporal worker failed to start"
+    cleanup
+    exit 1
+fi
+
+print_success "Temporal worker started (PID: $WORKER_PID)"
+
 # Print status
 echo ""
 print_success "🎉 Authentik Temporal Services are running!"
@@ -225,14 +247,16 @@ echo "=============================================="
 print_status "Server-node: http://localhost:$PORT"
 print_status "Temporal Server: localhost:$TEMPORAL_SERVER_PORT"
 print_status "Temporal Address: $TEMPORAL_ADDRESS"
+print_status "Worker Task Queue: $TEMPORAL_TASK_QUEUE"
 echo ""
 print_status "Server-node PID: $SERVER_NODE_PID"
 print_status "Temporal Server PID: $TEMPORAL_SERVER_PID"
+print_status "Temporal Worker PID: $WORKER_PID"
 echo ""
 print_warning "Press Ctrl+C to stop all services"
 echo ""
 
-# Monitor both processes
+# Monitor all processes
 while true; do
     # Check if temporal-server is still running
     if ! kill -0 $TEMPORAL_SERVER_PID 2>/dev/null; then
@@ -244,6 +268,13 @@ while true; do
     # Check if server-node is still running
     if ! kill -0 $SERVER_NODE_PID 2>/dev/null; then
         print_error "Server-node stopped unexpectedly"
+        cleanup
+        exit 1
+    fi
+
+    # Check if worker is still running
+    if ! kill -0 $WORKER_PID 2>/dev/null; then
+        print_error "Temporal worker stopped unexpectedly"
         cleanup
         exit 1
     fi

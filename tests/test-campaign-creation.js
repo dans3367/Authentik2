@@ -11,7 +11,7 @@ async function testCampaignCreation() {
     // Step 1: Login to get valid token
     console.log('1️⃣ Logging in...');
     const loginResponse = await axios.post(`${baseURL}/api/login`, {
-      email: 'beats@zendwise.com',
+      email: 'beats@zendwise.work',
       password: 'password'
     });
     

@@ -110,7 +110,7 @@ Check the webhook endpoint manually:
 curl -X POST http://localhost:3504/api/webhooks/resend \
   -H "Content-Type: application/json" \
   -H "resend-signature: test" \
-  -d '{"type":"email.opened","data":{"email":"dan@zendwise.com"}}'
+  -d '{"type":"email.opened","data":{"email":"dan@zendwise.work"}}'
 ```
 
 ### Check Database Directly
