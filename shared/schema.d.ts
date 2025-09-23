@@ -156,7 +156,7 @@ export declare const betterAuthUser: import("drizzle-orm/pg-core").PgTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         firstName: import("drizzle-orm/pg-core").PgColumn<{
             name: "first_name";
@@ -464,7 +464,7 @@ export declare const betterAuthUser: import("drizzle-orm/pg-core").PgTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         subscriptionStartDate: import("drizzle-orm/pg-core").PgColumn<{
             name: "subscription_start_date";
@@ -1023,7 +1023,7 @@ export declare const tenants: import("drizzle-orm/pg-core").PgTableWithColumns<{
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         name: import("drizzle-orm/pg-core").PgColumn<{
             name: "name";
@@ -1185,7 +1185,7 @@ export declare const refreshTokens: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -1204,7 +1204,7 @@ export declare const refreshTokens: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         userId: import("drizzle-orm/pg-core").PgColumn<{
             name: "user_id";
@@ -1223,7 +1223,7 @@ export declare const refreshTokens: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         token: import("drizzle-orm/pg-core").PgColumn<{
             name: "token";
@@ -1419,7 +1419,7 @@ export declare const stores: import("drizzle-orm/pg-core").PgTableWithColumns<{
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -1438,7 +1438,7 @@ export declare const stores: import("drizzle-orm/pg-core").PgTableWithColumns<{
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         name: import("drizzle-orm/pg-core").PgColumn<{
             name: "name";
@@ -1583,7 +1583,7 @@ export declare const shops: import("drizzle-orm/pg-core").PgTableWithColumns<{
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -1602,7 +1602,7 @@ export declare const shops: import("drizzle-orm/pg-core").PgTableWithColumns<{
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         name: import("drizzle-orm/pg-core").PgColumn<{
             name: "name";
@@ -1791,7 +1791,7 @@ export declare const shops: import("drizzle-orm/pg-core").PgTableWithColumns<{
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         operatingHours: import("drizzle-orm/pg-core").PgColumn<{
             name: "operating_hours";
@@ -1911,6 +1911,7 @@ export declare const shops: import("drizzle-orm/pg-core").PgTableWithColumns<{
             identity: undefined;
             generated: undefined;
         }, {}, {
+            size: undefined;
             baseBuilder: import("drizzle-orm/pg-core").PgColumnBuilder<{
                 name: "tags";
                 dataType: "string";
@@ -1919,7 +1920,6 @@ export declare const shops: import("drizzle-orm/pg-core").PgTableWithColumns<{
                 enumValues: [string, ...string[]];
                 driverParam: string;
             }, {}, {}, import("drizzle-orm").ColumnBuilderExtraConfig>;
-            size: undefined;
         }>;
         socialMedia: import("drizzle-orm/pg-core").PgColumn<{
             name: "social_media";
@@ -2030,7 +2030,7 @@ export declare const subscriptionPlans: import("drizzle-orm/pg-core").PgTableWit
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         name: import("drizzle-orm/pg-core").PgColumn<{
             name: "name";
@@ -2184,6 +2184,7 @@ export declare const subscriptionPlans: import("drizzle-orm/pg-core").PgTableWit
             identity: undefined;
             generated: undefined;
         }, {}, {
+            size: undefined;
             baseBuilder: import("drizzle-orm/pg-core").PgColumnBuilder<{
                 name: "features";
                 dataType: "string";
@@ -2192,7 +2193,6 @@ export declare const subscriptionPlans: import("drizzle-orm/pg-core").PgTableWit
                 enumValues: [string, ...string[]];
                 driverParam: string;
             }, {}, {}, import("drizzle-orm").ColumnBuilderExtraConfig>;
-            size: undefined;
         }>;
         maxUsers: import("drizzle-orm/pg-core").PgColumn<{
             name: "max_users";
@@ -2405,7 +2405,7 @@ export declare const subscriptions: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -2424,7 +2424,7 @@ export declare const subscriptions: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         userId: import("drizzle-orm/pg-core").PgColumn<{
             name: "user_id";
@@ -2443,7 +2443,7 @@ export declare const subscriptions: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         planId: import("drizzle-orm/pg-core").PgColumn<{
             name: "plan_id";
@@ -2462,7 +2462,7 @@ export declare const subscriptions: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         stripeSubscriptionId: import("drizzle-orm/pg-core").PgColumn<{
             name: "stripe_subscription_id";
@@ -2692,7 +2692,7 @@ export declare const tenantLimits: import("drizzle-orm/pg-core").PgTableWithColu
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -2711,7 +2711,7 @@ export declare const tenantLimits: import("drizzle-orm/pg-core").PgTableWithColu
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         maxShops: import("drizzle-orm/pg-core").PgColumn<{
             name: "max_shops";
@@ -2815,7 +2815,7 @@ export declare const tenantLimits: import("drizzle-orm/pg-core").PgTableWithColu
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         expiresAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "expires_at";
@@ -2913,7 +2913,7 @@ export declare const shopLimitEvents: import("drizzle-orm/pg-core").PgTableWithC
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -2932,7 +2932,7 @@ export declare const shopLimitEvents: import("drizzle-orm/pg-core").PgTableWithC
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         eventType: import("drizzle-orm/pg-core").PgColumn<{
             name: "event_type";
@@ -3002,7 +3002,7 @@ export declare const shopLimitEvents: import("drizzle-orm/pg-core").PgTableWithC
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         customLimitId: import("drizzle-orm/pg-core").PgColumn<{
             name: "custom_limit_id";
@@ -3021,7 +3021,7 @@ export declare const shopLimitEvents: import("drizzle-orm/pg-core").PgTableWithC
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         metadata: import("drizzle-orm/pg-core").PgColumn<{
             name: "metadata";
@@ -3081,7 +3081,7 @@ export declare const verificationTokens: import("drizzle-orm/pg-core").PgTableWi
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -3100,7 +3100,7 @@ export declare const verificationTokens: import("drizzle-orm/pg-core").PgTableWi
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         userId: import("drizzle-orm/pg-core").PgColumn<{
             name: "user_id";
@@ -3119,7 +3119,7 @@ export declare const verificationTokens: import("drizzle-orm/pg-core").PgTableWi
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         token: import("drizzle-orm/pg-core").PgColumn<{
             name: "token";
@@ -3196,7 +3196,7 @@ export declare const temp2faSessions: import("drizzle-orm/pg-core").PgTableWithC
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         sessionToken: import("drizzle-orm/pg-core").PgColumn<{
             name: "session_token";
@@ -3249,7 +3249,7 @@ export declare const temp2faSessions: import("drizzle-orm/pg-core").PgTableWithC
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         expiresAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "expires_at";
@@ -3309,7 +3309,7 @@ export declare const emailContacts: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -3328,7 +3328,7 @@ export declare const emailContacts: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         email: import("drizzle-orm/pg-core").PgColumn<{
             name: "email";
@@ -3602,7 +3602,7 @@ export declare const emailContacts: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         createdAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "created_at";
@@ -3662,7 +3662,7 @@ export declare const emailLists: import("drizzle-orm/pg-core").PgTableWithColumn
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -3681,7 +3681,7 @@ export declare const emailLists: import("drizzle-orm/pg-core").PgTableWithColumn
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         name: import("drizzle-orm/pg-core").PgColumn<{
             name: "name";
@@ -3775,7 +3775,7 @@ export declare const contactTags: import("drizzle-orm/pg-core").PgTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -3794,7 +3794,7 @@ export declare const contactTags: import("drizzle-orm/pg-core").PgTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         name: import("drizzle-orm/pg-core").PgColumn<{
             name: "name";
@@ -3871,7 +3871,7 @@ export declare const contactListMemberships: import("drizzle-orm/pg-core").PgTab
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -3890,7 +3890,7 @@ export declare const contactListMemberships: import("drizzle-orm/pg-core").PgTab
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         contactId: import("drizzle-orm/pg-core").PgColumn<{
             name: "contact_id";
@@ -3909,7 +3909,7 @@ export declare const contactListMemberships: import("drizzle-orm/pg-core").PgTab
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         listId: import("drizzle-orm/pg-core").PgColumn<{
             name: "list_id";
@@ -3928,7 +3928,7 @@ export declare const contactListMemberships: import("drizzle-orm/pg-core").PgTab
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         addedAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "added_at";
@@ -3971,7 +3971,7 @@ export declare const contactTagAssignments: import("drizzle-orm/pg-core").PgTabl
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -3990,7 +3990,7 @@ export declare const contactTagAssignments: import("drizzle-orm/pg-core").PgTabl
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         contactId: import("drizzle-orm/pg-core").PgColumn<{
             name: "contact_id";
@@ -4009,7 +4009,7 @@ export declare const contactTagAssignments: import("drizzle-orm/pg-core").PgTabl
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tagId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tag_id";
@@ -4028,7 +4028,7 @@ export declare const contactTagAssignments: import("drizzle-orm/pg-core").PgTabl
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         assignedAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "assigned_at";
@@ -4071,7 +4071,7 @@ export declare const companies: import("drizzle-orm/pg-core").PgTableWithColumns
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -4090,7 +4090,7 @@ export declare const companies: import("drizzle-orm/pg-core").PgTableWithColumns
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         ownerId: import("drizzle-orm/pg-core").PgColumn<{
             name: "owner_id";
@@ -4109,7 +4109,7 @@ export declare const companies: import("drizzle-orm/pg-core").PgTableWithColumns
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         name: import("drizzle-orm/pg-core").PgColumn<{
             name: "name";
@@ -4305,7 +4305,7 @@ export declare const forms: import("drizzle-orm/pg-core").PgTableWithColumns<{
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -4324,7 +4324,7 @@ export declare const forms: import("drizzle-orm/pg-core").PgTableWithColumns<{
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         userId: import("drizzle-orm/pg-core").PgColumn<{
             name: "user_id";
@@ -4343,7 +4343,7 @@ export declare const forms: import("drizzle-orm/pg-core").PgTableWithColumns<{
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         title: import("drizzle-orm/pg-core").PgColumn<{
             name: "title";
@@ -4522,7 +4522,7 @@ export declare const formResponses: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -4541,7 +4541,7 @@ export declare const formResponses: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         formId: import("drizzle-orm/pg-core").PgColumn<{
             name: "form_id";
@@ -4560,7 +4560,7 @@ export declare const formResponses: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         responseData: import("drizzle-orm/pg-core").PgColumn<{
             name: "response_data";
@@ -4654,7 +4654,7 @@ export declare const newsletters: import("drizzle-orm/pg-core").PgTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -4673,7 +4673,7 @@ export declare const newsletters: import("drizzle-orm/pg-core").PgTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         userId: import("drizzle-orm/pg-core").PgColumn<{
             name: "user_id";
@@ -4692,7 +4692,7 @@ export declare const newsletters: import("drizzle-orm/pg-core").PgTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         title: import("drizzle-orm/pg-core").PgColumn<{
             name: "title";
@@ -4846,6 +4846,7 @@ export declare const newsletters: import("drizzle-orm/pg-core").PgTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {
+            size: undefined;
             baseBuilder: import("drizzle-orm/pg-core").PgColumnBuilder<{
                 name: "selected_contact_ids";
                 dataType: "string";
@@ -4854,7 +4855,6 @@ export declare const newsletters: import("drizzle-orm/pg-core").PgTableWithColum
                 enumValues: [string, ...string[]];
                 driverParam: string;
             }, {}, {}, import("drizzle-orm").ColumnBuilderExtraConfig>;
-            size: undefined;
         }>;
         selectedTagIds: import("drizzle-orm/pg-core").PgColumn<{
             name: "selected_tag_ids";
@@ -4889,6 +4889,7 @@ export declare const newsletters: import("drizzle-orm/pg-core").PgTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {
+            size: undefined;
             baseBuilder: import("drizzle-orm/pg-core").PgColumnBuilder<{
                 name: "selected_tag_ids";
                 dataType: "string";
@@ -4897,7 +4898,6 @@ export declare const newsletters: import("drizzle-orm/pg-core").PgTableWithColum
                 enumValues: [string, ...string[]];
                 driverParam: string;
             }, {}, {}, import("drizzle-orm").ColumnBuilderExtraConfig>;
-            size: undefined;
         }>;
         recipientCount: import("drizzle-orm/pg-core").PgColumn<{
             name: "recipient_count";
@@ -5025,7 +5025,7 @@ export declare const newsletterTaskStatus: import("drizzle-orm/pg-core").PgTable
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -5044,7 +5044,7 @@ export declare const newsletterTaskStatus: import("drizzle-orm/pg-core").PgTable
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         newsletterId: import("drizzle-orm/pg-core").PgColumn<{
             name: "newsletter_id";
@@ -5063,7 +5063,7 @@ export declare const newsletterTaskStatus: import("drizzle-orm/pg-core").PgTable
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         taskType: import("drizzle-orm/pg-core").PgColumn<{
             name: "task_type";
@@ -5293,7 +5293,7 @@ export declare const campaigns: import("drizzle-orm/pg-core").PgTableWithColumns
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -5312,7 +5312,7 @@ export declare const campaigns: import("drizzle-orm/pg-core").PgTableWithColumns
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         userId: import("drizzle-orm/pg-core").PgColumn<{
             name: "user_id";
@@ -5331,7 +5331,7 @@ export declare const campaigns: import("drizzle-orm/pg-core").PgTableWithColumns
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         name: import("drizzle-orm/pg-core").PgColumn<{
             name: "name";
@@ -5519,6 +5519,7 @@ export declare const campaigns: import("drizzle-orm/pg-core").PgTableWithColumns
             identity: undefined;
             generated: undefined;
         }, {}, {
+            size: undefined;
             baseBuilder: import("drizzle-orm/pg-core").PgColumnBuilder<{
                 name: "goals";
                 dataType: "string";
@@ -5527,7 +5528,6 @@ export declare const campaigns: import("drizzle-orm/pg-core").PgTableWithColumns
                 enumValues: [string, ...string[]];
                 driverParam: string;
             }, {}, {}, import("drizzle-orm").ColumnBuilderExtraConfig>;
-            size: undefined;
         }>;
         kpis: import("drizzle-orm/pg-core").PgColumn<{
             name: "kpis";
@@ -5665,7 +5665,7 @@ export declare const campaigns: import("drizzle-orm/pg-core").PgTableWithColumns
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         reviewStatus: import("drizzle-orm/pg-core").PgColumn<{
             name: "review_status";
@@ -5793,7 +5793,7 @@ export declare const emailActivity: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -5812,7 +5812,7 @@ export declare const emailActivity: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         contactId: import("drizzle-orm/pg-core").PgColumn<{
             name: "contact_id";
@@ -5831,7 +5831,7 @@ export declare const emailActivity: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         campaignId: import("drizzle-orm/pg-core").PgColumn<{
             name: "campaign_id";
@@ -5850,7 +5850,7 @@ export declare const emailActivity: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         newsletterId: import("drizzle-orm/pg-core").PgColumn<{
             name: "newsletter_id";
@@ -5869,7 +5869,7 @@ export declare const emailActivity: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         activityType: import("drizzle-orm/pg-core").PgColumn<{
             name: "activity_type";
@@ -6031,7 +6031,7 @@ export declare const bouncedEmails: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         email: import("drizzle-orm/pg-core").PgColumn<{
             name: "email";
@@ -6169,7 +6169,7 @@ export declare const bouncedEmails: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         sourceNewsletterId: import("drizzle-orm/pg-core").PgColumn<{
             name: "source_newsletter_id";
@@ -6188,7 +6188,7 @@ export declare const bouncedEmails: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         sourceCampaignId: import("drizzle-orm/pg-core").PgColumn<{
             name: "source_campaign_id";
@@ -6207,7 +6207,7 @@ export declare const bouncedEmails: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         webhookId: import("drizzle-orm/pg-core").PgColumn<{
             name: "webhook_id";
@@ -6396,109 +6396,22 @@ export declare const shopRelations: import("drizzle-orm").Relations<"shops", {
     tenant: import("drizzle-orm").One<"tenants", true>;
     manager: import("drizzle-orm").One<"better_auth_user", false>;
 }>;
-export declare const insertUserSchema: z.ZodObject<Omit<{
-    id: z.ZodString;
-    name: z.ZodString;
-    email: z.ZodString;
-    emailVerified: z.ZodBoolean;
-    image: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    createdAt: z.ZodDate;
-    updatedAt: z.ZodDate;
-    role: z.ZodOptional<z.ZodString>;
-    tenantId: z.ZodOptional<z.ZodString>;
-    firstName: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    lastName: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    isActive: z.ZodOptional<z.ZodNullable<z.ZodBoolean>>;
-    twoFactorEnabled: z.ZodOptional<z.ZodNullable<z.ZodBoolean>>;
-    twoFactorSecret: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    emailVerificationToken: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    emailVerificationExpires: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    lastVerificationEmailSent: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    lastLoginAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    menuExpanded: z.ZodOptional<z.ZodNullable<z.ZodBoolean>>;
-    theme: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    language: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    avatarUrl: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    tokenValidAfter: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    stripeCustomerId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    stripeSubscriptionId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    subscriptionStatus: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    subscriptionPlanId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    subscriptionStartDate: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    subscriptionEndDate: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    trialEndsAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-}, "id" | "createdAt" | "updatedAt">, "strip", z.ZodTypeAny, {
-    email: string;
-    name: string;
-    emailVerified: boolean;
-    tenantId?: string | undefined;
-    image?: string | null | undefined;
-    role?: string | undefined;
-    firstName?: string | null | undefined;
-    lastName?: string | null | undefined;
-    isActive?: boolean | null | undefined;
-    twoFactorEnabled?: boolean | null | undefined;
-    twoFactorSecret?: string | null | undefined;
-    emailVerificationToken?: string | null | undefined;
-    emailVerificationExpires?: Date | null | undefined;
-    lastVerificationEmailSent?: Date | null | undefined;
-    lastLoginAt?: Date | null | undefined;
-    menuExpanded?: boolean | null | undefined;
-    theme?: string | null | undefined;
-    language?: string | null | undefined;
-    avatarUrl?: string | null | undefined;
-    tokenValidAfter?: Date | null | undefined;
-    stripeCustomerId?: string | null | undefined;
-    stripeSubscriptionId?: string | null | undefined;
-    subscriptionStatus?: string | null | undefined;
-    subscriptionPlanId?: string | null | undefined;
-    subscriptionStartDate?: Date | null | undefined;
-    subscriptionEndDate?: Date | null | undefined;
-    trialEndsAt?: Date | null | undefined;
-}, {
-    email: string;
-    name: string;
-    emailVerified: boolean;
-    tenantId?: string | undefined;
-    image?: string | null | undefined;
-    role?: string | undefined;
-    firstName?: string | null | undefined;
-    lastName?: string | null | undefined;
-    isActive?: boolean | null | undefined;
-    twoFactorEnabled?: boolean | null | undefined;
-    twoFactorSecret?: string | null | undefined;
-    emailVerificationToken?: string | null | undefined;
-    emailVerificationExpires?: Date | null | undefined;
-    lastVerificationEmailSent?: Date | null | undefined;
-    lastLoginAt?: Date | null | undefined;
-    menuExpanded?: boolean | null | undefined;
-    theme?: string | null | undefined;
-    language?: string | null | undefined;
-    avatarUrl?: string | null | undefined;
-    tokenValidAfter?: Date | null | undefined;
-    stripeCustomerId?: string | null | undefined;
-    stripeSubscriptionId?: string | null | undefined;
-    subscriptionStatus?: string | null | undefined;
-    subscriptionPlanId?: string | null | undefined;
-    subscriptionStartDate?: Date | null | undefined;
-    subscriptionEndDate?: Date | null | undefined;
-    trialEndsAt?: Date | null | undefined;
-}>;
+export declare const insertUserSchema: z.ZodObject<Omit<{}, "id" | "createdAt" | "updatedAt">, "strip", z.ZodTypeAny, {}, {}>;
 export declare const loginSchema: z.ZodObject<{
     email: z.ZodString;
     password: z.ZodString;
     twoFactorToken: z.ZodOptional<z.ZodString>;
     rememberMe: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
 }, "strip", z.ZodTypeAny, {
-    email: string;
-    password: string;
-    rememberMe: boolean;
-    twoFactorToken?: string | undefined;
+    email?: string;
+    password?: string;
+    twoFactorToken?: string;
+    rememberMe?: boolean;
 }, {
-    email: string;
-    password: string;
-    twoFactorToken?: string | undefined;
-    rememberMe?: boolean | undefined;
+    email?: string;
+    password?: string;
+    twoFactorToken?: string;
+    rememberMe?: boolean;
 }>;
 export declare const registerSchema: z.ZodEffects<z.ZodObject<{
     email: z.ZodString;
@@ -6507,29 +6420,29 @@ export declare const registerSchema: z.ZodEffects<z.ZodObject<{
     lastName: z.ZodString;
     confirmPassword: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    email: string;
-    firstName: string;
-    lastName: string;
-    password: string;
-    confirmPassword: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    password?: string;
+    confirmPassword?: string;
 }, {
-    email: string;
-    firstName: string;
-    lastName: string;
-    password: string;
-    confirmPassword: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    password?: string;
+    confirmPassword?: string;
 }>, {
-    email: string;
-    firstName: string;
-    lastName: string;
-    password: string;
-    confirmPassword: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    password?: string;
+    confirmPassword?: string;
 }, {
-    email: string;
-    firstName: string;
-    lastName: string;
-    password: string;
-    confirmPassword: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    password?: string;
+    confirmPassword?: string;
 }>;
 export declare const registerOwnerSchema: z.ZodEffects<z.ZodObject<{
     email: z.ZodString;
@@ -6540,44 +6453,44 @@ export declare const registerOwnerSchema: z.ZodEffects<z.ZodObject<{
     organizationName: z.ZodString;
     organizationSlug: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    email: string;
-    firstName: string;
-    lastName: string;
-    password: string;
-    confirmPassword: string;
-    organizationName: string;
-    organizationSlug: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    password?: string;
+    confirmPassword?: string;
+    organizationName?: string;
+    organizationSlug?: string;
 }, {
-    email: string;
-    firstName: string;
-    lastName: string;
-    password: string;
-    confirmPassword: string;
-    organizationName: string;
-    organizationSlug: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    password?: string;
+    confirmPassword?: string;
+    organizationName?: string;
+    organizationSlug?: string;
 }>, {
-    email: string;
-    firstName: string;
-    lastName: string;
-    password: string;
-    confirmPassword: string;
-    organizationName: string;
-    organizationSlug: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    password?: string;
+    confirmPassword?: string;
+    organizationName?: string;
+    organizationSlug?: string;
 }, {
-    email: string;
-    firstName: string;
-    lastName: string;
-    password: string;
-    confirmPassword: string;
-    organizationName: string;
-    organizationSlug: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    password?: string;
+    confirmPassword?: string;
+    organizationName?: string;
+    organizationSlug?: string;
 }>;
 export declare const forgotPasswordSchema: z.ZodObject<{
     email: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    email: string;
+    email?: string;
 }, {
-    email: string;
+    email?: string;
 }>;
 export declare const updateProfileSchema: z.ZodObject<{
     firstName: z.ZodString;
@@ -6586,73 +6499,73 @@ export declare const updateProfileSchema: z.ZodObject<{
     theme: z.ZodOptional<z.ZodEnum<["light", "dark"]>>;
     language: z.ZodOptional<z.ZodEnum<["en", "es"]>>;
 }, "strip", z.ZodTypeAny, {
-    email: string;
-    firstName: string;
-    lastName: string;
-    theme?: "light" | "dark" | undefined;
-    language?: "en" | "es" | undefined;
+    email?: string;
+    language?: "en" | "es";
+    firstName?: string;
+    lastName?: string;
+    theme?: "light" | "dark";
 }, {
-    email: string;
-    firstName: string;
-    lastName: string;
-    theme?: "light" | "dark" | undefined;
-    language?: "en" | "es" | undefined;
+    email?: string;
+    language?: "en" | "es";
+    firstName?: string;
+    lastName?: string;
+    theme?: "light" | "dark";
 }>;
 export declare const verifyEmailSchema: z.ZodObject<{
     token: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    token: string;
+    token?: string;
 }, {
-    token: string;
+    token?: string;
 }>;
 export declare const resendVerificationSchema: z.ZodObject<{
     email: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    email: string;
+    email?: string;
 }, {
-    email: string;
+    email?: string;
 }>;
 export declare const changePasswordSchema: z.ZodEffects<z.ZodObject<{
     currentPassword: z.ZodString;
     newPassword: z.ZodString;
     confirmPassword: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    confirmPassword: string;
-    currentPassword: string;
-    newPassword: string;
+    confirmPassword?: string;
+    currentPassword?: string;
+    newPassword?: string;
 }, {
-    confirmPassword: string;
-    currentPassword: string;
-    newPassword: string;
+    confirmPassword?: string;
+    currentPassword?: string;
+    newPassword?: string;
 }>, {
-    confirmPassword: string;
-    currentPassword: string;
-    newPassword: string;
+    confirmPassword?: string;
+    currentPassword?: string;
+    newPassword?: string;
 }, {
-    confirmPassword: string;
-    currentPassword: string;
-    newPassword: string;
+    confirmPassword?: string;
+    currentPassword?: string;
+    newPassword?: string;
 }>;
 export declare const enable2FASchema: z.ZodObject<{
     token: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    token: string;
+    token?: string;
 }, {
-    token: string;
+    token?: string;
 }>;
 export declare const disable2FASchema: z.ZodObject<{
     token: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    token: string;
+    token?: string;
 }, {
-    token: string;
+    token?: string;
 }>;
 export declare const verify2FASchema: z.ZodObject<{
     token: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    token: string;
+    token?: string;
 }, {
-    token: string;
+    token?: string;
 }>;
 export declare const createDeviceSessionSchema: z.ZodObject<{
     deviceName: z.ZodOptional<z.ZodString>;
@@ -6660,15 +6573,15 @@ export declare const createDeviceSessionSchema: z.ZodObject<{
     ipAddress: z.ZodOptional<z.ZodString>;
     location: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    ipAddress?: string | undefined;
-    userAgent?: string | undefined;
-    deviceName?: string | undefined;
-    location?: string | undefined;
+    location?: string;
+    ipAddress?: string;
+    userAgent?: string;
+    deviceName?: string;
 }, {
-    ipAddress?: string | undefined;
-    userAgent?: string | undefined;
-    deviceName?: string | undefined;
-    location?: string | undefined;
+    location?: string;
+    ipAddress?: string;
+    userAgent?: string;
+    deviceName?: string;
 }>;
 declare const nonOwnerRoles: readonly ["Administrator", "Manager", "Employee"];
 export { nonOwnerRoles };
@@ -6681,37 +6594,37 @@ export declare const createUserSchema: z.ZodEffects<z.ZodObject<{
     confirmPassword: z.ZodString;
     emailVerified: z.ZodDefault<z.ZodBoolean>;
 }, "strip", z.ZodTypeAny, {
-    email: string;
-    emailVerified: boolean;
-    role: "Employee" | "Administrator" | "Manager";
-    firstName: string;
-    lastName: string;
-    password: string;
-    confirmPassword: string;
+    role?: "Employee" | "Administrator" | "Manager";
+    email?: string;
+    emailVerified?: boolean;
+    firstName?: string;
+    lastName?: string;
+    password?: string;
+    confirmPassword?: string;
 }, {
-    email: string;
-    firstName: string;
-    lastName: string;
-    password: string;
-    confirmPassword: string;
-    emailVerified?: boolean | undefined;
-    role?: "Employee" | "Administrator" | "Manager" | undefined;
+    role?: "Employee" | "Administrator" | "Manager";
+    email?: string;
+    emailVerified?: boolean;
+    firstName?: string;
+    lastName?: string;
+    password?: string;
+    confirmPassword?: string;
 }>, {
-    email: string;
-    emailVerified: boolean;
-    role: "Employee" | "Administrator" | "Manager";
-    firstName: string;
-    lastName: string;
-    password: string;
-    confirmPassword: string;
+    role?: "Employee" | "Administrator" | "Manager";
+    email?: string;
+    emailVerified?: boolean;
+    firstName?: string;
+    lastName?: string;
+    password?: string;
+    confirmPassword?: string;
 }, {
-    email: string;
-    firstName: string;
-    lastName: string;
-    password: string;
-    confirmPassword: string;
-    emailVerified?: boolean | undefined;
-    role?: "Employee" | "Administrator" | "Manager" | undefined;
+    role?: "Employee" | "Administrator" | "Manager";
+    email?: string;
+    emailVerified?: boolean;
+    firstName?: string;
+    lastName?: string;
+    password?: string;
+    confirmPassword?: string;
 }>;
 export declare const updateUserSchema: z.ZodObject<{
     firstName: z.ZodString;
@@ -6720,17 +6633,17 @@ export declare const updateUserSchema: z.ZodObject<{
     role: z.ZodEnum<["Administrator", "Manager", "Employee"]>;
     isActive: z.ZodBoolean;
 }, "strip", z.ZodTypeAny, {
-    email: string;
-    role: "Employee" | "Administrator" | "Manager";
-    firstName: string;
-    lastName: string;
-    isActive: boolean;
+    role?: "Employee" | "Administrator" | "Manager";
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    isActive?: boolean;
 }, {
-    email: string;
-    role: "Employee" | "Administrator" | "Manager";
-    firstName: string;
-    lastName: string;
-    isActive: boolean;
+    role?: "Employee" | "Administrator" | "Manager";
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    isActive?: boolean;
 }>;
 export declare const userFiltersSchema: z.ZodObject<{
     search: z.ZodOptional<z.ZodString>;
@@ -6738,14 +6651,14 @@ export declare const userFiltersSchema: z.ZodObject<{
     status: z.ZodOptional<z.ZodEnum<["active", "inactive"]>>;
     showInactive: z.ZodDefault<z.ZodEffects<z.ZodBoolean, boolean, unknown>>;
 }, "strip", z.ZodTypeAny, {
-    showInactive: boolean;
-    status?: "inactive" | "active" | undefined;
-    search?: string | undefined;
-    role?: "Employee" | "Owner" | "Administrator" | "Manager" | undefined;
+    search?: string;
+    role?: "Employee" | "Owner" | "Administrator" | "Manager";
+    status?: "active" | "inactive";
+    showInactive?: boolean;
 }, {
-    status?: "inactive" | "active" | undefined;
-    search?: string | undefined;
-    role?: "Employee" | "Owner" | "Administrator" | "Manager" | undefined;
+    search?: string;
+    role?: "Employee" | "Owner" | "Administrator" | "Manager";
+    status?: "active" | "inactive";
     showInactive?: unknown;
 }>;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -6794,7 +6707,7 @@ export declare const subscriptionPlanSchema: import("drizzle-zod").BuildSchema<"
         identity: undefined;
         generated: undefined;
     }, {}, {
-        length: number | undefined;
+        length: number;
     }>;
     name: import("drizzle-orm/pg-core").PgColumn<{
         name: "name";
@@ -6948,6 +6861,7 @@ export declare const subscriptionPlanSchema: import("drizzle-zod").BuildSchema<"
         identity: undefined;
         generated: undefined;
     }, {}, {
+        size: undefined;
         baseBuilder: import("drizzle-orm/pg-core").PgColumnBuilder<{
             name: "features";
             dataType: "string";
@@ -6956,7 +6870,6 @@ export declare const subscriptionPlanSchema: import("drizzle-zod").BuildSchema<"
             enumValues: [string, ...string[]];
             driverParam: string;
         }, {}, {}, import("drizzle-orm").ColumnBuilderExtraConfig>;
-        size: undefined;
     }>;
     maxUsers: import("drizzle-orm/pg-core").PgColumn<{
         name: "max_users";
@@ -7146,165 +7059,44 @@ export declare const subscriptionPlanSchema: import("drizzle-zod").BuildSchema<"
         generated: undefined;
     }, {}, {}>;
 }, undefined>;
-export declare const createSubscriptionSchema: z.ZodObject<Omit<{
-    id: z.ZodOptional<z.ZodString>;
-    tenantId: z.ZodString;
-    userId: z.ZodString;
-    planId: z.ZodString;
-    stripeSubscriptionId: z.ZodString;
-    stripeCustomerId: z.ZodString;
-    status: z.ZodString;
-    currentPeriodStart: z.ZodDate;
-    currentPeriodEnd: z.ZodDate;
-    trialStart: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    trialEnd: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    cancelAtPeriodEnd: z.ZodOptional<z.ZodNullable<z.ZodBoolean>>;
-    canceledAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    isYearly: z.ZodOptional<z.ZodNullable<z.ZodBoolean>>;
-    createdAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    updatedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-}, "id" | "createdAt" | "updatedAt">, "strip", z.ZodTypeAny, {
-    status: string;
-    tenantId: string;
-    userId: string;
-    stripeCustomerId: string;
-    stripeSubscriptionId: string;
-    planId: string;
-    currentPeriodStart: Date;
-    currentPeriodEnd: Date;
-    trialStart?: Date | null | undefined;
-    trialEnd?: Date | null | undefined;
-    cancelAtPeriodEnd?: boolean | null | undefined;
-    canceledAt?: Date | null | undefined;
-    isYearly?: boolean | null | undefined;
-}, {
-    status: string;
-    tenantId: string;
-    userId: string;
-    stripeCustomerId: string;
-    stripeSubscriptionId: string;
-    planId: string;
-    currentPeriodStart: Date;
-    currentPeriodEnd: Date;
-    trialStart?: Date | null | undefined;
-    trialEnd?: Date | null | undefined;
-    cancelAtPeriodEnd?: boolean | null | undefined;
-    canceledAt?: Date | null | undefined;
-    isYearly?: boolean | null | undefined;
-}>;
+export declare const createSubscriptionSchema: z.ZodObject<Omit<{}, "id" | "createdAt" | "updatedAt">, "strip", z.ZodTypeAny, {}, {}>;
 export declare const billingInfoSchema: z.ZodObject<{
     planId: z.ZodString;
     billingCycle: z.ZodEnum<["monthly", "yearly"]>;
     paymentMethodId: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    planId: string;
-    billingCycle: "monthly" | "yearly";
-    paymentMethodId?: string | undefined;
+    planId?: string;
+    billingCycle?: "monthly" | "yearly";
+    paymentMethodId?: string;
 }, {
-    planId: string;
-    billingCycle: "monthly" | "yearly";
-    paymentMethodId?: string | undefined;
+    planId?: string;
+    billingCycle?: "monthly" | "yearly";
+    paymentMethodId?: string;
 }>;
 export type BillingInfo = z.infer<typeof billingInfoSchema>;
 export type Store = typeof stores.$inferSelect;
 export type InsertStore = z.infer<typeof insertStoreSchema>;
 export type CreateStoreData = z.infer<typeof createStoreSchema>;
 export type UpdateStoreData = z.infer<typeof updateStoreSchema>;
-export declare const insertStoreSchema: z.ZodObject<Omit<{
-    id: z.ZodOptional<z.ZodString>;
-    tenantId: z.ZodString;
-    name: z.ZodString;
-    address: z.ZodString;
-    telephone: z.ZodString;
-    email: z.ZodString;
-    isActive: z.ZodOptional<z.ZodNullable<z.ZodBoolean>>;
-    createdAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    updatedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-}, "id" | "tenantId" | "createdAt" | "updatedAt">, "strip", z.ZodTypeAny, {
-    address: string;
-    email: string;
-    name: string;
-    telephone: string;
-    isActive?: boolean | null | undefined;
-}, {
-    address: string;
-    email: string;
-    name: string;
-    telephone: string;
-    isActive?: boolean | null | undefined;
-}>;
-export declare const updateStoreSchema: z.ZodObject<{
-    address: z.ZodOptional<z.ZodString>;
-    email: z.ZodOptional<z.ZodString>;
-    name: z.ZodOptional<z.ZodString>;
-    isActive: z.ZodOptional<z.ZodOptional<z.ZodNullable<z.ZodBoolean>>>;
-    telephone: z.ZodOptional<z.ZodString>;
-}, "strip", z.ZodTypeAny, {
-    address?: string | undefined;
-    email?: string | undefined;
-    name?: string | undefined;
-    isActive?: boolean | null | undefined;
-    telephone?: string | undefined;
-}, {
-    address?: string | undefined;
-    email?: string | undefined;
-    name?: string | undefined;
-    isActive?: boolean | null | undefined;
-    telephone?: string | undefined;
-}>;
+export declare const insertStoreSchema: z.ZodObject<Omit<{}, "id" | "createdAt" | "updatedAt" | "tenantId">, "strip", z.ZodTypeAny, {}, {}>;
+export declare const updateStoreSchema: z.ZodObject<{}, "strip", z.ZodTypeAny, {}, {}>;
 export declare const createStoreSchema: z.ZodObject<{
     name: z.ZodString;
     address: z.ZodString;
     telephone: z.ZodString;
     email: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    address: string;
-    email: string;
-    name: string;
-    telephone: string;
+    name?: string;
+    address?: string;
+    email?: string;
+    telephone?: string;
 }, {
-    address: string;
-    email: string;
-    name: string;
-    telephone: string;
+    name?: string;
+    address?: string;
+    email?: string;
+    telephone?: string;
 }>;
-export declare const insertCompanySchema: z.ZodObject<Omit<{
-    id: z.ZodOptional<z.ZodString>;
-    tenantId: z.ZodString;
-    ownerId: z.ZodString;
-    name: z.ZodString;
-    address: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    companyType: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    companyEmail: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    phone: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    website: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    description: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    isActive: z.ZodOptional<z.ZodNullable<z.ZodBoolean>>;
-    createdAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    updatedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-}, "id" | "createdAt" | "updatedAt">, "strip", z.ZodTypeAny, {
-    tenantId: string;
-    name: string;
-    ownerId: string;
-    address?: string | null | undefined;
-    description?: string | null | undefined;
-    isActive?: boolean | null | undefined;
-    phone?: string | null | undefined;
-    website?: string | null | undefined;
-    companyType?: string | null | undefined;
-    companyEmail?: string | null | undefined;
-}, {
-    tenantId: string;
-    name: string;
-    ownerId: string;
-    address?: string | null | undefined;
-    description?: string | null | undefined;
-    isActive?: boolean | null | undefined;
-    phone?: string | null | undefined;
-    website?: string | null | undefined;
-    companyType?: string | null | undefined;
-    companyEmail?: string | null | undefined;
-}>;
+export declare const insertCompanySchema: z.ZodObject<Omit<{}, "id" | "createdAt" | "updatedAt">, "strip", z.ZodTypeAny, {}, {}>;
 export declare const updateCompanySchema: z.ZodObject<{
     name: z.ZodString;
     address: z.ZodOptional<z.ZodString>;
@@ -7315,23 +7107,23 @@ export declare const updateCompanySchema: z.ZodObject<{
     description: z.ZodOptional<z.ZodString>;
     isActive: z.ZodDefault<z.ZodBoolean>;
 }, "strip", z.ZodTypeAny, {
-    name: string;
-    isActive: boolean;
-    address?: string | undefined;
-    description?: string | undefined;
-    phone?: string | undefined;
-    website?: string | undefined;
-    companyType?: string | undefined;
-    companyEmail?: string | undefined;
+    name?: string;
+    address?: string;
+    description?: string;
+    isActive?: boolean;
+    phone?: string;
+    website?: string;
+    companyType?: string;
+    companyEmail?: string;
 }, {
-    name: string;
-    address?: string | undefined;
-    description?: string | undefined;
-    isActive?: boolean | undefined;
-    phone?: string | undefined;
-    website?: string | undefined;
-    companyType?: string | undefined;
-    companyEmail?: string | undefined;
+    name?: string;
+    address?: string;
+    description?: string;
+    isActive?: boolean;
+    phone?: string;
+    website?: string;
+    companyType?: string;
+    companyEmail?: string;
 }>;
 export declare const createCompanySchema: z.ZodObject<{
     name: z.ZodString;
@@ -7342,66 +7134,42 @@ export declare const createCompanySchema: z.ZodObject<{
     website: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
     description: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    name: string;
-    address?: string | undefined;
-    description?: string | undefined;
-    phone?: string | undefined;
-    website?: string | undefined;
-    companyType?: string | undefined;
-    companyEmail?: string | undefined;
+    name?: string;
+    address?: string;
+    description?: string;
+    phone?: string;
+    website?: string;
+    companyType?: string;
+    companyEmail?: string;
 }, {
-    name: string;
-    address?: string | undefined;
-    description?: string | undefined;
-    phone?: string | undefined;
-    website?: string | undefined;
-    companyType?: string | undefined;
-    companyEmail?: string | undefined;
+    name?: string;
+    address?: string;
+    description?: string;
+    phone?: string;
+    website?: string;
+    companyType?: string;
+    companyEmail?: string;
 }>;
 export type Company = typeof companies.$inferSelect;
 export type InsertCompany = z.infer<typeof insertCompanySchema>;
 export type CreateCompanyData = z.infer<typeof createCompanySchema>;
 export type UpdateCompanyData = z.infer<typeof updateCompanySchema>;
-export declare const tenantSchema: z.ZodObject<Omit<{
-    id: z.ZodOptional<z.ZodString>;
-    name: z.ZodString;
-    slug: z.ZodString;
-    domain: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    isActive: z.ZodOptional<z.ZodNullable<z.ZodBoolean>>;
-    settings: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    maxUsers: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
-    createdAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    updatedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-}, "id" | "createdAt" | "updatedAt">, "strip", z.ZodTypeAny, {
-    name: string;
-    slug: string;
-    isActive?: boolean | null | undefined;
-    domain?: string | null | undefined;
-    settings?: string | null | undefined;
-    maxUsers?: number | null | undefined;
-}, {
-    name: string;
-    slug: string;
-    isActive?: boolean | null | undefined;
-    domain?: string | null | undefined;
-    settings?: string | null | undefined;
-    maxUsers?: number | null | undefined;
-}>;
+export declare const tenantSchema: z.ZodObject<Omit<{}, "id" | "createdAt" | "updatedAt">, "strip", z.ZodTypeAny, {}, {}>;
 export declare const createTenantSchema: z.ZodObject<{
     name: z.ZodString;
     slug: z.ZodString;
     domain: z.ZodOptional<z.ZodString>;
     maxUsers: z.ZodDefault<z.ZodNumber>;
 }, "strip", z.ZodTypeAny, {
-    name: string;
-    slug: string;
-    maxUsers: number;
-    domain?: string | undefined;
+    name?: string;
+    slug?: string;
+    domain?: string;
+    maxUsers?: number;
 }, {
-    name: string;
-    slug: string;
-    domain?: string | undefined;
-    maxUsers?: number | undefined;
+    name?: string;
+    slug?: string;
+    domain?: string;
+    maxUsers?: number;
 }>;
 export declare const updateTenantSchema: z.ZodObject<{
     name: z.ZodString;
@@ -7409,15 +7177,15 @@ export declare const updateTenantSchema: z.ZodObject<{
     isActive: z.ZodBoolean;
     maxUsers: z.ZodNumber;
 }, "strip", z.ZodTypeAny, {
-    name: string;
-    isActive: boolean;
-    maxUsers: number;
-    domain?: string | undefined;
+    name?: string;
+    isActive?: boolean;
+    domain?: string;
+    maxUsers?: number;
 }, {
-    name: string;
-    isActive: boolean;
-    maxUsers: number;
-    domain?: string | undefined;
+    name?: string;
+    isActive?: boolean;
+    domain?: string;
+    maxUsers?: number;
 }>;
 export declare const createFormSchema: z.ZodObject<{
     title: z.ZodString;
@@ -7426,17 +7194,17 @@ export declare const createFormSchema: z.ZodObject<{
     theme: z.ZodDefault<z.ZodString>;
     isEmbeddable: z.ZodDefault<z.ZodBoolean>;
 }, "strip", z.ZodTypeAny, {
-    theme: string;
-    title: string;
-    formData: string;
-    isEmbeddable: boolean;
-    description?: string | undefined;
+    formData?: string;
+    title?: string;
+    description?: string;
+    theme?: string;
+    isEmbeddable?: boolean;
 }, {
-    title: string;
-    formData: string;
-    description?: string | undefined;
-    theme?: string | undefined;
-    isEmbeddable?: boolean | undefined;
+    formData?: string;
+    title?: string;
+    description?: string;
+    theme?: string;
+    isEmbeddable?: boolean;
 }>;
 export declare const updateFormSchema: z.ZodObject<{
     title: z.ZodString;
@@ -7446,19 +7214,19 @@ export declare const updateFormSchema: z.ZodObject<{
     isActive: z.ZodBoolean;
     isEmbeddable: z.ZodBoolean;
 }, "strip", z.ZodTypeAny, {
-    isActive: boolean;
-    theme: string;
-    title: string;
-    formData: string;
-    isEmbeddable: boolean;
-    description?: string | undefined;
+    formData?: string;
+    title?: string;
+    description?: string;
+    isActive?: boolean;
+    theme?: string;
+    isEmbeddable?: boolean;
 }, {
-    isActive: boolean;
-    theme: string;
-    title: string;
-    formData: string;
-    isEmbeddable: boolean;
-    description?: string | undefined;
+    formData?: string;
+    title?: string;
+    description?: string;
+    isActive?: boolean;
+    theme?: string;
+    isEmbeddable?: boolean;
 }>;
 export declare const submitFormResponseSchema: z.ZodObject<{
     formId: z.ZodString;
@@ -7466,15 +7234,15 @@ export declare const submitFormResponseSchema: z.ZodObject<{
     ipAddress: z.ZodOptional<z.ZodString>;
     userAgent: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    formId: string;
-    responseData: string;
-    ipAddress?: string | undefined;
-    userAgent?: string | undefined;
+    ipAddress?: string;
+    userAgent?: string;
+    formId?: string;
+    responseData?: string;
 }, {
-    formId: string;
-    responseData: string;
-    ipAddress?: string | undefined;
-    userAgent?: string | undefined;
+    ipAddress?: string;
+    userAgent?: string;
+    formId?: string;
+    responseData?: string;
 }>;
 export type Tenant = typeof tenants.$inferSelect;
 export type InsertTenant = z.infer<typeof tenantSchema>;
@@ -7503,76 +7271,7 @@ export interface RefreshTokenInfo {
     minutes: number;
     isExpired: boolean;
 }
-export declare const insertShopSchema: z.ZodObject<Omit<{
-    id: z.ZodOptional<z.ZodString>;
-    tenantId: z.ZodString;
-    name: z.ZodString;
-    description: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    address: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    city: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    state: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    zipCode: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    country: z.ZodOptional<z.ZodString>;
-    phone: z.ZodString;
-    email: z.ZodString;
-    website: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    managerId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    operatingHours: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    status: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    logoUrl: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    bannerUrl: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    category: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    tags: z.ZodOptional<z.ZodNullable<z.ZodArray<z.ZodString, "many">>>;
-    socialMedia: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    settings: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    isActive: z.ZodOptional<z.ZodNullable<z.ZodBoolean>>;
-    createdAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    updatedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-}, "id" | "createdAt" | "updatedAt">, "strip", z.ZodTypeAny, {
-    email: string;
-    tenantId: string;
-    name: string;
-    phone: string;
-    address?: string | null | undefined;
-    status?: string | null | undefined;
-    description?: string | null | undefined;
-    isActive?: boolean | null | undefined;
-    settings?: string | null | undefined;
-    city?: string | null | undefined;
-    state?: string | null | undefined;
-    zipCode?: string | null | undefined;
-    country?: string | undefined;
-    website?: string | null | undefined;
-    managerId?: string | null | undefined;
-    operatingHours?: string | null | undefined;
-    logoUrl?: string | null | undefined;
-    bannerUrl?: string | null | undefined;
-    category?: string | null | undefined;
-    tags?: string[] | null | undefined;
-    socialMedia?: string | null | undefined;
-}, {
-    email: string;
-    tenantId: string;
-    name: string;
-    phone: string;
-    address?: string | null | undefined;
-    status?: string | null | undefined;
-    description?: string | null | undefined;
-    isActive?: boolean | null | undefined;
-    settings?: string | null | undefined;
-    city?: string | null | undefined;
-    state?: string | null | undefined;
-    zipCode?: string | null | undefined;
-    country?: string | undefined;
-    website?: string | null | undefined;
-    managerId?: string | null | undefined;
-    operatingHours?: string | null | undefined;
-    logoUrl?: string | null | undefined;
-    bannerUrl?: string | null | undefined;
-    category?: string | null | undefined;
-    tags?: string[] | null | undefined;
-    socialMedia?: string | null | undefined;
-}>;
+export declare const insertShopSchema: z.ZodObject<Omit<{}, "id" | "createdAt" | "updatedAt">, "strip", z.ZodTypeAny, {}, {}>;
 export declare const createShopSchema: z.ZodObject<{
     name: z.ZodString;
     description: z.ZodOptional<z.ZodString>;
@@ -7592,41 +7291,41 @@ export declare const createShopSchema: z.ZodObject<{
     socialMedia: z.ZodOptional<z.ZodString>;
     settings: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    status: "inactive" | "active" | "maintenance";
-    email: string;
-    name: string;
-    country: string;
-    phone: string;
-    address?: string | undefined;
-    description?: string | undefined;
-    settings?: string | undefined;
-    city?: string | undefined;
-    state?: string | undefined;
-    zipCode?: string | undefined;
-    website?: string | undefined;
-    managerId?: string | null | undefined;
-    operatingHours?: string | undefined;
-    category?: string | undefined;
-    tags?: string[] | undefined;
-    socialMedia?: string | undefined;
+    name?: string;
+    state?: string;
+    address?: string;
+    country?: string;
+    email?: string;
+    description?: string;
+    status?: "active" | "inactive" | "maintenance";
+    settings?: string;
+    city?: string;
+    zipCode?: string;
+    phone?: string;
+    website?: string;
+    managerId?: string;
+    operatingHours?: string;
+    category?: string;
+    tags?: string[];
+    socialMedia?: string;
 }, {
-    email: string;
-    name: string;
-    phone: string;
-    address?: string | undefined;
-    status?: "inactive" | "active" | "maintenance" | undefined;
-    description?: string | undefined;
-    settings?: string | undefined;
-    city?: string | undefined;
-    state?: string | undefined;
-    zipCode?: string | undefined;
-    country?: string | undefined;
-    website?: string | undefined;
-    managerId?: string | null | undefined;
-    operatingHours?: string | undefined;
-    category?: string | undefined;
-    tags?: string[] | undefined;
-    socialMedia?: string | undefined;
+    name?: string;
+    state?: string;
+    address?: string;
+    country?: string;
+    email?: string;
+    description?: string;
+    status?: "active" | "inactive" | "maintenance";
+    settings?: string;
+    city?: string;
+    zipCode?: string;
+    phone?: string;
+    website?: string;
+    managerId?: string;
+    operatingHours?: string;
+    category?: string;
+    tags?: string[];
+    socialMedia?: string;
 }>;
 export declare const updateShopSchema: z.ZodObject<{
     name: z.ZodString;
@@ -7648,43 +7347,43 @@ export declare const updateShopSchema: z.ZodObject<{
     settings: z.ZodOptional<z.ZodString>;
     isActive: z.ZodBoolean;
 }, "strip", z.ZodTypeAny, {
-    status: "inactive" | "active" | "maintenance";
-    email: string;
-    name: string;
-    isActive: boolean;
-    country: string;
-    phone: string;
-    address?: string | undefined;
-    description?: string | undefined;
-    settings?: string | undefined;
-    city?: string | undefined;
-    state?: string | undefined;
-    zipCode?: string | undefined;
-    website?: string | undefined;
-    managerId?: string | null | undefined;
-    operatingHours?: string | undefined;
-    category?: string | undefined;
-    tags?: string[] | undefined;
-    socialMedia?: string | undefined;
+    name?: string;
+    state?: string;
+    address?: string;
+    country?: string;
+    email?: string;
+    description?: string;
+    status?: "active" | "inactive" | "maintenance";
+    isActive?: boolean;
+    settings?: string;
+    city?: string;
+    zipCode?: string;
+    phone?: string;
+    website?: string;
+    managerId?: string;
+    operatingHours?: string;
+    category?: string;
+    tags?: string[];
+    socialMedia?: string;
 }, {
-    status: "inactive" | "active" | "maintenance";
-    email: string;
-    name: string;
-    isActive: boolean;
-    country: string;
-    phone: string;
-    address?: string | undefined;
-    description?: string | undefined;
-    settings?: string | undefined;
-    city?: string | undefined;
-    state?: string | undefined;
-    zipCode?: string | undefined;
-    website?: string | undefined;
-    managerId?: string | null | undefined;
-    operatingHours?: string | undefined;
-    category?: string | undefined;
-    tags?: string[] | undefined;
-    socialMedia?: string | undefined;
+    name?: string;
+    state?: string;
+    address?: string;
+    country?: string;
+    email?: string;
+    description?: string;
+    status?: "active" | "inactive" | "maintenance";
+    isActive?: boolean;
+    settings?: string;
+    city?: string;
+    zipCode?: string;
+    phone?: string;
+    website?: string;
+    managerId?: string;
+    operatingHours?: string;
+    category?: string;
+    tags?: string[];
+    socialMedia?: string;
 }>;
 export type Shop = typeof shops.$inferSelect;
 export type InsertShop = z.infer<typeof insertShopSchema>;
@@ -7746,27 +7445,27 @@ export declare const createEmailContactSchema: z.ZodObject<{
     consentGiven: z.ZodEffects<z.ZodBoolean, boolean, boolean>;
     consentMethod: z.ZodDefault<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    status: "active" | "pending" | "unsubscribed" | "bounced";
-    email: string;
-    birthdayEmailEnabled: boolean;
-    consentGiven: boolean;
-    consentMethod: string;
-    birthday?: string | undefined;
-    firstName?: string | undefined;
-    lastName?: string | undefined;
-    tags?: string[] | undefined;
-    lists?: string[] | undefined;
+    email?: string;
+    status?: "active" | "pending" | "unsubscribed" | "bounced";
+    firstName?: string;
+    lastName?: string;
+    tags?: string[];
+    birthday?: string;
+    birthdayEmailEnabled?: boolean;
+    consentGiven?: boolean;
+    consentMethod?: string;
+    lists?: string[];
 }, {
-    email: string;
-    consentGiven: boolean;
-    status?: "active" | "pending" | "unsubscribed" | "bounced" | undefined;
-    birthday?: string | undefined;
-    firstName?: string | undefined;
-    lastName?: string | undefined;
-    tags?: string[] | undefined;
-    birthdayEmailEnabled?: boolean | undefined;
-    consentMethod?: string | undefined;
-    lists?: string[] | undefined;
+    email?: string;
+    status?: "active" | "pending" | "unsubscribed" | "bounced";
+    firstName?: string;
+    lastName?: string;
+    tags?: string[];
+    birthday?: string;
+    birthdayEmailEnabled?: boolean;
+    consentGiven?: boolean;
+    consentMethod?: string;
+    lists?: string[];
 }>;
 export declare const updateEmailContactSchema: z.ZodObject<{
     email: z.ZodOptional<z.ZodString>;
@@ -7778,43 +7477,43 @@ export declare const updateEmailContactSchema: z.ZodObject<{
     birthday: z.ZodOptional<z.ZodString>;
     birthdayEmailEnabled: z.ZodOptional<z.ZodBoolean>;
 }, "strip", z.ZodTypeAny, {
-    status?: "active" | "pending" | "unsubscribed" | "bounced" | undefined;
-    email?: string | undefined;
-    birthday?: string | undefined;
-    firstName?: string | undefined;
-    lastName?: string | undefined;
-    lastActivity?: Date | undefined;
-    emailsOpened?: number | undefined;
-    birthdayEmailEnabled?: boolean | undefined;
+    email?: string;
+    status?: "active" | "pending" | "unsubscribed" | "bounced";
+    firstName?: string;
+    lastName?: string;
+    lastActivity?: Date;
+    emailsOpened?: number;
+    birthday?: string;
+    birthdayEmailEnabled?: boolean;
 }, {
-    status?: "active" | "pending" | "unsubscribed" | "bounced" | undefined;
-    email?: string | undefined;
-    birthday?: string | undefined;
-    firstName?: string | undefined;
-    lastName?: string | undefined;
-    lastActivity?: Date | undefined;
-    emailsOpened?: number | undefined;
-    birthdayEmailEnabled?: boolean | undefined;
+    email?: string;
+    status?: "active" | "pending" | "unsubscribed" | "bounced";
+    firstName?: string;
+    lastName?: string;
+    lastActivity?: Date;
+    emailsOpened?: number;
+    birthday?: string;
+    birthdayEmailEnabled?: boolean;
 }>;
 export declare const createEmailListSchema: z.ZodObject<{
     name: z.ZodString;
     description: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    name: string;
-    description?: string | undefined;
+    name?: string;
+    description?: string;
 }, {
-    name: string;
-    description?: string | undefined;
+    name?: string;
+    description?: string;
 }>;
 export declare const createContactTagSchema: z.ZodObject<{
     name: z.ZodString;
     color: z.ZodDefault<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    name: string;
-    color: string;
+    name?: string;
+    color?: string;
 }, {
-    name: string;
-    color?: string | undefined;
+    name?: string;
+    color?: string;
 }>;
 export type EmailContact = typeof emailContacts.$inferSelect;
 export type InsertEmailContact = typeof emailContacts.$inferInsert;
@@ -7840,65 +7539,29 @@ export declare const createEmailActivitySchema: z.ZodObject<{
     webhookData: z.ZodOptional<z.ZodString>;
     occurredAt: z.ZodDate;
 }, "strip", z.ZodTypeAny, {
-    contactId: string;
-    activityType: "sent" | "unsubscribed" | "bounced" | "delivered" | "opened" | "clicked" | "complained";
-    occurredAt: Date;
-    ipAddress?: string | undefined;
-    userAgent?: string | undefined;
-    newsletterId?: string | undefined;
-    campaignId?: string | undefined;
-    activityData?: string | undefined;
-    webhookId?: string | undefined;
-    webhookData?: string | undefined;
+    ipAddress?: string;
+    userAgent?: string;
+    contactId?: string;
+    newsletterId?: string;
+    campaignId?: string;
+    activityType?: "unsubscribed" | "bounced" | "sent" | "delivered" | "opened" | "clicked" | "complained";
+    activityData?: string;
+    webhookId?: string;
+    webhookData?: string;
+    occurredAt?: Date;
 }, {
-    contactId: string;
-    activityType: "sent" | "unsubscribed" | "bounced" | "delivered" | "opened" | "clicked" | "complained";
-    occurredAt: Date;
-    ipAddress?: string | undefined;
-    userAgent?: string | undefined;
-    newsletterId?: string | undefined;
-    campaignId?: string | undefined;
-    activityData?: string | undefined;
-    webhookId?: string | undefined;
-    webhookData?: string | undefined;
+    ipAddress?: string;
+    userAgent?: string;
+    contactId?: string;
+    newsletterId?: string;
+    campaignId?: string;
+    activityType?: "unsubscribed" | "bounced" | "sent" | "delivered" | "opened" | "clicked" | "complained";
+    activityData?: string;
+    webhookId?: string;
+    webhookData?: string;
+    occurredAt?: Date;
 }>;
-export declare const insertEmailActivitySchema: z.ZodObject<Omit<{
-    id: z.ZodOptional<z.ZodString>;
-    tenantId: z.ZodString;
-    contactId: z.ZodString;
-    campaignId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    newsletterId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    activityType: z.ZodString;
-    activityData: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    userAgent: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    ipAddress: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    webhookId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    webhookData: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    occurredAt: z.ZodDate;
-    createdAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-}, "id" | "tenantId" | "createdAt">, "strip", z.ZodTypeAny, {
-    contactId: string;
-    activityType: string;
-    occurredAt: Date;
-    ipAddress?: string | null | undefined;
-    userAgent?: string | null | undefined;
-    newsletterId?: string | null | undefined;
-    campaignId?: string | null | undefined;
-    activityData?: string | null | undefined;
-    webhookId?: string | null | undefined;
-    webhookData?: string | null | undefined;
-}, {
-    contactId: string;
-    activityType: string;
-    occurredAt: Date;
-    ipAddress?: string | null | undefined;
-    userAgent?: string | null | undefined;
-    newsletterId?: string | null | undefined;
-    campaignId?: string | null | undefined;
-    activityData?: string | null | undefined;
-    webhookId?: string | null | undefined;
-    webhookData?: string | null | undefined;
-}>;
+export declare const insertEmailActivitySchema: z.ZodObject<Omit<{}, "id" | "createdAt" | "tenantId">, "strip", z.ZodTypeAny, {}, {}>;
 export type EmailActivity = typeof emailActivity.$inferSelect;
 export type InsertEmailActivity = z.infer<typeof insertEmailActivitySchema>;
 export type CreateEmailActivityData = z.infer<typeof createEmailActivitySchema>;
@@ -7935,23 +7598,23 @@ export declare const createNewsletterSchema: z.ZodObject<{
     selectedContactIds: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
     selectedTagIds: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
 }, "strip", z.ZodTypeAny, {
-    status: "scheduled" | "draft";
-    subject: string;
-    content: string;
-    title: string;
-    recipientType: "all" | "tags" | "selected";
-    scheduledAt?: Date | undefined;
-    selectedContactIds?: string[] | undefined;
-    selectedTagIds?: string[] | undefined;
+    content?: string;
+    title?: string;
+    status?: "draft" | "scheduled";
+    subject?: string;
+    scheduledAt?: Date;
+    recipientType?: "all" | "tags" | "selected";
+    selectedContactIds?: string[];
+    selectedTagIds?: string[];
 }, {
-    subject: string;
-    content: string;
-    title: string;
-    status?: "scheduled" | "draft" | undefined;
-    scheduledAt?: Date | undefined;
-    recipientType?: "all" | "tags" | "selected" | undefined;
-    selectedContactIds?: string[] | undefined;
-    selectedTagIds?: string[] | undefined;
+    content?: string;
+    title?: string;
+    status?: "draft" | "scheduled";
+    subject?: string;
+    scheduledAt?: Date;
+    recipientType?: "all" | "tags" | "selected";
+    selectedContactIds?: string[];
+    selectedTagIds?: string[];
 }>;
 export declare const updateNewsletterSchema: z.ZodObject<{
     title: z.ZodOptional<z.ZodString>;
@@ -7968,82 +7631,35 @@ export declare const updateNewsletterSchema: z.ZodObject<{
     uniqueOpenCount: z.ZodOptional<z.ZodNumber>;
     clickCount: z.ZodOptional<z.ZodNumber>;
 }, "strip", z.ZodTypeAny, {
-    status?: "scheduled" | "sent" | "draft" | undefined;
-    subject?: string | undefined;
-    content?: string | undefined;
-    scheduledAt?: Date | undefined;
-    sentAt?: Date | undefined;
-    title?: string | undefined;
-    recipientType?: "all" | "tags" | "selected" | undefined;
-    selectedContactIds?: string[] | undefined;
-    selectedTagIds?: string[] | undefined;
-    recipientCount?: number | undefined;
-    openCount?: number | undefined;
-    uniqueOpenCount?: number | undefined;
-    clickCount?: number | undefined;
+    content?: string;
+    title?: string;
+    status?: "draft" | "sent" | "scheduled";
+    subject?: string;
+    scheduledAt?: Date;
+    sentAt?: Date;
+    recipientType?: "all" | "tags" | "selected";
+    selectedContactIds?: string[];
+    selectedTagIds?: string[];
+    recipientCount?: number;
+    openCount?: number;
+    uniqueOpenCount?: number;
+    clickCount?: number;
 }, {
-    status?: "scheduled" | "sent" | "draft" | undefined;
-    subject?: string | undefined;
-    content?: string | undefined;
-    scheduledAt?: Date | undefined;
-    sentAt?: Date | undefined;
-    title?: string | undefined;
-    recipientType?: "all" | "tags" | "selected" | undefined;
-    selectedContactIds?: string[] | undefined;
-    selectedTagIds?: string[] | undefined;
-    recipientCount?: number | undefined;
-    openCount?: number | undefined;
-    uniqueOpenCount?: number | undefined;
-    clickCount?: number | undefined;
+    content?: string;
+    title?: string;
+    status?: "draft" | "sent" | "scheduled";
+    subject?: string;
+    scheduledAt?: Date;
+    sentAt?: Date;
+    recipientType?: "all" | "tags" | "selected";
+    selectedContactIds?: string[];
+    selectedTagIds?: string[];
+    recipientCount?: number;
+    openCount?: number;
+    uniqueOpenCount?: number;
+    clickCount?: number;
 }>;
-export declare const insertNewsletterSchema: z.ZodObject<Omit<{
-    id: z.ZodOptional<z.ZodString>;
-    tenantId: z.ZodString;
-    userId: z.ZodString;
-    title: z.ZodString;
-    subject: z.ZodString;
-    content: z.ZodString;
-    status: z.ZodOptional<z.ZodString>;
-    scheduledAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    sentAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    recipientType: z.ZodOptional<z.ZodString>;
-    selectedContactIds: z.ZodOptional<z.ZodNullable<z.ZodArray<z.ZodString, "many">>>;
-    selectedTagIds: z.ZodOptional<z.ZodNullable<z.ZodArray<z.ZodString, "many">>>;
-    recipientCount: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
-    openCount: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
-    uniqueOpenCount: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
-    clickCount: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
-    createdAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    updatedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-}, "id" | "tenantId" | "createdAt" | "updatedAt" | "userId">, "strip", z.ZodTypeAny, {
-    subject: string;
-    content: string;
-    title: string;
-    status?: string | undefined;
-    scheduledAt?: Date | null | undefined;
-    sentAt?: Date | null | undefined;
-    recipientType?: string | undefined;
-    selectedContactIds?: string[] | null | undefined;
-    selectedTagIds?: string[] | null | undefined;
-    recipientCount?: number | null | undefined;
-    openCount?: number | null | undefined;
-    uniqueOpenCount?: number | null | undefined;
-    clickCount?: number | null | undefined;
-}, {
-    subject: string;
-    content: string;
-    title: string;
-    status?: string | undefined;
-    scheduledAt?: Date | null | undefined;
-    sentAt?: Date | null | undefined;
-    recipientType?: string | undefined;
-    selectedContactIds?: string[] | null | undefined;
-    selectedTagIds?: string[] | null | undefined;
-    recipientCount?: number | null | undefined;
-    openCount?: number | null | undefined;
-    uniqueOpenCount?: number | null | undefined;
-    clickCount?: number | null | undefined;
-}>;
+export declare const insertNewsletterSchema: z.ZodObject<Omit<{}, "id" | "createdAt" | "updatedAt" | "tenantId" | "userId">, "strip", z.ZodTypeAny, {}, {}>;
 export type Newsletter = typeof newsletters.$inferSelect;
 export type InsertNewsletter = z.infer<typeof insertNewsletterSchema>;
 export type CreateNewsletterData = z.infer<typeof createNewsletterSchema>;
@@ -8057,21 +7673,21 @@ export declare const createNewsletterTaskStatusSchema: z.ZodObject<{
     errorMessage: z.ZodOptional<z.ZodString>;
     metadata: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    status: "failed" | "pending" | "running" | "completed";
-    taskType: "sending" | "validation" | "processing" | "analytics";
-    taskName: string;
-    progress: number;
-    metadata?: string | undefined;
-    details?: string | undefined;
-    errorMessage?: string | undefined;
+    progress?: number;
+    details?: string;
+    metadata?: string;
+    status?: "failed" | "running" | "pending" | "completed";
+    taskType?: "validation" | "processing" | "sending" | "analytics";
+    taskName?: string;
+    errorMessage?: string;
 }, {
-    taskType: "sending" | "validation" | "processing" | "analytics";
-    taskName: string;
-    status?: "failed" | "pending" | "running" | "completed" | undefined;
-    metadata?: string | undefined;
-    progress?: number | undefined;
-    details?: string | undefined;
-    errorMessage?: string | undefined;
+    progress?: number;
+    details?: string;
+    metadata?: string;
+    status?: "failed" | "running" | "pending" | "completed";
+    taskType?: "validation" | "processing" | "sending" | "analytics";
+    taskName?: string;
+    errorMessage?: string;
 }>;
 export declare const updateNewsletterTaskStatusSchema: z.ZodObject<{
     status: z.ZodOptional<z.ZodEnum<["pending", "running", "completed", "failed"]>>;
@@ -8083,63 +7699,25 @@ export declare const updateNewsletterTaskStatusSchema: z.ZodObject<{
     errorMessage: z.ZodOptional<z.ZodString>;
     metadata: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    status?: "failed" | "pending" | "running" | "completed" | undefined;
-    metadata?: string | undefined;
-    progress?: number | undefined;
-    startedAt?: Date | undefined;
-    completedAt?: Date | undefined;
-    duration?: number | undefined;
-    details?: string | undefined;
-    errorMessage?: string | undefined;
+    progress?: number;
+    details?: string;
+    metadata?: string;
+    status?: "failed" | "running" | "pending" | "completed";
+    duration?: number;
+    startedAt?: Date;
+    completedAt?: Date;
+    errorMessage?: string;
 }, {
-    status?: "failed" | "pending" | "running" | "completed" | undefined;
-    metadata?: string | undefined;
-    progress?: number | undefined;
-    startedAt?: Date | undefined;
-    completedAt?: Date | undefined;
-    duration?: number | undefined;
-    details?: string | undefined;
-    errorMessage?: string | undefined;
+    progress?: number;
+    details?: string;
+    metadata?: string;
+    status?: "failed" | "running" | "pending" | "completed";
+    duration?: number;
+    startedAt?: Date;
+    completedAt?: Date;
+    errorMessage?: string;
 }>;
-export declare const insertNewsletterTaskStatusSchema: z.ZodObject<Omit<{
-    id: z.ZodOptional<z.ZodString>;
-    tenantId: z.ZodString;
-    newsletterId: z.ZodString;
-    taskType: z.ZodString;
-    taskName: z.ZodString;
-    status: z.ZodOptional<z.ZodString>;
-    progress: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
-    startedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    completedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    duration: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
-    details: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    errorMessage: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    metadata: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    createdAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    updatedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-}, "id" | "tenantId" | "createdAt" | "updatedAt" | "newsletterId">, "strip", z.ZodTypeAny, {
-    taskType: string;
-    taskName: string;
-    status?: string | undefined;
-    metadata?: string | null | undefined;
-    progress?: number | null | undefined;
-    startedAt?: Date | null | undefined;
-    completedAt?: Date | null | undefined;
-    duration?: number | null | undefined;
-    details?: string | null | undefined;
-    errorMessage?: string | null | undefined;
-}, {
-    taskType: string;
-    taskName: string;
-    status?: string | undefined;
-    metadata?: string | null | undefined;
-    progress?: number | null | undefined;
-    startedAt?: Date | null | undefined;
-    completedAt?: Date | null | undefined;
-    duration?: number | null | undefined;
-    details?: string | null | undefined;
-    errorMessage?: string | null | undefined;
-}>;
+export declare const insertNewsletterTaskStatusSchema: z.ZodObject<Omit<{}, "id" | "createdAt" | "updatedAt" | "tenantId" | "newsletterId">, "strip", z.ZodTypeAny, {}, {}>;
 export type NewsletterTaskStatus = typeof newsletterTaskStatus.$inferSelect;
 export type InsertNewsletterTaskStatus = z.infer<typeof insertNewsletterTaskStatusSchema>;
 export type CreateNewsletterTaskStatusData = z.infer<typeof createNewsletterTaskStatusSchema>;
@@ -8165,35 +7743,35 @@ export declare const createCampaignSchema: z.ZodObject<{
     requiresReviewerApproval: z.ZodDefault<z.ZodBoolean>;
     reviewerId: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    type: "push" | "email" | "sms" | "social";
-    status: "active" | "draft" | "completed" | "paused" | "cancelled";
-    name: string;
-    currency: string;
-    requiresReviewerApproval: boolean;
-    description?: string | undefined;
-    settings?: string | undefined;
-    budget?: number | undefined;
-    startDate?: Date | undefined;
-    endDate?: Date | undefined;
-    targetAudience?: string | undefined;
-    goals?: string[] | undefined;
-    kpis?: string | undefined;
-    reviewerId?: string | undefined;
+    currency?: string;
+    name?: string;
+    type?: "push" | "email" | "sms" | "social";
+    description?: string;
+    status?: "active" | "paused" | "completed" | "draft" | "cancelled";
+    settings?: string;
+    budget?: number;
+    startDate?: Date;
+    endDate?: Date;
+    targetAudience?: string;
+    goals?: string[];
+    kpis?: string;
+    requiresReviewerApproval?: boolean;
+    reviewerId?: string;
 }, {
-    name: string;
-    type?: "push" | "email" | "sms" | "social" | undefined;
-    status?: "active" | "draft" | "completed" | "paused" | "cancelled" | undefined;
-    description?: string | undefined;
-    settings?: string | undefined;
-    budget?: number | undefined;
-    currency?: string | undefined;
-    startDate?: Date | undefined;
-    endDate?: Date | undefined;
-    targetAudience?: string | undefined;
-    goals?: string[] | undefined;
-    kpis?: string | undefined;
-    requiresReviewerApproval?: boolean | undefined;
-    reviewerId?: string | undefined;
+    currency?: string;
+    name?: string;
+    type?: "push" | "email" | "sms" | "social";
+    description?: string;
+    status?: "active" | "paused" | "completed" | "draft" | "cancelled";
+    settings?: string;
+    budget?: number;
+    startDate?: Date;
+    endDate?: Date;
+    targetAudience?: string;
+    goals?: string[];
+    kpis?: string;
+    requiresReviewerApproval?: boolean;
+    reviewerId?: string;
 }>;
 export declare const updateCampaignSchema: z.ZodObject<{
     name: z.ZodOptional<z.ZodString>;
@@ -8214,117 +7792,43 @@ export declare const updateCampaignSchema: z.ZodObject<{
     reviewNotes: z.ZodOptional<z.ZodString>;
     isActive: z.ZodOptional<z.ZodBoolean>;
 }, "strip", z.ZodTypeAny, {
-    type?: "push" | "email" | "sms" | "social" | undefined;
-    status?: "active" | "draft" | "completed" | "paused" | "cancelled" | undefined;
-    name?: string | undefined;
-    description?: string | undefined;
-    isActive?: boolean | undefined;
-    settings?: string | undefined;
-    budget?: number | undefined;
-    currency?: string | undefined;
-    startDate?: Date | undefined;
-    endDate?: Date | undefined;
-    targetAudience?: string | undefined;
-    goals?: string[] | undefined;
-    kpis?: string | undefined;
-    requiresReviewerApproval?: boolean | undefined;
-    reviewerId?: string | undefined;
-    reviewStatus?: "rejected" | "pending" | "approved" | undefined;
-    reviewNotes?: string | undefined;
+    currency?: string;
+    name?: string;
+    type?: "push" | "email" | "sms" | "social";
+    description?: string;
+    status?: "active" | "paused" | "completed" | "draft" | "cancelled";
+    isActive?: boolean;
+    settings?: string;
+    budget?: number;
+    startDate?: Date;
+    endDate?: Date;
+    targetAudience?: string;
+    goals?: string[];
+    kpis?: string;
+    requiresReviewerApproval?: boolean;
+    reviewerId?: string;
+    reviewStatus?: "pending" | "rejected" | "approved";
+    reviewNotes?: string;
 }, {
-    type?: "push" | "email" | "sms" | "social" | undefined;
-    status?: "active" | "draft" | "completed" | "paused" | "cancelled" | undefined;
-    name?: string | undefined;
-    description?: string | undefined;
-    isActive?: boolean | undefined;
-    settings?: string | undefined;
-    budget?: number | undefined;
-    currency?: string | undefined;
-    startDate?: Date | undefined;
-    endDate?: Date | undefined;
-    targetAudience?: string | undefined;
-    goals?: string[] | undefined;
-    kpis?: string | undefined;
-    requiresReviewerApproval?: boolean | undefined;
-    reviewerId?: string | undefined;
-    reviewStatus?: "rejected" | "pending" | "approved" | undefined;
-    reviewNotes?: string | undefined;
+    currency?: string;
+    name?: string;
+    type?: "push" | "email" | "sms" | "social";
+    description?: string;
+    status?: "active" | "paused" | "completed" | "draft" | "cancelled";
+    isActive?: boolean;
+    settings?: string;
+    budget?: number;
+    startDate?: Date;
+    endDate?: Date;
+    targetAudience?: string;
+    goals?: string[];
+    kpis?: string;
+    requiresReviewerApproval?: boolean;
+    reviewerId?: string;
+    reviewStatus?: "pending" | "rejected" | "approved";
+    reviewNotes?: string;
 }>;
-export declare const insertCampaignSchema: z.ZodObject<Omit<{
-    id: z.ZodOptional<z.ZodString>;
-    tenantId: z.ZodString;
-    userId: z.ZodString;
-    name: z.ZodString;
-    description: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    type: z.ZodOptional<z.ZodString>;
-    status: z.ZodOptional<z.ZodString>;
-    budget: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    currency: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    startDate: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    endDate: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    targetAudience: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    goals: z.ZodOptional<z.ZodNullable<z.ZodArray<z.ZodString, "many">>>;
-    kpis: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    settings: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    impressions: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
-    clicks: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
-    conversions: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
-    spent: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    requiresReviewerApproval: z.ZodOptional<z.ZodNullable<z.ZodBoolean>>;
-    reviewerId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    reviewStatus: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    reviewedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    reviewNotes: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    isActive: z.ZodOptional<z.ZodNullable<z.ZodBoolean>>;
-    createdAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    updatedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-}, "id" | "tenantId" | "createdAt" | "updatedAt" | "userId">, "strip", z.ZodTypeAny, {
-    name: string;
-    type?: string | undefined;
-    status?: string | undefined;
-    description?: string | null | undefined;
-    isActive?: boolean | null | undefined;
-    settings?: string | null | undefined;
-    budget?: string | null | undefined;
-    currency?: string | null | undefined;
-    startDate?: Date | null | undefined;
-    endDate?: Date | null | undefined;
-    targetAudience?: string | null | undefined;
-    goals?: string[] | null | undefined;
-    kpis?: string | null | undefined;
-    impressions?: number | null | undefined;
-    clicks?: number | null | undefined;
-    conversions?: number | null | undefined;
-    spent?: string | null | undefined;
-    requiresReviewerApproval?: boolean | null | undefined;
-    reviewerId?: string | null | undefined;
-    reviewStatus?: string | null | undefined;
-    reviewedAt?: Date | null | undefined;
-    reviewNotes?: string | null | undefined;
-}, {
-    name: string;
-    type?: string | undefined;
-    status?: string | undefined;
-    description?: string | null | undefined;
-    isActive?: boolean | null | undefined;
-    settings?: string | null | undefined;
-    budget?: string | null | undefined;
-    currency?: string | null | undefined;
-    startDate?: Date | null | undefined;
-    endDate?: Date | null | undefined;
-    targetAudience?: string | null | undefined;
-    goals?: string[] | null | undefined;
-    kpis?: string | null | undefined;
-    impressions?: number | null | undefined;
-    clicks?: number | null | undefined;
-    conversions?: number | null | undefined;
-    spent?: string | null | undefined;
-    requiresReviewerApproval?: boolean | null | undefined;
-    reviewerId?: string | null | undefined;
-    reviewStatus?: string | null | undefined;
-    reviewedAt?: Date | null | undefined;
-    reviewNotes?: string | null | undefined;
-}>;
+export declare const insertCampaignSchema: z.ZodObject<Omit<{}, "id" | "createdAt" | "updatedAt" | "tenantId" | "userId">, "strip", z.ZodTypeAny, {}, {}>;
 export type Campaign = typeof campaigns.$inferSelect;
 export type InsertCampaign = z.infer<typeof insertCampaignSchema>;
 export type CreateCampaignData = z.infer<typeof createCampaignSchema>;
@@ -8350,35 +7854,35 @@ export declare const createBouncedEmailSchema: z.ZodObject<{
     suppressionReason: z.ZodOptional<z.ZodString>;
     lastAttemptedAt: z.ZodOptional<z.ZodDate>;
 }, "strip", z.ZodTypeAny, {
-    email: string;
-    bounceType: "hard" | "soft" | "complaint";
-    firstBouncedAt: Date;
-    lastBouncedAt: Date;
-    bounceCount: number;
-    webhookId?: string | undefined;
-    webhookData?: string | undefined;
-    bounceReason?: string | undefined;
-    bounceSubType?: string | undefined;
-    sourceTenantId?: string | undefined;
-    sourceNewsletterId?: string | undefined;
-    sourceCampaignId?: string | undefined;
-    suppressionReason?: string | undefined;
-    lastAttemptedAt?: Date | undefined;
+    email?: string;
+    webhookId?: string;
+    webhookData?: string;
+    bounceType?: "hard" | "soft" | "complaint";
+    bounceReason?: string;
+    bounceSubType?: string;
+    firstBouncedAt?: Date;
+    lastBouncedAt?: Date;
+    bounceCount?: number;
+    sourceTenantId?: string;
+    sourceNewsletterId?: string;
+    sourceCampaignId?: string;
+    suppressionReason?: string;
+    lastAttemptedAt?: Date;
 }, {
-    email: string;
-    firstBouncedAt: Date;
-    lastBouncedAt: Date;
-    webhookId?: string | undefined;
-    webhookData?: string | undefined;
-    bounceType?: "hard" | "soft" | "complaint" | undefined;
-    bounceReason?: string | undefined;
-    bounceSubType?: string | undefined;
-    bounceCount?: number | undefined;
-    sourceTenantId?: string | undefined;
-    sourceNewsletterId?: string | undefined;
-    sourceCampaignId?: string | undefined;
-    suppressionReason?: string | undefined;
-    lastAttemptedAt?: Date | undefined;
+    email?: string;
+    webhookId?: string;
+    webhookData?: string;
+    bounceType?: "hard" | "soft" | "complaint";
+    bounceReason?: string;
+    bounceSubType?: string;
+    firstBouncedAt?: Date;
+    lastBouncedAt?: Date;
+    bounceCount?: number;
+    sourceTenantId?: string;
+    sourceNewsletterId?: string;
+    sourceCampaignId?: string;
+    suppressionReason?: string;
+    lastAttemptedAt?: Date;
 }>;
 export declare const updateBouncedEmailSchema: z.ZodObject<{
     bounceType: z.ZodOptional<z.ZodEnum<["hard", "soft", "complaint"]>>;
@@ -8390,76 +7894,25 @@ export declare const updateBouncedEmailSchema: z.ZodObject<{
     suppressionReason: z.ZodOptional<z.ZodString>;
     lastAttemptedAt: z.ZodOptional<z.ZodDate>;
 }, "strip", z.ZodTypeAny, {
-    isActive?: boolean | undefined;
-    bounceType?: "hard" | "soft" | "complaint" | undefined;
-    bounceReason?: string | undefined;
-    bounceSubType?: string | undefined;
-    lastBouncedAt?: Date | undefined;
-    bounceCount?: number | undefined;
-    suppressionReason?: string | undefined;
-    lastAttemptedAt?: Date | undefined;
+    isActive?: boolean;
+    bounceType?: "hard" | "soft" | "complaint";
+    bounceReason?: string;
+    bounceSubType?: string;
+    lastBouncedAt?: Date;
+    bounceCount?: number;
+    suppressionReason?: string;
+    lastAttemptedAt?: Date;
 }, {
-    isActive?: boolean | undefined;
-    bounceType?: "hard" | "soft" | "complaint" | undefined;
-    bounceReason?: string | undefined;
-    bounceSubType?: string | undefined;
-    lastBouncedAt?: Date | undefined;
-    bounceCount?: number | undefined;
-    suppressionReason?: string | undefined;
-    lastAttemptedAt?: Date | undefined;
+    isActive?: boolean;
+    bounceType?: "hard" | "soft" | "complaint";
+    bounceReason?: string;
+    bounceSubType?: string;
+    lastBouncedAt?: Date;
+    bounceCount?: number;
+    suppressionReason?: string;
+    lastAttemptedAt?: Date;
 }>;
-export declare const insertBouncedEmailSchema: z.ZodObject<Omit<{
-    id: z.ZodOptional<z.ZodString>;
-    email: z.ZodString;
-    bounceType: z.ZodOptional<z.ZodString>;
-    bounceReason: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    bounceSubType: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    firstBouncedAt: z.ZodDate;
-    lastBouncedAt: z.ZodDate;
-    bounceCount: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
-    sourceTenantId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    sourceNewsletterId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    sourceCampaignId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    webhookId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    webhookData: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    isActive: z.ZodOptional<z.ZodNullable<z.ZodBoolean>>;
-    suppressionReason: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    lastAttemptedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    createdAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    updatedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-}, "id" | "createdAt" | "updatedAt">, "strip", z.ZodTypeAny, {
-    email: string;
-    firstBouncedAt: Date;
-    lastBouncedAt: Date;
-    isActive?: boolean | null | undefined;
-    webhookId?: string | null | undefined;
-    webhookData?: string | null | undefined;
-    bounceType?: string | undefined;
-    bounceReason?: string | null | undefined;
-    bounceSubType?: string | null | undefined;
-    bounceCount?: number | null | undefined;
-    sourceTenantId?: string | null | undefined;
-    sourceNewsletterId?: string | null | undefined;
-    sourceCampaignId?: string | null | undefined;
-    suppressionReason?: string | null | undefined;
-    lastAttemptedAt?: Date | null | undefined;
-}, {
-    email: string;
-    firstBouncedAt: Date;
-    lastBouncedAt: Date;
-    isActive?: boolean | null | undefined;
-    webhookId?: string | null | undefined;
-    webhookData?: string | null | undefined;
-    bounceType?: string | undefined;
-    bounceReason?: string | null | undefined;
-    bounceSubType?: string | null | undefined;
-    bounceCount?: number | null | undefined;
-    sourceTenantId?: string | null | undefined;
-    sourceNewsletterId?: string | null | undefined;
-    sourceCampaignId?: string | null | undefined;
-    suppressionReason?: string | null | undefined;
-    lastAttemptedAt?: Date | null | undefined;
-}>;
+export declare const insertBouncedEmailSchema: z.ZodObject<Omit<{}, "id" | "createdAt" | "updatedAt">, "strip", z.ZodTypeAny, {}, {}>;
 export type BouncedEmail = typeof bouncedEmails.$inferSelect;
 export type InsertBouncedEmail = z.infer<typeof insertBouncedEmailSchema>;
 export type CreateBouncedEmailData = z.infer<typeof createBouncedEmailSchema>;
@@ -8485,7 +7938,7 @@ export declare const birthdaySettings: import("drizzle-orm/pg-core").PgTableWith
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -8504,7 +7957,7 @@ export declare const birthdaySettings: import("drizzle-orm/pg-core").PgTableWith
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         enabled: import("drizzle-orm/pg-core").PgColumn<{
             name: "enabled";
@@ -8698,19 +8151,19 @@ export declare const createTenantLimitsSchema: z.ZodObject<{
     overrideReason: z.ZodOptional<z.ZodString>;
     expiresAt: z.ZodOptional<z.ZodDate>;
 }, "strip", z.ZodTypeAny, {
-    customLimits: string;
-    expiresAt?: Date | undefined;
-    maxUsers?: number | undefined;
-    maxShops?: number | undefined;
-    maxStorageGb?: number | undefined;
-    overrideReason?: string | undefined;
+    expiresAt?: Date;
+    maxUsers?: number;
+    maxShops?: number;
+    maxStorageGb?: number;
+    customLimits?: string;
+    overrideReason?: string;
 }, {
-    expiresAt?: Date | undefined;
-    maxUsers?: number | undefined;
-    maxShops?: number | undefined;
-    maxStorageGb?: number | undefined;
-    customLimits?: string | undefined;
-    overrideReason?: string | undefined;
+    expiresAt?: Date;
+    maxUsers?: number;
+    maxShops?: number;
+    maxStorageGb?: number;
+    customLimits?: string;
+    overrideReason?: string;
 }>;
 export declare const updateTenantLimitsSchema: z.ZodObject<{
     maxShops: z.ZodOptional<z.ZodNumber>;
@@ -8721,52 +8174,23 @@ export declare const updateTenantLimitsSchema: z.ZodObject<{
     expiresAt: z.ZodOptional<z.ZodDate>;
     isActive: z.ZodOptional<z.ZodBoolean>;
 }, "strip", z.ZodTypeAny, {
-    isActive?: boolean | undefined;
-    expiresAt?: Date | undefined;
-    maxUsers?: number | undefined;
-    maxShops?: number | undefined;
-    maxStorageGb?: number | undefined;
-    customLimits?: string | undefined;
-    overrideReason?: string | undefined;
+    isActive?: boolean;
+    expiresAt?: Date;
+    maxUsers?: number;
+    maxShops?: number;
+    maxStorageGb?: number;
+    customLimits?: string;
+    overrideReason?: string;
 }, {
-    isActive?: boolean | undefined;
-    expiresAt?: Date | undefined;
-    maxUsers?: number | undefined;
-    maxShops?: number | undefined;
-    maxStorageGb?: number | undefined;
-    customLimits?: string | undefined;
-    overrideReason?: string | undefined;
+    isActive?: boolean;
+    expiresAt?: Date;
+    maxUsers?: number;
+    maxShops?: number;
+    maxStorageGb?: number;
+    customLimits?: string;
+    overrideReason?: string;
 }>;
-export declare const insertTenantLimitsSchema: z.ZodObject<Omit<{
-    id: z.ZodOptional<z.ZodString>;
-    tenantId: z.ZodString;
-    maxShops: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
-    maxUsers: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
-    maxStorageGb: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
-    customLimits: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    overrideReason: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    createdBy: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    expiresAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    isActive: z.ZodOptional<z.ZodNullable<z.ZodBoolean>>;
-    createdAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    updatedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-}, "id" | "tenantId" | "createdAt" | "updatedAt" | "createdBy">, "strip", z.ZodTypeAny, {
-    isActive?: boolean | null | undefined;
-    expiresAt?: Date | null | undefined;
-    maxUsers?: number | null | undefined;
-    maxShops?: number | null | undefined;
-    maxStorageGb?: number | null | undefined;
-    customLimits?: string | null | undefined;
-    overrideReason?: string | null | undefined;
-}, {
-    isActive?: boolean | null | undefined;
-    expiresAt?: Date | null | undefined;
-    maxUsers?: number | null | undefined;
-    maxShops?: number | null | undefined;
-    maxStorageGb?: number | null | undefined;
-    customLimits?: string | null | undefined;
-    overrideReason?: string | null | undefined;
-}>;
+export declare const insertTenantLimitsSchema: z.ZodObject<Omit<{}, "id" | "createdAt" | "updatedAt" | "tenantId" | "createdBy">, "strip", z.ZodTypeAny, {}, {}>;
 export type TenantLimits = typeof tenantLimits.$inferSelect;
 export type InsertTenantLimits = z.infer<typeof insertTenantLimitsSchema>;
 export type CreateTenantLimitsData = z.infer<typeof createTenantLimitsSchema>;
@@ -8779,45 +8203,21 @@ export declare const createShopLimitEventSchema: z.ZodObject<{
     customLimitId: z.ZodOptional<z.ZodString>;
     metadata: z.ZodDefault<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    metadata: string;
-    eventType: "limit_reached" | "limit_exceeded" | "limit_increased" | "limit_decreased" | "shop_created" | "shop_deleted";
-    shopCount: number;
-    subscriptionPlanId?: string | undefined;
-    limitValue?: number | undefined;
-    customLimitId?: string | undefined;
+    metadata?: string;
+    subscriptionPlanId?: string;
+    eventType?: "limit_reached" | "limit_exceeded" | "limit_increased" | "limit_decreased" | "shop_created" | "shop_deleted";
+    shopCount?: number;
+    limitValue?: number;
+    customLimitId?: string;
 }, {
-    eventType: "limit_reached" | "limit_exceeded" | "limit_increased" | "limit_decreased" | "shop_created" | "shop_deleted";
-    shopCount: number;
-    metadata?: string | undefined;
-    subscriptionPlanId?: string | undefined;
-    limitValue?: number | undefined;
-    customLimitId?: string | undefined;
+    metadata?: string;
+    subscriptionPlanId?: string;
+    eventType?: "limit_reached" | "limit_exceeded" | "limit_increased" | "limit_decreased" | "shop_created" | "shop_deleted";
+    shopCount?: number;
+    limitValue?: number;
+    customLimitId?: string;
 }>;
-export declare const insertShopLimitEventSchema: z.ZodObject<Omit<{
-    id: z.ZodOptional<z.ZodString>;
-    tenantId: z.ZodString;
-    eventType: z.ZodString;
-    shopCount: z.ZodNumber;
-    limitValue: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
-    subscriptionPlanId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    customLimitId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    metadata: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    createdAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-}, "id" | "tenantId" | "createdAt">, "strip", z.ZodTypeAny, {
-    eventType: string;
-    shopCount: number;
-    metadata?: string | null | undefined;
-    subscriptionPlanId?: string | null | undefined;
-    limitValue?: number | null | undefined;
-    customLimitId?: string | null | undefined;
-}, {
-    eventType: string;
-    shopCount: number;
-    metadata?: string | null | undefined;
-    subscriptionPlanId?: string | null | undefined;
-    limitValue?: number | null | undefined;
-    customLimitId?: string | null | undefined;
-}>;
+export declare const insertShopLimitEventSchema: z.ZodObject<Omit<{}, "id" | "createdAt" | "tenantId">, "strip", z.ZodTypeAny, {}, {}>;
 export type ShopLimitEvent = typeof shopLimitEvents.$inferSelect;
 export type InsertShopLimitEvent = z.infer<typeof insertShopLimitEventSchema>;
 export type CreateShopLimitEventData = z.infer<typeof createShopLimitEventSchema>;
@@ -8855,21 +8255,21 @@ export declare const createBirthdaySettingsSchema: z.ZodObject<{
     senderName: z.ZodDefault<z.ZodString>;
     senderEmail: z.ZodDefault<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    enabled: boolean;
-    sendDaysBefore: number;
-    emailTemplate: string;
-    segmentFilter: string;
-    customMessage: string;
-    senderName: string;
-    senderEmail: string;
+    enabled?: boolean;
+    sendDaysBefore?: number;
+    emailTemplate?: string;
+    segmentFilter?: string;
+    customMessage?: string;
+    senderName?: string;
+    senderEmail?: string;
 }, {
-    enabled?: boolean | undefined;
-    sendDaysBefore?: number | undefined;
-    emailTemplate?: string | undefined;
-    segmentFilter?: string | undefined;
-    customMessage?: string | undefined;
-    senderName?: string | undefined;
-    senderEmail?: string | undefined;
+    enabled?: boolean;
+    sendDaysBefore?: number;
+    emailTemplate?: string;
+    segmentFilter?: string;
+    customMessage?: string;
+    senderName?: string;
+    senderEmail?: string;
 }>;
 export declare const updateBirthdaySettingsSchema: z.ZodObject<{
     enabled: z.ZodOptional<z.ZodBoolean>;
@@ -8880,54 +8280,23 @@ export declare const updateBirthdaySettingsSchema: z.ZodObject<{
     senderName: z.ZodOptional<z.ZodString>;
     senderEmail: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    enabled?: boolean | undefined;
-    sendDaysBefore?: number | undefined;
-    emailTemplate?: string | undefined;
-    segmentFilter?: string | undefined;
-    customMessage?: string | undefined;
-    senderName?: string | undefined;
-    senderEmail?: string | undefined;
+    enabled?: boolean;
+    sendDaysBefore?: number;
+    emailTemplate?: string;
+    segmentFilter?: string;
+    customMessage?: string;
+    senderName?: string;
+    senderEmail?: string;
 }, {
-    enabled?: boolean | undefined;
-    sendDaysBefore?: number | undefined;
-    emailTemplate?: string | undefined;
-    segmentFilter?: string | undefined;
-    customMessage?: string | undefined;
-    senderName?: string | undefined;
-    senderEmail?: string | undefined;
+    enabled?: boolean;
+    sendDaysBefore?: number;
+    emailTemplate?: string;
+    segmentFilter?: string;
+    customMessage?: string;
+    senderName?: string;
+    senderEmail?: string;
 }>;
-export declare const insertBirthdaySettingsSchema: z.ZodObject<Omit<{
-    id: z.ZodOptional<z.ZodString>;
-    tenantId: z.ZodString;
-    enabled: z.ZodOptional<z.ZodNullable<z.ZodBoolean>>;
-    sendDaysBefore: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
-    emailTemplate: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    segmentFilter: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    customMessage: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    customThemeData: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    senderName: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    senderEmail: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    createdAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    updatedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-}, "id" | "tenantId" | "createdAt" | "updatedAt">, "strip", z.ZodTypeAny, {
-    enabled?: boolean | null | undefined;
-    sendDaysBefore?: number | null | undefined;
-    emailTemplate?: string | null | undefined;
-    segmentFilter?: string | null | undefined;
-    customMessage?: string | null | undefined;
-    customThemeData?: string | null | undefined;
-    senderName?: string | null | undefined;
-    senderEmail?: string | null | undefined;
-}, {
-    enabled?: boolean | null | undefined;
-    sendDaysBefore?: number | null | undefined;
-    emailTemplate?: string | null | undefined;
-    segmentFilter?: string | null | undefined;
-    customMessage?: string | null | undefined;
-    customThemeData?: string | null | undefined;
-    senderName?: string | null | undefined;
-    senderEmail?: string | null | undefined;
-}>;
+export declare const insertBirthdaySettingsSchema: z.ZodObject<Omit<{}, "id" | "createdAt" | "updatedAt" | "tenantId">, "strip", z.ZodTypeAny, {}, {}>;
 export type BirthdaySettings = typeof birthdaySettings.$inferSelect;
 export type InsertBirthdaySettings = z.infer<typeof insertBirthdaySettingsSchema>;
 export type CreateBirthdaySettingsData = z.infer<typeof createBirthdaySettingsSchema>;
@@ -8965,7 +8334,7 @@ export declare const promotions: import("drizzle-orm/pg-core").PgTableWithColumn
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -8984,7 +8353,7 @@ export declare const promotions: import("drizzle-orm/pg-core").PgTableWithColumn
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         userId: import("drizzle-orm/pg-core").PgColumn<{
             name: "user_id";
@@ -9003,7 +8372,7 @@ export declare const promotions: import("drizzle-orm/pg-core").PgTableWithColumn
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         title: import("drizzle-orm/pg-core").PgColumn<{
             name: "title";
@@ -9263,29 +8632,29 @@ export declare const createPromotionSchema: z.ZodObject<{
     promotionalCodes: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
     metadata: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    type: "birthday" | "newsletter" | "survey" | "announcement" | "sale" | "event";
-    content: string;
-    isActive: boolean;
-    title: string;
-    targetAudience: "all" | "subscribers" | "customers" | "prospects" | "vip";
-    metadata?: string | undefined;
-    description?: string | undefined;
-    maxUses?: number | undefined;
-    validFrom?: Date | undefined;
-    validTo?: Date | undefined;
-    promotionalCodes?: string[] | undefined;
+    type?: "event" | "birthday" | "newsletter" | "survey" | "announcement" | "sale";
+    content?: string;
+    title?: string;
+    metadata?: string;
+    description?: string;
+    isActive?: boolean;
+    targetAudience?: "all" | "subscribers" | "customers" | "prospects" | "vip";
+    maxUses?: number;
+    validFrom?: Date;
+    validTo?: Date;
+    promotionalCodes?: string[];
 }, {
-    content: string;
-    title: string;
-    type?: "birthday" | "newsletter" | "survey" | "announcement" | "sale" | "event" | undefined;
-    metadata?: string | undefined;
-    description?: string | undefined;
-    isActive?: boolean | undefined;
-    targetAudience?: "all" | "subscribers" | "customers" | "prospects" | "vip" | undefined;
-    maxUses?: number | undefined;
-    validFrom?: Date | undefined;
-    validTo?: Date | undefined;
-    promotionalCodes?: string[] | undefined;
+    type?: "event" | "birthday" | "newsletter" | "survey" | "announcement" | "sale";
+    content?: string;
+    title?: string;
+    metadata?: string;
+    description?: string;
+    isActive?: boolean;
+    targetAudience?: "all" | "subscribers" | "customers" | "prospects" | "vip";
+    maxUses?: number;
+    validFrom?: Date;
+    validTo?: Date;
+    promotionalCodes?: string[];
 }>;
 export declare const updatePromotionSchema: z.ZodObject<{
     title: z.ZodOptional<z.ZodString>;
@@ -9300,73 +8669,31 @@ export declare const updatePromotionSchema: z.ZodObject<{
     promotionalCodes: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
     metadata: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    type?: "birthday" | "newsletter" | "survey" | "announcement" | "sale" | "event" | undefined;
-    content?: string | undefined;
-    metadata?: string | undefined;
-    description?: string | undefined;
-    isActive?: boolean | undefined;
-    title?: string | undefined;
-    targetAudience?: "all" | "subscribers" | "customers" | "prospects" | "vip" | undefined;
-    maxUses?: number | undefined;
-    validFrom?: Date | undefined;
-    validTo?: Date | undefined;
-    promotionalCodes?: string[] | undefined;
+    type?: "event" | "birthday" | "newsletter" | "survey" | "announcement" | "sale";
+    content?: string;
+    title?: string;
+    metadata?: string;
+    description?: string;
+    isActive?: boolean;
+    targetAudience?: "all" | "subscribers" | "customers" | "prospects" | "vip";
+    maxUses?: number;
+    validFrom?: Date;
+    validTo?: Date;
+    promotionalCodes?: string[];
 }, {
-    type?: "birthday" | "newsletter" | "survey" | "announcement" | "sale" | "event" | undefined;
-    content?: string | undefined;
-    metadata?: string | undefined;
-    description?: string | undefined;
-    isActive?: boolean | undefined;
-    title?: string | undefined;
-    targetAudience?: "all" | "subscribers" | "customers" | "prospects" | "vip" | undefined;
-    maxUses?: number | undefined;
-    validFrom?: Date | undefined;
-    validTo?: Date | undefined;
-    promotionalCodes?: string[] | undefined;
+    type?: "event" | "birthday" | "newsletter" | "survey" | "announcement" | "sale";
+    content?: string;
+    title?: string;
+    metadata?: string;
+    description?: string;
+    isActive?: boolean;
+    targetAudience?: "all" | "subscribers" | "customers" | "prospects" | "vip";
+    maxUses?: number;
+    validFrom?: Date;
+    validTo?: Date;
+    promotionalCodes?: string[];
 }>;
-export declare const insertPromotionSchema: z.ZodObject<Omit<{
-    id: z.ZodOptional<z.ZodString>;
-    tenantId: z.ZodString;
-    userId: z.ZodString;
-    title: z.ZodString;
-    description: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    content: z.ZodString;
-    type: z.ZodOptional<z.ZodString>;
-    targetAudience: z.ZodOptional<z.ZodString>;
-    isActive: z.ZodOptional<z.ZodNullable<z.ZodBoolean>>;
-    usageCount: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
-    maxUses: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
-    validFrom: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    validTo: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    promotionalCodes: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    metadata: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    createdAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    updatedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-}, "id" | "tenantId" | "createdAt" | "updatedAt" | "userId" | "usageCount">, "strip", z.ZodTypeAny, {
-    content: string;
-    title: string;
-    type?: string | undefined;
-    metadata?: string | null | undefined;
-    description?: string | null | undefined;
-    isActive?: boolean | null | undefined;
-    targetAudience?: string | undefined;
-    maxUses?: number | null | undefined;
-    validFrom?: Date | null | undefined;
-    validTo?: Date | null | undefined;
-    promotionalCodes?: string | null | undefined;
-}, {
-    content: string;
-    title: string;
-    type?: string | undefined;
-    metadata?: string | null | undefined;
-    description?: string | null | undefined;
-    isActive?: boolean | null | undefined;
-    targetAudience?: string | undefined;
-    maxUses?: number | null | undefined;
-    validFrom?: Date | null | undefined;
-    validTo?: Date | null | undefined;
-    promotionalCodes?: string | null | undefined;
-}>;
+export declare const insertPromotionSchema: z.ZodObject<Omit<{}, "id" | "createdAt" | "updatedAt" | "tenantId" | "userId" | "usageCount">, "strip", z.ZodTypeAny, {}, {}>;
 export type Promotion = typeof promotions.$inferSelect;
 export type InsertPromotion = z.infer<typeof insertPromotionSchema>;
 export type CreatePromotionData = z.infer<typeof createPromotionSchema>;
@@ -9392,7 +8719,7 @@ export declare const appointments: import("drizzle-orm/pg-core").PgTableWithColu
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -9411,7 +8738,7 @@ export declare const appointments: import("drizzle-orm/pg-core").PgTableWithColu
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         customerId: import("drizzle-orm/pg-core").PgColumn<{
             name: "customer_id";
@@ -9430,7 +8757,7 @@ export declare const appointments: import("drizzle-orm/pg-core").PgTableWithColu
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         userId: import("drizzle-orm/pg-core").PgColumn<{
             name: "user_id";
@@ -9449,7 +8776,7 @@ export declare const appointments: import("drizzle-orm/pg-core").PgTableWithColu
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         title: import("drizzle-orm/pg-core").PgColumn<{
             name: "title";
@@ -9747,7 +9074,7 @@ export declare const appointmentReminders: import("drizzle-orm/pg-core").PgTable
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         tenantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "tenant_id";
@@ -9766,7 +9093,7 @@ export declare const appointmentReminders: import("drizzle-orm/pg-core").PgTable
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         appointmentId: import("drizzle-orm/pg-core").PgColumn<{
             name: "appointment_id";
@@ -9785,7 +9112,7 @@ export declare const appointmentReminders: import("drizzle-orm/pg-core").PgTable
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         customerId: import("drizzle-orm/pg-core").PgColumn<{
             name: "customer_id";
@@ -9804,7 +9131,7 @@ export declare const appointmentReminders: import("drizzle-orm/pg-core").PgTable
             identity: undefined;
             generated: undefined;
         }, {}, {
-            length: number | undefined;
+            length: number;
         }>;
         reminderType: import("drizzle-orm/pg-core").PgColumn<{
             name: "reminder_type";
@@ -10022,25 +9349,25 @@ export declare const createAppointmentSchema: z.ZodObject<{
     notes: z.ZodOptional<z.ZodString>;
     reminderSettings: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    title: string;
-    duration: number;
-    customerId: string;
-    appointmentDate: Date;
-    description?: string | undefined;
-    location?: string | undefined;
-    serviceType?: string | undefined;
-    notes?: string | undefined;
-    reminderSettings?: string | undefined;
+    location?: string;
+    title?: string;
+    description?: string;
+    duration?: number;
+    customerId?: string;
+    appointmentDate?: Date;
+    serviceType?: string;
+    notes?: string;
+    reminderSettings?: string;
 }, {
-    title: string;
-    customerId: string;
-    appointmentDate: Date;
-    description?: string | undefined;
-    location?: string | undefined;
-    duration?: number | undefined;
-    serviceType?: string | undefined;
-    notes?: string | undefined;
-    reminderSettings?: string | undefined;
+    location?: string;
+    title?: string;
+    description?: string;
+    duration?: number;
+    customerId?: string;
+    appointmentDate?: Date;
+    serviceType?: string;
+    notes?: string;
+    reminderSettings?: string;
 }>;
 export declare const updateAppointmentSchema: z.ZodObject<{
     title: z.ZodOptional<z.ZodString>;
@@ -10053,25 +9380,25 @@ export declare const updateAppointmentSchema: z.ZodObject<{
     notes: z.ZodOptional<z.ZodString>;
     reminderSettings: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    status?: "scheduled" | "completed" | "cancelled" | "confirmed" | "no_show" | undefined;
-    description?: string | undefined;
-    location?: string | undefined;
-    title?: string | undefined;
-    duration?: number | undefined;
-    appointmentDate?: Date | undefined;
-    serviceType?: string | undefined;
-    notes?: string | undefined;
-    reminderSettings?: string | undefined;
+    location?: string;
+    title?: string;
+    description?: string;
+    status?: "completed" | "scheduled" | "cancelled" | "confirmed" | "no_show";
+    duration?: number;
+    appointmentDate?: Date;
+    serviceType?: string;
+    notes?: string;
+    reminderSettings?: string;
 }, {
-    status?: "scheduled" | "completed" | "cancelled" | "confirmed" | "no_show" | undefined;
-    description?: string | undefined;
-    location?: string | undefined;
-    title?: string | undefined;
-    duration?: number | undefined;
-    appointmentDate?: Date | undefined;
-    serviceType?: string | undefined;
-    notes?: string | undefined;
-    reminderSettings?: string | undefined;
+    location?: string;
+    title?: string;
+    description?: string;
+    status?: "completed" | "scheduled" | "cancelled" | "confirmed" | "no_show";
+    duration?: number;
+    appointmentDate?: Date;
+    serviceType?: string;
+    notes?: string;
+    reminderSettings?: string;
 }>;
 export declare const createAppointmentReminderSchema: z.ZodObject<{
     appointmentId: z.ZodString;
@@ -10080,17 +9407,17 @@ export declare const createAppointmentReminderSchema: z.ZodObject<{
     scheduledFor: z.ZodDate;
     content: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    appointmentId: string;
-    reminderType: "push" | "email" | "sms";
-    reminderTiming: "custom" | "24h" | "1h" | "30m";
-    scheduledFor: Date;
-    content?: string | undefined;
+    content?: string;
+    appointmentId?: string;
+    reminderType?: "push" | "email" | "sms";
+    reminderTiming?: "custom" | "24h" | "1h" | "30m";
+    scheduledFor?: Date;
 }, {
-    appointmentId: string;
-    scheduledFor: Date;
-    content?: string | undefined;
-    reminderType?: "push" | "email" | "sms" | undefined;
-    reminderTiming?: "custom" | "24h" | "1h" | "30m" | undefined;
+    content?: string;
+    appointmentId?: string;
+    reminderType?: "push" | "email" | "sms";
+    reminderTiming?: "custom" | "24h" | "1h" | "30m";
+    scheduledFor?: Date;
 }>;
 export type Appointment = typeof appointments.$inferSelect;
 export type InsertAppointment = typeof appointments.$inferInsert;
