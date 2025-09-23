@@ -498,14 +498,56 @@ export default function BirthdaysPage() {
   useEffect(() => {
     if (birthdaySettings?.customThemeData) {
       try {
-        const customData = JSON.parse(birthdaySettings.customThemeData);
-        setCustomThemePreview(customData);
+        const parsedData = JSON.parse(birthdaySettings.customThemeData);
+
+        // Extract the custom theme data from the themes structure
+        const customThemeData = parsedData.themes?.custom;
+
+        console.log('🎨 [Birthday Cards] Initializing custom theme preview:', {
+          hasParsedData: !!parsedData,
+          hasThemes: !!parsedData.themes,
+          hasCustomTheme: !!customThemeData,
+          customImageUrl: customThemeData?.imageUrl,
+          customImage: customThemeData?.customImage
+        });
+
+        if (customThemeData) {
+          setCustomThemePreview(customThemeData);
+
+          // Also initialize themePreviewData['custom'] so the preview shows immediately on load
+          setThemePreviewData(prev => ({
+            ...prev,
+            custom: customThemeData
+          }));
+
+          // Initialize themePreviewData for all themes in the saved data
+          const allThemes = parsedData.themes || {};
+          setThemePreviewData(prev => ({
+            ...prev,
+            ...allThemes
+          }));
+
+          console.log('✅ [Birthday Cards] Custom theme preview initialized with imageUrl:', customThemeData.imageUrl);
+        } else {
+          setCustomThemePreview(null);
+          setThemePreviewData(prev => {
+            const newData = { ...prev };
+            delete newData.custom;
+            return newData;
+          });
+        }
       } catch (error) {
         console.warn('Failed to parse custom theme data:', error);
         setCustomThemePreview(null);
       }
     } else {
       setCustomThemePreview(null);
+      // Clear themePreviewData['custom'] if no saved data
+      setThemePreviewData(prev => {
+        const newData = { ...prev };
+        delete newData.custom;
+        return newData;
+      });
     }
   }, [birthdaySettings?.customThemeData]);
 
@@ -838,7 +880,14 @@ export default function BirthdaysPage() {
                         {tpl.id === 'custom' && (() => {
                           // Use real-time preview state for immediate updates
                           const customData = themePreviewData['custom'] || customThemePreview;
-                          
+
+                          console.log('🎨 [Custom Theme Preview] Rendering with data:', {
+                            hasThemePreviewData: !!themePreviewData['custom'],
+                            hasCustomThemePreview: !!customThemePreview,
+                            customDataImageUrl: customData?.imageUrl,
+                            customDataCustomImage: customData?.customImage
+                          });
+
                           if (customData?.imageUrl) {
                             return (
                               <>
