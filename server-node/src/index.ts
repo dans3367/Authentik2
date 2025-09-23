@@ -815,16 +815,25 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
     if (temporalService && temporalService.isConnected()) {
       try {
         console.log('🚀 Routing birthday test through Temporal workflow...');
-        
+
+        // Pre-render the birthday template to avoid sending placeholder
+        const renderedHtmlContent = renderBirthdayTemplate(selectedTemplate, {
+          recipientName: userName,
+          message: finalCustomMessage,
+          brandName: tenantName || 'Your Company',
+          customThemeData: finalCustomThemeData,
+          senderName: finalSenderName
+        });
+
         // Generate unique workflow ID
         const workflowId = `birthday-test-${userId}-${Date.now()}`;
 
-        // Prepare email workflow input for temporal with birthday template metadata
+        // Prepare email workflow input for temporal with pre-rendered content
         const emailWorkflowInput = {
           emailId: workflowId,
           recipient: testRecipient,
           subject: `🎉 Happy Birthday ${userName}! (Test - ${selectedTemplate} template)`,
-          content: 'placeholder', // Will be replaced by template rendering in temporal
+          content: renderedHtmlContent, // Use pre-rendered content instead of placeholder
           templateType: 'birthday-ecard',
           priority: 'normal' as const,
           tenantId,
@@ -841,7 +850,8 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
             customThemeData: finalCustomThemeData,
             senderName: finalSenderName,
             templateUsed: selectedTemplate,
-            hasCustomTheme: finalCustomThemeData !== null
+            hasCustomTheme: finalCustomThemeData !== null,
+            preRendered: true // Mark that content was pre-rendered
           }
         };
 

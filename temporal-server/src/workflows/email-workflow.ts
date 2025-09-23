@@ -87,20 +87,40 @@ export async function emailWorkflow(
       throw new Error(`Email content is required and must be a string. Received: ${typeof input.content}`);
     }
 
-    // Render birthday templates if requested
+    // Render birthday templates if requested and not pre-rendered
     let htmlContent = input.content;
     if ((input.templateType === 'birthday' || input.templateType === 'birthday-ecard') && typeof input.metadata?.birthdayTemplate === 'string') {
-      try {
-        htmlContent = renderBirthdayTemplate(input.metadata.birthdayTemplate, {
-          recipientName: input.metadata?.recipientName,
-          message: input.metadata?.message,
-          imageUrl: input.metadata?.imageUrl,
-          customThemeData: input.metadata?.customThemeData,
-          senderName: input.metadata?.senderName || 'Your Team',
-        });
-        workflowLogger.info(`🎂 Rendered birthday template: ${input.metadata.birthdayTemplate}`);
-      } catch (e: any) {
-        workflowLogger.error(`❌ Failed to render birthday template: ${e?.message || String(e)}`);
+      // Skip template rendering if content was pre-rendered (marked in metadata)
+      if (input.metadata?.preRendered) {
+        workflowLogger.info(`🎂 Using pre-rendered birthday template: ${input.metadata.birthdayTemplate}`);
+        htmlContent = input.content;
+      } else {
+        try {
+          htmlContent = renderBirthdayTemplate(input.metadata.birthdayTemplate, {
+            recipientName: input.metadata?.recipientName,
+            message: input.metadata?.message,
+            imageUrl: input.metadata?.imageUrl,
+            customThemeData: input.metadata?.customThemeData,
+            senderName: input.metadata?.senderName || 'Your Team',
+          });
+          workflowLogger.info(`🎂 Rendered birthday template: ${input.metadata.birthdayTemplate}`);
+        } catch (e: any) {
+          workflowLogger.error(`❌ Failed to render birthday template: ${e?.message || String(e)}`);
+          // Fallback: try to render template even if there's an error
+          try {
+            htmlContent = renderBirthdayTemplate(input.metadata.birthdayTemplate, {
+              recipientName: input.metadata?.recipientName || 'Friend',
+              message: input.metadata?.message || 'Happy Birthday!',
+              brandName: input.metadata?.brandName || 'Your Company',
+              customThemeData: input.metadata?.customThemeData,
+              senderName: input.metadata?.senderName || 'Your Team',
+            });
+            workflowLogger.info(`🎂 Fallback rendered birthday template: ${input.metadata.birthdayTemplate}`);
+          } catch (fallbackError: any) {
+            workflowLogger.error(`❌ Fallback template rendering also failed: ${fallbackError?.message || String(fallbackError)}`);
+            throw new Error(`Failed to render birthday template: ${e?.message || String(e)}`);
+          }
+        }
       }
     }
 
