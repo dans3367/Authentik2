@@ -779,8 +779,30 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
     // Use frontend-provided template data if available, otherwise fall back to database values
     const selectedTemplate = (emailTemplate as BirthdayTemplateId) || (birthdaySettingsData?.emailTemplate as BirthdayTemplateId) || 'default';
     const finalCustomMessage = customMessage || birthdaySettingsData?.customMessage || 'This is a test birthday card to show how our birthday email system works. In a real scenario, this would be sent to customers on their special day. Hope your day is as wonderful as you are!';
-    const finalCustomThemeData = customThemeData || (birthdaySettingsData?.customThemeData ? JSON.parse(birthdaySettingsData.customThemeData) : null);
     const finalSenderName = senderName || birthdaySettingsData?.senderName || 'Your Team';
+
+    // Parse customThemeData and extract theme-specific data
+    let finalCustomThemeData = customThemeData;
+    if (!finalCustomThemeData && birthdaySettingsData?.customThemeData) {
+      try {
+        const parsedThemeData = JSON.parse(birthdaySettingsData.customThemeData);
+
+        // Check if it's the new nested structure with themes
+        if (parsedThemeData.themes && parsedThemeData.themes[selectedTemplate]) {
+          finalCustomThemeData = parsedThemeData.themes[selectedTemplate];
+          console.log(`🎨 Extracted theme-specific data for ${selectedTemplate} template`);
+        } else if (!parsedThemeData.themes) {
+          // Old structure - assume it's for custom theme if we're using custom
+          if (selectedTemplate === 'custom') {
+            finalCustomThemeData = parsedThemeData;
+            console.log('🎨 Using legacy custom theme data structure');
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to parse customThemeData:', error);
+        finalCustomThemeData = null;
+      }
+    }
 
     console.log(`🎨 Using template: ${selectedTemplate}${selectedTemplate === 'custom' ? ' with custom theme data' : ''}`);
 
@@ -816,10 +838,10 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
             recipientName: userName,
             message: finalCustomMessage,
             brandName: tenantName || 'Your Company',
-            customThemeData: selectedTemplate === 'custom' ? finalCustomThemeData : null,
+            customThemeData: finalCustomThemeData,
             senderName: finalSenderName,
             templateUsed: selectedTemplate,
-            hasCustomTheme: selectedTemplate === 'custom' && finalCustomThemeData !== null
+            hasCustomTheme: finalCustomThemeData !== null
           }
         };
 
@@ -857,7 +879,7 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
         recipientName: userName,
         message: finalCustomMessage,
         brandName: tenantName || 'Your Company',
-        customThemeData: selectedTemplate === 'custom' ? finalCustomThemeData : null,
+        customThemeData: finalCustomThemeData,
         senderName: finalSenderName
       });
 
@@ -880,7 +902,7 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
             tenantName,
             isTest: true,
             templateUsed: selectedTemplate,
-            hasCustomTheme: selectedTemplate === 'custom' && finalCustomThemeData !== null
+            hasCustomTheme: finalCustomThemeData !== null
           },
           tenantId,
           tenantName,
@@ -903,7 +925,7 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
         recipient: testRecipient,
         method: 'direct-fallback',
         templateUsed: selectedTemplate,
-        hasCustomTheme: selectedTemplate === 'custom' && finalCustomThemeData !== null,
+        hasCustomTheme: finalCustomThemeData !== null,
         message: `Test birthday card sent successfully using ${selectedTemplate} template`
       });
 
