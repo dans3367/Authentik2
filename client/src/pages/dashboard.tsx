@@ -2,6 +2,7 @@ import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { useLocation } from "wouter";
 import { NewsletterCard } from "@/components/ui/newsletter-card";
 import { HighlightsCard } from "@/components/ui/highlights-card";
+import { UpcomingBirthdaysCard } from "@/components/ui/upcoming-birthdays-card";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
@@ -52,11 +53,16 @@ export default function Dashboard() {
           <div className="flex-[2]">
             <NewsletterCard />
           </div>
-          
+
           {/* Highlights - Narrower */}
           <div className="flex-[1]">
             <HighlightsCard />
           </div>
+        </div>
+
+        {/* Upcoming Birthdays Card */}
+        <div className="max-w-7xl w-full">
+          <UpcomingBirthdaysCard />
         </div>
       </div>
     </div>

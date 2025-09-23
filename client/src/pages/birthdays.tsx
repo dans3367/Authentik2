@@ -866,13 +866,30 @@ export default function BirthdaysPage() {
                               {(() => {
                                 // Get preview data for the current theme
                                 const previewData = themePreviewData[tpl.id];
-                                
+
+                                // Check for saved custom theme data first
+                                let savedTitle = null;
+                                if (birthdaySettings?.customThemeData) {
+                                  try {
+                                    const parsed = JSON.parse(birthdaySettings.customThemeData);
+                                    const themeSpecificData = parsed.themes?.[tpl.id];
+                                    if (themeSpecificData?.title !== undefined) {
+                                      savedTitle = themeSpecificData.title;
+                                    }
+                                  } catch (error) {
+                                    console.warn('Failed to parse saved theme data:', error);
+                                  }
+                                }
+
                                 if (tpl.id === 'custom') {
                                   const customData = previewData || customThemePreview;
-                                  return customData?.title || 'Happy Birthday!';
-                                } else if (previewData?.title) {
-                                  // Show custom title for default themes if set
-                                  return previewData.title;
+                                  return customData?.title || savedTitle || 'Happy Birthday!';
+                                } else if (previewData?.title !== undefined) {
+                                  // Show preview title (including empty strings) for default themes
+                                  return previewData.title || 'Happy Birthday!';
+                                } else if (savedTitle !== null) {
+                                  // Show saved custom title for default themes
+                                  return savedTitle || 'Happy Birthday!';
                                 } else {
                                   return 'Happy Birthday!';
                                 }
@@ -1566,7 +1583,7 @@ export default function BirthdaysPage() {
               </div>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Send test birthday cards to users in your system. Test emails will be sent to the selected user's actual email address.
+              Send test birthday cards to users individually or select multiple users for bulk sending. Test emails will be sent to the selected user's actual email address.
             </p>
           </CardHeader>
           <CardContent className="p-0">
@@ -1651,6 +1668,9 @@ export default function BirthdaysPage() {
                           <span className="text-sm">{user.email}</span>
                         </TableCell>
                         <TableCell>
+                          <span className="text-sm capitalize">{user.role}</span>
+                        </TableCell>
+                        <TableCell>
                           {user.emailVerified ? (
                             <CheckCircle className="h-4 w-4 text-green-500" />
                           ) : (
@@ -1658,8 +1678,8 @@ export default function BirthdaysPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             size="sm"
                             onClick={() => handleSendTestBirthdayCard(user.id)}
                             disabled={sendTestBirthdayMutation.isPending}
