@@ -95,6 +95,11 @@ export default function UsersPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  
+  // State for tracking unsaved changes in edit dialog
+  const [hasUnsavedEditChanges, setHasUnsavedEditChanges] = useState(false);
+  const [showEditConfirmDialog, setShowEditConfirmDialog] = useState(false);
+  const [initialEditValues, setInitialEditValues] = useState<UpdateUserData | null>(null);
 
   // Check authentication first
   if (authLoading) {
@@ -256,6 +261,21 @@ export default function UsersPage() {
     },
   });
 
+  // Track changes in edit form
+  const editFormValues = editForm.watch();
+  useEffect(() => {
+    if (initialEditValues && isEditDialogOpen) {
+      const hasChanges = 
+        editFormValues.firstName !== initialEditValues.firstName ||
+        editFormValues.lastName !== initialEditValues.lastName ||
+        editFormValues.email !== initialEditValues.email ||
+        editFormValues.role !== initialEditValues.role ||
+        editFormValues.isActive !== initialEditValues.isActive;
+      
+      setHasUnsavedEditChanges(hasChanges);
+    }
+  }, [editFormValues, initialEditValues, isEditDialogOpen]);
+
   // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: async (data: CreateUserData) => {
@@ -302,6 +322,8 @@ export default function UsersPage() {
       queryClient.invalidateQueries({ queryKey: ['/api/users/limits'] });
       setIsEditDialogOpen(false);
       setSelectedUser(null);
+      setHasUnsavedEditChanges(false);
+      setInitialEditValues(null);
       editForm.reset();
       toast({
         title: "Success",
@@ -379,13 +401,16 @@ export default function UsersPage() {
 
   const handleEditUser = (user: User) => {
     setSelectedUser(user);
-    editForm.reset({
+    const initialValues = {
       firstName: user.firstName || "",
       lastName: user.lastName || "",
       email: user.email,
       role: user.role === 'Owner' ? 'Administrator' : user.role as 'Administrator' | 'Manager' | 'Employee',
       isActive: user.isActive ?? true,
-    });
+    };
+    editForm.reset(initialValues);
+    setInitialEditValues(initialValues);
+    setHasUnsavedEditChanges(false);
     setIsEditDialogOpen(true);
   };
 
@@ -401,6 +426,34 @@ export default function UsersPage() {
 
   const handleToggleStatus = (userId: string, isActive: boolean) => {
     toggleStatusMutation.mutate({ userId, isActive });
+  };
+
+  // Handle edit dialog close with confirmation
+  const handleEditDialogClose = (open: boolean) => {
+    // If trying to close and there are unsaved changes, show confirmation
+    if (!open && hasUnsavedEditChanges) {
+      setShowEditConfirmDialog(true);
+      // Don't actually close the dialog yet
+      return;
+    }
+    
+    // If opening or closing without unsaved changes, proceed normally
+    setIsEditDialogOpen(open);
+    if (!open) {
+      setSelectedUser(null);
+      setHasUnsavedEditChanges(false);
+      setInitialEditValues(null);
+      editForm.reset();
+    }
+  };
+
+  const handleEditConfirmDiscard = () => {
+    setShowEditConfirmDialog(false);
+    setIsEditDialogOpen(false);
+    setSelectedUser(null);
+    setHasUnsavedEditChanges(false);
+    setInitialEditValues(null);
+    editForm.reset();
   };
 
   // Define columns for the data table (large screens)
@@ -1085,7 +1138,7 @@ export default function UsersPage() {
         </div>
 
         {/* Edit User Dialog */}
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogClose}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>Edit User</DialogTitle>
@@ -1193,6 +1246,24 @@ export default function UsersPage() {
             </Form>
           </DialogContent>
         </Dialog>
+
+        {/* Confirmation Dialog for Unsaved Changes */}
+        <AlertDialog open={showEditConfirmDialog} onOpenChange={setShowEditConfirmDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+              <AlertDialogDescription>
+                You have unsaved changes. Are you sure you want to discard them?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleEditConfirmDiscard}>
+                Discard Changes
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         </div>
       </div>
     </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,6 +44,19 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   const [searchQuery, setSearchQuery] = useState("");
   const [unsplashImages, setUnsplashImages] = useState<Array<{ id: string; urls: { small: string; regular: string }; alt_description: string }>>([]);
   const [loading, setLoading] = useState(false);
+  
+  // Change tracking and confirmation dialog state
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [initialValues, setInitialValues] = useState<{
+    title: string;
+    message: string;
+    imageUrl: string | null;
+    signature: string;
+    customImage: boolean;
+    imagePosition: { x: number; y: number };
+    imageScale: number;
+  } | null>(null);
   
   // Pagination state for Unsplash
   const [currentPage, setCurrentPage] = useState(1);
@@ -114,11 +128,36 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       setCustomImage(isCustomTheme);
     }
     
-    setImagePosition(initialData?.imagePosition ?? { x: 0, y: 0 });
-    setImageScale(initialData?.imageScale ?? 1);
+    const finalImagePosition = initialData?.imagePosition ?? { x: 0, y: 0 };
+    const finalImageScale = initialData?.imageScale ?? 1;
+    
+    setImagePosition(finalImagePosition);
+    setImageScale(finalImageScale);
     
     // Reset image error state on initialization
     setImageError(false);
+
+    // Store initial values for change tracking
+    const finalImageUrl = hasCustomImageData ? initialData.imageUrl : 
+      (isCustomTheme && initialData?.imageUrl) ? initialData.imageUrl :
+      (!isCustomTheme && initialThemeId && initialThemeId in defaultThemeImages) ? 
+        defaultThemeImages[initialThemeId as keyof typeof defaultThemeImages] : null;
+    
+    const finalCustomImage = hasCustomImageData || (isCustomTheme && initialData?.imageUrl) || 
+      (!isCustomTheme && initialThemeId && initialThemeId in defaultThemeImages) ? false : isCustomTheme;
+    
+    setInitialValues({
+      title: initialData?.title ?? "",
+      message: initialData?.message ?? "",
+      imageUrl: finalImageUrl,
+      signature: initialData?.signature ?? "",
+      customImage: finalCustomImage,
+      imagePosition: finalImagePosition,
+      imageScale: finalImageScale,
+    });
+    
+    // Reset change tracking
+    setHasUnsavedChanges(false);
 
     // Load persistent Unsplash search state
     try {
@@ -232,6 +271,23 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       });
     }
   }, [open, imageUrl, customImage, imageError, initialThemeId, uploading]);
+
+  // Change detection effect
+  useEffect(() => {
+    if (!open || !initialValues) return;
+    
+    const hasChanges = 
+      title !== initialValues.title ||
+      message !== initialValues.message ||
+      imageUrl !== initialValues.imageUrl ||
+      signature !== initialValues.signature ||
+      customImage !== initialValues.customImage ||
+      imagePosition.x !== initialValues.imagePosition.x ||
+      imagePosition.y !== initialValues.imagePosition.y ||
+      imageScale !== initialValues.imageScale;
+    
+    setHasUnsavedChanges(hasChanges);
+  }, [open, initialValues, title, message, imageUrl, signature, customImage, imagePosition, imageScale]);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -724,12 +780,26 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       imagePosition,
       imageScale
     } as DesignerData);
+    setHasUnsavedChanges(false); // Reset change tracking after save
     onOpenChange(false);
   };
 
+  const handleClose = () => {
+    if (hasUnsavedChanges) {
+      setShowConfirmDialog(true);
+    } else {
+      onOpenChange(false);
+    }
+  };
 
+  const handleConfirmDiscard = () => {
+    setShowConfirmDialog(false);
+    setHasUnsavedChanges(false);
+    onOpenChange(false);
+  };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
         className="max-w-[95vw] sm:max-w-[760px] max-h-[95vh] overflow-y-auto p-3 sm:p-6" 
@@ -1025,7 +1095,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
             )}
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)} className="text-sm">
+            <Button variant="outline" onClick={handleClose} className="text-sm">
               Close
             </Button>
             <Button onClick={handleSave} className="text-sm">
@@ -1170,6 +1240,25 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
         </Dialog>
       </DialogContent>
     </Dialog>
+
+    {/* Confirmation Dialog for Unsaved Changes */}
+    <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Discard changes?</AlertDialogTitle>
+          <AlertDialogDescription>
+            You have unsaved changes to your birthday card. Are you sure you want to close without saving? Your changes will be lost.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleConfirmDiscard}>
+            Discard changes
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
 
