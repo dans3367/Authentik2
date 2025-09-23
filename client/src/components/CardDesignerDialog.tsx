@@ -91,10 +91,15 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       initialCustomImage: initialData?.customImage
     });
     
-    // Set image state based on theme and data
+    // Set image state based on theme and data - PRESERVE CUSTOM IMAGES
     if (hasCustomImageData) {
-      // Has explicit custom image data
+      // Has explicit custom image data - always preserve this
       console.log('📸 Setting custom image:', initialData.imageUrl);
+      setImageUrl(initialData.imageUrl);
+      setCustomImage(true);
+    } else if (isCustomTheme && initialData?.imageUrl) {
+      // Custom theme with saved image URL (even if customImage flag is missing)
+      console.log('📸 Setting custom theme image from saved data:', initialData.imageUrl);
       setImageUrl(initialData.imageUrl);
       setCustomImage(true);
     } else if (!isCustomTheme && initialThemeId && initialThemeId in defaultThemeImages) {
@@ -135,7 +140,12 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   // If theme changes while open and no custom image chosen, update to theme's default image
   useEffect(() => {
     if (!open) return;
-    if (customImage) return; // Don't override custom images
+    
+    // Don't override custom images - this is the key fix
+    if (customImage && imageUrl) {
+      console.log('🔒 [Card Designer] Preserving custom image, skipping theme change effect');
+      return;
+    }
     
     // Default theme header images
     const defaultThemeImages = {
@@ -150,22 +160,20 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       currentImageUrl: imageUrl
     });
     
-    if (initialThemeId && initialThemeId in defaultThemeImages) {
-      console.log('🎭 Updating to default theme image for:', initialThemeId);
+    if (initialThemeId === 'custom') {
+      // For custom theme, only clear if no custom image is set
+      if (!customImage && !imageUrl) {
+        console.log('🎨 Custom theme with no image - clearing');
+        setImageUrl(null);
+        setImageError(false);
+      }
+    } else if (initialThemeId && initialThemeId in defaultThemeImages && !customImage) {
+      // For default themes, only set if not using a custom image
+      console.log('🎭 Setting default theme image for:', initialThemeId);
       setImageUrl(defaultThemeImages[initialThemeId as keyof typeof defaultThemeImages]);
-      setImageError(false); // Reset error state when switching themes
-    } else if (initialThemeId === 'custom') {
-      // For custom theme without custom image, show no image
-      console.log('🎨 Switching to custom theme - clearing default image');
-      setImageUrl(null);
-      setImageError(false);
-    } else {
-      // Unknown theme
-      console.log('❓ Unknown theme, clearing image');
-      setImageUrl(null);
       setImageError(false);
     }
-  }, [initialThemeId, customImage, open]);
+  }, [initialThemeId, open]);
 
   // Persist draft locally so switching themes won't lose text
   useEffect(() => {
@@ -988,17 +996,26 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
               <Button 
                 variant={isCurrentlyActive ? "secondary" : "default"}
                 onClick={() => {
+                  // Determine the correct theme ID based on current state
+                  let currentThemeId = initialThemeId || 'default';
+                  
+                  // Only set to custom if we're not working with a predefined theme
+                  // If initialThemeId is a predefined theme (default, confetti, balloons), preserve it
+                  if (customImage && initialThemeId && !['default', 'confetti', 'balloons'].includes(initialThemeId)) {
+                    currentThemeId = 'custom';
+                  }
+                  
                   const currentData = {
                     title,
                     message,
                     imageUrl,
                     signature,
-                    themeId: initialThemeId,
+                    themeId: currentThemeId,
                     customImage,
                     imagePosition,
                     imageScale,
                   };
-                  onMakeActive(initialThemeId || 'default', currentData);
+                  onMakeActive(currentThemeId, currentData);
                 }}
                 className="text-sm"
                 disabled={isCurrentlyActive}

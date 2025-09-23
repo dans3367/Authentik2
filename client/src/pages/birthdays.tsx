@@ -1009,8 +1009,8 @@ export default function BirthdaysPage() {
                   title: themeSpecificData.title || '',
                   message: themeSpecificData.message || birthdaySettings?.customMessage || '',
                   signature: themeSpecificData.signature || '',
-                  imageUrl: currentThemeId === 'custom' ? (themeSpecificData.imageUrl || null) : null,
-                  customImage: currentThemeId === 'custom' ? (themeSpecificData.customImage || false) : false,
+                  imageUrl: themeSpecificData.imageUrl || null,
+                  customImage: Boolean(themeSpecificData.customImage && themeSpecificData.imageUrl),
                   imagePosition: themeSpecificData.imagePosition || { x: 0, y: 0 },
                   imageScale: themeSpecificData.imageScale || 1,
                 };
@@ -1183,8 +1183,8 @@ export default function BirthdaysPage() {
             }
           };
           
-          if (themeId === 'custom' || (isDefaultTheme && hasCustomImage)) {
-            // Save as custom theme if explicitly custom or if default theme with custom image
+          if (themeId === 'custom') {
+            // Save as custom theme only if explicitly custom
             console.log('🎨 [Birthday Cards] Making custom theme active');
             setCustomThemePreview(themeData);
             
