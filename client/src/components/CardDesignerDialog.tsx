@@ -390,9 +390,9 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     setImageUrl(null);
     setCustomImage(false);
     setImageError(false); // Clear any error state
-    // Reset position and scale when image is removed
-    setImagePosition({ x: 0, y: 0 });
-    setImageScale(1);
+    // Reset position and scale when image is removed - TEMPORARILY DISABLED
+    // setImagePosition({ x: 0, y: 0 });
+    // setImageScale(1);
     setShowImageControls(false);
     
     console.log('✅ [Card Designer] Image removal complete');
@@ -608,9 +608,9 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     setImageError(false); // Reset any previous error state
     setUnsplashOpen(false);
     // Don't clear search state - keep it persistent
-    // Reset position and scale when new image is selected
-    setImagePosition({ x: 0, y: 0 });
-    setImageScale(1);
+    // Reset position and scale when new image is selected - TEMPORARILY DISABLED
+    // setImagePosition({ x: 0, y: 0 });
+    // setImageScale(1);
     setShowImageControls(false);
     
     console.log('✅ [Card Designer] Image selection complete, customImage set to true');
@@ -644,59 +644,64 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     }
   };
 
-  // Image manipulation functions
+  // Image manipulation functions - TEMPORARILY DISABLED
   const handleZoomIn = () => {
-    setImageScale(prev => Math.min(prev + 0.1, 2)); // Reduced max zoom to prevent excessive blurriness
+    // setImageScale(prev => Math.min(prev + 0.1, 2)); // Reduced max zoom to prevent excessive blurriness
   };
 
   const handleZoomOut = () => {
-    setImageScale(prev => Math.max(prev - 0.1, 0.8)); // Reduced min zoom to maintain quality
+    // setImageScale(prev => Math.max(prev - 0.1, 0.8)); // Reduced min zoom to maintain quality
   };
 
   const handleResetPosition = () => {
-    setImagePosition({ x: 0, y: 0 });
-    setImageScale(1);
+    // setImagePosition({ x: 0, y: 0 });
+    // setImageScale(1);
   };
 
+  // TEMPORARILY DISABLED - Image manipulation handlers
   const handleImageClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setShowImageControls(true);
+    // setShowImageControls(true);
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setShowImageControls(true);
-    setIsDragging(true);
-    setDragStart({
-      x: e.clientX,
-      y: e.clientY,
-      startX: imagePosition.x,
-      startY: imagePosition.y,
-    });
+    // TEMPORARILY DISABLED - Drag functionality
+    // setShowImageControls(true);
+    // setIsDragging(true);
+    // setDragStart({
+    //   x: e.clientX,
+    //   y: e.clientY,
+    //   startX: imagePosition.x,
+    //   startY: imagePosition.y,
+    // });
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !dragStart) return;
-    
-    const deltaX = e.clientX - dragStart.x;
-    const deltaY = e.clientY - dragStart.y;
-    
-    setImagePosition({
-      x: dragStart.startX + deltaX,
-      y: dragStart.startY + deltaY,
-    });
+    // TEMPORARILY DISABLED - Drag functionality
+    // if (!isDragging || !dragStart) return;
+    // 
+    // const deltaX = e.clientX - dragStart.x;
+    // const deltaY = e.clientY - dragStart.y;
+    // 
+    // setImagePosition({
+    //   x: dragStart.startX + deltaX,
+    //   y: dragStart.startY + deltaY,
+    // });
   };
 
   const handleMouseUp = () => {
-    setIsDragging(false);
-    setDragStart(null);
+    // TEMPORARILY DISABLED - Drag functionality
+    // setIsDragging(false);
+    // setDragStart(null);
   };
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.05 : 0.05; // Smaller increments for smoother control
-    setImageScale(prev => Math.max(0.8, Math.min(2, prev + delta))); // Limited range for better quality
+    // TEMPORARILY DISABLED - Zoom functionality
+    // const delta = e.deltaY > 0 ? -0.05 : 0.05; // Smaller increments for smoother control
+    // setImageScale(prev => Math.max(0.8, Math.min(2, prev + delta))); // Limited range for better quality
   };
 
   // Emoji functionality
@@ -749,8 +754,9 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
         }
         setImageUrl(null);
         setCustomImage(false);
-        setImagePosition({ x: 0, y: 0 });
-        setImageScale(1);
+        // Reset image position and scale - TEMPORARILY DISABLED
+        // setImagePosition({ x: 0, y: 0 });
+        // setImageScale(1);
         setShowImageControls(false);
         
         // Clear any error states
@@ -821,14 +827,16 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                 ? 'ring-2 ring-blue-400 ring-opacity-50' 
                 : ''
             }`}
-            onClick={imageUrl && !imageError ? handleImageClick : undefined}
-            onMouseDown={imageUrl && !imageError ? handleMouseDown : undefined}
-            onMouseMove={isDragging ? handleMouseMove : undefined}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            onWheel={imageUrl && !imageError ? handleWheel : undefined}
+            // TEMPORARILY DISABLED - Image manipulation event handlers
+            // onClick={imageUrl && !imageError ? handleImageClick : undefined}
+            // onMouseDown={imageUrl && !imageError ? handleMouseDown : undefined}
+            // onMouseMove={isDragging ? handleMouseMove : undefined}
+            // onMouseUp={handleMouseUp}
+            // onMouseLeave={handleMouseUp}
+            // onWheel={imageUrl && !imageError ? handleWheel : undefined}
             style={{ 
-              cursor: isDragging ? 'grabbing' : (imageUrl && !imageError ? 'grab' : 'default'),
+              // cursor: isDragging ? 'grabbing' : (imageUrl && !imageError ? 'grab' : 'default'),
+              cursor: 'default',
               height: 'clamp(200px, 40vw, 300px)',
               willChange: isDragging ? 'transform' : 'auto'
             }}
@@ -890,6 +898,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
             )}
 
             {/* Image Overlay Controls - only show when focused */}
+            {/* TEMPORARILY DISABLED - Image zoom and position controls
             {imageUrl && !imageError && !uploading && showImageControls && (
               <div className="absolute top-2 right-2 sm:top-3 sm:right-3 flex flex-col gap-1 sm:gap-2 animate-in fade-in-0 duration-200">
                 <div className="bg-black/70 backdrop-blur-sm rounded-lg p-1.5 sm:p-2 flex flex-col gap-0.5 sm:gap-1 shadow-lg">
@@ -939,8 +948,10 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                 </div>
               </div>
             )}
+            */}
 
             {/* Click to focus hint - only show when not focused and image is present */}
+            {/* TEMPORARILY DISABLED - Click to show controls hint
             {imageUrl && !imageError && !uploading && !showImageControls && (
               <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-300">
                 <div className="bg-black/50 backdrop-blur-sm rounded-lg px-3 py-2 sm:px-4 text-white text-xs sm:text-sm">
@@ -949,6 +960,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                 </div>
               </div>
             )}
+            */}
 
             <div className="absolute left-3 bottom-3">
               <DropdownMenu>
