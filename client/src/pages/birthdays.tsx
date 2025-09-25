@@ -36,7 +36,8 @@ import {
   MoreVertical,
   Download,
   Upload,
-  Palette
+  Palette,
+  Save
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -134,6 +135,9 @@ export default function BirthdaysPage() {
   
   // State for real-time preview of all themes (including default themes with customizations)
   const [themePreviewData, setThemePreviewData] = useState<{[key: string]: CustomThemeData}>({});
+  
+  // Local state for sender name to avoid API calls on every keystroke
+  const [localSenderName, setLocalSenderName] = useState<string>('');
 
   // Handler to navigate to add customer page
   const handleAddCustomer = () => {
@@ -297,6 +301,23 @@ export default function BirthdaysPage() {
       });
     },
   });
+
+  // Initialize local sender name when birthday settings are loaded
+  useEffect(() => {
+    if (birthdaySettings?.senderName !== undefined) {
+      setLocalSenderName(birthdaySettings.senderName);
+    }
+  }, [birthdaySettings?.senderName]);
+
+  // Save handler for sender name
+  const handleSaveSenderName = () => {
+    if (birthdaySettings) {
+      updateSettingsMutation.mutate({
+        ...birthdaySettings,
+        senderName: localSenderName,
+      });
+    }
+  };
 
   const handleSettingsUpdate = (field: keyof BirthdaySettings, value: any) => {
     if (birthdaySettings) {
@@ -1221,6 +1242,7 @@ export default function BirthdaysPage() {
           // For default themes, check exact match
           return currentTemplate === selectedTheme;
         })()}
+        senderName={birthdaySettings?.senderName}
       />
 
       {/* Settings Tab */}
@@ -1259,12 +1281,24 @@ export default function BirthdaysPage() {
                   <div className="space-y-4">
                     <div>
                       <Label className="text-sm">Sender Name</Label>
-                      <Input
-                        value={birthdaySettings?.senderName || ''}
-                        onChange={(e) => handleSettingsUpdate('senderName', e.target.value)}
-                        placeholder="Your Company Name"
-                        disabled={updateSettingsMutation.isPending}
-                      />
+                      <div className="flex gap-2">
+                        <Input
+                          value={localSenderName}
+                          onChange={(e) => setLocalSenderName(e.target.value)}
+                          placeholder="Your Company Name"
+                          disabled={updateSettingsMutation.isPending}
+                          className="flex-1"
+                        />
+                        <Button
+                          onClick={handleSaveSenderName}
+                          disabled={updateSettingsMutation.isPending || localSenderName === (birthdaySettings?.senderName || '')}
+                          size="sm"
+                          variant="outline"
+                          className="px-3"
+                        >
+                          <Save className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
 
                     

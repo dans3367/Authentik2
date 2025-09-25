@@ -31,9 +31,10 @@ interface CardDesignerDialogProps {
   onPreviewChange?: (data: DesignerData) => void;
   onMakeActive?: (themeId: string, data: DesignerData) => void;
   isCurrentlyActive?: boolean;
+  senderName?: string;
 }
 
-export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initialData, onSave, onPreviewChange, onMakeActive, isCurrentlyActive }: CardDesignerDialogProps) {
+export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initialData, onSave, onPreviewChange, onMakeActive, isCurrentlyActive, senderName }: CardDesignerDialogProps) {
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [message, setMessage] = useState(initialData?.message ?? "");
   const [imageUrl, setImageUrl] = useState<string | null>(initialData?.imageUrl ?? 
@@ -1055,7 +1056,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
               <Input
                 value={signature}
                 onChange={(e) => setSignature(e.target.value)}
-                placeholder="From [Your Name]"
+                placeholder={senderName ? `From ${senderName}` : "From [Your Name]"}
                 className="w-full max-w-[180px] sm:max-w-[220px] text-right border-0 shadow-none px-0 focus-visible:ring-0 placeholder:text-gray-400"
               />
             </div>
