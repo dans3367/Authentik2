@@ -17,6 +17,7 @@ import { auth } from "./auth";
 import { toNodeHandler } from "better-auth/node";
 import { serverLogger } from "./logger";
 import { newsletterWorkerService } from "./services/NewsletterWorkerService";
+import { birthdayWorkerService } from "./services/BirthdayWorkerService";
 
 const app = express();
 
@@ -123,6 +124,16 @@ app.use((req, res, next) => {
     serverLogger.info('✅ Newsletter Worker Service started');
   } catch (error) {
     serverLogger.error("Failed to initialize Newsletter Worker Service:", error);
+    // Don't exit - continue without worker service
+  }
+
+  // Initialize Birthday Worker Service
+  try {
+    serverLogger.info('🎂 Starting Birthday Worker Service...');
+    birthdayWorkerService.start();
+    serverLogger.info('✅ Birthday Worker Service started');
+  } catch (error) {
+    serverLogger.error("Failed to initialize Birthday Worker Service:", error);
     // Don't exit - continue without worker service
   }
 

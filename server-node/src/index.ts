@@ -762,7 +762,8 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
       customMessage,
       customThemeData,
       senderName,
-      senderEmail
+      senderEmail,
+      promotionId
     } = req.body;
 
     // Validate required fields
@@ -791,11 +792,13 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
       const settings = await db.select().from(birthdaySettings).where(eq(birthdaySettings.tenantId, tenantId)).limit(1);
       birthdaySettingsData = settings.length > 0 ? settings[0] : null;
       
-      // If birthday settings has a promotion, fetch the promotion data
-      if (birthdaySettingsData?.promotionId) {
+      // Fetch promotion data - prioritize promotionId from request body, then fall back to birthday settings
+      const finalPromotionId = promotionId || birthdaySettingsData?.promotionId;
+      if (finalPromotionId) {
         try {
-          const promotion = await db.select().from(promotions).where(eq(promotions.id, birthdaySettingsData.promotionId)).limit(1);
+          const promotion = await db.select().from(promotions).where(eq(promotions.id, finalPromotionId)).limit(1);
           promotionData = promotion.length > 0 ? promotion[0] : null;
+          console.log(`🎁 Fetched promotion data for ID: ${finalPromotionId}`, promotionData ? 'Success' : 'Not found');
         } catch (promotionError) {
           console.warn('Failed to fetch promotion data:', promotionError);
         }

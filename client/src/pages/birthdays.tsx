@@ -158,7 +158,7 @@ export default function BirthdaysPage() {
   const [localSenderName, setLocalSenderName] = useState<string>('');
 
   // State for promotion selection
-  const [selectedPromotions, setSelectedPromotions] = useState<any[]>([]);
+  const [selectedPromotions, setSelectedPromotions] = useState<string[]>([]);
 
   // Customer modal state
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
@@ -230,6 +230,8 @@ export default function BirthdaysPage() {
           segmentFilter: 'all',
           customMessage: '',
           senderName: '',
+          promotionId: null,
+          promotion: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
@@ -242,6 +244,8 @@ export default function BirthdaysPage() {
           segmentFilter: 'all',
           customMessage: '',
           senderName: '',
+          promotionId: null,
+          promotion: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
@@ -379,7 +383,7 @@ export default function BirthdaysPage() {
   // Initialize selected promotions when birthday settings are loaded
   useEffect(() => {
     if (birthdaySettings?.promotion) {
-      setSelectedPromotions([birthdaySettings.promotion]);
+      setSelectedPromotions([birthdaySettings.promotion.id]);
     } else {
       setSelectedPromotions([]);
     }
@@ -411,12 +415,18 @@ export default function BirthdaysPage() {
   };
 
   // Handler for promotion selection changes
-  const handlePromotionsChange = (promotions: any[]) => {
-    setSelectedPromotions(promotions);
+  const handlePromotionsChange = (promotionIds: string[]) => {
+    setSelectedPromotions(promotionIds);
     if (birthdaySettings) {
-      const promotionId = promotions.length > 0 ? promotions[0].id : null;
+      const promotionId = promotionIds.length > 0 ? promotionIds[0] : null;
       updateSettingsMutation.mutate({
-        ...birthdaySettings,
+        id: birthdaySettings.id,
+        enabled: birthdaySettings.enabled,
+        emailTemplate: birthdaySettings.emailTemplate || 'default',
+        segmentFilter: birthdaySettings.segmentFilter || 'all',
+        customMessage: birthdaySettings.customMessage || '',
+        senderName: birthdaySettings.senderName || '',
+        customThemeData: birthdaySettings.customThemeData,
         promotionId: promotionId,
       });
     }
@@ -577,7 +587,8 @@ export default function BirthdaysPage() {
           emailTemplate: birthdaySettings?.emailTemplate || 'default',
           customMessage: birthdaySettings?.customMessage || '',
           customThemeData: birthdaySettings?.customThemeData || null,
-          senderName: birthdaySettings?.senderName || ''
+          senderName: birthdaySettings?.senderName || '',
+          promotionId: birthdaySettings?.promotionId || null
         }),
       });
 

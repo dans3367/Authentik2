@@ -30,6 +30,7 @@ import appointmentRoutes from "./routes/appointmentRoutes";
 import appointmentRemindersRoutes from "./routes/appointmentRemindersRoutes";
 import newsletterWorkerRoutes from "./routes/newsletterWorkerRoutes";
 import suppressionManagementRoutes from "./routes/suppressionManagementRoutes";
+import { birthdayWorkerRoutes } from "./routes/birthdayWorkerRoutes";
 
 // Import middleware
 import { authRateLimiter, apiRateLimiter, jwtTokenRateLimiter } from "./middleware/security";
@@ -60,6 +61,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/appointments", appointmentRoutes);
   app.use("/api/appointment-reminders", appointmentRemindersRoutes);
   app.use("/api/newsletter-worker", newsletterWorkerRoutes);
+  app.use("/api/birthday-worker", birthdayWorkerRoutes);
   app.use("/api/suppression", suppressionManagementRoutes);
 
   // Newsletter stats endpoint

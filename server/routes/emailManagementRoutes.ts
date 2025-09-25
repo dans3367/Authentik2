@@ -1267,6 +1267,28 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
       return res.status(400).json({ message: 'enabled field must be a boolean' });
     }
 
+    // Validate required string fields
+    if (emailTemplate === undefined || emailTemplate === null || typeof emailTemplate !== 'string') {
+      return res.status(400).json({ message: 'emailTemplate is required and must be a string' });
+    }
+
+    if (segmentFilter === undefined || segmentFilter === null || typeof segmentFilter !== 'string') {
+      return res.status(400).json({ message: 'segmentFilter is required and must be a string' });
+    }
+
+    if (customMessage === undefined || customMessage === null || typeof customMessage !== 'string') {
+      return res.status(400).json({ message: 'customMessage is required and must be a string' });
+    }
+
+    if (senderName === undefined || senderName === null || typeof senderName !== 'string') {
+      return res.status(400).json({ message: 'senderName is required and must be a string' });
+    }
+
+    // Validate promotionId if provided
+    if (promotionId !== null && promotionId !== undefined && typeof promotionId !== 'string') {
+      return res.status(400).json({ message: 'promotionId must be a string or null' });
+    }
+
 
 
 
