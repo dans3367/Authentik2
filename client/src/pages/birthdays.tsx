@@ -51,13 +51,11 @@ import { CardDesignerDialog } from "@/components/CardDesignerDialog";
 interface BirthdaySettings {
   id: string;
   enabled: boolean;
-  sendDaysBefore: number;
   emailTemplate: string;
   segmentFilter: string;
   customMessage: string;
   customThemeData?: string | null;
   senderName: string;
-  senderEmail: string;
   created_at: string;
   updated_at: string;
 }
@@ -157,12 +155,10 @@ export default function BirthdaysPage() {
         return data || {
           id: '',
           enabled: false,
-          sendDaysBefore: 0,
           emailTemplate: 'default',
           segmentFilter: 'all',
           customMessage: '',
           senderName: '',
-          senderEmail: '',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
@@ -171,12 +167,10 @@ export default function BirthdaysPage() {
         return {
           id: '',
           enabled: false,
-          sendDaysBefore: 0,
           emailTemplate: 'default',
           segmentFilter: 'all',
           customMessage: '',
           senderName: '',
-          senderEmail: '',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
@@ -474,8 +468,7 @@ export default function BirthdaysPage() {
           emailTemplate: birthdaySettings?.emailTemplate || 'default',
           customMessage: birthdaySettings?.customMessage || '',
           customThemeData: birthdaySettings?.customThemeData || null,
-          senderName: birthdaySettings?.senderName || '',
-          senderEmail: birthdaySettings?.senderEmail || ''
+          senderName: birthdaySettings?.senderName || ''
         }),
       });
 
@@ -1258,28 +1251,7 @@ export default function BirthdaysPage() {
                   />
                 </div>
 
-                <Separator />
 
-                {/* Timing Settings */}
-                <div className="space-y-4">
-                  <Label className="text-base font-medium">Timing Settings</Label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-sm">Send Days Before Birthday</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        max="30"
-                        value={birthdaySettings?.sendDaysBefore || 0}
-                        onChange={(e) => handleSettingsUpdate('sendDaysBefore', parseInt(e.target.value))}
-                        disabled={updateSettingsMutation.isPending}
-                      />
-                      <p className="text-xs text-gray-500 mt-1">0 = on birthday, 1 = day before, etc.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
 
                 {/* Email Template Settings */}
                 <div className="space-y-4">
@@ -1294,16 +1266,7 @@ export default function BirthdaysPage() {
                         disabled={updateSettingsMutation.isPending}
                       />
                     </div>
-                    <div>
-                      <Label className="text-sm">Sender Email</Label>
-                      <Input
-                        type="email"
-                        value={birthdaySettings?.senderEmail || ''}
-                        onChange={(e) => handleSettingsUpdate('senderEmail', e.target.value)}
-                        placeholder="birthday@yourcompany.com"
-                        disabled={updateSettingsMutation.isPending}
-                      />
-                    </div>
+
                     
                   </div>
                 </div>

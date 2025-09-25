@@ -1227,12 +1227,10 @@ emailManagementRoutes.get("/birthday-settings", authenticateToken, requireTenant
       const defaultSettings = {
         id: '',
         enabled: false,
-        sendDaysBefore: 0,
         emailTemplate: 'default',
         segmentFilter: 'all',
         customMessage: '',
         senderName: '',
-        senderEmail: '',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -1251,13 +1249,11 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
   try {
     const { 
       enabled, 
-      sendDaysBefore, 
       emailTemplate, 
       segmentFilter, 
       customMessage, 
       customThemeData,
-      senderName, 
-      senderEmail 
+      senderName
     } = req.body;
 
     // Validate input
@@ -1265,13 +1261,9 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
       return res.status(400).json({ message: 'enabled field must be a boolean' });
     }
 
-    if (sendDaysBefore !== undefined && (!Number.isInteger(sendDaysBefore) || sendDaysBefore < 0 || sendDaysBefore > 30)) {
-      return res.status(400).json({ message: 'sendDaysBefore must be an integer between 0 and 30' });
-    }
 
-    if (senderEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(senderEmail)) {
-      return res.status(400).json({ message: 'Please enter a valid sender email address' });
-    }
+
+
 
     // Validate custom theme data if provided
     if (customThemeData !== undefined) {
@@ -1321,12 +1313,10 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
       // Update existing settings
       const updateData: any = {
         enabled,
-        sendDaysBefore,
         emailTemplate,
         segmentFilter,
         customMessage,
         senderName,
-        senderEmail,
         updatedAt: new Date(),
       };
       
@@ -1343,12 +1333,10 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
       const insertData: any = {
         tenantId: req.user.tenantId,
         enabled,
-        sendDaysBefore,
         emailTemplate,
         segmentFilter,
         customMessage,
         senderName,
-        senderEmail,
       };
 
       if (customThemeDataStr !== undefined) {

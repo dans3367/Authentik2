@@ -1412,13 +1412,11 @@ export const birthdaySettings = pgTable("birthday_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   enabled: boolean("enabled").default(false),
-  sendDaysBefore: integer("send_days_before").default(0), // How many days before birthday to send
   emailTemplate: text("email_template").default('default'), // Email template to use
   segmentFilter: text("segment_filter").default('all'), // Which contacts to include
   customMessage: text("custom_message").default(''), // Custom birthday message
   customThemeData: text("custom_theme_data"), // JSON data for custom theme
   senderName: text("sender_name").default(''),
-  senderEmail: text("sender_email").default(''),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1531,22 +1529,18 @@ export const birthdaySettingsRelations = relations(birthdaySettings, ({ one }) =
 // Birthday settings schemas
 export const createBirthdaySettingsSchema = z.object({
   enabled: z.boolean().default(false),
-  sendDaysBefore: z.number().int().min(0).max(30).default(0),
   emailTemplate: z.string().default('default'),
   segmentFilter: z.string().default('all'),
   customMessage: z.string().default(''),
   senderName: z.string().default(''),
-  senderEmail: z.string().email("Please enter a valid email address").default(''),
 });
 
 export const updateBirthdaySettingsSchema = z.object({
   enabled: z.boolean().optional(),
-  sendDaysBefore: z.number().int().min(0).max(30).optional(),
   emailTemplate: z.string().optional(),
   segmentFilter: z.string().optional(),
   customMessage: z.string().optional(),
   senderName: z.string().optional(),
-  senderEmail: z.string().email("Please enter a valid email address").optional(),
 });
 
 export const insertBirthdaySettingsSchema = createInsertSchema(birthdaySettings).omit({
