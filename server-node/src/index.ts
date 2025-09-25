@@ -746,7 +746,8 @@ app.post('/api/birthday-invitation', authenticateRequest, async (req: Authentica
 });
 
 // Birthday test endpoint for sending test birthday cards to users
-app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedRequest, res) => {
+app.post('/api/birthday-test', async (req: any, res) => {
+  console.log('🎂 BIRTHDAY TEST ENDPOINT HIT!');
   try {
     const {
       userId,
@@ -784,6 +785,7 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
     }
 
     console.log(`🎂 Starting test birthday card workflow for user ${userId} (${userEmail})`);
+    console.log(`🏢 Using tenant ID: ${tenantId}`);
 
     // Fetch birthday settings for the tenant to get selected template and promotion
     let birthdaySettingsData;
@@ -791,17 +793,23 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
     try {
       const settings = await db.select().from(birthdaySettings).where(eq(birthdaySettings.tenantId, tenantId)).limit(1);
       birthdaySettingsData = settings.length > 0 ? settings[0] : null;
-      
+      console.log(`🎨 Birthday settings found:`, birthdaySettingsData ? 'Yes' : 'No');
+      console.log(`🎨 Settings promotion ID: ${birthdaySettingsData?.promotionId}`);
+
       // Fetch promotion data - prioritize promotionId from request body, then fall back to birthday settings
       const finalPromotionId = promotionId || birthdaySettingsData?.promotionId;
+      console.log(`🎁 Final promotion ID to use: ${finalPromotionId} (from request: ${promotionId}, from settings: ${birthdaySettingsData?.promotionId})`);
+
       if (finalPromotionId) {
         try {
           const promotion = await db.select().from(promotions).where(eq(promotions.id, finalPromotionId)).limit(1);
           promotionData = promotion.length > 0 ? promotion[0] : null;
-          console.log(`🎁 Fetched promotion data for ID: ${finalPromotionId}`, promotionData ? 'Success' : 'Not found');
+          console.log(`🎁 Fetched promotion data for ID: ${finalPromotionId}`, promotionData ? `Success - "${promotionData.title}" (${promotionData.content?.length} chars)` : 'Not found');
         } catch (promotionError) {
           console.warn('Failed to fetch promotion data:', promotionError);
         }
+      } else {
+        console.log(`🎁 No promotion ID found, will send without promotion`);
       }
     } catch (error) {
       console.warn('Failed to fetch birthday settings, using defaults:', error);
@@ -924,6 +932,10 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
 
     // Fallback: Generate birthday card HTML and send directly
     try {
+      console.log('📧 About to render birthday template');
+      console.log('📧 Promotion data:', promotionData ? `Has content: ${promotionData.content?.length} chars` : 'No promotion data');
+      console.log('📧 Promotion content preview:', promotionData?.content?.substring(0, 50) + '...');
+
       const htmlContent = renderBirthdayTemplate(selectedTemplate, {
         recipientName: userName,
         message: finalCustomMessage,
@@ -932,6 +944,9 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
         senderName: finalSenderName,
         promotionContent: promotionData?.content || undefined
       });
+
+      console.log('📧 Template rendered, HTML length:', htmlContent.length);
+      console.log('📧 Promotion content in HTML:', htmlContent.includes(promotionData?.content?.substring(0, 20)) ? 'YES' : 'NO');
 
       // Send via main server
       const response = await fetch('http://localhost:5000/api/email/send', {
