@@ -180,10 +180,10 @@
     "table": {
       "name": "NAME",
       "status": "STATUS",
-      "birthday": "BIRTHDAY",
+      "birthday": "BIRTH DATE",
       "lists": "LISTS",
       "activity": "ACTIVITY",
-      "campaigns": "CAMPAIGNS",
+      "campaigns": "BIRTHDAY CARDS",
       "actions": "ACTIONS",
       "sent": "Sent",
       "opened": "Opened",

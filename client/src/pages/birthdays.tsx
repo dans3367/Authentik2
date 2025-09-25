@@ -1506,10 +1506,9 @@ export default function BirthdaysPage() {
                       <TableHead>{t('birthdays.table.name')}</TableHead>
                       <TableHead>{t('birthdays.table.status')}</TableHead>
                       <TableHead>{t('birthdays.table.birthday')}</TableHead>
-                      <TableHead>{t('birthdays.table.lists')}</TableHead>
+
                       <TableHead>{t('birthdays.table.activity')}</TableHead>
                       <TableHead>{t('birthdays.table.campaigns')}</TableHead>
-                      <TableHead>{t('birthdays.table.actions')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1553,15 +1552,7 @@ export default function BirthdaysPage() {
                             </button>
                           )}
                         </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {contact.lists.map((list) => (
-                              <Badge key={list.id} variant="outline" className="text-xs">
-                                {list.name}
-                              </Badge>
-                            ))}
-                          </div>
-                        </TableCell>
+
                         <TableCell>
                           <div className="text-sm">
                             <p>{t('birthdays.table.sent')}: {contact.emailsSent}</p>
@@ -1579,27 +1570,7 @@ export default function BirthdaysPage() {
                             <span className="text-gray-400 text-sm">{t('birthdays.table.na')}</span>
                           )}
                         </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="sm">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            {!contact.birthday && (
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={() => handleSendBirthdayInvitation(contact.id)}
-                                disabled={sendInvitationMutation.isPending}
-                                title={t('birthdays.buttons.sendInvitation')}
-                              >
-                                <Mail className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
+
                       </TableRow>
                     ))}
                   </TableBody>
