@@ -10,7 +10,7 @@ import postgres from "postgres";
 import { sql, eq } from 'drizzle-orm';
 import { pgTable, varchar, boolean, integer, text, timestamp } from 'drizzle-orm/pg-core';
 
-// Define birthday settings table schema
+// Define birthday settings table schema with promotion support
 const birthdaySettings = pgTable("birthday_settings", {
   id: varchar("id").primaryKey(),
   tenantId: varchar("tenant_id").notNull(),
@@ -22,6 +22,28 @@ const birthdaySettings = pgTable("birthday_settings", {
   customThemeData: text("custom_theme_data"),
   senderName: text("sender_name").default(''),
   senderEmail: text("sender_email").default(''),
+  promotionId: varchar("promotion_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Define promotions table schema
+const promotions = pgTable("promotions", {
+  id: varchar("id").primaryKey(),
+  tenantId: varchar("tenant_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  content: text("content").notNull(),
+  type: text("type").notNull().default('newsletter'),
+  targetAudience: text("target_audience").notNull().default('all'),
+  isActive: boolean("is_active").default(true),
+  usageCount: integer("usage_count").default(0),
+  maxUses: integer("max_uses"),
+  validFrom: timestamp("valid_from"),
+  validTo: timestamp("valid_to"),
+  promotionalCodes: text("promotional_codes"),
+  metadata: text("metadata"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -47,7 +69,7 @@ type BirthdayTemplateId = 'default' | 'confetti' | 'balloons' | 'custom';
 
 function renderBirthdayTemplate(
   template: BirthdayTemplateId,
-  params: { recipientName?: string; message?: string; imageUrl?: string; brandName?: string; customThemeData?: any; senderName?: string }
+  params: { recipientName?: string; message?: string; imageUrl?: string; brandName?: string; customThemeData?: any; senderName?: string; promotionContent?: string }
 ): string {
   // Handle custom theme with rich styling
   if (template === 'custom' && params.customThemeData) {
@@ -100,6 +122,7 @@ function renderBirthdayTemplate(
           <!-- 3. Content Area (message) -->
           <div style="padding: 30px;">
             <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">${message}</div>
+            ${params.promotionContent ? `<div style="margin-top: 30px; padding: 20px; background: #f7fafc; border-radius: 8px; border-left: 4px solid #667eea; text-align: left;">${params.promotionContent}</div>` : ''}
             ${signature ? `<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">${signature}</div>` : ''}
           </div>
           
@@ -185,6 +208,7 @@ function renderBirthdayTemplate(
         <!-- 3. Content Area (message) -->
         <div style="padding: 30px;">
           <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">${params.message || 'Wishing you a wonderful day!'}</div>
+          ${params.promotionContent ? `<div style="margin-top: 30px; padding: 20px; background: #f7fafc; border-radius: 8px; border-left: 4px solid ${colors.primary}; text-align: left;">${params.promotionContent}</div>` : ''}
           ${signature ? `<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">${signature}</div>` : ''}
         </div>
         
@@ -516,7 +540,6 @@ app.post('/api/email-tracking', authenticateRequest, async (req: AuthenticatedRe
           success: true,
           emailId,
           workflowId: handle.workflowId,
-          runId: handle.runId, // Include the run ID for tracking
           status: isScheduled ? 'scheduled' : 'queued',
           message: 'Email workflow created successfully',
           temporal: true,
@@ -761,11 +784,22 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
 
     console.log(`🎂 Starting test birthday card workflow for user ${userId} (${userEmail})`);
 
-    // Fetch birthday settings for the tenant to get selected template
+    // Fetch birthday settings for the tenant to get selected template and promotion
     let birthdaySettingsData;
+    let promotionData = null;
     try {
       const settings = await db.select().from(birthdaySettings).where(eq(birthdaySettings.tenantId, tenantId)).limit(1);
       birthdaySettingsData = settings.length > 0 ? settings[0] : null;
+      
+      // If birthday settings has a promotion, fetch the promotion data
+      if (birthdaySettingsData?.promotionId) {
+        try {
+          const promotion = await db.select().from(promotions).where(eq(promotions.id, birthdaySettingsData.promotionId)).limit(1);
+          promotionData = promotion.length > 0 ? promotion[0] : null;
+        } catch (promotionError) {
+          console.warn('Failed to fetch promotion data:', promotionError);
+        }
+      }
     } catch (error) {
       console.warn('Failed to fetch birthday settings, using defaults:', error);
       birthdaySettingsData = null;
@@ -822,7 +856,8 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
           message: finalCustomMessage,
           brandName: tenantName || 'Your Company',
           customThemeData: finalCustomThemeData,
-          senderName: finalSenderName
+          senderName: finalSenderName,
+          promotionContent: promotionData?.content || undefined
         });
 
         // Generate unique workflow ID
@@ -851,6 +886,7 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
             senderName: finalSenderName,
             templateUsed: selectedTemplate,
             hasCustomTheme: finalCustomThemeData !== null,
+            promotionContent: promotionData?.content || undefined,
             preRendered: true // Mark that content was pre-rendered
           }
         };
@@ -890,7 +926,8 @@ app.post('/api/birthday-test', authenticateRequest, async (req: AuthenticatedReq
         message: finalCustomMessage,
         brandName: tenantName || 'Your Company',
         customThemeData: finalCustomThemeData,
-        senderName: finalSenderName
+        senderName: finalSenderName,
+        promotionContent: promotionData?.content || undefined
       });
 
       // Send via main server

@@ -1417,6 +1417,7 @@ export const birthdaySettings = pgTable("birthday_settings", {
   customMessage: text("custom_message").default(''), // Custom birthday message
   customThemeData: text("custom_theme_data"), // JSON data for custom theme
   senderName: text("sender_name").default(''),
+  promotionId: varchar("promotion_id").references(() => promotions.id, { onDelete: 'set null' }), // Optional promotion to include in birthday emails
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1524,6 +1525,10 @@ export const birthdaySettingsRelations = relations(birthdaySettings, ({ one }) =
     fields: [birthdaySettings.tenantId],
     references: [tenants.id],
   }),
+  promotion: one(promotions, {
+    fields: [birthdaySettings.promotionId],
+    references: [promotions.id],
+  }),
 }));
 
 // Birthday settings schemas
@@ -1533,6 +1538,7 @@ export const createBirthdaySettingsSchema = z.object({
   segmentFilter: z.string().default('all'),
   customMessage: z.string().default(''),
   senderName: z.string().default(''),
+  promotionId: z.string().optional(),
 });
 
 export const updateBirthdaySettingsSchema = z.object({
@@ -1541,6 +1547,7 @@ export const updateBirthdaySettingsSchema = z.object({
   segmentFilter: z.string().optional(),
   customMessage: z.string().optional(),
   senderName: z.string().optional(),
+  promotionId: z.string().optional(),
 });
 
 export const insertBirthdaySettingsSchema = createInsertSchema(birthdaySettings).omit({

@@ -103,8 +103,9 @@ export function PromotionSelector({
       if (searchTerm) params.append('search', searchTerm);
       params.append('isActive', 'true'); // Only show active promotions
       
-      const response = await apiRequest(`/api/promotions?${params.toString()}`);
-      return response.promotions;
+      const response = await apiRequest('GET', `/api/promotions?${params.toString()}`);
+      const data = await response.json();
+      return data.promotions;
     },
   });
 
@@ -112,9 +113,14 @@ export function PromotionSelector({
     queryKey: ['/api/promotions/selected', selectedPromotions],
     queryFn: async () => {
       if (selectedPromotions.length === 0) return [];
-      const promises = selectedPromotions.map(id => 
-        apiRequest(`/api/promotions/${id}`).catch(() => null)
-      );
+      const promises = selectedPromotions.map(async id => {
+        try {
+          const response = await apiRequest('GET', `/api/promotions/${id}`);
+          return await response.json();
+        } catch (error) {
+          return null;
+        }
+      });
       const results = await Promise.all(promises);
       return results.filter(Boolean);
     },

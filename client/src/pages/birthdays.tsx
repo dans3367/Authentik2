@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CardDesignerDialog } from "@/components/CardDesignerDialog";
+import { PromotionSelector } from "@/components/PromotionSelector";
 
 interface BirthdaySettings {
   id: string;
@@ -57,6 +58,14 @@ interface BirthdaySettings {
   customMessage: string;
   customThemeData?: string | null;
   senderName: string;
+  promotionId?: string | null;
+  promotion?: {
+    id: string;
+    title: string;
+    description: string;
+    content: string;
+    type: string;
+  } | null;
   created_at: string;
   updated_at: string;
 }
@@ -148,6 +157,9 @@ export default function BirthdaysPage() {
   // Local state for sender name to avoid API calls on every keystroke
   const [localSenderName, setLocalSenderName] = useState<string>('');
 
+  // State for promotion selection
+  const [selectedPromotions, setSelectedPromotions] = useState<any[]>([]);
+
   // Customer modal state
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Contact | null>(null);
@@ -157,6 +169,36 @@ export default function BirthdaysPage() {
     setCustomerModalOpen(false);
     setSelectedCustomer(null);
   }, [location]);
+
+  // Handle browser back/forward button navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tab = urlParams.get('tab');
+      if (tab && ['themes', 'settings', 'customers', 'test'].includes(tab)) {
+        setActiveTab(tab as "themes" | "settings" | "customers" | "test");
+      } else {
+        setActiveTab("themes");
+      }
+      // Reset modal state on browser navigation
+      setCustomerModalOpen(false);
+      setSelectedCustomer(null);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Update URL when tab changes (for proper browser history)
+  useEffect(() => {
+    const currentUrl = new URL(window.location.href);
+    const currentTab = currentUrl.searchParams.get('tab');
+    
+    if (currentTab !== activeTab) {
+      currentUrl.searchParams.set('tab', activeTab);
+      window.history.replaceState(null, '', currentUrl.toString());
+    }
+  }, [activeTab]);
 
   // Handler to navigate to add customer page
   const handleAddCustomer = () => {
@@ -334,6 +376,15 @@ export default function BirthdaysPage() {
     }
   }, [birthdaySettings?.senderName]);
 
+  // Initialize selected promotions when birthday settings are loaded
+  useEffect(() => {
+    if (birthdaySettings?.promotion) {
+      setSelectedPromotions([birthdaySettings.promotion]);
+    } else {
+      setSelectedPromotions([]);
+    }
+  }, [birthdaySettings?.promotion]);
+
   // Save handler for sender name
   const handleSaveSenderName = () => {
     if (birthdaySettings) {
@@ -356,6 +407,18 @@ export default function BirthdaysPage() {
   const handleToggleGlobalEnabled = () => {
     if (birthdaySettings) {
       handleSettingsUpdate('enabled', !birthdaySettings.enabled);
+    }
+  };
+
+  // Handler for promotion selection changes
+  const handlePromotionsChange = (promotions: any[]) => {
+    setSelectedPromotions(promotions);
+    if (birthdaySettings) {
+      const promotionId = promotions.length > 0 ? promotions[0].id : null;
+      updateSettingsMutation.mutate({
+        ...birthdaySettings,
+        promotionId: promotionId,
+      });
     }
   };
 
@@ -1326,6 +1389,19 @@ export default function BirthdaysPage() {
                       </div>
                     </div>
 
+                    {/* Promotion Selection */}
+                    <div>
+                      <Label className="text-sm">Promotion (Optional)</Label>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                        Select a promotion to include in birthday emails
+                      </p>
+                      <PromotionSelector
+                        selectedPromotions={selectedPromotions}
+                        onPromotionsChange={handlePromotionsChange}
+                        campaignType="birthday"
+                        onPromotionContentInsert={() => {}} // Not needed for birthday emails
+                      />
+                    </div>
                     
                   </div>
                 </div>

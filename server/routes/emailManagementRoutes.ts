@@ -1220,6 +1220,9 @@ emailManagementRoutes.get("/birthday-settings", authenticateToken, requireTenant
   try {
     const settings = await db.query.birthdaySettings.findFirst({
       where: sql`${birthdaySettings.tenantId} = ${req.user.tenantId}`,
+      with: {
+        promotion: true,
+      },
     });
 
     // If no settings exist, return default settings
@@ -1231,6 +1234,8 @@ emailManagementRoutes.get("/birthday-settings", authenticateToken, requireTenant
         segmentFilter: 'all',
         customMessage: '',
         senderName: '',
+        promotionId: null,
+        promotion: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -1253,7 +1258,8 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
       segmentFilter, 
       customMessage, 
       customThemeData,
-      senderName
+      senderName,
+      promotionId
     } = req.body;
 
     // Validate input
@@ -1317,6 +1323,7 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
         segmentFilter,
         customMessage,
         senderName,
+        promotionId: promotionId || null,
         updatedAt: new Date(),
       };
       
@@ -1337,6 +1344,7 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
         segmentFilter,
         customMessage,
         senderName,
+        promotionId: promotionId || null,
       };
 
       if (customThemeDataStr !== undefined) {
