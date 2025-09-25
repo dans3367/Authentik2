@@ -116,10 +116,19 @@ interface User {
 
 export default function BirthdaysPage() {
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { t, currentLanguage } = useLanguage();
   const { user: currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<"themes" | "settings" | "customers" | "test">("themes");
+  
+  // Initialize activeTab based on URL parameter or default to "themes"
+  const [activeTab, setActiveTab] = useState<"themes" | "settings" | "customers" | "test">(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tab = urlParams.get('tab');
+    if (tab && ['themes', 'settings', 'customers', 'test'].includes(tab)) {
+      return tab as "themes" | "settings" | "customers" | "test";
+    }
+    return "themes";
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
@@ -139,9 +148,25 @@ export default function BirthdaysPage() {
   // Local state for sender name to avoid API calls on every keystroke
   const [localSenderName, setLocalSenderName] = useState<string>('');
 
+  // Customer modal state
+  const [customerModalOpen, setCustomerModalOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Contact | null>(null);
+
+  // Reset modal state when location changes (prevents frozen modal on navigation back)
+  useEffect(() => {
+    setCustomerModalOpen(false);
+    setSelectedCustomer(null);
+  }, [location]);
+
   // Handler to navigate to add customer page
   const handleAddCustomer = () => {
     setLocation('/email-contacts/new');
+  };
+
+  // Handler to open customer modal
+  const handleCustomerClick = (customer: Contact) => {
+    setSelectedCustomer(customer);
+    setCustomerModalOpen(true);
   };
 
   // Fetch birthday settings
@@ -1523,7 +1548,13 @@ export default function BirthdaysPage() {
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p className="font-medium">{getContactName(contact)}</p>
+                            <button
+                              type="button"
+                              onClick={() => handleCustomerClick(contact)}
+                              className="font-medium text-left hover:text-blue-600 hover:underline transition-colors cursor-pointer"
+                            >
+                              {getContactName(contact)}
+                            </button>
                             <p className="text-sm text-gray-500">{contact.email}</p>
                           </div>
                         </TableCell>
@@ -1715,6 +1746,119 @@ export default function BirthdaysPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Customer Details Modal */}
+      <Dialog open={customerModalOpen} onOpenChange={setCustomerModalOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Customer Details
+            </DialogTitle>
+            <DialogDescription>
+              View customer information and activity
+            </DialogDescription>
+          </DialogHeader>
+          {selectedCustomer && (
+            <div className="space-y-4">
+              {/* Customer Basic Info */}
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Name</Label>
+                  <p className="text-sm font-medium">{selectedCustomer.firstName || selectedCustomer.lastName ? `${selectedCustomer.firstName || ''} ${selectedCustomer.lastName || ''}`.trim() : 'No name provided'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Email</Label>
+                  <p className="text-sm">{selectedCustomer.email}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Status</Label>
+                  <Badge className={`${selectedCustomer.status === 'active' ? 'bg-green-100 text-green-800' : 
+                    selectedCustomer.status === 'unsubscribed' ? 'bg-red-100 text-red-800' : 
+                    selectedCustomer.status === 'bounced' ? 'bg-yellow-100 text-yellow-800' : 
+                    'bg-gray-100 text-gray-800'}`}>
+                    {selectedCustomer.status}
+                  </Badge>
+                </div>
+                {selectedCustomer.birthday && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Birthday</Label>
+                    <div className="flex items-center gap-2">
+                      <CakeIcon className="h-4 w-4 text-pink-500" />
+                      <span className="text-sm">{new Date(selectedCustomer.birthday).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Activity Stats */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium text-gray-700">Email Activity</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-3 bg-blue-50 rounded-lg">
+                    <p className="text-2xl font-bold text-blue-600">{selectedCustomer.emailsSent}</p>
+                    <p className="text-xs text-blue-600">Emails Sent</p>
+                  </div>
+                  <div className="text-center p-3 bg-green-50 rounded-lg">
+                    <p className="text-2xl font-bold text-green-600">{selectedCustomer.emailsOpened}</p>
+                    <p className="text-xs text-green-600">Emails Opened</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tags */}
+              {selectedCustomer.tags && selectedCustomer.tags.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Tags</Label>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedCustomer.tags.map((tag) => (
+                      <Badge key={tag.id} variant="outline" style={{ backgroundColor: tag.color + '20', borderColor: tag.color, color: tag.color }}>
+                        {tag.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Dates */}
+              <div className="space-y-2">
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Added Date</Label>
+                  <p className="text-sm text-gray-600">{new Date(selectedCustomer.addedDate).toLocaleDateString()}</p>
+                </div>
+                {selectedCustomer.lastActivity && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Last Activity</Label>
+                    <p className="text-sm text-gray-600">{new Date(selectedCustomer.lastActivity).toLocaleDateString()}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Button */}
+              <div className="flex justify-end pt-4">
+                <Button 
+                  onClick={() => {
+                    const customerId = selectedCustomer.id;
+                    // Immediately close modal and reset state
+                    setCustomerModalOpen(false);
+                    setSelectedCustomer(null);
+                    // Navigate after a brief delay to ensure smooth transition
+                    setTimeout(() => {
+                      setLocation(`/email-contacts/view/${customerId}?return=/birthdays?tab=customers`);
+                    }, 100);
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Eye className="h-4 w-4" />
+                  View Full Profile
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Birthday Modal */}
       <Dialog open={birthdayModalOpen} onOpenChange={setBirthdayModalOpen}>

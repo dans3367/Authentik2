@@ -68,6 +68,10 @@ export default function ViewContact() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // Get return URL from query parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const returnUrl = urlParams.get('return') || '/email-contacts';
 
   const { data: response, isLoading, error } = useQuery({
     queryKey: ['/api/email-contacts', id],
@@ -135,7 +139,7 @@ export default function ViewContact() {
         title: "Success",
         description: "Contact deleted successfully",
       });
-      setLocation('/email-contacts');
+      setLocation(returnUrl);
     },
     onError: (error: any) => {
       toast({
@@ -249,7 +253,7 @@ export default function ViewContact() {
             There was an error loading the contact: {error.message || 'Unknown error'}
           </p>
           <Button 
-            onClick={() => setLocation('/email-contacts')} 
+            onClick={() => setLocation(returnUrl)} 
             variant="outline"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -273,7 +277,7 @@ export default function ViewContact() {
             Contact ID: {id}
           </p>
           <Button 
-            onClick={() => setLocation('/email-contacts')} 
+            onClick={() => setLocation(returnUrl)} 
             variant="outline"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -311,7 +315,7 @@ export default function ViewContact() {
       <div className="mb-6">
         <Button 
           variant="ghost" 
-          onClick={() => setLocation('/email-contacts')}
+          onClick={() => setLocation(returnUrl)}
           className="mb-4"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
