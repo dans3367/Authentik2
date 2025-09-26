@@ -524,6 +524,24 @@ export default function BirthdaysPage() {
         throw new Error('Contact not found');
       }
 
+      // Fetch promotion content if promotionId exists
+      let promotionContent = null;
+      if (birthdaySettings?.promotionId) {
+        try {
+          const promotionResponse = await fetch(`/api/promotions/${birthdaySettings.promotionId}`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('auth-token')}`,
+            },
+          });
+          if (promotionResponse.ok) {
+            const promotion = await promotionResponse.json();
+            promotionContent = promotion.content;
+          }
+        } catch (error) {
+          console.warn('Failed to fetch promotion content:', error);
+        }
+      }
+
       // Call the workflow-based API
       const response = await fetch('http://localhost:3502/api/birthday-invitation', {
         method: 'POST',
@@ -539,7 +557,9 @@ export default function BirthdaysPage() {
           tenantId: currentUser?.tenantId || 'unknown-tenant',
           tenantName: currentUser?.name || 'Your Company',
           userId: currentUser?.id || 'unknown-user',
-          fromEmail: 'admin@zendwise.work'
+          fromEmail: 'admin@zendwise.work',
+          promotionId: birthdaySettings?.promotionId || null,
+          promotionContent: promotionContent
         }),
       });
 
