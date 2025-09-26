@@ -28,6 +28,8 @@ export interface BirthdayInvitationWorkflowInput {
   userId?: string;
   fromEmail?: string;
   baseUrl?: string;
+  promotionId?: string;
+  promotionContent?: string;
 }
 
 export interface BirthdayInvitationWorkflowResult {
@@ -70,7 +72,9 @@ export async function birthdayInvitationWorkflow(
       contactLastName: input.contactLastName,
       tenantName: input.tenantName,
       invitationToken: tokenResult.token,
-      baseUrl: input.baseUrl
+      baseUrl: input.baseUrl,
+      promotionId: input.promotionId,
+      promotionContent: input.promotionContent
     });
 
     if (!emailData.success) {
