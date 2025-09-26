@@ -587,8 +587,8 @@ export default function BirthdaysPage() {
         throw new Error('User not found');
       }
 
-      // Call the workflow-based API for test birthday cards
-      const response = await fetch('http://localhost:3502/api/birthday-test', {
+      // Call the workflow-based API for test birthday cards through main server proxy
+      const response = await fetch('/api/birthday-test', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

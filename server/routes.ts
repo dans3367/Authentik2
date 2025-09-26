@@ -148,6 +148,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Birthday test endpoints - proxy to server-node
+  app.post("/api/birthday-test", authenticateToken, async (req: any, res) => {
+    try {
+      console.log('🎂 [Birthday Test Proxy] Forwarding test request to server-node for user:', req.user.id);
+      
+      // Forward request to server-node with authentication
+      const response = await fetch('http://localhost:3502/api/birthday-test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': req.headers.authorization || '',
+        },
+        body: JSON.stringify({
+          ...req.body,
+          userId: req.user.id,
+          tenantId: req.user.tenantId
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [Birthday Test Proxy] server-node returned error:', response.status, errorText);
+        return res.status(response.status).json({
+          success: false,
+          message: 'server-node request failed',
+          error: errorText
+        });
+      }
+
+      const result = await response.json();
+      console.log('✅ [Birthday Test Proxy] server-node response:', result);
+      res.json(result);
+    } catch (error) {
+      console.error('❌ [Birthday Test Proxy] Failed to communicate with server-node:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to communicate with birthday test service',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Email tracking endpoints - proxy to server-node
   app.get("/api/email-tracking", authenticateToken, async (req: any, res) => {
     try {
