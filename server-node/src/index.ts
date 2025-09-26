@@ -71,6 +71,13 @@ function renderBirthdayTemplate(
   template: BirthdayTemplateId,
   params: { recipientName?: string; message?: string; imageUrl?: string; brandName?: string; customThemeData?: any; senderName?: string; promotionContent?: string }
 ): string {
+  console.log('🎂 [renderBirthdayTemplate] Called with params:', {
+    template,
+    hasPromotionContent: !!params.promotionContent,
+    promotionContentLength: params.promotionContent?.length,
+    promotionContentPreview: params.promotionContent?.substring(0, 100)
+  });
+  
   // Handle custom theme with rich styling
   if (template === 'custom' && params.customThemeData) {
     let customData = null;
@@ -935,6 +942,9 @@ app.post('/api/birthday-test', async (req: any, res) => {
       console.log('📧 About to render birthday template');
       console.log('📧 Promotion data:', promotionData ? `Has content: ${promotionData.content?.length} chars` : 'No promotion data');
       console.log('📧 Promotion content preview:', promotionData?.content?.substring(0, 50) + '...');
+      console.log('📧 Promotion ID from request:', promotionId);
+      console.log('📧 Promotion ID from settings:', birthdaySettingsData?.promotionId);
+      console.log('📧 Full promotion object:', JSON.stringify(promotionData, null, 2));
 
       const htmlContent = renderBirthdayTemplate(selectedTemplate, {
         recipientName: userName,
