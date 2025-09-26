@@ -75,7 +75,9 @@ function renderBirthdayTemplate(
     template,
     hasPromotionContent: !!params.promotionContent,
     promotionContentLength: params.promotionContent?.length,
-    promotionContentPreview: params.promotionContent?.substring(0, 100)
+    promotionContentPreview: params.promotionContent?.substring(0, 100),
+    promotionContentType: typeof params.promotionContent,
+    promotionContentTruthy: params.promotionContent ? 'YES' : 'NO'
   });
   
   // Handle custom theme with rich styling
@@ -215,7 +217,7 @@ function renderBirthdayTemplate(
         <!-- 3. Content Area (message) -->
         <div style="padding: 30px;">
           <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">${params.message || 'Wishing you a wonderful day!'}</div>
-          ${params.promotionContent ? `<div style="margin-top: 30px; padding: 20px; background: #f7fafc; border-radius: 8px; border-left: 4px solid ${colors.primary}; text-align: left;">${params.promotionContent}</div>` : ''}
+          ${params.promotionContent ? `<div style="margin-top: 30px; padding: 20px; background: #f7fafc; border-radius: 8px; border-left: 4px solid ${colors.primary}; text-align: left;">${params.promotionContent}</div>` : '<!-- NO PROMOTION CONTENT -->'}
           ${signature ? `<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">${signature}</div>` : ''}
         </div>
         
@@ -945,6 +947,9 @@ app.post('/api/birthday-test', async (req: any, res) => {
       console.log('📧 Promotion ID from request:', promotionId);
       console.log('📧 Promotion ID from settings:', birthdaySettingsData?.promotionId);
       console.log('📧 Full promotion object:', JSON.stringify(promotionData, null, 2));
+      console.log('📧 About to pass to template - promotionData?.content type:', typeof promotionData?.content);
+      console.log('📧 About to pass to template - promotionData?.content truthy:', promotionData?.content ? 'YES' : 'NO');
+      console.log('📧 About to pass to template - promotionData?.content length:', promotionData?.content?.length);
 
       const htmlContent = renderBirthdayTemplate(selectedTemplate, {
         recipientName: userName,
