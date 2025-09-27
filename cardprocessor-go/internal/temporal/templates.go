@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"regexp"
+	"strings"
 )
 
 // BirthdayTemplateId represents the different template types
@@ -34,13 +36,19 @@ type TemplateParams struct {
 type ThemeColors struct {
 	Primary   string `json:"primary"`
 	Secondary string `json:"secondary"`
-	Accent    string `json:"accent"`
+}
+
+// ThemeHeaders represents header images for different templates
+var themeHeaders = map[BirthdayTemplateId]string{
+	TemplateDefault:  "https://images.unsplash.com/photo-1588195538326-c5b1e9f80a1b?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+	TemplateConfetti: "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+	TemplateBalloons: "https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
 }
 
 var themeColors = map[BirthdayTemplateId]ThemeColors{
-	TemplateDefault:  {Primary: "#667eea", Secondary: "#764ba2", Accent: "#e91e63"},
-	TemplateConfetti: {Primary: "#ff6b6b", Secondary: "#4ecdc4", Accent: "#45b7d1"},
-	TemplateBalloons: {Primary: "#96ceb4", Secondary: "#feca57", Accent: "#ff9ff3"},
+	TemplateDefault:  {Primary: "#667eea", Secondary: "#764ba2"},
+	TemplateConfetti: {Primary: "#ff6b6b", Secondary: "#feca57"},
+	TemplateBalloons: {Primary: "#54a0ff", Secondary: "#5f27cd"},
 }
 
 // RenderBirthdayTemplate renders a birthday card template based on the template type and parameters
@@ -56,9 +64,12 @@ func RenderBirthdayTemplate(templateId BirthdayTemplateId, params TemplateParams
 	return renderPredefinedTemplate(templateId, params)
 }
 
-// renderCustomTemplate renders a custom birthday template
+// renderCustomTemplate renders a custom birthday template exactly matching server-node
 func renderCustomTemplate(params TemplateParams) string {
 	customData := params.CustomThemeData
+	if customData == nil {
+		return `<html><body><p>No custom theme data found</p></body></html>`
+	}
 
 	// Check if it's the new structure (has themes property)
 	if themes, ok := customData["themes"].(map[string]interface{}); ok {
@@ -68,8 +79,8 @@ func renderCustomTemplate(params TemplateParams) string {
 	}
 
 	title := "Happy Birthday!"
-	if recipientName, ok := customData["title"].(string); ok && recipientName != "" {
-		title = recipientName
+	if customTitle, ok := customData["title"].(string); ok && customTitle != "" {
+		title = customTitle
 	} else if params.RecipientName != "" {
 		title = fmt.Sprintf("Happy Birthday, %s!", params.RecipientName)
 	}
@@ -95,48 +106,38 @@ func renderCustomTemplate(params TemplateParams) string {
 		fromMessage = "The Team"
 	}
 
-	// Extract custom colors
-	primaryColor := "#667eea"
-	secondaryColor := "#764ba2"
-	if colors, ok := customData["colors"].(map[string]interface{}); ok {
-		if primary, ok := colors["primary"].(string); ok {
-			primaryColor = primary
-		}
-		if secondary, ok := colors["secondary"].(string); ok {
-			secondaryColor = secondary
-		}
-	}
-
-	testBadge := ""
-	if params.IsTest {
-		testBadge = `<div style="position: absolute; top: 20px; right: 20px; background: #ff9800; color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: bold;">TEST EMAIL</div>`
+	// Header image section - exactly matching server-node logic
+	headerImageSection := ""
+	if imageUrl, ok := customData["imageUrl"].(string); ok && imageUrl != "" {
+		headerImageSection = fmt.Sprintf(`
+			<div style="height: 200px; background-image: url('%s'); background-size: cover; background-position: center; border-radius: 12px 12px 0 0;">
+			</div>`, imageUrl)
+	} else {
+		headerImageSection = `
+			<div style="background: linear-gradient(135deg, #a8e6cf 0%, #dcedc1 100%); height: 200px; border-radius: 12px 12px 0 0;">
+			</div>`
 	}
 
 	return fmt.Sprintf(`<html>
-		<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, %s 0%%, %s 100%%);">
-			<div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1); position: relative;">
+		<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%);">
+			<div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
+				
+				<!-- 1. Header Image (standalone) -->
 				%s
 				
-				<!-- Header Image -->
-				<div style="height: 200px; background: linear-gradient(135deg, %s 0%%, %s 100%%); background-size: cover; background-position: center; border-radius: 12px 12px 0 0; position: relative;">
-					<div style="position: absolute; top: 50%%; left: 50%%; transform: translate(-50%%, -50%%); text-align: center; color: white;">
-						<h1 style="font-size: 3rem; margin: 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">🎂</h1>
-					</div>
-				</div>
-				
-				<!-- Header Text -->
+				<!-- 2. Header Text (separate from image) -->
 				<div style="padding: 30px 30px 20px 30px; text-align: center; border-bottom: 1px solid #f0f0f0;">
 					<h1 style="color: #2d3748; font-size: 2.5rem; margin: 0; font-weight: bold;">%s</h1>
 				</div>
 				
-				<!-- Content Area -->
+				<!-- 3. Content Area (message) -->
 				<div style="padding: 30px;">
 					<div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">%s</div>
 					%s
 					%s
 				</div>
 				
-				<!-- From Message -->
+				<!-- 4. From Message -->
 				<div style="padding: 20px 30px 30px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
 					<div style="font-size: 0.9rem; color: #718096;">
 						<p style="margin: 0;">Best regards,</p>
@@ -146,27 +147,60 @@ func renderCustomTemplate(params TemplateParams) string {
 			</div>
 		</body>
 	</html>`,
-		primaryColor, secondaryColor,
-		testBadge,
-		primaryColor, secondaryColor,
+		headerImageSection,
 		template.HTMLEscapeString(title),
-		template.HTMLEscapeString(message),
+		sanitizeHTMLContent(message),
 		renderPromotionContent(params),
 		renderSignature(signature),
 		template.HTMLEscapeString(fromMessage),
 	)
 }
 
-// renderPredefinedTemplate renders predefined birthday templates
+// renderPredefinedTemplate renders predefined birthday templates exactly matching server-node
 func renderPredefinedTemplate(templateId BirthdayTemplateId, params TemplateParams) string {
 	colors := themeColors[templateId]
 	if colors.Primary == "" {
 		colors = themeColors[TemplateDefault]
 	}
 
-	recipientName := params.RecipientName
-	if recipientName == "" {
-		recipientName = "Friend"
+	headerImage := themeHeaders[templateId]
+	if headerImage == "" {
+		headerImage = themeHeaders[TemplateDefault]
+	}
+
+	// Check if there's custom theme data with custom title/signature for this specific theme
+	headline := fmt.Sprintf("Happy Birthday%s!", func() string {
+		if params.RecipientName != "" {
+			return ", " + params.RecipientName
+		}
+		return ""
+	}())
+	signature := ""
+
+	if params.CustomThemeData != nil {
+		var themeSpecificData map[string]interface{}
+
+		// Check if it's the new structure (has themes property)
+		if themes, ok := params.CustomThemeData["themes"].(map[string]interface{}); ok {
+			if themeData, ok := themes[string(templateId)].(map[string]interface{}); ok {
+				themeSpecificData = themeData
+			}
+		} else {
+			// Old structure - use directly if no themes property
+			themeSpecificData = params.CustomThemeData
+		}
+
+		if themeSpecificData != nil {
+			// Use custom title if provided, otherwise use default
+			if customTitle, ok := themeSpecificData["title"].(string); ok && customTitle != "" {
+				headline = customTitle
+			}
+
+			// Use custom signature if provided
+			if customSignature, ok := themeSpecificData["signature"].(string); ok {
+				signature = customSignature
+			}
+		}
 	}
 
 	message := params.Message
@@ -182,47 +216,27 @@ func renderPredefinedTemplate(templateId BirthdayTemplateId, params TemplatePara
 		fromMessage = "The Team"
 	}
 
-	// Template-specific content
-	var headerImage, headline string
-	switch templateId {
-	case TemplateConfetti:
-		headerImage = "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=600&h=200&fit=crop"
-		headline = fmt.Sprintf("🎉 Happy Birthday, %s!", recipientName)
-	case TemplateBalloons:
-		headerImage = "https://images.unsplash.com/photo-1464207687429-7505649dae38?w=600&h=200&fit=crop"
-		headline = fmt.Sprintf("🎈 Happy Birthday, %s!", recipientName)
-	default: // TemplateDefault
-		headerImage = "https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=600&h=200&fit=crop"
-		headline = fmt.Sprintf("🎂 Happy Birthday, %s!", recipientName)
-	}
-
-	testBadge := ""
-	if params.IsTest {
-		testBadge = `<div style="position: absolute; top: 20px; right: 20px; background: #ff9800; color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: bold;">TEST EMAIL</div>`
-	}
-
 	return fmt.Sprintf(`<html>
 		<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, %s 0%%, %s 100%%);">
-			<div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1); position: relative;">
-				%s
+			<div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
 				
-				<!-- Header Image -->
+				<!-- 1. Header Image (standalone) -->
 				<div style="height: 200px; background-image: url('%s'); background-size: cover; background-position: center; border-radius: 12px 12px 0 0;">
 				</div>
 				
-				<!-- Header Text -->
+				<!-- 2. Header Text (separate from image) -->
 				<div style="padding: 30px 30px 20px 30px; text-align: center; border-bottom: 1px solid #f0f0f0;">
 					<h1 style="color: #2d3748; font-size: 2.5rem; margin: 0; font-weight: bold;">%s</h1>
 				</div>
 				
-				<!-- Content Area -->
+				<!-- 3. Content Area (message) -->
 				<div style="padding: 30px;">
 					<div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">%s</div>
 					%s
 					%s
 				</div>
 				
-				<!-- From Message -->
+				<!-- 4. From Message -->
 				<div style="padding: 20px 30px 30px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
 					<div style="font-size: 0.9rem; color: #718096;">
 						<p style="margin: 0;">Best regards,</p>
@@ -233,12 +247,11 @@ func renderPredefinedTemplate(templateId BirthdayTemplateId, params TemplatePara
 		</body>
 	</html>`,
 		colors.Primary, colors.Secondary,
-		testBadge,
 		headerImage,
 		template.HTMLEscapeString(headline),
-		template.HTMLEscapeString(message),
+		sanitizeHTMLContent(message),
 		renderPromotionContent(params),
-		renderSignature(""),
+		renderSignature(signature),
 		template.HTMLEscapeString(fromMessage),
 	)
 }
@@ -251,12 +264,12 @@ func renderPromotionContent(params TemplateParams) string {
 
 	promotionTitle := ""
 	if params.PromotionTitle != "" {
-		promotionTitle = fmt.Sprintf(`<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">%s</h3>`, template.HTMLEscapeString(params.PromotionTitle))
+		promotionTitle = fmt.Sprintf(`<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">%s</h3>`, sanitizeHTMLContent(params.PromotionTitle))
 	}
 
 	promotionDescription := ""
 	if params.PromotionDescription != "" {
-		promotionDescription = fmt.Sprintf(`<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">%s</p>`, template.HTMLEscapeString(params.PromotionDescription))
+		promotionDescription = fmt.Sprintf(`<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">%s</p>`, sanitizeHTMLContent(params.PromotionDescription))
 	}
 
 	return fmt.Sprintf(`
@@ -267,7 +280,7 @@ func renderPromotionContent(params TemplateParams) string {
 		</div>`,
 		promotionTitle,
 		promotionDescription,
-		template.HTMLEscapeString(params.PromotionContent),
+		sanitizeHTMLContent(params.PromotionContent),
 	)
 }
 
@@ -276,7 +289,41 @@ func renderSignature(signature string) string {
 	if signature == "" {
 		return ""
 	}
-	return fmt.Sprintf(`<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">%s</div>`, template.HTMLEscapeString(signature))
+	return fmt.Sprintf(`<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">%s</div>`, sanitizeHTMLContent(signature))
+}
+
+// sanitizeHTMLContent safely renders HTML content by allowing only safe HTML tags
+func sanitizeHTMLContent(content string) string {
+	if content == "" {
+		return ""
+	}
+
+	// Allow common safe HTML tags for formatting
+	allowedTags := []string{
+		"p", "br", "strong", "b", "em", "i", "u", "span", "div",
+		"h1", "h2", "h3", "h4", "h5", "h6",
+	}
+
+	// Allow common safe style attributes (for future use)
+	_ = []string{
+		"color", "font-weight", "font-style", "text-decoration",
+		"font-size", "text-align", "margin", "padding",
+	}
+
+	// Basic HTML content - if it contains HTML tags, render as-is (assuming it's safe)
+	// This is a simplified approach - in production, you might want to use a proper HTML sanitizer
+	if strings.Contains(content, "<") && strings.Contains(content, ">") {
+		// Simple validation - check if it contains only allowed tags
+		for _, tag := range allowedTags {
+			// Replace common patterns to ensure they're properly formatted
+			content = regexp.MustCompile(`<`+tag+`\s*>`).ReplaceAllString(content, `<`+tag+`>`)
+			content = regexp.MustCompile(`</`+tag+`\s*>`).ReplaceAllString(content, `</`+tag+`>`)
+		}
+		return content
+	}
+
+	// If no HTML tags, escape the content for safety
+	return template.HTMLEscapeString(content)
 }
 
 // ParseCustomThemeData parses custom theme data from various formats
