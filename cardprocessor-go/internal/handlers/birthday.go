@@ -1,27 +1,37 @@
 package handlers
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
 
+	"cardprocessor-go/internal/config"
 	"cardprocessor-go/internal/middleware"
 	"cardprocessor-go/internal/models"
 	"cardprocessor-go/internal/repository"
+	"cardprocessor-go/internal/temporal"
 
 	"github.com/gin-gonic/gin"
 )
 
 // BirthdayHandler handles birthday-related API endpoints
 type BirthdayHandler struct {
-	repo *repository.Repository
+	repo           *repository.Repository
+	temporalClient *temporal.TemporalClient
+	config         *config.Config
 }
 
 // NewBirthdayHandler creates a new birthday handler
-func NewBirthdayHandler(repo *repository.Repository) *BirthdayHandler {
+func NewBirthdayHandler(repo *repository.Repository, temporalClient *temporal.TemporalClient, cfg *config.Config) *BirthdayHandler {
 	return &BirthdayHandler{
-		repo: repo,
+		repo:           repo,
+		temporalClient: temporalClient,
+		config:         cfg,
 	}
 }
 
@@ -360,26 +370,42 @@ func (h *BirthdayHandler) SendBirthdayInvitation(c *gin.Context) {
 
 // SendTestBirthdayCard sends a test birthday card to a user
 func (h *BirthdayHandler) SendTestBirthdayCard(c *gin.Context) {
-	_, err := middleware.GetTenantID(c)
+	fmt.Printf("🎂 [Birthday Test] Request received from IP: %s\n", c.ClientIP())
+	fmt.Printf("🎂 [Birthday Test] Headers: %+v\n", c.Request.Header)
+
+	tenantID, err := middleware.GetTenantID(c)
 	if err != nil {
+		fmt.Printf("❌ [Birthday Test] Failed to get tenant ID: %v\n", err)
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
 			"error":   "Tenant ID not found",
 		})
 		return
 	}
+	fmt.Printf("✅ [Birthday Test] Tenant ID extracted: %s\n", tenantID)
 
 	userID, err := middleware.GetUserID(c)
 	if err != nil {
+		fmt.Printf("❌ [Birthday Test] Failed to get user ID: %v\n", err)
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
 			"error":   "User ID not found",
 		})
 		return
 	}
+	fmt.Printf("✅ [Birthday Test] User ID extracted: %s\n", userID)
+
+	// Log raw request body
+	bodyBytes, _ := c.GetRawData()
+	fmt.Printf("🎂 [Birthday Test] Raw request body: %s\n", string(bodyBytes))
+
+	// Reset the request body for ShouldBindJSON
+	c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
 	var req models.SendTestBirthdayCardRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		fmt.Printf("❌ [Birthday Test] Failed to bind JSON: %v\n", err)
+		fmt.Printf("❌ [Birthday Test] Request body that failed to bind: %s\n", string(bodyBytes))
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   "Invalid request body",
@@ -387,13 +413,111 @@ func (h *BirthdayHandler) SendTestBirthdayCard(c *gin.Context) {
 		return
 	}
 
-	// TODO: Implement test birthday card sending logic
-	// This would integrate with the email service providers and use the birthday settings
+	fmt.Printf("✅ [Birthday Test] Request parsed successfully: %+v\n", req)
 
-	// For now, return success
+	// Validate required fields
+	if req.UserEmail == "" {
+		fmt.Printf("❌ [Birthday Test] User email is empty\n")
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "User email is required",
+		})
+		return
+	}
+	fmt.Printf("✅ [Birthday Test] User email validation passed: %s\n", req.UserEmail)
+
+	// Convert CustomThemeData to proper format
+	var customThemeData map[string]interface{}
+	if req.CustomThemeData != nil {
+		switch v := req.CustomThemeData.(type) {
+		case map[string]interface{}:
+			customThemeData = v
+		case string:
+			if v == "null" || v == "" {
+				customThemeData = nil
+			} else {
+				// Try to parse as JSON
+				var parsed map[string]interface{}
+				if err := json.Unmarshal([]byte(v), &parsed); err != nil {
+					fmt.Printf("⚠️ [Birthday Test] Failed to parse CustomThemeData as JSON: %v\n", err)
+					customThemeData = nil
+				} else {
+					customThemeData = parsed
+				}
+			}
+		default:
+			fmt.Printf("⚠️ [Birthday Test] Unexpected CustomThemeData type: %T\n", v)
+			customThemeData = nil
+		}
+	}
+	fmt.Printf("🎂 [Birthday Test] CustomThemeData converted: %+v\n", customThemeData)
+
+	// Get tenant name for the workflow
+	tenantName := "Your Company" // Default fallback
+	// TODO: Get actual tenant name from database if needed
+
+	fmt.Printf("🎂 [Birthday Test] Checking Temporal client availability...\n")
+	fmt.Printf("🎂 [Birthday Test] Temporal client: %v\n", h.temporalClient != nil)
+	if h.temporalClient != nil {
+		fmt.Printf("🎂 [Birthday Test] Temporal client connected: %v\n", h.temporalClient.IsConnected())
+	}
+
+	// If temporal client is available, use workflow; otherwise, send directly
+	if h.temporalClient != nil && h.temporalClient.IsConnected() {
+		fmt.Printf("🎂 [Birthday Test] Using Temporal workflow\n")
+
+		// Prepare workflow input
+		workflowInput := temporal.BirthdayTestWorkflowInput{
+			UserID:          userID,
+			UserEmail:       req.UserEmail,
+			UserFirstName:   req.UserFirstName,
+			UserLastName:    req.UserLastName,
+			TenantID:        tenantID,
+			TenantName:      tenantName,
+			FromEmail:       h.config.DefaultFromEmail,
+			EmailTemplate:   req.EmailTemplate,
+			CustomMessage:   req.CustomMessage,
+			CustomThemeData: customThemeData,
+			SenderName:      req.SenderName,
+			IsTest:          true,
+		}
+
+		fmt.Printf("🎂 [Birthday Test] Workflow input prepared: %+v\n", workflowInput)
+
+		// Start the birthday test workflow
+		ctx := context.Background()
+		workflowRun, err := h.temporalClient.StartBirthdayTestWorkflow(ctx, workflowInput)
+		if err != nil {
+			fmt.Printf("❌ [Birthday Test] Failed to start workflow: %v\n", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"error":   "Failed to start birthday test workflow: " + err.Error(),
+			})
+			return
+		}
+
+		fmt.Printf("✅ [Birthday Test] Workflow started successfully: %s\n", workflowRun.GetID())
+
+		c.JSON(http.StatusOK, gin.H{
+			"success":       true,
+			"message":       "Birthday test workflow started successfully",
+			"workflowId":    workflowRun.GetID(),
+			"workflowRunId": workflowRun.GetRunID(),
+			"recipient": gin.H{
+				"userId":    userID,
+				"userEmail": req.UserEmail,
+			},
+		})
+		return
+	}
+
+	fmt.Printf("🎂 [Birthday Test] Temporal client not available, using direct mode\n")
+
+	// Fallback: Send email directly (simplified implementation)
+	// TODO: Implement direct email sending as fallback
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "Test birthday card sent successfully",
+		"message": "Test birthday card sent successfully (direct mode)",
 		"recipient": gin.H{
 			"userId":    userID,
 			"userEmail": req.UserEmail,

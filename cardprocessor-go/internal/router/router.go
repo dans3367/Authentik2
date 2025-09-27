@@ -5,12 +5,13 @@ import (
 	"cardprocessor-go/internal/handlers"
 	"cardprocessor-go/internal/middleware"
 	"cardprocessor-go/internal/repository"
+	"cardprocessor-go/internal/temporal"
 
 	"github.com/gin-gonic/gin"
 )
 
 // SetupRouter configures and returns the Gin router with all routes
-func SetupRouter(cfg *config.Config, repo *repository.Repository) *gin.Engine {
+func SetupRouter(cfg *config.Config, repo *repository.Repository, temporalClient *temporal.TemporalClient) *gin.Engine {
 	// Set Gin mode based on environment
 	if cfg.Server.Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -24,7 +25,7 @@ func SetupRouter(cfg *config.Config, repo *repository.Repository) *gin.Engine {
 	router.Use(middleware.SetupCORS(cfg))
 
 	// Create handlers
-	birthdayHandler := handlers.NewBirthdayHandler(repo)
+	birthdayHandler := handlers.NewBirthdayHandler(repo, temporalClient, cfg)
 	authMiddleware := middleware.NewAuthMiddleware(cfg)
 
 	// Health check endpoint (no auth required)

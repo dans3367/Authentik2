@@ -37,6 +37,12 @@ type Config struct {
 	BirthdayRetryDelay    int // in seconds
 	BirthdayWorkerEnabled bool
 
+	// Temporal settings
+	TemporalAddress       string
+	TemporalNamespace     string
+	TemporalTaskQueue     string
+	TemporalWorkerEnabled bool
+
 	// Logging
 	LogLevel string
 
@@ -73,6 +79,13 @@ type CORSConfig struct {
 	AllowCredentials bool
 }
 
+type TemporalConfig struct {
+	Address   string
+	Namespace string
+	TaskQueue string
+	Enabled   bool
+}
+
 func Load() *Config {
 	return &Config{
 		// Database
@@ -90,10 +103,10 @@ func Load() *Config {
 		},
 
 		// Server
-		Port:    getEnv("PORT", "3503"),
+		Port:    getEnv("PORT", "5003"),
 		GinMode: getEnv("GIN_MODE", "release"),
 		Server: ServerConfig{
-			Port:        getEnv("PORT", "3503"),
+			Port:        getEnv("PORT", "5003"),
 			Environment: getEnv("ENVIRONMENT", "development"),
 		},
 
@@ -120,15 +133,31 @@ func Load() *Config {
 		BirthdayRetryDelay:    getEnvAsInt("BIRTHDAY_RETRY_DELAY", 300),
 		BirthdayWorkerEnabled: getEnvAsBool("BIRTHDAY_WORKER_ENABLED", true),
 
+		// Temporal settings
+		TemporalAddress:       getEnv("TEMPORAL_ADDRESS", "localhost:7233"),
+		TemporalNamespace:     getEnv("TEMPORAL_NAMESPACE", "default"),
+		TemporalTaskQueue:     getEnv("TEMPORAL_TASK_QUEUE", "authentik-tasks"),
+		TemporalWorkerEnabled: getEnvAsBool("TEMPORAL_WORKER_ENABLED", true),
+
 		// Logging
 		LogLevel: getEnv("LOG_LEVEL", "info"),
 
-		// CORS
-		CORSAllowedOrigins: getEnvAsSlice("CORS_ALLOWED_ORIGINS", []string{"http://localhost:5173", "http://localhost:3000"}),
+		// CORS - More relaxed for development (allow all localhost ports)
+		CORSAllowedOrigins: getEnvAsSlice("CORS_ALLOWED_ORIGINS", []string{
+			"http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003",
+			"http://localhost:4000", "http://localhost:4001", "http://localhost:4002", "http://localhost:4003",
+			"http://localhost:5000", "http://localhost:5001", "http://localhost:5002", "http://localhost:5003",
+			"http://localhost:5173", "http://localhost:5174", "http://localhost:8000", "http://localhost:8080",
+		}),
 		CORS: CORSConfig{
-			AllowedOrigins:   getEnvAsSlice("CORS_ALLOWED_ORIGINS", []string{"http://localhost:5173", "http://localhost:3000"}),
-			AllowedMethods:   getEnvAsSlice("CORS_ALLOWED_METHODS", []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}),
-			AllowedHeaders:   getEnvAsSlice("CORS_ALLOWED_HEADERS", []string{"Origin", "Content-Type", "Accept", "Authorization"}),
+			AllowedOrigins: getEnvAsSlice("CORS_ALLOWED_ORIGINS", []string{
+				"http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003",
+				"http://localhost:4000", "http://localhost:4001", "http://localhost:4002", "http://localhost:4003",
+				"http://localhost:5000", "http://localhost:5001", "http://localhost:5002", "http://localhost:5003",
+				"http://localhost:5173", "http://localhost:5174", "http://localhost:8000", "http://localhost:8080",
+			}),
+			AllowedMethods:   getEnvAsSlice("CORS_ALLOWED_METHODS", []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"}),
+			AllowedHeaders:   getEnvAsSlice("CORS_ALLOWED_HEADERS", []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With", "X-CSRF-Token"}),
 			AllowCredentials: getEnvAsBool("CORS_ALLOW_CREDENTIALS", true),
 		},
 	}

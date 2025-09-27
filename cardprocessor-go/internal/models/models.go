@@ -206,5 +206,11 @@ type SendBirthdayInvitationRequest struct {
 
 // SendTestBirthdayCardRequest represents test birthday card request
 type SendTestBirthdayCardRequest struct {
-	UserEmail string `json:"userEmail"`
+	UserEmail       string      `json:"userEmail"`
+	UserFirstName   string      `json:"userFirstName"`
+	UserLastName    string      `json:"userLastName"`
+	EmailTemplate   string      `json:"emailTemplate"`
+	CustomMessage   string      `json:"customMessage"`
+	CustomThemeData interface{} `json:"customThemeData"`
+	SenderName      string      `json:"senderName"`
 }

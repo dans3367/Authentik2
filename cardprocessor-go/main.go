@@ -1,12 +1,17 @@
 package main
 
 import (
+	"context"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"cardprocessor-go/internal/config"
 	"cardprocessor-go/internal/database"
 	"cardprocessor-go/internal/repository"
 	"cardprocessor-go/internal/router"
+	"cardprocessor-go/internal/temporal"
 
 	"github.com/joho/godotenv"
 )
@@ -30,15 +35,51 @@ func main() {
 	// Initialize repository
 	repo := repository.NewRepository(db)
 
-	// TODO: Initialize birthday worker
-	// worker := worker.NewBirthdayWorker(db, cfg)
-	// go worker.Start()
+	// Initialize Temporal worker if enabled
+	var temporalClient *temporal.TemporalClient
+	if cfg.TemporalWorkerEnabled {
+		temporalClient, err = temporal.NewTemporalClient(cfg)
+		if err != nil {
+			log.Printf("⚠️ Failed to initialize Temporal client: %v", err)
+			log.Println("Continuing without Temporal worker...")
+		} else {
+			// Set activity dependencies
+			temporal.SetActivityDependencies(cfg, repo)
+
+			// Start Temporal worker in a goroutine
+			go func() {
+				ctx := context.Background()
+				if err := temporalClient.Start(ctx); err != nil {
+					log.Printf("❌ Temporal worker failed: %v", err)
+				}
+			}()
+			log.Println("✅ Temporal worker started")
+		}
+	} else {
+		log.Println("ℹ️ Temporal worker is disabled")
+	}
 
 	// Initialize and start server
-	router := router.SetupRouter(cfg, repo)
+	router := router.SetupRouter(cfg, repo, temporalClient)
 
-	log.Printf("Starting server on port %s", cfg.Server.Port)
-	if err := router.Run(":" + cfg.Server.Port); err != nil {
+	// Handle shutdown signals
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-sigChan
+		log.Println("🛑 Shutdown signal received...")
+
+		// Stop Temporal worker
+		if temporalClient != nil {
+			temporalClient.Stop()
+		}
+
+		os.Exit(0)
+	}()
+
+	log.Printf("🚀 Starting server on port %s", cfg.Port)
+	if err := router.Run(":" + cfg.Port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }

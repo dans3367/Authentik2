@@ -14,8 +14,9 @@ import (
 
 // JWTClaims represents the JWT token claims structure
 type JWTClaims struct {
-	UserID   string `json:"userId"`
-	TenantID string `json:"tenantId"`
+	Sub    string `json:"sub"`    // Standard 'subject' claim (user ID)
+	Tenant string `json:"tenant"` // Tenant ID claim
+	Scope  string `json:"scope"`  // Scope claim
 	jwt.RegisteredClaims
 }
 
@@ -34,8 +35,20 @@ func NewAuthMiddleware(cfg *config.Config) *AuthMiddleware {
 // RequireAuth is a Gin middleware that validates JWT tokens
 func (am *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		fmt.Printf("🔐 [Auth] Request received: %s %s from IP: %s\n", c.Request.Method, c.Request.URL.Path, c.ClientIP())
+
+		// Skip authentication for OPTIONS requests (CORS preflight)
+		if c.Request.Method == "OPTIONS" {
+			fmt.Printf("🔐 [Auth] Skipping OPTIONS request\n")
+			c.Next()
+			return
+		}
+
 		authHeader := c.GetHeader("Authorization")
+		fmt.Printf("🔐 [Auth] Authorization header: %s\n", authHeader)
+
 		if authHeader == "" {
+			fmt.Printf("❌ [Auth] No authorization header provided\n")
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"success": false,
 				"error":   "Authorization header required",
@@ -46,6 +59,7 @@ func (am *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 		if tokenString == authHeader {
+			fmt.Printf("❌ [Auth] Invalid Bearer token format\n")
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"success": false,
 				"error":   "Bearer token required",
@@ -53,6 +67,13 @@ func (am *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+
+		fmt.Printf("🔐 [Auth] Token string length: %d\n", len(tokenString))
+		tokenPreview := tokenString
+		if len(tokenString) > 20 {
+			tokenPreview = tokenString[:20]
+		}
+		fmt.Printf("🔐 [Auth] Token preview: %s...\n", tokenPreview)
 
 		token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -62,6 +83,7 @@ func (am *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 		})
 
 		if err != nil {
+			fmt.Printf("❌ [Auth] Token parsing failed: %v\n", err)
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"success": false,
 				"error":   "Invalid token",
@@ -72,6 +94,7 @@ func (am *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 
 		claims, ok := token.Claims.(*JWTClaims)
 		if !ok || !token.Valid {
+			fmt.Printf("❌ [Auth] Invalid token claims or token not valid\n")
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"success": false,
 				"error":   "Invalid token claims",
@@ -80,9 +103,11 @@ func (am *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 			return
 		}
 
+		fmt.Printf("✅ [Auth] Token validated successfully - User: %s, Tenant: %s\n", claims.Sub, claims.Tenant)
+
 		// Add user info to context
-		c.Set("userID", claims.UserID)
-		c.Set("tenantID", claims.TenantID)
+		c.Set("userID", claims.Sub)
+		c.Set("tenantID", claims.Tenant)
 
 		c.Next()
 	}

@@ -107,7 +107,7 @@
       "cwd": "${workspaceFolder}/cardprocessor-go",
       "env": {
         "GIN_MODE": "debug",
-        "PORT": "3503",
+        "PORT": "5003",
         "LOG_LEVEL": "debug"
       },
       "console": "integratedTerminal",

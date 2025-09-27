@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useSession } from "@/lib/betterAuthClient";
 import {
   Gift,
   Users,
@@ -128,6 +129,31 @@ export default function BirthdaysPage() {
   const [location, setLocation] = useLocation();
   const { t, currentLanguage } = useLanguage();
   const { user: currentUser } = useAuth();
+
+  // Use Better Auth session to get external token
+  const { data: session } = useSession();
+
+  // Query to get external service token when authenticated
+  const { data: tokenData, isLoading: tokenLoading, error: tokenError } = useQuery({
+    queryKey: ['/api/external-token', session?.user?.id],
+    queryFn: async () => {
+      console.log('🔑 [Token] Requesting external token for user:', session?.user?.email);
+      const response = await apiRequest('POST', '/api/external-token');
+      if (!response.ok) {
+        throw new Error(`Token request failed: ${response.status}`);
+      }
+      const data = await response.json();
+      console.log('✅ [Token] External token received, length:', data.token?.length);
+      return data;
+    },
+    enabled: !!session?.user,
+    staleTime: 12 * 60 * 1000, // Token cached for 12 minutes (3 min buffer before 15 min expiry)
+    gcTime: 15 * 60 * 1000, // Garbage collect after 15 minutes
+    retry: 3,
+    refetchOnWindowFocus: false, // Don't refetch on window focus to avoid unnecessary token generation
+  });
+
+  const accessToken = tokenData?.token;
 
   // Initialize activeTab based on URL parameter or default to "themes"
   const [activeTab, setActiveTab] = useState<"themes" | "settings" | "customers" | "test">(() => {
@@ -525,12 +551,23 @@ export default function BirthdaysPage() {
       }
 
 
+      // Check if we have a valid token
+      if (!accessToken) {
+        if (tokenLoading) {
+          throw new Error('Authentication token is still loading. Please wait a moment and try again.');
+        }
+        if (tokenError) {
+          throw new Error(`Authentication failed: ${tokenError.message}`);
+        }
+        throw new Error('No authentication token available. Please make sure you are logged in.');
+      }
+
       // Call the workflow-based API
       const response = await fetch('http://localhost:3502/api/birthday-invitation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth-token')}`, // Assuming token is stored here
+          'Authorization': `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           contactId: contact.id,
@@ -562,42 +599,97 @@ export default function BirthdaysPage() {
   // Mutation: send test birthday card to users
   const sendTestBirthdayMutation = useMutation({
     mutationFn: async (userId: string) => {
+      // Check if we have a valid token
+      if (!accessToken) {
+        if (tokenLoading) {
+          throw new Error('Authentication token is still loading. Please wait a moment and try again.');
+        }
+        if (tokenError) {
+          throw new Error(`Authentication failed: ${tokenError.message}`);
+        }
+        throw new Error('No authentication token available. Please make sure you are logged in.');
+      }
+
       // Find the user to get additional details
       const user = users.find(u => u.id === userId);
       if (!user) {
         throw new Error('User not found');
       }
 
-      // Call the workflow-based API for test birthday cards through main server proxy
-      const response = await fetch('/api/birthday-test', {
+      // Call the cardprocessor API directly for test birthday cards
+      const cardprocessorUrl = import.meta.env.VITE_CARDPROCESSOR_URL || 'http://localhost:5004';
+
+      // Prepare request payload
+      const requestPayload = {
+        userEmail: user.email,
+        userFirstName: user.firstName,
+        userLastName: user.lastName,
+        emailTemplate: birthdaySettings?.emailTemplate || 'default',
+        customMessage: birthdaySettings?.customMessage || '',
+        customThemeData: birthdaySettings?.customThemeData || null,
+        senderName: birthdaySettings?.senderName || ''
+      };
+
+      console.log('🎂 [Birthday Test] Starting test birthday card request:', {
+        url: `${cardprocessorUrl}/api/birthday-test`,
+        userId: userId,
+        userEmail: user.email,
+        userFirstName: user.firstName,
+        userLastName: user.lastName,
+        accessTokenLength: accessToken?.length,
+        accessTokenPreview: accessToken ? `${accessToken.substring(0, 20)}...` : 'null',
+        birthdaySettings: {
+          emailTemplate: birthdaySettings?.emailTemplate,
+          customMessage: birthdaySettings?.customMessage,
+          customThemeData: birthdaySettings?.customThemeData,
+          senderName: birthdaySettings?.senderName
+        },
+        requestPayload: requestPayload
+      });
+
+      const response = await fetch(`${cardprocessorUrl}/api/birthday-test`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth-token')}`,
+          'Authorization': `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({
-          userId: user.id,
-          userEmail: user.email,
-          userFirstName: user.firstName,
-          userLastName: user.lastName,
-          tenantId: currentUser?.tenantId || 'unknown-tenant',
-          tenantName: currentUser?.name || 'Your Company',
-          fromEmail: 'admin@zendwise.work', // Test emails go to the selected user's email
-          isTest: true,
-          // Include theme and custom content information
-          emailTemplate: birthdaySettings?.emailTemplate || 'default',
-          customMessage: birthdaySettings?.customMessage || '',
-          customThemeData: birthdaySettings?.customThemeData || null,
-          senderName: birthdaySettings?.senderName || ''
-        }),
+        body: JSON.stringify(requestPayload),
+      });
+
+      console.log('🎂 [Birthday Test] Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send test birthday card');
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (parseError) {
+          console.error('🎂 [Birthday Test] Failed to parse error response:', parseError);
+          errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
+        }
+
+        console.error('🎂 [Birthday Test] Request failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData: errorData,
+          requestPayload: requestPayload,
+          url: `${cardprocessorUrl}/api/birthday-test`
+        });
+
+        throw new Error(errorData.error || `Failed to send test birthday card (${response.status})`);
       }
 
-      return response.json();
+      const responseData = await response.json();
+      console.log('🎂 [Birthday Test] Success response:', {
+        responseData: responseData,
+        requestPayload: requestPayload
+      });
+
+      return responseData;
     },
     onSuccess: () => {
       toast({ title: "Test Birthday Card Sent", description: "Test birthday card has been sent successfully" });
