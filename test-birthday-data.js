@@ -108,12 +108,10 @@ async function testBirthdayEndpoints() {
   // Test updating birthday settings
   await apiRequest('PUT', '/api/birthday-settings', {
     enabled: true,
-    sendDaysBefore: 1,
     emailTemplate: 'default',
     segmentFilter: 'all',
     customMessage: 'Happy Birthday!',
-    senderName: 'Test Company',
-    senderEmail: 'birthday@testcompany.com'
+    senderName: 'Test Company'
   });
 }
 

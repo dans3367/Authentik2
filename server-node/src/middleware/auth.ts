@@ -21,6 +21,7 @@ export async function authenticateRequest(
   next: NextFunction
 ) {
   try {
+    debugger;
     console.log('🔍 [Server-Node Auth] Authenticating request for:', req.path);
 
     // For newsletter endpoint, use a simplified authentication

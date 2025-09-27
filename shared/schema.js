@@ -13,7 +13,7 @@ export const betterAuthUser = pgTable("better_auth_user", {
     createdAt: timestamp("created_at").notNull(),
     updatedAt: timestamp("updated_at").notNull(),
     role: text("role").default('Employee').notNull(), // Keep our existing role system
-    tenantId: varchar("tenant_id").default(sql `'29c69b4f-3129-4aa4-a475-7bf892e5c5b9'`).notNull(), // Default value for multi-tenancy
+    tenantId: varchar("tenant_id").default(sql`'29c69b4f-3129-4aa4-a475-7bf892e5c5b9'`).notNull(), // Default value for multi-tenancy
     // Additional fields from users table
     firstName: text("first_name"),
     lastName: text("last_name"),
@@ -75,7 +75,7 @@ export const betterAuthVerification = pgTable("better_auth_verification", {
 export const userRoles = ['Owner', 'Administrator', 'Manager', 'Employee'];
 // Tenants table for multi-tenancy
 export const tenants = pgTable("tenants", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(), // URL-friendly identifier
     domain: text("domain"), // Custom domain (optional)
@@ -87,14 +87,14 @@ export const tenants = pgTable("tenants", {
 });
 // Users table removed - now using better_auth_user table only
 export const refreshTokens = pgTable("refresh_tokens", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
     token: text("token").notNull().unique(),
     expiresAt: timestamp("expires_at").notNull(),
     createdAt: timestamp("created_at").defaultNow(),
     // Device tracking fields
-    deviceId: text("device_id").default(sql `gen_random_uuid()`).notNull(), // Unique identifier for the device/session
+    deviceId: text("device_id").default(sql`gen_random_uuid()`).notNull(), // Unique identifier for the device/session
     deviceName: text("device_name"), // User-friendly device name
     userAgent: text("user_agent"), // Browser/app user agent
     ipAddress: text("ip_address"), // IP address at login
@@ -104,7 +104,7 @@ export const refreshTokens = pgTable("refresh_tokens", {
 });
 // Stores table for multi-tenant shop management
 export const stores = pgTable("stores", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     name: text("name").notNull(),
     address: text("address").notNull(),
@@ -116,7 +116,7 @@ export const stores = pgTable("stores", {
 });
 // Shops table for enhanced multi-tenant shop management
 export const shops = pgTable("shops", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     name: text("name").notNull(),
     description: text("description"),
@@ -143,7 +143,7 @@ export const shops = pgTable("shops", {
 });
 // Subscription plans table
 export const subscriptionPlans = pgTable("subscription_plans", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     name: text("name").notNull(), // Basic, Pro, Enterprise
     displayName: text("display_name").notNull(), // User-friendly name
     description: text("description").notNull(),
@@ -166,7 +166,7 @@ export const subscriptionPlans = pgTable("subscription_plans", {
 });
 // User subscriptions history table
 export const subscriptions = pgTable("subscriptions", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
     planId: varchar("plan_id").notNull().references(() => subscriptionPlans.id),
@@ -185,7 +185,7 @@ export const subscriptions = pgTable("subscriptions", {
 });
 // Tenant-specific limit overrides
 export const tenantLimits = pgTable("tenant_limits", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }).unique(),
     maxShops: integer("max_shops"), // NULL means use subscription plan limit
     maxUsers: integer("max_users"), // NULL means use subscription plan limit
@@ -211,7 +211,7 @@ export const tenantLimitsRelations = relations(tenantLimits, ({ one }) => ({
 }));
 // Shop limit events for audit and analytics
 export const shopLimitEvents = pgTable("shop_limit_events", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     eventType: text("event_type").notNull(), // 'limit_reached', 'limit_exceeded', 'limit_increased', etc.
     shopCount: integer("shop_count").notNull(),
@@ -223,7 +223,7 @@ export const shopLimitEvents = pgTable("shop_limit_events", {
 });
 // Email verification tokens table (missing from current schema)
 export const verificationTokens = pgTable("verification_tokens", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
     token: text("token").notNull().unique(),
@@ -232,7 +232,7 @@ export const verificationTokens = pgTable("verification_tokens", {
 });
 // Temporary 2FA sessions table for managing 2FA verification flow
 export const temp2faSessions = pgTable("temp_2fa_sessions", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     sessionToken: text("session_token").notNull().unique(), // Better Auth session token
     userId: text("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
@@ -241,7 +241,7 @@ export const temp2faSessions = pgTable("temp_2fa_sessions", {
 });
 // Email contacts tables for contact management
 export const emailContacts = pgTable("email_contacts", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     email: text("email").notNull(),
     firstName: text("first_name"),
@@ -265,7 +265,7 @@ export const emailContacts = pgTable("email_contacts", {
     updatedAt: timestamp("updated_at").defaultNow(),
 });
 export const emailLists = pgTable("email_lists", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     name: text("name").notNull(),
     description: text("description"),
@@ -273,7 +273,7 @@ export const emailLists = pgTable("email_lists", {
     updatedAt: timestamp("updated_at").defaultNow(),
 });
 export const contactTags = pgTable("contact_tags", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     name: text("name").notNull(),
     color: text("color").default('#3B82F6'),
@@ -281,14 +281,14 @@ export const contactTags = pgTable("contact_tags", {
 });
 // Junction tables for many-to-many relationships
 export const contactListMemberships = pgTable("contact_list_memberships", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     contactId: varchar("contact_id").notNull().references(() => emailContacts.id, { onDelete: 'cascade' }),
     listId: varchar("list_id").notNull().references(() => emailLists.id, { onDelete: 'cascade' }),
     addedAt: timestamp("added_at").defaultNow(),
 });
 export const contactTagAssignments = pgTable("contact_tag_assignments", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     contactId: varchar("contact_id").notNull().references(() => emailContacts.id, { onDelete: 'cascade' }),
     tagId: varchar("tag_id").notNull().references(() => contactTags.id, { onDelete: 'cascade' }),
@@ -296,7 +296,7 @@ export const contactTagAssignments = pgTable("contact_tag_assignments", {
 });
 // Companies table for multi-tenant company information
 export const companies = pgTable("companies", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     ownerId: varchar("owner_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }), // Links to account owner
     name: text("name").notNull(),
@@ -312,7 +312,7 @@ export const companies = pgTable("companies", {
 });
 // Forms table for DragFormMaster integration with multi-tenancy
 export const forms = pgTable("forms", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
     title: text("title").notNull(),
@@ -327,7 +327,7 @@ export const forms = pgTable("forms", {
 });
 // Form responses table for storing form submissions
 export const formResponses = pgTable("form_responses", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     formId: varchar("form_id").notNull().references(() => forms.id, { onDelete: 'cascade' }),
     responseData: text("response_data").notNull(), // JSON string of form responses
@@ -337,7 +337,7 @@ export const formResponses = pgTable("form_responses", {
 });
 // Newsletters table for newsletter management
 export const newsletters = pgTable("newsletters", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
     title: text("title").notNull(),
@@ -359,7 +359,7 @@ export const newsletters = pgTable("newsletters", {
 });
 // Newsletter task status for tracking processing stages
 export const newsletterTaskStatus = pgTable("newsletter_task_status", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     newsletterId: varchar("newsletter_id").notNull().references(() => newsletters.id, { onDelete: 'cascade' }),
     taskType: text("task_type").notNull(), // 'validation', 'processing', 'sending', 'analytics'
@@ -377,7 +377,7 @@ export const newsletterTaskStatus = pgTable("newsletter_task_status", {
 });
 // Campaigns table for campaign management
 export const campaigns = pgTable("campaigns", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
     name: text("name").notNull(),
@@ -409,7 +409,7 @@ export const campaigns = pgTable("campaigns", {
 });
 // Email activity tracking for webhook events
 export const emailActivity = pgTable("email_activity", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     contactId: varchar("contact_id").notNull().references(() => emailContacts.id, { onDelete: 'cascade' }),
     campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'set null' }),
@@ -425,7 +425,7 @@ export const emailActivity = pgTable("email_activity", {
 });
 // Universal bounced emails list - prevents sending to any email that has ever bounced
 export const bouncedEmails = pgTable("bounced_emails", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     email: text("email").notNull().unique(), // The bounced email address
     bounceType: text("bounce_type").notNull().default('hard'), // 'hard', 'soft', 'complaint'
     bounceReason: text("bounce_reason"), // Detailed reason for the bounce
@@ -1137,16 +1137,14 @@ export const insertBouncedEmailSchema = createInsertSchema(bouncedEmails).omit({
 });
 // Birthday settings table for managing birthday email campaigns
 export const birthdaySettings = pgTable("birthday_settings", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     enabled: boolean("enabled").default(false),
-    sendDaysBefore: integer("send_days_before").default(0), // How many days before birthday to send
     emailTemplate: text("email_template").default('default'), // Email template to use
     segmentFilter: text("segment_filter").default('all'), // Which contacts to include
     customMessage: text("custom_message").default(''), // Custom birthday message
     customThemeData: text("custom_theme_data"), // JSON data for custom theme
     senderName: text("sender_name").default(''),
-    senderEmail: text("sender_email").default(''),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1199,21 +1197,17 @@ export const birthdaySettingsRelations = relations(birthdaySettings, ({ one }) =
 // Birthday settings schemas
 export const createBirthdaySettingsSchema = z.object({
     enabled: z.boolean().default(false),
-    sendDaysBefore: z.number().int().min(0).max(30).default(0),
     emailTemplate: z.string().default('default'),
     segmentFilter: z.string().default('all'),
     customMessage: z.string().default(''),
     senderName: z.string().default(''),
-    senderEmail: z.string().email("Please enter a valid email address").default(''),
 });
 export const updateBirthdaySettingsSchema = z.object({
     enabled: z.boolean().optional(),
-    sendDaysBefore: z.number().int().min(0).max(30).optional(),
     emailTemplate: z.string().optional(),
     segmentFilter: z.string().optional(),
     customMessage: z.string().optional(),
     senderName: z.string().optional(),
-    senderEmail: z.string().email("Please enter a valid email address").optional(),
 });
 export const insertBirthdaySettingsSchema = createInsertSchema(birthdaySettings).omit({
     id: true,
@@ -1223,7 +1217,7 @@ export const insertBirthdaySettingsSchema = createInsertSchema(birthdaySettings)
 });
 // Promotions table for managing promotional content templates
 export const promotions = pgTable("promotions", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
     title: text("title").notNull(),
@@ -1289,7 +1283,7 @@ export const insertPromotionSchema = createInsertSchema(promotions).omit({
 });
 // Appointments table for managing appointments and reminders
 export const appointments = pgTable("appointments", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     customerId: varchar("customer_id").notNull().references(() => emailContacts.id, { onDelete: 'cascade' }),
     userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }), // Who created the appointment
@@ -1312,7 +1306,7 @@ export const appointments = pgTable("appointments", {
 });
 // Appointment reminders table for tracking reminder history
 export const appointmentReminders = pgTable("appointment_reminders", {
-    id: varchar("id").primaryKey().default(sql `gen_random_uuid()`),
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
     tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     appointmentId: varchar("appointment_id").notNull().references(() => appointments.id, { onDelete: 'cascade' }),
     customerId: varchar("customer_id").notNull().references(() => emailContacts.id, { onDelete: 'cascade' }),

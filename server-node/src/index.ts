@@ -15,13 +15,11 @@ const birthdaySettings = pgTable("birthday_settings", {
   id: varchar("id").primaryKey(),
   tenantId: varchar("tenant_id").notNull(),
   enabled: boolean("enabled").default(false),
-  sendDaysBefore: integer("send_days_before").default(0),
   emailTemplate: text("email_template").default('default'),
   segmentFilter: text("segment_filter").default('all'),
   customMessage: text("custom_message").default(''),
   customThemeData: text("custom_theme_data"),
   senderName: text("sender_name").default(''),
-  senderEmail: text("sender_email").default(''),
   promotionId: varchar("promotion_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -49,12 +47,12 @@ type BirthdayTemplateId = 'default' | 'confetti' | 'balloons' | 'custom';
 
 function renderBirthdayTemplate(
   template: BirthdayTemplateId,
-  params: { 
-    recipientName?: string; 
-    message?: string; 
-    imageUrl?: string; 
-    brandName?: string; 
-    customThemeData?: any; 
+  params: {
+    recipientName?: string;
+    message?: string;
+    imageUrl?: string;
+    brandName?: string;
+    customThemeData?: any;
     senderName?: string;
     promotionContent?: string;
     promotionTitle?: string;
@@ -539,7 +537,7 @@ app.post('/api/email-tracking', authenticateRequest, async (req: AuthenticatedRe
           tenantId,
           userId
         });
-
+        debugger;
         const workflowResponse = {
           success: true,
           emailId,
@@ -766,8 +764,7 @@ app.post('/api/birthday-test', async (req: any, res) => {
       emailTemplate,
       customMessage,
       customThemeData,
-      senderName,
-      senderEmail
+      senderName
     } = req.body;
 
     // Validate required fields
@@ -796,7 +793,7 @@ app.post('/api/birthday-test', async (req: any, res) => {
     try {
       const settings = await db.select().from(birthdaySettings).where(eq(birthdaySettings.tenantId, tenantId)).limit(1);
       birthdaySettingsData = settings.length > 0 ? settings[0] : null;
-      
+
       // Fetch promotion data if promotionId exists
       if (birthdaySettingsData?.promotionId) {
         const promotions = pgTable("promotions", {
@@ -805,11 +802,11 @@ app.post('/api/birthday-test', async (req: any, res) => {
           content: text("content").notNull(),
           description: text("description"),
         });
-        
+
         const promotionResult = await db.select().from(promotions).where(eq(promotions.id, birthdaySettingsData.promotionId)).limit(1);
         promotionData = promotionResult.length > 0 ? promotionResult[0] : null;
       }
-      
+
       console.log(`🎨 Birthday settings found:`, birthdaySettingsData ? 'Yes' : 'No');
       console.log(`🎁 Promotion data found:`, promotionData ? `Yes (${promotionData.title})` : 'No');
     } catch (error) {
@@ -850,9 +847,9 @@ app.post('/api/birthday-test', async (req: any, res) => {
         finalCustomThemeData = null;
       }
     }
-
+    debugger;
     console.log(`🎨 Using template: ${selectedTemplate}${selectedTemplate === 'custom' ? ' with custom theme data' : ''}`);
-
+    debugger;
     // Send test email to the actual user's email address
     const testRecipient = userEmail;
 
@@ -1103,5 +1100,4 @@ process.on('SIGTERM', async () => {
 
   process.exit(0);
 });
-
 startServer().catch(console.error);

@@ -87,7 +87,7 @@ ${cleanHtml}
       textLength: emailData.text.length,
       tagsCount: emailData.tags.length
     });
-
+    debugger;
     const result = await resend.emails.send(emailData);
 
     if (result.error) {
@@ -96,7 +96,7 @@ ${cleanHtml}
         name: result.error.name,
         details: result.error
       });
-      
+
       // Log the email data that caused the error (for debugging)
       console.error('❌ Email data that caused error:', {
         fromLength: emailData.from.length,
@@ -105,7 +105,7 @@ ${cleanHtml}
         htmlPreview: emailData.html.substring(0, 200) + '...',
         textPreview: emailData.text.substring(0, 200) + '...'
       });
-      
+
       return {
         success: false,
         error: result.error.message || 'Unknown Resend error',
@@ -135,15 +135,15 @@ ${cleanHtml}
  */
 export async function getAvailableEmailProviders(): Promise<string[]> {
   const providers: string[] = [];
-  
+
   if (process.env.RESEND_API_KEY) {
     providers.push('resend');
   }
-  
+
   if (process.env.POSTMARK_API_KEY) {
     providers.push('postmark');
   }
-  
+
   return providers;
 }
 
