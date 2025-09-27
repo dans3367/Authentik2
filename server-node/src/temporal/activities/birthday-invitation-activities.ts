@@ -20,8 +20,6 @@ export interface PrepareEmailInput {
   tenantName?: string;
   invitationToken: string;
   baseUrl?: string;
-  promotionId?: string;
-  promotionContent?: string;
 }
 
 export interface PrepareEmailResult {
@@ -145,13 +143,6 @@ export async function prepareBirthdayInvitationEmail(
             <li>📧 Personalized birthday messages</li>
             <li>🌟 Early access to birthday-themed content</li>
           </ul>
-          
-          ${input.promotionContent ? `
-          <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; padding: 15px; margin: 20px 0;">
-            <h3 style="color: #856404; margin: 0 0 10px 0; font-size: 16px;">🎉 Special Promotion Just for You!</h3>
-            <div style="color: #856404;">${input.promotionContent}</div>
-          </div>
-          ` : ''}
           
           <div style="text-align: center; margin: 25px 0;">
             <a href="${profileUpdateUrl}" 

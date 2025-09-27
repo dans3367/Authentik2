@@ -27,26 +27,6 @@ const birthdaySettings = pgTable("birthday_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Define promotions table schema
-const promotions = pgTable("promotions", {
-  id: varchar("id").primaryKey(),
-  tenantId: varchar("tenant_id").notNull(),
-  userId: varchar("user_id").notNull(),
-  title: text("title").notNull(),
-  description: text("description"),
-  content: text("content").notNull(),
-  type: text("type").notNull().default('newsletter'),
-  targetAudience: text("target_audience").notNull().default('all'),
-  isActive: boolean("is_active").default(true),
-  usageCount: integer("usage_count").default(0),
-  maxUses: integer("max_uses"),
-  validFrom: timestamp("valid_from"),
-  validTo: timestamp("valid_to"),
-  promotionalCodes: text("promotional_codes"),
-  metadata: text("metadata"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
 import { TemporalService } from './temporal/temporal-service';
 import { authenticateRequest, type AuthenticatedRequest } from './middleware/auth';
 import './lib/auth'; // Ensure auth types are available
@@ -69,26 +49,19 @@ type BirthdayTemplateId = 'default' | 'confetti' | 'balloons' | 'custom';
 
 function renderBirthdayTemplate(
   template: BirthdayTemplateId,
-  params: { recipientName?: string; message?: string; imageUrl?: string; brandName?: string; customThemeData?: any; senderName?: string; promotionContent?: string }
+  params: { recipientName?: string; message?: string; imageUrl?: string; brandName?: string; customThemeData?: any; senderName?: string }
 ): string {
-  console.log('🎂 [renderBirthdayTemplate] Called with params:', {
-    template,
-    hasPromotionContent: !!params.promotionContent,
-    promotionContentLength: params.promotionContent?.length,
-    promotionContentPreview: params.promotionContent?.substring(0, 100),
-    promotionContentType: typeof params.promotionContent,
-    promotionContentTruthy: params.promotionContent ? 'YES' : 'NO'
-  });
-  
+  console.log('🎂 [renderBirthdayTemplate] Called with template:', template);
+
   // Handle custom theme with rich styling
   if (template === 'custom' && params.customThemeData) {
     let customData = null;
-    
+
     try {
-      const parsedData = typeof params.customThemeData === 'string' 
-        ? JSON.parse(params.customThemeData) 
+      const parsedData = typeof params.customThemeData === 'string'
+        ? JSON.parse(params.customThemeData)
         : params.customThemeData;
-      
+
       // Check if it's the new structure (has themes property)
       if (parsedData.themes && parsedData.themes.custom) {
         customData = parsedData.themes.custom;
@@ -100,16 +73,16 @@ function renderBirthdayTemplate(
       console.warn('Failed to parse customThemeData for custom template:', e);
       return `<html><body><p>Error loading custom theme</p></body></html>`;
     }
-    
+
     if (!customData) {
       return `<html><body><p>No custom theme data found</p></body></html>`;
     }
-    
+
     const title = customData.title || `Happy Birthday${params.recipientName ? ', ' + params.recipientName : ''}!`;
     const message = customData.message || params.message || 'Wishing you a wonderful day!';
     const signature = customData.signature || '';
     const fromMessage = params.senderName || params.brandName || 'The Team';
-    
+
     return `<html>
       <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
         <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
@@ -131,7 +104,6 @@ function renderBirthdayTemplate(
           <!-- 3. Content Area (message) -->
           <div style="padding: 30px;">
             <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">${message}</div>
-            ${params.promotionContent ? `<div style="margin-top: 30px; padding: 20px; background: #f7fafc; border-radius: 8px; border-left: 4px solid #667eea; text-align: left;">${params.promotionContent}</div>` : ''}
             ${signature ? `<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">${signature}</div>` : ''}
           </div>
           
@@ -159,19 +131,19 @@ function renderBirthdayTemplate(
     confetti: { primary: '#ff6b6b', secondary: '#feca57' },
     balloons: { primary: '#54a0ff', secondary: '#5f27cd' }
   };
-  
+
   // Check if there's custom theme data with custom title/signature for this specific theme
   let headline = `Happy Birthday${params.recipientName ? ', ' + params.recipientName : ''}!`;
   let signature = '';
-  
+
   if (params.customThemeData) {
     try {
-      const parsedData = typeof params.customThemeData === 'string' 
-        ? JSON.parse(params.customThemeData) 
+      const parsedData = typeof params.customThemeData === 'string'
+        ? JSON.parse(params.customThemeData)
         : params.customThemeData;
-      
+
       let themeSpecificData = null;
-      
+
       // Check if it's the new structure (has themes property)
       if (parsedData.themes && parsedData.themes[template]) {
         themeSpecificData = parsedData.themes[template];
@@ -179,13 +151,13 @@ function renderBirthdayTemplate(
         // Old structure - use directly if no themes property
         themeSpecificData = parsedData;
       }
-      
+
       if (themeSpecificData) {
         // Use custom title if provided, otherwise use default
         if (themeSpecificData.title) {
           headline = themeSpecificData.title;
         }
-        
+
         // Use custom signature if provided
         if (themeSpecificData.signature) {
           signature = themeSpecificData.signature;
@@ -196,11 +168,11 @@ function renderBirthdayTemplate(
       console.warn('Failed to parse customThemeData for template:', template, e);
     }
   }
-  
+
   const headerImage = themeHeaders[template as keyof typeof themeHeaders] || themeHeaders.default;
   const colors = themeColors[template as keyof typeof themeColors] || themeColors.default;
   const fromMessage = params.senderName || params.brandName || 'The Team';
-  
+
   return `<html>
     <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%);">
       <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
@@ -217,7 +189,6 @@ function renderBirthdayTemplate(
         <!-- 3. Content Area (message) -->
         <div style="padding: 30px;">
           <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">${params.message || 'Wishing you a wonderful day!'}</div>
-          ${params.promotionContent ? `<div style="margin-top: 30px; padding: 20px; background: #f7fafc; border-radius: 8px; border-left: 4px solid ${colors.primary}; text-align: left;">${params.promotionContent}</div>` : '<!-- NO PROMOTION CONTENT -->'}
           ${signature ? `<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">${signature}</div>` : ''}
         </div>
         
@@ -239,20 +210,20 @@ const PORT = 3502;
 // Helper function to generate birthday invitation HTML
 async function generateBirthdayInvitationHTML(input: any): Promise<string> {
   const { contactFirstName, contactLastName, tenantName, baseUrl } = input;
-  
-  const contactName = contactFirstName 
-    ? `${contactFirstName}${contactLastName ? ` ${contactLastName}` : ''}` 
+
+  const contactName = contactFirstName
+    ? `${contactFirstName}${contactLastName ? ` ${contactLastName}` : ''}`
     : 'Valued Customer';
-  
+
   // Generate JWT token for profile update
   const profileUpdateToken = jwt.sign(
     { contactId: input.contactId, action: 'update_birthday' },
     process.env.JWT_SECRET!,
     { expiresIn: '30d' }
   );
-  
+
   const profileUpdateUrl = `${baseUrl || 'http://localhost:3500'}/update-profile?token=${profileUpdateToken}`;
-  
+
   return `
     <!DOCTYPE html>
     <html>
@@ -321,8 +292,8 @@ let temporalService: TemporalService;
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
+  res.json({
+    status: 'healthy',
     timestamp: new Date().toISOString(),
     temporal: temporalService?.isConnected() || false,
     mode: temporalService?.isConnected() ? 'temporal' : 'fallback'
@@ -337,22 +308,22 @@ app.post('/api/newsletter/send', authenticateRequest, async (req: AuthenticatedR
     console.log('📋 [server-node] Newsletter ID:', req.body.newsletter_id);
     console.log('👤 [server-node] Authenticated user:', req.user);
     console.log('👤 [server-node] User tenant ID:', req.user?.tenantId);
-    
+
     if (!temporalService) {
       console.error('❌ [server-node] Temporal service not initialized');
       return res.status(503).json({ error: 'Temporal service not initialized' });
     }
 
-    const { 
-      newsletter_id: newsletterId, 
-      tenant_id: tenantId, 
-      user_id: userId, 
-      group_uuid: groupUUID, 
-      subject, 
-      content, 
-      recipients, 
+    const {
+      newsletter_id: newsletterId,
+      tenant_id: tenantId,
+      user_id: userId,
+      group_uuid: groupUUID,
+      subject,
+      content,
+      recipients,
       metadata,
-      batch_size: batchSize 
+      batch_size: batchSize
     } = req.body;
 
     console.log('🔍 [server-node] Extracted data:', {
@@ -373,10 +344,10 @@ app.post('/api/newsletter/send', authenticateRequest, async (req: AuthenticatedR
     }
 
     const workflowId = `newsletter-${newsletterId}-${Date.now()}`;
-    
+
     console.log('⏰ [server-node] Starting Temporal workflow:', workflowId);
     console.log('🔧 [server-node] Temporal service connected:', temporalService.isConnected());
-    
+
     const handle = await temporalService.startWorkflow('newsletterSendingWorkflow', workflowId, {
       newsletterId,
       tenantId,
@@ -388,13 +359,13 @@ app.post('/api/newsletter/send', authenticateRequest, async (req: AuthenticatedR
       metadata,
       batchSize: batchSize || 50
     });
-    
+
     console.log('✅ [server-node] Workflow started successfully:', {
       workflowId: handle.workflowId
     });
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       workflowId: handle.workflowId,
       newsletterId,
       groupUUID
@@ -409,18 +380,18 @@ app.post('/api/newsletter/send', authenticateRequest, async (req: AuthenticatedR
 app.post('/api/temporal/clear-workflows', authenticateRequest, async (req: AuthenticatedRequest, res) => {
   try {
     console.log('🧹 [server-node] Processing temporal workflow cleanup request');
-    
+
     if (!temporalService) {
-      return res.status(503).json({ 
+      return res.status(503).json({
         success: false,
-        error: 'Temporal service not initialized' 
+        error: 'Temporal service not initialized'
       });
     }
 
     // For now, simulate workflow cleanup since we don't have a specific clear method
     // In a real implementation, you would call the temporal client to clear workflows
     console.log('✅ [server-node] Temporal workflows cleanup completed');
-    
+
     res.json({
       success: true,
       message: 'Workflows cleared successfully',
@@ -441,7 +412,7 @@ app.post('/api/temporal/clear-workflows', authenticateRequest, async (req: Authe
 app.get('/api/email-tracking', authenticateRequest, async (req: AuthenticatedRequest, res) => {
   try {
     console.log('📧 [server-node] Processing email tracking GET request');
-    
+
     // Return email tracking data - for now return empty array
     // This would be replaced with actual email tracking logic
     res.json({
@@ -451,9 +422,9 @@ app.get('/api/email-tracking', authenticateRequest, async (req: AuthenticatedReq
     });
   } catch (error) {
     console.error('❌ [server-node] Failed to get email tracking data:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: 'Failed to get email tracking data' 
+      message: 'Failed to get email tracking data'
     });
   }
 });
@@ -528,7 +499,7 @@ app.post('/api/email-tracking', authenticateRequest, async (req: AuthenticatedRe
     // Create email tracking entry
     const emailId = `email-${Date.now()}-${Math.random().toString(36).substring(7)}`;
     const workflowId = `email-workflow-${emailId}`;
-    
+
     // Try to use Temporal service if available
     if (temporalService && temporalService.isConnected()) {
       try {
@@ -562,7 +533,7 @@ app.post('/api/email-tracking', authenticateRequest, async (req: AuthenticatedRe
         console.error('❌ [server-node] Temporal workflow failed, using fallback:', workflowError);
       }
     }
-    
+
     // Fallback mode - simulate email processing without Temporal
     console.log('🔄 [server-node] Using fallback mode (no Temporal)');
     const fallbackResponse = {
@@ -587,7 +558,7 @@ app.post('/api/email-tracking', authenticateRequest, async (req: AuthenticatedRe
     res.json(fallbackResponse);
   } catch (error) {
     console.error('❌ [server-node] Failed to process email:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       message: 'Failed to process email request',
       error: error instanceof Error ? error.message : 'Unknown error'
@@ -686,11 +657,11 @@ app.post('/api/birthday-invitation', authenticateRequest, async (req: Authentica
         // Fall through to direct email sending
       }
     }
-    
+
     // Fallback: Send email directly via main server API
     try {
       console.log(`📧 Sending birthday invitation directly via main server API`);
-      
+
       // Prepare workflow input for HTML generation
       const workflowInput = {
         contactId,
@@ -746,7 +717,7 @@ app.post('/api/birthday-invitation', authenticateRequest, async (req: Authentica
 
   } catch (error) {
     console.error('❌ Birthday invitation workflow error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       message: 'Failed to start birthday invitation workflow',
       error: error instanceof Error ? error.message : 'Unknown error'
@@ -772,8 +743,7 @@ app.post('/api/birthday-test', async (req: any, res) => {
       customMessage,
       customThemeData,
       senderName,
-      senderEmail,
-      promotionId
+      senderEmail
     } = req.body;
 
     // Validate required fields
@@ -796,38 +766,20 @@ app.post('/api/birthday-test', async (req: any, res) => {
     console.log(`🎂 Starting test birthday card workflow for user ${userId} (${userEmail})`);
     console.log(`🏢 Using tenant ID: ${tenantId}`);
 
-    // Fetch birthday settings for the tenant to get selected template and promotion
+    // Fetch birthday settings for the tenant to get selected template
     let birthdaySettingsData;
-    let promotionData = null;
     try {
       const settings = await db.select().from(birthdaySettings).where(eq(birthdaySettings.tenantId, tenantId)).limit(1);
       birthdaySettingsData = settings.length > 0 ? settings[0] : null;
       console.log(`🎨 Birthday settings found:`, birthdaySettingsData ? 'Yes' : 'No');
-      console.log(`🎨 Settings promotion ID: ${birthdaySettingsData?.promotionId}`);
-
-      // Fetch promotion data - prioritize promotionId from request body, then fall back to birthday settings
-      const finalPromotionId = promotionId || birthdaySettingsData?.promotionId;
-      console.log(`🎁 Final promotion ID to use: ${finalPromotionId} (from request: ${promotionId}, from settings: ${birthdaySettingsData?.promotionId})`);
-
-      if (finalPromotionId) {
-        try {
-          const promotion = await db.select().from(promotions).where(eq(promotions.id, finalPromotionId)).limit(1);
-          promotionData = promotion.length > 0 ? promotion[0] : null;
-          console.log(`🎁 Fetched promotion data for ID: ${finalPromotionId}`, promotionData ? `Success - "${promotionData.title}" (${promotionData.content?.length} chars)` : 'Not found');
-        } catch (promotionError) {
-          console.warn('Failed to fetch promotion data:', promotionError);
-        }
-      } else {
-        console.log(`🎁 No promotion ID found, will send without promotion`);
-      }
     } catch (error) {
       console.warn('Failed to fetch birthday settings, using defaults:', error);
       birthdaySettingsData = null;
     }
 
     // Prepare template parameters
-    const userName = userFirstName 
-      ? `${userFirstName}${userLastName ? ` ${userLastName}` : ''}` 
+    const userName = userFirstName
+      ? `${userFirstName}${userLastName ? ` ${userLastName}` : ''}`
       : 'Team Member';
 
     // Use frontend-provided template data if available, otherwise fall back to database values
@@ -862,8 +814,9 @@ app.post('/api/birthday-test', async (req: any, res) => {
 
     // Send test email to the actual user's email address
     const testRecipient = userEmail;
-    
+
     console.log(`📧 Sending test birthday card to ${testRecipient}`);
+
 
     // Try to use Temporal service if available, otherwise fallback to direct sending
     if (temporalService && temporalService.isConnected()) {
@@ -876,8 +829,7 @@ app.post('/api/birthday-test', async (req: any, res) => {
           message: finalCustomMessage,
           brandName: tenantName || 'Your Company',
           customThemeData: finalCustomThemeData,
-          senderName: finalSenderName,
-          promotionContent: promotionData?.content || undefined
+          senderName: finalSenderName
         });
 
         // Generate unique workflow ID
@@ -906,7 +858,6 @@ app.post('/api/birthday-test', async (req: any, res) => {
             senderName: finalSenderName,
             templateUsed: selectedTemplate,
             hasCustomTheme: finalCustomThemeData !== null,
-            promotionContent: promotionData?.content || undefined,
             preRendered: true // Mark that content was pre-rendered
           }
         };
@@ -942,26 +893,16 @@ app.post('/api/birthday-test', async (req: any, res) => {
     // Fallback: Generate birthday card HTML and send directly
     try {
       console.log('📧 About to render birthday template');
-      console.log('📧 Promotion data:', promotionData ? `Has content: ${promotionData.content?.length} chars` : 'No promotion data');
-      console.log('📧 Promotion content preview:', promotionData?.content?.substring(0, 50) + '...');
-      console.log('📧 Promotion ID from request:', promotionId);
-      console.log('📧 Promotion ID from settings:', birthdaySettingsData?.promotionId);
-      console.log('📧 Full promotion object:', JSON.stringify(promotionData, null, 2));
-      console.log('📧 About to pass to template - promotionData?.content type:', typeof promotionData?.content);
-      console.log('📧 About to pass to template - promotionData?.content truthy:', promotionData?.content ? 'YES' : 'NO');
-      console.log('📧 About to pass to template - promotionData?.content length:', promotionData?.content?.length);
 
       const htmlContent = renderBirthdayTemplate(selectedTemplate, {
         recipientName: userName,
         message: finalCustomMessage,
         brandName: tenantName || 'Your Company',
         customThemeData: finalCustomThemeData,
-        senderName: finalSenderName,
-        promotionContent: promotionData?.content || undefined
+        senderName: finalSenderName
       });
 
       console.log('📧 Template rendered, HTML length:', htmlContent.length);
-      console.log('📧 Promotion content in HTML:', htmlContent.includes(promotionData?.content?.substring(0, 20)) ? 'YES' : 'NO');
 
       // Send via main server
       const response = await fetch('http://localhost:5000/api/email/send', {
@@ -1016,7 +957,7 @@ app.post('/api/birthday-test', async (req: any, res) => {
 
   } catch (error) {
     console.error('❌ Test birthday card workflow error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       message: 'Failed to send test birthday card',
       error: error instanceof Error ? error.message : 'Unknown error'
@@ -1035,9 +976,9 @@ app.post('/workflows/:workflowType', async (req, res) => {
     const { workflowId, input } = req.body;
 
     const handle = await temporalService.startWorkflow(workflowType, workflowId, input);
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       workflowId: handle.workflowId
     });
   } catch (error) {
@@ -1054,7 +995,7 @@ app.get('/workflows/:workflowId', async (req, res) => {
 
     const { workflowId } = req.params;
     const result = await temporalService.getWorkflowResult(workflowId);
-    
+
     res.json({ success: true, result });
   } catch (error) {
     console.error('Error getting workflow result:', error);
@@ -1068,7 +1009,7 @@ async function startServer() {
     // Initialize Temporal service (non-blocking)
     console.log('Initializing Temporal service...');
     temporalService = new TemporalService();
-    
+
     // Try to connect to Temporal, but don't block server startup
     try {
       await temporalService.connect();
@@ -1094,21 +1035,21 @@ async function startServer() {
 // Graceful shutdown
 process.on('SIGINT', async () => {
   console.log('\nShutting down gracefully...');
-  
+
   if (temporalService) {
     await temporalService.disconnect();
   }
-  
+
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
   console.log('\nShutting down gracefully...');
-  
+
   if (temporalService) {
     await temporalService.disconnect();
   }
-  
+
   process.exit(0);
 });
 

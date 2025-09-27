@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import { db } from '../db';
-import { emailContacts, birthdaySettings, promotions } from '@shared/schema';
+import { emailContacts, birthdaySettings } from '@shared/schema';
 import { eq, and, sql, isNotNull } from 'drizzle-orm';
 import { enhancedEmailService } from '../emailService';
 
@@ -18,13 +18,6 @@ export interface BirthdayJob {
     customMessage?: string;
     customThemeData?: string;
     senderName?: string;
-    promotionId?: string;
-  };
-  promotionData?: {
-    id: string;
-    title: string;
-    content: string;
-    type: string;
   };
   createdAt: Date;
 }
@@ -200,21 +193,9 @@ export class BirthdayWorker extends EventEmitter {
         return;
       }
 
-      // Get promotion data if specified
-      let promotionData = null;
-      if (settings.promotionId) {
-        try {
-          const promotion = await db.select().from(promotions).where(eq(promotions.id, settings.promotionId)).limit(1);
-          promotionData = promotion.length > 0 ? promotion[0] : null;
-          console.log(`🎁 [BirthdayWorker] Fetched promotion data for tenant ${tenantId}:`, promotionData ? 'Success' : 'Not found');
-        } catch (promotionError) {
-          console.warn(`🎁 [BirthdayWorker] Failed to fetch promotion data for tenant ${tenantId}:`, promotionError);
-        }
-      }
-
       // Create birthday jobs for each contact
       for (const contact of contacts) {
-        const jobId = this.createBirthdayJob(contact, settings, promotionData);
+        const jobId = this.createBirthdayJob(contact, settings);
         console.log(`🎂 [BirthdayWorker] Created birthday job ${jobId} for ${contact.email}`);
       }
 
@@ -226,7 +207,7 @@ export class BirthdayWorker extends EventEmitter {
     }
   }
 
-  private createBirthdayJob(contact: any, settings: any, promotionData: any): string {
+  private createBirthdayJob(contact: any, settings: any): string {
     const jobId = `birthday-${contact.id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     const job: BirthdayJob = {
@@ -242,14 +223,7 @@ export class BirthdayWorker extends EventEmitter {
         customMessage: settings.customMessage || '',
         customThemeData: settings.customThemeData || null,
         senderName: settings.senderName || '',
-        promotionId: settings.promotionId || null,
       },
-      promotionData: promotionData ? {
-        id: promotionData.id,
-        title: promotionData.title,
-        content: promotionData.content,
-        type: promotionData.type,
-      } : undefined,
       createdAt: new Date(),
     };
 
@@ -309,7 +283,6 @@ export class BirthdayWorker extends EventEmitter {
         brandName: job.tenantName || 'Your Company',
         customThemeData: job.settings.customThemeData ? JSON.parse(job.settings.customThemeData) : null,
         senderName: job.settings.senderName || 'Your Team',
-        promotionContent: job.promotionData?.content || undefined,
       });
 
       // Send the birthday email
@@ -325,7 +298,6 @@ export class BirthdayWorker extends EventEmitter {
           contactId: job.contactId,
           tenantId: job.tenantId,
           birthdayDate: job.birthdayDate,
-          promotionId: job.settings.promotionId,
           automated: true,
         },
       });
@@ -339,17 +311,6 @@ export class BirthdayWorker extends EventEmitter {
         console.log(`✅ [BirthdayWorker] Birthday card sent successfully to ${job.contactEmail}: ${result.messageId}`);
         this.emit('jobCompleted', { jobId, job, result });
 
-        // Update promotion usage count if promotion was used
-        if (job.promotionData) {
-          try {
-            await db.update(promotions)
-              .set({ usageCount: sql`${promotions.usageCount} + 1` })
-              .where(eq(promotions.id, job.promotionData.id));
-            console.log(`🎁 [BirthdayWorker] Updated promotion usage count for ${job.promotionData.id}`);
-          } catch (promotionError) {
-            console.warn(`🎁 [BirthdayWorker] Failed to update promotion usage:`, promotionError);
-          }
-        }
       } else {
         throw new Error(result.error || 'Failed to send birthday card');
       }
@@ -365,7 +326,7 @@ export class BirthdayWorker extends EventEmitter {
 
   private renderBirthdayTemplate(
     template: 'default' | 'confetti' | 'balloons' | 'custom',
-    params: { recipientName?: string; message?: string; brandName?: string; customThemeData?: any; senderName?: string; promotionContent?: string }
+    params: { recipientName?: string; message?: string; brandName?: string; customThemeData?: any; senderName?: string }
   ): string {
     // This is a simplified version - you might want to import the actual template renderer
     // from your existing birthday template system
@@ -388,7 +349,6 @@ export class BirthdayWorker extends EventEmitter {
           </div>
           <div style="padding: 30px;">
             <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">${params.message || 'Wishing you a wonderful day!'}</div>
-            ${params.promotionContent ? `<div style="margin-top: 30px; padding: 20px; background: #f7fafc; border-radius: 8px; border-left: 4px solid ${colors.primary}; text-align: left;">${params.promotionContent}</div>` : ''}
           </div>
           <div style="padding: 20px 30px 30px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
             <div style="font-size: 0.9rem; color: #718096;">

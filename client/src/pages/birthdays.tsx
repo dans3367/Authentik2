@@ -128,7 +128,7 @@ export default function BirthdaysPage() {
   const [location, setLocation] = useLocation();
   const { t, currentLanguage } = useLanguage();
   const { user: currentUser } = useAuth();
-  
+
   // Initialize activeTab based on URL parameter or default to "themes"
   const [activeTab, setActiveTab] = useState<"themes" | "settings" | "customers" | "test">(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -147,13 +147,13 @@ export default function BirthdaysPage() {
   const [birthdayContactId, setBirthdayContactId] = useState<string | null>(null);
   const [designerOpen, setDesignerOpen] = useState(false);
   const [designerThemeId, setDesignerThemeId] = useState<string | null>(null);
-  
+
   // State for real-time custom theme preview
   const [customThemePreview, setCustomThemePreview] = useState<CustomThemeData | null>(null);
-  
+
   // State for real-time preview of all themes (including default themes with customizations)
-  const [themePreviewData, setThemePreviewData] = useState<{[key: string]: CustomThemeData}>({});
-  
+  const [themePreviewData, setThemePreviewData] = useState<{ [key: string]: CustomThemeData }>({});
+
   // Local state for sender name to avoid API calls on every keystroke
   const [localSenderName, setLocalSenderName] = useState<string>('');
 
@@ -193,7 +193,7 @@ export default function BirthdaysPage() {
   useEffect(() => {
     const currentUrl = new URL(window.location.href);
     const currentTab = currentUrl.searchParams.get('tab');
-    
+
     if (currentTab !== activeTab) {
       currentUrl.searchParams.set('tab', activeTab);
       window.history.replaceState(null, '', currentUrl.toString());
@@ -212,10 +212,10 @@ export default function BirthdaysPage() {
   };
 
   // Fetch birthday settings
-  const { 
-    data: birthdaySettings, 
+  const {
+    data: birthdaySettings,
     isLoading: settingsLoading,
-    refetch: refetchSettings 
+    refetch: refetchSettings
   } = useQuery<BirthdaySettings>({
     queryKey: ['/api/birthday-settings'],
     queryFn: async () => {
@@ -256,17 +256,17 @@ export default function BirthdaysPage() {
 
 
   // Fetch contacts from the existing email-contacts endpoint
-  const { 
+  const {
     data: contactsData,
     isLoading: contactsLoading,
-    refetch: refetchContacts 
+    refetch: refetchContacts
   } = useQuery({
     queryKey: ['/api/email-contacts', searchQuery, statusFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
       if (statusFilter !== 'all') params.append('status', statusFilter);
-      
+
       const response = await apiRequest('GET', `/api/email-contacts?${params.toString()}`);
       return response.json();
     },
@@ -276,15 +276,15 @@ export default function BirthdaysPage() {
 
   // Extract contacts array from response data
   const contacts: Contact[] = contactsData?.contacts || [];
-  
+
   // Filter contacts who have birthdays for birthday-specific features
   const customersWithBirthdays = contacts.filter(contact => contact.birthday);
 
   // Fetch users from the tenant
-  const { 
+  const {
     data: usersData,
     isLoading: usersLoading,
-    refetch: refetchUsers 
+    refetch: refetchUsers
   } = useQuery({
     queryKey: ['/api/users'],
     queryFn: async () => {
@@ -461,7 +461,7 @@ export default function BirthdaysPage() {
       const contact = contacts.find(c => c.id === contactId);
       return contact && contact.birthday;
     });
-    
+
     if (contactsWithBirthdays.length === 0) {
       toast({
         title: t('birthdays.toasts.noActionNeeded'),
@@ -524,23 +524,6 @@ export default function BirthdaysPage() {
         throw new Error('Contact not found');
       }
 
-      // Fetch promotion content if promotionId exists
-      let promotionContent = null;
-      if (birthdaySettings?.promotionId) {
-        try {
-          const promotionResponse = await fetch(`/api/promotions/${birthdaySettings.promotionId}`, {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('auth-token')}`,
-            },
-          });
-          if (promotionResponse.ok) {
-            const promotion = await promotionResponse.json();
-            promotionContent = promotion.content;
-          }
-        } catch (error) {
-          console.warn('Failed to fetch promotion content:', error);
-        }
-      }
 
       // Call the workflow-based API
       const response = await fetch('http://localhost:3502/api/birthday-invitation', {
@@ -557,9 +540,7 @@ export default function BirthdaysPage() {
           tenantId: currentUser?.tenantId || 'unknown-tenant',
           tenantName: currentUser?.name || 'Your Company',
           userId: currentUser?.id || 'unknown-user',
-          fromEmail: 'admin@zendwise.work',
-          promotionId: birthdaySettings?.promotionId || null,
-          promotionContent: promotionContent
+          fromEmail: 'admin@zendwise.work'
         }),
       });
 
@@ -607,8 +588,7 @@ export default function BirthdaysPage() {
           emailTemplate: birthdaySettings?.emailTemplate || 'default',
           customMessage: birthdaySettings?.customMessage || '',
           customThemeData: birthdaySettings?.customThemeData || null,
-          senderName: birthdaySettings?.senderName || '',
-          promotionId: birthdaySettings?.promotionId || null
+          senderName: birthdaySettings?.senderName || ''
         }),
       });
 
@@ -697,7 +677,7 @@ export default function BirthdaysPage() {
     // Update real-time preview as user makes changes
     try {
       if (!previewData || !designerThemeId) return;
-      
+
       const previewThemeData: CustomThemeData = {
         title: previewData.title || '',
         message: previewData.message || '',
@@ -707,13 +687,13 @@ export default function BirthdaysPage() {
         imagePosition: previewData.imagePosition || { x: 0, y: 0 },
         imageScale: previewData.imageScale || 1,
       };
-      
+
       // Update preview data for the current theme being edited
       setThemePreviewData(prev => ({
         ...prev,
         [designerThemeId]: previewThemeData
       }));
-      
+
       // Also update customThemePreview for backward compatibility
       if (designerThemeId === 'custom') {
         setCustomThemePreview(previewThemeData);
@@ -725,7 +705,7 @@ export default function BirthdaysPage() {
 
   const openBirthdayModal = (contactId: string) => {
     setBirthdayContactId(contactId);
-    
+
     // Pre-populate the calendar with existing birthday if available
     const contact = contacts.find(c => c.id === contactId);
     if (contact && contact.birthday) {
@@ -733,7 +713,7 @@ export default function BirthdaysPage() {
     } else {
       setBirthdayDraft(undefined);
     }
-    
+
     setBirthdayModalOpen(true);
   };
 
@@ -813,1197 +793,1197 @@ export default function BirthdaysPage() {
 
   // Check if all contacts are selected
   const isAllSelected = contacts.length > 0 && selectedContacts.length === contacts.length;
-  
+
   // Check if some contacts are selected (for indeterminate state)
   const isSomeSelected = selectedContacts.length > 0 && selectedContacts.length < contacts.length;
 
   // Check if all users are selected
   const isAllUsersSelected = users.length > 0 && selectedUsers.length === users.length;
-  
+
   // Check if some users are selected (for indeterminate state)
   const isSomeUsersSelected = selectedUsers.length > 0 && selectedUsers.length < users.length;
 
   if (settingsLoading) {
     return (
-    <div className="min-h-screen">
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen">
+        <div className="container mx-auto p-6">
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+          </div>
         </div>
       </div>
-    </div>
     );
   }
 
   return (
     <div key={currentLanguage} className="min-h-screen overflow-x-hidden">
-    <div className="mx-auto max-w-7xl p-4 sm:p-6 space-y-6 sm:space-y-8">
-      {/* Greeting Header Card */}
-      <Card className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <CardContent className="p-4 sm:p-6 lg:p-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
-            <div className="space-y-4 sm:space-y-6 lg:space-y-8 pr-0 sm:pr-4 lg:pr-6 xl:pr-12 lg:col-span-8">
-              <div className="birthday-header space-y-2 sm:space-y-3">
-                <div className="flex items-baseline gap-2 sm:gap-4 flex-wrap">
-                  <span className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl">🎉</span>
-                  <h1 
+      <div className="mx-auto max-w-7xl p-4 sm:p-6 space-y-6 sm:space-y-8">
+        {/* Greeting Header Card */}
+        <Card className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <CardContent className="p-4 sm:p-6 lg:p-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
+              <div className="space-y-4 sm:space-y-6 lg:space-y-8 pr-0 sm:pr-4 lg:pr-6 xl:pr-12 lg:col-span-8">
+                <div className="birthday-header space-y-2 sm:space-y-3">
+                  <div className="flex items-baseline gap-2 sm:gap-4 flex-wrap">
+                    <span className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl">🎉</span>
+                    <h1
+                      tabIndex={-1}
+                      className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight break-words"
+                    >
+                      {t('birthdays.hero.celebration')}
+                    </h1>
+                  </div>
+                  <h1
                     tabIndex={-1}
                     className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight break-words"
                   >
-                    {t('birthdays.hero.celebration')}
+                    {t('birthdays.hero.dayWith')}
+                  </h1>
+                  <h1
+                    tabIndex={-1}
+                    className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight break-words"
+                  >
+                    {t('birthdays.hero.ecard')}
                   </h1>
                 </div>
-                <h1 
-                  tabIndex={-1}
-                  className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight break-words"
-                >
-                  {t('birthdays.hero.dayWith')}
-                </h1>
-                <h1 
-                  tabIndex={-1}
-                  className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight break-words"
-                >
-                  {t('birthdays.hero.ecard')}
-                </h1>
+                <p className="text-gray-600 dark:text-gray-400 text-base sm:text-lg leading-relaxed max-w-full">
+                  {t('birthdays.hero.description')}
+                </p>
               </div>
-              <p className="text-gray-600 dark:text-gray-400 text-base sm:text-lg leading-relaxed max-w-full">
-                {t('birthdays.hero.description')}
-              </p>
-            </div>
-            <div className="justify-self-center lg:justify-self-end lg:col-span-4 mt-4 lg:mt-0">
-              <img
-                src="/guy_present.svg"
-                alt="Person with birthday present illustration"
-                className="w-[280px] sm:w-[320px] md:w-[360px] xl:w-[420px] max-w-full h-auto"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Navigation Tabs */}
-      <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg w-fit">
-        <Button
-          variant={activeTab === "themes" ? "default" : "ghost"}
-          size="sm"
-          onClick={() => setActiveTab("themes")}
-          className="flex items-center gap-2"
-        >
-          <Palette className="h-4 w-4" />
-          Themes
-        </Button>
-        <Button
-          variant={activeTab === "settings" ? "default" : "ghost"}
-          size="sm"
-          onClick={() => setActiveTab("settings")}
-          className="flex items-center gap-2"
-        >
-          <Settings className="h-4 w-4" />
-          Settings
-        </Button>
-
-        <Button
-          variant={activeTab === "customers" ? "default" : "ghost"}
-          size="sm"
-          onClick={() => setActiveTab("customers")}
-          className="flex items-center gap-2"
-        >
-          <Users className="h-4 w-4" />
-          Customers
-          {contacts.length > 0 && (
-            <Badge variant="secondary" className="ml-1">
-              {contacts.length}
-            </Badge>
-          )}
-        </Button>
-        <Button
-          variant={activeTab === "test" ? "default" : "ghost"}
-          size="sm"
-          onClick={() => setActiveTab("test")}
-          className="flex items-center gap-2"
-        >
-          <Mail className="h-4 w-4" />
-          Test
-        </Button>
-      </div>
-
-      {/* Themes Tab */}
-      {activeTab === "themes" && (
-        <Card className="w-11/12">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Palette className="h-5 w-5" />
-              Themes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div>
-              <Label className="text-sm">Choose a Template</Label>
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
-                {[
-                  { id: 'default', name: 'Default' },
-                  { id: 'confetti', name: 'Confetti' },
-                  { id: 'balloons', name: 'Balloons' },
-                  { id: 'custom', name: 'Custom' },
-                ].map((tpl) => {
-                  const isSelected = (birthdaySettings?.emailTemplate || 'default') === tpl.id;
-                  return (
-                    <button
-                      key={tpl.id}
-                      type="button"
-                      onClick={() => {
-                        setDesignerThemeId(tpl.id);
-                        
-                        // Clear localStorage draft when switching themes to prevent cross-contamination
-                        try {
-                          localStorage.removeItem('birthdayCardDesignerDraft');
-                        } catch {}
-                        
-                        // Don't clear preview data - preserve it so users can see their changes
-                        // Only clear if we're switching from one theme to another different theme
-                        // This preserves the preview state when reopening the same theme
-                        
-                        setDesignerOpen(true);
-                      }}
-                      disabled={updateSettingsMutation.isPending}
-                      className={`relative rounded-xl border p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${isSelected ? 'ring-2 ring-blue-600 border-blue-600' : 'border-gray-200 hover:border-gray-300'}`}
-                    >
-                      <div className="relative h-40 rounded-lg overflow-hidden">
-                        {/* Default theme with header image */}
-                        {tpl.id === 'default' && (
-                          <>
-                            <img
-                              src="https://images.unsplash.com/photo-1588195538326-c5b1e9f80a1b?q=80&w=600&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-                              alt="Default birthday theme"
-                              className="absolute inset-0 h-full w-full object-cover"
-                            />
-                            <div className="absolute inset-0 bg-black/30" />
-                          </>
-                        )}
-                        
-                        {/* Confetti theme with header image */}
-                        {tpl.id === 'confetti' && (
-                          <>
-                            <img
-                              src="https://images.unsplash.com/photo-1530103862676-de8c9debad1d?q=80&w=600&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-                              alt="Confetti birthday theme"
-                              className="absolute inset-0 h-full w-full object-cover"
-                            />
-                            <div className="absolute inset-0 bg-black/20" />
-                            <span className="absolute left-3 top-3 text-2xl opacity-90">🎉</span>
-                            <span className="absolute right-4 top-6 text-xl opacity-80">🎁</span>
-                          </>
-                        )}
-                        
-                        {/* Balloons theme with header image */}
-                        {tpl.id === 'balloons' && (
-                          <>
-                            <img
-                              src="https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?q=80&w=600&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-                              alt="Balloons birthday theme"
-                              className="absolute inset-0 h-full w-full object-cover"
-                            />
-                            <div className="absolute inset-0 bg-black/20" />
-                            <span className="absolute left-3 top-3 text-2xl opacity-90">🎈</span>
-                            <span className="absolute right-4 top-6 text-xl opacity-80">🎈</span>
-                          </>
-                        )}
-                        
-                        {/* Custom theme */}
-                        {tpl.id === 'custom' && (() => {
-                          // Use real-time preview state for immediate updates
-                          const customData = themePreviewData['custom'] || customThemePreview;
-
-                          console.log('🎨 [Custom Theme Preview] Rendering with data:', {
-                            hasThemePreviewData: !!themePreviewData['custom'],
-                            hasCustomThemePreview: !!customThemePreview,
-                            customDataImageUrl: customData?.imageUrl,
-                            customDataCustomImage: customData?.customImage
-                          });
-
-                          if (customData?.imageUrl) {
-                            return (
-                              <>
-                                <img
-                                  src={customData.imageUrl}
-                                  alt="Custom theme"
-                                  className="absolute inset-0 h-full w-full object-cover"
-                                />
-                                <div className="absolute inset-0 bg-black/30" />
-                              </>
-                            );
-                          } else {
-                            return (
-                              <>
-                                <div className="absolute inset-0 bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50" />
-                                <span className="absolute left-3 top-3 text-2xl opacity-70">✨</span>
-                              </>
-                            );
-                          }
-                        })()}
-
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="text-center">
-                            <div className="font-bold text-white drop-shadow-lg text-shadow">
-                              {(() => {
-                                // Get preview data for the current theme
-                                const previewData = themePreviewData[tpl.id];
-
-                                // Check for saved custom theme data first
-                                let savedTitle = null;
-                                if (birthdaySettings?.customThemeData) {
-                                  try {
-                                    const parsed = JSON.parse(birthdaySettings.customThemeData);
-                                    const themeSpecificData = parsed.themes?.[tpl.id];
-                                    if (themeSpecificData?.title !== undefined) {
-                                      savedTitle = themeSpecificData.title;
-                                    }
-                                  } catch (error) {
-                                    console.warn('Failed to parse saved theme data:', error);
-                                  }
-                                }
-
-                                if (tpl.id === 'custom') {
-                                  const customData = previewData || customThemePreview;
-                                  return customData?.title || savedTitle || 'Happy Birthday!';
-                                } else if (previewData?.title !== undefined) {
-                                  // Show preview title (including empty strings) for default themes
-                                  return previewData.title || 'Happy Birthday!';
-                                } else if (savedTitle !== null) {
-                                  // Show saved custom title for default themes
-                                  return savedTitle || 'Happy Birthday!';
-                                } else {
-                                  return 'Happy Birthday!';
-                                }
-                              })()}
-                            </div>
-                            <div className="text-xs text-white/90 drop-shadow">{tpl.name} preview</div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="mt-2 flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-900">{tpl.name}</span>
-                        {isSelected && (
-                          <span className="text-xs font-semibold text-blue-600">Selected</span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Card Designer */}
-      <CardDesignerDialog
-        open={designerOpen}
-        onOpenChange={(open) => {
-          setDesignerOpen(open);
-          // When closing, preserve preview data so users can see their changes
-          // Only clear preview data if the user explicitly cancels without saving
-          // The preview data will be useful for showing real-time updates
-          if (!open && designerThemeId) {
-            // We'll keep the preview data to maintain the visual state
-            // This allows users to see their changes even after closing the designer
-            console.log('🎨 [Birthday Cards] Designer closed, preserving preview data for theme:', designerThemeId);
-          }
-        }}
-        initialThemeId={designerThemeId || undefined}
-        onPreviewChange={handlePreviewChange}
-        initialData={(() => {
-          // Load persistent draft first
-          try {
-            const raw = localStorage.getItem('birthdayCardDesignerDraft');
-            if (raw) return JSON.parse(raw);
-          } catch {}
-          
-          // Parse existing customThemeData and load theme-specific data
-          if (birthdaySettings?.customThemeData) {
-            try {
-              const parsed = JSON.parse(birthdaySettings.customThemeData);
-              const currentThemeId = designerThemeId || 'default';
-              
-              let themeSpecificData = null;
-              
-              // Check if it's the new structure (has themes property)
-              if (parsed.themes && parsed.themes[currentThemeId]) {
-                themeSpecificData = parsed.themes[currentThemeId];
-              } else if (!parsed.themes) {
-                // Old structure - assume it's for custom theme if we're loading custom
-                if (currentThemeId === 'custom') {
-                  themeSpecificData = parsed;
-                }
-              }
-              
-              if (themeSpecificData) {
-                return {
-                  title: themeSpecificData.title || '',
-                  message: themeSpecificData.message || birthdaySettings?.customMessage || '',
-                  signature: themeSpecificData.signature || '',
-                  imageUrl: themeSpecificData.imageUrl || null,
-                  customImage: Boolean(themeSpecificData.customImage && themeSpecificData.imageUrl),
-                  imagePosition: themeSpecificData.imagePosition || { x: 0, y: 0 },
-                  imageScale: themeSpecificData.imageScale || 1,
-                };
-              }
-            } catch {
-              // Fall through to default if parsing fails
-            }
-          }
-          
-          // Default data if no theme-specific customizations found
-          return {
-            title: '',
-            message: birthdaySettings?.customMessage || '',
-            signature: '',
-            imageUrl: null, // Let CardDesignerDialog load the default theme image
-            customImage: false, // This is key - tells the dialog it's NOT a custom image
-            imagePosition: { x: 0, y: 0 },
-            imageScale: 1,
-          };
-        })()}
-        onSave={(data) => {
-          try {
-            localStorage.setItem('birthdayCardDesignerDraft', JSON.stringify({ title: data.title, message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId, customImage: (data as any).customImage }));
-          } catch {}
-          
-          // Create theme data for preview updates
-          const themeData: CustomThemeData = {
-            title: data.title,
-            message: data.message,
-            signature: data.signature || '',
-            imageUrl: data.imageUrl || null,
-            customImage: (data as any).customImage || false,
-            imagePosition: (data as any).imagePosition || { x: 0, y: 0 },
-            imageScale: (data as any).imageScale || 1,
-          };
-          
-          // Update preview state immediately for instant visual feedback
-          setThemePreviewData(prev => ({
-            ...prev,
-            [designerThemeId || 'default']: themeData
-          }));
-          
-          // Parse existing customThemeData or create new structure
-          let existingThemeData: Record<string, any> = {};
-          if (birthdaySettings?.customThemeData) {
-            try {
-              const parsed = JSON.parse(birthdaySettings.customThemeData);
-              // Check if it's the new structure (has themes property) or old structure
-              if (parsed.themes) {
-                existingThemeData = parsed;
-              } else {
-                // Migrate old structure to new structure
-                existingThemeData = {
-                  themes: {
-                    custom: parsed // Assume old data was for custom theme
-                  }
-                };
-              }
-            } catch {
-              existingThemeData = { themes: {} };
-            }
-          } else {
-            existingThemeData = { themes: {} };
-          }
-          
-          // Update the specific theme's data
-          const currentThemeId = designerThemeId || 'default';
-          const updatedThemeData = {
-            ...existingThemeData,
-            themes: {
-              ...existingThemeData.themes,
-              [currentThemeId]: themeData
-            }
-          };
-          
-          // Check if user has made any text customizations (title or signature)
-          const hasTextCustomizations = data.title !== '' || data.signature !== '';
-          
-          // Save button should preserve current theme selection and only save theme-specific data
-          if (designerThemeId === 'custom') {
-            console.log('🎨 [Birthday Cards] Saving custom theme data');
-            
-            // Update real-time preview immediately for instant visual feedback
-            setCustomThemePreview(themeData);
-            
-            // Update both the custom theme data and keep the email template as custom
-            updateSettingsMutation.mutate({
-              ...birthdaySettings,
-              emailTemplate: 'custom',
-              customMessage: data.message,
-              customThemeData: JSON.stringify(updatedThemeData),
-            });
-          } else if (hasTextCustomizations || data.message !== (birthdaySettings?.customMessage || '')) {
-            // For default themes with any customizations, save the theme-specific data
-            console.log('🎨 [Birthday Cards] Saving theme-specific customizations for', currentThemeId);
-            const currentTemplate = birthdaySettings?.emailTemplate || 'default';
-            updateSettingsMutation.mutate({
-              ...birthdaySettings,
-              emailTemplate: currentTemplate, // Preserve current theme selection
-              customMessage: data.message,
-              customThemeData: JSON.stringify(updatedThemeData), // Save theme-specific data
-            });
-          } else {
-            // For default themes with no customizations, just save the message
-            const currentTemplate = birthdaySettings?.emailTemplate || 'default';
-            updateSettingsMutation.mutate({
-              ...birthdaySettings,
-              emailTemplate: currentTemplate, // Preserve current theme selection
-              customMessage: data.message,
-            });
-          }
-        }}
-        onMakeActive={(themeId, data) => {
-          // Handle making the card active - this will set it as the current email template
-          const isDefaultTheme = ['default', 'confetti', 'balloons'].includes(themeId || '');
-          
-          // Check if user has uploaded custom image (makes it truly custom)
-          const hasCustomImage = (data as any).customImage === true;
-          
-          // Check if user has made text customizations (title or signature)
-          const hasTextCustomizations = data.title !== '' || data.signature !== '';
-          
-          // Create theme data for preview updates
-          const themeData: CustomThemeData = {
-            title: data.title,
-            message: data.message,
-            signature: data.signature || '',
-            imageUrl: data.imageUrl || null,
-            customImage: (data as any).customImage || false,
-            imagePosition: (data as any).imagePosition || { x: 0, y: 0 },
-            imageScale: (data as any).imageScale || 1,
-          };
-          
-          // Update preview state immediately
-          setThemePreviewData(prev => ({
-            ...prev,
-            [themeId || 'default']: themeData
-          }));
-          
-          // Parse existing customThemeData or create new structure
-          let existingThemeData: Record<string, any> = {};
-          if (birthdaySettings?.customThemeData) {
-            try {
-              const parsed = JSON.parse(birthdaySettings.customThemeData);
-              // Check if it's the new structure (has themes property) or old structure
-              if (parsed.themes) {
-                existingThemeData = parsed;
-              } else {
-                // Migrate old structure to new structure
-                existingThemeData = {
-                  themes: {
-                    custom: parsed // Assume old data was for custom theme
-                  }
-                };
-              }
-            } catch {
-              existingThemeData = { themes: {} };
-            }
-          } else {
-            existingThemeData = { themes: {} };
-          }
-          
-          // Update the specific theme's data
-          const currentThemeId = themeId || 'default';
-          const updatedThemeData = {
-            ...existingThemeData,
-            themes: {
-              ...existingThemeData.themes,
-              [currentThemeId]: themeData
-            }
-          };
-          
-          if (themeId === 'custom') {
-            // Save as custom theme only if explicitly custom
-            console.log('🎨 [Birthday Cards] Making custom theme active');
-            setCustomThemePreview(themeData);
-            
-            updateSettingsMutation.mutate({
-              ...birthdaySettings,
-              emailTemplate: 'custom',
-              customMessage: data.message,
-              customThemeData: JSON.stringify(updatedThemeData),
-            });
-          } else if (isDefaultTheme && (hasTextCustomizations || data.message !== (birthdaySettings?.customMessage || ''))) {
-            // For default themes with customizations, save theme-specific data but keep original theme template
-            console.log('🎨 [Birthday Cards] Making default theme with customizations active:', currentThemeId);
-            updateSettingsMutation.mutate({
-              ...birthdaySettings,
-              emailTemplate: themeId || 'default', // Keep the default theme selection
-              customMessage: data.message,
-              customThemeData: JSON.stringify(updatedThemeData), // Save theme-specific data
-            });
-          } else {
-            // For default themes with no customizations, just set the template
-            console.log('🎨 [Birthday Cards] Making default theme active');
-            updateSettingsMutation.mutate({
-              ...birthdaySettings,
-              emailTemplate: themeId || 'default',
-              customMessage: data.message,
-            });
-          }
-          
-          // Close the designer after making active
-          setDesignerOpen(false);
-        }}
-        isCurrentlyActive={(() => {
-          const currentTemplate = birthdaySettings?.emailTemplate || 'default';
-          const selectedTheme = designerThemeId || 'default';
-          
-          // For custom theme, check if current template is 'custom' and we're viewing custom
-          if (selectedTheme === 'custom') {
-            return currentTemplate === 'custom';
-          }
-          
-          // For default themes, check exact match
-          return currentTemplate === selectedTheme;
-        })()}
-        senderName={birthdaySettings?.senderName}
-      />
-
-      {/* Settings Tab */}
-      {activeTab === "settings" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Settings */}
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
-                  Birthday Email Settings
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Global Enable/Disable */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-base font-medium">Enable Birthday Emails</Label>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Automatically send birthday emails to customers
-                    </p>
-                  </div>
-                  <Switch
-                    checked={birthdaySettings?.enabled || false}
-                    onCheckedChange={handleToggleGlobalEnabled}
-                    disabled={updateSettingsMutation.isPending}
-                  />
-                </div>
-
-
-
-                {/* Email Template Settings */}
-                <div className="space-y-4">
-                  <Label className="text-base font-medium">Email Template</Label>
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-sm">Sender Name</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          value={localSenderName}
-                          onChange={(e) => setLocalSenderName(e.target.value)}
-                          placeholder="Your Company Name"
-                          disabled={updateSettingsMutation.isPending}
-                          className="flex-1"
-                        />
-                        <Button
-                          onClick={handleSaveSenderName}
-                          disabled={updateSettingsMutation.isPending || localSenderName === (birthdaySettings?.senderName || '')}
-                          size="sm"
-                          variant="outline"
-                          className="px-3"
-                        >
-                          <Save className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Promotion Selection */}
-                    <div>
-                      <Label className="text-sm">Promotion (Optional)</Label>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                        Select a promotion to include in birthday emails
-                      </p>
-                      <PromotionSelector
-                        selectedPromotions={selectedPromotions}
-                        onPromotionsChange={handlePromotionsChange}
-                        campaignType="birthday"
-                        onPromotionContentInsert={() => {}} // Not needed for birthday emails
-                      />
-                    </div>
-                    
-                  </div>
-                </div>
-
-
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Sidebar Stats */}
-          <div className="space-y-6">
-            {/* Overview Stats */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  Overview
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Total Customers</span>
-                  <Badge variant="outline">{contacts.length}</Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">With Birthdays</span>
-                  <Badge variant="outline">{customersWithBirthdays.length}</Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Birthday Emails Enabled</span>
-                  <Badge variant="outline">
-                    {customersWithBirthdays.filter(c => c.birthdayEmailEnabled).length}
-                  </Badge>
-                </div>
-
-              </CardContent>
-            </Card>
-
-            {/* Upcoming Birthdays */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CakeIcon className="h-5 w-5" />
-                  Upcoming Birthdays
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {upcomingBirthdays.length === 0 ? (
-                  <div className="text-center py-4">
-                    <CakeIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      No birthdays in the next 30 days
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {upcomingBirthdays.map((contact) => (
-                      <div key={contact.id} className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{getContactName(contact)}</p>
-                          <p className="text-xs text-gray-500">
-                            {contact.birthday && new Date(contact.birthday).toLocaleDateString()}
-                          </p>
-                        </div>
-                        {contact.birthdayEmailEnabled ? (
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <XCircle className="h-4 w-4 text-red-500" />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      )}
-
-
-
-      {/* Customers Tab */}
-      {activeTab === "customers" && (
-        <Card className="w-11/12">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                {t('birthdays.title')}
-              </CardTitle>
-              <Button onClick={handleAddCustomer}>
-                <UserPlus className="h-4 w-4 mr-2" />
-                {t('common.add')} Customer
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {/* Search and Filter Controls */}
-            <div className="flex items-center gap-4 p-6 border-b">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder={t('birthdays.filters.searchPlaceholder')}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+              <div className="justify-self-center lg:justify-self-end lg:col-span-4 mt-4 lg:mt-0">
+                <img
+                  src="/guy_present.svg"
+                  alt="Person with birthday present illustration"
+                  className="w-[280px] sm:w-[320px] md:w-[360px] xl:w-[420px] max-w-full h-auto"
                 />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t('birthdays.filters.allStatuses')}</SelectItem>
-                  <SelectItem value="active">{t('birthdays.filters.active')}</SelectItem>
-                  <SelectItem value="unsubscribed">{t('birthdays.filters.unsubscribed')}</SelectItem>
-                  <SelectItem value="bounced">Bounced</SelectItem>
-                  <SelectItem value="pending">{t('birthdays.filters.pending')}</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
-
-            {/* Bulk Actions */}
-            {selectedContacts.length > 0 && (
-              <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-4 border-b">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">{selectedContacts.length} selected</span>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => setSelectedContacts([])}
-                  >
-                    Clear Selection
-                  </Button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleBulkEnableBirthdayEmail}
-                    disabled={bulkUpdateBirthdayEmailMutation.isPending}
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Enable Birthday Emails
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleBulkDisableBirthdayEmail}
-                    disabled={bulkUpdateBirthdayEmailMutation.isPending}
-                  >
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Disable Birthday Emails
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuItem>
-                        <Download className="h-4 w-4 mr-2" />
-                        Export Selected
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-red-600">
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Remove Selected
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            )}
-
-            {contactsLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
-              </div>
-            ) : contacts.length === 0 ? (
-              <div className="text-center py-12">
-                <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">No customers found</p>
-                <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">Start by adding your first customer to begin managing birthday emails</p>
-                <Button onClick={handleAddCustomer}>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Add Your First Customer
-                </Button>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">
-                        <Checkbox
-                          checked={isAllSelected}
-                          onCheckedChange={handleSelectAll}
-                          aria-label="Select all customers"
-                        />
-                      </TableHead>
-                      <TableHead>{t('birthdays.table.name')}</TableHead>
-                      <TableHead>{t('birthdays.table.status')}</TableHead>
-                      <TableHead>{t('birthdays.table.birthday')}</TableHead>
-
-                      <TableHead>{t('birthdays.table.activity')}</TableHead>
-                      <TableHead>{t('birthdays.table.campaigns')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {contacts.map((contact) => (
-                      <TableRow key={contact.id}>
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedContacts.includes(contact.id)}
-                            onCheckedChange={(checked) => handleSelectContact(contact.id, checked as boolean)}
-                            aria-label={`Select ${getContactName(contact)}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <button
-                              type="button"
-                              onClick={() => handleCustomerClick(contact)}
-                              className="font-medium text-left hover:text-blue-600 hover:underline transition-colors cursor-pointer"
-                            >
-                              {getContactName(contact)}
-                            </button>
-                            <p className="text-sm text-gray-500">{contact.email}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(contact.status)}>
-                            {contact.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {contact.birthday ? (
-                            <button
-                              type="button"
-                              onClick={() => openBirthdayModal(contact.id)}
-                              className="flex items-center gap-2 text-left hover:bg-gray-50 p-1 rounded transition-colors"
-                            >
-                              <CakeIcon className="h-4 w-4 text-pink-500" />
-                              <span className="text-sm">{new Date(contact.birthday).toLocaleDateString()}</span>
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => openBirthdayModal(contact.id)}
-                              className="text-gray-400 text-sm underline underline-offset-2 hover:text-gray-600"
-                            >
-                              {t('birthdays.table.notSet')}
-                            </button>
-                          )}
-                        </TableCell>
-
-                        <TableCell>
-                          <div className="text-sm">
-                            <p>{t('birthdays.table.sent')}: {contact.emailsSent}</p>
-                            <p>{t('birthdays.table.opened')}: {contact.emailsOpened}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {contact.birthday ? (
-                            <Switch
-                              checked={contact.birthdayEmailEnabled || false}
-                              onCheckedChange={() => handleToggleBirthdayEmail(contact.id, contact.birthdayEmailEnabled || false)}
-                              disabled={toggleBirthdayEmailMutation.isPending}
-                            />
-                          ) : (
-                            <span className="text-gray-400 text-sm">{t('birthdays.table.na')}</span>
-                          )}
-                        </TableCell>
-
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
           </CardContent>
         </Card>
-      )}
 
-      {/* Test Tab */}
-      {activeTab === "test" && (
-        <Card className="w-11/12">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5" />
-                Test Birthday Cards
-              </CardTitle>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                  Test Mode
-                </Badge>
-                <Badge variant="secondary">
-                  {users.length} Users
-                </Badge>
-              </div>
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Send test birthday cards to users individually or select multiple users for bulk sending. Test emails will be sent to the selected user's actual email address.
-            </p>
-          </CardHeader>
-          <CardContent className="p-0">
-            {/* Bulk Actions for Users */}
-            {selectedUsers.length > 0 && (
-              <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-4 border-b">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">{selectedUsers.length} user(s) selected</span>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => setSelectedUsers([])}
-                  >
-                    Clear Selection
-                  </Button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="default" 
-                    size="sm" 
-                    onClick={() => {
-                      selectedUsers.forEach(userId => {
-                        handleSendTestBirthdayCard(userId);
-                      });
-                      setSelectedUsers([]);
-                    }}
-                    disabled={sendTestBirthdayMutation.isPending}
-                  >
-                    <Mail className="h-4 w-4 mr-2" />
-                    Send Test Cards to Selected
-                  </Button>
-                </div>
-              </div>
+        {/* Navigation Tabs */}
+        <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg w-fit">
+          <Button
+            variant={activeTab === "themes" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setActiveTab("themes")}
+            className="flex items-center gap-2"
+          >
+            <Palette className="h-4 w-4" />
+            Themes
+          </Button>
+          <Button
+            variant={activeTab === "settings" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setActiveTab("settings")}
+            className="flex items-center gap-2"
+          >
+            <Settings className="h-4 w-4" />
+            Settings
+          </Button>
+
+          <Button
+            variant={activeTab === "customers" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setActiveTab("customers")}
+            className="flex items-center gap-2"
+          >
+            <Users className="h-4 w-4" />
+            Customers
+            {contacts.length > 0 && (
+              <Badge variant="secondary" className="ml-1">
+                {contacts.length}
+              </Badge>
             )}
+          </Button>
+          <Button
+            variant={activeTab === "test" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setActiveTab("test")}
+            className="flex items-center gap-2"
+          >
+            <Mail className="h-4 w-4" />
+            Test
+          </Button>
+        </div>
 
-            {usersLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
-              </div>
-            ) : users.length === 0 ? (
-              <div className="text-center py-12">
-                <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">No users found</p>
-                <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">No users available in your tenant for testing</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">
-                        <Checkbox
-                          checked={isAllUsersSelected}
-                          onCheckedChange={handleSelectAllUsers}
-                          aria-label="Select all users"
-                        />
-                      </TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Email Verified</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedUsers.includes(user.id)}
-                            onCheckedChange={(checked) => handleSelectUser(user.id, checked as boolean)}
-                            aria-label={`Select ${getUserName(user)}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{getUserName(user)}</p>
-                            <p className="text-sm text-gray-500">ID: {user.id}</p>
+        {/* Themes Tab */}
+        {activeTab === "themes" && (
+          <Card className="w-11/12">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Palette className="h-5 w-5" />
+                Themes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div>
+                <Label className="text-sm">Choose a Template</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
+                  {[
+                    { id: 'default', name: 'Default' },
+                    { id: 'confetti', name: 'Confetti' },
+                    { id: 'balloons', name: 'Balloons' },
+                    { id: 'custom', name: 'Custom' },
+                  ].map((tpl) => {
+                    const isSelected = (birthdaySettings?.emailTemplate || 'default') === tpl.id;
+                    return (
+                      <button
+                        key={tpl.id}
+                        type="button"
+                        onClick={() => {
+                          setDesignerThemeId(tpl.id);
+
+                          // Clear localStorage draft when switching themes to prevent cross-contamination
+                          try {
+                            localStorage.removeItem('birthdayCardDesignerDraft');
+                          } catch { }
+
+                          // Don't clear preview data - preserve it so users can see their changes
+                          // Only clear if we're switching from one theme to another different theme
+                          // This preserves the preview state when reopening the same theme
+
+                          setDesignerOpen(true);
+                        }}
+                        disabled={updateSettingsMutation.isPending}
+                        className={`relative rounded-xl border p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${isSelected ? 'ring-2 ring-blue-600 border-blue-600' : 'border-gray-200 hover:border-gray-300'}`}
+                      >
+                        <div className="relative h-40 rounded-lg overflow-hidden">
+                          {/* Default theme with header image */}
+                          {tpl.id === 'default' && (
+                            <>
+                              <img
+                                src="https://images.unsplash.com/photo-1588195538326-c5b1e9f80a1b?q=80&w=600&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                                alt="Default birthday theme"
+                                className="absolute inset-0 h-full w-full object-cover"
+                              />
+                              <div className="absolute inset-0 bg-black/30" />
+                            </>
+                          )}
+
+                          {/* Confetti theme with header image */}
+                          {tpl.id === 'confetti' && (
+                            <>
+                              <img
+                                src="https://images.unsplash.com/photo-1530103862676-de8c9debad1d?q=80&w=600&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                                alt="Confetti birthday theme"
+                                className="absolute inset-0 h-full w-full object-cover"
+                              />
+                              <div className="absolute inset-0 bg-black/20" />
+                              <span className="absolute left-3 top-3 text-2xl opacity-90">🎉</span>
+                              <span className="absolute right-4 top-6 text-xl opacity-80">🎁</span>
+                            </>
+                          )}
+
+                          {/* Balloons theme with header image */}
+                          {tpl.id === 'balloons' && (
+                            <>
+                              <img
+                                src="https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?q=80&w=600&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                                alt="Balloons birthday theme"
+                                className="absolute inset-0 h-full w-full object-cover"
+                              />
+                              <div className="absolute inset-0 bg-black/20" />
+                              <span className="absolute left-3 top-3 text-2xl opacity-90">🎈</span>
+                              <span className="absolute right-4 top-6 text-xl opacity-80">🎈</span>
+                            </>
+                          )}
+
+                          {/* Custom theme */}
+                          {tpl.id === 'custom' && (() => {
+                            // Use real-time preview state for immediate updates
+                            const customData = themePreviewData['custom'] || customThemePreview;
+
+                            console.log('🎨 [Custom Theme Preview] Rendering with data:', {
+                              hasThemePreviewData: !!themePreviewData['custom'],
+                              hasCustomThemePreview: !!customThemePreview,
+                              customDataImageUrl: customData?.imageUrl,
+                              customDataCustomImage: customData?.customImage
+                            });
+
+                            if (customData?.imageUrl) {
+                              return (
+                                <>
+                                  <img
+                                    src={customData.imageUrl}
+                                    alt="Custom theme"
+                                    className="absolute inset-0 h-full w-full object-cover"
+                                  />
+                                  <div className="absolute inset-0 bg-black/30" />
+                                </>
+                              );
+                            } else {
+                              return (
+                                <>
+                                  <div className="absolute inset-0 bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50" />
+                                  <span className="absolute left-3 top-3 text-2xl opacity-70">✨</span>
+                                </>
+                              );
+                            }
+                          })()}
+
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="text-center">
+                              <div className="font-bold text-white drop-shadow-lg text-shadow">
+                                {(() => {
+                                  // Get preview data for the current theme
+                                  const previewData = themePreviewData[tpl.id];
+
+                                  // Check for saved custom theme data first
+                                  let savedTitle = null;
+                                  if (birthdaySettings?.customThemeData) {
+                                    try {
+                                      const parsed = JSON.parse(birthdaySettings.customThemeData);
+                                      const themeSpecificData = parsed.themes?.[tpl.id];
+                                      if (themeSpecificData?.title !== undefined) {
+                                        savedTitle = themeSpecificData.title;
+                                      }
+                                    } catch (error) {
+                                      console.warn('Failed to parse saved theme data:', error);
+                                    }
+                                  }
+
+                                  if (tpl.id === 'custom') {
+                                    const customData = previewData || customThemePreview;
+                                    return customData?.title || savedTitle || 'Happy Birthday!';
+                                  } else if (previewData?.title !== undefined) {
+                                    // Show preview title (including empty strings) for default themes
+                                    return previewData.title || 'Happy Birthday!';
+                                  } else if (savedTitle !== null) {
+                                    // Show saved custom title for default themes
+                                    return savedTitle || 'Happy Birthday!';
+                                  } else {
+                                    return 'Happy Birthday!';
+                                  }
+                                })()}
+                              </div>
+                              <div className="text-xs text-white/90 drop-shadow">{tpl.name} preview</div>
+                            </div>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm">{user.email}</span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm capitalize">{user.role}</span>
-                        </TableCell>
-                        <TableCell>
-                          {user.emailVerified ? (
+                        </div>
+                        <div className="mt-2 flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-900">{tpl.name}</span>
+                          {isSelected && (
+                            <span className="text-xs font-semibold text-blue-600">Selected</span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Card Designer */}
+        <CardDesignerDialog
+          open={designerOpen}
+          onOpenChange={(open) => {
+            setDesignerOpen(open);
+            // When closing, preserve preview data so users can see their changes
+            // Only clear preview data if the user explicitly cancels without saving
+            // The preview data will be useful for showing real-time updates
+            if (!open && designerThemeId) {
+              // We'll keep the preview data to maintain the visual state
+              // This allows users to see their changes even after closing the designer
+              console.log('🎨 [Birthday Cards] Designer closed, preserving preview data for theme:', designerThemeId);
+            }
+          }}
+          initialThemeId={designerThemeId || undefined}
+          onPreviewChange={handlePreviewChange}
+          initialData={(() => {
+            // Load persistent draft first
+            try {
+              const raw = localStorage.getItem('birthdayCardDesignerDraft');
+              if (raw) return JSON.parse(raw);
+            } catch { }
+
+            // Parse existing customThemeData and load theme-specific data
+            if (birthdaySettings?.customThemeData) {
+              try {
+                const parsed = JSON.parse(birthdaySettings.customThemeData);
+                const currentThemeId = designerThemeId || 'default';
+
+                let themeSpecificData = null;
+
+                // Check if it's the new structure (has themes property)
+                if (parsed.themes && parsed.themes[currentThemeId]) {
+                  themeSpecificData = parsed.themes[currentThemeId];
+                } else if (!parsed.themes) {
+                  // Old structure - assume it's for custom theme if we're loading custom
+                  if (currentThemeId === 'custom') {
+                    themeSpecificData = parsed;
+                  }
+                }
+
+                if (themeSpecificData) {
+                  return {
+                    title: themeSpecificData.title || '',
+                    message: themeSpecificData.message || birthdaySettings?.customMessage || '',
+                    signature: themeSpecificData.signature || '',
+                    imageUrl: themeSpecificData.imageUrl || null,
+                    customImage: Boolean(themeSpecificData.customImage && themeSpecificData.imageUrl),
+                    imagePosition: themeSpecificData.imagePosition || { x: 0, y: 0 },
+                    imageScale: themeSpecificData.imageScale || 1,
+                  };
+                }
+              } catch {
+                // Fall through to default if parsing fails
+              }
+            }
+
+            // Default data if no theme-specific customizations found
+            return {
+              title: '',
+              message: birthdaySettings?.customMessage || '',
+              signature: '',
+              imageUrl: null, // Let CardDesignerDialog load the default theme image
+              customImage: false, // This is key - tells the dialog it's NOT a custom image
+              imagePosition: { x: 0, y: 0 },
+              imageScale: 1,
+            };
+          })()}
+          onSave={(data) => {
+            try {
+              localStorage.setItem('birthdayCardDesignerDraft', JSON.stringify({ title: data.title, message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId, customImage: (data as any).customImage }));
+            } catch { }
+
+            // Create theme data for preview updates
+            const themeData: CustomThemeData = {
+              title: data.title,
+              message: data.message,
+              signature: data.signature || '',
+              imageUrl: data.imageUrl || null,
+              customImage: (data as any).customImage || false,
+              imagePosition: (data as any).imagePosition || { x: 0, y: 0 },
+              imageScale: (data as any).imageScale || 1,
+            };
+
+            // Update preview state immediately for instant visual feedback
+            setThemePreviewData(prev => ({
+              ...prev,
+              [designerThemeId || 'default']: themeData
+            }));
+
+            // Parse existing customThemeData or create new structure
+            let existingThemeData: Record<string, any> = {};
+            if (birthdaySettings?.customThemeData) {
+              try {
+                const parsed = JSON.parse(birthdaySettings.customThemeData);
+                // Check if it's the new structure (has themes property) or old structure
+                if (parsed.themes) {
+                  existingThemeData = parsed;
+                } else {
+                  // Migrate old structure to new structure
+                  existingThemeData = {
+                    themes: {
+                      custom: parsed // Assume old data was for custom theme
+                    }
+                  };
+                }
+              } catch {
+                existingThemeData = { themes: {} };
+              }
+            } else {
+              existingThemeData = { themes: {} };
+            }
+
+            // Update the specific theme's data
+            const currentThemeId = designerThemeId || 'default';
+            const updatedThemeData = {
+              ...existingThemeData,
+              themes: {
+                ...existingThemeData.themes,
+                [currentThemeId]: themeData
+              }
+            };
+
+            // Check if user has made any text customizations (title or signature)
+            const hasTextCustomizations = data.title !== '' || data.signature !== '';
+
+            // Save button should preserve current theme selection and only save theme-specific data
+            if (designerThemeId === 'custom') {
+              console.log('🎨 [Birthday Cards] Saving custom theme data');
+
+              // Update real-time preview immediately for instant visual feedback
+              setCustomThemePreview(themeData);
+
+              // Update both the custom theme data and keep the email template as custom
+              updateSettingsMutation.mutate({
+                ...birthdaySettings,
+                emailTemplate: 'custom',
+                customMessage: data.message,
+                customThemeData: JSON.stringify(updatedThemeData),
+              });
+            } else if (hasTextCustomizations || data.message !== (birthdaySettings?.customMessage || '')) {
+              // For default themes with any customizations, save the theme-specific data
+              console.log('🎨 [Birthday Cards] Saving theme-specific customizations for', currentThemeId);
+              const currentTemplate = birthdaySettings?.emailTemplate || 'default';
+              updateSettingsMutation.mutate({
+                ...birthdaySettings,
+                emailTemplate: currentTemplate, // Preserve current theme selection
+                customMessage: data.message,
+                customThemeData: JSON.stringify(updatedThemeData), // Save theme-specific data
+              });
+            } else {
+              // For default themes with no customizations, just save the message
+              const currentTemplate = birthdaySettings?.emailTemplate || 'default';
+              updateSettingsMutation.mutate({
+                ...birthdaySettings,
+                emailTemplate: currentTemplate, // Preserve current theme selection
+                customMessage: data.message,
+              });
+            }
+          }}
+          onMakeActive={(themeId, data) => {
+            // Handle making the card active - this will set it as the current email template
+            const isDefaultTheme = ['default', 'confetti', 'balloons'].includes(themeId || '');
+
+            // Check if user has uploaded custom image (makes it truly custom)
+            const hasCustomImage = (data as any).customImage === true;
+
+            // Check if user has made text customizations (title or signature)
+            const hasTextCustomizations = data.title !== '' || data.signature !== '';
+
+            // Create theme data for preview updates
+            const themeData: CustomThemeData = {
+              title: data.title,
+              message: data.message,
+              signature: data.signature || '',
+              imageUrl: data.imageUrl || null,
+              customImage: (data as any).customImage || false,
+              imagePosition: (data as any).imagePosition || { x: 0, y: 0 },
+              imageScale: (data as any).imageScale || 1,
+            };
+
+            // Update preview state immediately
+            setThemePreviewData(prev => ({
+              ...prev,
+              [themeId || 'default']: themeData
+            }));
+
+            // Parse existing customThemeData or create new structure
+            let existingThemeData: Record<string, any> = {};
+            if (birthdaySettings?.customThemeData) {
+              try {
+                const parsed = JSON.parse(birthdaySettings.customThemeData);
+                // Check if it's the new structure (has themes property) or old structure
+                if (parsed.themes) {
+                  existingThemeData = parsed;
+                } else {
+                  // Migrate old structure to new structure
+                  existingThemeData = {
+                    themes: {
+                      custom: parsed // Assume old data was for custom theme
+                    }
+                  };
+                }
+              } catch {
+                existingThemeData = { themes: {} };
+              }
+            } else {
+              existingThemeData = { themes: {} };
+            }
+
+            // Update the specific theme's data
+            const currentThemeId = themeId || 'default';
+            const updatedThemeData = {
+              ...existingThemeData,
+              themes: {
+                ...existingThemeData.themes,
+                [currentThemeId]: themeData
+              }
+            };
+
+            if (themeId === 'custom') {
+              // Save as custom theme only if explicitly custom
+              console.log('🎨 [Birthday Cards] Making custom theme active');
+              setCustomThemePreview(themeData);
+
+              updateSettingsMutation.mutate({
+                ...birthdaySettings,
+                emailTemplate: 'custom',
+                customMessage: data.message,
+                customThemeData: JSON.stringify(updatedThemeData),
+              });
+            } else if (isDefaultTheme && (hasTextCustomizations || data.message !== (birthdaySettings?.customMessage || ''))) {
+              // For default themes with customizations, save theme-specific data but keep original theme template
+              console.log('🎨 [Birthday Cards] Making default theme with customizations active:', currentThemeId);
+              updateSettingsMutation.mutate({
+                ...birthdaySettings,
+                emailTemplate: themeId || 'default', // Keep the default theme selection
+                customMessage: data.message,
+                customThemeData: JSON.stringify(updatedThemeData), // Save theme-specific data
+              });
+            } else {
+              // For default themes with no customizations, just set the template
+              console.log('🎨 [Birthday Cards] Making default theme active');
+              updateSettingsMutation.mutate({
+                ...birthdaySettings,
+                emailTemplate: themeId || 'default',
+                customMessage: data.message,
+              });
+            }
+
+            // Close the designer after making active
+            setDesignerOpen(false);
+          }}
+          isCurrentlyActive={(() => {
+            const currentTemplate = birthdaySettings?.emailTemplate || 'default';
+            const selectedTheme = designerThemeId || 'default';
+
+            // For custom theme, check if current template is 'custom' and we're viewing custom
+            if (selectedTheme === 'custom') {
+              return currentTemplate === 'custom';
+            }
+
+            // For default themes, check exact match
+            return currentTemplate === selectedTheme;
+          })()}
+          senderName={birthdaySettings?.senderName}
+        />
+
+        {/* Settings Tab */}
+        {activeTab === "settings" && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Main Settings */}
+            <div className="lg:col-span-2 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Settings className="h-5 w-5" />
+                    Birthday Email Settings
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Global Enable/Disable */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-base font-medium">Enable Birthday Emails</Label>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Automatically send birthday emails to customers
+                      </p>
+                    </div>
+                    <Switch
+                      checked={birthdaySettings?.enabled || false}
+                      onCheckedChange={handleToggleGlobalEnabled}
+                      disabled={updateSettingsMutation.isPending}
+                    />
+                  </div>
+
+
+
+                  {/* Email Template Settings */}
+                  <div className="space-y-4">
+                    <Label className="text-base font-medium">Email Template</Label>
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="text-sm">Sender Name</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            value={localSenderName}
+                            onChange={(e) => setLocalSenderName(e.target.value)}
+                            placeholder="Your Company Name"
+                            disabled={updateSettingsMutation.isPending}
+                            className="flex-1"
+                          />
+                          <Button
+                            onClick={handleSaveSenderName}
+                            disabled={updateSettingsMutation.isPending || localSenderName === (birthdaySettings?.senderName || '')}
+                            size="sm"
+                            variant="outline"
+                            className="px-3"
+                          >
+                            <Save className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Promotion Selection */}
+                      <div>
+                        <Label className="text-sm">Promotion (Optional)</Label>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                          Select a promotion to include in birthday emails
+                        </p>
+                        <PromotionSelector
+                          selectedPromotions={selectedPromotions}
+                          onPromotionsChange={handlePromotionsChange}
+                          campaignType="birthday"
+                          onPromotionContentInsert={() => { }} // Not needed for birthday emails
+                        />
+                      </div>
+
+                    </div>
+                  </div>
+
+
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Sidebar Stats */}
+            <div className="space-y-6">
+              {/* Overview Stats */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    Overview
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Total Customers</span>
+                    <Badge variant="outline">{contacts.length}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">With Birthdays</span>
+                    <Badge variant="outline">{customersWithBirthdays.length}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Birthday Emails Enabled</span>
+                    <Badge variant="outline">
+                      {customersWithBirthdays.filter(c => c.birthdayEmailEnabled).length}
+                    </Badge>
+                  </div>
+
+                </CardContent>
+              </Card>
+
+              {/* Upcoming Birthdays */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CakeIcon className="h-5 w-5" />
+                    Upcoming Birthdays
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {upcomingBirthdays.length === 0 ? (
+                    <div className="text-center py-4">
+                      <CakeIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        No birthdays in the next 30 days
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {upcomingBirthdays.map((contact) => (
+                        <div key={contact.id} className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">{getContactName(contact)}</p>
+                            <p className="text-xs text-gray-500">
+                              {contact.birthday && new Date(contact.birthday).toLocaleDateString()}
+                            </p>
+                          </div>
+                          {contact.birthdayEmailEnabled ? (
                             <CheckCircle className="h-4 w-4 text-green-500" />
                           ) : (
                             <XCircle className="h-4 w-4 text-red-500" />
                           )}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleSendTestBirthdayCard(user.id)}
-                            disabled={sendTestBirthdayMutation.isPending}
-                            className="flex items-center gap-2"
-                          >
-                            <Mail className="h-4 w-4" />
-                            Send Test Card
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Customer Details Modal */}
-      <Dialog open={customerModalOpen} onOpenChange={setCustomerModalOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Customer Details
-            </DialogTitle>
-            <DialogDescription>
-              View customer information and activity
-            </DialogDescription>
-          </DialogHeader>
-          {selectedCustomer && (
-            <div className="space-y-4">
-              {/* Customer Basic Info */}
-              <div className="space-y-3">
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Name</Label>
-                  <p className="text-sm font-medium">{selectedCustomer.firstName || selectedCustomer.lastName ? `${selectedCustomer.firstName || ''} ${selectedCustomer.lastName || ''}`.trim() : 'No name provided'}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Email</Label>
-                  <p className="text-sm">{selectedCustomer.email}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Status</Label>
-                  <Badge className={`${selectedCustomer.status === 'active' ? 'bg-green-100 text-green-800' : 
-                    selectedCustomer.status === 'unsubscribed' ? 'bg-red-100 text-red-800' : 
-                    selectedCustomer.status === 'bounced' ? 'bg-yellow-100 text-yellow-800' : 
-                    'bg-gray-100 text-gray-800'}`}>
-                    {selectedCustomer.status}
-                  </Badge>
-                </div>
-                {selectedCustomer.birthday && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">Birthday</Label>
-                    <div className="flex items-center gap-2">
-                      <CakeIcon className="h-4 w-4 text-pink-500" />
-                      <span className="text-sm">{new Date(selectedCustomer.birthday).toLocaleDateString()}</span>
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                )}
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+
+
+
+        {/* Customers Tab */}
+        {activeTab === "customers" && (
+          <Card className="w-11/12">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  {t('birthdays.title')}
+                </CardTitle>
+                <Button onClick={handleAddCustomer}>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  {t('common.add')} Customer
+                </Button>
               </div>
-
-              <Separator />
-
-              {/* Activity Stats */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium text-gray-700">Email Activity</Label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-3 bg-blue-50 rounded-lg">
-                    <p className="text-2xl font-bold text-blue-600">{selectedCustomer.emailsSent}</p>
-                    <p className="text-xs text-blue-600">Emails Sent</p>
-                  </div>
-                  <div className="text-center p-3 bg-green-50 rounded-lg">
-                    <p className="text-2xl font-bold text-green-600">{selectedCustomer.emailsOpened}</p>
-                    <p className="text-xs text-green-600">Emails Opened</p>
-                  </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {/* Search and Filter Controls */}
+              <div className="flex items-center gap-4 p-6 border-b">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder={t('birthdays.filters.searchPlaceholder')}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
                 </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t('birthdays.filters.allStatuses')}</SelectItem>
+                    <SelectItem value="active">{t('birthdays.filters.active')}</SelectItem>
+                    <SelectItem value="unsubscribed">{t('birthdays.filters.unsubscribed')}</SelectItem>
+                    <SelectItem value="bounced">Bounced</SelectItem>
+                    <SelectItem value="pending">{t('birthdays.filters.pending')}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              {/* Tags */}
-              {selectedCustomer.tags && selectedCustomer.tags.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-700">Tags</Label>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedCustomer.tags.map((tag) => (
-                      <Badge key={tag.id} variant="outline" style={{ backgroundColor: tag.color + '20', borderColor: tag.color, color: tag.color }}>
-                        {tag.name}
-                      </Badge>
-                    ))}
+              {/* Bulk Actions */}
+              {selectedContacts.length > 0 && (
+                <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-4 border-b">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{selectedContacts.length} selected</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedContacts([])}
+                    >
+                      Clear Selection
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleBulkEnableBirthdayEmail}
+                      disabled={bulkUpdateBirthdayEmailMutation.isPending}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Enable Birthday Emails
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleBulkDisableBirthdayEmail}
+                      disabled={bulkUpdateBirthdayEmailMutation.isPending}
+                    >
+                      <XCircle className="h-4 w-4 mr-2" />
+                      Disable Birthday Emails
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem>
+                          <Download className="h-4 w-4 mr-2" />
+                          Export Selected
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="text-red-600">
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Remove Selected
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
               )}
 
-              {/* Dates */}
-              <div className="space-y-2">
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Added Date</Label>
-                  <p className="text-sm text-gray-600">{new Date(selectedCustomer.addedDate).toLocaleDateString()}</p>
+              {contactsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
                 </div>
-                {selectedCustomer.lastActivity && (
+              ) : contacts.length === 0 ? (
+                <div className="text-center py-12">
+                  <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">No customers found</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">Start by adding your first customer to begin managing birthday emails</p>
+                  <Button onClick={handleAddCustomer}>
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Add Your First Customer
+                  </Button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">
+                          <Checkbox
+                            checked={isAllSelected}
+                            onCheckedChange={handleSelectAll}
+                            aria-label="Select all customers"
+                          />
+                        </TableHead>
+                        <TableHead>{t('birthdays.table.name')}</TableHead>
+                        <TableHead>{t('birthdays.table.status')}</TableHead>
+                        <TableHead>{t('birthdays.table.birthday')}</TableHead>
+
+                        <TableHead>{t('birthdays.table.activity')}</TableHead>
+                        <TableHead>{t('birthdays.table.campaigns')}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {contacts.map((contact) => (
+                        <TableRow key={contact.id}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedContacts.includes(contact.id)}
+                              onCheckedChange={(checked) => handleSelectContact(contact.id, checked as boolean)}
+                              aria-label={`Select ${getContactName(contact)}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <button
+                                type="button"
+                                onClick={() => handleCustomerClick(contact)}
+                                className="font-medium text-left hover:text-blue-600 hover:underline transition-colors cursor-pointer"
+                              >
+                                {getContactName(contact)}
+                              </button>
+                              <p className="text-sm text-gray-500">{contact.email}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={getStatusColor(contact.status)}>
+                              {contact.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {contact.birthday ? (
+                              <button
+                                type="button"
+                                onClick={() => openBirthdayModal(contact.id)}
+                                className="flex items-center gap-2 text-left hover:bg-gray-50 p-1 rounded transition-colors"
+                              >
+                                <CakeIcon className="h-4 w-4 text-pink-500" />
+                                <span className="text-sm">{new Date(contact.birthday).toLocaleDateString()}</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => openBirthdayModal(contact.id)}
+                                className="text-gray-400 text-sm underline underline-offset-2 hover:text-gray-600"
+                              >
+                                {t('birthdays.table.notSet')}
+                              </button>
+                            )}
+                          </TableCell>
+
+                          <TableCell>
+                            <div className="text-sm">
+                              <p>{t('birthdays.table.sent')}: {contact.emailsSent}</p>
+                              <p>{t('birthdays.table.opened')}: {contact.emailsOpened}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {contact.birthday ? (
+                              <Switch
+                                checked={contact.birthdayEmailEnabled || false}
+                                onCheckedChange={() => handleToggleBirthdayEmail(contact.id, contact.birthdayEmailEnabled || false)}
+                                disabled={toggleBirthdayEmailMutation.isPending}
+                              />
+                            ) : (
+                              <span className="text-gray-400 text-sm">{t('birthdays.table.na')}</span>
+                            )}
+                          </TableCell>
+
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Test Tab */}
+        {activeTab === "test" && (
+          <Card className="w-11/12">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="h-5 w-5" />
+                  Test Birthday Cards
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                    Test Mode
+                  </Badge>
+                  <Badge variant="secondary">
+                    {users.length} Users
+                  </Badge>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Send test birthday cards to users individually or select multiple users for bulk sending. Test emails will be sent to the selected user's actual email address.
+              </p>
+            </CardHeader>
+            <CardContent className="p-0">
+              {/* Bulk Actions for Users */}
+              {selectedUsers.length > 0 && (
+                <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-4 border-b">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{selectedUsers.length} user(s) selected</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedUsers([])}
+                    >
+                      Clear Selection
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => {
+                        selectedUsers.forEach(userId => {
+                          handleSendTestBirthdayCard(userId);
+                        });
+                        setSelectedUsers([]);
+                      }}
+                      disabled={sendTestBirthdayMutation.isPending}
+                    >
+                      <Mail className="h-4 w-4 mr-2" />
+                      Send Test Cards to Selected
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {usersLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
+                </div>
+              ) : users.length === 0 ? (
+                <div className="text-center py-12">
+                  <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">No users found</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">No users available in your tenant for testing</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">
+                          <Checkbox
+                            checked={isAllUsersSelected}
+                            onCheckedChange={handleSelectAllUsers}
+                            aria-label="Select all users"
+                          />
+                        </TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Email Verified</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {users.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedUsers.includes(user.id)}
+                              onCheckedChange={(checked) => handleSelectUser(user.id, checked as boolean)}
+                              aria-label={`Select ${getUserName(user)}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">{getUserName(user)}</p>
+                              <p className="text-sm text-gray-500">ID: {user.id}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm">{user.email}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm capitalize">{user.role}</span>
+                          </TableCell>
+                          <TableCell>
+                            {user.emailVerified ? (
+                              <CheckCircle className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <XCircle className="h-4 w-4 text-red-500" />
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleSendTestBirthdayCard(user.id)}
+                              disabled={sendTestBirthdayMutation.isPending}
+                              className="flex items-center gap-2"
+                            >
+                              <Mail className="h-4 w-4" />
+                              Send Test Card
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Customer Details Modal */}
+        <Dialog open={customerModalOpen} onOpenChange={setCustomerModalOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Customer Details
+              </DialogTitle>
+              <DialogDescription>
+                View customer information and activity
+              </DialogDescription>
+            </DialogHeader>
+            {selectedCustomer && (
+              <div className="space-y-4">
+                {/* Customer Basic Info */}
+                <div className="space-y-3">
                   <div>
-                    <Label className="text-sm font-medium text-gray-700">Last Activity</Label>
-                    <p className="text-sm text-gray-600">{new Date(selectedCustomer.lastActivity).toLocaleDateString()}</p>
+                    <Label className="text-sm font-medium text-gray-700">Name</Label>
+                    <p className="text-sm font-medium">{selectedCustomer.firstName || selectedCustomer.lastName ? `${selectedCustomer.firstName || ''} ${selectedCustomer.lastName || ''}`.trim() : 'No name provided'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Email</Label>
+                    <p className="text-sm">{selectedCustomer.email}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Status</Label>
+                    <Badge className={`${selectedCustomer.status === 'active' ? 'bg-green-100 text-green-800' :
+                      selectedCustomer.status === 'unsubscribed' ? 'bg-red-100 text-red-800' :
+                        selectedCustomer.status === 'bounced' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-gray-100 text-gray-800'}`}>
+                      {selectedCustomer.status}
+                    </Badge>
+                  </div>
+                  {selectedCustomer.birthday && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">Birthday</Label>
+                      <div className="flex items-center gap-2">
+                        <CakeIcon className="h-4 w-4 text-pink-500" />
+                        <span className="text-sm">{new Date(selectedCustomer.birthday).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
+                {/* Activity Stats */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-700">Email Activity</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-3 bg-blue-50 rounded-lg">
+                      <p className="text-2xl font-bold text-blue-600">{selectedCustomer.emailsSent}</p>
+                      <p className="text-xs text-blue-600">Emails Sent</p>
+                    </div>
+                    <div className="text-center p-3 bg-green-50 rounded-lg">
+                      <p className="text-2xl font-bold text-green-600">{selectedCustomer.emailsOpened}</p>
+                      <p className="text-xs text-green-600">Emails Opened</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tags */}
+                {selectedCustomer.tags && selectedCustomer.tags.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-gray-700">Tags</Label>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedCustomer.tags.map((tag) => (
+                        <Badge key={tag.id} variant="outline" style={{ backgroundColor: tag.color + '20', borderColor: tag.color, color: tag.color }}>
+                          {tag.name}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 )}
-              </div>
 
-              {/* Action Button */}
-              <div className="flex justify-end pt-4">
-                <Button 
-                  onClick={() => {
-                    const customerId = selectedCustomer.id;
-                    // Immediately close modal and reset state
-                    setCustomerModalOpen(false);
-                    setSelectedCustomer(null);
-                    // Navigate after a brief delay to ensure smooth transition
-                    setTimeout(() => {
-                      setLocation(`/email-contacts/view/${customerId}?return=/birthdays?tab=customers`);
-                    }, 100);
+                {/* Dates */}
+                <div className="space-y-2">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Added Date</Label>
+                    <p className="text-sm text-gray-600">{new Date(selectedCustomer.addedDate).toLocaleDateString()}</p>
+                  </div>
+                  {selectedCustomer.lastActivity && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">Last Activity</Label>
+                      <p className="text-sm text-gray-600">{new Date(selectedCustomer.lastActivity).toLocaleDateString()}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Action Button */}
+                <div className="flex justify-end pt-4">
+                  <Button
+                    onClick={() => {
+                      const customerId = selectedCustomer.id;
+                      // Immediately close modal and reset state
+                      setCustomerModalOpen(false);
+                      setSelectedCustomer(null);
+                      // Navigate after a brief delay to ensure smooth transition
+                      setTimeout(() => {
+                        setLocation(`/email-contacts/view/${customerId}?return=/birthdays?tab=customers`);
+                      }, 100);
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <Eye className="h-4 w-4" />
+                    View Full Profile
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Birthday Modal */}
+        <Dialog open={birthdayModalOpen} onOpenChange={setBirthdayModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                {birthdayContactId && contacts.find(c => c.id === birthdayContactId)?.birthday
+                  ? t('birthdays.modal.editTitle')
+                  : t('birthdays.modal.addTitle')}
+              </DialogTitle>
+              <DialogDescription>
+                {birthdayContactId && contacts.find(c => c.id === birthdayContactId)?.birthday
+                  ? t('birthdays.modal.editDescription')
+                  : t('birthdays.modal.addDescription')}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="birthday-date">Birthday Date</Label>
+                <Input
+                  id="birthday-date"
+                  type="date"
+                  value={birthdayDraft ? birthdayDraft.toISOString().split('T')[0] : ''}
+                  onChange={(e) => {
+                    const date = e.target.value ? new Date(e.target.value) : undefined;
+                    setBirthdayDraft(date);
                   }}
-                  className="flex items-center gap-2"
-                >
-                  <Eye className="h-4 w-4" />
-                  View Full Profile
-                </Button>
+                  max={new Date().toISOString().split('T')[0]}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setBirthdayModalOpen(false)}>{t('birthdays.modal.cancel')}</Button>
+                <Button onClick={saveBirthday} disabled={!birthdayDraft || !birthdayContactId || updateContactBirthdayMutation.isPending}>{t('birthdays.modal.save')}</Button>
               </div>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Birthday Modal */}
-      <Dialog open={birthdayModalOpen} onOpenChange={setBirthdayModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {birthdayContactId && contacts.find(c => c.id === birthdayContactId)?.birthday 
-                ? t('birthdays.modal.editTitle')
-                : t('birthdays.modal.addTitle')}
-            </DialogTitle>
-            <DialogDescription>
-              {birthdayContactId && contacts.find(c => c.id === birthdayContactId)?.birthday 
-                ? t('birthdays.modal.editDescription')
-                : t('birthdays.modal.addDescription')}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="birthday-date">Birthday Date</Label>
-              <Input
-                id="birthday-date"
-                type="date"
-                value={birthdayDraft ? birthdayDraft.toISOString().split('T')[0] : ''}
-                onChange={(e) => {
-                  const date = e.target.value ? new Date(e.target.value) : undefined;
-                  setBirthdayDraft(date);
-                }}
-                max={new Date().toISOString().split('T')[0]}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setBirthdayModalOpen(false)}>{t('birthdays.modal.cancel')}</Button>
-              <Button onClick={saveBirthday} disabled={!birthdayDraft || !birthdayContactId || updateContactBirthdayMutation.isPending}>{t('birthdays.modal.save')}</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   );
 }

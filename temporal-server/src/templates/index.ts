@@ -4,7 +4,7 @@ export type BirthdayTemplateId = 'default' | 'confetti' | 'balloons' | 'custom';
 
 export function renderBirthdayTemplate(
   template: BirthdayTemplateId,
-  params: { recipientName?: string; message?: string; imageUrl?: string; brandName?: string; customThemeData?: any; senderName?: string; promotionContent?: string }
+  params: { recipientName?: string; message?: string; imageUrl?: string; brandName?: string; customThemeData?: any; senderName?: string }
 ): string {
   // Handle custom theme with rich styling
   if (template === 'custom' && params.customThemeData) {
@@ -128,7 +128,6 @@ export function renderBirthdayTemplate(
         </div>
         <div style="padding: 30px;">
           <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">${params.message || 'Wishing you a wonderful day!'}</div>
-          ${params.promotionContent ? `<div style="margin-top: 30px; padding: 20px; background: #f7fafc; border-radius: 8px; border-left: 4px solid ${colors.primary}; text-align: left;">${params.promotionContent}</div>` : ''}
           ${signature ? `<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">${signature}</div>` : ''}
           ${params.senderName ? `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #718096; font-size: 0.9rem;">Best wishes from ${params.senderName}</div>` : ''}
         </div>
