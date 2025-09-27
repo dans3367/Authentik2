@@ -4,7 +4,17 @@ export type BirthdayTemplateId = 'default' | 'confetti' | 'balloons' | 'custom';
 
 export function renderBirthdayTemplate(
   template: BirthdayTemplateId,
-  params: { recipientName?: string; message?: string; imageUrl?: string; brandName?: string; customThemeData?: any; senderName?: string }
+  params: { 
+    recipientName?: string; 
+    message?: string; 
+    imageUrl?: string; 
+    brandName?: string; 
+    customThemeData?: any; 
+    senderName?: string;
+    promotionContent?: string;
+    promotionTitle?: string;
+    promotionDescription?: string;
+  }
 ): string {
   // Handle custom theme with rich styling
   if (template === 'custom' && params.customThemeData) {
@@ -53,7 +63,13 @@ export function renderBirthdayTemplate(
           </div>
           <div style="padding: 30px;">
             <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; margin-bottom: 20px;">${message}</div>
-            ${params.promotionContent ? `<div style="margin-top: 30px; padding: 20px; background: #f7fafc; border-radius: 8px; border-left: 4px solid #667eea;">${params.promotionContent}</div>` : ''}
+            ${params.promotionContent ? `
+              <div style="margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border-radius: 8px; border-left: 4px solid #667eea;">
+                ${params.promotionTitle ? `<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">${params.promotionTitle}</h3>` : ''}
+                ${params.promotionDescription ? `<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${params.promotionDescription}</p>` : ''}
+                <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${params.promotionContent}</div>
+              </div>
+            ` : ''}
             ${signature ? `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-style: italic; color: #718096;">${signature}</div>` : ''}
             ${params.senderName ? `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #718096; font-size: 0.9rem;">Best wishes from ${params.senderName}</div>` : ''}
           </div>
@@ -128,6 +144,13 @@ export function renderBirthdayTemplate(
         </div>
         <div style="padding: 30px;">
           <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">${params.message || 'Wishing you a wonderful day!'}</div>
+          ${params.promotionContent ? `
+            <div style="margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border-radius: 8px; border-left: 4px solid ${colors.primary};">
+              ${params.promotionTitle ? `<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">${params.promotionTitle}</h3>` : ''}
+              ${params.promotionDescription ? `<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${params.promotionDescription}</p>` : ''}
+              <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${params.promotionContent}</div>
+            </div>
+          ` : ''}
           ${signature ? `<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">${signature}</div>` : ''}
           ${params.senderName ? `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #718096; font-size: 0.9rem;">Best wishes from ${params.senderName}</div>` : ''}
         </div>

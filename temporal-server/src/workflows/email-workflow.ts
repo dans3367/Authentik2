@@ -103,6 +103,8 @@ export async function emailWorkflow(
             customThemeData: input.metadata?.customThemeData,
             senderName: input.metadata?.senderName || 'Your Team',
             promotionContent: input.metadata?.promotionContent,
+            promotionTitle: input.metadata?.promotionTitle,
+            promotionDescription: input.metadata?.promotionDescription,
           });
           workflowLogger.info(`🎂 Rendered birthday template: ${input.metadata.birthdayTemplate}`);
         } catch (e: any) {
@@ -116,6 +118,8 @@ export async function emailWorkflow(
               customThemeData: input.metadata?.customThemeData,
               senderName: input.metadata?.senderName || 'Your Team',
               promotionContent: input.metadata?.promotionContent,
+              promotionTitle: input.metadata?.promotionTitle,
+              promotionDescription: input.metadata?.promotionDescription,
             });
             workflowLogger.info(`🎂 Fallback rendered birthday template: ${input.metadata.birthdayTemplate}`);
           } catch (fallbackError: any) {

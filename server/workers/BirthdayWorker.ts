@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import { db } from '../db';
-import { emailContacts, birthdaySettings } from '@shared/schema';
+import { emailContacts, birthdaySettings, promotions } from '@shared/schema';
 import { eq, and, sql, isNotNull } from 'drizzle-orm';
 import { enhancedEmailService } from '../emailService';
 
@@ -18,6 +18,13 @@ export interface BirthdayJob {
     customMessage?: string;
     customThemeData?: string;
     senderName?: string;
+    promotionId?: string;
+  };
+  promotion?: {
+    id: string;
+    title: string;
+    content: string;
+    description?: string;
   };
   createdAt: Date;
 }
@@ -183,9 +190,12 @@ export class BirthdayWorker extends EventEmitter {
 
   private async processTenantBirthdays(tenantId: string, contacts: any[]): Promise<void> {
     try {
-      // Get birthday settings for this tenant
+      // Get birthday settings for this tenant with promotion data
       const settings = await db.query.birthdaySettings.findFirst({
         where: eq(birthdaySettings.tenantId, tenantId),
+        with: {
+          promotion: true,
+        },
       });
 
       if (!settings || !settings.enabled) {
@@ -196,7 +206,7 @@ export class BirthdayWorker extends EventEmitter {
       // Create birthday jobs for each contact
       for (const contact of contacts) {
         const jobId = this.createBirthdayJob(contact, settings);
-        console.log(`🎂 [BirthdayWorker] Created birthday job ${jobId} for ${contact.email}`);
+        console.log(`🎂 [BirthdayWorker] Created birthday job ${jobId} for ${contact.email}${settings.promotion ? ' with promotion' : ''}`);
       }
 
       // Process jobs in batches
@@ -223,7 +233,14 @@ export class BirthdayWorker extends EventEmitter {
         customMessage: settings.customMessage || '',
         customThemeData: settings.customThemeData || null,
         senderName: settings.senderName || '',
+        promotionId: settings.promotionId || null,
       },
+      promotion: settings.promotion ? {
+        id: settings.promotion.id,
+        title: settings.promotion.title,
+        content: settings.promotion.content,
+        description: settings.promotion.description,
+      } : undefined,
       createdAt: new Date(),
     };
 
@@ -283,6 +300,9 @@ export class BirthdayWorker extends EventEmitter {
         brandName: job.tenantName || 'Your Company',
         customThemeData: job.settings.customThemeData ? JSON.parse(job.settings.customThemeData) : null,
         senderName: job.settings.senderName || 'Your Team',
+        promotionContent: job.promotion?.content,
+        promotionTitle: job.promotion?.title,
+        promotionDescription: job.promotion?.description,
       });
 
       // Send the birthday email
@@ -326,7 +346,16 @@ export class BirthdayWorker extends EventEmitter {
 
   private renderBirthdayTemplate(
     template: 'default' | 'confetti' | 'balloons' | 'custom',
-    params: { recipientName?: string; message?: string; brandName?: string; customThemeData?: any; senderName?: string }
+    params: { 
+      recipientName?: string; 
+      message?: string; 
+      brandName?: string; 
+      customThemeData?: any; 
+      senderName?: string;
+      promotionContent?: string;
+      promotionTitle?: string;
+      promotionDescription?: string;
+    }
   ): string {
     // This is a simplified version - you might want to import the actual template renderer
     // from your existing birthday template system
@@ -341,6 +370,18 @@ export class BirthdayWorker extends EventEmitter {
     const headline = `Happy Birthday${params.recipientName ? ', ' + params.recipientName : ''}!`;
     const fromMessage = params.senderName || params.brandName || 'The Team';
 
+    // Build promotion section if promotion content exists
+    let promotionSection = '';
+    if (params.promotionContent) {
+      promotionSection = `
+        <div style="margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border-radius: 8px; border-left: 4px solid ${colors.primary};">
+          ${params.promotionTitle ? `<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">${params.promotionTitle}</h3>` : ''}
+          ${params.promotionDescription ? `<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${params.promotionDescription}</p>` : ''}
+          <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${params.promotionContent}</div>
+        </div>
+      `;
+    }
+
     return `<html>
       <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%);">
         <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
@@ -349,6 +390,7 @@ export class BirthdayWorker extends EventEmitter {
           </div>
           <div style="padding: 30px;">
             <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">${params.message || 'Wishing you a wonderful day!'}</div>
+            ${promotionSection}
           </div>
           <div style="padding: 20px 30px 30px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
             <div style="font-size: 0.9rem; color: #718096;">

@@ -12,7 +12,7 @@ export class TemporalService {
 
   async connect(): Promise<void> {
     try {
-      const serverUrl = process.env.TEMPORAL_ADDRESS || '172.18.0.5:7233';
+      const serverUrl = process.env.TEMPORAL_ADDRESS || process.env.TEMPORAL_HOST || '172.18.0.5:7233';
       const namespace = process.env.TEMPORAL_NAMESPACE || 'default';
 
       console.log(`Connecting to Temporal server at ${serverUrl}`);

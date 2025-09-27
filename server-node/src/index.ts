@@ -49,7 +49,17 @@ type BirthdayTemplateId = 'default' | 'confetti' | 'balloons' | 'custom';
 
 function renderBirthdayTemplate(
   template: BirthdayTemplateId,
-  params: { recipientName?: string; message?: string; imageUrl?: string; brandName?: string; customThemeData?: any; senderName?: string }
+  params: { 
+    recipientName?: string; 
+    message?: string; 
+    imageUrl?: string; 
+    brandName?: string; 
+    customThemeData?: any; 
+    senderName?: string;
+    promotionContent?: string;
+    promotionTitle?: string;
+    promotionDescription?: string;
+  }
 ): string {
   console.log('🎂 [renderBirthdayTemplate] Called with template:', template);
 
@@ -104,6 +114,13 @@ function renderBirthdayTemplate(
           <!-- 3. Content Area (message) -->
           <div style="padding: 30px;">
             <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">${message}</div>
+            ${params.promotionContent ? `
+              <div style="margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border-radius: 8px; border-left: 4px solid #667eea;">
+                ${params.promotionTitle ? `<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">${params.promotionTitle}</h3>` : ''}
+                ${params.promotionDescription ? `<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${params.promotionDescription}</p>` : ''}
+                <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${params.promotionContent}</div>
+              </div>
+            ` : ''}
             ${signature ? `<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">${signature}</div>` : ''}
           </div>
           
@@ -189,6 +206,13 @@ function renderBirthdayTemplate(
         <!-- 3. Content Area (message) -->
         <div style="padding: 30px;">
           <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">${params.message || 'Wishing you a wonderful day!'}</div>
+          ${params.promotionContent ? `
+            <div style="margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border-radius: 8px; border-left: 4px solid ${colors.primary};">
+              ${params.promotionTitle ? `<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">${params.promotionTitle}</h3>` : ''}
+              ${params.promotionDescription ? `<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${params.promotionDescription}</p>` : ''}
+              <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${params.promotionContent}</div>
+            </div>
+          ` : ''}
           ${signature ? `<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">${signature}</div>` : ''}
         </div>
         
@@ -766,15 +790,32 @@ app.post('/api/birthday-test', async (req: any, res) => {
     console.log(`🎂 Starting test birthday card workflow for user ${userId} (${userEmail})`);
     console.log(`🏢 Using tenant ID: ${tenantId}`);
 
-    // Fetch birthday settings for the tenant to get selected template
+    // Fetch birthday settings for the tenant to get selected template and promotion data
     let birthdaySettingsData;
+    let promotionData = null;
     try {
       const settings = await db.select().from(birthdaySettings).where(eq(birthdaySettings.tenantId, tenantId)).limit(1);
       birthdaySettingsData = settings.length > 0 ? settings[0] : null;
+      
+      // Fetch promotion data if promotionId exists
+      if (birthdaySettingsData?.promotionId) {
+        const promotions = pgTable("promotions", {
+          id: varchar("id").primaryKey(),
+          title: text("title").notNull(),
+          content: text("content").notNull(),
+          description: text("description"),
+        });
+        
+        const promotionResult = await db.select().from(promotions).where(eq(promotions.id, birthdaySettingsData.promotionId)).limit(1);
+        promotionData = promotionResult.length > 0 ? promotionResult[0] : null;
+      }
+      
       console.log(`🎨 Birthday settings found:`, birthdaySettingsData ? 'Yes' : 'No');
+      console.log(`🎁 Promotion data found:`, promotionData ? `Yes (${promotionData.title})` : 'No');
     } catch (error) {
       console.warn('Failed to fetch birthday settings, using defaults:', error);
       birthdaySettingsData = null;
+      promotionData = null;
     }
 
     // Prepare template parameters
@@ -829,7 +870,10 @@ app.post('/api/birthday-test', async (req: any, res) => {
           message: finalCustomMessage,
           brandName: tenantName || 'Your Company',
           customThemeData: finalCustomThemeData,
-          senderName: finalSenderName
+          senderName: finalSenderName,
+          promotionContent: promotionData?.content || undefined,
+          promotionTitle: promotionData?.title || undefined,
+          promotionDescription: promotionData?.description || undefined,
         });
 
         // Generate unique workflow ID
@@ -858,6 +902,10 @@ app.post('/api/birthday-test', async (req: any, res) => {
             senderName: finalSenderName,
             templateUsed: selectedTemplate,
             hasCustomTheme: finalCustomThemeData !== null,
+            promotionContent: promotionData?.content || undefined,
+            promotionTitle: promotionData?.title || undefined,
+            promotionDescription: promotionData?.description || undefined,
+            promotionId: promotionData?.id || undefined,
             preRendered: true // Mark that content was pre-rendered
           }
         };
@@ -899,7 +947,10 @@ app.post('/api/birthday-test', async (req: any, res) => {
         message: finalCustomMessage,
         brandName: tenantName || 'Your Company',
         customThemeData: finalCustomThemeData,
-        senderName: finalSenderName
+        senderName: finalSenderName,
+        promotionContent: promotionData?.content || undefined,
+        promotionTitle: promotionData?.title || undefined,
+        promotionDescription: promotionData?.description || undefined,
       });
 
       console.log('📧 Template rendered, HTML length:', htmlContent.length);
