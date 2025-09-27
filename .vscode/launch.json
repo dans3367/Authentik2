@@ -1,0 +1,80 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Server Node (tsx)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/server-node/src/index.ts",
+      "cwd": "${workspaceFolder}/server-node",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "--inspect"],
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "restart": true,
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Debug Server Node (tsx-brk)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/server-node/src/index.ts",
+      "cwd": "${workspaceFolder}/server-node",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "--inspect-brk"],
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "restart": true,
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Debug Server Node (Built)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/server-node/dist/index.js",
+      "cwd": "${workspaceFolder}/server-node",
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "restart": true,
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/server-node/dist/**/*.js"],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Attach to Server Node",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "restart": true,
+      "localRoot": "${workspaceFolder}/server-node",
+      "remoteRoot": "/home/root/Authentik/server-node",
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/server-node/dist/**/*.js"],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    }
+  ]
+}

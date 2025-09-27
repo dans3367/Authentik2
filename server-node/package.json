@@ -5,6 +5,10 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "debug": "tsx --inspect src/index.ts",
+    "debug-brk": "tsx --inspect-brk src/index.ts",
+    "debug-built": "node --inspect dist/index.js",
+    "debug-built-brk": "node --inspect-brk dist/index.js",
     "worker": "tsx src/temporal/worker.ts",
     "build": "tsc",
     "start": "node dist/index.js",
