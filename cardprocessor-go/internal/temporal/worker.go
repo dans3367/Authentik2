@@ -8,8 +8,10 @@ import (
 func registerActivities(w worker.Worker) {
 	// Register birthday test activities
 	w.RegisterActivity(PrepareBirthdayTestEmail)
+	w.RegisterActivity(PrepareBirthdayTestEmailWithPromotion)
 	w.RegisterActivity(SendBirthdayTestEmail)
 	w.RegisterActivity(UpdateBirthdayTestStatus)
+	w.RegisterActivity(FetchPromotionData)
 
 	// Register birthday invitation activities
 	w.RegisterActivity(PrepareBirthdayInvitationEmail)
@@ -21,4 +23,7 @@ func registerActivities(w worker.Worker) {
 	w.RegisterWorkflow(BirthdayTestWorkflow)
 	w.RegisterWorkflow(BirthdayInvitationWorkflow)
 }
+
+
+
 

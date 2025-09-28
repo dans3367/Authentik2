@@ -620,3 +620,56 @@ func (r *Repository) GetTenant(tenantID string) (*models.Tenant, error) {
 
 	return &tenant, nil
 }
+
+// GetPromotion retrieves a promotion by ID and tenant ID
+func (r *Repository) GetPromotion(ctx context.Context, promotionID, tenantID string) (*models.Promotion, error) {
+	query := `
+		SELECT id, tenant_id, user_id, title, description, content, type, 
+		       target_audience, is_active, usage_count, max_uses, valid_from, 
+		       valid_to, created_at, updated_at
+		FROM promotions 
+		WHERE id = $1 AND tenant_id = $2 AND is_active = true
+	`
+
+	var promotion models.Promotion
+	err := r.db.QueryRowContext(ctx, query, promotionID, tenantID).Scan(
+		&promotion.ID,
+		&promotion.TenantID,
+		&promotion.UserID,
+		&promotion.Title,
+		&promotion.Description,
+		&promotion.Content,
+		&promotion.Type,
+		&promotion.TargetAudience,
+		&promotion.IsActive,
+		&promotion.UsageCount,
+		&promotion.MaxUses,
+		&promotion.ValidFrom,
+		&promotion.ValidTo,
+		&promotion.CreatedAt,
+		&promotion.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // No promotion found
+		}
+		return nil, fmt.Errorf("failed to get promotion: %w", err)
+	}
+
+	// Check if promotion is valid (within date range if specified)
+	now := time.Now()
+	if promotion.ValidFrom != nil && now.Before(*promotion.ValidFrom) {
+		return nil, nil // Promotion not yet valid
+	}
+	if promotion.ValidTo != nil && now.After(*promotion.ValidTo) {
+		return nil, nil // Promotion expired
+	}
+
+	// Check if promotion has reached max uses
+	if promotion.MaxUses != nil && promotion.UsageCount >= *promotion.MaxUses {
+		return nil, nil // Promotion max uses reached
+	}
+
+	return &promotion, nil
+}

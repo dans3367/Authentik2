@@ -462,6 +462,16 @@ func (h *BirthdayHandler) SendTestBirthdayCard(c *gin.Context) {
 		fmt.Printf("🎂 [Birthday Test] Temporal client connected: %v\n", h.temporalClient.IsConnected())
 	}
 
+	// Fetch birthday settings to get promotion ID
+	var promotionID string
+	birthdaySettings, err := h.repo.GetBirthdaySettings(context.Background(), tenantID)
+	if err != nil {
+		fmt.Printf("⚠️ [Birthday Test] Failed to fetch birthday settings: %v\n", err)
+	} else if birthdaySettings != nil && birthdaySettings.PromotionID != nil {
+		promotionID = *birthdaySettings.PromotionID
+		fmt.Printf("🎁 [Birthday Test] Found promotion ID in settings: %s\n", promotionID)
+	}
+
 	// If temporal client is available, use workflow; otherwise, send directly
 	if h.temporalClient != nil && h.temporalClient.IsConnected() {
 		fmt.Printf("🎂 [Birthday Test] Using Temporal workflow\n")
@@ -479,6 +489,7 @@ func (h *BirthdayHandler) SendTestBirthdayCard(c *gin.Context) {
 			CustomMessage:   req.CustomMessage,
 			CustomThemeData: customThemeData,
 			SenderName:      req.SenderName,
+			PromotionID:     promotionID,
 			IsTest:          true,
 		}
 

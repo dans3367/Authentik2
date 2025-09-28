@@ -103,17 +103,17 @@ func Load() *Config {
 		},
 
 		// Server
-		Port:    getEnv("PORT", "5003"),
+		Port:    getEnv("PORT", "5004"),
 		GinMode: getEnv("GIN_MODE", "release"),
 		Server: ServerConfig{
-			Port:        getEnv("PORT", "5003"),
+			Port:        getEnv("PORT", "5004"),
 			Environment: getEnv("ENVIRONMENT", "development"),
 		},
 
 		// JWT
-		JWTSecret: getEnv("JWT_SECRET", "your-jwt-secret-key-here"),
+		JWTSecret: getEnv("JWT_SECRET", "your-jwt-secret-key-here23424242342423347"),
 		JWT: JWTConfig{
-			Secret: getEnv("JWT_SECRET", "your-jwt-secret-key-here"),
+			Secret: getEnv("JWT_SECRET", "your-jwt-secret-key-here234242423424237"),
 		},
 
 		// Email providers

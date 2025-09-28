@@ -156,11 +156,11 @@ export default function BirthdaysPage() {
   const accessToken = tokenData?.token;
 
   // Initialize activeTab based on URL parameter or default to "themes"
-  const [activeTab, setActiveTab] = useState<"themes" | "settings" | "customers" | "test">(() => {
+  const [activeTab, setActiveTab] = useState<"themes" | "settings" | "customers" | "test" | "promotions">(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tab = urlParams.get('tab');
-    if (tab && ['themes', 'settings', 'customers', 'test'].includes(tab)) {
-      return tab as "themes" | "settings" | "customers" | "test";
+    if (tab && ['themes', 'settings', 'customers', 'test', 'promotions'].includes(tab)) {
+      return tab as "themes" | "settings" | "customers" | "test" | "promotions";
     }
     return "themes";
   });
@@ -201,8 +201,8 @@ export default function BirthdaysPage() {
     const handlePopState = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const tab = urlParams.get('tab');
-      if (tab && ['themes', 'settings', 'customers', 'test'].includes(tab)) {
-        setActiveTab(tab as "themes" | "settings" | "customers" | "test");
+      if (tab && ['themes', 'settings', 'customers', 'test', 'promotions'].includes(tab)) {
+        setActiveTab(tab as "themes" | "settings" | "customers" | "test" | "promotions");
       } else {
         setActiveTab("themes");
       }
@@ -989,6 +989,15 @@ export default function BirthdaysPage() {
             )}
           </Button>
           <Button
+            variant={activeTab === "promotions" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setActiveTab("promotions")}
+            className="flex items-center gap-2"
+          >
+            <Gift className="h-4 w-4" />
+            Promotions
+          </Button>
+          <Button
             variant={activeTab === "test" ? "default" : "ghost"}
             size="sm"
             onClick={() => setActiveTab("test")}
@@ -1492,19 +1501,6 @@ export default function BirthdaysPage() {
                         </div>
                       </div>
 
-                      {/* Promotion Selection */}
-                      <div>
-                        <Label className="text-sm">Promotion (Optional)</Label>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                          Select a promotion to include in birthday emails
-                        </p>
-                        <PromotionSelector
-                          selectedPromotions={selectedPromotions}
-                          onPromotionsChange={handlePromotionsChange}
-                          campaignType="birthday"
-                          onPromotionContentInsert={() => { }} // Not needed for birthday emails
-                        />
-                      </div>
 
                     </div>
                   </div>
@@ -1922,6 +1918,62 @@ export default function BirthdaysPage() {
                   </Table>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Promotions Tab */}
+        {activeTab === "promotions" && (
+          <Card className="w-11/12">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gift className="h-5 w-5" />
+                Promotions
+              </CardTitle>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Select promotions to include in birthday emails
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Promotion Selection */}
+                <div>
+                  <Label className="text-sm font-medium">Promotion (Optional)</Label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                    Select a promotion to include in birthday emails. This will add promotional content to your birthday cards.
+                  </p>
+                  <PromotionSelector
+                    selectedPromotions={selectedPromotions}
+                    onPromotionsChange={handlePromotionsChange}
+                    campaignType="birthday"
+                    onPromotionContentInsert={() => { }} // Not needed for birthday emails
+                  />
+                </div>
+
+                {/* Promotion Preview */}
+                {selectedPromotions.length > 0 && birthdaySettings?.promotion && (
+                  <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <h4 className="text-sm font-medium mb-2">Selected Promotion Preview</h4>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">{birthdaySettings.promotion.title}</p>
+                      {birthdaySettings.promotion.description && (
+                        <p className="text-xs text-gray-600 dark:text-gray-400">{birthdaySettings.promotion.description}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Help Text */}
+                <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">How Promotions Work</h4>
+                  <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1">
+                    <li>• Promotions are automatically included in birthday email templates</li>
+                    <li>• Only one promotion can be active at a time</li>
+                    <li>• Promotions will appear alongside your birthday message</li>
+                    <li>• You can change or remove promotions at any time</li>
+                  </ul>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}

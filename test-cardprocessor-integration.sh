@@ -93,3 +93,6 @@ echo "2. Start the frontend: cd client && npm run dev"
 echo "3. Test the birthday test functionality in the UI"
 echo "4. Check Temporal worker logs for workflow execution"
 
+
+
+

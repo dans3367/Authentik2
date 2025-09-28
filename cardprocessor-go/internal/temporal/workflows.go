@@ -3,6 +3,8 @@ package temporal
 import (
 	"time"
 
+	"cardprocessor-go/internal/models"
+
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
@@ -20,6 +22,7 @@ type BirthdayTestWorkflowInput struct {
 	CustomMessage   string                 `json:"customMessage"`
 	CustomThemeData map[string]interface{} `json:"customThemeData"`
 	SenderName      string                 `json:"senderName"`
+	PromotionID     string                 `json:"promotionId"`
 	IsTest          bool                   `json:"isTest"`
 }
 
@@ -60,7 +63,8 @@ type BirthdayInvitationWorkflowResult struct {
 // BirthdayTestWorkflow implements the birthday test card workflow
 func BirthdayTestWorkflow(ctx workflow.Context, input BirthdayTestWorkflowInput) (BirthdayTestWorkflowResult, error) {
 	logger := workflow.GetLogger(ctx)
-	logger.Info("🎂 Starting birthday test workflow", "userId", input.UserID, "email", input.UserEmail)
+	userIDinfo := input.UserID
+	logger.Info("🎂 Starting birthday test workflow", "userId", input.UserID, "email", input.UserEmail, userIDinfo)
 
 	// Set activity options
 	activityOptions := workflow.ActivityOptions{
@@ -75,9 +79,31 @@ func BirthdayTestWorkflow(ctx workflow.Context, input BirthdayTestWorkflowInput)
 	}
 	ctx = workflow.WithActivityOptions(ctx, activityOptions)
 
-	// Step 1: Prepare birthday test email content
+	// Step 1: Fetch promotion data if promotion ID is provided
+	var promotion *models.Promotion
+	if input.PromotionID != "" {
+		err := workflow.ExecuteActivity(ctx, FetchPromotionData, FetchPromotionInput{
+			PromotionID: input.PromotionID,
+			TenantID:    input.TenantID,
+		}).Get(ctx, &promotion)
+		if err != nil {
+			logger.Error("Failed to fetch promotion data", "error", err)
+			// Continue without promotion rather than failing the entire workflow
+			promotion = nil
+		}
+	}
+
+	// Step 2: Prepare birthday test email content with promotion data
+	enrichedInput := input
+	if promotion != nil {
+		logger.Info("Including promotion in birthday test email", "promotionId", promotion.ID, "title", promotion.Title)
+	}
+
 	var emailContent EmailContent
-	err := workflow.ExecuteActivity(ctx, PrepareBirthdayTestEmail, input).Get(ctx, &emailContent)
+	err := workflow.ExecuteActivity(ctx, PrepareBirthdayTestEmailWithPromotion, PrepareBirthdayTestEmailInput{
+		WorkflowInput: enrichedInput,
+		Promotion:     promotion,
+	}).Get(ctx, &emailContent)
 	if err != nil {
 		logger.Error("Failed to prepare birthday test email", "error", err)
 		return BirthdayTestWorkflowResult{
@@ -88,7 +114,7 @@ func BirthdayTestWorkflow(ctx workflow.Context, input BirthdayTestWorkflowInput)
 		}, nil
 	}
 
-	// Step 2: Send birthday test email
+	// Step 3: Send birthday test email
 	var sendResult EmailSendResult
 	err = workflow.ExecuteActivity(ctx, SendBirthdayTestEmail, emailContent).Get(ctx, &sendResult)
 	if err != nil {

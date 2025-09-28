@@ -204,6 +204,25 @@ type SendBirthdayInvitationRequest struct {
 	LastName  string `json:"lastName"`
 }
 
+// Promotion represents a promotion in the promotions table
+type Promotion struct {
+	ID             string     `json:"id" db:"id"`
+	TenantID       string     `json:"tenantId" db:"tenant_id"`
+	UserID         string     `json:"userId" db:"user_id"`
+	Title          string     `json:"title" db:"title"`
+	Description    *string    `json:"description" db:"description"`
+	Content        string     `json:"content" db:"content"`
+	Type           string     `json:"type" db:"type"`
+	TargetAudience string     `json:"targetAudience" db:"target_audience"`
+	IsActive       bool       `json:"isActive" db:"is_active"`
+	UsageCount     int        `json:"usageCount" db:"usage_count"`
+	MaxUses        *int       `json:"maxUses" db:"max_uses"`
+	ValidFrom      *time.Time `json:"validFrom" db:"valid_from"`
+	ValidTo        *time.Time `json:"validTo" db:"valid_to"`
+	CreatedAt      time.Time  `json:"createdAt" db:"created_at"`
+	UpdatedAt      time.Time  `json:"updatedAt" db:"updated_at"`
+}
+
 // SendTestBirthdayCardRequest represents test birthday card request
 type SendTestBirthdayCardRequest struct {
 	UserEmail       string      `json:"userEmail"`

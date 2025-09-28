@@ -43,3 +43,6 @@ VITE_BETTER_AUTH_URL=
 
 The frontend will automatically use the configured URLs for API calls. If no environment variables are set, it will use the default localhost URLs.
 
+
+
+

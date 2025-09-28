@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"cardprocessor-go/internal/config"
+	"cardprocessor-go/internal/models"
 	"cardprocessor-go/internal/repository"
 
 	"go.temporal.io/sdk/activity"
@@ -98,6 +99,64 @@ type UpdateStatusInput struct {
 	InvitationSent  bool   `json:"invitationSent,omitempty"`
 	InvitationToken string `json:"invitationToken,omitempty"`
 	SentAt          string `json:"sentAt"`
+}
+
+// FetchPromotionInput represents input for fetching promotion data
+type FetchPromotionInput struct {
+	PromotionID string `json:"promotionId"`
+	TenantID    string `json:"tenantId"`
+}
+
+// FetchPromotionData fetches promotion data for birthday cards
+func FetchPromotionData(ctx context.Context, input FetchPromotionInput) (*models.Promotion, error) {
+	logger := activity.GetLogger(ctx)
+	logger.Info("🎁 Fetching promotion data", "promotionId", input.PromotionID, "tenantId", input.TenantID)
+
+	if input.PromotionID == "" {
+		logger.Info("No promotion ID provided, skipping promotion fetch")
+		return nil, nil
+	}
+
+	promotion, err := activityDeps.Repo.GetPromotion(ctx, input.PromotionID, input.TenantID)
+	if err != nil {
+		logger.Error("Failed to fetch promotion", "error", err)
+		return nil, fmt.Errorf("failed to fetch promotion: %w", err)
+	}
+
+	if promotion == nil {
+		logger.Info("No active promotion found", "promotionId", input.PromotionID)
+		return nil, nil
+	}
+
+	logger.Info("✅ Promotion fetched successfully", "promotionId", promotion.ID, "title", promotion.Title)
+	return promotion, nil
+}
+
+// PrepareBirthdayTestEmailInput represents input for preparing birthday test email with promotion
+type PrepareBirthdayTestEmailInput struct {
+	WorkflowInput BirthdayTestWorkflowInput `json:"workflowInput"`
+	Promotion     *models.Promotion         `json:"promotion"`
+}
+
+// PrepareBirthdayTestEmailWithPromotion prepares birthday test email content with promotion data
+func PrepareBirthdayTestEmailWithPromotion(ctx context.Context, input PrepareBirthdayTestEmailInput) (EmailContent, error) {
+	logger := activity.GetLogger(ctx)
+	logger.Info("📧 Preparing birthday test email with promotion", "userId", input.WorkflowInput.UserID, "email", input.WorkflowInput.UserEmail)
+
+	// Generate HTML content for birthday test card with promotion
+	htmlContent := generateBirthdayTestHTMLWithPromotion(input.WorkflowInput, input.Promotion)
+
+	// Generate text content (simplified version)
+	textContent := fmt.Sprintf("Happy Birthday %s!\n\n%s\n\nBest regards,\n%s",
+		input.WorkflowInput.UserFirstName, input.WorkflowInput.CustomMessage, input.WorkflowInput.SenderName)
+
+	return EmailContent{
+		Subject:     fmt.Sprintf("🎂 Happy Birthday %s!", input.WorkflowInput.UserFirstName),
+		HTMLContent: htmlContent,
+		TextContent: textContent,
+		To:          input.WorkflowInput.UserEmail,
+		From:        activityDeps.Config.DefaultFromEmail,
+	}, nil
 }
 
 // PrepareBirthdayTestEmail prepares birthday test email content
@@ -340,6 +399,47 @@ func generateBirthdayTestHTML(input BirthdayTestWorkflowInput) string {
 		PromotionTitle:       "",
 		PromotionDescription: "",
 		IsTest:               input.IsTest,
+	}
+
+	// Render the template
+	return RenderBirthdayTemplate(templateId, params)
+}
+
+// generateBirthdayTestHTMLWithPromotion generates HTML content for birthday test card with promotion data
+func generateBirthdayTestHTMLWithPromotion(input BirthdayTestWorkflowInput, promotion *models.Promotion) string {
+	// Parse custom theme data
+	customThemeData := ParseCustomThemeData(input.CustomThemeData)
+
+	// Determine template type
+	templateId := TemplateDefault
+	switch strings.ToLower(input.EmailTemplate) {
+	case "confetti":
+		templateId = TemplateConfetti
+	case "balloons":
+		templateId = TemplateBalloons
+	case "custom":
+		templateId = TemplateCustom
+	default:
+		templateId = TemplateDefault
+	}
+
+	// Prepare template parameters with promotion data
+	params := TemplateParams{
+		RecipientName:   input.UserFirstName,
+		Message:         input.CustomMessage,
+		BrandName:       input.TenantName,
+		CustomThemeData: customThemeData,
+		SenderName:      input.SenderName,
+		IsTest:          input.IsTest,
+	}
+
+	// Add promotion data if available
+	if promotion != nil {
+		params.PromotionContent = promotion.Content
+		params.PromotionTitle = promotion.Title
+		if promotion.Description != nil {
+			params.PromotionDescription = *promotion.Description
+		}
 	}
 
 	// Render the template
