@@ -134,7 +134,7 @@ export default function BirthdaysPage() {
   const { data: session } = useSession();
 
   // Query to get external service token when authenticated
-  const { data: tokenData, isLoading: tokenLoading, error: tokenError } = useQuery({
+  const { data: tokenData, isLoading: tokenLoading, error: tokenError, refetch: refetchToken } = useQuery({
     queryKey: ['/api/external-token', session?.user?.id],
     queryFn: async () => {
       console.log('🔑 [Token] Requesting external token for user:', session?.user?.email);
@@ -147,10 +147,11 @@ export default function BirthdaysPage() {
       return data;
     },
     enabled: !!session?.user,
-    staleTime: 12 * 60 * 1000, // Token cached for 12 minutes (3 min buffer before 15 min expiry)
+    staleTime: 10 * 60 * 1000, // Token cached for 10 minutes (5 min buffer before 15 min expiry)
     gcTime: 15 * 60 * 1000, // Garbage collect after 15 minutes
     retry: 3,
-    refetchOnWindowFocus: false, // Don't refetch on window focus to avoid unnecessary token generation
+    refetchOnWindowFocus: true, // Refetch on window focus to refresh expired tokens
+    refetchOnReconnect: true, // Refetch when reconnecting
   });
 
   const accessToken = tokenData?.token;
@@ -550,16 +551,30 @@ export default function BirthdaysPage() {
         throw new Error('Contact not found');
       }
 
+      // Check if we have a valid token, if not try to refresh it
+      let currentToken = accessToken;
 
-      // Check if we have a valid token
-      if (!accessToken) {
-        if (tokenLoading) {
-          throw new Error('Authentication token is still loading. Please wait a moment and try again.');
+      if (!currentToken) {
+        console.log('🔄 [Birthday Invitation] No token available, attempting to refresh...');
+        try {
+          const refreshedTokenData = await refetchToken();
+          currentToken = refreshedTokenData.data?.token;
+
+          if (!currentToken) {
+            if (tokenLoading) {
+              throw new Error('Authentication token is still loading. Please wait a moment and try again.');
+            }
+            if (tokenError) {
+              throw new Error(`Authentication failed: ${tokenError.message}`);
+            }
+            throw new Error('No authentication token available. Please make sure you are logged in.');
+          }
+
+          console.log('✅ [Birthday Invitation] Token refreshed successfully');
+        } catch (refreshError) {
+          console.error('❌ [Birthday Invitation] Token refresh failed:', refreshError);
+          throw new Error('Failed to refresh authentication token. Please try again.');
         }
-        if (tokenError) {
-          throw new Error(`Authentication failed: ${tokenError.message}`);
-        }
-        throw new Error('No authentication token available. Please make sure you are logged in.');
       }
 
       // Call the workflow-based API
@@ -567,7 +582,7 @@ export default function BirthdaysPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': `Bearer ${currentToken}`,
         },
         body: JSON.stringify({
           contactId: contact.id,
@@ -582,6 +597,46 @@ export default function BirthdaysPage() {
       });
 
       if (!response.ok) {
+        // If it's an authentication error, try to refresh the token and retry once
+        if (response.status === 401) {
+          console.log('🔄 [Birthday Invitation] Token appears to be expired, attempting refresh and retry...');
+
+          try {
+            const refreshedTokenData = await refetchToken();
+            const newToken = refreshedTokenData.data?.token;
+
+            if (newToken && newToken !== currentToken) {
+              console.log('✅ [Birthday Invitation] Token refreshed, retrying request...');
+
+              const retryResponse = await fetch('http://localhost:3502/api/birthday-invitation', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${newToken}`,
+                },
+                body: JSON.stringify({
+                  contactId: contact.id,
+                  contactEmail: contact.email,
+                  contactFirstName: contact.firstName,
+                  contactLastName: contact.lastName,
+                  tenantId: currentUser?.tenantId || 'unknown-tenant',
+                  tenantName: currentUser?.name || 'Your Company',
+                  userId: currentUser?.id || 'unknown-user',
+                  fromEmail: 'admin@zendwise.work'
+                }),
+              });
+
+              if (retryResponse.ok) {
+                const retryResponseData = await retryResponse.json();
+                console.log('✅ [Birthday Invitation] Retry successful:', retryResponseData);
+                return retryResponseData;
+              }
+            }
+          } catch (retryError) {
+            console.error('❌ [Birthday Invitation] Token refresh retry failed:', retryError);
+          }
+        }
+
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to send birthday invitation');
       }
@@ -599,15 +654,30 @@ export default function BirthdaysPage() {
   // Mutation: send test birthday card to users
   const sendTestBirthdayMutation = useMutation({
     mutationFn: async (userId: string) => {
-      // Check if we have a valid token
-      if (!accessToken) {
-        if (tokenLoading) {
-          throw new Error('Authentication token is still loading. Please wait a moment and try again.');
+      // Check if we have a valid token, if not try to refresh it
+      let currentToken = accessToken;
+
+      if (!currentToken) {
+        console.log('🔄 [Birthday Test] No token available, attempting to refresh...');
+        try {
+          const refreshedTokenData = await refetchToken();
+          currentToken = refreshedTokenData.data?.token;
+
+          if (!currentToken) {
+            if (tokenLoading) {
+              throw new Error('Authentication token is still loading. Please wait a moment and try again.');
+            }
+            if (tokenError) {
+              throw new Error(`Authentication failed: ${tokenError.message}`);
+            }
+            throw new Error('No authentication token available. Please make sure you are logged in.');
+          }
+
+          console.log('✅ [Birthday Test] Token refreshed successfully');
+        } catch (refreshError) {
+          console.error('❌ [Birthday Test] Token refresh failed:', refreshError);
+          throw new Error('Failed to refresh authentication token. Please try again.');
         }
-        if (tokenError) {
-          throw new Error(`Authentication failed: ${tokenError.message}`);
-        }
-        throw new Error('No authentication token available. Please make sure you are logged in.');
       }
 
       // Find the user to get additional details
@@ -636,8 +706,8 @@ export default function BirthdaysPage() {
         userEmail: user.email,
         userFirstName: user.firstName,
         userLastName: user.lastName,
-        accessTokenLength: accessToken?.length,
-        accessTokenPreview: accessToken ? `${accessToken.substring(0, 20)}...` : 'null',
+        accessTokenLength: currentToken?.length,
+        accessTokenPreview: currentToken ? `${currentToken.substring(0, 20)}...` : 'null',
         birthdaySettings: {
           emailTemplate: birthdaySettings?.emailTemplate,
           customMessage: birthdaySettings?.customMessage,
@@ -651,7 +721,7 @@ export default function BirthdaysPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': `Bearer ${currentToken}`,
         },
         body: JSON.stringify(requestPayload),
       });
@@ -670,6 +740,37 @@ export default function BirthdaysPage() {
         } catch (parseError) {
           console.error('🎂 [Birthday Test] Failed to parse error response:', parseError);
           errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
+        }
+
+        // If it's an authentication error, try to refresh the token and retry once
+        if (response.status === 401 && errorData.error?.includes('Invalid token')) {
+          console.log('🔄 [Birthday Test] Token appears to be expired, attempting refresh and retry...');
+
+          try {
+            const refreshedTokenData = await refetchToken();
+            const newToken = refreshedTokenData.data?.token;
+
+            if (newToken && newToken !== currentToken) {
+              console.log('✅ [Birthday Test] Token refreshed, retrying request...');
+
+              const retryResponse = await fetch(`${cardprocessorUrl}/api/birthday-test`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${newToken}`,
+                },
+                body: JSON.stringify(requestPayload),
+              });
+
+              if (retryResponse.ok) {
+                const retryResponseData = await retryResponse.json();
+                console.log('✅ [Birthday Test] Retry successful:', retryResponseData);
+                return retryResponseData;
+              }
+            }
+          } catch (retryError) {
+            console.error('❌ [Birthday Test] Token refresh retry failed:', retryError);
+          }
         }
 
         console.error('🎂 [Birthday Test] Request failed:', {
@@ -1833,10 +1934,10 @@ export default function BirthdaysPage() {
                         });
                         setSelectedUsers([]);
                       }}
-                      disabled={sendTestBirthdayMutation.isPending}
+                      disabled={sendTestBirthdayMutation.isPending || tokenLoading}
                     >
                       <Mail className="h-4 w-4 mr-2" />
-                      Send Test Cards to Selected
+                      {tokenLoading ? "Refreshing..." : sendTestBirthdayMutation.isPending ? "Sending..." : "Send Test Cards to Selected"}
                     </Button>
                   </div>
                 </div>
@@ -1905,11 +2006,11 @@ export default function BirthdaysPage() {
                               variant="outline"
                               size="sm"
                               onClick={() => handleSendTestBirthdayCard(user.id)}
-                              disabled={sendTestBirthdayMutation.isPending}
+                              disabled={sendTestBirthdayMutation.isPending || tokenLoading}
                               className="flex items-center gap-2"
                             >
                               <Mail className="h-4 w-4" />
-                              Send Test Card
+                              {tokenLoading ? "Refreshing..." : sendTestBirthdayMutation.isPending ? "Sending..." : "Send Test Card"}
                             </Button>
                           </TableCell>
                         </TableRow>

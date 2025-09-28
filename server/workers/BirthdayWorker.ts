@@ -78,7 +78,7 @@ export class BirthdayWorker extends EventEmitter {
     if (this.config.enabled) {
       // Start the periodic birthday check
       this.scheduleNextCheck();
-      
+
       // Run an initial check
       this.checkForBirthdays();
     } else {
@@ -104,7 +104,7 @@ export class BirthdayWorker extends EventEmitter {
     // Wait for any active jobs to complete (with timeout)
     const timeout = 30000; // 30 seconds
     const startTime = Date.now();
-    
+
     while (this.getActiveJobCount() > 0 && (Date.now() - startTime) < timeout) {
       console.log(`⏳ [BirthdayWorker] Waiting for ${this.getActiveJobCount()} active jobs to complete...`);
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -136,7 +136,7 @@ export class BirthdayWorker extends EventEmitter {
       // Get today's date in YYYY-MM-DD format
       const today = new Date();
       const todayString = today.toISOString().split('T')[0];
-      
+
       // Extract month and day for birthday matching (MM-DD format)
       const monthDay = todayString.substring(5); // Gets MM-DD part
 
@@ -289,8 +289,8 @@ export class BirthdayWorker extends EventEmitter {
       console.log(`🎂 [BirthdayWorker] Sending birthday card to ${job.contactEmail}`);
 
       // Prepare recipient name
-      const recipientName = job.contactFirstName 
-        ? `${job.contactFirstName}${job.contactLastName ? ` ${job.contactLastName}` : ''}` 
+      const recipientName = job.contactFirstName
+        ? `${job.contactFirstName}${job.contactLastName ? ` ${job.contactLastName}` : ''}`
         : 'Friend';
 
       // Render birthday template with promotion content
@@ -346,11 +346,11 @@ export class BirthdayWorker extends EventEmitter {
 
   private renderBirthdayTemplate(
     template: 'default' | 'confetti' | 'balloons' | 'custom',
-    params: { 
-      recipientName?: string; 
-      message?: string; 
-      brandName?: string; 
-      customThemeData?: any; 
+    params: {
+      recipientName?: string;
+      message?: string;
+      brandName?: string;
+      customThemeData?: any;
       senderName?: string;
       promotionContent?: string;
       promotionTitle?: string;
@@ -359,7 +359,7 @@ export class BirthdayWorker extends EventEmitter {
   ): string {
     // This is a simplified version - you might want to import the actual template renderer
     // from your existing birthday template system
-    
+
     const themeColors = {
       default: { primary: '#667eea', secondary: '#764ba2' },
       confetti: { primary: '#ff6b6b', secondary: '#feca57' },
@@ -368,7 +368,7 @@ export class BirthdayWorker extends EventEmitter {
 
     const colors = themeColors[template as keyof typeof themeColors] || themeColors.default;
     const headline = `Happy Birthday${params.recipientName ? ', ' + params.recipientName : ''}!`;
-    const fromMessage = params.senderName || params.brandName || 'The Team';
+    const fromMessage = params.senderName || 'The Team';
 
     // Build promotion section if promotion content exists
     let promotionSection = '';
@@ -392,12 +392,13 @@ export class BirthdayWorker extends EventEmitter {
             <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">${params.message || 'Wishing you a wonderful day!'}</div>
             ${promotionSection}
           </div>
+          ${fromMessage ? `
           <div style="padding: 20px 30px 30px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
             <div style="font-size: 0.9rem; color: #718096;">
-              <p style="margin: 0;">Best regards,</p>
-              <p style="margin: 5px 0 0 0; font-weight: 600; color: #4a5568;">${fromMessage}</p>
+              <p style="margin: 0; font-weight: 600; color: #4a5568;">${fromMessage}</p>
             </div>
           </div>
+          ` : ''}
         </div>
       </body>
     </html>`;

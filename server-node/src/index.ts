@@ -89,7 +89,7 @@ function renderBirthdayTemplate(
     const title = customData.title || `Happy Birthday${params.recipientName ? ', ' + params.recipientName : ''}!`;
     const message = customData.message || params.message || 'Wishing you a wonderful day!';
     const signature = customData.signature || '';
-    const fromMessage = params.senderName || params.brandName || 'The Team';
+    const fromMessage = params.senderName || 'The Team';
 
     return `<html>
       <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
@@ -123,12 +123,13 @@ function renderBirthdayTemplate(
           </div>
           
           <!-- 4. From Message -->
+          ${!signature ? `
           <div style="padding: 20px 30px 30px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
             <div style="font-size: 0.9rem; color: #718096;">
-              <p style="margin: 0;">Best regards,</p>
-              <p style="margin: 5px 0 0 0; font-weight: 600; color: #4a5568;">${fromMessage}</p>
+              <p style="margin: 0; font-weight: 600; color: #4a5568;">${fromMessage}</p>
             </div>
           </div>
+          ` : ''}
         </div>
       </body>
     </html>`;
@@ -186,7 +187,7 @@ function renderBirthdayTemplate(
 
   const headerImage = themeHeaders[template as keyof typeof themeHeaders] || themeHeaders.default;
   const colors = themeColors[template as keyof typeof themeColors] || themeColors.default;
-  const fromMessage = params.senderName || params.brandName || 'The Team';
+  const fromMessage = params.senderName || 'The Team';
 
   return `<html>
     <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%);">
@@ -215,12 +216,13 @@ function renderBirthdayTemplate(
         </div>
         
         <!-- 4. From Message -->
+        ${!signature ? `
         <div style="padding: 20px 30px 30px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
           <div style="font-size: 0.9rem; color: #718096;">
-            <p style="margin: 0;">Best regards,</p>
-            <p style="margin: 5px 0 0 0; font-weight: 600; color: #4a5568;">${fromMessage}</p>
+            <p style="margin: 0; font-weight: 600; color: #4a5568;">${fromMessage}</p>
           </div>
         </div>
+        ` : ''}
       </div>
     </body>
   </html>`;

@@ -100,9 +100,6 @@ func renderCustomTemplate(params TemplateParams) string {
 
 	fromMessage := params.SenderName
 	if fromMessage == "" {
-		fromMessage = params.BrandName
-	}
-	if fromMessage == "" {
 		fromMessage = "The Team"
 	}
 
@@ -116,6 +113,18 @@ func renderCustomTemplate(params TemplateParams) string {
 		headerImageSection = `
 			<div style="background: linear-gradient(135deg, #a8e6cf 0%, #dcedc1 100%); height: 200px; border-radius: 12px 12px 0 0;">
 			</div>`
+	}
+
+	// Conditionally render fromMessage section only if no signature
+	fromMessageSection := ""
+	if signature == "" {
+		fromMessageSection = fmt.Sprintf(`
+				<!-- 4. From Message -->
+				<div style="padding: 20px 30px 30px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
+					<div style="font-size: 0.9rem; color: #718096;">
+						<p style="margin: 0; font-weight: 600; color: #4a5568;">%s</p>
+					</div>
+				</div>`, template.HTMLEscapeString(fromMessage))
 	}
 
 	return fmt.Sprintf(`<html>
@@ -137,13 +146,7 @@ func renderCustomTemplate(params TemplateParams) string {
 					%s
 				</div>
 				
-				<!-- 4. From Message -->
-				<div style="padding: 20px 30px 30px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
-					<div style="font-size: 0.9rem; color: #718096;">
-						<p style="margin: 0;">Best regards,</p>
-						<p style="margin: 5px 0 0 0; font-weight: 600; color: #4a5568;">%s</p>
-					</div>
-				</div>
+				%s
 			</div>
 		</body>
 	</html>`,
@@ -152,7 +155,7 @@ func renderCustomTemplate(params TemplateParams) string {
 		sanitizeHTMLContent(message),
 		renderPromotionContent(params),
 		renderSignature(signature),
-		template.HTMLEscapeString(fromMessage),
+		fromMessageSection,
 	)
 }
 
@@ -210,10 +213,19 @@ func renderPredefinedTemplate(templateId BirthdayTemplateId, params TemplatePara
 
 	fromMessage := params.SenderName
 	if fromMessage == "" {
-		fromMessage = params.BrandName
-	}
-	if fromMessage == "" {
 		fromMessage = "The Team"
+	}
+
+	// Conditionally render fromMessage section only if no signature
+	fromMessageSection := ""
+	if signature == "" {
+		fromMessageSection = fmt.Sprintf(`
+				<!-- 4. From Message -->
+				<div style="padding: 20px 30px 30px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
+					<div style="font-size: 0.9rem; color: #718096;">
+						<p style="margin: 0; font-weight: 600; color: #4a5568;">%s</p>
+					</div>
+				</div>`, template.HTMLEscapeString(fromMessage))
 	}
 
 	return fmt.Sprintf(`<html>
@@ -236,13 +248,7 @@ func renderPredefinedTemplate(templateId BirthdayTemplateId, params TemplatePara
 					%s
 				</div>
 				
-				<!-- 4. From Message -->
-				<div style="padding: 20px 30px 30px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
-					<div style="font-size: 0.9rem; color: #718096;">
-						<p style="margin: 0;">Best regards,</p>
-						<p style="margin: 5px 0 0 0; font-weight: 600; color: #4a5568;">%s</p>
-					</div>
-				</div>
+				%s
 			</div>
 		</body>
 	</html>`,
@@ -252,7 +258,7 @@ func renderPredefinedTemplate(templateId BirthdayTemplateId, params TemplatePara
 		sanitizeHTMLContent(message),
 		renderPromotionContent(params),
 		renderSignature(signature),
-		template.HTMLEscapeString(fromMessage),
+		fromMessageSection,
 	)
 }
 

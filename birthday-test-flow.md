@@ -377,3 +377,4 @@ TemporalTaskQueue:     getEnv("TEMPORAL_TASK_QUEUE", "authentik-tasks"),
 - **Comprehensive Logging**: Detailed logging at each step
 - **Error Recovery**: Retry policies and graceful degradation
 - **Test Mode**: Special handling for test cards vs. production cards
+
