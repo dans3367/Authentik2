@@ -1399,10 +1399,8 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
       }
     }
 
-    res.json({
-      message: 'Birthday settings updated successfully',
-      settings: updatedSettings[0],
-    });
+    // Return just the settings object to match GET endpoint structure
+    res.json(updatedSettings[0]);
   } catch (error) {
     console.error('Update birthday settings error:', error);
     res.status(500).json({ message: 'Failed to update birthday settings' });

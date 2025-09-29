@@ -344,8 +344,8 @@ export default function BirthdaysPage() {
         description: "Birthday settings updated successfully",
       });
       
-      // Update the query cache immediately with the server response (extract settings object)
-      queryClient.setQueryData(['/api/birthday-settings'], updatedSettings.settings);
+      // Update the query cache immediately with the server response (now returns settings directly)
+      queryClient.setQueryData(['/api/birthday-settings'], updatedSettings);
       
       // Force a re-render by invalidating the query
       queryClient.invalidateQueries({ queryKey: ['/api/birthday-settings'] });
