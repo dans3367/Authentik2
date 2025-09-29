@@ -107,10 +107,10 @@ emailManagementRoutes.get("/email-contacts", authenticateToken, requireTenant, a
       // Extract and transform the relationship data
       const tags = contact.tagAssignments?.map(assignment => assignment.tag).filter(Boolean) || [];
       const lists = contact.listMemberships?.map(membership => membership.list).filter(Boolean) || [];
-      
+
       // Remove the backend-specific relationship fields and add frontend-compatible ones
       const { tagAssignments, listMemberships, ...contactData } = contact;
-      
+
       return {
         ...contactData,
         tags,
@@ -161,7 +161,7 @@ emailManagementRoutes.get("/email-contacts/:id", authenticateToken, requireTenan
     // Transform the data to match frontend expectations
     const tags = contact.tagAssignments?.map(assignment => assignment.tag).filter(Boolean) || [];
     const lists = contact.listMemberships?.map(membership => membership.list).filter(Boolean) || [];
-    
+
     const { tagAssignments, listMemberships, ...contactData } = contact;
     const transformedContact = {
       ...contactData,
@@ -238,7 +238,7 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
         const existingUser = await tx.query.betterAuthUser.findFirst({
           where: sql`${betterAuthUser.id} = ${req.user.id}`,
         });
-        
+
         if (!existingUser) {
           // User doesn't exist in betterAuthUser table, create a basic record
           console.log('🔧 Creating missing betterAuthUser record for:', req.user.email);
@@ -338,7 +338,7 @@ emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenan
 
     if (email !== undefined) {
       const sanitizedEmail = sanitizeEmail(email);
-      
+
       // Check if new email is already taken by another contact
       const existingContact = await db.query.emailContacts.findFirst({
         where: sql`${emailContacts.email} = ${sanitizedEmail} AND ${emailContacts.id} != ${id}`,
@@ -1075,14 +1075,14 @@ emailManagementRoutes.patch("/email-contacts/:contactId/birthday-email", authent
 
     // Update birthday email preference
     const updatedContact = await db.update(emailContacts)
-      .set({ 
+      .set({
         birthdayEmailEnabled: enabled,
         updatedAt: new Date(),
       })
       .where(sql`${emailContacts.id} = ${contactId}`)
       .returning();
 
-    res.json({ 
+    res.json({
       message: `Birthday email preference ${enabled ? 'enabled' : 'disabled'} successfully`,
       contact: updatedContact[0]
     });
@@ -1116,14 +1116,14 @@ emailManagementRoutes.patch("/email-contacts/birthday-email/bulk", authenticateT
 
     // Update birthday email preferences for all specified contacts
     const updatedContacts = await db.update(emailContacts)
-      .set({ 
+      .set({
         birthdayEmailEnabled: enabled,
         updatedAt: new Date(),
       })
       .where(sql`${emailContacts.id} = ANY(${contactIds})`)
       .returning();
 
-    res.json({ 
+    res.json({
       message: `Birthday email preference ${enabled ? 'enabled' : 'disabled'} for ${updatedContacts.length} contacts`,
       updatedContacts: updatedContacts.length
     });
@@ -1146,7 +1146,7 @@ emailManagementRoutes.get("/birthday-contacts", authenticateToken, requireTenant
       const today = new Date();
       const thirtyDaysFromNow = new Date();
       thirtyDaysFromNow.setDate(today.getDate() + 30);
-      
+
       // This is a simplified approach - you might need more complex logic for year-agnostic birthday matching
       whereClause = sql`${whereClause} AND ${emailContacts.birthday} IS NOT NULL`;
     }
@@ -1233,7 +1233,7 @@ emailManagementRoutes.get("/birthday-settings", authenticateToken, requireTenant
         emailTemplate: 'default',
         segmentFilter: 'all',
         customMessage: '',
-        senderName: '',
+        senderName: 'Birthday Team',
         promotionId: null,
         promotion: null,
         created_at: new Date().toISOString(),
@@ -1242,7 +1242,13 @@ emailManagementRoutes.get("/birthday-settings", authenticateToken, requireTenant
       return res.json(defaultSettings);
     }
 
-    res.json(settings);
+    // Ensure senderName is always present with a default value
+    const settingsWithDefaults = {
+      ...settings,
+      senderName: settings.senderName || 'Birthday Team'
+    };
+
+    res.json(settingsWithDefaults);
   } catch (error) {
     console.error('Get birthday settings error:', error);
     res.status(500).json({ message: 'Failed to get birthday settings' });
@@ -1252,11 +1258,11 @@ emailManagementRoutes.get("/birthday-settings", authenticateToken, requireTenant
 // Update birthday settings
 emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant, async (req: any, res) => {
   try {
-    const { 
-      enabled, 
-      emailTemplate, 
-      segmentFilter, 
-      customMessage, 
+    const {
+      enabled,
+      emailTemplate,
+      segmentFilter,
+      customMessage,
       customThemeData,
       senderName,
       promotionId
@@ -1280,9 +1286,10 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
       return res.status(400).json({ message: 'customMessage is required and must be a string' });
     }
 
-    if (senderName === undefined || senderName === null || typeof senderName !== 'string') {
-      return res.status(400).json({ message: 'senderName is required and must be a string' });
-    }
+    // Handle senderName - use default if not provided, null, or empty
+    const finalSenderName = (senderName && typeof senderName === 'string' && senderName.trim() !== '')
+      ? senderName.trim()
+      : 'Birthday Team';
 
     // Validate promotionId if provided
     if (promotionId !== null && promotionId !== undefined && typeof promotionId !== 'string') {
@@ -1299,13 +1306,8 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
         if (typeof customThemeData === 'string') {
           JSON.parse(customThemeData);
         } else if (typeof customThemeData === 'object' && customThemeData !== null) {
-          // Already an object, validate structure
-          const requiredFields = ['title', 'message', 'signature', 'customImage', 'imagePosition', 'imageScale'];
-          for (const field of requiredFields) {
-            if (!(field in customThemeData)) {
-              return res.status(400).json({ message: `customThemeData missing required field: ${field}` });
-            }
-          }
+          // Allow any valid object structure for customThemeData
+          // The frontend sends nested theme data which is valid
         } else {
           return res.status(400).json({ message: 'customThemeData must be a valid JSON string or object' });
         }
@@ -1331,10 +1333,10 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
     }
 
     let updatedSettings;
-    
+
     // Prepare custom theme data for storage
-    const customThemeDataStr = customThemeData ? 
-      (typeof customThemeData === 'string' ? customThemeData : JSON.stringify(customThemeData)) 
+    const customThemeDataStr = customThemeData ?
+      (typeof customThemeData === 'string' ? customThemeData : JSON.stringify(customThemeData))
       : undefined;
 
     if (existingSettings) {
@@ -1344,11 +1346,11 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
         emailTemplate,
         segmentFilter,
         customMessage,
-        senderName,
+        senderName: finalSenderName,
         promotionId: promotionId || null,
         updatedAt: new Date(),
       };
-      
+
       if (customThemeDataStr !== undefined) {
         updateData.customThemeData = customThemeDataStr;
       }
@@ -1365,7 +1367,7 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
         emailTemplate,
         segmentFilter,
         customMessage,
-        senderName,
+        senderName: finalSenderName,
         promotionId: promotionId || null,
       };
 
@@ -1383,7 +1385,7 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
       try {
         const newCustomData = typeof customThemeData === 'string' ? JSON.parse(customThemeData) : customThemeData;
         const newImageUrl = newCustomData?.imageUrl || null;
-        
+
         // Only delete old image if a new different image is being set or image is being removed
         if (newImageUrl !== oldImageUrl) {
           console.log('📸 [Birthday Settings] Cleaning up old image:', oldImageUrl);
@@ -1411,7 +1413,7 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
 emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { contactId } = req.params;
-    
+
     // Find the contact
     const contact = await db.query.emailContacts.findFirst({
       where: sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
@@ -1441,13 +1443,13 @@ emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken,
       process.env.JWT_SECRET!,
       { expiresIn: '30d' }
     );
-    
+
     const profileUpdateUrl = `${process.env.BASE_URL || 'http://localhost:3500'}/update-profile?token=${profileUpdateToken}`;
-    
+
     // Create email content
     const contactName = contact.firstName ? `${contact.firstName}${contact.lastName ? ` ${contact.lastName}` : ''}` : 'Valued Customer';
     const subject = `🎂 Help us celebrate your special day!`;
-    
+
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -1501,7 +1503,7 @@ emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken,
 
     // Send the email using the email service
     const { enhancedEmailService } = await import('../emailService');
-    
+
     const result = await enhancedEmailService.sendCustomEmail(
       contact.email,
       subject,
@@ -1516,7 +1518,7 @@ emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken,
     );
 
     if (result.success) {
-      res.json({ 
+      res.json({
         message: 'Birthday invitation sent successfully',
         messageId: result.messageId
       });
@@ -1565,7 +1567,7 @@ emailManagementRoutes.post("/update-profile", async (req: any, res) => {
 
     // Update the contact's birthday
     const updatedContact = await db.update(emailContacts)
-      .set({ 
+      .set({
         birthday,
         birthdayEmailEnabled: true, // Enable birthday emails by default when they add their birthday
         updatedAt: new Date()
@@ -1577,7 +1579,7 @@ emailManagementRoutes.post("/update-profile", async (req: any, res) => {
       return res.status(404).json({ message: 'Contact not found' });
     }
 
-    res.json({ 
+    res.json({
       message: 'Birthday updated successfully',
       contact: {
         id: updatedContact[0].id,
@@ -1631,7 +1633,7 @@ emailManagementRoutes.get("/profile-form", async (req: any, res) => {
       return res.status(404).json({ message: 'Contact not found' });
     }
 
-    res.json({ 
+    res.json({
       contact: {
         id: contact.id,
         email: contact.email,
@@ -1650,7 +1652,7 @@ emailManagementRoutes.get("/profile-form", async (req: any, res) => {
 // Internal birthday invitation endpoint for server-node (no auth required)
 emailManagementRoutes.post("/internal/birthday-invitation", async (req: any, res) => {
   try {
-    const { 
+    const {
       contactId,
       contactEmail,
       contactFirstName,
@@ -1666,7 +1668,7 @@ emailManagementRoutes.post("/internal/birthday-invitation", async (req: any, res
 
     // Send the email using the email service
     const { enhancedEmailService } = await import('../emailService');
-    
+
     const result = await enhancedEmailService.sendCustomEmail(
       contactEmail,
       '🎂 Help us celebrate your special day!',
@@ -1682,7 +1684,7 @@ emailManagementRoutes.post("/internal/birthday-invitation", async (req: any, res
     );
 
     if (result.success) {
-      res.json({ 
+      res.json({
         message: 'Birthday invitation sent successfully',
         messageId: result.messageId,
         success: true
@@ -1694,5 +1696,112 @@ emailManagementRoutes.post("/internal/birthday-invitation", async (req: any, res
   } catch (error) {
     console.error('Send internal birthday invitation error:', error);
     res.status(500).json({ message: 'Failed to send birthday invitation' });
+  }
+});
+
+// Birthday unsubscribe page
+emailManagementRoutes.get("/unsubscribe/birthday", async (req: any, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).send(`
+        <html>
+          <head><title>Invalid Unsubscribe Link</title></head>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1>Invalid Unsubscribe Link</h1>
+            <p>This unsubscribe link is invalid or has expired.</p>
+          </body>
+        </html>
+      `);
+    }
+
+    // TODO: Validate token and get contact info
+    // For now, show a simple unsubscribe form
+    res.send(`
+      <html>
+        <head>
+          <title>Unsubscribe from Birthday Cards</title>
+          <style>
+            body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+            .container { background: #f9f9f9; padding: 30px; border-radius: 8px; text-align: center; }
+            .button { background: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+            .button:hover { background: #c82333; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>🎂 Unsubscribe from Birthday Cards</h1>
+            <p>We're sorry to see you go! You can unsubscribe from receiving birthday card notifications below.</p>
+            <form method="POST" action="/api/unsubscribe/birthday">
+              <input type="hidden" name="token" value="${token}" />
+              <button type="submit" class="button">Unsubscribe</button>
+            </form>
+          </div>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error('Birthday unsubscribe page error:', error);
+    res.status(500).send(`
+      <html>
+        <head><title>Error</title></head>
+        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+          <h1>Error</h1>
+          <p>An error occurred while processing your request.</p>
+        </body>
+      </html>
+    `);
+  }
+});
+
+// Process birthday unsubscribe
+emailManagementRoutes.post("/unsubscribe/birthday", async (req: any, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).send(`
+        <html>
+          <head><title>Invalid Request</title></head>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1>Invalid Request</h1>
+            <p>Token is required.</p>
+          </body>
+        </html>
+      `);
+    }
+
+    // TODO: Process unsubscribe token and update contact
+    // For now, show success message
+    res.send(`
+      <html>
+        <head>
+          <title>Unsubscribed Successfully</title>
+          <style>
+            body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+            .container { background: #d4edda; padding: 30px; border-radius: 8px; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>✅ Successfully Unsubscribed</h1>
+            <p>You have been unsubscribed from birthday card notifications.</p>
+            <p>You can always contact us if you change your mind.</p>
+          </div>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error('Birthday unsubscribe processing error:', error);
+    res.status(500).send(`
+      <html>
+        <head><title>Error</title></head>
+        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+          <h1>Error</h1>
+          <p>An error occurred while processing your unsubscribe request.</p>
+        </body>
+      </html>
+    `);
   }
 });

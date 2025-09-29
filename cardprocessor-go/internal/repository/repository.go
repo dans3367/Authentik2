@@ -227,7 +227,8 @@ func (r *Repository) GetContactsWithBirthday(ctx context.Context, tenantID strin
 		SELECT id, tenant_id, email, first_name, last_name, status, added_date, 
 		       last_activity, emails_sent, emails_opened, birthday, birthday_email_enabled
 		FROM email_contacts 
-		WHERE tenant_id = $1 AND birthday = $2 AND birthday_email_enabled = true
+		WHERE tenant_id = $1 AND birthday = $2 AND birthday_email_enabled = true 
+		      AND birthday_unsubscribed_at IS NULL
 		ORDER BY first_name, last_name
 	`
 
@@ -307,7 +308,7 @@ func (r *Repository) GetUpcomingBirthdayContacts(ctx context.Context, tenantID s
 	// Get total count
 	countQuery := `
 		SELECT COUNT(*) FROM email_contacts 
-		WHERE tenant_id = $1 AND birthday IS NOT NULL
+		WHERE tenant_id = $1 AND birthday IS NOT NULL AND birthday_unsubscribed_at IS NULL
 		AND (
 			(EXTRACT(MONTH FROM birthday::date) = EXTRACT(MONTH FROM $2::date) AND EXTRACT(DAY FROM birthday::date) >= EXTRACT(DAY FROM $2::date))
 			OR (EXTRACT(MONTH FROM birthday::date) = EXTRACT(MONTH FROM $3::date) AND EXTRACT(DAY FROM birthday::date) <= EXTRACT(DAY FROM $3::date))
@@ -325,7 +326,7 @@ func (r *Repository) GetUpcomingBirthdayContacts(ctx context.Context, tenantID s
 		SELECT id, tenant_id, email, first_name, last_name, status, added_date, 
 		       last_activity, emails_sent, emails_opened, birthday, birthday_email_enabled
 		FROM email_contacts 
-		WHERE tenant_id = $1 AND birthday IS NOT NULL
+		WHERE tenant_id = $1 AND birthday IS NOT NULL AND birthday_unsubscribed_at IS NULL
 		AND (
 			(EXTRACT(MONTH FROM birthday::date) = EXTRACT(MONTH FROM $2::date) AND EXTRACT(DAY FROM birthday::date) >= EXTRACT(DAY FROM $2::date))
 			OR (EXTRACT(MONTH FROM birthday::date) = EXTRACT(MONTH FROM $3::date) AND EXTRACT(DAY FROM birthday::date) <= EXTRACT(DAY FROM $3::date))
@@ -621,14 +622,109 @@ func (r *Repository) GetTenant(tenantID string) (*models.Tenant, error) {
 	return &tenant, nil
 }
 
+// CreateBirthdayUnsubscribeToken creates a new unsubscribe token for a contact
+func (r *Repository) CreateBirthdayUnsubscribeToken(ctx context.Context, tenantID, contactID, token string) (*models.BirthdayUnsubscribeToken, error) {
+	id := uuid.New().String()
+	now := time.Now()
+
+	query := `
+		INSERT INTO birthday_unsubscribe_tokens (id, tenant_id, contact_id, token, used, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, tenant_id, contact_id, token, used, created_at, used_at
+	`
+
+	var unsubToken models.BirthdayUnsubscribeToken
+	err := r.db.QueryRowContext(ctx, query, id, tenantID, contactID, token, false, now).Scan(
+		&unsubToken.ID,
+		&unsubToken.TenantID,
+		&unsubToken.ContactID,
+		&unsubToken.Token,
+		&unsubToken.Used,
+		&unsubToken.CreatedAt,
+		&unsubToken.UsedAt,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create birthday unsubscribe token: %w", err)
+	}
+
+	return &unsubToken, nil
+}
+
+// GetBirthdayUnsubscribeToken retrieves an unsubscribe token by token string
+func (r *Repository) GetBirthdayUnsubscribeToken(ctx context.Context, token string) (*models.BirthdayUnsubscribeToken, error) {
+	query := `
+		SELECT id, tenant_id, contact_id, token, used, created_at, used_at
+		FROM birthday_unsubscribe_tokens
+		WHERE token = $1
+	`
+
+	var unsubToken models.BirthdayUnsubscribeToken
+	err := r.db.QueryRowContext(ctx, query, token).Scan(
+		&unsubToken.ID,
+		&unsubToken.TenantID,
+		&unsubToken.ContactID,
+		&unsubToken.Token,
+		&unsubToken.Used,
+		&unsubToken.CreatedAt,
+		&unsubToken.UsedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get birthday unsubscribe token: %w", err)
+	}
+
+	return &unsubToken, nil
+}
+
+// MarkBirthdayUnsubscribeTokenUsed marks an unsubscribe token as used
+func (r *Repository) MarkBirthdayUnsubscribeTokenUsed(ctx context.Context, tokenID string) error {
+	now := time.Now()
+	query := `
+		UPDATE birthday_unsubscribe_tokens 
+		SET used = true, used_at = $1
+		WHERE id = $2
+	`
+
+	_, err := r.db.ExecContext(ctx, query, now, tokenID)
+	if err != nil {
+		return fmt.Errorf("failed to mark birthday unsubscribe token as used: %w", err)
+	}
+
+	return nil
+}
+
+// UnsubscribeContactFromBirthdayEmails unsubscribes a contact from birthday emails
+func (r *Repository) UnsubscribeContactFromBirthdayEmails(ctx context.Context, contactID string, reason *string) error {
+	now := time.Now()
+	query := `
+		UPDATE email_contacts 
+		SET birthday_email_enabled = false, 
+		    birthday_unsubscribe_reason = $1,
+		    birthday_unsubscribed_at = $2,
+		    updated_at = $2
+		WHERE id = $3
+	`
+
+	_, err := r.db.ExecContext(ctx, query, reason, now, contactID)
+	if err != nil {
+		return fmt.Errorf("failed to unsubscribe contact from birthday emails: %w", err)
+	}
+
+	return nil
+}
+
 // GetPromotion retrieves a promotion by ID and tenant ID
 func (r *Repository) GetPromotion(ctx context.Context, promotionID, tenantID string) (*models.Promotion, error) {
 	query := `
 		SELECT id, tenant_id, user_id, title, description, content, type, 
-		       target_audience, is_active, usage_count, max_uses, valid_from, 
-		       valid_to, created_at, updated_at
+		       target_audience, is_active, usage_count, max_uses, 
+		       valid_from, valid_to, created_at, updated_at
 		FROM promotions 
-		WHERE id = $1 AND tenant_id = $2 AND is_active = true
+		WHERE id = $1 AND tenant_id = $2
 	`
 
 	var promotion models.Promotion
@@ -652,23 +748,9 @@ func (r *Repository) GetPromotion(ctx context.Context, promotionID, tenantID str
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil // No promotion found
+			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to get promotion: %w", err)
-	}
-
-	// Check if promotion is valid (within date range if specified)
-	now := time.Now()
-	if promotion.ValidFrom != nil && now.Before(*promotion.ValidFrom) {
-		return nil, nil // Promotion not yet valid
-	}
-	if promotion.ValidTo != nil && now.After(*promotion.ValidTo) {
-		return nil, nil // Promotion expired
-	}
-
-	// Check if promotion has reached max uses
-	if promotion.MaxUses != nil && promotion.UsageCount >= *promotion.MaxUses {
-		return nil, nil // Promotion max uses reached
 	}
 
 	return &promotion, nil

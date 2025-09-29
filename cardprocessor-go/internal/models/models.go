@@ -8,26 +8,28 @@ import (
 
 // EmailContact represents a contact in the email_contacts table
 type EmailContact struct {
-	ID                   string     `json:"id" db:"id"`
-	TenantID             string     `json:"tenantId" db:"tenant_id"`
-	Email                string     `json:"email" db:"email"`
-	FirstName            *string    `json:"firstName" db:"first_name"`
-	LastName             *string    `json:"lastName" db:"last_name"`
-	Status               string     `json:"status" db:"status"`
-	AddedDate            time.Time  `json:"addedDate" db:"added_date"`
-	LastActivity         *time.Time `json:"lastActivity" db:"last_activity"`
-	EmailsSent           int        `json:"emailsSent" db:"emails_sent"`
-	EmailsOpened         int        `json:"emailsOpened" db:"emails_opened"`
-	Birthday             *string    `json:"birthday" db:"birthday"`
-	BirthdayEmailEnabled bool       `json:"birthdayEmailEnabled" db:"birthday_email_enabled"`
-	ConsentGiven         bool       `json:"consentGiven" db:"consent_given"`
-	ConsentDate          *time.Time `json:"consentDate" db:"consent_date"`
-	ConsentMethod        *string    `json:"consentMethod" db:"consent_method"`
-	ConsentIPAddress     *string    `json:"consentIpAddress" db:"consent_ip_address"`
-	ConsentUserAgent     *string    `json:"consentUserAgent" db:"consent_user_agent"`
-	AddedByUserID        *string    `json:"addedByUserId" db:"added_by_user_id"`
-	CreatedAt            time.Time  `json:"createdAt" db:"created_at"`
-	UpdatedAt            time.Time  `json:"updatedAt" db:"updated_at"`
+	ID                         string     `json:"id" db:"id"`
+	TenantID                   string     `json:"tenantId" db:"tenant_id"`
+	Email                      string     `json:"email" db:"email"`
+	FirstName                  *string    `json:"firstName" db:"first_name"`
+	LastName                   *string    `json:"lastName" db:"last_name"`
+	Status                     string     `json:"status" db:"status"`
+	AddedDate                  time.Time  `json:"addedDate" db:"added_date"`
+	LastActivity               *time.Time `json:"lastActivity" db:"last_activity"`
+	EmailsSent                 int        `json:"emailsSent" db:"emails_sent"`
+	EmailsOpened               int        `json:"emailsOpened" db:"emails_opened"`
+	Birthday                   *string    `json:"birthday" db:"birthday"`
+	BirthdayEmailEnabled       bool       `json:"birthdayEmailEnabled" db:"birthday_email_enabled"`
+	BirthdayUnsubscribeReason  *string    `json:"birthdayUnsubscribeReason" db:"birthday_unsubscribe_reason"`
+	BirthdayUnsubscribedAt     *time.Time `json:"birthdayUnsubscribedAt" db:"birthday_unsubscribed_at"`
+	ConsentGiven               bool       `json:"consentGiven" db:"consent_given"`
+	ConsentDate                *time.Time `json:"consentDate" db:"consent_date"`
+	ConsentMethod              *string    `json:"consentMethod" db:"consent_method"`
+	ConsentIPAddress           *string    `json:"consentIpAddress" db:"consent_ip_address"`
+	ConsentUserAgent           *string    `json:"consentUserAgent" db:"consent_user_agent"`
+	AddedByUserID              *string    `json:"addedByUserId" db:"added_by_user_id"`
+	CreatedAt                  time.Time  `json:"createdAt" db:"created_at"`
+	UpdatedAt                  time.Time  `json:"updatedAt" db:"updated_at"`
 }
 
 // BirthdaySettings represents the birthday_settings table
@@ -221,6 +223,30 @@ type Promotion struct {
 	ValidTo        *time.Time `json:"validTo" db:"valid_to"`
 	CreatedAt      time.Time  `json:"createdAt" db:"created_at"`
 	UpdatedAt      time.Time  `json:"updatedAt" db:"updated_at"`
+}
+
+// BirthdayUnsubscribeToken represents an unsubscribe token for birthday emails
+type BirthdayUnsubscribeToken struct {
+	ID        string     `json:"id" db:"id"`
+	TenantID  string     `json:"tenantId" db:"tenant_id"`
+	ContactID string     `json:"contactId" db:"contact_id"`
+	Token     string     `json:"token" db:"token"`
+	Used      bool       `json:"used" db:"used"`
+	CreatedAt time.Time  `json:"createdAt" db:"created_at"`
+	UsedAt    *time.Time `json:"usedAt" db:"used_at"`
+}
+
+// BirthdayUnsubscribeRequest represents the request to unsubscribe from birthday emails
+type BirthdayUnsubscribeRequest struct {
+	Token  string  `json:"token" form:"token"`
+	Reason *string `json:"reason,omitempty" form:"reason"`
+}
+
+// BirthdayUnsubscribeResponse represents the response after unsubscribing
+type BirthdayUnsubscribeResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Email   string `json:"email,omitempty"`
 }
 
 // SendTestBirthdayCardRequest represents test birthday card request

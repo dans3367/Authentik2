@@ -293,7 +293,29 @@ export class BirthdayWorker extends EventEmitter {
         ? `${job.contactFirstName}${job.contactLastName ? ` ${job.contactLastName}` : ''}`
         : 'Friend';
 
-      // Render birthday template with promotion content
+      // Generate unsubscribe token
+      let unsubscribeToken = '';
+      try {
+        const tokenResponse = await fetch(`http://localhost:5004/api/birthday-unsubscribe-token/${job.contactId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            // Note: In production, you might need to add authentication headers
+          },
+        });
+
+        if (tokenResponse.ok) {
+          const tokenData = await tokenResponse.json();
+          unsubscribeToken = tokenData.token;
+          console.log(`🔗 [BirthdayWorker] Generated unsubscribe token for ${job.contactEmail}`);
+        } else {
+          console.warn(`⚠️ [BirthdayWorker] Failed to generate unsubscribe token for ${job.contactEmail}: ${tokenResponse.status}`);
+        }
+      } catch (error) {
+        console.warn(`⚠️ [BirthdayWorker] Error generating unsubscribe token for ${job.contactEmail}:`, error);
+      }
+
+      // Render birthday template with promotion content and unsubscribe link
       const htmlContent = this.renderBirthdayTemplate(job.settings.emailTemplate as any, {
         recipientName,
         message: job.settings.customMessage || 'Wishing you a wonderful birthday!',
@@ -303,6 +325,7 @@ export class BirthdayWorker extends EventEmitter {
         promotionContent: job.promotion?.content,
         promotionTitle: job.promotion?.title,
         promotionDescription: job.promotion?.description,
+        unsubscribeToken,
       });
 
       // Send the birthday email
@@ -319,6 +342,7 @@ export class BirthdayWorker extends EventEmitter {
           tenantId: job.tenantId,
           birthdayDate: job.birthdayDate,
           automated: true,
+          unsubscribeToken: unsubscribeToken || 'none',
         },
       });
 
@@ -355,6 +379,7 @@ export class BirthdayWorker extends EventEmitter {
       promotionContent?: string;
       promotionTitle?: string;
       promotionDescription?: string;
+      unsubscribeToken?: string;
     }
   ): string {
     // This is a simplified version - you might want to import the actual template renderer
@@ -382,6 +407,20 @@ export class BirthdayWorker extends EventEmitter {
       `;
     }
 
+    // Build unsubscribe section if token exists
+    let unsubscribeSection = '';
+    if (params.unsubscribeToken) {
+      const unsubscribeUrl = `http://localhost:5004/unsubscribe/birthday?token=${params.unsubscribeToken}`;
+      unsubscribeSection = `
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">
+          <p style="margin: 0; font-size: 0.8rem; color: #a0aec0; line-height: 1.4;">
+            Don't want to receive birthday cards? 
+            <a href="${unsubscribeUrl}" style="color: #667eea; text-decoration: none;">Unsubscribe here</a>
+          </p>
+        </div>
+      `;
+    }
+
     return `<html>
       <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%);">
         <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
@@ -397,6 +436,7 @@ export class BirthdayWorker extends EventEmitter {
             <div style="font-size: 0.9rem; color: #718096;">
               <p style="margin: 0; font-weight: 600; color: #4a5568;">${fromMessage}</p>
             </div>
+            ${unsubscribeSection}
           </div>
           ` : ''}
         </div>

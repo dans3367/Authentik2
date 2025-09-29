@@ -3,6 +3,8 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -108,7 +110,7 @@ func (h *BirthdayHandler) UpdateBirthdaySettings(c *gin.Context) {
 	if req.SenderName == nil || *req.SenderName == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"error":   "senderName is required",
+			"error":   "senderName is required and must be a string",
 		})
 		return
 	}
@@ -132,7 +134,7 @@ func (h *BirthdayHandler) UpdateBirthdaySettings(c *gin.Context) {
 		SegmentFilter:   *req.SegmentFilter,
 		CustomMessage:   getStringValue(req.CustomMessage),
 		CustomThemeData: req.CustomThemeData,
-		SenderName:      *req.SenderName,
+		SenderName:      getStringValue(req.SenderName),
 		PromotionID:     req.PromotionID,
 		UpdatedAt:       time.Now(),
 	}
@@ -533,6 +535,203 @@ func (h *BirthdayHandler) SendTestBirthdayCard(c *gin.Context) {
 			"userId":    userID,
 			"userEmail": req.UserEmail,
 		},
+	})
+}
+
+// GenerateBirthdayUnsubscribeToken generates an unsubscribe token for a contact
+func (h *BirthdayHandler) GenerateBirthdayUnsubscribeToken(c *gin.Context) {
+	tenantID, err := middleware.GetTenantID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Tenant ID not found",
+		})
+		return
+	}
+
+	contactID := c.Param("contactId")
+	if contactID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Contact ID is required",
+		})
+		return
+	}
+
+	// Verify contact exists and belongs to tenant
+	contact, err := h.repo.GetContactByID(c.Request.Context(), tenantID, contactID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to get contact",
+		})
+		return
+	}
+
+	if contact == nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":   "Contact not found",
+		})
+		return
+	}
+
+	// Generate secure random token
+	tokenBytes := make([]byte, 32)
+	_, err = rand.Read(tokenBytes)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to generate token",
+		})
+		return
+	}
+	token := hex.EncodeToString(tokenBytes)
+
+	// Create unsubscribe token in database
+	unsubToken, err := h.repo.CreateBirthdayUnsubscribeToken(c.Request.Context(), tenantID, contactID, token)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to create unsubscribe token",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"token":   unsubToken.Token,
+		"contact": gin.H{
+			"id":    contact.ID,
+			"email": contact.Email,
+		},
+	})
+}
+
+// ShowBirthdayUnsubscribePage shows the unsubscribe page
+func (h *BirthdayHandler) ShowBirthdayUnsubscribePage(c *gin.Context) {
+	token := c.Query("token")
+	if token == "" {
+		c.HTML(http.StatusBadRequest, "unsubscribe_error.html", gin.H{
+			"ErrorMessage": "Invalid unsubscribe link. Token is missing.",
+		})
+		return
+	}
+
+	// Get unsubscribe token from database
+	unsubToken, err := h.repo.GetBirthdayUnsubscribeToken(c.Request.Context(), token)
+	if err != nil {
+		c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
+			"ErrorMessage": "Failed to process unsubscribe request. Please try again later.",
+		})
+		return
+	}
+
+	if unsubToken == nil {
+		c.HTML(http.StatusNotFound, "unsubscribe_error.html", gin.H{
+			"ErrorMessage": "Invalid unsubscribe link. Token not found.",
+		})
+		return
+	}
+
+	if unsubToken.Used {
+		c.HTML(http.StatusOK, "unsubscribe_success.html", gin.H{
+			"Message": "You have already been unsubscribed from birthday emails.",
+			"Email":   "",
+		})
+		return
+	}
+
+	// Get contact information
+	contact, err := h.repo.GetContactByID(c.Request.Context(), unsubToken.TenantID, unsubToken.ContactID)
+	if err != nil || contact == nil {
+		c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
+			"ErrorMessage": "Failed to find contact information.",
+		})
+		return
+	}
+
+	// Show unsubscribe form
+	c.HTML(http.StatusOK, "unsubscribe.html", gin.H{
+		"Token":     token,
+		"Email":     contact.Email,
+		"FirstName": getStringValue(contact.FirstName),
+		"LastName":  getStringValue(contact.LastName),
+	})
+}
+
+// ProcessBirthdayUnsubscribe processes the unsubscribe request
+func (h *BirthdayHandler) ProcessBirthdayUnsubscribe(c *gin.Context) {
+	var req models.BirthdayUnsubscribeRequest
+	if err := c.ShouldBind(&req); err != nil {
+		c.HTML(http.StatusBadRequest, "unsubscribe_error.html", gin.H{
+			"ErrorMessage": "Invalid request data",
+		})
+		return
+	}
+
+	if req.Token == "" {
+		c.HTML(http.StatusBadRequest, "unsubscribe_error.html", gin.H{
+			"ErrorMessage": "Token is required",
+		})
+		return
+	}
+
+	// Get unsubscribe token from database
+	unsubToken, err := h.repo.GetBirthdayUnsubscribeToken(c.Request.Context(), req.Token)
+	if err != nil {
+		c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
+			"ErrorMessage": "Failed to process unsubscribe request",
+		})
+		return
+	}
+
+	if unsubToken == nil {
+		c.HTML(http.StatusNotFound, "unsubscribe_error.html", gin.H{
+			"ErrorMessage": "Invalid unsubscribe token",
+		})
+		return
+	}
+
+	if unsubToken.Used {
+		c.HTML(http.StatusBadRequest, "unsubscribe_error.html", gin.H{
+			"ErrorMessage": "This unsubscribe link has already been used",
+		})
+		return
+	}
+
+	// Get contact information for response
+	contact, err := h.repo.GetContactByID(c.Request.Context(), unsubToken.TenantID, unsubToken.ContactID)
+	if err != nil || contact == nil {
+		c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
+			"ErrorMessage": "Failed to find contact information",
+		})
+		return
+	}
+
+	// Unsubscribe the contact
+	err = h.repo.UnsubscribeContactFromBirthdayEmails(c.Request.Context(), unsubToken.ContactID, req.Reason)
+	if err != nil {
+		c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
+			"ErrorMessage": "Failed to unsubscribe from birthday emails",
+		})
+		return
+	}
+
+	// Mark token as used
+	err = h.repo.MarkBirthdayUnsubscribeTokenUsed(c.Request.Context(), unsubToken.ID)
+	if err != nil {
+		// Log error but don't fail the request since unsubscribe was successful
+		fmt.Printf("Warning: Failed to mark unsubscribe token as used: %v\n", err)
+	}
+
+	// Return success response
+	c.HTML(http.StatusOK, "unsubscribe_success.html", gin.H{
+		"Message":   "You have been successfully unsubscribed from birthday emails.",
+		"Email":     contact.Email,
+		"FirstName": getStringValue(contact.FirstName),
+		"LastName":  getStringValue(contact.LastName),
+		"Reason":    req.Reason,
 	})
 }
 

@@ -19,6 +19,9 @@ func SetupRouter(cfg *config.Config, repo *repository.Repository, temporalClient
 
 	router := gin.New()
 
+	// Load HTML templates
+	router.LoadHTMLGlob("templates/*")
+
 	// Add middleware
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
@@ -36,6 +39,10 @@ func SetupRouter(cfg *config.Config, repo *repository.Repository, temporalClient
 			"version": "1.0.0",
 		})
 	})
+
+	// Public unsubscribe routes (no auth required)
+	router.GET("/unsubscribe/birthday", birthdayHandler.ShowBirthdayUnsubscribePage)
+	router.POST("/unsubscribe/birthday", birthdayHandler.ProcessBirthdayUnsubscribe)
 
 	// API routes with authentication
 	api := router.Group("/api")
@@ -57,6 +64,9 @@ func SetupRouter(cfg *config.Config, repo *repository.Repository, temporalClient
 
 		// Test birthday card endpoint
 		api.POST("/birthday-test", birthdayHandler.SendTestBirthdayCard)
+
+		// Generate unsubscribe token (authenticated endpoint for internal use)
+		api.POST("/birthday-unsubscribe-token/:contactId", birthdayHandler.GenerateBirthdayUnsubscribeToken)
 	}
 
 	return router

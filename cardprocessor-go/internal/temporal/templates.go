@@ -29,6 +29,7 @@ type TemplateParams struct {
 	PromotionContent     string                 `json:"promotionContent"`
 	PromotionTitle       string                 `json:"promotionTitle"`
 	PromotionDescription string                 `json:"promotionDescription"`
+	UnsubscribeToken     string                 `json:"unsubscribeToken"`
 	IsTest               bool                   `json:"isTest"`
 }
 
@@ -124,7 +125,8 @@ func renderCustomTemplate(params TemplateParams) string {
 					<div style="font-size: 0.9rem; color: #718096;">
 						<p style="margin: 0; font-weight: 600; color: #4a5568;">%s</p>
 					</div>
-				</div>`, template.HTMLEscapeString(fromMessage))
+					%s
+				</div>`, template.HTMLEscapeString(fromMessage), renderUnsubscribeSection(params))
 	}
 
 	return fmt.Sprintf(`<html>
@@ -296,6 +298,23 @@ func renderSignature(signature string, params TemplateParams) string {
 		return ""
 	}
 	return fmt.Sprintf(`<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">%s</div>`, sanitizeHTMLContent(signature, params))
+}
+
+// renderUnsubscribeSection renders unsubscribe link if token is available
+func renderUnsubscribeSection(params TemplateParams) string {
+	if params.UnsubscribeToken == "" {
+		return ""
+	}
+
+	unsubscribeUrl := fmt.Sprintf("http://localhost:5000/unsubscribe/birthday?token=%s", params.UnsubscribeToken)
+
+	return fmt.Sprintf(`
+		<div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">
+			<p style="margin: 0; font-size: 0.8rem; color: #a0aec0; line-height: 1.4;">
+				Don't want to receive birthday cards? 
+				<a href="%s" style="color: #667eea; text-decoration: none;">Unsubscribe here</a>
+			</p>
+		</div>`, unsubscribeUrl)
 }
 
 // processPlaceholders replaces placeholder tokens with actual customer data

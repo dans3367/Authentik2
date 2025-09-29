@@ -378,3 +378,5 @@ TemporalTaskQueue:     getEnv("TEMPORAL_TASK_QUEUE", "authentik-tasks"),
 - **Error Recovery**: Retry policies and graceful degradation
 - **Test Mode**: Special handling for test cards vs. production cards
 
+
+

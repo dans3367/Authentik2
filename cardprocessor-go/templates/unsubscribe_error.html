@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unsubscribe Error</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 100%;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 24px;
+            background: #fed7d7;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+        }
+        
+        h1 {
+            color: #2d3748;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+        
+        .subtitle {
+            color: #718096;
+            font-size: 16px;
+            margin-bottom: 32px;
+            line-height: 1.5;
+        }
+        
+        .error-message {
+            background: #fed7d7;
+            border: 1px solid #feb2b2;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 32px;
+            color: #742a2a;
+            text-align: left;
+        }
+        
+        .error-message h3 {
+            color: #742a2a;
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+        
+        .error-message p {
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .help-section {
+            background: #f7fafc;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 32px;
+            text-align: left;
+        }
+        
+        .help-section h4 {
+            color: #2d3748;
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+        
+        .help-section ul {
+            color: #4a5568;
+            font-size: 14px;
+            line-height: 1.6;
+            padding-left: 20px;
+        }
+        
+        .help-section li {
+            margin-bottom: 8px;
+        }
+        
+        .btn {
+            padding: 14px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+            background: #4a5568;
+            color: white;
+            margin: 0 8px;
+        }
+        
+        .btn:hover {
+            background: #2d3748;
+            transform: translateY(-1px);
+        }
+        
+        .btn-primary {
+            background: #3182ce;
+        }
+        
+        .btn-primary:hover {
+            background: #2c5282;
+        }
+        
+        .footer {
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid #e2e8f0;
+            color: #718096;
+            font-size: 14px;
+        }
+        
+        @media (max-width: 480px) {
+            .container {
+                padding: 24px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+            
+            .btn {
+                display: block;
+                margin: 8px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">❌</div>
+        <h1>Unsubscribe Error</h1>
+        <p class="subtitle">We encountered an issue while processing your unsubscribe request.</p>
+        
+        <div class="error-message">
+            <h3>Error Details:</h3>
+            <p>{{.ErrorMessage}}</p>
+        </div>
+        
+        <div class="help-section">
+            <h4>What you can do:</h4>
+            <ul>
+                <li>Check if the unsubscribe link is complete and hasn't been truncated</li>
+                <li>Make sure you're using the most recent unsubscribe link from your email</li>
+                <li>Try refreshing the page and attempting again</li>
+                <li>Contact our support team if the problem persists</li>
+            </ul>
+        </div>
+        
+        <div>
+            <button onclick="window.location.reload()" class="btn btn-primary">Try Again</button>
+            <button onclick="window.close()" class="btn">Close Window</button>
+        </div>
+        
+        <div class="footer">
+            <p>If you continue to experience issues, please contact our support team for assistance.</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -253,7 +253,7 @@ export default function BirthdaysPage() {
           emailTemplate: 'default',
           segmentFilter: 'all',
           customMessage: '',
-          senderName: '',
+          senderName: 'Birthday Team',
           promotionId: null,
           promotion: null,
           created_at: new Date().toISOString(),
@@ -267,7 +267,7 @@ export default function BirthdaysPage() {
           emailTemplate: 'default',
           segmentFilter: 'all',
           customMessage: '',
-          senderName: '',
+          senderName: 'Birthday Team',
           promotionId: null,
           promotion: null,
           created_at: new Date().toISOString(),
@@ -325,25 +325,51 @@ export default function BirthdaysPage() {
   // Update birthday settings
   const updateSettingsMutation = useMutation({
     mutationFn: async (settings: Partial<BirthdaySettings>) => {
+      console.log('🎨 [Birthday Cards] Sending update request:', settings);
       const response = await fetch('/api/birthday-settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings),
       });
-      if (!response.ok) throw new Error('Failed to update settings');
-      return response.json();
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        console.error('🎨 [Birthday Cards] Server error:', errorData);
+        throw new Error(errorData.message || `Server error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('🎨 [Birthday Cards] Update successful:', result);
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (updatedSettings) => {
+      console.log('🎨 [Birthday Cards] Server response:', updatedSettings);
+      
       toast({
         title: "Success",
         description: "Birthday settings updated successfully",
       });
-      refetchSettings();
+      
+      // Update the query cache immediately with the server response
+      queryClient.setQueryData(['/api/birthday-settings'], updatedSettings);
+      
+      // Force a re-render by invalidating the query
+      queryClient.invalidateQueries({ queryKey: ['/api/birthday-settings'] });
     },
     onError: (error: any) => {
+      console.error('🎨 [Birthday Cards] Update settings error:', error);
+
+      // Try to extract error message from response
+      let errorMessage = "Failed to update birthday settings";
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+
       toast({
         title: "Error",
-        description: error?.message || "Failed to update birthday settings",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -1483,29 +1509,47 @@ export default function BirthdaysPage() {
               console.log('🎨 [Birthday Cards] Making custom theme active');
               setCustomThemePreview(themeData);
 
-              updateSettingsMutation.mutate({
+              const payload = {
                 ...birthdaySettings,
+                enabled: birthdaySettings?.enabled || false,
                 emailTemplate: 'custom',
+                segmentFilter: birthdaySettings?.segmentFilter || 'all',
                 customMessage: data.message,
                 customThemeData: JSON.stringify(updatedThemeData),
-              });
+                senderName: birthdaySettings?.senderName || 'Birthday Team',
+              };
+              
+              console.log('🎨 [Birthday Cards] Custom theme payload:', payload);
+              updateSettingsMutation.mutate(payload);
             } else if (isDefaultTheme && (hasTextCustomizations || data.message !== (birthdaySettings?.customMessage || ''))) {
               // For default themes with customizations, save theme-specific data but keep original theme template
               console.log('🎨 [Birthday Cards] Making default theme with customizations active:', currentThemeId);
-              updateSettingsMutation.mutate({
+              const payload = {
                 ...birthdaySettings,
+                enabled: birthdaySettings?.enabled || false,
                 emailTemplate: themeId || 'default', // Keep the default theme selection
+                segmentFilter: birthdaySettings?.segmentFilter || 'all',
                 customMessage: data.message,
                 customThemeData: JSON.stringify(updatedThemeData), // Save theme-specific data
-              });
+                senderName: birthdaySettings?.senderName || 'Birthday Team',
+              };
+              
+              console.log('🎨 [Birthday Cards] Default theme with customizations payload:', payload);
+              updateSettingsMutation.mutate(payload);
             } else {
               // For default themes with no customizations, just set the template
               console.log('🎨 [Birthday Cards] Making default theme active');
-              updateSettingsMutation.mutate({
+              const payload = {
                 ...birthdaySettings,
+                enabled: birthdaySettings?.enabled || false,
                 emailTemplate: themeId || 'default',
+                segmentFilter: birthdaySettings?.segmentFilter || 'all',
                 customMessage: data.message,
-              });
+                senderName: birthdaySettings?.senderName || 'Birthday Team',
+              };
+              
+              console.log('🎨 [Birthday Cards] Default theme payload:', payload);
+              updateSettingsMutation.mutate(payload);
             }
 
             // Close the designer after making active

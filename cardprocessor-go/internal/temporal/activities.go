@@ -3,6 +3,8 @@ package temporal
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -269,6 +271,23 @@ func GenerateBirthdayInvitationToken(ctx context.Context, input TokenInput) (Tok
 	}, nil
 }
 
+func GenerateBirthdayUnsubscribeToken(ctx context.Context, input TokenInput) (TokenResult, error) {
+	logger := activity.GetLogger(ctx)
+	logger.Info("🔑 Generating birthday unsubscribe token", "contactId", input.ContactID)
+
+	// Generate a secure random token
+	tokenBytes := make([]byte, 32)
+	_, err := rand.Read(tokenBytes)
+	if err != nil {
+		return TokenResult{Success: false, Error: "Failed to generate token"}, err
+	}
+	token := hex.EncodeToString(tokenBytes)
+
+	// Note: For test emails, we don't need to store the token in the database
+	// In production workflows, you would call the repository method with proper parameters
+	return TokenResult{Success: true, Token: token}, nil
+}
+
 // UpdateBirthdayTestStatus updates the birthday test status in database
 func UpdateBirthdayTestStatus(ctx context.Context, input UpdateStatusInput) error {
 	logger := activity.GetLogger(ctx)
@@ -398,6 +417,15 @@ func generateBirthdayTestHTML(input BirthdayTestWorkflowInput) string {
 		}
 	}
 
+	// Generate unsubscribe token for test emails
+	var unsubscribeToken string
+	if input.UserID != "" {
+		tokenBytes := make([]byte, 32)
+		if _, err := rand.Read(tokenBytes); err == nil {
+			unsubscribeToken = hex.EncodeToString(tokenBytes)
+		}
+	}
+
 	// Prepare template parameters
 	params := TemplateParams{
 		RecipientName:        recipientName,
@@ -409,6 +437,7 @@ func generateBirthdayTestHTML(input BirthdayTestWorkflowInput) string {
 		PromotionTitle:       "",
 		PromotionDescription: "",
 		IsTest:               input.IsTest,
+		UnsubscribeToken:     unsubscribeToken,
 	}
 
 	// Render the template
@@ -443,6 +472,15 @@ func generateBirthdayTestHTMLWithPromotion(input BirthdayTestWorkflowInput, prom
 		}
 	}
 
+	// Generate unsubscribe token for test emails
+	var unsubscribeToken string
+	if input.UserID != "" {
+		tokenBytes := make([]byte, 32)
+		if _, err := rand.Read(tokenBytes); err == nil {
+			unsubscribeToken = hex.EncodeToString(tokenBytes)
+		}
+	}
+
 	// Prepare template parameters with promotion data
 	params := TemplateParams{
 		RecipientName:   recipientName,
@@ -451,6 +489,7 @@ func generateBirthdayTestHTMLWithPromotion(input BirthdayTestWorkflowInput, prom
 		CustomThemeData: customThemeData,
 		SenderName:      input.SenderName,
 		IsTest:          input.IsTest,
+		UnsubscribeToken: unsubscribeToken,
 	}
 
 	// Add promotion data if available

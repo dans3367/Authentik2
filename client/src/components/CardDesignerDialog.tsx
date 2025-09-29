@@ -1091,11 +1091,11 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                     // Determine the correct theme ID based on current state
                     let currentThemeId = initialThemeId || 'default';
 
-                    // Only set to custom if we're not working with a predefined theme
-                    // If initialThemeId is a predefined theme (default, confetti, balloons), preserve it
-                    if (customImage && initialThemeId && !['default', 'confetti', 'balloons'].includes(initialThemeId)) {
+                    // Set to custom theme if user has uploaded a custom image OR if we're explicitly in custom theme mode
+                    if (customImage || initialThemeId === 'custom') {
                       currentThemeId = 'custom';
                     }
+                    // Otherwise, preserve the default theme (default, confetti, balloons)
 
                     const currentData = {
                       title,
