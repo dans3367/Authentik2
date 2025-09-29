@@ -152,9 +152,9 @@ func renderCustomTemplate(params TemplateParams) string {
 	</html>`,
 		headerImageSection,
 		template.HTMLEscapeString(title),
-		sanitizeHTMLContent(message),
+		sanitizeHTMLContent(message, params),
 		renderPromotionContent(params),
-		renderSignature(signature),
+		renderSignature(signature, params),
 		fromMessageSection,
 	)
 }
@@ -255,9 +255,9 @@ func renderPredefinedTemplate(templateId BirthdayTemplateId, params TemplatePara
 		colors.Primary, colors.Secondary,
 		headerImage,
 		template.HTMLEscapeString(headline),
-		sanitizeHTMLContent(message),
+		sanitizeHTMLContent(message, params),
 		renderPromotionContent(params),
-		renderSignature(signature),
+		renderSignature(signature, params),
 		fromMessageSection,
 	)
 }
@@ -270,12 +270,12 @@ func renderPromotionContent(params TemplateParams) string {
 
 	promotionTitle := ""
 	if params.PromotionTitle != "" {
-		promotionTitle = fmt.Sprintf(`<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">%s</h3>`, sanitizeHTMLContent(params.PromotionTitle))
+		promotionTitle = fmt.Sprintf(`<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">%s</h3>`, sanitizeHTMLContent(params.PromotionTitle, params))
 	}
 
 	promotionDescription := ""
 	if params.PromotionDescription != "" {
-		promotionDescription = fmt.Sprintf(`<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">%s</p>`, sanitizeHTMLContent(params.PromotionDescription))
+		promotionDescription = fmt.Sprintf(`<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">%s</p>`, sanitizeHTMLContent(params.PromotionDescription, params))
 	}
 
 	return fmt.Sprintf(`
@@ -286,23 +286,52 @@ func renderPromotionContent(params TemplateParams) string {
 		</div>`,
 		promotionTitle,
 		promotionDescription,
-		sanitizeHTMLContent(params.PromotionContent),
+		sanitizeHTMLContent(params.PromotionContent, params),
 	)
 }
 
 // renderSignature renders signature if available
-func renderSignature(signature string) string {
+func renderSignature(signature string, params TemplateParams) string {
 	if signature == "" {
 		return ""
 	}
-	return fmt.Sprintf(`<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">%s</div>`, sanitizeHTMLContent(signature))
+	return fmt.Sprintf(`<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">%s</div>`, sanitizeHTMLContent(signature, params))
 }
 
-// sanitizeHTMLContent safely renders HTML content by allowing only safe HTML tags
-func sanitizeHTMLContent(content string) string {
+// processPlaceholders replaces placeholder tokens with actual customer data
+func processPlaceholders(content string, params TemplateParams) string {
+	if content == "" {
+		return content
+	}
+
+	// Extract first and last name from recipientName
+	firstName := ""
+	lastName := ""
+	if params.RecipientName != "" {
+		nameParts := strings.Fields(params.RecipientName)
+		if len(nameParts) > 0 {
+			firstName = nameParts[0]
+		}
+		if len(nameParts) > 1 {
+			lastName = strings.Join(nameParts[1:], " ")
+		}
+	}
+
+	// Replace placeholders
+	content = strings.ReplaceAll(content, "{{firstName}}", firstName)
+	content = strings.ReplaceAll(content, "{{lastName}}", lastName)
+
+	return content
+}
+
+// sanitizeHTMLContent safely renders HTML content by allowing only safe HTML tags and processes placeholders
+func sanitizeHTMLContent(content string, params TemplateParams) string {
 	if content == "" {
 		return ""
 	}
+
+	// First process placeholders
+	content = processPlaceholders(content, params)
 
 	// Allow common safe HTML tags for formatting
 	allowedTags := []string{

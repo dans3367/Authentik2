@@ -388,9 +388,19 @@ func generateBirthdayTestHTML(input BirthdayTestWorkflowInput) string {
 		templateId = TemplateDefault
 	}
 
+	// Prepare recipient name (combine first and last name for placeholder processing)
+	recipientName := input.UserFirstName
+	if input.UserLastName != "" {
+		if recipientName != "" {
+			recipientName += " " + input.UserLastName
+		} else {
+			recipientName = input.UserLastName
+		}
+	}
+
 	// Prepare template parameters
 	params := TemplateParams{
-		RecipientName:        input.UserFirstName,
+		RecipientName:        recipientName,
 		Message:              input.CustomMessage,
 		BrandName:            input.TenantName,
 		CustomThemeData:      customThemeData,
@@ -423,9 +433,19 @@ func generateBirthdayTestHTMLWithPromotion(input BirthdayTestWorkflowInput, prom
 		templateId = TemplateDefault
 	}
 
+	// Prepare recipient name (combine first and last name for placeholder processing)
+	recipientName := input.UserFirstName
+	if input.UserLastName != "" {
+		if recipientName != "" {
+			recipientName += " " + input.UserLastName
+		} else {
+			recipientName = input.UserLastName
+		}
+	}
+
 	// Prepare template parameters with promotion data
 	params := TemplateParams{
-		RecipientName:   input.UserFirstName,
+		RecipientName:   recipientName,
 		Message:         input.CustomMessage,
 		BrandName:       input.TenantName,
 		CustomThemeData: customThemeData,

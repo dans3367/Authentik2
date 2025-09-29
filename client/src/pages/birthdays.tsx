@@ -181,9 +181,6 @@ export default function BirthdaysPage() {
   // State for real-time preview of all themes (including default themes with customizations)
   const [themePreviewData, setThemePreviewData] = useState<{ [key: string]: CustomThemeData }>({});
 
-  // Local state for sender name to avoid API calls on every keystroke
-  const [localSenderName, setLocalSenderName] = useState<string>('');
-
   // State for promotion selection
   const [selectedPromotions, setSelectedPromotions] = useState<string[]>([]);
 
@@ -400,13 +397,6 @@ export default function BirthdaysPage() {
     },
   });
 
-  // Initialize local sender name when birthday settings are loaded
-  useEffect(() => {
-    if (birthdaySettings?.senderName !== undefined) {
-      setLocalSenderName(birthdaySettings.senderName);
-    }
-  }, [birthdaySettings?.senderName]);
-
   // Initialize selected promotions when birthday settings are loaded
   useEffect(() => {
     if (birthdaySettings?.promotion) {
@@ -415,16 +405,6 @@ export default function BirthdaysPage() {
       setSelectedPromotions([]);
     }
   }, [birthdaySettings?.promotion]);
-
-  // Save handler for sender name
-  const handleSaveSenderName = () => {
-    if (birthdaySettings) {
-      updateSettingsMutation.mutate({
-        ...birthdaySettings,
-        senderName: localSenderName,
-      });
-    }
-  };
 
   const handleSettingsUpdate = (field: keyof BirthdaySettings, value: any) => {
     if (birthdaySettings) {
@@ -1576,35 +1556,6 @@ export default function BirthdaysPage() {
 
 
 
-                  {/* Email Template Settings */}
-                  <div className="space-y-4">
-                    <Label className="text-base font-medium">Email Template</Label>
-                    <div className="space-y-4">
-                      <div>
-                        <Label className="text-sm">Sender Name</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            value={localSenderName}
-                            onChange={(e) => setLocalSenderName(e.target.value)}
-                            placeholder="Your Company Name"
-                            disabled={updateSettingsMutation.isPending}
-                            className="flex-1"
-                          />
-                          <Button
-                            onClick={handleSaveSenderName}
-                            disabled={updateSettingsMutation.isPending || localSenderName === (birthdaySettings?.senderName || '')}
-                            size="sm"
-                            variant="outline"
-                            className="px-3"
-                          >
-                            <Save className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-
-
-                    </div>
-                  </div>
 
 
                 </CardContent>

@@ -1412,11 +1412,9 @@ export const birthdaySettings = pgTable("birthday_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   enabled: boolean("enabled").default(false),
-  emailTemplate: text("email_template").default('default'), // Email template to use
   segmentFilter: text("segment_filter").default('all'), // Which contacts to include
   customMessage: text("custom_message").default(''), // Custom birthday message
   customThemeData: text("custom_theme_data"), // JSON data for custom theme
-  senderName: text("sender_name").default(''),
   promotionId: varchar("promotion_id").references(() => promotions.id, { onDelete: 'set null' }), // Optional promotion to include in birthday emails
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

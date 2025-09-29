@@ -45,6 +45,31 @@ const db = drizzle(pool);
 // Birthday template types and renderer
 type BirthdayTemplateId = 'default' | 'confetti' | 'balloons' | 'custom';
 
+// Function to process placeholders in content
+function processPlaceholders(content: string, params: { recipientName?: string }): string {
+  if (!content) return content;
+
+  // Extract first and last name from recipientName
+  let firstName = '';
+  let lastName = '';
+
+  if (params.recipientName) {
+    const nameParts = params.recipientName.trim().split(/\s+/);
+    if (nameParts.length > 0) {
+      firstName = nameParts[0];
+    }
+    if (nameParts.length > 1) {
+      lastName = nameParts.slice(1).join(' ');
+    }
+  }
+
+  // Replace placeholders
+  content = content.replace(/\{\{firstName\}\}/g, firstName);
+  content = content.replace(/\{\{lastName\}\}/g, lastName);
+
+  return content;
+}
+
 function renderBirthdayTemplate(
   template: BirthdayTemplateId,
   params: {
@@ -87,7 +112,7 @@ function renderBirthdayTemplate(
     }
 
     const title = customData.title || `Happy Birthday${params.recipientName ? ', ' + params.recipientName : ''}!`;
-    const message = customData.message || params.message || 'Wishing you a wonderful day!';
+    const message = processPlaceholders(customData.message || params.message || 'Wishing you a wonderful day!', params);
     const signature = customData.signature || '';
     const fromMessage = params.senderName || 'The Team';
 
@@ -114,12 +139,12 @@ function renderBirthdayTemplate(
             <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">${message}</div>
             ${params.promotionContent ? `
               <div style="margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border-radius: 8px; border-left: 4px solid #667eea;">
-                ${params.promotionTitle ? `<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">${params.promotionTitle}</h3>` : ''}
-                ${params.promotionDescription ? `<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${params.promotionDescription}</p>` : ''}
-                <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${params.promotionContent}</div>
+                ${params.promotionTitle ? `<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">${processPlaceholders(params.promotionTitle, params)}</h3>` : ''}
+                ${params.promotionDescription ? `<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${processPlaceholders(params.promotionDescription, params)}</p>` : ''}
+                <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${processPlaceholders(params.promotionContent, params)}</div>
               </div>
             ` : ''}
-            ${signature ? `<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">${signature}</div>` : ''}
+            ${signature ? `<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">${processPlaceholders(signature, params)}</div>` : ''}
           </div>
           
           <!-- 4. From Message -->
@@ -204,15 +229,15 @@ function renderBirthdayTemplate(
         
         <!-- 3. Content Area (message) -->
         <div style="padding: 30px;">
-          <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">${params.message || 'Wishing you a wonderful day!'}</div>
+          <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">${processPlaceholders(params.message || 'Wishing you a wonderful day!', params)}</div>
           ${params.promotionContent ? `
             <div style="margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border-radius: 8px; border-left: 4px solid ${colors.primary};">
-              ${params.promotionTitle ? `<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">${params.promotionTitle}</h3>` : ''}
-              ${params.promotionDescription ? `<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${params.promotionDescription}</p>` : ''}
-              <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${params.promotionContent}</div>
+              ${params.promotionTitle ? `<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">${processPlaceholders(params.promotionTitle, params)}</h3>` : ''}
+              ${params.promotionDescription ? `<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${processPlaceholders(params.promotionDescription, params)}</p>` : ''}
+              <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${processPlaceholders(params.promotionContent, params)}</div>
             </div>
           ` : ''}
-          ${signature ? `<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">${signature}</div>` : ''}
+          ${signature ? `<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">${processPlaceholders(signature, params)}</div>` : ''}
         </div>
         
         <!-- 4. From Message -->
