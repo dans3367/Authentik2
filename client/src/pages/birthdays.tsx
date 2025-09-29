@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -434,6 +434,60 @@ export default function BirthdaysPage() {
       setSelectedPromotions([]);
     }
   }, [birthdaySettings?.promotion]);
+
+  // Memoized initial data for CardDesignerDialog to prevent re-render loops
+  const cardDesignerInitialData = useMemo(() => {
+    // Load persistent draft first
+    try {
+      const raw = localStorage.getItem('birthdayCardDesignerDraft');
+      if (raw) return JSON.parse(raw);
+    } catch { }
+
+    // Parse existing customThemeData and load theme-specific data
+    if (birthdaySettings?.customThemeData) {
+      try {
+        const parsed = JSON.parse(birthdaySettings.customThemeData);
+        const currentThemeId = designerThemeId || 'default';
+
+        let themeSpecificData = null;
+
+        // Check if it's the new structure (has themes property)
+        if (parsed.themes && parsed.themes[currentThemeId]) {
+          themeSpecificData = parsed.themes[currentThemeId];
+        } else if (!parsed.themes) {
+          // Old structure - assume it's for custom theme if we're loading custom
+          if (currentThemeId === 'custom') {
+            themeSpecificData = parsed;
+          }
+        }
+
+        if (themeSpecificData) {
+          return {
+            title: themeSpecificData.title || '',
+            message: themeSpecificData.message || birthdaySettings?.customMessage || '',
+            signature: themeSpecificData.signature || '',
+            imageUrl: themeSpecificData.imageUrl || null,
+            customImage: Boolean(themeSpecificData.customImage && themeSpecificData.imageUrl),
+            imagePosition: themeSpecificData.imagePosition || { x: 0, y: 0 },
+            imageScale: themeSpecificData.imageScale || 1,
+          };
+        }
+      } catch {
+        // Fall through to default if parsing fails
+      }
+    }
+
+    // Default data if no theme-specific customizations found
+    return {
+      title: '',
+      message: birthdaySettings?.customMessage || '',
+      signature: '',
+      imageUrl: null, // Let CardDesignerDialog load the default theme image
+      customImage: false, // This is key - tells the dialog it's NOT a custom image
+      imagePosition: { x: 0, y: 0 },
+      imageScale: 1,
+    };
+  }, [birthdaySettings?.customThemeData, birthdaySettings?.customMessage, designerThemeId]);
 
   const handleSettingsUpdate = (field: keyof BirthdaySettings, value: any) => {
     if (birthdaySettings) {
@@ -1137,7 +1191,9 @@ export default function BirthdaysPage() {
                     { id: 'balloons', name: 'Balloons' },
                     { id: 'custom', name: 'Custom' },
                   ].map((tpl) => {
-                    const isSelected = (birthdaySettings?.emailTemplate || 'default') === tpl.id;
+                    // Use the same logic as isCurrentlyActive in CardDesignerDialog
+                    const currentTemplate = birthdaySettings?.emailTemplate || 'default';
+                    const isSelected = currentTemplate === tpl.id;
                     return (
                       <button
                         key={tpl.id}
@@ -1303,58 +1359,7 @@ export default function BirthdaysPage() {
           }}
           initialThemeId={designerThemeId || undefined}
           onPreviewChange={handlePreviewChange}
-          initialData={(() => {
-            // Load persistent draft first
-            try {
-              const raw = localStorage.getItem('birthdayCardDesignerDraft');
-              if (raw) return JSON.parse(raw);
-            } catch { }
-
-            // Parse existing customThemeData and load theme-specific data
-            if (birthdaySettings?.customThemeData) {
-              try {
-                const parsed = JSON.parse(birthdaySettings.customThemeData);
-                const currentThemeId = designerThemeId || 'default';
-
-                let themeSpecificData = null;
-
-                // Check if it's the new structure (has themes property)
-                if (parsed.themes && parsed.themes[currentThemeId]) {
-                  themeSpecificData = parsed.themes[currentThemeId];
-                } else if (!parsed.themes) {
-                  // Old structure - assume it's for custom theme if we're loading custom
-                  if (currentThemeId === 'custom') {
-                    themeSpecificData = parsed;
-                  }
-                }
-
-                if (themeSpecificData) {
-                  return {
-                    title: themeSpecificData.title || '',
-                    message: themeSpecificData.message || birthdaySettings?.customMessage || '',
-                    signature: themeSpecificData.signature || '',
-                    imageUrl: themeSpecificData.imageUrl || null,
-                    customImage: Boolean(themeSpecificData.customImage && themeSpecificData.imageUrl),
-                    imagePosition: themeSpecificData.imagePosition || { x: 0, y: 0 },
-                    imageScale: themeSpecificData.imageScale || 1,
-                  };
-                }
-              } catch {
-                // Fall through to default if parsing fails
-              }
-            }
-
-            // Default data if no theme-specific customizations found
-            return {
-              title: '',
-              message: birthdaySettings?.customMessage || '',
-              signature: '',
-              imageUrl: null, // Let CardDesignerDialog load the default theme image
-              customImage: false, // This is key - tells the dialog it's NOT a custom image
-              imagePosition: { x: 0, y: 0 },
-              imageScale: 1,
-            };
-          })()}
+          initialData={cardDesignerInitialData}
           onSave={(data) => {
             try {
               localStorage.setItem('birthdayCardDesignerDraft', JSON.stringify({ title: data.title, message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId, customImage: (data as any).customImage }));
