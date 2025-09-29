@@ -164,7 +164,12 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     // Reset change tracking
     setHasUnsavedChanges(false);
 
-    // Load persistent Unsplash search state
+  }, [open, initialThemeId, initialData]);
+
+  // Load persistent Unsplash search state only once when modal opens
+  useEffect(() => {
+    if (!open) return;
+
     try {
       const savedSearchState = localStorage.getItem("unsplashSearchState");
       if (savedSearchState) {
@@ -179,7 +184,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     } catch (error) {
       console.warn('Error loading search state:', error);
     }
-  }, [open, initialThemeId, initialData]);
+  }, [open]); // Only depend on open, not other props
 
   // If theme changes while open and no custom image chosen, update to theme's default image
   useEffect(() => {
@@ -828,8 +833,8 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
             <div
               ref={imageContainerRef}
               className={`relative bg-gray-100 overflow-hidden transition-all duration-200 ${showImageControls && imageUrl && !imageError
-                  ? 'ring-2 ring-blue-400 ring-opacity-50'
-                  : ''
+                ? 'ring-2 ring-blue-400 ring-opacity-50'
+                : ''
                 }`}
               // TEMPORARILY DISABLED - Image manipulation event handlers
               // onClick={imageUrl && !imageError ? handleImageClick : undefined}
@@ -1138,17 +1143,19 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && startNewSearch(searchQuery)}
                       className="flex-1 text-sm sm:text-base pr-8"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
                     />
-                    {searchQuery && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 text-gray-400 hover:text-gray-600"
-                        onClick={clearSearch}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={`absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 text-gray-400 hover:text-gray-600 ${searchQuery ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                      onClick={clearSearch}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
                   </div>
                   <Button
                     onClick={() => startNewSearch(searchQuery)}

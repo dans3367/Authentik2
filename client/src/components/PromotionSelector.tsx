@@ -33,6 +33,7 @@ interface PromotionSelectorProps {
   onPromotionContentInsert?: (content: string) => void;
   campaignType?: 'newsletter' | 'survey' | 'birthday' | 'announcement' | 'sale' | 'event';
   className?: string;
+  singleSelection?: boolean; // New prop to enable single selection mode
 }
 
 const promotionTypeColors = {
@@ -44,10 +45,10 @@ const promotionTypeColors = {
   event: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300',
 };
 
-function PromotionPreviewModal({ promotion, isOpen, onClose }: { 
-  promotion: Promotion; 
-  isOpen: boolean; 
-  onClose: () => void; 
+function PromotionPreviewModal({ promotion, isOpen, onClose }: {
+  promotion: Promotion;
+  isOpen: boolean;
+  onClose: () => void;
 }) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -69,7 +70,7 @@ function PromotionPreviewModal({ promotion, isOpen, onClose }: {
           )}
           <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-900">
             <h4 className="font-medium mb-2">Content Preview:</h4>
-            <div 
+            <div
               className="prose prose-sm max-w-none dark:prose-invert"
               dangerouslySetInnerHTML={{ __html: promotion.content }}
             />
@@ -83,12 +84,13 @@ function PromotionPreviewModal({ promotion, isOpen, onClose }: {
   );
 }
 
-export function PromotionSelector({ 
-  selectedPromotions, 
-  onPromotionsChange, 
+export function PromotionSelector({
+  selectedPromotions,
+  onPromotionsChange,
   onPromotionContentInsert,
   campaignType,
-  className 
+  className,
+  singleSelection = false
 }: PromotionSelectorProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [filterType, setFilterType] = useState<string>('all');
@@ -102,7 +104,7 @@ export function PromotionSelector({
       if (filterType !== 'all') params.append('type', filterType);
       if (searchTerm) params.append('search', searchTerm);
       params.append('isActive', 'true'); // Only show active promotions
-      
+
       const response = await apiRequest('GET', `/api/promotions?${params.toString()}`);
       const data = await response.json();
       return data.promotions;
@@ -129,18 +131,36 @@ export function PromotionSelector({
 
   const handlePromotionToggle = (promotionId: string) => {
     if (selectedPromotions.includes(promotionId)) {
+      // Remove the promotion
       onPromotionsChange(selectedPromotions.filter(id => id !== promotionId));
     } else {
-      onPromotionsChange([...selectedPromotions, promotionId]);
+      // Add the promotion
+      if (singleSelection) {
+        // In single selection mode, replace the current selection
+        onPromotionsChange([promotionId]);
+      } else {
+        // In multi-selection mode, add to existing selection
+        onPromotionsChange([...selectedPromotions, promotionId]);
+      }
     }
   };
 
   const handleInsertContent = (promotion: Promotion) => {
-    if (onPromotionContentInsert) {
-      onPromotionContentInsert(promotion.content);
-    }
-    if (!selectedPromotions.includes(promotion.id)) {
-      onPromotionsChange([...selectedPromotions, promotion.id]);
+    if (selectedPromotions.includes(promotion.id)) {
+      // Remove the promotion
+      onPromotionsChange(selectedPromotions.filter(id => id !== promotion.id));
+    } else {
+      // Add the promotion
+      if (onPromotionContentInsert) {
+        onPromotionContentInsert(promotion.content);
+      }
+      if (singleSelection) {
+        // In single selection mode, replace the current selection
+        onPromotionsChange([promotion.id]);
+      } else {
+        // In multi-selection mode, add to existing selection
+        onPromotionsChange([...selectedPromotions, promotion.id]);
+      }
     }
     setIsDialogOpen(false);
   };
@@ -158,7 +178,9 @@ export function PromotionSelector({
       {selectedPromotions.length > 0 && selectedPromotionData && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Selected Promotions</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {singleSelection ? 'Selected Promotion' : 'Selected Promotions'}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
@@ -188,17 +210,23 @@ export function PromotionSelector({
         <DialogTrigger asChild>
           <Button variant="outline" className="w-full">
             <Megaphone className="h-4 w-4 mr-2" />
-            {selectedPromotions.length > 0 
-              ? `Manage Promotions (${selectedPromotions.length} selected)`
-              : 'Add Promotions'
+            {selectedPromotions.length > 0
+              ? singleSelection
+                ? `Manage Promotion (${selectedPromotions.length} selected)`
+                : `Manage Promotions (${selectedPromotions.length} selected)`
+              : singleSelection
+                ? 'Add Promotion'
+                : 'Add Promotions'
             }
           </Button>
         </DialogTrigger>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>Select Promotions</DialogTitle>
+            <DialogTitle>
+              {singleSelection ? 'Select Promotion' : 'Select Promotions'}
+            </DialogTitle>
           </DialogHeader>
-          
+
           {/* Filters */}
           <div className="flex gap-4 pb-4">
             <Select value={filterType} onValueChange={setFilterType}>
@@ -245,8 +273,8 @@ export function PromotionSelector({
             ) : (
               <div className="space-y-3">
                 {filteredPromotions.map((promotion: Promotion) => (
-                  <div 
-                    key={promotion.id} 
+                  <div
+                    key={promotion.id}
                     className={cn(
                       "border rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow",
                       selectedPromotions.includes(promotion.id) && "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
@@ -283,27 +311,26 @@ export function PromotionSelector({
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button
-                          size="sm"
-                          variant={selectedPromotions.includes(promotion.id) ? "default" : "outline"}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePromotionToggle(promotion.id);
-                          }}
-                        >
-                          {selectedPromotions.includes(promotion.id) ? 'Remove' : 'Select'}
-                        </Button>
                         {onPromotionContentInsert && (
                           <Button
                             size="sm"
-                            variant="secondary"
+                            variant={selectedPromotions.includes(promotion.id) ? "destructive" : "secondary"}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleInsertContent(promotion);
                             }}
                           >
-                            <Plus className="h-4 w-4 mr-1" />
-                            Insert
+                            {selectedPromotions.includes(promotion.id) ? (
+                              <>
+                                <X className="h-4 w-4 mr-1" />
+                                Remove
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="h-4 w-4 mr-1" />
+                                Insert
+                              </>
+                            )}
                           </Button>
                         )}
                       </div>
@@ -318,8 +345,8 @@ export function PromotionSelector({
 
       {/* Preview Modal */}
       {previewPromotion && (
-        <PromotionPreviewModal 
-          promotion={previewPromotion} 
+        <PromotionPreviewModal
+          promotion={previewPromotion}
           isOpen={!!previewPromotion}
           onClose={() => setPreviewPromotion(null)}
         />

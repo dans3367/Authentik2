@@ -24,6 +24,3 @@ func registerActivities(w worker.Worker) {
 	w.RegisterWorkflow(BirthdayInvitationWorkflow)
 }
 
-
-
-

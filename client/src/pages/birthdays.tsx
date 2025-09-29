@@ -1998,6 +1998,7 @@ export default function BirthdaysPage() {
                     selectedPromotions={selectedPromotions}
                     onPromotionsChange={handlePromotionsChange}
                     campaignType="birthday"
+                    singleSelection={true}
                     onPromotionContentInsert={() => { }} // Not needed for birthday emails
                   />
                 </div>
