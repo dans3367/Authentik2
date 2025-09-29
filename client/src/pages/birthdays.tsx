@@ -325,7 +325,6 @@ export default function BirthdaysPage() {
   // Update birthday settings
   const updateSettingsMutation = useMutation({
     mutationFn: async (settings: Partial<BirthdaySettings>) => {
-      console.log('🎨 [Birthday Cards] Sending update request:', settings);
       const response = await fetch('/api/birthday-settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -334,24 +333,19 @@ export default function BirthdaysPage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
-        console.error('🎨 [Birthday Cards] Server error:', errorData);
         throw new Error(errorData.message || `Server error: ${response.status}`);
       }
 
-      const result = await response.json();
-      console.log('🎨 [Birthday Cards] Update successful:', result);
-      return result;
+      return response.json();
     },
     onSuccess: (updatedSettings) => {
-      console.log('🎨 [Birthday Cards] Server response:', updatedSettings);
-      
       toast({
         title: "Success",
         description: "Birthday settings updated successfully",
       });
       
-      // Update the query cache immediately with the server response
-      queryClient.setQueryData(['/api/birthday-settings'], updatedSettings);
+      // Update the query cache immediately with the server response (extract settings object)
+      queryClient.setQueryData(['/api/birthday-settings'], updatedSettings.settings);
       
       // Force a re-render by invalidating the query
       queryClient.invalidateQueries({ queryKey: ['/api/birthday-settings'] });
