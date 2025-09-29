@@ -247,6 +247,7 @@ export default function BirthdaysPage() {
         const response = await fetch('/api/birthday-settings');
         if (!response.ok) throw new Error('Failed to fetch settings');
         const data = await response.json();
+        console.log('📥 [Birthday Settings] Fetched settings:', data);
         return data || {
           id: '',
           enabled: false,
@@ -325,6 +326,7 @@ export default function BirthdaysPage() {
   // Update birthday settings
   const updateSettingsMutation = useMutation({
     mutationFn: async (settings: Partial<BirthdaySettings>) => {
+      console.log('📤 [Birthday Settings] Sending update:', settings);
       const response = await fetch('/api/birthday-settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -336,9 +338,14 @@ export default function BirthdaysPage() {
         throw new Error(errorData.message || `Server error: ${response.status}`);
       }
 
-      return response.json();
+      const result = await response.json();
+      console.log('📥 [Birthday Settings] Server returned:', result);
+      return result;
     },
     onSuccess: (updatedSettings) => {
+      console.log('✅ [Birthday Settings] Update success, updating cache with:', updatedSettings);
+      console.log('📌 [Birthday Settings] New emailTemplate should be:', updatedSettings?.emailTemplate);
+      
       toast({
         title: "Success",
         description: "Birthday settings updated successfully",
@@ -346,9 +353,11 @@ export default function BirthdaysPage() {
       
       // Update the query cache immediately with the server response (now returns settings directly)
       queryClient.setQueryData(['/api/birthday-settings'], updatedSettings);
+      console.log('💾 [Birthday Settings] Cache updated');
       
       // Force a re-render by invalidating the query
       queryClient.invalidateQueries({ queryKey: ['/api/birthday-settings'] });
+      console.log('🔄 [Birthday Settings] Query invalidated, will refetch');
     },
     onError: (error: any) => {
       console.error('🎨 [Birthday Cards] Update settings error:', error);
@@ -1552,6 +1561,13 @@ export default function BirthdaysPage() {
           isCurrentlyActive={(() => {
             const currentTemplate = birthdaySettings?.emailTemplate || 'default';
             const selectedTheme = designerThemeId || 'default';
+            
+            console.log('🎯 [Theme Active Check]', {
+              currentTemplate,
+              selectedTheme,
+              birthdaySettings,
+              match: currentTemplate === selectedTheme
+            });
 
             // For custom theme, check if current template is 'custom' and we're viewing custom
             if (selectedTheme === 'custom') {

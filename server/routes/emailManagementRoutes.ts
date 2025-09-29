@@ -1227,6 +1227,7 @@ emailManagementRoutes.get("/birthday-settings", authenticateToken, requireTenant
 
     // If no settings exist, return default settings
     if (!settings) {
+      console.log('🎨 [Birthday Settings GET] No settings found, returning defaults');
       const defaultSettings = {
         id: '',
         enabled: false,
@@ -1247,6 +1248,13 @@ emailManagementRoutes.get("/birthday-settings", authenticateToken, requireTenant
       ...settings,
       senderName: settings.senderName || 'Birthday Team'
     };
+
+    console.log('🎨 [Birthday Settings GET] Returning settings:', {
+      id: settingsWithDefaults.id,
+      emailTemplate: settingsWithDefaults.emailTemplate,
+      enabled: settingsWithDefaults.enabled,
+      customThemeData: settingsWithDefaults.customThemeData ? 'present' : 'null'
+    });
 
     res.json(settingsWithDefaults);
   } catch (error) {
@@ -1398,6 +1406,14 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
         console.warn('Failed to compare image URLs for cleanup:', error);
       }
     }
+
+    // Log what we're about to return
+    console.log('🎨 [Birthday Settings PUT] Returning updated settings:', {
+      id: updatedSettings[0]?.id,
+      emailTemplate: updatedSettings[0]?.emailTemplate,
+      enabled: updatedSettings[0]?.enabled,
+      customThemeData: updatedSettings[0]?.customThemeData ? 'present' : 'null'
+    });
 
     // Return just the settings object to match GET endpoint structure
     res.json(updatedSettings[0]);
