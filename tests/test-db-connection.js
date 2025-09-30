@@ -1,7 +1,7 @@
 // Test database connection and promotion query
 import { db } from './server-node/src/db.js';
 import { eq } from 'drizzle-orm';
-import { promotions } from './shared/schema.js';
+import { promotions } from '../shared/schema.js';
 
 async function testDB() {
   try {

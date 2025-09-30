@@ -1,5 +1,5 @@
-import "./server/config";
-import { db } from "./server/db";
+import "../server/config";
+import { db } from "../server/db";
 import { tenants } from "@shared/schema";
 
 async function testDatabaseConnection() {
