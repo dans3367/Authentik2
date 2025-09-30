@@ -109,6 +109,8 @@ interface Contact {
   emailsOpened: number;
   birthday?: string | null; // Optional birthday field
   birthdayEmailEnabled?: boolean; // Optional birthday email preference
+  birthdayUnsubscribedAt?: Date | null; // Timestamp when unsubscribed from birthday emails
+  birthdayUnsubscribeReason?: string | null; // Reason for unsubscribing from birthday emails
 }
 
 interface User {
@@ -1878,11 +1880,17 @@ export default function BirthdaysPage() {
                           </TableCell>
                           <TableCell>
                             {contact.birthday ? (
-                              <Switch
-                                checked={contact.birthdayEmailEnabled || false}
-                                onCheckedChange={() => handleToggleBirthdayEmail(contact.id, contact.birthdayEmailEnabled || false)}
-                                disabled={toggleBirthdayEmailMutation.isPending}
-                              />
+                              contact.birthdayUnsubscribedAt ? (
+                                <Badge className="bg-orange-100 text-orange-800">
+                                  unsubscribed
+                                </Badge>
+                              ) : (
+                                <Switch
+                                  checked={contact.birthdayEmailEnabled || false}
+                                  onCheckedChange={() => handleToggleBirthdayEmail(contact.id, contact.birthdayEmailEnabled || false)}
+                                  disabled={toggleBirthdayEmailMutation.isPending}
+                                />
+                              )
                             ) : (
                               <span className="text-gray-400 text-sm">{t('birthdays.table.na')}</span>
                             )}

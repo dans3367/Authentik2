@@ -1073,6 +1073,14 @@ emailManagementRoutes.patch("/email-contacts/:contactId/birthday-email", authent
       return res.status(404).json({ message: 'Contact not found' });
     }
 
+    // Check if contact has unsubscribed from birthday emails
+    if (enabled && contact.birthdayUnsubscribedAt) {
+      return res.status(403).json({ 
+        message: 'Cannot re-enable birthday emails for a contact who has unsubscribed. The customer must opt-in again through the unsubscribe link.',
+        reason: 'unsubscribed'
+      });
+    }
+
     // Update birthday email preference
     const updatedContact = await db.update(emailContacts)
       .set({
@@ -1112,6 +1120,18 @@ emailManagementRoutes.patch("/email-contacts/birthday-email/bulk", authenticateT
 
     if (contacts.length !== contactIds.length) {
       return res.status(400).json({ message: 'Some contacts were not found or do not belong to your tenant' });
+    }
+
+    // Check if any contacts have unsubscribed from birthday emails when enabling
+    if (enabled) {
+      const unsubscribedContacts = contacts.filter(c => c.birthdayUnsubscribedAt);
+      if (unsubscribedContacts.length > 0) {
+        return res.status(403).json({ 
+          message: `Cannot re-enable birthday emails for ${unsubscribedContacts.length} contact(s) who have unsubscribed. These customers must opt-in again through the unsubscribe link.`,
+          reason: 'unsubscribed',
+          unsubscribedContactIds: unsubscribedContacts.map(c => c.id)
+        });
+      }
     }
 
     // Update birthday email preferences for all specified contacts

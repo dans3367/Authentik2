@@ -272,6 +272,8 @@ export const emailContacts = pgTable("email_contacts", {
   // Birthday tracking fields
   birthday: text("birthday"), // Date in YYYY-MM-DD format
   birthdayEmailEnabled: boolean("birthday_email_enabled").default(false), // Whether user wants birthday emails
+  birthdayUnsubscribeReason: text("birthday_unsubscribe_reason"), // Reason for unsubscribing from birthday emails
+  birthdayUnsubscribedAt: timestamp("birthday_unsubscribed_at"), // Timestamp when unsubscribed from birthday emails
   // Consent tracking fields
   consentGiven: boolean("consent_given").notNull().default(false),
   consentDate: timestamp("consent_date"),

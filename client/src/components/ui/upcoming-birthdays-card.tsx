@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CakeIcon, CheckCircle, XCircle, ChevronRight } from "lucide-react";
+import { CakeIcon, CheckCircle, XCircle, ChevronRight, AlertTriangle } from "lucide-react";
 import { useLocation } from "wouter";
 
 interface Contact {
@@ -13,6 +13,7 @@ interface Contact {
   status: "active" | "unsubscribed" | "bounced" | "pending";
   birthday?: string | null;
   birthdayEmailEnabled?: boolean;
+  birthdayUnsubscribedAt?: Date | null;
 }
 
 export function UpcomingBirthdaysCard() {
@@ -124,7 +125,9 @@ export function UpcomingBirthdaysCard() {
                       {contact.birthday && new Date(contact.birthday).toLocaleDateString()}
                     </p>
                   </div>
-                  {contact.birthdayEmailEnabled ? (
+                  {contact.birthdayUnsubscribedAt ? (
+                    <AlertTriangle className="h-4 w-4 text-orange-500 ml-2" title="Unsubscribed from birthday emails" />
+                  ) : contact.birthdayEmailEnabled ? (
                     <CheckCircle className="h-4 w-4 text-green-500 ml-2" />
                   ) : (
                     <XCircle className="h-4 w-4 text-red-500 ml-2" />
