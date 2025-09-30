@@ -141,9 +141,10 @@ app.use((req, res, next) => {
   serverLogger.info('🔄 Checking service connectivity...');
   try {
     serverLogger.info('📊 Service Architecture:');
-    serverLogger.info('   🌐 Main Server: localhost:3500 (Authentication & Proxy)');
+    serverLogger.info('   🌐 Main Server: localhost:5000 (Authentication & Proxy)');
     serverLogger.info('   🤖 server-node: localhost:3502 (Temporal Client)');
     serverLogger.info('   ⚡ temporal-server: localhost:50051 (GRPC Bridge)');
+    serverLogger.info('   🎂 cardprocessor-go: localhost:5004 (Birthday & Unsubscribe)');
     
     // Test connectivity to server-node
     try {
@@ -180,10 +181,10 @@ app.use((req, res, next) => {
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 3500 if not specified.
+  // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "3500", 10);
+  const port = parseInt(process.env.PORT || "5000", 10);
   server.listen(
     {
       port,

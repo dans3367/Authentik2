@@ -125,12 +125,12 @@ rm -f /tmp/authentik_pids.txt
 
 # Define services and their ports
 declare -A SERVICES=(
-    ["Main Server"]="3500"
+    ["Main Server"]="5000"
     ["Form Server"]="3004"
     ["Server Node"]="3502"
     ["Temporal Server"]="50051"
     ["Webhook Server"]="3505"
-    ["Unsubscribe Server"]="7070"
+    ["Cardprocessor Go"]="5004"
 )
 
 print_status "Checking and cleaning up ports for all services..."
@@ -150,11 +150,11 @@ echo ""
 
 # Set environment variables
 export NODE_ENV=${NODE_ENV:-development}
-export PORT=${PORT:-3500}
+export PORT=${PORT:-5000}
 export FSERVER_PORT=${FSERVER_PORT:-3004}
 export TEMPORAL_SERVER_PORT=${TEMPORAL_SERVER_PORT:-50051}
 export WEBHOOK_PORT=${WEBHOOK_PORT:-3505}
-export UNSUBSCRIBE_PORT=${UNSUBSCRIBE_PORT:-7070}
+export CARDPROCESSOR_PORT=${CARDPROCESSOR_PORT:-5004}
 
 print_status "Environment: $NODE_ENV"
 print_status "Starting services..."
@@ -164,9 +164,9 @@ echo ""
 PROJECT_ROOT=$(pwd)
 
 # 1. Start Main Server
-start_service "Main Server" "3500" "NODE_ENV=development npx tsx server/index.ts" "$PROJECT_ROOT"
+start_service "Main Server" "5000" "NODE_ENV=development PORT=5000 npx tsx server/index.ts" "$PROJECT_ROOT"
 if [ $? -eq 0 ]; then
-    print_port "Main Server: http://localhost:3500"
+    print_port "Main Server: http://localhost:5000"
 fi
 
 # 2. Start Form Server
@@ -199,11 +199,11 @@ if [ -d "$PROJECT_ROOT/server-hook" ]; then
     fi
 fi
 
-# 6. Start Unsubscribe Server (Go service on port 7070)
+# 6. Start Cardprocessor Go Server (Birthday cards + Unsubscribe on port 5004)
 if [ -d "$PROJECT_ROOT/cardprocessor-go" ]; then
-    start_service "Unsubscribe Server" "7070" "go run unsubscribe-server.go" "$PROJECT_ROOT/cardprocessor-go"
+    start_service "Cardprocessor Go" "5004" "go run main.go" "$PROJECT_ROOT/cardprocessor-go"
     if [ $? -eq 0 ]; then
-        print_port "Unsubscribe Server: http://localhost:7070"
+        print_port "Cardprocessor Go: http://localhost:5004 (Birthday cards & Unsubscribe)"
     fi
 fi
 

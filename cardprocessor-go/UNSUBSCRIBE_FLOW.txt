@@ -27,17 +27,17 @@
                       │
                       ▼
               ┌───────────────────┐
-              │  Express Server   │ (Port 3500)
+              │  Express Server   │ (Port 5000)
               │  routes.ts        │
               └───────────────────┘
                       │
                       │ [PROXY REQUEST]
                       ▼
-              ┌───────────────────┐
-              │ Unsubscribe Server│ (Port 7070)
-              │ unsubscribe-server│
-              │      .go          │
-              └───────────────────┘
+              ┌──────────────────────┐
+              │ Cardprocessor-Go  │ (Port 5004)
+              │     Server        │
+              │    main.go        │
+              └──────────────────────┘
                       │
                       ├─► Validate token exists
                       ├─► Check if already used
@@ -61,17 +61,17 @@
                       │
                       ▼
               ┌───────────────────┐
-              │  Express Server   │ (Port 3500)
+              │  Express Server   │ (Port 5000)
               │  routes.ts        │
               └───────────────────┘
                       │
                       │ [PROXY REQUEST]
                       ▼
-              ┌───────────────────┐
-              │ Unsubscribe Server│ (Port 7070)
-              │ unsubscribe-server│
-              │      .go          │
-              └───────────────────┘
+              ┌──────────────────────┐
+              │ Cardprocessor-Go  │ (Port 5004)
+              │     Server        │
+              │    main.go        │
+              └──────────────────────┘
                       │
                       ├─► Validate token
                       ├─► Check not used
@@ -148,12 +148,12 @@
                          SERVICE ARCHITECTURE
 ═══════════════════════════════════════════════════════════════════════════
 
-    Port 3500: Main Server (Express)         ← Entry point, proxy
+    Port 5000: Main Server (Express)         ← Entry point, proxy
     Port 3004: Form Server
     Port 3502: Server Node
     Port 50051: Temporal Server
     Port 3505: Webhook Server
-    Port 7070: Unsubscribe Server (NEW!)     ← Handles unsubscribes
+    Port 5004: Cardprocessor-Go Server       ← Birthday cards & Unsubscribe
 
 
 ═══════════════════════════════════════════════════════════════════════════
@@ -163,14 +163,15 @@
     Start All Services:
     $ ./start.sh
 
-    Start Unsubscribe Server Only:
-    $ cd cardprocessor-go && go run unsubscribe-server.go
+    Start Cardprocessor-Go Server Only:
+    $ cd cardprocessor-go && go run main.go
 
     Health Check:
-    $ curl http://localhost:7070/health
+    $ curl http://localhost:5004/health
 
     Test Unsubscribe (replace TOKEN):
-    $ curl "http://localhost:3500/api/unsubscribe/birthday?token=TOKEN"
+    $ curl "http://localhost:5000/api/unsubscribe/birthday?token=TOKEN"
+    $ curl "http://localhost:5004/api/unsubscribe/birthday?token=TOKEN"
 
     Check Database:
     $ psql $DATABASE_URL
@@ -183,7 +184,8 @@
 ═══════════════════════════════════════════════════════════════════════════
 
     Server Code:
-    📄 /cardprocessor-go/unsubscribe-server.go
+    📄 /cardprocessor-go/main.go (main server)
+    📄 /cardprocessor-go/internal/router/router.go (routes)
 
     Handlers (reused):
     📄 /cardprocessor-go/internal/handlers/birthday.go

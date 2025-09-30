@@ -2,14 +2,14 @@
 
 ## Overview
 
-A new dedicated Go-based unsubscribe server has been created to handle birthday card email unsubscribes. The server runs on **port 7070** and is proxied through the main Express server on port 5000 (exposed as 3500 internally).
+The unsubscribe functionality has been integrated into the main cardprocessor-go server (port 5004) to handle birthday card email unsubscribes. The Express server on port 5000 proxies unsubscribe requests to the cardprocessor-go server.
 
 ## What Was Created
 
-### 1. New Unsubscribe Server (`/cardprocessor-go/unsubscribe-server.go`)
+### 1. Integrated Unsubscribe Routes in Main Server (`/cardprocessor-go/main.go`)
 
-A standalone Go HTTP server that:
-- Runs on port 7070
+Unsubscribe functionality integrated into the main cardprocessor-go server:
+- Runs on port 5004 (same as birthday card processor)
 - Serves HTML pages for the unsubscribe flow
 - Validates unsubscribe tokens
 - Updates customer email preferences in the database
@@ -31,13 +31,13 @@ Added proxy endpoints to the main Express server:
 // POST /api/unsubscribe/birthday
 ```
 
-These routes forward requests to the unsubscribe server on port 7070, allowing customers to use the main domain for unsubscribing.
+These routes forward requests to the cardprocessor-go server on port 5004, allowing customers to use the main domain for unsubscribing.
 
 ### 3. Start Script Integration (`/start.sh`)
 
 Updated the startup script to:
-- Check and clean port 7070 on startup
-- Start the unsubscribe server alongside other services
+- Check and clean port 5004 on startup
+- Start the cardprocessor-go server with birthday and unsubscribe functionality
 - Track the process for graceful shutdown
 - Display startup status and port information
 
@@ -62,9 +62,9 @@ Customer Email Link
     ↓
 https://yourdomain.com/api/unsubscribe/birthday?token=xxx
     ↓
-Express Server (Port 5000/3500)
+Express Server (Port 5000)
     ↓ [Proxy]
-Unsubscribe Server (Port 7070)
+Cardprocessor-Go Server (Port 5004)
     ↓
 PostgreSQL Database
 ```
@@ -92,13 +92,13 @@ Uses existing schema:
 ### Unsubscribe Flow (New Implementation)
 1. Customer clicks unsubscribe link in email
 2. Request goes to Express server at `/api/unsubscribe/birthday?token=xxx`
-3. Express proxies to unsubscribe server on port 7070
-4. Unsubscribe server:
+3. Express proxies to cardprocessor-go server on port 5004
+4. Cardprocessor-go server:
    - Validates token exists and hasn't been used
    - Displays HTML form with contact info
    - Shows reason selection and feedback fields
 5. Customer submits form
-6. Unsubscribe server:
+6. Cardprocessor-go server:
    - Marks token as used
    - Updates contact's `birthday_email_enabled` to false
    - Stores unsubscribe reason and timestamp
@@ -113,33 +113,33 @@ Uses existing schema:
 ```
 
 This starts:
-- Main Server (3500)
+- Main Server (5000)
 - Form Server (3004)
 - Server Node (3502)
 - Temporal Server (50051)
 - Webhook Server (3505)
-- **Unsubscribe Server (7070)** ← NEW
+- **Cardprocessor-Go Server (5004)** ← Birthday cards & Unsubscribe
 
-### Start Unsubscribe Server Only
+### Start Cardprocessor-Go Server Only
 ```bash
 cd cardprocessor-go
-go run unsubscribe-server.go
+go run main.go
 ```
 
 ### Check Health
 ```bash
 # Via proxy (main domain)
-curl http://localhost:3500/api/unsubscribe/birthday
+curl http://localhost:5000/api/unsubscribe/birthday
 
-# Direct access
-curl http://localhost:7070/health
+# Direct access to cardprocessor-go
+curl http://localhost:5004/health
 ```
 
 ## Testing
 
 ### Manual Test
 1. Get or generate a valid unsubscribe token
-2. Visit: `http://localhost:3500/api/unsubscribe/birthday?token=YOUR_TOKEN`
+2. Visit: `http://localhost:5000/api/unsubscribe/birthday?token=YOUR_TOKEN`
 3. Submit the unsubscribe form
 4. Verify contact is marked as unsubscribed in database
 
@@ -174,9 +174,13 @@ JWT_SECRET=your-secret
 
 No additional configuration required!
 
-## Removed/Deprecated
+## Integration Benefits
 
-The old unsubscribe handlers in the main cardprocessor-go server (port 5004) are still functional but can be removed if desired. The new dedicated server provides better separation of concerns.
+By integrating unsubscribe into the main cardprocessor-go server:
+- Single server handles all birthday card operations
+- Simplified deployment and maintenance
+- Shared database connection pool
+- Unified logging and monitoring
 
 ## Benefits
 
@@ -198,12 +202,12 @@ The old unsubscribe handlers in the main cardprocessor-go server (port 5004) are
 
 ## Files Modified
 
-1. `/cardprocessor-go/unsubscribe-server.go` - NEW
-2. `/server/routes.ts` - Added proxy endpoints
-3. `/start.sh` - Added service startup
+1. `/cardprocessor-go/internal/router/router.go` - Already had unsubscribe routes
+2. `/server/routes.ts` - Added proxy endpoints to port 5004
+3. `/start.sh` - Added cardprocessor-go service startup on port 5004
 4. `/cardprocessor-go/templates/unsubscribe.html` - Fixed form action
-5. `/cardprocessor-go/UNSUBSCRIBE_SERVER.md` - NEW
-6. `/UNSUBSCRIBE_IMPLEMENTATION.md` - NEW (this file)
+5. `/cardprocessor-go/UNSUBSCRIBE_SERVER.md` - Documentation
+6. `/UNSUBSCRIBE_IMPLEMENTATION.md` - This implementation guide
 
 ## Support
 
@@ -211,7 +215,7 @@ For issues or questions:
 1. Check `/cardprocessor-go/UNSUBSCRIBE_SERVER.md` for detailed documentation
 2. Verify all services are running: `./start.sh`
 3. Check logs for errors
-4. Test health endpoint: `curl http://localhost:7070/health`
+4. Test health endpoint: `curl http://localhost:5004/health`
 
 ---
 

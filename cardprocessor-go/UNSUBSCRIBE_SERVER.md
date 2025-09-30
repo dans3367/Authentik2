@@ -1,19 +1,19 @@
-# Unsubscribe Server
+# Unsubscribe Functionality
 
-A dedicated Go-based HTTP server for handling birthday card email unsubscribe requests.
+Integrated unsubscribe routes in the main cardprocessor-go server for handling birthday card email unsubscribe requests.
 
 ## Overview
 
-The unsubscribe server is a standalone service running on **port 7070** that provides a customer-facing interface for users to unsubscribe from birthday card emails. It is proxied through the main Express server to provide seamless access.
+The unsubscribe functionality runs on **port 5004** as part of the main cardprocessor-go server, providing a customer-facing interface for users to unsubscribe from birthday card emails. It is proxied through the main Express server to provide seamless access.
 
 ## Architecture
 
 ```
 Client Request
     ↓
-Express Server (Port 3500)
+Express Server (Port 5000)
     ↓ (Proxy)
-Unsubscribe Server (Port 7070)
+Cardprocessor-Go Server (Port 5004)
     ↓
 Database (PostgreSQL)
 ```
@@ -66,10 +66,10 @@ Health check endpoint for monitoring.
 
 ```bash
 cd cardprocessor-go
-go run unsubscribe-server.go
+go run main.go
 ```
 
-The server will start on port 7070.
+The server will start on port 5004.
 
 ### With Full Stack
 
@@ -80,8 +80,8 @@ Use the provided start script which automatically starts all services:
 ```
 
 This will start:
-1. Main Server (port 3500) - with proxy to unsubscribe server
-2. Unsubscribe Server (port 7070)
+1. Main Server (port 5000) - with proxy to cardprocessor-go
+2. Cardprocessor-Go Server (port 5004) - Birthday cards & Unsubscribe
 3. Other services...
 
 ## Database Schema
@@ -137,11 +137,11 @@ The Express server (port 3500) proxies unsubscribe requests to this server:
 ```typescript
 // In server/routes.ts
 app.get("/api/unsubscribe/birthday", async (req, res) => {
-  // Forward to http://localhost:7070/api/unsubscribe/birthday
+  // Forward to http://localhost:5004/api/unsubscribe/birthday
 });
 
 app.post("/api/unsubscribe/birthday", async (req, res) => {
-  // Forward to http://localhost:7070/api/unsubscribe/birthday
+  // Forward to http://localhost:5004/api/unsubscribe/birthday
 });
 ```
 
@@ -164,16 +164,15 @@ https://yourdomain.com/api/unsubscribe/birthday?token=abc123...
 Check server health:
 
 ```bash
-curl http://localhost:7070/health
+curl http://localhost:5004/health
 ```
 
 Expected response:
 ```json
 {
   "status": "ok",
-  "service": "unsubscribe-server",
-  "version": "1.0.0",
-  "port": "7070"
+  "service": "birthday-card-processor",
+  "version": "1.0.0"
 }
 ```
 
@@ -183,7 +182,7 @@ Expected response:
 
 ```bash
 cd cardprocessor-go
-go build -o bin/unsubscribe-server unsubscribe-server.go
+go build -o bin/cardprocessor-go main.go
 ```
 
 ### Testing
@@ -191,15 +190,15 @@ go build -o bin/unsubscribe-server unsubscribe-server.go
 Test the unsubscribe flow:
 
 1. Generate a token (via the main API)
-2. Visit: `http://localhost:7070/api/unsubscribe/birthday?token={token}`
+2. Visit: `http://localhost:5004/api/unsubscribe/birthday?token={token}` or `http://localhost:5000/api/unsubscribe/birthday?token={token}` (proxied)
 3. Submit the form
 4. Verify the contact is marked as unsubscribed in the database
 
 ## Troubleshooting
 
-### Port 7070 already in use
+### Port 5004 already in use
 ```bash
-lsof -ti:7070 | xargs kill -9
+lsof -ti:5004 | xargs kill -9
 ```
 
 ### Cannot connect to database
@@ -208,9 +207,9 @@ lsof -ti:7070 | xargs kill -9
 - Verify database credentials
 
 ### Templates not loading
-- Ensure you're running from the project root
-- Check that `cardprocessor-go/templates/*.html` files exist
-- Template path is relative to the working directory
+- Ensure you're running from the `cardprocessor-go` directory
+- Check that `templates/*.html` files exist in cardprocessor-go directory
+- Template path is `templates/*` relative to cardprocessor-go directory
 
 ## Integration with Email System
 

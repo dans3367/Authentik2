@@ -19,7 +19,7 @@ func SetupRouter(cfg *config.Config, repo *repository.Repository, temporalClient
 
 	router := gin.New()
 
-	// Load HTML templates
+	// Load HTML templates (relative to cardprocessor-go directory)
 	router.LoadHTMLGlob("templates/*")
 
 	// Add middleware
