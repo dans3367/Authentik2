@@ -130,6 +130,7 @@ declare -A SERVICES=(
     ["Server Node"]="3502"
     ["Temporal Server"]="50051"
     ["Webhook Server"]="3505"
+    ["Unsubscribe Server"]="7070"
 )
 
 print_status "Checking and cleaning up ports for all services..."
@@ -153,6 +154,7 @@ export PORT=${PORT:-3500}
 export FSERVER_PORT=${FSERVER_PORT:-3004}
 export TEMPORAL_SERVER_PORT=${TEMPORAL_SERVER_PORT:-50051}
 export WEBHOOK_PORT=${WEBHOOK_PORT:-3505}
+export UNSUBSCRIBE_PORT=${UNSUBSCRIBE_PORT:-7070}
 
 print_status "Environment: $NODE_ENV"
 print_status "Starting services..."
@@ -194,6 +196,14 @@ if [ -d "$PROJECT_ROOT/server-hook" ]; then
     start_service "Webhook Server" "3505" "NODE_ENV=development npx tsx index.ts" "$PROJECT_ROOT/server-hook"
     if [ $? -eq 0 ]; then
         print_port "Webhook Server: http://localhost:3505"
+    fi
+fi
+
+# 6. Start Unsubscribe Server (Go service on port 7070)
+if [ -d "$PROJECT_ROOT/cardprocessor-go" ]; then
+    start_service "Unsubscribe Server" "7070" "go run unsubscribe-server.go" "$PROJECT_ROOT/cardprocessor-go"
+    if [ $? -eq 0 ]; then
+        print_port "Unsubscribe Server: http://localhost:7070"
     fi
 fi
 

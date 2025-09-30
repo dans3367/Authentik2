@@ -190,6 +190,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Unsubscribe endpoints - proxy to cardprocessor-go unsubscribe server (port 7070)
+  // These routes are public (no authentication) for customer-facing unsubscribe functionality
+  app.get("/api/unsubscribe/birthday", async (req: any, res) => {
+    try {
+      console.log('🔗 [Unsubscribe Proxy] Forwarding GET request to unsubscribe server, token:', req.query.token?.substring(0, 10) + '...');
+      
+      // Build query string
+      const queryParams = new URLSearchParams(req.query as any).toString();
+      const url = `http://localhost:7070/api/unsubscribe/birthday${queryParams ? '?' + queryParams : ''}`;
+      
+      // Forward request to unsubscribe server
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'text/html',
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [Unsubscribe Proxy] unsubscribe-server returned error:', response.status, errorText);
+        return res.status(response.status).send(errorText);
+      }
+
+      const html = await response.text();
+      res.set('Content-Type', 'text/html');
+      res.send(html);
+    } catch (error) {
+      console.error('❌ [Unsubscribe Proxy] Failed to communicate with unsubscribe-server:', error);
+      res.status(500).send('<html><body><h1>Service Temporarily Unavailable</h1><p>Unable to process unsubscribe request. Please try again later.</p></body></html>');
+    }
+  });
+
+  app.post("/api/unsubscribe/birthday", async (req: any, res) => {
+    try {
+      console.log('🔗 [Unsubscribe Proxy] Forwarding POST request to unsubscribe server');
+      
+      // Forward request to unsubscribe server
+      const response = await fetch('http://localhost:7070/api/unsubscribe/birthday', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams(req.body).toString()
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [Unsubscribe Proxy] unsubscribe-server returned error:', response.status, errorText);
+        return res.status(response.status).send(errorText);
+      }
+
+      const html = await response.text();
+      console.log('✅ [Unsubscribe Proxy] Successfully processed unsubscribe request');
+      res.set('Content-Type', 'text/html');
+      res.send(html);
+    } catch (error) {
+      console.error('❌ [Unsubscribe Proxy] Failed to communicate with unsubscribe-server:', error);
+      res.status(500).send('<html><body><h1>Service Temporarily Unavailable</h1><p>Unable to process unsubscribe request. Please try again later.</p></body></html>');
+    }
+  });
+
   // Email tracking endpoints - proxy to server-node
   app.get("/api/email-tracking", authenticateToken, async (req: any, res) => {
     try {

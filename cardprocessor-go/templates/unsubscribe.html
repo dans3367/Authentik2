@@ -204,7 +204,8 @@
             you change your mind.
         </div>
 
-        <form method="POST" action="/api/unsubscribe/birthday/{{.Token}}">
+        <form method="POST" action="/api/unsubscribe/birthday">
+            <input type="hidden" name="token" value="{{.Token}}" />
             <div class="form-group">
                 <label for="reason">Why are you unsubscribing? (Optional)</label>
                 <select name="reason" id="reason">
