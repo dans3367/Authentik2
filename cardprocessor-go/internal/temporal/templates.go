@@ -121,13 +121,16 @@ func renderCustomTemplate(params TemplateParams) string {
 	if signature == "" {
 		fromMessageSection = fmt.Sprintf(`
 				<!-- 4. From Message -->
-				<div style="padding: 20px 30px 30px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
+				<div style="padding: 20px 30px 10px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
 					<div style="font-size: 0.9rem; color: #718096;">
 						<p style="margin: 0; font-weight: 600; color: #4a5568;">%s</p>
 					</div>
 					%s
-				</div>`, template.HTMLEscapeString(fromMessage), renderUnsubscribeSection(params))
+				</div>`, template.HTMLEscapeString(fromMessage))
 	}
+
+	// Always render unsubscribe section if token exists
+	unsubscribeSection := renderUnsubscribeSection(params)
 
 	return fmt.Sprintf(`<html>
 		<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%);">
@@ -149,6 +152,7 @@ func renderCustomTemplate(params TemplateParams) string {
 				</div>
 				
 				%s
+				%s
 			</div>
 		</body>
 	</html>`,
@@ -158,6 +162,7 @@ func renderCustomTemplate(params TemplateParams) string {
 		renderPromotionContent(params),
 		renderSignature(signature, params),
 		fromMessageSection,
+		unsubscribeSection,
 	)
 }
 
@@ -223,12 +228,15 @@ func renderPredefinedTemplate(templateId BirthdayTemplateId, params TemplatePara
 	if signature == "" {
 		fromMessageSection = fmt.Sprintf(`
 				<!-- 4. From Message -->
-				<div style="padding: 20px 30px 30px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
+				<div style="padding: 20px 30px 10px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
 					<div style="font-size: 0.9rem; color: #718096;">
 						<p style="margin: 0; font-weight: 600; color: #4a5568;">%s</p>
 					</div>
 				</div>`, template.HTMLEscapeString(fromMessage))
 	}
+
+	// Always render unsubscribe section if token exists
+	unsubscribeSection := renderUnsubscribeSection(params)
 
 	return fmt.Sprintf(`<html>
 		<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, %s 0%%, %s 100%%);">
@@ -251,6 +259,7 @@ func renderPredefinedTemplate(templateId BirthdayTemplateId, params TemplatePara
 				</div>
 				
 				%s
+				%s
 			</div>
 		</body>
 	</html>`,
@@ -261,6 +270,7 @@ func renderPredefinedTemplate(templateId BirthdayTemplateId, params TemplatePara
 		renderPromotionContent(params),
 		renderSignature(signature, params),
 		fromMessageSection,
+		unsubscribeSection,
 	)
 }
 
@@ -309,10 +319,10 @@ func renderUnsubscribeSection(params TemplateParams) string {
 	unsubscribeUrl := fmt.Sprintf("http://localhost:5000/unsubscribe/birthday?token=%s", params.UnsubscribeToken)
 
 	return fmt.Sprintf(`
-		<div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">
+		<div style="padding: 20px 30px; border-top: 1px solid #e2e8f0; text-align: center; background-color: #f7fafc;">
 			<p style="margin: 0; font-size: 0.8rem; color: #a0aec0; line-height: 1.4;">
 				Don't want to receive birthday cards? 
-				<a href="%s" style="color: #667eea; text-decoration: none;">Unsubscribe here</a>
+				<a href="%s" style="color: #667eea; text-decoration: none; font-weight: 500;">Unsubscribe here</a>
 			</p>
 		</div>`, unsubscribeUrl)
 }
