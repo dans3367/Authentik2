@@ -117,7 +117,10 @@ app.use((req, res, next) => {
     process.exit(1);
   }
 
-  // Initialize Newsletter Worker Service
+  // Newsletter Worker Service - DISABLED
+  // Workers are now handled by cardprocessor-go on port 5004
+  // Uncomment below to re-enable if needed
+  /*
   try {
     serverLogger.info('🏭 Starting Newsletter Worker Service...');
     await newsletterWorkerService.start();
@@ -126,8 +129,13 @@ app.use((req, res, next) => {
     serverLogger.error("Failed to initialize Newsletter Worker Service:", error);
     // Don't exit - continue without worker service
   }
+  */
+  serverLogger.info('🚫 Newsletter Worker Service: DISABLED (handled by cardprocessor-go)');
 
-  // Initialize Birthday Worker Service
+  // Birthday Worker Service - DISABLED
+  // Workers are now handled by cardprocessor-go on port 5004
+  // Uncomment below to re-enable if needed
+  /*
   try {
     serverLogger.info('🎂 Starting Birthday Worker Service...');
     birthdayWorkerService.start();
@@ -136,6 +144,8 @@ app.use((req, res, next) => {
     serverLogger.error("Failed to initialize Birthday Worker Service:", error);
     // Don't exit - continue without worker service
   }
+  */
+  serverLogger.info('🚫 Birthday Worker Service: DISABLED (handled by cardprocessor-go)');
 
   // Check server-node connectivity
   serverLogger.info('🔄 Checking service connectivity...');
