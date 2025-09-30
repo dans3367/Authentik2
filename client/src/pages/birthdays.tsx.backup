@@ -404,42 +404,6 @@ export default function BirthdaysPage() {
   });
 
   // Bulk update birthday email preferences
-  // Send birthday card mutation
-  const sendBirthdayCardMutation = useMutation({
-    mutationFn: async (contactIds: string[]) => {
-      const response = await apiRequest('POST', '/api/email-contacts/send-birthday-card', { contactIds });
-      return response.json();
-    },
-    onSuccess: (data, contactIds) => {
-      setSelectedContacts([]);
-      const summary = data.summary || { successful: 0, failed: 0, total: contactIds.length };
-      toast({
-        title: t('birthdays.cardsSent') || "Birthday Cards Sent",
-        description: `Successfully sent ${summary.successful} of ${summary.total} birthday cards${summary.failed > 0 ? ` (${summary.failed} failed)` : ''}`,
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: t('common.error') || "Error",
-        description: error.message || "Failed to send birthday cards",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Handle send birthday card
-  const handleSendBirthdayCard = () => {
-    if (selectedContacts.length === 0) return;
-
-    const confirmMessage = selectedContacts.length === 1
-      ? 'Are you sure you want to send a birthday card to this customer?'
-      : `Are you sure you want to send birthday cards to ${selectedContacts.length} customers?`;
-
-    if (window.confirm(confirmMessage)) {
-      sendBirthdayCardMutation.mutate(selectedContacts);
-    }
-  };
-
   const bulkUpdateBirthdayEmailMutation = useMutation({
     mutationFn: async ({ contactIds, enabled }: { contactIds: string[]; enabled: boolean }) => {
       return apiRequest('PATCH', `/api/email-contacts/birthday-email/bulk`, {
@@ -1811,11 +1775,6 @@ export default function BirthdaysPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
-                        <DropdownMenuItem onClick={handleSendBirthdayCard} disabled={sendBirthdayCardMutation.isPending}>
-                          <CakeIcon className="h-4 w-4 mr-2" />
-                          {sendBirthdayCardMutation.isPending ? 'Sending...' : 'Send Birthday Card'}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
                         <DropdownMenuItem>
                           <Download className="h-4 w-4 mr-2" />
                           Export Selected
