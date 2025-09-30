@@ -79,10 +79,29 @@ func BirthdayTestWorkflow(ctx workflow.Context, input BirthdayTestWorkflowInput)
 	}
 	ctx = workflow.WithActivityOptions(ctx, activityOptions)
 
-	// Step 1: Fetch promotion data if promotion ID is provided
+	// Step 1: Generate unsubscribe token and store in database (if not a test)
+	var unsubscribeTokenResult TokenResult
+	err := workflow.ExecuteActivity(ctx, GenerateBirthdayUnsubscribeToken, TokenInput{
+		ContactID: input.UserID, // For test emails, use UserID as ContactID
+		TenantID:  input.TenantID,
+		Action:    "unsubscribe_birthday",
+		ExpiresIn: "never",
+	}).Get(ctx, &unsubscribeTokenResult)
+	if err != nil {
+		logger.Error("Failed to generate unsubscribe token", "error", err)
+		// Continue without unsubscribe token rather than failing
+		unsubscribeTokenResult.Token = ""
+	} else {
+		logger.Info("✅ Unsubscribe token generated successfully",
+			"hasToken", unsubscribeTokenResult.Token != "",
+			"tokenLength", len(unsubscribeTokenResult.Token),
+			"success", unsubscribeTokenResult.Success)
+	}
+
+	// Step 2: Fetch promotion data if promotion ID is provided
 	var promotion *models.Promotion
 	if input.PromotionID != "" {
-		err := workflow.ExecuteActivity(ctx, FetchPromotionData, FetchPromotionInput{
+		err = workflow.ExecuteActivity(ctx, FetchPromotionData, FetchPromotionInput{
 			PromotionID: input.PromotionID,
 			TenantID:    input.TenantID,
 		}).Get(ctx, &promotion)
@@ -93,14 +112,31 @@ func BirthdayTestWorkflow(ctx workflow.Context, input BirthdayTestWorkflowInput)
 		}
 	}
 
-	// Step 2: Prepare birthday test email content with promotion data
+	// Step 3: Prepare birthday test email content with promotion data
 	enrichedInput := input
+	// Add unsubscribe token to custom theme data
+	if enrichedInput.CustomThemeData == nil {
+		enrichedInput.CustomThemeData = make(map[string]interface{})
+	}
+	tokenToAdd := unsubscribeTokenResult.Token
+	enrichedInput.CustomThemeData["unsubscribeToken"] = tokenToAdd
+	logger.Info("📝 Added unsubscribe token to CustomThemeData",
+		"hasToken", tokenToAdd != "",
+		"tokenLength", len(tokenToAdd),
+		"customThemeDataKeys", len(enrichedInput.CustomThemeData),
+		"tokenPreview", func() string {
+			if len(tokenToAdd) > 10 {
+				return tokenToAdd[:10] + "..."
+			}
+			return tokenToAdd
+		}())
+
 	if promotion != nil {
 		logger.Info("Including promotion in birthday test email", "promotionId", promotion.ID, "title", promotion.Title)
 	}
 
 	var emailContent EmailContent
-	err := workflow.ExecuteActivity(ctx, PrepareBirthdayTestEmailWithPromotion, PrepareBirthdayTestEmailInput{
+	err = workflow.ExecuteActivity(ctx, PrepareBirthdayTestEmailWithPromotion, PrepareBirthdayTestEmailInput{
 		WorkflowInput: enrichedInput,
 		Promotion:     promotion,
 	}).Get(ctx, &emailContent)
@@ -114,7 +150,7 @@ func BirthdayTestWorkflow(ctx workflow.Context, input BirthdayTestWorkflowInput)
 		}, nil
 	}
 
-	// Step 3: Send birthday test email
+	// Step 4: Send birthday test email
 	var sendResult EmailSendResult
 	err = workflow.ExecuteActivity(ctx, SendBirthdayTestEmail, emailContent).Get(ctx, &sendResult)
 	if err != nil {
@@ -127,7 +163,7 @@ func BirthdayTestWorkflow(ctx workflow.Context, input BirthdayTestWorkflowInput)
 		}, nil
 	}
 
-	// Step 3: Update tracking status
+	// Step 5: Update tracking status
 	err = workflow.ExecuteActivity(ctx, UpdateBirthdayTestStatus, UpdateStatusInput{
 		UserID:    input.UserID,
 		TenantID:  input.TenantID,

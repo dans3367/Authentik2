@@ -313,7 +313,11 @@ func renderSignature(signature string, params TemplateParams) string {
 
 // renderUnsubscribeSection renders unsubscribe link if token is available
 func renderUnsubscribeSection(params TemplateParams) string {
+	fmt.Printf("🔍 [renderUnsubscribeSection] Called with UnsubscribeToken: %v (empty: %v)\n",
+		len(params.UnsubscribeToken) > 0, params.UnsubscribeToken == "")
+
 	if params.UnsubscribeToken == "" {
+		fmt.Println("⚠️  [renderUnsubscribeSection] UnsubscribeToken is empty, returning empty string")
 		return ""
 	}
 
@@ -323,6 +327,8 @@ func renderUnsubscribeSection(params TemplateParams) string {
 		baseUrl = "http://localhost:3502"
 	}
 	unsubscribeUrl := fmt.Sprintf("%s/api/unsubscribe/birthday?token=%s", baseUrl, params.UnsubscribeToken)
+
+	fmt.Printf("✅ [renderUnsubscribeSection] Generated unsubscribe URL: %s\n", unsubscribeUrl[:50]+"...")
 
 	return fmt.Sprintf(`
 		<div style="padding: 20px 30px; border-top: 1px solid #e2e8f0; text-align: center; background-color: #f7fafc;">

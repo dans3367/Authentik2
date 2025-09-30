@@ -67,9 +67,14 @@ export class BirthdayWorkerService extends EventEmitter {
 
   /**
    * Start the birthday worker
+   * DISABLED: Workers are now handled by cardprocessor-go on port 5004
    */
   start(): void {
-    this.worker.start();
+    console.log('🚫 [BirthdayWorkerService] Start called but DISABLED - workers handled by cardprocessor-go on port 5004');
+    return;
+    
+    // Original code commented out - workers now handled by cardprocessor-go
+    // this.worker.start();
   }
 
   /**
@@ -128,12 +133,13 @@ export class BirthdayWorkerService extends EventEmitter {
 }
 
 // Create a singleton instance
+// DISABLED: Workers are now handled by cardprocessor-go on port 5004
 const birthdayWorkerService = new BirthdayWorkerService({
   checkInterval: parseInt(process.env.BIRTHDAY_CHECK_INTERVAL || '3600000'), // 1 hour default
   batchSize: parseInt(process.env.BIRTHDAY_BATCH_SIZE || '10'),
   maxRetries: parseInt(process.env.BIRTHDAY_MAX_RETRIES || '3'),
   retryDelay: parseInt(process.env.BIRTHDAY_RETRY_DELAY || '5000'),
-  enabled: process.env.BIRTHDAY_WORKER_ENABLED !== 'false', // Enabled by default
+  enabled: false, // DISABLED - workers handled by cardprocessor-go
 });
 
 export { birthdayWorkerService };

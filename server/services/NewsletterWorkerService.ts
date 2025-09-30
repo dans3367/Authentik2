@@ -54,8 +54,14 @@ export class NewsletterWorkerService extends EventEmitter {
 
   /**
    * Start the worker service
+   * DISABLED: Workers are now handled by cardprocessor-go on port 5004
    */
   start(): void {
+    console.log('🚫 [NewsletterWorkerService] Start called but DISABLED - workers handled by cardprocessor-go on port 5004');
+    return;
+    
+    // Original code commented out - workers now handled by cardprocessor-go
+    /*
     if (this.isStarted) {
       console.log('⚠️ [NewsletterWorkerService] Service already started');
       return;
@@ -74,6 +80,7 @@ export class NewsletterWorkerService extends EventEmitter {
 
     this.emit('started');
     console.log(`✅ [NewsletterWorkerService] Started with ${this.config.numberOfWorkers} workers`);
+    */
   }
 
   /**
@@ -394,6 +401,8 @@ export class NewsletterWorkerService extends EventEmitter {
 }
 
 // Create and export a singleton instance
+// DISABLED: Workers are now handled by cardprocessor-go on port 5004
+// Set autoStart to false to prevent automatic initialization
 export const newsletterWorkerService = new NewsletterWorkerService({
   numberOfWorkers: parseInt(process.env.NEWSLETTER_WORKERS || '3'),
   workerConfig: {
@@ -402,7 +411,7 @@ export const newsletterWorkerService = new NewsletterWorkerService({
     delayBetweenBatches: parseInt(process.env.NEWSLETTER_BATCH_DELAY || '2000'),
     maxRetries: parseInt(process.env.NEWSLETTER_MAX_RETRIES || '3'),
   },
-  autoStart: process.env.NODE_ENV !== 'test',
+  autoStart: false, // DISABLED - workers handled by cardprocessor-go
 });
 
 // Graceful shutdown

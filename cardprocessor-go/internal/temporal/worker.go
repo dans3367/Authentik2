@@ -19,8 +19,10 @@ func registerActivities(w worker.Worker) {
 	w.RegisterActivity(GenerateBirthdayInvitationToken)
 	w.RegisterActivity(UpdateContactInvitationStatus)
 
+	// Register unsubscribe token generation
+	w.RegisterActivity(GenerateBirthdayUnsubscribeToken)
+
 	// Register workflows
 	w.RegisterWorkflow(BirthdayTestWorkflow)
 	w.RegisterWorkflow(BirthdayInvitationWorkflow)
 }
-

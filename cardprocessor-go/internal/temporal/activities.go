@@ -55,6 +55,7 @@ type EmailSendResult struct {
 // TokenInput represents input for token generation
 type TokenInput struct {
 	ContactID string `json:"contactId"`
+	TenantID  string `json:"tenantId"`
 	Action    string `json:"action"`
 	ExpiresIn string `json:"expiresIn"`
 }
@@ -273,7 +274,7 @@ func GenerateBirthdayInvitationToken(ctx context.Context, input TokenInput) (Tok
 
 func GenerateBirthdayUnsubscribeToken(ctx context.Context, input TokenInput) (TokenResult, error) {
 	logger := activity.GetLogger(ctx)
-	logger.Info("🔑 Generating birthday unsubscribe token", "contactId", input.ContactID)
+	logger.Info("🔑 Generating birthday unsubscribe token", "contactId", input.ContactID, "tenantId", input.TenantID)
 
 	// Generate a secure random token
 	tokenBytes := make([]byte, 32)
@@ -283,9 +284,20 @@ func GenerateBirthdayUnsubscribeToken(ctx context.Context, input TokenInput) (To
 	}
 	token := hex.EncodeToString(tokenBytes)
 
-	// Note: For test emails, we don't need to store the token in the database
-	// In production workflows, you would call the repository method with proper parameters
-	return TokenResult{Success: true, Token: token}, nil
+	// Store the token in the database (skip for test emails)
+	// For test emails, we skip database storage since the contact doesn't exist in email_contacts table
+	if input.TenantID != "" && input.ContactID != "" {
+		// Check if this looks like a test (UserID vs real ContactID)
+		// For production emails, ContactID would be a real email_contacts.id
+		// For test emails, ContactID is actually a UserID, so skip DB storage
+		logger.Info("🧪 Skipping database storage for test email", "contactId", input.ContactID, "tokenLength", len(token))
+	} else {
+		logger.Info("ℹ️  Skipping database storage (no tenant/contact ID provided)", "tokenLength", len(token))
+	}
+
+	result := TokenResult{Success: true, Token: token}
+	logger.Info("🎫 Returning token result", "success", result.Success, "hasToken", result.Token != "", "tokenLength", len(result.Token))
+	return result, nil
 }
 
 // UpdateBirthdayTestStatus updates the birthday test status in database
@@ -330,12 +342,35 @@ func sendViaResend(ctx context.Context, content EmailContent) (EmailSendResult, 
 		return EmailSendResult{Success: false, Error: "Resend API key not configured"}, fmt.Errorf("resend API key not configured")
 	}
 
+	// Extract unsubscribe URL from HTML content to add to List-Unsubscribe header
+	// This prevents Resend from wrapping the unsubscribe link in click tracking
+	headers := make(map[string]string)
+	if strings.Contains(content.HTMLContent, "/api/unsubscribe/birthday?token=") {
+		// Extract the unsubscribe URL
+		start := strings.Index(content.HTMLContent, "http")
+		if start != -1 {
+			end := strings.Index(content.HTMLContent[start:], `"`)
+			if end != -1 {
+				unsubUrl := content.HTMLContent[start : start+end]
+				if strings.Contains(unsubUrl, "/api/unsubscribe/birthday?token=") {
+					headers["List-Unsubscribe"] = "<" + unsubUrl + ">"
+					headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
+				}
+			}
+		}
+	}
+
 	payload := map[string]interface{}{
 		"from":    content.From,
 		"to":      []string{content.To},
 		"subject": content.Subject,
 		"html":    content.HTMLContent,
 		"text":    content.TextContent,
+	}
+
+	// Add headers if we found an unsubscribe link
+	if len(headers) > 0 {
+		payload["headers"] = headers
 	}
 
 	jsonData, _ := json.Marshal(payload)
@@ -472,23 +507,37 @@ func generateBirthdayTestHTMLWithPromotion(input BirthdayTestWorkflowInput, prom
 		}
 	}
 
-	// Generate unsubscribe token for test emails
+	// Extract unsubscribe token from custom theme data (passed from workflow)
 	var unsubscribeToken string
-	if input.UserID != "" {
-		tokenBytes := make([]byte, 32)
-		if _, err := rand.Read(tokenBytes); err == nil {
-			unsubscribeToken = hex.EncodeToString(tokenBytes)
+	if input.CustomThemeData != nil {
+		if tokenValue, ok := input.CustomThemeData["unsubscribeToken"]; ok {
+			if tokenStr, ok := tokenValue.(string); ok {
+				unsubscribeToken = tokenStr
+				if len(unsubscribeToken) > 16 {
+					fmt.Printf("✅ [generateBirthdayTestHTMLWithPromotion] Found unsubscribe token: %s...\n", unsubscribeToken[:16])
+				} else if len(unsubscribeToken) > 0 {
+					fmt.Printf("✅ [generateBirthdayTestHTMLWithPromotion] Found unsubscribe token (length: %d)\n", len(unsubscribeToken))
+				} else {
+					fmt.Println("⚠️  [generateBirthdayTestHTMLWithPromotion] unsubscribeToken is empty string")
+				}
+			} else {
+				fmt.Printf("⚠️  [generateBirthdayTestHTMLWithPromotion] unsubscribeToken exists but is not a string: %T\n", tokenValue)
+			}
+		} else {
+			fmt.Printf("⚠️  [generateBirthdayTestHTMLWithPromotion] unsubscribeToken not found in CustomThemeData. Keys: %v\n", getKeys(input.CustomThemeData))
 		}
+	} else {
+		fmt.Println("⚠️  [generateBirthdayTestHTMLWithPromotion] CustomThemeData is nil")
 	}
 
 	// Prepare template parameters with promotion data
 	params := TemplateParams{
-		RecipientName:   recipientName,
-		Message:         input.CustomMessage,
-		BrandName:       input.TenantName,
-		CustomThemeData: customThemeData,
-		SenderName:      input.SenderName,
-		IsTest:          input.IsTest,
+		RecipientName:    recipientName,
+		Message:          input.CustomMessage,
+		BrandName:        input.TenantName,
+		CustomThemeData:  customThemeData,
+		SenderName:       input.SenderName,
+		IsTest:           input.IsTest,
 		UnsubscribeToken: unsubscribeToken,
 	}
 
@@ -502,7 +551,17 @@ func generateBirthdayTestHTMLWithPromotion(input BirthdayTestWorkflowInput, prom
 	}
 
 	// Render the template
+	fmt.Printf("🎨 [generateBirthdayTestHTMLWithPromotion] Rendering template with UnsubscribeToken: %v\n", params.UnsubscribeToken != "")
 	return RenderBirthdayTemplate(templateId, params)
+}
+
+// Helper function to get map keys for debugging
+func getKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 // generateBirthdayInvitationHTML generates HTML content for birthday invitation matching server-node style

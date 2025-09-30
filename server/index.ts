@@ -16,8 +16,6 @@ import {
 import { auth } from "./auth";
 import { toNodeHandler } from "better-auth/node";
 import { serverLogger } from "./logger";
-import { newsletterWorkerService } from "./services/NewsletterWorkerService";
-import { birthdayWorkerService } from "./services/BirthdayWorkerService";
 
 const app = express();
 
