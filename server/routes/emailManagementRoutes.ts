@@ -1714,7 +1714,7 @@ emailManagementRoutes.post("/internal/birthday-invitation", async (req: any, res
 });
 
 // Birthday unsubscribe page
-emailManagementRoutes.get("/unsubscribe/birthday", async (req: any, res) => {
+emailManagementRoutes.get("/api/unsubscribe/birthday", async (req: any, res) => {
   try {
     const { token } = req.query;
 
@@ -1747,7 +1747,7 @@ emailManagementRoutes.get("/unsubscribe/birthday", async (req: any, res) => {
           <div class="container">
             <h1>🎂 Unsubscribe from Birthday Cards</h1>
             <p>We're sorry to see you go! You can unsubscribe from receiving birthday card notifications below.</p>
-            <form method="POST" action="/api/unsubscribe/birthday">
+            <form method="POST" action="/api/api/unsubscribe/birthday">
               <input type="hidden" name="token" value="${token}" />
               <button type="submit" class="button">Unsubscribe</button>
             </form>
@@ -1770,7 +1770,7 @@ emailManagementRoutes.get("/unsubscribe/birthday", async (req: any, res) => {
 });
 
 // Process birthday unsubscribe
-emailManagementRoutes.post("/unsubscribe/birthday", async (req: any, res) => {
+emailManagementRoutes.post("/api/unsubscribe/birthday", async (req: any, res) => {
   try {
     const { token } = req.body;
 

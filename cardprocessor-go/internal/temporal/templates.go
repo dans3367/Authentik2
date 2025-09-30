@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"os"
 	"regexp"
 	"strings"
 )
@@ -316,7 +317,12 @@ func renderUnsubscribeSection(params TemplateParams) string {
 		return ""
 	}
 
-	unsubscribeUrl := fmt.Sprintf("http://localhost:5000/unsubscribe/birthday?token=%s", params.UnsubscribeToken)
+	// Use the main server's unsubscribe endpoint (APP_URL env var or default to localhost:3502)
+	baseUrl := os.Getenv("APP_URL")
+	if baseUrl == "" {
+		baseUrl = "http://localhost:3502"
+	}
+	unsubscribeUrl := fmt.Sprintf("%s/api/unsubscribe/birthday?token=%s", baseUrl, params.UnsubscribeToken)
 
 	return fmt.Sprintf(`
 		<div style="padding: 20px 30px; border-top: 1px solid #e2e8f0; text-align: center; background-color: #f7fafc;">

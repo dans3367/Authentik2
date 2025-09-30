@@ -296,7 +296,8 @@ export class BirthdayWorker extends EventEmitter {
       // Generate unsubscribe token
       let unsubscribeToken = '';
       try {
-        const tokenResponse = await fetch(`http://localhost:5004/api/birthday-unsubscribe-token/${job.contactId}`, {
+        const cardprocessorUrl = process.env.CARDPROCESSOR_URL || 'http://localhost:5003';
+        const tokenResponse = await fetch(`${cardprocessorUrl}/api/birthday-unsubscribe-token/${job.contactId}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -410,7 +411,9 @@ export class BirthdayWorker extends EventEmitter {
     // Build unsubscribe section if token exists
     let unsubscribeSection = '';
     if (params.unsubscribeToken) {
-      const unsubscribeUrl = `http://localhost:5004/unsubscribe/birthday?token=${params.unsubscribeToken}`;
+      // Use the main server's unsubscribe endpoint
+      const baseUrl = process.env.APP_URL || 'http://localhost:3502';
+      const unsubscribeUrl = `${baseUrl}/api/unsubscribe/birthday?token=${params.unsubscribeToken}`;
       unsubscribeSection = `
         <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">
           <p style="margin: 0; font-size: 0.8rem; color: #a0aec0; line-height: 1.4;">
