@@ -141,6 +141,16 @@ func (h *BirthdayHandler) UpdateBirthdaySettings(c *gin.Context) {
 
 	updatedSettings, err := h.repo.UpdateBirthdaySettings(c.Request.Context(), settings)
 	if err != nil {
+		fmt.Printf("❌ [500 ERROR] UpdateBirthdaySettings failed\n")
+		fmt.Printf("   └─ Tenant ID: %s\n", tenantID)
+		fmt.Printf("   └─ Error Type: %T\n", err)
+		fmt.Printf("   └─ Error Message: %v\n", err)
+		fmt.Printf("   └─ Settings: enabled=%v, template=%s, segment=%s\n",
+			settings.Enabled, settings.EmailTemplate, settings.SegmentFilter)
+		fmt.Printf("   └─ Request Path: %s %s\n", c.Request.Method, c.Request.URL.Path)
+		fmt.Printf("   └─ Client IP: %s\n", c.ClientIP())
+		fmt.Printf("   └─ Stack Trace: Failed to update birthday settings: %+v\n", err)
+
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   "Failed to update birthday settings",
@@ -188,6 +198,16 @@ func (h *BirthdayHandler) GetBirthdayContacts(c *gin.Context) {
 	}
 
 	if err != nil {
+		fmt.Printf("❌ [500 ERROR] GetBirthdayContacts failed\n")
+		fmt.Printf("   └─ Tenant ID: %s\n", tenantID)
+		fmt.Printf("   └─ Error Type: %T\n", err)
+		fmt.Printf("   └─ Error Message: %v\n", err)
+		fmt.Printf("   └─ Query Parameters: page=%d, limit=%d, upcomingOnly=%v\n", page, limit, upcomingOnly)
+		fmt.Printf("   └─ Offset: %d\n", offset)
+		fmt.Printf("   └─ Request Path: %s %s\n", c.Request.Method, c.Request.URL.Path)
+		fmt.Printf("   └─ Client IP: %s\n", c.ClientIP())
+		fmt.Printf("   └─ Stack Trace: %+v\n", err)
+
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   "Failed to get birthday contacts",
@@ -250,6 +270,17 @@ func (h *BirthdayHandler) UpdateContactBirthday(c *gin.Context) {
 
 	_, err = h.repo.UpdateContactBirthday(c.Request.Context(), tenantID, contactID, req.Birthday, req.BirthdayEmailEnabled)
 	if err != nil {
+		fmt.Printf("❌ [500 ERROR] UpdateContactBirthday failed\n")
+		fmt.Printf("   └─ Tenant ID: %s\n", tenantID)
+		fmt.Printf("   └─ Contact ID: %s\n", contactID)
+		fmt.Printf("   └─ Error Type: %T\n", err)
+		fmt.Printf("   └─ Error Message: %v\n", err)
+		fmt.Printf("   └─ Birthday: %v\n", req.Birthday)
+		fmt.Printf("   └─ Email Enabled: %v\n", req.BirthdayEmailEnabled)
+		fmt.Printf("   └─ Request Path: %s %s\n", c.Request.Method, c.Request.URL.Path)
+		fmt.Printf("   └─ Client IP: %s\n", c.ClientIP())
+		fmt.Printf("   └─ Stack Trace: %+v\n", err)
+
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   "Failed to update contact birthday",
@@ -293,6 +324,17 @@ func (h *BirthdayHandler) UpdateBulkBirthdayEmailPreference(c *gin.Context) {
 
 	err = h.repo.UpdateBulkBirthdayEmailPreference(c.Request.Context(), tenantID, req.ContactIDs, req.BirthdayEmailEnabled)
 	if err != nil {
+		fmt.Printf("❌ [500 ERROR] UpdateBulkBirthdayEmailPreference failed\n")
+		fmt.Printf("   └─ Tenant ID: %s\n", tenantID)
+		fmt.Printf("   └─ Error Type: %T\n", err)
+		fmt.Printf("   └─ Error Message: %v\n", err)
+		fmt.Printf("   └─ Contact IDs Count: %d\n", len(req.ContactIDs))
+		fmt.Printf("   └─ Contact IDs: %v\n", req.ContactIDs)
+		fmt.Printf("   └─ Email Enabled: %v\n", req.BirthdayEmailEnabled)
+		fmt.Printf("   └─ Request Path: %s %s\n", c.Request.Method, c.Request.URL.Path)
+		fmt.Printf("   └─ Client IP: %s\n", c.ClientIP())
+		fmt.Printf("   └─ Stack Trace: %+v\n", err)
+
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   "Failed to update birthday email preferences",
@@ -501,7 +543,20 @@ func (h *BirthdayHandler) SendTestBirthdayCard(c *gin.Context) {
 		ctx := context.Background()
 		workflowRun, err := h.temporalClient.StartBirthdayTestWorkflow(ctx, workflowInput)
 		if err != nil {
-			fmt.Printf("❌ [Birthday Test] Failed to start workflow: %v\n", err)
+			fmt.Printf("❌ [500 ERROR] StartBirthdayTestWorkflow failed\n")
+			fmt.Printf("   └─ Tenant ID: %s\n", tenantID)
+			fmt.Printf("   └─ User ID: %s\n", userID)
+			fmt.Printf("   └─ User Email: %s\n", req.UserEmail)
+			fmt.Printf("   └─ Error Type: %T\n", err)
+			fmt.Printf("   └─ Error Message: %v\n", err)
+			fmt.Printf("   └─ Email Template: %s\n", req.EmailTemplate)
+			fmt.Printf("   └─ Sender Name: %s\n", req.SenderName)
+			fmt.Printf("   └─ Promotion ID: %s\n", promotionID)
+			fmt.Printf("   └─ Temporal Connected: %v\n", h.temporalClient.IsConnected())
+			fmt.Printf("   └─ Request Path: %s %s\n", c.Request.Method, c.Request.URL.Path)
+			fmt.Printf("   └─ Client IP: %s\n", c.ClientIP())
+			fmt.Printf("   └─ Stack Trace: %+v\n", err)
+
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"success": false,
 				"error":   "Failed to start birthday test workflow: " + err.Error(),
@@ -561,6 +616,15 @@ func (h *BirthdayHandler) GenerateBirthdayUnsubscribeToken(c *gin.Context) {
 	// Verify contact exists and belongs to tenant
 	contact, err := h.repo.GetContactByID(c.Request.Context(), tenantID, contactID)
 	if err != nil {
+		fmt.Printf("❌ [500 ERROR] GetContactByID failed (GenerateBirthdayUnsubscribeToken)\n")
+		fmt.Printf("   └─ Tenant ID: %s\n", tenantID)
+		fmt.Printf("   └─ Contact ID: %s\n", contactID)
+		fmt.Printf("   └─ Error Type: %T\n", err)
+		fmt.Printf("   └─ Error Message: %v\n", err)
+		fmt.Printf("   └─ Request Path: %s %s\n", c.Request.Method, c.Request.URL.Path)
+		fmt.Printf("   └─ Client IP: %s\n", c.ClientIP())
+		fmt.Printf("   └─ Stack Trace: %+v\n", err)
+
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   "Failed to get contact",
@@ -580,6 +644,15 @@ func (h *BirthdayHandler) GenerateBirthdayUnsubscribeToken(c *gin.Context) {
 	tokenBytes := make([]byte, 32)
 	_, err = rand.Read(tokenBytes)
 	if err != nil {
+		fmt.Printf("❌ [500 ERROR] Failed to generate random token\n")
+		fmt.Printf("   └─ Tenant ID: %s\n", tenantID)
+		fmt.Printf("   └─ Contact ID: %s\n", contactID)
+		fmt.Printf("   └─ Error Type: %T\n", err)
+		fmt.Printf("   └─ Error Message: %v\n", err)
+		fmt.Printf("   └─ Request Path: %s %s\n", c.Request.Method, c.Request.URL.Path)
+		fmt.Printf("   └─ Client IP: %s\n", c.ClientIP())
+		fmt.Printf("   └─ Stack Trace: %+v\n", err)
+
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   "Failed to generate token",
@@ -591,6 +664,16 @@ func (h *BirthdayHandler) GenerateBirthdayUnsubscribeToken(c *gin.Context) {
 	// Create unsubscribe token in database
 	unsubToken, err := h.repo.CreateBirthdayUnsubscribeToken(c.Request.Context(), tenantID, contactID, token)
 	if err != nil {
+		fmt.Printf("❌ [500 ERROR] CreateBirthdayUnsubscribeToken failed\n")
+		fmt.Printf("   └─ Tenant ID: %s\n", tenantID)
+		fmt.Printf("   └─ Contact ID: %s\n", contactID)
+		fmt.Printf("   └─ Token Length: %d\n", len(token))
+		fmt.Printf("   └─ Error Type: %T\n", err)
+		fmt.Printf("   └─ Error Message: %v\n", err)
+		fmt.Printf("   └─ Request Path: %s %s\n", c.Request.Method, c.Request.URL.Path)
+		fmt.Printf("   └─ Client IP: %s\n", c.ClientIP())
+		fmt.Printf("   └─ Stack Trace: %+v\n", err)
+
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   "Failed to create unsubscribe token",
@@ -621,6 +704,15 @@ func (h *BirthdayHandler) ShowBirthdayUnsubscribePage(c *gin.Context) {
 	// Get unsubscribe token from database
 	unsubToken, err := h.repo.GetBirthdayUnsubscribeToken(c.Request.Context(), token)
 	if err != nil {
+		fmt.Printf("❌ [500 ERROR] GetBirthdayUnsubscribeToken failed (ShowBirthdayUnsubscribePage)\n")
+		fmt.Printf("   └─ Token: %s\n", token)
+		fmt.Printf("   └─ Error Type: %T\n", err)
+		fmt.Printf("   └─ Error Message: %v\n", err)
+		fmt.Printf("   └─ Request Path: %s %s\n", c.Request.Method, c.Request.URL.Path)
+		fmt.Printf("   └─ Client IP: %s\n", c.ClientIP())
+		fmt.Printf("   └─ Query String: %s\n", c.Request.URL.RawQuery)
+		fmt.Printf("   └─ Stack Trace: %+v\n", err)
+
 		c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
 			"ErrorMessage": "Failed to process unsubscribe request. Please try again later.",
 		})
@@ -645,6 +737,19 @@ func (h *BirthdayHandler) ShowBirthdayUnsubscribePage(c *gin.Context) {
 	// Get contact information
 	contact, err := h.repo.GetContactByID(c.Request.Context(), unsubToken.TenantID, unsubToken.ContactID)
 	if err != nil || contact == nil {
+		fmt.Printf("❌ [500 ERROR] GetContactByID failed (ShowBirthdayUnsubscribePage)\n")
+		fmt.Printf("   └─ Tenant ID: %s\n", unsubToken.TenantID)
+		fmt.Printf("   └─ Contact ID: %s\n", unsubToken.ContactID)
+		fmt.Printf("   └─ Token: %s\n", token)
+		fmt.Printf("   └─ Contact is nil: %v\n", contact == nil)
+		if err != nil {
+			fmt.Printf("   └─ Error Type: %T\n", err)
+			fmt.Printf("   └─ Error Message: %v\n", err)
+			fmt.Printf("   └─ Stack Trace: %+v\n", err)
+		}
+		fmt.Printf("   └─ Request Path: %s %s\n", c.Request.Method, c.Request.URL.Path)
+		fmt.Printf("   └─ Client IP: %s\n", c.ClientIP())
+
 		c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
 			"ErrorMessage": "Failed to find contact information.",
 		})
@@ -680,6 +785,15 @@ func (h *BirthdayHandler) ProcessBirthdayUnsubscribe(c *gin.Context) {
 	// Get unsubscribe token from database
 	unsubToken, err := h.repo.GetBirthdayUnsubscribeToken(c.Request.Context(), req.Token)
 	if err != nil {
+		fmt.Printf("❌ [500 ERROR] GetBirthdayUnsubscribeToken failed (ProcessBirthdayUnsubscribe)\n")
+		fmt.Printf("   └─ Token: %s\n", req.Token)
+		fmt.Printf("   └─ Error Type: %T\n", err)
+		fmt.Printf("   └─ Error Message: %v\n", err)
+		fmt.Printf("   └─ Request Path: %s %s\n", c.Request.Method, c.Request.URL.Path)
+		fmt.Printf("   └─ Client IP: %s\n", c.ClientIP())
+		fmt.Printf("   └─ Form Data - Reason: %v\n", req.Reason)
+		fmt.Printf("   └─ Stack Trace: %+v\n", err)
+
 		c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
 			"ErrorMessage": "Failed to process unsubscribe request",
 		})
@@ -703,6 +817,19 @@ func (h *BirthdayHandler) ProcessBirthdayUnsubscribe(c *gin.Context) {
 	// Get contact information for response
 	contact, err := h.repo.GetContactByID(c.Request.Context(), unsubToken.TenantID, unsubToken.ContactID)
 	if err != nil || contact == nil {
+		fmt.Printf("❌ [500 ERROR] GetContactByID failed (ProcessBirthdayUnsubscribe)\n")
+		fmt.Printf("   └─ Tenant ID: %s\n", unsubToken.TenantID)
+		fmt.Printf("   └─ Contact ID: %s\n", unsubToken.ContactID)
+		fmt.Printf("   └─ Token: %s\n", req.Token)
+		fmt.Printf("   └─ Contact is nil: %v\n", contact == nil)
+		if err != nil {
+			fmt.Printf("   └─ Error Type: %T\n", err)
+			fmt.Printf("   └─ Error Message: %v\n", err)
+			fmt.Printf("   └─ Stack Trace: %+v\n", err)
+		}
+		fmt.Printf("   └─ Request Path: %s %s\n", c.Request.Method, c.Request.URL.Path)
+		fmt.Printf("   └─ Client IP: %s\n", c.ClientIP())
+
 		c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
 			"ErrorMessage": "Failed to find contact information",
 		})
@@ -712,6 +839,17 @@ func (h *BirthdayHandler) ProcessBirthdayUnsubscribe(c *gin.Context) {
 	// Unsubscribe the contact
 	err = h.repo.UnsubscribeContactFromBirthdayEmails(c.Request.Context(), unsubToken.ContactID, req.Reason)
 	if err != nil {
+		fmt.Printf("❌ [500 ERROR] UnsubscribeContactFromBirthdayEmails failed\n")
+		fmt.Printf("   └─ Tenant ID: %s\n", unsubToken.TenantID)
+		fmt.Printf("   └─ Contact ID: %s\n", unsubToken.ContactID)
+		fmt.Printf("   └─ Token: %s\n", req.Token)
+		fmt.Printf("   └─ Reason: %v\n", req.Reason)
+		fmt.Printf("   └─ Error Type: %T\n", err)
+		fmt.Printf("   └─ Error Message: %v\n", err)
+		fmt.Printf("   └─ Request Path: %s %s\n", c.Request.Method, c.Request.URL.Path)
+		fmt.Printf("   └─ Client IP: %s\n", c.ClientIP())
+		fmt.Printf("   └─ Stack Trace: %+v\n", err)
+
 		c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
 			"ErrorMessage": "Failed to unsubscribe from birthday emails",
 		})

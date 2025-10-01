@@ -705,11 +705,11 @@ func (r *Repository) UnsubscribeContactFromBirthdayEmails(ctx context.Context, c
 		SET birthday_email_enabled = false, 
 		    birthday_unsubscribe_reason = $1,
 		    birthday_unsubscribed_at = $2,
-		    updated_at = $2
-		WHERE id = $3
+		    updated_at = $3
+		WHERE id = $4
 	`
 
-	_, err := r.db.ExecContext(ctx, query, reason, now, contactID)
+	_, err := r.db.ExecContext(ctx, query, reason, now, now, contactID)
 	if err != nil {
 		return fmt.Errorf("failed to unsubscribe contact from birthday emails: %w", err)
 	}

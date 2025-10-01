@@ -23,8 +23,10 @@ func SetupRouter(cfg *config.Config, repo *repository.Repository, temporalClient
 	router.LoadHTMLGlob("templates/*")
 
 	// Add middleware
+	router.Use(middleware.RequestLogger())
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
+	router.Use(middleware.ErrorLogger())
 	router.Use(middleware.SetupCORS(cfg))
 
 	// Create handlers
