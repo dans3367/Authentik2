@@ -1075,7 +1075,7 @@ emailManagementRoutes.patch("/email-contacts/:contactId/birthday-email", authent
 
     // Check if contact has unsubscribed from birthday emails
     if (enabled && contact.birthdayUnsubscribedAt) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         message: 'Cannot re-enable birthday emails for a contact who has unsubscribed. The customer must opt-in again through the unsubscribe link.',
         reason: 'unsubscribed'
       });
@@ -1126,7 +1126,7 @@ emailManagementRoutes.patch("/email-contacts/birthday-email/bulk", authenticateT
     if (enabled) {
       const unsubscribedContacts = contacts.filter(c => c.birthdayUnsubscribedAt);
       if (unsubscribedContacts.length > 0) {
-        return res.status(403).json({ 
+        return res.status(403).json({
           message: `Cannot re-enable birthday emails for ${unsubscribedContacts.length} contact(s) who have unsubscribed. These customers must opt-in again through the unsubscribe link.`,
           reason: 'unsubscribed',
           unsubscribedContactIds: unsubscribedContacts.map(c => c.id)
@@ -1886,7 +1886,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
 
     const results = [];
     const cardprocessorUrl = process.env.CARDPROCESSOR_URL || 'http://localhost:5004';
-    
+
     // Import email service
     const { enhancedEmailService } = await import('../emailService');
 
@@ -2025,6 +2025,23 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
   }
 });
 
+// Helper function to process placeholders in content
+function processPlaceholders(content: string, params: { recipientName?: string }): string {
+  if (!content) return content;
+
+  let processed = content;
+
+  // Handle {{firstName}} and {{lastName}} placeholders
+  const nameParts = (params.recipientName || '').split(' ');
+  const firstName = nameParts[0] || '';
+  const lastName = nameParts.slice(1).join(' ') || '';
+
+  processed = processed.replace(/\{\{firstName\}\}/g, firstName);
+  processed = processed.replace(/\{\{lastName\}\}/g, lastName);
+
+  return processed;
+}
+
 // Helper function to render birthday template
 function renderBirthdayTemplate(
   template: 'default' | 'confetti' | 'balloons' | 'custom',
@@ -2040,14 +2057,159 @@ function renderBirthdayTemplate(
     unsubscribeToken?: string;
   }
 ): string {
+  // Handle custom theme with rich styling
+  if (template === 'custom' && params.customThemeData) {
+    let customData = null;
+
+    try {
+      const parsedData = typeof params.customThemeData === 'string'
+        ? JSON.parse(params.customThemeData)
+        : params.customThemeData;
+
+      // Check if it's the new structure (has themes property)
+      if (parsedData.themes && parsedData.themes.custom) {
+        customData = parsedData.themes.custom;
+      } else if (!parsedData.themes) {
+        // Old structure - use directly if no themes property
+        customData = parsedData;
+      }
+    } catch (e) {
+      console.warn('Failed to parse customThemeData for custom template:', e);
+      return `<html><body><p>Error loading custom theme</p></body></html>`;
+    }
+
+    if (!customData) {
+      return `<html><body><p>No custom theme data found</p></body></html>`;
+    }
+
+    const title = customData.title || `Happy Birthday${params.recipientName ? ', ' + params.recipientName : ''}!`;
+    const message = processPlaceholders(customData.message || params.message || 'Wishing you a wonderful day!', params);
+    const signature = customData.signature || '';
+    const fromMessage = params.senderName || 'The Team';
+
+    // Header image section
+    const headerImageSection = customData.imageUrl
+      ? `<div style="height: 200px; background-image: url('${customData.imageUrl}'); background-size: cover; background-position: center; border-radius: 12px 12px 0 0;"></div>`
+      : `<div style="background: linear-gradient(135deg, #a8e6cf 0%, #dcedc1 100%); height: 200px; border-radius: 12px 12px 0 0;"></div>`;
+
+    // Build promotion section if promotion content exists
+    let promotionSection = '';
+    if (params.promotionContent) {
+      promotionSection = `
+        <div style="margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border-radius: 8px; border-left: 4px solid #667eea;">
+          ${params.promotionTitle ? `<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">${processPlaceholders(params.promotionTitle, params)}</h3>` : ''}
+          ${params.promotionDescription ? `<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${processPlaceholders(params.promotionDescription, params)}</p>` : ''}
+          <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${processPlaceholders(params.promotionContent, params)}</div>
+        </div>
+      `;
+    }
+
+    // Signature section
+    const signatureSection = signature
+      ? `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-style: italic; color: #718096;">${processPlaceholders(signature, params)}</div>`
+      : '';
+
+    // From message section (only if no signature)
+    const fromMessageSection = !signature && fromMessage
+      ? `<div style="padding: 20px 30px 10px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
+           <div style="font-size: 0.9rem; color: #718096;">
+             <p style="margin: 0; font-weight: 600; color: #4a5568;">${fromMessage}</p>
+           </div>
+         </div>`
+      : '';
+
+    // Build unsubscribe section if token exists
+    let unsubscribeSection = '';
+    if (params.unsubscribeToken) {
+      const baseUrl = process.env.APP_URL || 'http://localhost:5000';
+      const unsubscribeUrl = `${baseUrl}/api/unsubscribe/birthday?token=${params.unsubscribeToken}`;
+      unsubscribeSection = `
+        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">
+          <p style="margin: 0; font-size: 0.8rem; color: #a0aec0; line-height: 1.4;">
+            Don't want to receive birthday cards? 
+            <a href="${unsubscribeUrl}" style="color: #667eea; text-decoration: none;">Unsubscribe here</a>
+          </p>
+        </div>
+      `;
+    }
+
+    return `<html>
+      <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+        <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
+          <!-- 1. Header Image (standalone) -->
+          ${headerImageSection}
+          
+          <!-- 2. Header Text (separate from image) -->
+          <div style="padding: 30px 30px 20px 30px; text-align: center; border-bottom: 1px solid #f0f0f0;">
+            <h1 style="color: #2d3748; font-size: 2.5rem; margin: 0; font-weight: bold;">${title}</h1>
+          </div>
+          
+          <!-- 3. Content Area (message) -->
+          <div style="padding: 30px;">
+            <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; margin-bottom: 20px;">${message}</div>
+            ${promotionSection}
+            ${signatureSection}
+          </div>
+          
+          ${fromMessageSection}
+          ${unsubscribeSection ? `<div style="padding: 0 30px 30px 30px;">${unsubscribeSection}</div>` : ''}
+        </div>
+      </body>
+    </html>`;
+  }
+
+  // Default theme header images
+  const themeHeaders = {
+    default: 'https://images.unsplash.com/photo-1588195538326-c5b1e9f80a1b?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+    confetti: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+    balloons: 'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'
+  };
+
   const themeColors = {
     default: { primary: '#667eea', secondary: '#764ba2' },
     confetti: { primary: '#ff6b6b', secondary: '#feca57' },
     balloons: { primary: '#54a0ff', secondary: '#5f27cd' }
   };
 
+  // Check if there's custom theme data with custom title/signature for this specific theme
+  let headline = `Happy Birthday${params.recipientName ? ', ' + params.recipientName : ''}!`;
+  let signature = '';
+
+  if (params.customThemeData) {
+    try {
+      const parsedData = typeof params.customThemeData === 'string'
+        ? JSON.parse(params.customThemeData)
+        : params.customThemeData;
+
+      let themeSpecificData = null;
+
+      // Check if it's the new structure (has themes property)
+      if (parsedData.themes && parsedData.themes[template]) {
+        themeSpecificData = parsedData.themes[template];
+      } else if (!parsedData.themes) {
+        // Old structure - use directly if no themes property
+        themeSpecificData = parsedData;
+      }
+
+      if (themeSpecificData) {
+        // Use custom title if provided, otherwise use default
+        if (themeSpecificData.title) {
+          headline = themeSpecificData.title;
+        }
+
+        // Use custom signature if provided
+        if (themeSpecificData.signature) {
+          signature = themeSpecificData.signature;
+        }
+      }
+    } catch (e) {
+      // If parsing fails, continue with defaults
+      console.warn('Failed to parse customThemeData for template:', template, e);
+    }
+  }
+
+  const headerImage = themeHeaders[template as keyof typeof themeHeaders] || themeHeaders.default;
   const colors = themeColors[template as keyof typeof themeColors] || themeColors.default;
-  const headline = `Happy Birthday${params.recipientName ? ', ' + params.recipientName : ''}!`;
   const fromMessage = params.senderName || 'The Team';
 
   // Build promotion section if promotion content exists
@@ -2055,12 +2217,22 @@ function renderBirthdayTemplate(
   if (params.promotionContent) {
     promotionSection = `
       <div style="margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border-radius: 8px; border-left: 4px solid ${colors.primary};">
-        ${params.promotionTitle ? `<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">${params.promotionTitle}</h3>` : ''}
-        ${params.promotionDescription ? `<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${params.promotionDescription}</p>` : ''}
-        <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${params.promotionContent}</div>
+        ${params.promotionTitle ? `<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">${processPlaceholders(params.promotionTitle, params)}</h3>` : ''}
+        ${params.promotionDescription ? `<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${processPlaceholders(params.promotionDescription, params)}</p>` : ''}
+        <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${processPlaceholders(params.promotionContent, params)}</div>
       </div>
     `;
   }
+
+  // Signature section
+  const signatureSection = signature
+    ? `<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">${processPlaceholders(signature, params)}</div>`
+    : '';
+
+  // From message section (only if no signature)
+  const fromMessageSection = !signature && fromMessage
+    ? `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #718096; font-size: 0.9rem; font-weight: 600;">${fromMessage}</div>`
+    : '';
 
   // Build unsubscribe section if token exists
   let unsubscribeSection = '';
@@ -2068,7 +2240,7 @@ function renderBirthdayTemplate(
     const baseUrl = process.env.APP_URL || 'http://localhost:5000';
     const unsubscribeUrl = `${baseUrl}/api/unsubscribe/birthday?token=${params.unsubscribeToken}`;
     unsubscribeSection = `
-      <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">
+      <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">
         <p style="margin: 0; font-size: 0.8rem; color: #a0aec0; line-height: 1.4;">
           Don't want to receive birthday cards? 
           <a href="${unsubscribeUrl}" style="color: #667eea; text-decoration: none;">Unsubscribe here</a>
@@ -2080,21 +2252,22 @@ function renderBirthdayTemplate(
   return `<html>
     <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%);">
       <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
+        <!-- 1. Header Image (standalone) -->
+        <div style="height: 200px; background-image: url('${headerImage}'); background-size: cover; background-position: center; border-radius: 12px 12px 0 0;"></div>
+        
+        <!-- 2. Header Text (separate from image) -->
         <div style="padding: 30px 30px 20px 30px; text-align: center; border-bottom: 1px solid #f0f0f0;">
           <h1 style="color: #2d3748; font-size: 2.5rem; margin: 0; font-weight: bold;">${headline}</h1>
         </div>
+        
+        <!-- 3. Content Area (message) -->
         <div style="padding: 30px;">
-          <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">${params.message || 'Wishing you a wonderful day!'}</div>
+          <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">${processPlaceholders(params.message || 'Wishing you a wonderful day!', params)}</div>
           ${promotionSection}
-        </div>
-        ${fromMessage ? `
-        <div style="padding: 20px 30px 30px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
-          <div style="font-size: 0.9rem; color: #718096;">
-            <p style="margin: 0; font-weight: 600; color: #4a5568;">${fromMessage}</p>
-          </div>
+          ${signatureSection}
+          ${fromMessageSection}
           ${unsubscribeSection}
         </div>
-        ` : ''}
       </div>
     </body>
   </html>`;

@@ -26,5 +26,3 @@ attached_assets/*.jpeg
 *.log
 server-go/*.log
 cardprocessor-go/tmp/main
-cardprocessor-go/tmp
-cardprocessor-go/tmp/main
