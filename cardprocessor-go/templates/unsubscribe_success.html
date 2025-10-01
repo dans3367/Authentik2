@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Successfully Unsubscribed</title>
+    <title>{{if eq .Message "You have been successfully resubscribed to birthday emails."}}Successfully Resubscribed{{else}}Successfully Unsubscribed{{end}}</title>
     <style>
         * {
             margin: 0;
@@ -98,6 +98,27 @@
             margin-bottom: 4px;
         }
         
+        .resubscribe-section {
+            background: #fffaf0;
+            border: 1px solid #fbd38d;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 32px;
+            text-align: center;
+        }
+        
+        .resubscribe-section h4 {
+            color: #744210;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+        
+        .resubscribe-section p {
+            color: #975a16;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        
         .btn {
             padding: 14px 24px;
             border: none;
@@ -110,11 +131,21 @@
             display: inline-block;
             background: #48bb78;
             color: white;
+            margin: 0 8px 8px 0;
         }
         
         .btn:hover {
             background: #38a169;
             transform: translateY(-1px);
+        }
+        
+        .btn-secondary {
+            background: #ed8936;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #dd6b20;
         }
         
         .footer {
@@ -139,31 +170,44 @@
 <body>
     <div class="container">
         <div class="icon">✅</div>
-        <h1>Successfully Unsubscribed</h1>
-        <p class="subtitle">You have been successfully unsubscribed from birthday card notifications.</p>
+        <h1>{{if eq .Message "You have been successfully resubscribed to birthday emails."}}Successfully Resubscribed{{else}}Successfully Unsubscribed{{end}}</h1>
+        <p class="subtitle">{{if .Message}}{{.Message}}{{else}}You have been successfully unsubscribed from birthday card notifications.{{end}}</p>
         
         <div class="success-message">
             <h3>What happens next?</h3>
+            {{if eq .Message "You have been successfully resubscribed to birthday emails."}}
+            <p>• You will now receive birthday card notifications again<br>
+            • Your email preferences have been updated<br>
+            • This change is effective immediately</p>
+            {{else}}
             <p>• You will no longer receive birthday card notifications<br>
             • Your email preferences have been updated<br>
             • This change is effective immediately</p>
+            {{end}}
         </div>
         
         {{if .Contact}}
         <div class="contact-info">
-            <h4>Unsubscribed Contact:</h4>
+            <h4>{{if eq .Message "You have been successfully resubscribed to birthday emails."}}Resubscribed Contact:{{else}}Unsubscribed Contact:{{end}}</h4>
             <p><strong>{{.Contact.FirstName}} {{.Contact.LastName}}</strong></p>
             <p>{{.Contact.Email}}</p>
             {{if .UnsubscribedAt}}
-            <p>Unsubscribed on: {{.UnsubscribedAt}}</p>
+            <p>{{if eq .Message "You have been successfully resubscribed to birthday emails."}}Previously unsubscribed on:{{else}}Unsubscribed on:{{end}} {{.UnsubscribedAt}}</p>
             {{end}}
         </div>
         {{end}}
         
-        <button onclick="window.close()" class="btn">Close Window</button>
+        {{if ne .Message "You have been successfully resubscribed to birthday emails."}}
+        <div class="resubscribe-section">
+            <h4>Unsubscribed by mistake?</h4>
+            <p>You can resubscribe to birthday card notifications at any time.</p>
+            <a href="/api/resubscribe/birthday?token={{.Token}}" class="btn btn-secondary">Resubscribe</a>
+        </div>
+        {{end}}
+        
         
         <div class="footer">
-            <p>If you unsubscribed by mistake or want to resubscribe in the future, please contact our support team.</p>
+            <p>If you need help with your email preferences, please contact our support team.</p>
         </div>
     </div>
 </body>

@@ -252,6 +252,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Resubscribe endpoint - proxy to cardprocessor-go main server (port 5004)
+  app.get("/api/resubscribe/birthday", async (req: any, res) => {
+    try {
+      console.log("🔗 [Resubscribe Proxy] Forwarding GET request to cardprocessor-go:5004, token:", req.query.token?.substring(0, 10) + "...");
+      
+      // Build query string
+      const queryParams = new URLSearchParams(req.query as any).toString();
+      const url = `http://localhost:5004/api/resubscribe/birthday${queryParams ? "?" + queryParams : ""}`;
+      
+      // Forward request to cardprocessor-go server
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "User-Agent": "birthday-service-proxy",
+        },
+      });
+      
+      // Forward the HTML response
+      const html = await response.text();
+      res.status(response.status).type("text/html").send(html);
+      
+    } catch (error) {
+      console.error("❌ [Resubscribe Proxy] Failed to communicate with cardprocessor-go:", error);
+      res.status(500).send("<html><body><h1>Service Temporarily Unavailable</h1><p>Unable to process resubscribe request. Please try again later.</p></body></html>");
+    }
+  });
+
   // Email tracking endpoints - proxy to server-node
   app.get("/api/email-tracking", authenticateToken, async (req: any, res) => {
     try {

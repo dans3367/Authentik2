@@ -45,6 +45,7 @@ func SetupRouter(cfg *config.Config, repo *repository.Repository, temporalClient
 	// Public unsubscribe routes (no auth required)
 	router.GET("/api/unsubscribe/birthday", birthdayHandler.ShowBirthdayUnsubscribePage)
 	router.POST("/api/unsubscribe/birthday", birthdayHandler.ProcessBirthdayUnsubscribe)
+	router.GET("/api/resubscribe/birthday", birthdayHandler.ProcessBirthdayResubscribe)
 
 	// API routes with authentication
 	api := router.Group("/api")

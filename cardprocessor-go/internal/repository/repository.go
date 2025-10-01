@@ -717,6 +717,42 @@ func (r *Repository) UnsubscribeContactFromBirthdayEmails(ctx context.Context, c
 	return nil
 }
 
+// ResubscribeContactToBirthdayEmails resubscribes a contact to birthday emails
+func (r *Repository) ResubscribeContactToBirthdayEmails(ctx context.Context, contactID string) error {
+	now := time.Now()
+	query := `
+		UPDATE email_contacts 
+		SET birthday_email_enabled = true, 
+		    birthday_unsubscribe_reason = NULL,
+		    birthday_unsubscribed_at = NULL,
+		    updated_at = $1
+		WHERE id = $2
+	`
+
+	_, err := r.db.ExecContext(ctx, query, now, contactID)
+	if err != nil {
+		return fmt.Errorf("failed to resubscribe contact to birthday emails: %w", err)
+	}
+
+	return nil
+}
+
+// ResetBirthdayUnsubscribeToken resets a birthday unsubscribe token to unused status
+func (r *Repository) ResetBirthdayUnsubscribeToken(ctx context.Context, tokenID string) error {
+	query := `
+		UPDATE birthday_unsubscribe_tokens 
+		SET used = false, used_at = NULL
+		WHERE id = $1
+	`
+
+	_, err := r.db.ExecContext(ctx, query, tokenID)
+	if err != nil {
+		return fmt.Errorf("failed to reset birthday unsubscribe token: %w", err)
+	}
+
+	return nil
+}
+
 // GetPromotion retrieves a promotion by ID and tenant ID
 func (r *Repository) GetPromotion(ctx context.Context, promotionID, tenantID string) (*models.Promotion, error) {
 	query := `

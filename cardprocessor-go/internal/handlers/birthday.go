@@ -727,9 +727,16 @@ func (h *BirthdayHandler) ShowBirthdayUnsubscribePage(c *gin.Context) {
 	}
 
 	if unsubToken.Used {
+		// Try to load contact info for context, but don't fail if missing
+		var contact *models.EmailContact
+		if cinfo, err := h.repo.GetContactByID(c.Request.Context(), unsubToken.TenantID, unsubToken.ContactID); err == nil {
+			contact = cinfo
+		}
+
 		c.HTML(http.StatusOK, "unsubscribe_success.html", gin.H{
 			"Message": "You have already been unsubscribed from birthday emails.",
-			"Email":   "",
+			"Contact": contact,
+			"Token":   token, // ensure resubscribe button has a token
 		})
 		return
 	}
@@ -865,11 +872,10 @@ func (h *BirthdayHandler) ProcessBirthdayUnsubscribe(c *gin.Context) {
 
 	// Return success response
 	c.HTML(http.StatusOK, "unsubscribe_success.html", gin.H{
-		"Message":   "You have been successfully unsubscribed from birthday emails.",
-		"Email":     contact.Email,
-		"FirstName": getStringValue(contact.FirstName),
-		"LastName":  getStringValue(contact.LastName),
-		"Reason":    req.Reason,
+		"Message":        "You have been successfully unsubscribed from birthday emails.",
+		"Contact":        contact,
+		"Token":          unsubToken.Token,
+		"UnsubscribedAt": time.Now().Format("January 2, 2006 at 3:04 PM"),
 	})
 }
 
@@ -879,4 +885,95 @@ func getStringValue(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// ProcessBirthdayResubscribe processes the resubscribe request
+func (h *BirthdayHandler) ProcessBirthdayResubscribe(c *gin.Context) {
+	token := c.Query("token")
+	if token == "" {
+		c.HTML(http.StatusBadRequest, "unsubscribe_error.html", gin.H{
+			"ErrorMessage": "Invalid resubscribe link. Token is missing.",
+		})
+		return
+	}
+
+	// Get unsubscribe token from database
+	unsubToken, err := h.repo.GetBirthdayUnsubscribeToken(c.Request.Context(), token)
+	if err != nil {
+		fmt.Printf("❌ [500 ERROR] GetBirthdayUnsubscribeToken failed (ProcessBirthdayResubscribe)\n")
+		fmt.Printf("   └─ Token: %s\n", token)
+		fmt.Printf("   └─ Error Type: %T\n", err)
+		fmt.Printf("   └─ Error Message: %v\n", err)
+		fmt.Printf("   └─ Request Path: %s %s\n", c.Request.Method, c.Request.URL.Path)
+		fmt.Printf("   └─ Client IP: %s\n", c.ClientIP())
+		fmt.Printf("   └─ Stack Trace: %+v\n", err)
+
+		c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
+			"ErrorMessage": "Failed to process resubscribe request. Please try again later.",
+		})
+		return
+	}
+
+	if unsubToken == nil {
+		c.HTML(http.StatusNotFound, "unsubscribe_error.html", gin.H{
+			"ErrorMessage": "Invalid resubscribe link. Token not found.",
+		})
+		return
+	}
+
+	// Get contact information
+	contact, err := h.repo.GetContactByID(c.Request.Context(), unsubToken.TenantID, unsubToken.ContactID)
+	if err != nil || contact == nil {
+		fmt.Printf("❌ [500 ERROR] GetContactByID failed (ProcessBirthdayResubscribe)\n")
+		fmt.Printf("   └─ Tenant ID: %s\n", unsubToken.TenantID)
+		fmt.Printf("   └─ Contact ID: %s\n", unsubToken.ContactID)
+		fmt.Printf("   └─ Token: %s\n", token)
+		fmt.Printf("   └─ Contact is nil: %v\n", contact == nil)
+		if err != nil {
+			fmt.Printf("   └─ Error Type: %T\n", err)
+			fmt.Printf("   └─ Error Message: %v\n", err)
+			fmt.Printf("   └─ Stack Trace: %+v\n", err)
+		}
+		fmt.Printf("   └─ Request Path: %s %s\n", c.Request.Method, c.Request.URL.Path)
+		fmt.Printf("   └─ Client IP: %s\n", c.ClientIP())
+
+		c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
+			"ErrorMessage": "Failed to find contact information.",
+		})
+		return
+	}
+
+	// Resubscribe the contact
+	err = h.repo.ResubscribeContactToBirthdayEmails(c.Request.Context(), unsubToken.ContactID)
+	if err != nil {
+		fmt.Printf("❌ [500 ERROR] ResubscribeContactToBirthdayEmails failed\n")
+		fmt.Printf("   └─ Tenant ID: %s\n", unsubToken.TenantID)
+		fmt.Printf("   └─ Contact ID: %s\n", unsubToken.ContactID)
+		fmt.Printf("   └─ Token: %s\n", token)
+		fmt.Printf("   └─ Error Type: %T\n", err)
+		fmt.Printf("   └─ Error Message: %v\n", err)
+		fmt.Printf("   └─ Request Path: %s %s\n", c.Request.Method, c.Request.URL.Path)
+		fmt.Printf("   └─ Client IP: %s\n", c.ClientIP())
+		fmt.Printf("   └─ Stack Trace: %+v\n", err)
+
+		c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
+			"ErrorMessage": "Failed to resubscribe to birthday emails",
+		})
+		return
+	}
+
+	// Reset the token's used status so it can be used for future unsubscribe requests
+	err = h.repo.ResetBirthdayUnsubscribeToken(c.Request.Context(), unsubToken.ID)
+	if err != nil {
+		// Log error but don't fail the request since resubscribe was successful
+		fmt.Printf("Warning: Failed to reset unsubscribe token status: %v\n", err)
+	}
+
+	// Return success response
+	c.HTML(http.StatusOK, "unsubscribe_success.html", gin.H{
+		"Message":        "You have been successfully resubscribed to birthday emails.",
+		"Contact":        contact,
+		"Token":          token,
+		"UnsubscribedAt": "",
+	})
 }

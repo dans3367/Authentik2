@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Successfully Unsubscribed</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 100%;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 24px;
+            background: #f0fff4;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+        }
+        
+        h1 {
+            color: #2d3748;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+        
+        .subtitle {
+            color: #718096;
+            font-size: 16px;
+            margin-bottom: 32px;
+            line-height: 1.5;
+        }
+        
+        .success-message {
+            background: #f0fff4;
+            border: 1px solid #9ae6b4;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 32px;
+            color: #22543d;
+            text-align: left;
+        }
+        
+        .success-message h3 {
+            color: #22543d;
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+        
+        .success-message p {
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .contact-info {
+            background: #f7fafc;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 32px;
+            border-left: 4px solid #48bb78;
+        }
+        
+        .contact-info h4 {
+            color: #2d3748;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+        
+        .contact-info p {
+            color: #4a5568;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        
+        .btn {
+            padding: 14px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+            background: #48bb78;
+            color: white;
+        }
+        
+        .btn:hover {
+            background: #38a169;
+            transform: translateY(-1px);
+        }
+        
+        .footer {
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid #e2e8f0;
+            color: #718096;
+            font-size: 14px;
+        }
+        
+        @media (max-width: 480px) {
+            .container {
+                padding: 24px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">✅</div>
+        <h1>Successfully Unsubscribed</h1>
+        <p class="subtitle">You have been successfully unsubscribed from birthday card notifications.</p>
+        
+        <div class="success-message">
+            <h3>What happens next?</h3>
+            <p>• You will no longer receive birthday card notifications<br>
+            • Your email preferences have been updated<br>
+            • This change is effective immediately</p>
+        </div>
+        
+        {{if .Contact}}
+        <div class="contact-info">
+            <h4>Unsubscribed Contact:</h4>
+            <p><strong>{{.Contact.FirstName}} {{.Contact.LastName}}</strong></p>
+            <p>{{.Contact.Email}}</p>
+            {{if .UnsubscribedAt}}
+            <p>Unsubscribed on: {{.UnsubscribedAt}}</p>
+            {{end}}
+        </div>
+        {{end}}
+        
+        <button onclick="window.close()" class="btn">Close Window</button>
+        
+        <div class="footer">
+            <p>If you unsubscribed by mistake or want to resubscribe in the future, please contact our support team.</p>
+        </div>
+    </div>
+</body>
+</html>
