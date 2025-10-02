@@ -6,6 +6,7 @@ import { NewsletterGrpcService } from './services/newsletter-grpc-service';
 import { WorkflowGrpcService } from './services/workflow-grpc-service';
 import { loadProtoDefinitions } from './utils/proto-loader';
 import { serverLogger } from './logger';
+import { ActivityConfig } from './activity-config';
 
 // Load environment variables (local .env and monorepo root .env)
 const localEnv = dotenv.config();
@@ -18,6 +19,19 @@ serverLogger.info(
 serverLogger.info(
   `🧪 [Env] RESEND_API_KEY present: ${process.env.RESEND_API_KEY ? 'yes' : 'no'}, PRIMARY_EMAIL_PROVIDER: ${process.env.PRIMARY_EMAIL_PROVIDER || 'unset'}`
 );
+
+// Create activity configuration from environment variables
+const activityConfig: ActivityConfig = {
+  backendUrl: process.env.BACKEND_URL || 'http://localhost:3500',
+  resendApiKey: process.env.RESEND_API_KEY || '',
+  postmarkApiToken: process.env.POSTMARK_API_TOKEN || '',
+  primaryEmailProvider: process.env.PRIMARY_EMAIL_PROVIDER || 'resend',
+  frontendUrl: process.env.FRONTEND_URL || 'https://app.zendwise.work',
+  fromEmail: process.env.FROM_EMAIL || 'admin@zendwise.work',
+  emailConcurrencyLimit: parseInt(process.env.EMAIL_CONCURRENCY_LIMIT || '5')
+};
+
+serverLogger.info(`🔧 Activity configuration created - Backend: ${activityConfig.backendUrl}, Provider: ${activityConfig.primaryEmailProvider}, From: ${activityConfig.fromEmail}, Resend: ${activityConfig.resendApiKey ? 'yes' : 'no'}, Postmark: ${activityConfig.postmarkApiToken ? 'yes' : 'no'}`);
 
 const PORT = process.env.TEMPORAL_SERVER_PORT || 50051;
 const TEMPORAL_ADDRESS = process.env.TEMPORAL_ADDRESS || '100.125.36.104:7233';
@@ -32,7 +46,8 @@ async function startServer() {
     const temporalWorker = new TemporalWorkerService(
       TEMPORAL_ADDRESS,
       TEMPORAL_NAMESPACE,
-      TEMPORAL_TASK_QUEUE
+      TEMPORAL_TASK_QUEUE,
+      activityConfig
     );
     await temporalWorker.initialize();
     serverLogger.info('✅ Temporal Worker initialized');
@@ -69,7 +84,7 @@ async function startServer() {
       ServerCredentials.createInsecure(),
       (err, port) => {
         if (err) {
-          serverLogger.error('❌ Failed to bind server:', err);
+          serverLogger.error(`❌ Failed to bind server: ${err.message}`);
           process.exit(1);
         }
 
@@ -90,7 +105,7 @@ async function startServer() {
       
       server.tryShutdown((err) => {
         if (err) {
-          serverLogger.error('❌ Error during GRPC server shutdown:', err);
+          serverLogger.error(`❌ Error during GRPC server shutdown: ${err.message}`);
           server.forceShutdown();
         }
         serverLogger.info('✅ GRPC Server shut down');
@@ -105,22 +120,22 @@ async function startServer() {
     process.on('SIGINT', shutdown);
     process.on('SIGTERM', shutdown);
     process.on('uncaughtException', (err) => {
-      serverLogger.error('❌ Uncaught Exception:', err);
+      serverLogger.error(`❌ Uncaught Exception: ${err.message}`);
       shutdown();
     });
     process.on('unhandledRejection', (reason, promise) => {
-      serverLogger.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+      serverLogger.error(`❌ Unhandled Rejection: ${reason}`);
       shutdown();
     });
 
   } catch (error) {
-    serverLogger.error('❌ Failed to start server:', error);
+    serverLogger.error(`❌ Failed to start server: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
 }
 
 startServer().catch((error) => {
-  serverLogger.error('❌ Fatal error:', error);
+  serverLogger.error(`❌ Fatal error: ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
 });
 

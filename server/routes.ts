@@ -14,6 +14,7 @@ import { companyRoutes } from "./routes/companyRoutes";
 import { shopsRoutes } from "./routes/shopsRoutes";
 import { emailManagementRoutes } from "./routes/emailManagementRoutes";
 import { newsletterRoutes } from "./routes/newsletterRoutes";
+import { cardImageRoutes } from "./routes/cardImageRoutes";
 import { authenticateToken, requireTenant } from "./middleware/auth-middleware";
 import { campaignRoutes } from "./routes/campaignRoutes";
 import { webhookRoutes } from "./routes/webhookRoutes";
@@ -29,6 +30,7 @@ import appointmentRoutes from "./routes/appointmentRoutes";
 import appointmentRemindersRoutes from "./routes/appointmentRemindersRoutes";
 import newsletterWorkerRoutes from "./routes/newsletterWorkerRoutes";
 import suppressionManagementRoutes from "./routes/suppressionManagementRoutes";
+import { birthdayWorkerRoutes } from "./routes/birthdayWorkerRoutes";
 
 // Import middleware
 import { authRateLimiter, apiRateLimiter, jwtTokenRateLimiter } from "./middleware/security";
@@ -54,10 +56,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/shops", shopsRoutes);
   app.use("/api", emailManagementRoutes);
   app.use("/api/newsletters", newsletterRoutes);
+  app.use("/api/card-images", cardImageRoutes);
   app.use("/api/promotions", promotionRoutes);
   app.use("/api/appointments", appointmentRoutes);
   app.use("/api/appointment-reminders", appointmentRemindersRoutes);
   app.use("/api/newsletter-worker", newsletterWorkerRoutes);
+  app.use("/api/birthday-worker", birthdayWorkerRoutes);
   app.use("/api/suppression", suppressionManagementRoutes);
 
   // Newsletter stats endpoint
@@ -141,6 +145,137 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: 'Failed to communicate with temporal service',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
+    }
+  });
+
+  // Birthday test endpoints - proxy to server-node
+  app.post("/api/birthday-test", authenticateToken, async (req: any, res) => {
+    try {
+      console.log('🎂 [Birthday Test Proxy] Forwarding test request to server-node for user:', req.user.id);
+      
+      // Forward request to server-node with authentication
+      const response = await fetch('http://localhost:3502/api/birthday-test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': req.headers.authorization || '',
+        },
+        body: JSON.stringify({
+          ...req.body,
+          userId: req.user.id,
+          tenantId: req.user.tenantId
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [Birthday Test Proxy] server-node returned error:', response.status, errorText);
+        return res.status(response.status).json({
+          success: false,
+          message: 'server-node request failed',
+          error: errorText
+        });
+      }
+
+      const result = await response.json();
+      console.log('✅ [Birthday Test Proxy] server-node response:', result);
+      res.json(result);
+    } catch (error) {
+      console.error('❌ [Birthday Test Proxy] Failed to communicate with server-node:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to communicate with birthday test service',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Unsubscribe endpoints - proxy to cardprocessor-go main server (port 5004)
+  // These routes are public (no authentication) for customer-facing unsubscribe functionality
+  app.get("/api/unsubscribe/birthday", async (req: any, res) => {
+    try {
+      console.log('🔗 [Unsubscribe Proxy] Forwarding GET request to cardprocessor-go:5004, token:', req.query.token?.substring(0, 10) + '...');
+      
+      // Build query string
+      const queryParams = new URLSearchParams(req.query as any).toString();
+      const url = `http://localhost:5004/api/unsubscribe/birthday${queryParams ? '?' + queryParams : ''}`;
+      
+      // Forward request to cardprocessor-go server
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'text/html',
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [Unsubscribe Proxy] cardprocessor-go returned error:', response.status, errorText);
+        return res.status(response.status).send(errorText);
+      }
+
+      const html = await response.text();
+      res.set('Content-Type', 'text/html');
+      res.send(html);
+    } catch (error) {
+      console.error('❌ [Unsubscribe Proxy] Failed to communicate with cardprocessor-go:', error);
+      res.status(500).send('<html><body><h1>Service Temporarily Unavailable</h1><p>Unable to process unsubscribe request. Please try again later.</p></body></html>');
+    }
+  });
+
+  app.post("/api/unsubscribe/birthday", async (req: any, res) => {
+    try {
+      console.log('🔗 [Unsubscribe Proxy] Forwarding POST request to cardprocessor-go:5004');
+      
+      // Forward request to cardprocessor-go server
+      const response = await fetch('http://localhost:5004/api/unsubscribe/birthday', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams(req.body).toString()
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [Unsubscribe Proxy] cardprocessor-go returned error:', response.status, errorText);
+        return res.status(response.status).send(errorText);
+      }
+
+      const html = await response.text();
+      console.log('✅ [Unsubscribe Proxy] Successfully processed unsubscribe request');
+      res.set('Content-Type', 'text/html');
+      res.send(html);
+    } catch (error) {
+      console.error('❌ [Unsubscribe Proxy] Failed to communicate with cardprocessor-go:', error);
+      res.status(500).send('<html><body><h1>Service Temporarily Unavailable</h1><p>Unable to process unsubscribe request. Please try again later.</p></body></html>');
+    }
+  });
+
+  // Resubscribe endpoint - proxy to cardprocessor-go main server (port 5004)
+  app.get("/api/resubscribe/birthday", async (req: any, res) => {
+    try {
+      console.log("🔗 [Resubscribe Proxy] Forwarding GET request to cardprocessor-go:5004, token:", req.query.token?.substring(0, 10) + "...");
+      
+      // Build query string
+      const queryParams = new URLSearchParams(req.query as any).toString();
+      const url = `http://localhost:5004/api/resubscribe/birthday${queryParams ? "?" + queryParams : ""}`;
+      
+      // Forward request to cardprocessor-go server
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "User-Agent": "birthday-service-proxy",
+        },
+      });
+      
+      // Forward the HTML response
+      const html = await response.text();
+      res.status(response.status).type("text/html").send(html);
+      
+    } catch (error) {
+      console.error("❌ [Resubscribe Proxy] Failed to communicate with cardprocessor-go:", error);
+      res.status(500).send("<html><body><h1>Service Temporarily Unavailable</h1><p>Unable to process resubscribe request. Please try again later.</p></body></html>");
     }
   });
 
@@ -335,7 +470,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         users: "/api/users/*",
         twoFactor: "/api/2fa/*",
       },
-      documentation: "https://docs.zendwise.com/api",
+      documentation: "https://docs.zendwise.work/api",
     });
   });
 

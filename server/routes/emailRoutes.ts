@@ -77,7 +77,18 @@ emailRoutes.get('/status/:emailId', async (req, res) => {
 // Send custom email endpoint (for testing)
 emailRoutes.post('/send', async (req, res) => {
   try {
-    const { to, subject, html, text, preferredProvider, useQueue } = req.body;
+    const { 
+      to, 
+      subject, 
+      html, 
+      text, 
+      preferredProvider, 
+      useQueue, 
+      metadata, 
+      fromEmail,
+      tenantId,
+      tenantName 
+    } = req.body;
     
     if (!to || !subject || !html) {
       return res.status(400).json({
@@ -93,11 +104,15 @@ emailRoutes.post('/send', async (req, res) => {
       html,
       {
         text,
+        from: fromEmail,
         preferredProvider,
         useQueue: useQueue || false,
         metadata: {
           source: 'api',
-          requestId: req.get('x-request-id') || 'unknown'
+          requestId: req.get('x-request-id') || 'unknown',
+          tenantId,
+          tenantName,
+          ...(metadata || {})
         }
       }
     );

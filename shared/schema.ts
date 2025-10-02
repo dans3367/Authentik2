@@ -272,6 +272,8 @@ export const emailContacts = pgTable("email_contacts", {
   // Birthday tracking fields
   birthday: text("birthday"), // Date in YYYY-MM-DD format
   birthdayEmailEnabled: boolean("birthday_email_enabled").default(false), // Whether user wants birthday emails
+  birthdayUnsubscribeReason: text("birthday_unsubscribe_reason"), // Reason for unsubscribing from birthday emails
+  birthdayUnsubscribedAt: timestamp("birthday_unsubscribed_at"), // Timestamp when unsubscribed from birthday emails
   // Consent tracking fields
   consentGiven: boolean("consent_given").notNull().default(false),
   consentDate: timestamp("consent_date"),
@@ -1412,12 +1414,11 @@ export const birthdaySettings = pgTable("birthday_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   enabled: boolean("enabled").default(false),
-  sendDaysBefore: integer("send_days_before").default(0), // How many days before birthday to send
   emailTemplate: text("email_template").default('default'), // Email template to use
   segmentFilter: text("segment_filter").default('all'), // Which contacts to include
   customMessage: text("custom_message").default(''), // Custom birthday message
-  senderName: text("sender_name").default(''),
-  senderEmail: text("sender_email").default(''),
+  customThemeData: text("custom_theme_data"), // JSON data for custom theme
+  promotionId: varchar("promotion_id").references(() => promotions.id, { onDelete: 'set null' }), // Optional promotion to include in birthday emails
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1525,27 +1526,29 @@ export const birthdaySettingsRelations = relations(birthdaySettings, ({ one }) =
     fields: [birthdaySettings.tenantId],
     references: [tenants.id],
   }),
+  promotion: one(promotions, {
+    fields: [birthdaySettings.promotionId],
+    references: [promotions.id],
+  }),
 }));
 
 // Birthday settings schemas
 export const createBirthdaySettingsSchema = z.object({
   enabled: z.boolean().default(false),
-  sendDaysBefore: z.number().int().min(0).max(30).default(0),
   emailTemplate: z.string().default('default'),
   segmentFilter: z.string().default('all'),
   customMessage: z.string().default(''),
   senderName: z.string().default(''),
-  senderEmail: z.string().email("Please enter a valid email address").default(''),
+  promotionId: z.string().optional(),
 });
 
 export const updateBirthdaySettingsSchema = z.object({
   enabled: z.boolean().optional(),
-  sendDaysBefore: z.number().int().min(0).max(30).optional(),
   emailTemplate: z.string().optional(),
   segmentFilter: z.string().optional(),
   customMessage: z.string().optional(),
   senderName: z.string().optional(),
-  senderEmail: z.string().email("Please enter a valid email address").optional(),
+  promotionId: z.string().optional(),
 });
 
 export const insertBirthdaySettingsSchema = createInsertSchema(birthdaySettings).omit({
@@ -1560,6 +1563,17 @@ export type BirthdaySettings = typeof birthdaySettings.$inferSelect;
 export type InsertBirthdaySettings = z.infer<typeof insertBirthdaySettingsSchema>;
 export type CreateBirthdaySettingsData = z.infer<typeof createBirthdaySettingsSchema>;
 export type UpdateBirthdaySettingsData = z.infer<typeof updateBirthdaySettingsSchema>;
+
+// Custom theme data structure for birthday cards
+export interface CustomThemeData {
+  title: string;
+  message: string;
+  signature: string;
+  imageUrl?: string | null;
+  customImage: boolean;
+  imagePosition: { x: number; y: number };
+  imageScale: number;
+}
 
 // Promotions table for managing promotional content templates
 export const promotions = pgTable("promotions", {

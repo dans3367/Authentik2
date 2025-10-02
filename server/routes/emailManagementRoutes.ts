@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { sql } from 'drizzle-orm';
-import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, emailActivity } from '@shared/schema';
+import { sql, eq, and } from 'drizzle-orm';
+import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, emailActivity, tenants } from '@shared/schema';
+import { deleteImageFromR2 } from '../config/r2';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { type ContactFilters, type BouncedEmailFilters } from '@shared/schema';
 import { sanitizeString, sanitizeEmail } from '../utils/sanitization';
 import { storage } from '../storage';
+import jwt from 'jsonwebtoken';
 
 export const emailManagementRoutes = Router();
 
@@ -105,10 +107,10 @@ emailManagementRoutes.get("/email-contacts", authenticateToken, requireTenant, a
       // Extract and transform the relationship data
       const tags = contact.tagAssignments?.map(assignment => assignment.tag).filter(Boolean) || [];
       const lists = contact.listMemberships?.map(membership => membership.list).filter(Boolean) || [];
-      
+
       // Remove the backend-specific relationship fields and add frontend-compatible ones
       const { tagAssignments, listMemberships, ...contactData } = contact;
-      
+
       return {
         ...contactData,
         tags,
@@ -159,7 +161,7 @@ emailManagementRoutes.get("/email-contacts/:id", authenticateToken, requireTenan
     // Transform the data to match frontend expectations
     const tags = contact.tagAssignments?.map(assignment => assignment.tag).filter(Boolean) || [];
     const lists = contact.listMemberships?.map(membership => membership.list).filter(Boolean) || [];
-    
+
     const { tagAssignments, listMemberships, ...contactData } = contact;
     const transformedContact = {
       ...contactData,
@@ -236,7 +238,7 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
         const existingUser = await tx.query.betterAuthUser.findFirst({
           where: sql`${betterAuthUser.id} = ${req.user.id}`,
         });
-        
+
         if (!existingUser) {
           // User doesn't exist in betterAuthUser table, create a basic record
           console.log('🔧 Creating missing betterAuthUser record for:', req.user.email);
@@ -336,7 +338,7 @@ emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenan
 
     if (email !== undefined) {
       const sanitizedEmail = sanitizeEmail(email);
-      
+
       // Check if new email is already taken by another contact
       const existingContact = await db.query.emailContacts.findFirst({
         where: sql`${emailContacts.email} = ${sanitizedEmail} AND ${emailContacts.id} != ${id}`,
@@ -1071,16 +1073,24 @@ emailManagementRoutes.patch("/email-contacts/:contactId/birthday-email", authent
       return res.status(404).json({ message: 'Contact not found' });
     }
 
+    // Check if contact has unsubscribed from birthday emails
+    if (enabled && contact.birthdayUnsubscribedAt) {
+      return res.status(403).json({
+        message: 'Cannot re-enable birthday emails for a contact who has unsubscribed. The customer must opt-in again through the unsubscribe link.',
+        reason: 'unsubscribed'
+      });
+    }
+
     // Update birthday email preference
     const updatedContact = await db.update(emailContacts)
-      .set({ 
+      .set({
         birthdayEmailEnabled: enabled,
         updatedAt: new Date(),
       })
       .where(sql`${emailContacts.id} = ${contactId}`)
       .returning();
 
-    res.json({ 
+    res.json({
       message: `Birthday email preference ${enabled ? 'enabled' : 'disabled'} successfully`,
       contact: updatedContact[0]
     });
@@ -1112,16 +1122,28 @@ emailManagementRoutes.patch("/email-contacts/birthday-email/bulk", authenticateT
       return res.status(400).json({ message: 'Some contacts were not found or do not belong to your tenant' });
     }
 
+    // Check if any contacts have unsubscribed from birthday emails when enabling
+    if (enabled) {
+      const unsubscribedContacts = contacts.filter(c => c.birthdayUnsubscribedAt);
+      if (unsubscribedContacts.length > 0) {
+        return res.status(403).json({
+          message: `Cannot re-enable birthday emails for ${unsubscribedContacts.length} contact(s) who have unsubscribed. These customers must opt-in again through the unsubscribe link.`,
+          reason: 'unsubscribed',
+          unsubscribedContactIds: unsubscribedContacts.map(c => c.id)
+        });
+      }
+    }
+
     // Update birthday email preferences for all specified contacts
     const updatedContacts = await db.update(emailContacts)
-      .set({ 
+      .set({
         birthdayEmailEnabled: enabled,
         updatedAt: new Date(),
       })
       .where(sql`${emailContacts.id} = ANY(${contactIds})`)
       .returning();
 
-    res.json({ 
+    res.json({
       message: `Birthday email preference ${enabled ? 'enabled' : 'disabled'} for ${updatedContacts.length} contacts`,
       updatedContacts: updatedContacts.length
     });
@@ -1144,7 +1166,7 @@ emailManagementRoutes.get("/birthday-contacts", authenticateToken, requireTenant
       const today = new Date();
       const thirtyDaysFromNow = new Date();
       thirtyDaysFromNow.setDate(today.getDate() + 30);
-      
+
       // This is a simplified approach - you might need more complex logic for year-agnostic birthday matching
       whereClause = sql`${whereClause} AND ${emailContacts.birthday} IS NOT NULL`;
     }
@@ -1218,26 +1240,43 @@ emailManagementRoutes.get("/birthday-settings", authenticateToken, requireTenant
   try {
     const settings = await db.query.birthdaySettings.findFirst({
       where: sql`${birthdaySettings.tenantId} = ${req.user.tenantId}`,
+      with: {
+        promotion: true,
+      },
     });
 
     // If no settings exist, return default settings
     if (!settings) {
+      console.log('🎨 [Birthday Settings GET] No settings found, returning defaults');
       const defaultSettings = {
         id: '',
         enabled: false,
-        sendDaysBefore: 0,
         emailTemplate: 'default',
         segmentFilter: 'all',
         customMessage: '',
-        senderName: '',
-        senderEmail: '',
+        senderName: 'Birthday Team',
+        promotionId: null,
+        promotion: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
       return res.json(defaultSettings);
     }
 
-    res.json(settings);
+    // Ensure senderName is always present with a default value
+    const settingsWithDefaults = {
+      ...settings,
+      senderName: settings.senderName || 'Birthday Team'
+    };
+
+    console.log('🎨 [Birthday Settings GET] Returning settings:', {
+      id: settingsWithDefaults.id,
+      emailTemplate: settingsWithDefaults.emailTemplate,
+      enabled: settingsWithDefaults.enabled,
+      customThemeData: settingsWithDefaults.customThemeData ? 'present' : 'null'
+    });
+
+    res.json(settingsWithDefaults);
   } catch (error) {
     console.error('Get birthday settings error:', error);
     res.status(500).json({ message: 'Failed to get birthday settings' });
@@ -1247,14 +1286,14 @@ emailManagementRoutes.get("/birthday-settings", authenticateToken, requireTenant
 // Update birthday settings
 emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant, async (req: any, res) => {
   try {
-    const { 
-      enabled, 
-      sendDaysBefore, 
-      emailTemplate, 
-      segmentFilter, 
-      customMessage, 
-      senderName, 
-      senderEmail 
+    const {
+      enabled,
+      emailTemplate,
+      segmentFilter,
+      customMessage,
+      customThemeData,
+      senderName,
+      promotionId
     } = req.body;
 
     // Validate input
@@ -1262,12 +1301,47 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
       return res.status(400).json({ message: 'enabled field must be a boolean' });
     }
 
-    if (sendDaysBefore !== undefined && (!Number.isInteger(sendDaysBefore) || sendDaysBefore < 0 || sendDaysBefore > 30)) {
-      return res.status(400).json({ message: 'sendDaysBefore must be an integer between 0 and 30' });
+    // Validate required string fields
+    if (emailTemplate === undefined || emailTemplate === null || typeof emailTemplate !== 'string') {
+      return res.status(400).json({ message: 'emailTemplate is required and must be a string' });
     }
 
-    if (senderEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(senderEmail)) {
-      return res.status(400).json({ message: 'Please enter a valid sender email address' });
+    if (segmentFilter === undefined || segmentFilter === null || typeof segmentFilter !== 'string') {
+      return res.status(400).json({ message: 'segmentFilter is required and must be a string' });
+    }
+
+    if (customMessage === undefined || customMessage === null || typeof customMessage !== 'string') {
+      return res.status(400).json({ message: 'customMessage is required and must be a string' });
+    }
+
+    // Handle senderName - use default if not provided, null, or empty
+    const finalSenderName = (senderName && typeof senderName === 'string' && senderName.trim() !== '')
+      ? senderName.trim()
+      : 'Birthday Team';
+
+    // Validate promotionId if provided
+    if (promotionId !== null && promotionId !== undefined && typeof promotionId !== 'string') {
+      return res.status(400).json({ message: 'promotionId must be a string or null' });
+    }
+
+
+
+
+
+    // Validate custom theme data if provided
+    if (customThemeData !== undefined) {
+      try {
+        if (typeof customThemeData === 'string') {
+          JSON.parse(customThemeData);
+        } else if (typeof customThemeData === 'object' && customThemeData !== null) {
+          // Allow any valid object structure for customThemeData
+          // The frontend sends nested theme data which is valid
+        } else {
+          return res.status(400).json({ message: 'customThemeData must be a valid JSON string or object' });
+        }
+      } catch (error) {
+        return res.status(400).json({ message: 'customThemeData must be valid JSON' });
+      }
     }
 
     // Check if settings already exist
@@ -1275,45 +1349,926 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
       where: sql`${birthdaySettings.tenantId} = ${req.user.tenantId}`,
     });
 
+    // Handle old image cleanup if custom theme data is being updated
+    let oldImageUrl: string | null = null;
+    if (customThemeData && existingSettings?.customThemeData) {
+      try {
+        const existingCustomData = JSON.parse(existingSettings.customThemeData);
+        oldImageUrl = existingCustomData?.imageUrl || null;
+      } catch (error) {
+        console.warn('Failed to parse existing custom theme data:', error);
+      }
+    }
+
     let updatedSettings;
-    
+
+    // Prepare custom theme data for storage
+    const customThemeDataStr = customThemeData ?
+      (typeof customThemeData === 'string' ? customThemeData : JSON.stringify(customThemeData))
+      : undefined;
+
     if (existingSettings) {
       // Update existing settings
+      const updateData: any = {
+        enabled,
+        emailTemplate,
+        segmentFilter,
+        customMessage,
+        senderName: finalSenderName,
+        promotionId: promotionId || null,
+        updatedAt: new Date(),
+      };
+
+      if (customThemeDataStr !== undefined) {
+        updateData.customThemeData = customThemeDataStr;
+      }
+
       updatedSettings = await db.update(birthdaySettings)
-        .set({
-          enabled,
-          sendDaysBefore,
-          emailTemplate,
-          segmentFilter,
-          customMessage,
-          senderName,
-          senderEmail,
-          updatedAt: new Date(),
-        })
+        .set(updateData)
         .where(sql`${birthdaySettings.tenantId} = ${req.user.tenantId}`)
         .returning();
     } else {
       // Create new settings
+      const insertData: any = {
+        tenantId: req.user.tenantId,
+        enabled,
+        emailTemplate,
+        segmentFilter,
+        customMessage,
+        senderName: finalSenderName,
+        promotionId: promotionId || null,
+      };
+
+      if (customThemeDataStr !== undefined) {
+        insertData.customThemeData = customThemeDataStr;
+      }
+
       updatedSettings = await db.insert(birthdaySettings)
-        .values({
-          tenantId: req.user.tenantId,
-          enabled,
-          sendDaysBefore,
-          emailTemplate,
-          segmentFilter,
-          customMessage,
-          senderName,
-          senderEmail,
-        })
+        .values(insertData)
         .returning();
     }
 
-    res.json({
-      message: 'Birthday settings updated successfully',
-      settings: updatedSettings[0],
+    // Clean up old image after successful database update
+    if (oldImageUrl && customThemeDataStr) {
+      try {
+        const newCustomData = typeof customThemeData === 'string' ? JSON.parse(customThemeData) : customThemeData;
+        const newImageUrl = newCustomData?.imageUrl || null;
+
+        // Only delete old image if a new different image is being set or image is being removed
+        if (newImageUrl !== oldImageUrl) {
+          console.log('📸 [Birthday Settings] Cleaning up old image:', oldImageUrl);
+          // Delete old image asynchronously (don't wait for it to complete)
+          deleteImageFromR2(oldImageUrl).catch(error => {
+            console.error('📸 [Birthday Settings] Failed to delete old image:', oldImageUrl, error);
+          });
+        }
+      } catch (error) {
+        console.warn('Failed to compare image URLs for cleanup:', error);
+      }
+    }
+
+    // Log what we're about to return
+    console.log('🎨 [Birthday Settings PUT] Returning updated settings:', {
+      id: updatedSettings[0]?.id,
+      emailTemplate: updatedSettings[0]?.emailTemplate,
+      enabled: updatedSettings[0]?.enabled,
+      customThemeData: updatedSettings[0]?.customThemeData ? 'present' : 'null'
     });
+
+    // Return just the settings object to match GET endpoint structure
+    res.json(updatedSettings[0]);
   } catch (error) {
     console.error('Update birthday settings error:', error);
     res.status(500).json({ message: 'Failed to update birthday settings' });
   }
 });
+
+// Send birthday invitation email to a contact
+emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { contactId } = req.params;
+
+    // Find the contact
+    const contact = await db.query.emailContacts.findFirst({
+      where: sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
+    });
+
+    if (!contact) {
+      return res.status(404).json({ message: 'Contact not found' });
+    }
+
+    // Check if contact already has a birthday
+    if (contact.birthday) {
+      return res.status(400).json({ message: 'Contact already has a birthday set' });
+    }
+
+    // Get tenant information for the email
+    const tenant = await db.query.tenants.findFirst({
+      where: sql`${tenants.id} = ${req.user.tenantId}`,
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ message: 'Tenant not found' });
+    }
+
+    // Create profile update URL with token
+    const profileUpdateToken = jwt.sign(
+      { contactId, action: 'update_birthday' },
+      process.env.JWT_SECRET!,
+      { expiresIn: '30d' }
+    );
+
+    const profileUpdateUrl = `${process.env.BASE_URL || 'http://localhost:3500'}/update-profile?token=${profileUpdateToken}`;
+
+    // Create email content
+    const contactName = contact.firstName ? `${contact.firstName}${contact.lastName ? ` ${contact.lastName}` : ''}` : 'Valued Customer';
+    const subject = `🎂 Help us celebrate your special day!`;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Birthday Information Request</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #e91e63; margin: 0;">🎂 Birthday Celebration!</h1>
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 25px; border-radius: 8px; margin-bottom: 20px;">
+          <p style="margin: 0 0 15px 0; font-size: 16px;">Hi ${contactName},</p>
+          
+          <p style="margin: 0 0 15px 0;">We'd love to make your birthday extra special! To ensure you don't miss out on exclusive birthday promotions, special offers, and personalized birthday surprises, we'd like to add your birthday to our records.</p>
+          
+          <p style="margin: 0 0 20px 0;">By sharing your birthday with us, you'll receive:</p>
+          
+          <ul style="margin: 0 0 20px 20px; padding: 0;">
+            <li>🎁 Exclusive birthday discounts and offers</li>
+            <li>🎉 Special birthday promotions</li>
+            <li>📧 Personalized birthday messages</li>
+            <li>🌟 Early access to birthday-themed content</li>
+          </ul>
+          
+          <div style="text-align: center; margin: 25px 0;">
+            <a href="${profileUpdateUrl}" 
+               style="background: linear-gradient(135deg, #e91e63, #f06292); 
+                      color: white; 
+                      padding: 12px 30px; 
+                      text-decoration: none; 
+                      border-radius: 25px; 
+                      font-weight: bold; 
+                      display: inline-block; 
+                      box-shadow: 0 4px 8px rgba(233, 30, 99, 0.3);">
+              🎂 Add My Birthday
+            </a>
+          </div>
+          
+          <p style="margin: 15px 0 0 0; font-size: 14px; color: #666;">This link will expire in 30 days. Your privacy is important to us - we'll only use your birthday to send you special offers and birthday wishes.</p>
+        </div>
+        
+        <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #888; text-align: center;">
+          <p style="margin: 0;">Best regards,<br>${tenant.name || 'The Team'}</p>
+          <p style="margin: 10px 0 0 0;">This invitation was sent because you're a valued customer. If you'd prefer not to receive birthday-related communications, you can simply ignore this email.</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    // Send the email using the email service
+    const { enhancedEmailService } = await import('../emailService');
+
+    const result = await enhancedEmailService.sendCustomEmail(
+      contact.email,
+      subject,
+      htmlContent,
+      {
+        metadata: {
+          type: 'birthday_invitation',
+          contactId: contact.id,
+          tenantId: req.user.tenantId
+        }
+      }
+    );
+
+    if (result.success) {
+      res.json({
+        message: 'Birthday invitation sent successfully',
+        messageId: result.messageId
+      });
+    } else {
+      throw new Error('Failed to send email');
+    }
+
+  } catch (error) {
+    console.error('Send birthday invitation error:', error);
+    res.status(500).json({ message: 'Failed to send birthday invitation' });
+  }
+});
+
+// Update contact profile via token (for customers)
+emailManagementRoutes.post("/update-profile", async (req: any, res) => {
+  try {
+    const { token, birthday } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ message: 'Token is required' });
+    }
+
+    // Verify the token
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    } catch (error) {
+      return res.status(401).json({ message: 'Invalid or expired token' });
+    }
+
+    if (decoded.action !== 'update_birthday') {
+      return res.status(401).json({ message: 'Invalid token action' });
+    }
+
+    const { contactId } = decoded;
+
+    if (!birthday) {
+      return res.status(400).json({ message: 'Birthday is required' });
+    }
+
+    // Validate birthday format (YYYY-MM-DD)
+    const birthdayRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!birthdayRegex.test(birthday)) {
+      return res.status(400).json({ message: 'Invalid birthday format. Use YYYY-MM-DD' });
+    }
+
+    // Update the contact's birthday
+    const updatedContact = await db.update(emailContacts)
+      .set({
+        birthday,
+        birthdayEmailEnabled: true, // Enable birthday emails by default when they add their birthday
+        updatedAt: new Date()
+      })
+      .where(sql`${emailContacts.id} = ${contactId}`)
+      .returning();
+
+    if (updatedContact.length === 0) {
+      return res.status(404).json({ message: 'Contact not found' });
+    }
+
+    res.json({
+      message: 'Birthday updated successfully',
+      contact: {
+        id: updatedContact[0].id,
+        birthday: updatedContact[0].birthday,
+        birthdayEmailEnabled: updatedContact[0].birthdayEmailEnabled
+      }
+    });
+
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ message: 'Failed to update profile' });
+  }
+});
+
+// Get profile update form (for customers)
+emailManagementRoutes.get("/profile-form", async (req: any, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).json({ message: 'Token is required' });
+    }
+
+    // Verify the token
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    } catch (error) {
+      return res.status(401).json({ message: 'Invalid or expired token' });
+    }
+
+    if (decoded.action !== 'update_birthday') {
+      return res.status(401).json({ message: 'Invalid token action' });
+    }
+
+    const { contactId } = decoded;
+
+    // Get contact information
+    const contact = await db.query.emailContacts.findFirst({
+      where: sql`${emailContacts.id} = ${contactId}`,
+      columns: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        birthday: true
+      }
+    });
+
+    if (!contact) {
+      return res.status(404).json({ message: 'Contact not found' });
+    }
+
+    res.json({
+      contact: {
+        id: contact.id,
+        email: contact.email,
+        firstName: contact.firstName,
+        lastName: contact.lastName,
+        birthday: contact.birthday
+      }
+    });
+
+  } catch (error) {
+    console.error('Get profile form error:', error);
+    res.status(500).json({ message: 'Failed to get profile information' });
+  }
+});
+
+// Internal birthday invitation endpoint for server-node (no auth required)
+emailManagementRoutes.post("/internal/birthday-invitation", async (req: any, res) => {
+  try {
+    const {
+      contactId,
+      contactEmail,
+      contactFirstName,
+      contactLastName,
+      tenantName,
+      htmlContent,
+      fromEmail
+    } = req.body;
+
+    if (!contactId || !contactEmail || !htmlContent) {
+      return res.status(400).json({ message: 'contactId, contactEmail, and htmlContent are required' });
+    }
+
+    // Send the email using the email service
+    const { enhancedEmailService } = await import('../emailService');
+
+    const result = await enhancedEmailService.sendCustomEmail(
+      contactEmail,
+      '🎂 Help us celebrate your special day!',
+      htmlContent,
+      {
+        from: fromEmail || 'admin@zendwise.work',
+        metadata: {
+          type: 'birthday_invitation',
+          contactId: contactId,
+          source: 'server-node-workflow'
+        }
+      }
+    );
+
+    if (result.success) {
+      res.json({
+        message: 'Birthday invitation sent successfully',
+        messageId: result.messageId,
+        success: true
+      });
+    } else {
+      throw new Error('Failed to send email');
+    }
+
+  } catch (error) {
+    console.error('Send internal birthday invitation error:', error);
+    res.status(500).json({ message: 'Failed to send birthday invitation' });
+  }
+});
+
+// Birthday unsubscribe page
+emailManagementRoutes.get("/api/unsubscribe/birthday", async (req: any, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).send(`
+        <html>
+          <head><title>Invalid Unsubscribe Link</title></head>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1>Invalid Unsubscribe Link</h1>
+            <p>This unsubscribe link is invalid or has expired.</p>
+          </body>
+        </html>
+      `);
+    }
+
+    // TODO: Validate token and get contact info
+    // For now, show a simple unsubscribe form
+    res.send(`
+      <html>
+        <head>
+          <title>Unsubscribe from Birthday Cards</title>
+          <style>
+            body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+            .container { background: #f9f9f9; padding: 30px; border-radius: 8px; text-align: center; }
+            .button { background: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+            .button:hover { background: #c82333; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>🎂 Unsubscribe from Birthday Cards</h1>
+            <p>We're sorry to see you go! You can unsubscribe from receiving birthday card notifications below.</p>
+            <form method="POST" action="/api/api/unsubscribe/birthday">
+              <input type="hidden" name="token" value="${token}" />
+              <button type="submit" class="button">Unsubscribe</button>
+            </form>
+          </div>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error('Birthday unsubscribe page error:', error);
+    res.status(500).send(`
+      <html>
+        <head><title>Error</title></head>
+        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+          <h1>Error</h1>
+          <p>An error occurred while processing your request.</p>
+        </body>
+      </html>
+    `);
+  }
+});
+
+// Process birthday unsubscribe
+emailManagementRoutes.post("/api/unsubscribe/birthday", async (req: any, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).send(`
+        <html>
+          <head><title>Invalid Request</title></head>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1>Invalid Request</h1>
+            <p>Token is required.</p>
+          </body>
+        </html>
+      `);
+    }
+
+    // TODO: Process unsubscribe token and update contact
+    // For now, show success message
+    res.send(`
+      <html>
+        <head>
+          <title>Unsubscribed Successfully</title>
+          <style>
+            body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+            .container { background: #d4edda; padding: 30px; border-radius: 8px; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>✅ Successfully Unsubscribed</h1>
+            <p>You have been unsubscribed from birthday card notifications.</p>
+            <p>You can always contact us if you change your mind.</p>
+          </div>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error('Birthday unsubscribe processing error:', error);
+    res.status(500).send(`
+      <html>
+        <head><title>Error</title></head>
+        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+          <h1>Error</h1>
+          <p>An error occurred while processing your unsubscribe request.</p>
+        </body>
+      </html>
+    `);
+  }
+});
+// Send manual birthday cards to selected contacts
+emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateToken, async (req: any, res) => {
+  try {
+    const { contactIds } = req.body;
+    const tenantId = req.user.tenantId;
+
+    if (!contactIds || !Array.isArray(contactIds) || contactIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Contact IDs are required',
+      });
+    }
+
+    console.log(`🎂 [ManualBirthdayCard] Sending birthday cards to ${contactIds.length} contact(s)`);
+
+    // Get birthday settings for this tenant with promotion data
+    const settings = await db.query.birthdaySettings.findFirst({
+      where: eq(birthdaySettings.tenantId, tenantId),
+      with: {
+        promotion: true,
+      },
+    });
+
+    if (!settings) {
+      return res.status(404).json({
+        success: false,
+        message: 'Birthday settings not found. Please configure birthday settings first.',
+      });
+    }
+
+    // Fetch the selected contacts
+    const contacts = await db.query.emailContacts.findMany({
+      where: and(
+        eq(emailContacts.tenantId, tenantId),
+        sql`${emailContacts.id} IN (${sql.join(contactIds.map((id: string) => sql`${id}`), sql`, `)})`
+      ),
+    });
+
+    if (contacts.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No valid contacts found',
+      });
+    }
+
+    const results = [];
+    const cardprocessorUrl = process.env.CARDPROCESSOR_URL || 'http://localhost:5004';
+
+    // Import email service
+    const { enhancedEmailService } = await import('../emailService');
+
+    // Send birthday cards to each contact
+    for (const contact of contacts) {
+      try {
+        // Generate unsubscribe token
+        let unsubscribeToken: string | undefined;
+        try {
+          // Generate a JWT token for internal API call to cardprocessor
+          const internalToken = jwt.sign(
+            {
+              sub: req.user.id,
+              tenant: tenantId,
+              type: 'internal',
+            },
+            process.env.JWT_SECRET || '',
+            { expiresIn: '5m' }
+          );
+
+          const tokenResponse = await fetch(`${cardprocessorUrl}/api/birthday-unsubscribe-token/${contact.id}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${internalToken}`,
+            },
+          });
+
+          if (tokenResponse.ok) {
+            const tokenData = await tokenResponse.json();
+            unsubscribeToken = tokenData.token;
+            console.log(`🔗 [ManualBirthdayCard] Generated unsubscribe token for ${contact.email}`);
+          } else {
+            console.warn(`⚠️ [ManualBirthdayCard] Failed to generate unsubscribe token for ${contact.email}`);
+          }
+        } catch (error) {
+          console.warn(`⚠️ [ManualBirthdayCard] Error generating unsubscribe token for ${contact.email}:`, error);
+        }
+
+        // Prepare recipient name
+        const recipientName = contact.firstName || contact.lastName
+          ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
+          : contact.email.split('@')[0];
+
+        // Render birthday template
+        const htmlContent = renderBirthdayTemplate(settings.emailTemplate as any, {
+          recipientName,
+          message: settings.customMessage || 'Wishing you a wonderful birthday!',
+          brandName: req.user.tenantName || 'Your Company',
+          customThemeData: settings.customThemeData ? JSON.parse(settings.customThemeData) : null,
+          senderName: settings.senderName || 'Your Team',
+          promotionContent: settings.promotion?.content,
+          promotionTitle: settings.promotion?.title,
+          promotionDescription: settings.promotion?.description,
+          unsubscribeToken,
+        });
+
+        // Send the birthday email
+        const result = await enhancedEmailService.sendCustomEmail(
+          contact.email,
+          `🎉 Happy Birthday ${recipientName}!`,
+          htmlContent,
+          {
+            text: htmlContent.replace(/<[^>]*>/g, ''),
+            from: 'admin@zendwise.work',
+            metadata: {
+              type: 'birthday-card',
+              contactId: contact.id,
+              tenantId: tenantId,
+              manual: true,
+              tags: ['birthday', 'manual', `tenant-${tenantId}`],
+              unsubscribeToken: unsubscribeToken || 'none',
+            },
+          }
+        );
+
+        // Handle result - can be EmailSendResult or string (queue ID)
+        if (typeof result === 'string') {
+          // Queued
+          console.log(`✅ [ManualBirthdayCard] Birthday card queued for ${contact.email}: ${result}`);
+          results.push({
+            contactId: contact.id,
+            email: contact.email,
+            success: true,
+            messageId: result,
+          });
+        } else if (result.success) {
+          console.log(`✅ [ManualBirthdayCard] Birthday card sent to ${contact.email}`);
+          results.push({
+            contactId: contact.id,
+            email: contact.email,
+            success: true,
+            messageId: result.messageId,
+          });
+        } else {
+          console.error(`❌ [ManualBirthdayCard] Failed to send to ${contact.email}:`, result.error);
+          results.push({
+            contactId: contact.id,
+            email: contact.email,
+            success: false,
+            error: result.error,
+          });
+        }
+      } catch (error) {
+        console.error(`❌ [ManualBirthdayCard] Error sending to ${contact.email}:`, error);
+        results.push({
+          contactId: contact.id,
+          email: contact.email,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    const successCount = results.filter(r => r.success).length;
+    const failureCount = results.filter(r => !r.success).length;
+
+    res.json({
+      success: true,
+      message: `Birthday cards sent: ${successCount} successful, ${failureCount} failed`,
+      results,
+      summary: {
+        total: results.length,
+        successful: successCount,
+        failed: failureCount,
+      },
+    });
+
+  } catch (error) {
+    console.error('Send manual birthday card error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send birthday cards',
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+// Helper function to process placeholders in content
+function processPlaceholders(content: string, params: { recipientName?: string }): string {
+  if (!content) return content;
+
+  let processed = content;
+
+  // Handle {{firstName}} and {{lastName}} placeholders
+  const nameParts = (params.recipientName || '').split(' ');
+  const firstName = nameParts[0] || '';
+  const lastName = nameParts.slice(1).join(' ') || '';
+
+  processed = processed.replace(/\{\{firstName\}\}/g, firstName);
+  processed = processed.replace(/\{\{lastName\}\}/g, lastName);
+
+  return processed;
+}
+
+// Helper function to render birthday template
+function renderBirthdayTemplate(
+  template: 'default' | 'confetti' | 'balloons' | 'custom',
+  params: {
+    recipientName?: string;
+    message?: string;
+    brandName?: string;
+    customThemeData?: any;
+    senderName?: string;
+    promotionContent?: string;
+    promotionTitle?: string;
+    promotionDescription?: string;
+    unsubscribeToken?: string;
+  }
+): string {
+  // Handle custom theme with rich styling
+  if (template === 'custom' && params.customThemeData) {
+    let customData = null;
+
+    try {
+      const parsedData = typeof params.customThemeData === 'string'
+        ? JSON.parse(params.customThemeData)
+        : params.customThemeData;
+
+      // Check if it's the new structure (has themes property)
+      if (parsedData.themes && parsedData.themes.custom) {
+        customData = parsedData.themes.custom;
+      } else if (!parsedData.themes) {
+        // Old structure - use directly if no themes property
+        customData = parsedData;
+      }
+    } catch (e) {
+      console.warn('Failed to parse customThemeData for custom template:', e);
+      return `<html><body><p>Error loading custom theme</p></body></html>`;
+    }
+
+    if (!customData) {
+      return `<html><body><p>No custom theme data found</p></body></html>`;
+    }
+
+    const title = customData.title || `Happy Birthday${params.recipientName ? ', ' + params.recipientName : ''}!`;
+    const message = processPlaceholders(customData.message || params.message || 'Wishing you a wonderful day!', params);
+    const signature = customData.signature || '';
+    const fromMessage = params.senderName || 'The Team';
+
+    // Header image section
+    const headerImageSection = customData.imageUrl
+      ? `<div style="height: 200px; background-image: url('${customData.imageUrl}'); background-size: cover; background-position: center; border-radius: 12px 12px 0 0;"></div>`
+      : `<div style="background: linear-gradient(135deg, #a8e6cf 0%, #dcedc1 100%); height: 200px; border-radius: 12px 12px 0 0;"></div>`;
+
+    // Build promotion section if promotion content exists
+    let promotionSection = '';
+    if (params.promotionContent) {
+      promotionSection = `
+        <div style="margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border-radius: 8px; border-left: 4px solid #667eea;">
+          ${params.promotionTitle ? `<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">${processPlaceholders(params.promotionTitle, params)}</h3>` : ''}
+          ${params.promotionDescription ? `<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${processPlaceholders(params.promotionDescription, params)}</p>` : ''}
+          <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${processPlaceholders(params.promotionContent, params)}</div>
+        </div>
+      `;
+    }
+
+    // Signature section
+    const signatureSection = signature
+      ? `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-style: italic; color: #718096;">${processPlaceholders(signature, params)}</div>`
+      : '';
+
+    // From message section (only if no signature)
+    const fromMessageSection = !signature && fromMessage
+      ? `<div style="padding: 20px 30px 10px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
+           <div style="font-size: 0.9rem; color: #718096;">
+             <p style="margin: 0; font-weight: 600; color: #4a5568;">${fromMessage}</p>
+           </div>
+         </div>`
+      : '';
+
+    // Build unsubscribe section if token exists
+    let unsubscribeSection = '';
+    if (params.unsubscribeToken) {
+      const baseUrl = process.env.APP_URL || 'http://localhost:5000';
+      const unsubscribeUrl = `${baseUrl}/api/unsubscribe/birthday?token=${params.unsubscribeToken}`;
+      unsubscribeSection = `
+        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">
+          <p style="margin: 0; font-size: 0.8rem; color: #a0aec0; line-height: 1.4;">
+            Don't want to receive birthday cards? 
+            <a href="${unsubscribeUrl}" style="color: #667eea; text-decoration: none;">Unsubscribe here</a>
+          </p>
+        </div>
+      `;
+    }
+
+    return `<html>
+      <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+        <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
+          <!-- 1. Header Image (standalone) -->
+          ${headerImageSection}
+          
+          <!-- 2. Header Text (separate from image) -->
+          <div style="padding: 30px 30px 20px 30px; text-align: center; border-bottom: 1px solid #f0f0f0;">
+            <h1 style="color: #2d3748; font-size: 2.5rem; margin: 0; font-weight: bold;">${title}</h1>
+          </div>
+          
+          <!-- 3. Content Area (message) -->
+          <div style="padding: 30px;">
+            <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; margin-bottom: 20px;">${message}</div>
+            ${promotionSection}
+            ${signatureSection}
+          </div>
+          
+          ${fromMessageSection}
+          ${unsubscribeSection ? `<div style="padding: 0 30px 30px 30px;">${unsubscribeSection}</div>` : ''}
+        </div>
+      </body>
+    </html>`;
+  }
+
+  // Default theme header images
+  const themeHeaders = {
+    default: 'https://images.unsplash.com/photo-1588195538326-c5b1e9f80a1b?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+    confetti: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+    balloons: 'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'
+  };
+
+  const themeColors = {
+    default: { primary: '#667eea', secondary: '#764ba2' },
+    confetti: { primary: '#ff6b6b', secondary: '#feca57' },
+    balloons: { primary: '#54a0ff', secondary: '#5f27cd' }
+  };
+
+  // Check if there's custom theme data with custom title/signature for this specific theme
+  let headline = `Happy Birthday${params.recipientName ? ', ' + params.recipientName : ''}!`;
+  let signature = '';
+
+  if (params.customThemeData) {
+    try {
+      const parsedData = typeof params.customThemeData === 'string'
+        ? JSON.parse(params.customThemeData)
+        : params.customThemeData;
+
+      let themeSpecificData = null;
+
+      // Check if it's the new structure (has themes property)
+      if (parsedData.themes && parsedData.themes[template]) {
+        themeSpecificData = parsedData.themes[template];
+      } else if (!parsedData.themes) {
+        // Old structure - use directly if no themes property
+        themeSpecificData = parsedData;
+      }
+
+      if (themeSpecificData) {
+        // Use custom title if provided, otherwise use default
+        if (themeSpecificData.title) {
+          headline = themeSpecificData.title;
+        }
+
+        // Use custom signature if provided
+        if (themeSpecificData.signature) {
+          signature = themeSpecificData.signature;
+        }
+      }
+    } catch (e) {
+      // If parsing fails, continue with defaults
+      console.warn('Failed to parse customThemeData for template:', template, e);
+    }
+  }
+
+  const headerImage = themeHeaders[template as keyof typeof themeHeaders] || themeHeaders.default;
+  const colors = themeColors[template as keyof typeof themeColors] || themeColors.default;
+  const fromMessage = params.senderName || 'The Team';
+
+  // Build promotion section if promotion content exists
+  let promotionSection = '';
+  if (params.promotionContent) {
+    promotionSection = `
+      <div style="margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border-radius: 8px; border-left: 4px solid ${colors.primary};">
+        ${params.promotionTitle ? `<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">${processPlaceholders(params.promotionTitle, params)}</h3>` : ''}
+        ${params.promotionDescription ? `<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${processPlaceholders(params.promotionDescription, params)}</p>` : ''}
+        <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${processPlaceholders(params.promotionContent, params)}</div>
+      </div>
+    `;
+  }
+
+  // Signature section
+  const signatureSection = signature
+    ? `<div style="font-size: 1rem; line-height: 1.5; color: #718096; text-align: center; font-style: italic; margin-top: 20px;">${processPlaceholders(signature, params)}</div>`
+    : '';
+
+  // From message section (only if no signature)
+  const fromMessageSection = !signature && fromMessage
+    ? `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #718096; font-size: 0.9rem; font-weight: 600;">${fromMessage}</div>`
+    : '';
+
+  // Build unsubscribe section if token exists
+  let unsubscribeSection = '';
+  if (params.unsubscribeToken) {
+    const baseUrl = process.env.APP_URL || 'http://localhost:5000';
+    const unsubscribeUrl = `${baseUrl}/api/unsubscribe/birthday?token=${params.unsubscribeToken}`;
+    unsubscribeSection = `
+      <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">
+        <p style="margin: 0; font-size: 0.8rem; color: #a0aec0; line-height: 1.4;">
+          Don't want to receive birthday cards? 
+          <a href="${unsubscribeUrl}" style="color: #667eea; text-decoration: none;">Unsubscribe here</a>
+        </p>
+      </div>
+    `;
+  }
+
+  return `<html>
+    <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%);">
+      <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
+        <!-- 1. Header Image (standalone) -->
+        <div style="height: 200px; background-image: url('${headerImage}'); background-size: cover; background-position: center; border-radius: 12px 12px 0 0;"></div>
+        
+        <!-- 2. Header Text (separate from image) -->
+        <div style="padding: 30px 30px 20px 30px; text-align: center; border-bottom: 1px solid #f0f0f0;">
+          <h1 style="color: #2d3748; font-size: 2.5rem; margin: 0; font-weight: bold;">${headline}</h1>
+        </div>
+        
+        <!-- 3. Content Area (message) -->
+        <div style="padding: 30px;">
+          <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; text-align: center; margin-bottom: 20px;">${processPlaceholders(params.message || 'Wishing you a wonderful day!', params)}</div>
+          ${promotionSection}
+          ${signatureSection}
+          ${fromMessageSection}
+          ${unsubscribeSection}
+        </div>
+      </div>
+    </body>
+  </html>`;
+}

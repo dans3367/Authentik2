@@ -50,6 +50,7 @@ const ConfirmAppointmentPage = lazy(() => import("@/pages/confirm-appointment"))
 const PromotionsPage = lazy(() => import("@/pages/promotions"));
 const CreatePromotionPage = lazy(() => import("@/pages/promotions/create"));
 const EditEmailCampaignPage = lazy(() => import("@/pages/email-campaigns/edit"));
+const UpdateProfilePage = lazy(() => import("@/pages/update-profile"));
 
 // Loading component for Suspense fallback
 const PageLoader = () => (
@@ -122,7 +123,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isAuthenticated) {
       // Allow certain routes for unauthenticated users
-      if (!['/auth', '/verify-email'].includes(location)) {
+      if (!['/auth', '/verify-email', '/update-profile'].includes(location)) {
         setLocation('/auth');
       }
     } else if (isAuthenticated && isEmailVerified === false) {
@@ -196,6 +197,7 @@ function Router() {
           <Route path="/auth" component={AuthPage} />
           <Route path="/pending-verification" component={PendingVerificationPage} />
           <Route path="/verify-email" component={VerifyEmailPage} />
+          <Route path="/update-profile" component={UpdateProfilePage} />
           <Route path="/confirm-appointment/:id" component={ConfirmAppointmentPage} />
 
           {/* Routes that should be wrapped in AppLayout */}

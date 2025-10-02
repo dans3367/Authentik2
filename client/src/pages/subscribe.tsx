@@ -353,7 +353,7 @@ export default function Subscribe() {
 
   // Check if user already has a subscription - moved before conditional returns
   const { data: userSubscription, isLoading: subscriptionLoading } = useQuery<UserSubscriptionResponse>({
-    queryKey: ['/api/my-subscription'],
+    queryKey: ['/api/subscription/my-subscription'],
     enabled: isInitialized && !!user && !authLoading && user?.role === 'Owner',
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 60 * 1000, // 1 minute

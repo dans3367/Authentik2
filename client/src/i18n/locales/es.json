@@ -180,10 +180,10 @@
     "table": {
       "name": "NOMBRE",
       "status": "ESTADO",
-      "birthday": "CUMPLEAÑOS",
+      "birthday": "FECHA DE NACIMIENTO",
       "lists": "LISTAS",
       "activity": "ACTIVIDAD",
-      "campaigns": "CAMPAÑAS",
+      "campaigns": "TARJETAS DE CUMPLEAÑOS",
       "actions": "ACCIONES",
       "sent": "Enviados",
       "opened": "Abiertos",

@@ -1,1 +1,1 @@
-Use Memory MCP on all requests
+Do not run final test task unless strictly specified

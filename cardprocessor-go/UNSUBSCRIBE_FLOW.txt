@@ -1,0 +1,216 @@
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     BIRTHDAY CARD UNSUBSCRIBE FLOW                      │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ STEP 1: Token Generation (when sending birthday emails)                 │
+└──────────────────────────────────────────────────────────────────────────┘
+
+    Birthday Worker Service
+           │
+           ├─► Generate Token (32-byte random)
+           │
+           ├─► Store in birthday_unsubscribe_tokens table
+           │      - id, tenant_id, contact_id, token, used=false
+           │
+           └─► Include in email footer:
+                 https://yourdomain.com/api/unsubscribe/birthday?token=abc123...
+
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ STEP 2: Customer Clicks Unsubscribe Link                                │
+└──────────────────────────────────────────────────────────────────────────┘
+
+    Customer Email Client
+           │
+           └─► Click: https://yourdomain.com/api/unsubscribe/birthday?token=abc123
+                      │
+                      ▼
+              ┌───────────────────┐
+              │  Express Server   │ (Port 5000)
+              │  routes.ts        │
+              └───────────────────┘
+                      │
+                      │ [PROXY REQUEST]
+                      ▼
+              ┌──────────────────────┐
+              │ Cardprocessor-Go  │ (Port 5004)
+              │     Server        │
+              │    main.go        │
+              └──────────────────────┘
+                      │
+                      ├─► Validate token exists
+                      ├─► Check if already used
+                      ├─► Fetch contact info
+                      │
+                      └─► Render: unsubscribe.html
+                           - Shows contact name & email
+                           - Reason dropdown
+                           - Feedback textarea
+                           - Submit button
+
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ STEP 3: Customer Submits Form                                           │
+└──────────────────────────────────────────────────────────────────────────┘
+
+    Customer Browser
+           │
+           └─► POST /api/unsubscribe/birthday
+                 Form data: { token, reason, feedback }
+                      │
+                      ▼
+              ┌───────────────────┐
+              │  Express Server   │ (Port 5000)
+              │  routes.ts        │
+              └───────────────────┘
+                      │
+                      │ [PROXY REQUEST]
+                      ▼
+              ┌──────────────────────┐
+              │ Cardprocessor-Go  │ (Port 5004)
+              │     Server        │
+              │    main.go        │
+              └──────────────────────┘
+                      │
+                      ├─► Validate token
+                      ├─► Check not used
+                      │
+                      ├─► UPDATE email_contacts
+                      │    SET birthday_email_enabled = false
+                      │        birthday_unsubscribe_reason = reason
+                      │        birthday_unsubscribed_at = NOW()
+                      │
+                      ├─► UPDATE birthday_unsubscribe_tokens
+                      │    SET used = true
+                      │        used_at = NOW()
+                      │
+                      └─► Render: unsubscribe_success.html
+                           - Success confirmation
+                           - What happens next
+                           - Close button
+
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ STEP 4: Future Email Checks                                             │
+└──────────────────────────────────────────────────────────────────────────┘
+
+    Birthday Worker Service
+           │
+           ├─► Query contacts with upcoming birthdays
+           │    WHERE birthday_email_enabled = true  ← Customer excluded!
+           │
+           └─► Send emails only to opted-in customers
+
+
+═══════════════════════════════════════════════════════════════════════════
+                            ERROR HANDLING
+═══════════════════════════════════════════════════════════════════════════
+
+    ❌ Invalid Token         → unsubscribe_error.html
+    ❌ Token Already Used    → unsubscribe_success.html (already unsubscribed)
+    ❌ Contact Not Found     → unsubscribe_error.html
+    ❌ Database Error        → unsubscribe_error.html
+    ❌ Server Unavailable    → Generic error page from proxy
+
+
+═══════════════════════════════════════════════════════════════════════════
+                          DATABASE TABLES
+═══════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────┐
+│ birthday_unsubscribe_tokens     │
+├─────────────────────────────────┤
+│ • id (UUID, PK)                 │
+│ • tenant_id (VARCHAR)           │
+│ • contact_id (VARCHAR, FK)      │
+│ • token (VARCHAR, UNIQUE)       │
+│ • used (BOOLEAN)                │  ← Set to true after unsubscribe
+│ • created_at (TIMESTAMP)        │
+│ • used_at (TIMESTAMP)           │  ← Set when token is used
+└─────────────────────────────────┘
+
+┌─────────────────────────────────┐
+│ email_contacts                  │
+├─────────────────────────────────┤
+│ • id (UUID, PK)                 │
+│ • email (VARCHAR)               │
+│ • first_name (VARCHAR)          │
+│ • last_name (VARCHAR)           │
+│ • birthday_email_enabled (BOOL) │  ← Set to false on unsubscribe
+│ • birthday_unsubscribe_reason   │  ← Stores reason
+│ • birthday_unsubscribed_at      │  ← Timestamp
+│ • ... other fields              │
+└─────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════
+                         SERVICE ARCHITECTURE
+═══════════════════════════════════════════════════════════════════════════
+
+    Port 5000: Main Server (Express)         ← Entry point, proxy
+    Port 3004: Form Server
+    Port 3502: Server Node
+    Port 50051: Temporal Server
+    Port 3505: Webhook Server
+    Port 5004: Cardprocessor-Go Server       ← Birthday cards & Unsubscribe
+
+
+═══════════════════════════════════════════════════════════════════════════
+                           QUICK COMMANDS
+═══════════════════════════════════════════════════════════════════════════
+
+    Start All Services:
+    $ ./start.sh
+
+    Start Cardprocessor-Go Server Only:
+    $ cd cardprocessor-go && go run main.go
+
+    Health Check:
+    $ curl http://localhost:5004/health
+
+    Test Unsubscribe (replace TOKEN):
+    $ curl "http://localhost:5000/api/unsubscribe/birthday?token=TOKEN"
+    $ curl "http://localhost:5004/api/unsubscribe/birthday?token=TOKEN"
+
+    Check Database:
+    $ psql $DATABASE_URL
+      SELECT * FROM birthday_unsubscribe_tokens WHERE token = 'TOKEN';
+      SELECT birthday_email_enabled FROM email_contacts WHERE id = 'ID';
+
+
+═══════════════════════════════════════════════════════════════════════════
+                         FILES & LOCATIONS
+═══════════════════════════════════════════════════════════════════════════
+
+    Server Code:
+    📄 /cardprocessor-go/main.go (main server)
+    📄 /cardprocessor-go/internal/router/router.go (routes)
+
+    Handlers (reused):
+    📄 /cardprocessor-go/internal/handlers/birthday.go
+         ├─ ShowBirthdayUnsubscribePage()
+         └─ ProcessBirthdayUnsubscribe()
+
+    Repository (reused):
+    📄 /cardprocessor-go/internal/repository/repository.go
+         ├─ GetBirthdayUnsubscribeToken()
+         ├─ GetContactByID()
+         ├─ UnsubscribeContactFromBirthdayEmails()
+         └─ MarkBirthdayUnsubscribeTokenUsed()
+
+    Templates:
+    📄 /cardprocessor-go/templates/unsubscribe.html
+    📄 /cardprocessor-go/templates/unsubscribe_success.html
+    📄 /cardprocessor-go/templates/unsubscribe_error.html
+
+    Proxy Configuration:
+    📄 /server/routes.ts (lines 193-253)
+
+    Startup Script:
+    📄 /start.sh (lines 133, 202-208)
+
+    Documentation:
+    📄 /cardprocessor-go/UNSUBSCRIBE_SERVER.md
+    📄 /UNSUBSCRIBE_IMPLEMENTATION.md
+    📄 /cardprocessor-go/UNSUBSCRIBE_FLOW.txt (this file)

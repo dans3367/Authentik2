@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Users as UsersIcon, Plus, Search, Filter, Edit, Trash2, Shield, UserCheck, UserX, Calendar, Mail, MapPin, Eye, EyeOff } from "lucide-react";
+import { Users as UsersIcon, Plus, Search, Filter, Edit, Trash2, Shield, UserCheck, UserX, Calendar, Mail, MapPin, Eye, EyeOff, X } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -95,6 +95,11 @@ export default function UsersPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  
+  // State for tracking unsaved changes in edit dialog
+  const [hasUnsavedEditChanges, setHasUnsavedEditChanges] = useState(false);
+  const [showEditConfirmDialog, setShowEditConfirmDialog] = useState(false);
+  const [initialEditValues, setInitialEditValues] = useState<UpdateUserData | null>(null);
 
   // Check authentication first
   if (authLoading) {
@@ -256,6 +261,21 @@ export default function UsersPage() {
     },
   });
 
+  // Track changes in edit form
+  const editFormValues = editForm.watch();
+  useEffect(() => {
+    if (initialEditValues && isEditDialogOpen) {
+      const hasChanges = 
+        editFormValues.firstName !== initialEditValues.firstName ||
+        editFormValues.lastName !== initialEditValues.lastName ||
+        editFormValues.email !== initialEditValues.email ||
+        editFormValues.role !== initialEditValues.role ||
+        editFormValues.isActive !== initialEditValues.isActive;
+      
+      setHasUnsavedEditChanges(hasChanges);
+    }
+  }, [editFormValues, initialEditValues, isEditDialogOpen]);
+
   // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: async (data: CreateUserData) => {
@@ -302,6 +322,8 @@ export default function UsersPage() {
       queryClient.invalidateQueries({ queryKey: ['/api/users/limits'] });
       setIsEditDialogOpen(false);
       setSelectedUser(null);
+      setHasUnsavedEditChanges(false);
+      setInitialEditValues(null);
       editForm.reset();
       toast({
         title: "Success",
@@ -379,13 +401,16 @@ export default function UsersPage() {
 
   const handleEditUser = (user: User) => {
     setSelectedUser(user);
-    editForm.reset({
+    const initialValues = {
       firstName: user.firstName || "",
       lastName: user.lastName || "",
       email: user.email,
       role: user.role === 'Owner' ? 'Administrator' : user.role as 'Administrator' | 'Manager' | 'Employee',
       isActive: user.isActive ?? true,
-    });
+    };
+    editForm.reset(initialValues);
+    setInitialEditValues(initialValues);
+    setHasUnsavedEditChanges(false);
     setIsEditDialogOpen(true);
   };
 
@@ -401,6 +426,34 @@ export default function UsersPage() {
 
   const handleToggleStatus = (userId: string, isActive: boolean) => {
     toggleStatusMutation.mutate({ userId, isActive });
+  };
+
+  // Handle edit dialog close with confirmation
+  const handleEditDialogClose = (open: boolean) => {
+    // If trying to close and there are unsaved changes, show confirmation
+    if (!open && hasUnsavedEditChanges) {
+      setShowEditConfirmDialog(true);
+      // Don't actually close the dialog yet
+      return;
+    }
+    
+    // If opening or closing without unsaved changes, proceed normally
+    setIsEditDialogOpen(open);
+    if (!open) {
+      setSelectedUser(null);
+      setHasUnsavedEditChanges(false);
+      setInitialEditValues(null);
+      editForm.reset();
+    }
+  };
+
+  const handleEditConfirmDiscard = () => {
+    setShowEditConfirmDialog(false);
+    setIsEditDialogOpen(false);
+    setSelectedUser(null);
+    setHasUnsavedEditChanges(false);
+    setInitialEditValues(null);
+    editForm.reset();
   };
 
   // Define columns for the data table (large screens)
@@ -782,12 +835,12 @@ export default function UsersPage() {
 
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300">
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Total Users</p>
-                  <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{stats.totalUsers}</p>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Total Users</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalUsers}</p>
                 </div>
                 <UsersIcon className="text-blue-500 w-8 h-8" />
               </div>
@@ -795,12 +848,12 @@ export default function UsersPage() {
             </CardContent>
           </Card>
           
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300">
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-green-600 dark:text-green-400">Active Users</p>
-                  <p className="text-2xl font-bold text-green-900 dark:text-green-100">{stats.activeUsers}</p>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Active Users</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.activeUsers}</p>
                 </div>
                 <UserCheck className="text-green-500 w-8 h-8" />
               </div>
@@ -810,12 +863,12 @@ export default function UsersPage() {
             </CardContent>
           </Card>
           
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300">
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Roles</p>
-                  <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">{Object.keys(stats.usersByRole).length}</p>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Roles</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{Object.keys(stats.usersByRole).length}</p>
                 </div>
                 <Shield className="text-purple-500 w-8 h-8" />
               </div>
@@ -823,12 +876,12 @@ export default function UsersPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300">
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-orange-600 dark:text-orange-400">Plan Limits</p>
-                  <p className="text-2xl font-bold text-orange-900 dark:text-orange-100">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Plan Limits</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                     {limits.currentUsers}{limits.maxUsers ? `/${limits.maxUsers}` : ''}
                   </p>
                 </div>
@@ -849,8 +902,17 @@ export default function UsersPage() {
               placeholder="Search users by name or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 pr-10"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 h-4 w-4"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
           <Select value={roleFilter} onValueChange={(value) => setRoleFilter(value === "all" ? "" : value as UserRole)}>
             <SelectTrigger className="w-full sm:w-[180px]">
@@ -888,7 +950,7 @@ export default function UsersPage() {
         </div>
 
         {/* Responsive Users Layout */}
-        <div className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-lg shadow-sm">
+        <div className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm rounded-lg">
           {/* Table View for Large Screens */}
           <div className="hidden lg:block">
             <DataTable
@@ -915,7 +977,7 @@ export default function UsersPage() {
                 {filteredUsers.map((user: User) => (
                   <Card
                     key={user.id}
-                    className="transition-all duration-300 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-700"
+                    className="transition-all duration-300 hover:border-blue-200 dark:hover:border-blue-700"
                     data-testid={`card-user-${user.id}`}
                   >
                     <CardContent className="p-4">
@@ -1076,7 +1138,7 @@ export default function UsersPage() {
         </div>
 
         {/* Edit User Dialog */}
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogClose}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>Edit User</DialogTitle>
@@ -1184,6 +1246,24 @@ export default function UsersPage() {
             </Form>
           </DialogContent>
         </Dialog>
+
+        {/* Confirmation Dialog for Unsaved Changes */}
+        <AlertDialog open={showEditConfirmDialog} onOpenChange={setShowEditConfirmDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+              <AlertDialogDescription>
+                You have unsaved changes. Are you sure you want to discard them?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleEditConfirmDiscard}>
+                Discard Changes
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         </div>
       </div>
     </div>

@@ -341,7 +341,7 @@ export default function ProfilePage() {
 
   // Check if user already has a subscription
   const { data: userSubscription, isLoading: subscriptionLoading } = useQuery<UserSubscriptionResponse>({
-    queryKey: ['/api/my-subscription'],
+    queryKey: ['/api/subscription/my-subscription'],
     enabled: isInitialized && !!user && !authLoading && user?.role === 'Owner',
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 60 * 1000, // 1 minute
@@ -413,7 +413,7 @@ export default function ProfilePage() {
         description: "Your subscription has been updated successfully!",
       });
       // Refetch subscription data
-      queryClient.invalidateQueries({ queryKey: ['/api/my-subscription'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/subscription/my-subscription'] });
     },
     onError: (error: any) => {
       toast({

@@ -9,7 +9,7 @@ temporal:
 
 email:
   postmark_api_key: "8ee3fc3d-c242-47e3-a252-9d832d9ca942"
-  from_email: "dan@zendwise.com"
+  from_email: "noreply@zendwise.work"
   retry_attempts: 5
   retry_interval: "1m"
 

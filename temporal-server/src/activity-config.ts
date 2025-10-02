@@ -22,7 +22,7 @@ let activityConfig: ActivityConfig = {
   postmarkApiToken: '',
   primaryEmailProvider: 'resend',
   frontendUrl: 'https://app.zendwise.work',
-  fromEmail: 'noreply@zendwise.work',
+  fromEmail: 'admin@zendwise.work',
   emailConcurrencyLimit: 5
 };
 
@@ -59,15 +59,21 @@ export function initializeActivityConfigFromEnv(): ActivityConfig {
       const dotenv = globalThis.require('dotenv');
       const path = globalThis.require('path');
 
-      // Load local .env file in temporal-server directory
-      const localResult = dotenv.config();
+      // Load local .env file in temporal-server directory first
+      const localEnvPath = path.resolve(globalThis.process.cwd(), '.env');
+      const localResult = dotenv.config({ path: localEnvPath });
 
-      // Load root .env file from main project
-      const rootEnvPath = path.resolve(__dirname, '../../.env');
+      // Load root .env file from main project as fallback
+      const rootEnvPath = path.resolve(globalThis.process.cwd(), '../.env');
       const rootResult = dotenv.config({ path: rootEnvPath });
 
-      console.log(`[ActivityConfig] Local .env loaded: ${localResult.error ? 'no' : 'yes'}, Root .env loaded: ${rootResult.error ? 'no' : 'yes'}`);
+      console.log(`[ActivityConfig] Local .env (${localEnvPath}) loaded: ${localResult.error ? 'no' : 'yes'}`);
+      console.log(`[ActivityConfig] Root .env (${rootEnvPath}) loaded: ${rootResult.error ? 'no' : 'yes'}`);
+      console.log(`[ActivityConfig] Current working directory: ${globalThis.process.cwd()}`);
       console.log(`[ActivityConfig] RESEND_API_KEY available: ${globalThis.process.env.RESEND_API_KEY ? 'yes' : 'no'}`);
+      if (globalThis.process.env.RESEND_API_KEY) {
+        console.log(`[ActivityConfig] RESEND_API_KEY length: ${globalThis.process.env.RESEND_API_KEY.length}`);
+      }
       console.log(`[ActivityConfig] POSTMARK_API_TOKEN available: ${globalThis.process.env.POSTMARK_API_TOKEN ? 'yes' : 'no'}`);
     } catch (error) {
       console.warn('[ActivityConfig] Failed to load dotenv:', error);
@@ -79,7 +85,7 @@ export function initializeActivityConfigFromEnv(): ActivityConfig {
       postmarkApiToken: globalThis.process.env.POSTMARK_API_TOKEN || globalThis.process.env.POSTMARK_API_KEY || '',
       primaryEmailProvider: globalThis.process.env.PRIMARY_EMAIL_PROVIDER || 'resend',
       frontendUrl: globalThis.process.env.FRONTEND_URL || 'https://app.zendwise.work',
-      fromEmail: globalThis.process.env.FROM_EMAIL || 'noreply@zendwise.work',
+      fromEmail: globalThis.process.env.FROM_EMAIL || 'admin@zendwise.work',
       emailConcurrencyLimit: parseInt(globalThis.process.env.EMAIL_CONCURRENCY_LIMIT || '5')
     };
 

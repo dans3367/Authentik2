@@ -180,10 +180,10 @@
     "table": {
       "name": "NAME",
       "status": "STATUS",
-      "birthday": "BIRTHDAY",
+      "birthday": "BIRTH DATE",
       "lists": "LISTS",
       "activity": "ACTIVITY",
-      "campaigns": "CAMPAIGNS",
+      "campaigns": "BIRTHDAY CARDS",
       "actions": "ACTIONS",
       "sent": "Sent",
       "opened": "Opened",
@@ -221,7 +221,12 @@
       "noActionNeeded": "No Action Needed",
       "noBirthdaysSelected": "Selected customers don't have birthday dates set.",
       "bulkUpdateSuccess": "Birthday campaigns updated successfully",
-      "bulkUpdateError": "Failed to update birthday campaigns"
+      "bulkUpdateError": "Failed to update birthday campaigns",
+      "invitationSent": "Birthday invitation sent successfully",
+      "invitationError": "Failed to send birthday invitation"
+    },
+    "buttons": {
+      "sendInvitation": "Send Birthday Invitation"
     }
   },
   "toast": {

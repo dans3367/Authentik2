@@ -16,7 +16,6 @@ import {
 import { auth } from "./auth";
 import { toNodeHandler } from "better-auth/node";
 import { serverLogger } from "./logger";
-import { newsletterWorkerService } from "./services/NewsletterWorkerService";
 
 const app = express();
 
@@ -116,7 +115,10 @@ app.use((req, res, next) => {
     process.exit(1);
   }
 
-  // Initialize Newsletter Worker Service
+  // Newsletter Worker Service - DISABLED
+  // Workers are now handled by cardprocessor-go on port 5004
+  // Uncomment below to re-enable if needed
+  /*
   try {
     serverLogger.info('🏭 Starting Newsletter Worker Service...');
     await newsletterWorkerService.start();
@@ -125,14 +127,32 @@ app.use((req, res, next) => {
     serverLogger.error("Failed to initialize Newsletter Worker Service:", error);
     // Don't exit - continue without worker service
   }
+  */
+  serverLogger.info('🚫 Newsletter Worker Service: DISABLED (handled by cardprocessor-go)');
+
+  // Birthday Worker Service - DISABLED
+  // Workers are now handled by cardprocessor-go on port 5004
+  // Uncomment below to re-enable if needed
+  /*
+  try {
+    serverLogger.info('🎂 Starting Birthday Worker Service...');
+    birthdayWorkerService.start();
+    serverLogger.info('✅ Birthday Worker Service started');
+  } catch (error) {
+    serverLogger.error("Failed to initialize Birthday Worker Service:", error);
+    // Don't exit - continue without worker service
+  }
+  */
+  serverLogger.info('🚫 Birthday Worker Service: DISABLED (handled by cardprocessor-go)');
 
   // Check server-node connectivity
   serverLogger.info('🔄 Checking service connectivity...');
   try {
     serverLogger.info('📊 Service Architecture:');
-    serverLogger.info('   🌐 Main Server: localhost:3500 (Authentication & Proxy)');
+    serverLogger.info('   🌐 Main Server: localhost:5000 (Authentication & Proxy)');
     serverLogger.info('   🤖 server-node: localhost:3502 (Temporal Client)');
     serverLogger.info('   ⚡ temporal-server: localhost:50051 (GRPC Bridge)');
+    serverLogger.info('   🎂 cardprocessor-go: localhost:5004 (Birthday & Unsubscribe)');
     
     // Test connectivity to server-node
     try {
@@ -169,10 +189,10 @@ app.use((req, res, next) => {
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 3500 if not specified.
+  // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "3500", 10);
+  const port = parseInt(process.env.PORT || "5000", 10);
   server.listen(
     {
       port,

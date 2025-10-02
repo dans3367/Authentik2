@@ -231,7 +231,7 @@ curl -X POST http://localhost:3501/api/email-tracking \
     "status": "queued",
     "temporalWorkflow": "email-workflow-test-123",
     "metadata": {
-      "recipient": "dan@zendwise.com",
+      "recipient": "dan@zendwise.work",
       "subject": "Test Email",
       "content": "This is a test email",
       "templateType": "marketing",

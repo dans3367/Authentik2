@@ -59,6 +59,60 @@ export async function deleteFromR2(key: string) {
   await r2Client.send(command)
 }
 
+/**
+ * Extract R2 key from a full R2 URL
+ * @param url - The full R2 URL (e.g., https://bucket.r2.cloudflarestorage.com/card-images/tenant-id/filename.jpg)
+ * @returns The R2 key (e.g., card-images/tenant-id/filename.jpg) or null if not a valid R2 URL
+ */
+export function extractR2KeyFromUrl(url: string): string | null {
+  try {
+    if (!url || typeof url !== 'string') {
+      return null
+    }
+
+    // Check if it's an R2 URL
+    const urlObj = new URL(url)
+    const hostname = urlObj.hostname
+    
+    // Check if it's our R2 bucket hostname
+    if (hostname.includes('r2.cloudflarestorage.com') || hostname.includes(R2_CONFIG.bucketName)) {
+      // Extract the key from the pathname (remove leading slash)
+      const key = urlObj.pathname.substring(1)
+      return key || null
+    }
+
+    return null
+  } catch (error) {
+    console.warn('Failed to extract R2 key from URL:', url, error)
+    return null
+  }
+}
+
+/**
+ * Delete an image from R2 using its full URL
+ * @param imageUrl - The full R2 URL
+ */
+export async function deleteImageFromR2(imageUrl: string) {
+  if (!imageUrl || typeof imageUrl !== 'string') {
+    console.warn('Invalid image URL provided for deletion:', imageUrl)
+    return
+  }
+
+  const key = extractR2KeyFromUrl(imageUrl)
+  if (!key) {
+    console.warn('Could not extract R2 key from URL:', imageUrl)
+    return
+  }
+
+  try {
+    await deleteFromR2(key)
+    console.log('📸 [R2 Cleanup] Successfully deleted image:', key)
+  } catch (error) {
+    console.error('📸 [R2 Cleanup] Failed to delete image:', key, error)
+    // Don't throw error to avoid breaking the main flow
+  }
+}
+
 export async function generatePresignedUrl(key: string, expiresIn = 3600) {
   if (!R2_CONFIG.isConfigured) {
     throw new Error('Cloudflare R2 is not configured')

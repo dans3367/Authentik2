@@ -17,7 +17,7 @@ echo "1️⃣ Registering test user..."
 REGISTER_RESPONSE=$(curl -s -X POST "$BASE_URL/api/auth/register-owner" \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "beats@zendwise.com",
+    "email": "beats@zendwise.work",
     "password": "TestPassword123!",
     "firstName": "Test",
     "lastName": "User",
@@ -41,7 +41,7 @@ echo "2️⃣ Logging in..."
 LOGIN_RESPONSE=$(curl -s -X POST "$BASE_URL/api/auth/login" \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "beats@zendwise.com",
+    "email": "beats@zendwise.work",
     "password": "TestPassword123!"
   }' \
   -w "HTTP_STATUS:%{http_code}")

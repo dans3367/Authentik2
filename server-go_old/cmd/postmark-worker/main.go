@@ -178,7 +178,7 @@ func loadConfigFromEnv() *Config {
 			RetryInterval  string `yaml:"retry_interval"`
 		}{
 			PostmarkAPIKey: getEnvOrDefault("POSTMARK_API_KEY", "8ee3fc3d-c242-47e3-a252-9d832d9ca942"),
-			FromEmail:      getEnvOrDefault("FROM_EMAIL", "dan@zendwise.com"),
+			FromEmail:      getEnvOrDefault("FROM_EMAIL", "noreply@zendwise.work"),
 			RetryAttempts:  5,
 			RetryInterval:  "1m",
 		},
