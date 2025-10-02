@@ -36,10 +36,9 @@ interface CardDesignerDialogProps {
     firstName?: string;
     lastName?: string;
   };
-  businessName?: string;
 }
 
-export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initialData, onSave, onPreviewChange, onMakeActive, isCurrentlyActive, senderName, customerInfo, businessName }: CardDesignerDialogProps) {
+export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initialData, onSave, onPreviewChange, onMakeActive, isCurrentlyActive, senderName, customerInfo }: CardDesignerDialogProps) {
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [message, setMessage] = useState(initialData?.message ?? "");
   const [imageUrl, setImageUrl] = useState<string | null>(initialData?.imageUrl ??
@@ -1060,7 +1059,6 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                 placeholder="Type your birthday message here..."
                 className="text-sm sm:text-base text-gray-800"
                 customerInfo={customerInfo}
-                businessName={businessName}
               />
 
               <div className="flex items-center justify-end text-gray-500 text-xs sm:text-sm">

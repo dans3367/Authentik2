@@ -1621,6 +1621,7 @@ export default function BirthdaysPage() {
             return currentTemplate === selectedTheme;
           })()}
           senderName={birthdaySettings?.senderName}
+          businessName={currentUser?.name}
         />
 
         {/* Settings Tab */}
