@@ -294,3 +294,46 @@ export async function makeMoreFormalText(
     };
   }
 }
+
+interface TranslateParams {
+  text: string;
+  targetLanguage: string;
+}
+
+interface TranslateResponse {
+  success: boolean;
+  translatedText?: string;
+  error?: string;
+}
+
+/**
+ * Translate selected text to target language
+ */
+export async function translateText(
+  params: TranslateParams
+): Promise<TranslateResponse> {
+  try {
+    const response = await fetch("/api/ai/translate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || "Failed to translate text");
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error: any) {
+    console.error("Error translating text:", error);
+    return {
+      success: false,
+      error: error.message || "Failed to translate text",
+    };
+  }
+}

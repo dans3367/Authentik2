@@ -4,8 +4,8 @@ import { generateText } from "ai";
 const router = Router();
 
 // AI model configuration - default google/gemini-2.0-flash
-// Other models: meta/llama-3.1-8b, google/gemini-2.0-flash-lite, xai/grok-3-mini
-const AI_MODEL = 'meta/llama-3.1-8b';
+// Other models: meta/llama-3.1-8b, google/gemini-2.0-flash-lite, xai/grok-3-mini, meta/llama-4-scout
+const AI_MODEL = 'google/gemini-2.5-flash-lite';
 
 // POST /api/ai/generate-birthday-message
 // Generate a birthday card message using AI
@@ -191,13 +191,23 @@ router.post("/shorten-text", async (req, res) => {
       });
     }
 
-    const promptText = `Make the following birthday greeting from a business to a customer more concise and shorter while keeping the core message, tone, and warmth intact. Change any first-person singular pronouns (I, me, my) to first-person plural (we, us, our) to reflect that this message is from a business. Do not add a salutation or signature. Do not use phrases like "At [Company Name]" or similar company references. Format the output as HTML, using one <p> tag per logical paragraph (group related sentences together). Do not put each sentence in its own <p> tag. Do not add extra line breaks between paragraphs. Return only the raw HTML content - do not wrap it in markdown code blocks (\`\`\`html or \`\`\`), backticks, or any other formatting. Return the HTML directly.\n\n${text}`;
+    const promptText = `You are a text editor. Your task is to make the following birthday greeting shorter and more concise.
 
+RULES:
+1. Remove unnecessary words while keeping the core message
+2. Change "I/me/my" to "we/us/our" 
+3. Keep the warm, friendly tone
+4. Do NOT add greetings, signatures, or company references like "At [Company Name]"
+5. Format as HTML with <p> tags (one per paragraph, group related sentences)
+6. Return ONLY the shortened HTML - no explanations, no markdown code blocks
+
+TEXT TO SHORTEN:
+${text}`;
+console.log(text);
     const { text: shortened } = await generateText({
       model: AI_MODEL,
       prompt: promptText,
     });
-
     res.json({
       success: true,
       shortenedText: shortened.trim(),
@@ -289,6 +299,74 @@ router.post("/more-formal-text", async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || "Failed to make text more formal",
+    });
+  }
+});
+
+// POST /api/ai/translate
+// Translate selected text to various languages
+router.post("/translate", async (req, res) => {
+  try {
+    const { text, targetLanguage } = req.body;
+
+    if (!text || typeof text !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "Text is required",
+      });
+    }
+
+    if (!targetLanguage || typeof targetLanguage !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "Target language is required",
+      });
+    }
+
+    const apiKey = process.env.AI_GATEWAY_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({
+        success: false,
+        error: "AI Gateway API key not configured",
+      });
+    }
+
+    const languageMap: { [key: string]: string } = {
+      "english": "English",
+      "spanish": "Spanish (Español)",
+      "mandarin": "Chinese (简体中文)",
+      "hindi": "Hindi (हिन्दी)",
+      "bengali": "Bengali (বাংলা)"
+    };
+
+    const targetLanguageName = languageMap[targetLanguage] || targetLanguage;
+
+    const promptText = `You are a professional translator. Translate the following birthday greeting to ${targetLanguageName}.
+
+RULES:
+1. Keep the same warm, friendly tone
+2. Make it natural and culturally appropriate for ${targetLanguageName} speakers
+3. Maintain any HTML formatting from the input
+4. Do NOT add greetings, signatures, or explanations
+5. Return ONLY the translated HTML - no markdown code blocks
+
+TEXT TO TRANSLATE:
+${text}`;
+
+    const { text: translated } = await generateText({
+      model: AI_MODEL,
+      prompt: promptText,
+    });
+
+    res.json({
+      success: true,
+      translatedText: translated.trim(),
+    });
+  } catch (error: any) {
+    console.error("Error translating text:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to translate text",
     });
   }
 });

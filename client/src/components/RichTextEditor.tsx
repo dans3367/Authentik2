@@ -9,13 +9,16 @@ import { Color } from "@tiptap/extension-color";
 import { Placeholder } from "@tiptap/extension-placeholder";
 import { Image } from "@tiptap/extension-image";
 import { Button } from "@/components/ui/button";
-import { Bold, AlignLeft, AlignCenter, AlignRight, Droplet, User, Sparkles, Wand2, PartyPopper, ArrowRightFromLine, ArrowLeftToLine, Tag, Undo, Redo } from "lucide-react";
-import { generateBirthdayMessage, improveText, emojifyText, expandText, shortenText, makeMoreCasualText, makeMoreFormalText } from "@/lib/aiApi";
+import { Bold, AlignLeft, AlignCenter, AlignRight, Droplet, User, Sparkles, Wand2, PartyPopper, ArrowRightFromLine, ArrowLeftToLine, Tag, Undo, Redo, Languages } from "lucide-react";
+import { generateBirthdayMessage, improveText, emojifyText, expandText, shortenText, makeMoreCasualText, makeMoreFormalText, translateText } from "@/lib/aiApi";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 
 interface RichTextEditorProps {
@@ -41,6 +44,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
   const [isShortening, setIsShortening] = useState(false);
   const [isCasualizing, setIsCasualizing] = useState(false);
   const [isFormalizing, setIsFormalizing] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
   
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -52,7 +56,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
     position: 'absolute' | 'fixed';
   } | null>(null);
 
-  const isProcessing = isImproving || isEmojifying || isExpanding || isShortening || isCasualizing || isFormalizing;
+  const isProcessing = isImproving || isEmojifying || isExpanding || isShortening || isCasualizing || isFormalizing || isTranslating;
   
   // Track active states for toolbar buttons
   const [isBold, setIsBold] = useState(false);
@@ -249,6 +253,30 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
     }
   };
 
+  const handleTranslate = async (targetLanguage: string) => {
+    if (isProcessing || !editor || !contextMenu) return;
+
+    const selection = contextMenu;
+    setIsTranslating(true);
+    setContextMenu(null);
+
+    try {
+      const result = await translateText({ text: selection.selectedText, targetLanguage });
+
+      if (result.success && result.translatedText) {
+        replaceSelection({ from: selection.from, to: selection.to }, result.translatedText);
+      } else {
+        console.error("Failed to translate text:", result.error);
+        alert(result.error || "Failed to translate text. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error translating text:", error);
+      alert("An error occurred while translating the text. Please try again.");
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -308,7 +336,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
 
           // Approximate menu dimensions for bounds clamping
           const menuWidth = 220;
-          const menuHeight = 220;
+          const menuHeight = 260;
 
           const clampedX = Math.max(8, Math.min(offsetX, containerRect.width - menuWidth));
           const clampedY = Math.max(8, Math.min(offsetY, containerRect.height - menuHeight));
@@ -580,6 +608,66 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
             <ArrowLeftToLine className={`w-4 h-4 ${isShortening ? 'animate-pulse' : ''}`} />
             {isShortening ? 'Shortening...' : 'Make shorter'}
           </button>
+          
+          {/* Translate submenu */}
+          <div className="relative group">
+            <button
+              className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 flex items-center justify-between text-gray-700 hover:text-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isProcessing}
+              onMouseEnter={(e) => {
+                const submenu = e.currentTarget.nextElementSibling as HTMLElement;
+                if (submenu) submenu.style.display = 'block';
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <Languages className={`w-4 h-4 ${isTranslating ? 'animate-pulse' : ''}`} />
+                {isTranslating ? 'Translating...' : 'Translate'}
+              </div>
+              <span className="ml-auto text-xs">›</span>
+            </button>
+            <div 
+              className="hidden absolute left-full bottom-0 ml-1 bg-white border border-gray-200 rounded-md shadow-lg py-1 z-[101] min-w-[180px]"
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.display = 'none';
+              }}
+            >
+              <button
+                className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 text-gray-700 hover:text-purple-700 disabled:opacity-50"
+                onClick={() => handleTranslate('english')}
+                disabled={isProcessing}
+              >
+                English
+              </button>
+              <button
+                className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 text-gray-700 hover:text-purple-700 disabled:opacity-50"
+                onClick={() => handleTranslate('spanish')}
+                disabled={isProcessing}
+              >
+                Spanish
+              </button>
+              <button
+                className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 text-gray-700 hover:text-purple-700 disabled:opacity-50"
+                onClick={() => handleTranslate('mandarin')}
+                disabled={isProcessing}
+              >
+                Chinese
+              </button>
+              <button
+                className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 text-gray-700 hover:text-purple-700 disabled:opacity-50"
+                onClick={() => handleTranslate('hindi')}
+                disabled={isProcessing}
+              >
+                Hindi
+              </button>
+              <button
+                className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 text-gray-700 hover:text-purple-700 disabled:opacity-50"
+                onClick={() => handleTranslate('bengali')}
+                disabled={isProcessing}
+              >
+                Bengali
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
