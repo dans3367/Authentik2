@@ -179,6 +179,26 @@ interface ShortenTextResponse {
   error?: string;
 }
 
+interface MoreCasualTextParams {
+  text: string;
+}
+
+interface MoreCasualTextResponse {
+  success: boolean;
+  casualText?: string;
+  error?: string;
+}
+
+interface MoreFormalTextParams {
+  text: string;
+}
+
+interface MoreFormalTextResponse {
+  success: boolean;
+  formalText?: string;
+  error?: string;
+}
+
 /**
  * Shorten selected text to be more concise
  */
@@ -207,6 +227,70 @@ export async function shortenText(
     return {
       success: false,
       error: error.message || "Failed to shorten text",
+    };
+  }
+}
+
+/**
+ * Make selected text slightly more casual
+ */
+export async function makeMoreCasualText(
+  params: MoreCasualTextParams
+): Promise<MoreCasualTextResponse> {
+  try {
+    const response = await fetch("/api/ai/more-casual-text", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || "Failed to make text more casual");
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error: any) {
+    console.error("Error making text more casual:", error);
+    return {
+      success: false,
+      error: error.message || "Failed to make text more casual",
+    };
+  }
+}
+
+/**
+ * Make selected text more formal and polished
+ */
+export async function makeMoreFormalText(
+  params: MoreFormalTextParams
+): Promise<MoreFormalTextResponse> {
+  try {
+    const response = await fetch("/api/ai/more-formal-text", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || "Failed to make text more formal");
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error: any) {
+    console.error("Error making text more formal:", error);
+    return {
+      success: false,
+      error: error.message || "Failed to make text more formal",
     };
   }
 }

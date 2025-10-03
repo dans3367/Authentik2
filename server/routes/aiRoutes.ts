@@ -4,7 +4,8 @@ import { generateText } from "ai";
 const router = Router();
 
 // AI model configuration - default google/gemini-2.0-flash
-const AI_MODEL = 'meta/llama-3.1-8b';
+// Other models: meta/llama-3.1-8b, google/gemini-2.0-flash-lite
+const AI_MODEL = 'google/gemini-2.0-flash-lite';
 
 // POST /api/ai/generate-birthday-message
 // Generate a birthday card message using AI
@@ -206,6 +207,88 @@ router.post("/shorten-text", async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || "Failed to shorten text",
+    });
+  }
+});
+
+// POST /api/ai/more-casual-text
+// Make selected text feel more casual and friendly
+router.post("/more-casual-text", async (req, res) => {
+  try {
+    const { text } = req.body;
+
+    if (!text || typeof text !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "Text is required",
+      });
+    }
+
+    const apiKey = process.env.AI_GATEWAY_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({
+        success: false,
+        error: "AI Gateway API key not configured",
+      });
+    }
+
+    const promptText = `Rewrite the following birthday greeting from a business to a customer in a slightly more casual, conversational tone while keeping it professional and warm. Maintain the original intent and replace any first-person singular pronouns (I, me, my) with first-person plural (we, us, our). Do not add a salutation or signature and keep the length similar. Return only the updated text.\n\n${text}`;
+
+    const { text: casual } = await generateText({
+      model: AI_MODEL,
+      prompt: promptText,
+    });
+
+    res.json({
+      success: true,
+      casualText: casual.trim(),
+    });
+  } catch (error: any) {
+    console.error("Error making text more casual:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to make text more casual",
+    });
+  }
+});
+
+// POST /api/ai/more-formal-text
+// Make selected text sound more formal and polished
+router.post("/more-formal-text", async (req, res) => {
+  try {
+    const { text } = req.body;
+
+    if (!text || typeof text !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "Text is required",
+      });
+    }
+
+    const apiKey = process.env.AI_GATEWAY_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({
+        success: false,
+        error: "AI Gateway API key not configured",
+      });
+    }
+
+    const promptText = `Rewrite the following birthday greeting from a business to a customer in a more formal, polished tone while keeping it warm and sincere. Maintain the original meaning and replace any first-person singular pronouns (I, me, my) with first-person plural (we, us, our). Do not add a salutation or signature and keep the length similar. Return only the updated text.\n\n${text}`;
+
+    const { text: formal } = await generateText({
+      model: AI_MODEL,
+      prompt: promptText,
+    });
+
+    res.json({
+      success: true,
+      formalText: formal.trim(),
+    });
+  } catch (error: any) {
+    console.error("Error making text more formal:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to make text more formal",
     });
   }
 });

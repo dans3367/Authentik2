@@ -10,7 +10,7 @@ import { Placeholder } from "@tiptap/extension-placeholder";
 import { Image } from "@tiptap/extension-image";
 import { Button } from "@/components/ui/button";
 import { Bold, AlignLeft, AlignCenter, AlignRight, Droplet, User, Sparkles, Wand2, PartyPopper, ArrowRightFromLine, ArrowLeftToLine, Tag, Undo, Redo } from "lucide-react";
-import { generateBirthdayMessage, improveText, emojifyText, expandText, shortenText } from "@/lib/aiApi";
+import { generateBirthdayMessage, improveText, emojifyText, expandText, shortenText, makeMoreCasualText, makeMoreFormalText } from "@/lib/aiApi";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +39,8 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
   const [isEmojifying, setIsEmojifying] = useState(false);
   const [isExpanding, setIsExpanding] = useState(false);
   const [isShortening, setIsShortening] = useState(false);
+  const [isCasualizing, setIsCasualizing] = useState(false);
+  const [isFormalizing, setIsFormalizing] = useState(false);
   
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -50,7 +52,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
     position: 'absolute' | 'fixed';
   } | null>(null);
 
-  const isProcessing = isImproving || isEmojifying || isExpanding || isShortening;
+  const isProcessing = isImproving || isEmojifying || isExpanding || isShortening || isCasualizing || isFormalizing;
   
   // Track active states for toolbar buttons
   const [isBold, setIsBold] = useState(false);
@@ -199,6 +201,54 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
     }
   };
 
+  const handleMoreCasualText = async () => {
+    if (isProcessing || !editor || !contextMenu) return;
+
+    const selection = contextMenu;
+    setIsCasualizing(true);
+    setContextMenu(null);
+
+    try {
+      const result = await makeMoreCasualText({ text: selection.selectedText });
+
+      if (result.success && result.casualText) {
+        replaceSelection({ from: selection.from, to: selection.to }, result.casualText);
+      } else {
+        console.error("Failed to make text more casual:", result.error);
+        alert(result.error || "Failed to make text more casual. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error making text more casual:", error);
+      alert("An error occurred while making the text more casual. Please try again.");
+    } finally {
+      setIsCasualizing(false);
+    }
+  };
+
+  const handleMoreFormalText = async () => {
+    if (isProcessing || !editor || !contextMenu) return;
+
+    const selection = contextMenu;
+    setIsFormalizing(true);
+    setContextMenu(null);
+
+    try {
+      const result = await makeMoreFormalText({ text: selection.selectedText });
+
+      if (result.success && result.formalText) {
+        replaceSelection({ from: selection.from, to: selection.to }, result.formalText);
+      } else {
+        console.error("Failed to make text more formal:", result.error);
+        alert(result.error || "Failed to make text more formal. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error making text more formal:", error);
+      alert("An error occurred while making the text more formal. Please try again.");
+    } finally {
+      setIsFormalizing(false);
+    }
+  };
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -258,7 +308,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
 
           // Approximate menu dimensions for bounds clamping
           const menuWidth = 220;
-          const menuHeight = 160;
+          const menuHeight = 220;
 
           const clampedX = Math.max(8, Math.min(offsetX, containerRect.width - menuWidth));
           const clampedY = Math.max(8, Math.min(offsetY, containerRect.height - menuHeight));
@@ -489,6 +539,22 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           >
             <Wand2 className={`w-4 h-4 ${isImproving ? 'animate-pulse' : ''}`} />
             {isImproving ? 'Improving...' : 'Improve with AI'}
+          </button>
+          <button
+            className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 flex items-center gap-2 text-gray-700 hover:text-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleMoreCasualText}
+            disabled={isProcessing}
+          >
+            <Sparkles className={`w-4 h-4 ${isCasualizing ? 'animate-pulse' : ''}`} />
+            {isCasualizing ? 'Tuning tone...' : 'More casual'}
+          </button>
+          <button
+            className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 flex items-center gap-2 text-gray-700 hover:text-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleMoreFormalText}
+            disabled={isProcessing}
+          >
+            <Sparkles className={`w-4 h-4 ${isFormalizing ? 'animate-pulse' : ''}`} />
+            {isFormalizing ? 'Polishing...' : 'More formal'}
           </button>
           <button
             className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 flex items-center gap-2 text-gray-700 hover:text-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
