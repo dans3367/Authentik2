@@ -54,7 +54,9 @@ export default function UpdateProfilePage() {
 
       setContact(data.contact);
       if (data.contact.birthday) {
-        setBirthday(new Date(data.contact.birthday));
+        // Parse date as local to avoid timezone shifts
+        const [year, month, day] = data.contact.birthday.split('-').map(Number);
+        setBirthday(new Date(year, month - 1, day));
       }
     } catch (err: any) {
       setError(err.message || 'Failed to load profile information');

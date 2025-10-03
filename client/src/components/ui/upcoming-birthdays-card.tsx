@@ -38,8 +38,11 @@ export function UpcomingBirthdaysCard() {
 
   const upcomingBirthdays = customersWithBirthdays.filter(contact => {
     if (!contact.birthday) return false;
-    const birthday = new Date(contact.birthday);
+    // Parse date as local to avoid timezone shifts
+    const [year, month, day] = contact.birthday.split('-').map(Number);
+    const birthday = new Date(year, month - 1, day);
     const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
     const daysUntilBirthday = Math.ceil((birthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     return daysUntilBirthday >= 0 && daysUntilBirthday <= 30;
   }).slice(0, 5);
@@ -122,7 +125,12 @@ export function UpcomingBirthdaysCard() {
                       {getContactName(contact)}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {contact.birthday && new Date(contact.birthday).toLocaleDateString()}
+                      {contact.birthday && (() => {
+                        // Parse date as local to avoid timezone shifts
+                        const [year, month, day] = contact.birthday.split('-').map(Number);
+                        const localDate = new Date(year, month - 1, day);
+                        return localDate.toLocaleDateString();
+                      })()}
                     </p>
                   </div>
                   {contact.birthdayUnsubscribedAt ? (

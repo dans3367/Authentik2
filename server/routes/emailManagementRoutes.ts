@@ -1479,6 +1479,7 @@ emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken,
     );
 
     const profileUpdateUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/update-profile?token=${profileUpdateToken}`;
+    console.log('🔗 [Birthday Invitation] Generated URL:', profileUpdateUrl, '| BASE_URL env:', process.env.BASE_URL);
 
     // Create email content
     const contactName = contact.firstName ? `${contact.firstName}${contact.lastName ? ` ${contact.lastName}` : ''}` : 'Valued Customer';

@@ -971,7 +971,10 @@ export default function BirthdaysPage() {
     // Pre-populate the calendar with existing birthday if available
     const contact = contacts.find(c => c.id === contactId);
     if (contact && contact.birthday) {
-      setBirthdayDraft(new Date(contact.birthday));
+      // Parse the date string as a local date (not UTC) to avoid timezone shifts
+      // Format: YYYY-MM-DD
+      const [year, month, day] = contact.birthday.split('-').map(Number);
+      setBirthdayDraft(new Date(year, month - 1, day));
     } else {
       setBirthdayDraft(undefined);
     }
@@ -981,6 +984,7 @@ export default function BirthdaysPage() {
 
   const saveBirthday = () => {
     if (!birthdayContactId || !birthdayDraft) return;
+    // Format the date in local timezone to avoid timezone shifts
     const y = birthdayDraft.getFullYear();
     const m = `${birthdayDraft.getMonth() + 1}`.padStart(2, '0');
     const d = `${birthdayDraft.getDate()}`.padStart(2, '0');
@@ -1053,8 +1057,11 @@ export default function BirthdaysPage() {
 
   const upcomingBirthdays = customersWithBirthdays.filter(contact => {
     if (!contact.birthday) return false;
-    const birthday = new Date(contact.birthday);
+    // Parse date as local to avoid timezone shifts
+    const [year, month, day] = contact.birthday.split('-').map(Number);
+    const birthday = new Date(year, month - 1, day);
     const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
     const daysUntilBirthday = Math.ceil((birthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     return daysUntilBirthday >= 0 && daysUntilBirthday <= 30;
   }).slice(0, 5);
@@ -1718,7 +1725,12 @@ export default function BirthdaysPage() {
                           <div>
                             <p className="font-medium">{getContactName(contact)}</p>
                             <p className="text-xs text-gray-500">
-                              {contact.birthday && new Date(contact.birthday).toLocaleDateString()}
+                              {contact.birthday && (() => {
+                                // Parse date as local to avoid timezone shifts
+                                const [year, month, day] = contact.birthday.split('-').map(Number);
+                                const localDate = new Date(year, month - 1, day);
+                                return localDate.toLocaleDateString();
+                              })()}
                             </p>
                           </div>
                           {contact.birthdayEmailEnabled ? (
@@ -1912,7 +1924,12 @@ export default function BirthdaysPage() {
                                 className="flex items-center gap-2 text-left hover:bg-gray-50 p-1 rounded transition-colors"
                               >
                                 <CakeIcon className="h-4 w-4 text-pink-500" />
-                                <span className="text-sm">{new Date(contact.birthday).toLocaleDateString()}</span>
+                                <span className="text-sm">{(() => {
+                                  // Parse date as local to avoid timezone shifts
+                                  const [year, month, day] = contact.birthday.split('-').map(Number);
+                                  const localDate = new Date(year, month - 1, day);
+                                  return localDate.toLocaleDateString();
+                                })()}</span>
                               </button>
                             ) : (
                               <button
@@ -2204,7 +2221,12 @@ export default function BirthdaysPage() {
                       <Label className="text-sm font-medium text-gray-700">Birthday</Label>
                       <div className="flex items-center gap-2">
                         <CakeIcon className="h-4 w-4 text-pink-500" />
-                        <span className="text-sm">{new Date(selectedCustomer.birthday).toLocaleDateString()}</span>
+                        <span className="text-sm">{(() => {
+                          // Parse date as local to avoid timezone shifts
+                          const [year, month, day] = selectedCustomer.birthday.split('-').map(Number);
+                          const localDate = new Date(year, month - 1, day);
+                          return localDate.toLocaleDateString();
+                        })()}</span>
                       </div>
                     </div>
                   )}
@@ -2300,12 +2322,30 @@ export default function BirthdaysPage() {
                 <Input
                   id="birthday-date"
                   type="date"
-                  value={birthdayDraft ? birthdayDraft.toISOString().split('T')[0] : ''}
+                  value={birthdayDraft ? (() => {
+                    // Format date in local timezone to avoid timezone shifts
+                    const y = birthdayDraft.getFullYear();
+                    const m = `${birthdayDraft.getMonth() + 1}`.padStart(2, '0');
+                    const d = `${birthdayDraft.getDate()}`.padStart(2, '0');
+                    return `${y}-${m}-${d}`;
+                  })() : ''}
                   onChange={(e) => {
-                    const date = e.target.value ? new Date(e.target.value) : undefined;
-                    setBirthdayDraft(date);
+                    if (e.target.value) {
+                      // Parse the date string as a local date to avoid timezone shifts
+                      const [year, month, day] = e.target.value.split('-').map(Number);
+                      setBirthdayDraft(new Date(year, month - 1, day));
+                    } else {
+                      setBirthdayDraft(undefined);
+                    }
                   }}
-                  max={new Date().toISOString().split('T')[0]}
+                  max={(() => {
+                    // Format today's date in local timezone
+                    const today = new Date();
+                    const y = today.getFullYear();
+                    const m = `${today.getMonth() + 1}`.padStart(2, '0');
+                    const d = `${today.getDate()}`.padStart(2, '0');
+                    return `${y}-${m}-${d}`;
+                  })()}
                 />
               </div>
               <div className="flex justify-end gap-2">

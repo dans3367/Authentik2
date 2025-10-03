@@ -12,7 +12,7 @@ export { enhancedEmailService };
 export class EmailService {
   private fromEmail = process.env.FROM_EMAIL || 'dan@zendwise.work';
   private appName = process.env.APP_NAME || 'SaaS Auth App';
-  private baseUrl = process.env.BASE_URL || 'http://localhost:3500';
+  private baseUrl = process.env.BASE_URL || 'http://localhost:5000';
   private useEnhanced = process.env.USE_ENHANCED_EMAIL !== 'false'; // Default to true
 
   async sendVerificationEmail(email: string, verificationToken: string, firstName?: string) {
