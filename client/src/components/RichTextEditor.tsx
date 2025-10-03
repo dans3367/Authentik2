@@ -9,8 +9,14 @@ import { Color } from "@tiptap/extension-color";
 import { Placeholder } from "@tiptap/extension-placeholder";
 import { Image } from "@tiptap/extension-image";
 import { Button } from "@/components/ui/button";
-import { Bold, AlignLeft, AlignCenter, AlignRight, Droplet, User, Sparkles } from "lucide-react";
-import { generateBirthdayMessage } from "@/lib/aiApi";
+import { Bold, AlignLeft, AlignCenter, AlignRight, Droplet, User, Sparkles, Wand2, PartyPopper, ArrowRightFromLine, ArrowLeftToLine, Tag, Undo, Redo } from "lucide-react";
+import { generateBirthdayMessage, improveText, emojifyText, expandText, shortenText } from "@/lib/aiApi";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface RichTextEditorProps {
   value: string;
@@ -29,6 +35,22 @@ interface RichTextEditorProps {
 export default function RichTextEditor({ value, onChange, placeholder = "Start typing your message...", className = "", customerInfo, businessName, onGenerateStart, onGenerateEnd }: RichTextEditorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isImproving, setIsImproving] = useState(false);
+  const [isEmojifying, setIsEmojifying] = useState(false);
+  const [isExpanding, setIsExpanding] = useState(false);
+  const [isShortening, setIsShortening] = useState(false);
+  
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    selectedText: string;
+    from: number;
+    to: number;
+    position: 'absolute' | 'fixed';
+  } | null>(null);
+
+  const isProcessing = isImproving || isEmojifying || isExpanding || isShortening;
   
   // Track active states for toolbar buttons
   const [isBold, setIsBold] = useState(false);
@@ -75,6 +97,108 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
     }
   };
 
+  // Handle AI text improvement
+  const replaceSelection = (range: { from: number; to: number }, replacement: string) => {
+    if (!editor) return;
+    editor.chain().focus().insertContentAt({ from: range.from, to: range.to }, replacement).run();
+  };
+
+  const handleImproveText = async () => {
+    if (isProcessing || !editor || !contextMenu) return;
+
+    const selection = contextMenu;
+    setIsImproving(true);
+    setContextMenu(null);
+
+    try {
+      const result = await improveText({ text: selection.selectedText });
+
+      if (result.success && result.improvedText) {
+        replaceSelection({ from: selection.from, to: selection.to }, result.improvedText);
+      } else {
+        console.error("Failed to improve text:", result.error);
+        alert(result.error || "Failed to improve text. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error improving text:", error);
+      alert("An error occurred while improving the text. Please try again.");
+    } finally {
+      setIsImproving(false);
+    }
+  };
+
+  const handleEmojifyText = async () => {
+    if (isProcessing || !editor || !contextMenu) return;
+
+    const selection = contextMenu;
+    setIsEmojifying(true);
+    setContextMenu(null);
+
+    try {
+      const result = await emojifyText({ text: selection.selectedText });
+
+      if (result.success && result.emojifiedText) {
+        replaceSelection({ from: selection.from, to: selection.to }, result.emojifiedText);
+      } else {
+        console.error("Failed to emojify text:", result.error);
+        alert(result.error || "Failed to emojify text. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error emojifying text:", error);
+      alert("An error occurred while emojifying the text. Please try again.");
+    } finally {
+      setIsEmojifying(false);
+    }
+  };
+
+  const handleExpandText = async () => {
+    if (isProcessing || !editor || !contextMenu) return;
+
+    const selection = contextMenu;
+    setIsExpanding(true);
+    setContextMenu(null);
+
+    try {
+      const result = await expandText({ text: selection.selectedText });
+
+      if (result.success && result.expandedText) {
+        replaceSelection({ from: selection.from, to: selection.to }, result.expandedText);
+      } else {
+        console.error("Failed to expand text:", result.error);
+        alert(result.error || "Failed to make text longer. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error expanding text:", error);
+      alert("An error occurred while making the text longer. Please try again.");
+    } finally {
+      setIsExpanding(false);
+    }
+  };
+
+  const handleShortenText = async () => {
+    if (isProcessing || !editor || !contextMenu) return;
+
+    const selection = contextMenu;
+    setIsShortening(true);
+    setContextMenu(null);
+
+    try {
+      const result = await shortenText({ text: selection.selectedText });
+
+      if (result.success && result.shortenedText) {
+        replaceSelection({ from: selection.from, to: selection.to }, result.shortenedText);
+      } else {
+        console.error("Failed to shorten text:", result.error);
+        alert(result.error || "Failed to make text shorter. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error shortening text:", error);
+      alert("An error occurred while making the text shorter. Please try again.");
+    } finally {
+      setIsShortening(false);
+    }
+  };
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -108,6 +232,65 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
     }
   }, [value, editor]);
 
+  // Handle context menu on editor
+  useEffect(() => {
+    if (!editor) return;
+
+    const editorElement = editor.view.dom;
+
+    const handleContextMenu = (event: MouseEvent) => {
+      const { state, view } = editor;
+      const { from, to } = state.selection;
+      const selectedText = state.doc.textBetween(from, to, ' ');
+      
+      // Only show context menu if text is selected
+      if (selectedText && selectedText.trim().length > 0) {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        // Get the coordinates of the end of the selection
+        const coords = view.coordsAtPos(to);
+        const containerRect = containerRef.current?.getBoundingClientRect();
+
+        if (containerRect) {
+          const offsetX = coords.left - containerRect.left;
+          const offsetY = coords.bottom - containerRect.top;
+
+          // Approximate menu dimensions for bounds clamping
+          const menuWidth = 220;
+          const menuHeight = 160;
+
+          const clampedX = Math.max(8, Math.min(offsetX, containerRect.width - menuWidth));
+          const clampedY = Math.max(8, Math.min(offsetY, containerRect.height - menuHeight));
+
+          setContextMenu({
+            x: clampedX,
+            y: clampedY,
+            selectedText: selectedText.trim(),
+            from,
+            to,
+            position: 'absolute',
+          });
+        } else {
+          setContextMenu({
+            x: coords.right,
+            y: coords.bottom,
+            selectedText: selectedText.trim(),
+            from,
+            to,
+            position: 'fixed',
+          });
+        }
+      }
+    };
+
+    editorElement.addEventListener('contextmenu', handleContextMenu);
+
+    return () => {
+      editorElement.removeEventListener('contextmenu', handleContextMenu);
+    };
+  }, [editor]);
+
   // Update toolbar button states when selection or content changes
   useEffect(() => {
     if (!editor) return;
@@ -134,10 +317,49 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
     };
   }, [editor]);
 
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setContextMenu(null);
+    };
+
+    if (contextMenu) {
+      document.addEventListener('click', handleClickOutside);
+      document.addEventListener('contextmenu', handleClickOutside);
+      return () => {
+        document.removeEventListener('click', handleClickOutside);
+        document.removeEventListener('contextmenu', handleClickOutside);
+      };
+    }
+  }, [contextMenu]);
+
   return (
     <div ref={containerRef} className="relative min-h-[150px] border rounded-md bg-white">
       {/* Permanent top toolbar */}
       <div className="bg-gray-800 text-white rounded-t-md shadow-lg px-2 py-1 flex items-center gap-1 border-b">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-white hover:bg-gray-700"
+          onClick={() => editor?.chain().focus().undo().run()}
+          disabled={!editor}
+          title="Undo"
+        >
+          <Undo className="w-4 h-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-white hover:bg-gray-700"
+          onClick={() => editor?.chain().focus().redo().run()}
+          disabled={!editor}
+          title="Redo"
+        >
+          <Redo className="w-4 h-4" />
+        </Button>
+        <div className="w-px h-6 bg-gray-600" />
         <Button
           type="button"
           variant="ghost"
@@ -197,7 +419,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           </div>
         </div>
 
-        {/* Placeholder buttons */}
+        {/* AI Generate and Tags dropdown */}
         <div className="w-px h-6 bg-gray-600 mx-1" />
         <Button
           type="button"
@@ -212,36 +434,88 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           {isGenerating ? 'Generating...' : 'Generate'}
         </Button>
         <div className="w-px h-6 bg-gray-600 mx-1" />
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8 px-2 text-xs font-medium text-blue-300 hover:text-blue-100 hover:bg-gray-700"
-          onClick={() => insertPlaceholder('firstName')}
-          disabled={!editor}
-          title="Insert First Name placeholder"
-        >
-          <User className="w-3 h-3 mr-1" />
-          First Name
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8 px-2 text-xs font-medium text-blue-300 hover:text-blue-100 hover:bg-gray-700"
-          onClick={() => insertPlaceholder('lastName')}
-          disabled={!editor}
-          title="Insert Last Name placeholder"
-        >
-          <User className="w-3 h-3 mr-1" />
-          Last Name
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-xs font-medium text-blue-300 hover:text-blue-100 hover:bg-gray-700"
+              disabled={!editor}
+              title="Insert placeholders"
+            >
+              <Tag className="w-3 h-3 mr-1" />
+              Tags
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="bg-gray-800 border-gray-700">
+            <DropdownMenuItem
+              onClick={() => insertPlaceholder('firstName')}
+              className="text-white hover:bg-gray-700 cursor-pointer"
+            >
+              <User className="w-3 h-3 mr-2" />
+              First Name
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => insertPlaceholder('lastName')}
+              className="text-white hover:bg-gray-700 cursor-pointer"
+            >
+              <User className="w-3 h-3 mr-2" />
+              Last Name
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       
       {/* Editor content with permanent top padding */}
       <div className="p-2">
         <EditorContent editor={editor} />
       </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className={`${contextMenu.position === 'fixed' ? 'fixed' : 'absolute'} bg-white border border-gray-200 rounded-md shadow-lg py-1 z-[100] min-w-[160px]`}
+          style={{
+            left: `${contextMenu.x}px`,
+            top: `${contextMenu.y}px`,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 flex items-center gap-2 text-gray-700 hover:text-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleImproveText}
+            disabled={isProcessing}
+          >
+            <Wand2 className={`w-4 h-4 ${isImproving ? 'animate-pulse' : ''}`} />
+            {isImproving ? 'Improving...' : 'Improve with AI'}
+          </button>
+          <button
+            className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 flex items-center gap-2 text-gray-700 hover:text-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleEmojifyText}
+            disabled={isProcessing}
+          >
+            <PartyPopper className={`w-4 h-4 ${isEmojifying ? 'animate-pulse' : ''}`} />
+            {isEmojifying ? 'Adding emojis...' : 'Emojify'}
+          </button>
+          <button
+            className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 flex items-center gap-2 text-gray-700 hover:text-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleExpandText}
+            disabled={isProcessing}
+          >
+            <ArrowRightFromLine className={`w-4 h-4 ${isExpanding ? 'animate-pulse' : ''}`} />
+            {isExpanding ? 'Expanding...' : 'Make longer'}
+          </button>
+          <button
+            className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 flex items-center gap-2 text-gray-700 hover:text-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleShortenText}
+            disabled={isProcessing}
+          >
+            <ArrowLeftToLine className={`w-4 h-4 ${isShortening ? 'animate-pulse' : ''}`} />
+            {isShortening ? 'Shortening...' : 'Make shorter'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
