@@ -678,24 +678,8 @@ export default function BirthdaysPage() {
         }
       }
 
-      // Call the workflow-based API
-      const response = await fetch('http://localhost:3502/api/birthday-invitation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${currentToken}`,
-        },
-        body: JSON.stringify({
-          contactId: contact.id,
-          contactEmail: contact.email,
-          contactFirstName: contact.firstName,
-          contactLastName: contact.lastName,
-          tenantId: currentUser?.tenantId || 'unknown-tenant',
-          tenantName: currentUser?.name || 'Your Company',
-          userId: currentUser?.id || 'unknown-user',
-          fromEmail: 'admin@zendwise.work'
-        }),
-      });
+      // Call the direct API endpoint (no longer requires temporal server)
+      const response = await apiRequest('POST', `/api/birthday-invitation/${contactId}`);
 
       if (!response.ok) {
         // If it's an authentication error, try to refresh the token and retry once
@@ -709,23 +693,7 @@ export default function BirthdaysPage() {
             if (newToken && newToken !== currentToken) {
               console.log('✅ [Birthday Invitation] Token refreshed, retrying request...');
 
-              const retryResponse = await fetch('http://localhost:3502/api/birthday-invitation', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${newToken}`,
-                },
-                body: JSON.stringify({
-                  contactId: contact.id,
-                  contactEmail: contact.email,
-                  contactFirstName: contact.firstName,
-                  contactLastName: contact.lastName,
-                  tenantId: currentUser?.tenantId || 'unknown-tenant',
-                  tenantName: currentUser?.name || 'Your Company',
-                  userId: currentUser?.id || 'unknown-user',
-                  fromEmail: 'admin@zendwise.work'
-                }),
-              });
+              const retryResponse = await apiRequest('POST', `/api/birthday-invitation/${contactId}`);
 
               if (retryResponse.ok) {
                 const retryResponseData = await retryResponse.json();
@@ -1021,6 +989,44 @@ export default function BirthdaysPage() {
 
   const handleSendBirthdayInvitation = (contactId: string) => {
     sendInvitationMutation.mutate(contactId);
+  };
+
+  const handleBulkRequestBirthdays = () => {
+    if (selectedContacts.length === 0) {
+      toast({
+        title: "No Selection",
+        description: "Please select customers without birthdays first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Filter to only send invites to contacts without birthdays
+    const contactsWithoutBirthdays = selectedContacts.filter(id => {
+      const contact = contacts.find(c => c.id === id);
+      return contact && !contact.birthday;
+    });
+
+    if (contactsWithoutBirthdays.length === 0) {
+      toast({
+        title: "No Eligible Customers",
+        description: "All selected customers already have birthdays set",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const confirmMessage = contactsWithoutBirthdays.length === 1
+      ? 'Are you sure you want to send a birthday request email to 1 customer?'
+      : `Are you sure you want to send birthday request emails to ${contactsWithoutBirthdays.length} customers?`;
+
+    if (window.confirm(confirmMessage)) {
+      // Send invitations sequentially
+      contactsWithoutBirthdays.forEach(contactId => {
+        handleSendBirthdayInvitation(contactId);
+      });
+      setSelectedContacts([]);
+    }
   };
 
   const handleSendTestBirthdayCard = (userId: string) => {
@@ -1816,6 +1822,10 @@ export default function BirthdaysPage() {
                           <CakeIcon className="h-4 w-4 mr-2" />
                           {sendBirthdayCardMutation.isPending ? 'Sending...' : 'Send Birthday Card'}
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleBulkRequestBirthdays} disabled={sendInvitationMutation.isPending}>
+                          <Mail className="h-4 w-4 mr-2" />
+                          {sendInvitationMutation.isPending ? 'Sending...' : 'Request Birthdays'}
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem>
                           <Download className="h-4 w-4 mr-2" />
@@ -1864,6 +1874,7 @@ export default function BirthdaysPage() {
 
                         <TableHead>{t('birthdays.table.activity')}</TableHead>
                         <TableHead>{t('birthdays.table.campaigns')}</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1938,7 +1949,22 @@ export default function BirthdaysPage() {
                             )}
                           </TableCell>
 
-                        </TableRow>
+                        
+                          <TableCell>
+                            {!contact.birthday && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleSendBirthdayInvitation(contact.id)}
+                                disabled={sendInvitationMutation.isPending || tokenLoading}
+                                className="flex items-center gap-2"
+                              >
+                                <Mail className="h-4 w-4" />
+                                {tokenLoading ? "Refreshing..." : sendInvitationMutation.isPending ? "Sending..." : "Request Birthday"}
+                              </Button>
+                            )}
+                          </TableCell>
+</TableRow>
                       ))}
                     </TableBody>
                   </Table>

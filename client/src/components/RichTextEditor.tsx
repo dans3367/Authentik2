@@ -29,6 +29,12 @@ interface RichTextEditorProps {
 export default function RichTextEditor({ value, onChange, placeholder = "Start typing your message...", className = "", customerInfo, businessName, onGenerateStart, onGenerateEnd }: RichTextEditorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Track active states for toolbar buttons
+  const [isBold, setIsBold] = useState(false);
+  const [isAlignLeft, setIsAlignLeft] = useState(false);
+  const [isAlignCenter, setIsAlignCenter] = useState(false);
+  const [isAlignRight, setIsAlignRight] = useState(false);
 
   // Function to insert placeholder text
   // Placeholders are inserted in the format {{firstName}} or {{lastName}}
@@ -102,6 +108,32 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
     }
   }, [value, editor]);
 
+  // Update toolbar button states when selection or content changes
+  useEffect(() => {
+    if (!editor) return;
+
+    const updateToolbarStates = () => {
+      setIsBold(editor.isActive('bold'));
+      setIsAlignLeft(editor.isActive({ textAlign: 'left' }));
+      setIsAlignCenter(editor.isActive({ textAlign: 'center' }));
+      setIsAlignRight(editor.isActive({ textAlign: 'right' }));
+    };
+
+    // Update states initially
+    updateToolbarStates();
+
+    // Listen to editor events
+    editor.on('selectionUpdate', updateToolbarStates);
+    editor.on('transaction', updateToolbarStates);
+    editor.on('update', updateToolbarStates);
+
+    return () => {
+      editor.off('selectionUpdate', updateToolbarStates);
+      editor.off('transaction', updateToolbarStates);
+      editor.off('update', updateToolbarStates);
+    };
+  }, [editor]);
+
   return (
     <div ref={containerRef} className="relative min-h-[150px] border rounded-md bg-white">
       {/* Permanent top toolbar */}
@@ -110,7 +142,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           type="button"
           variant="ghost"
           size="icon"
-          className={`h-8 w-8 text-white hover:bg-gray-700 ${editor?.isActive('bold') ? 'bg-gray-700' : ''}`}
+          className={`h-8 w-8 text-white hover:bg-gray-700 ${isBold ? 'bg-gray-700' : ''}`}
           onClick={() => editor?.chain().focus().toggleBold().run()}
           disabled={!editor}
         >
@@ -121,7 +153,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           type="button"
           variant="ghost"
           size="icon"
-          className={`h-8 w-8 text-white hover:bg-gray-700 ${editor?.isActive({ textAlign: 'left' }) ? 'bg-gray-700' : ''}`}
+          className={`h-8 w-8 text-white hover:bg-gray-700 ${isAlignLeft ? 'bg-gray-700' : ''}`}
           onClick={() => editor?.chain().focus().setTextAlign('left').run()}
           disabled={!editor}
         >
@@ -131,7 +163,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           type="button"
           variant="ghost"
           size="icon"
-          className={`h-8 w-8 text-white hover:bg-gray-700 ${editor?.isActive({ textAlign: 'center' }) ? 'bg-gray-700' : ''}`}
+          className={`h-8 w-8 text-white hover:bg-gray-700 ${isAlignCenter ? 'bg-gray-700' : ''}`}
           onClick={() => editor?.chain().focus().setTextAlign('center').run()}
           disabled={!editor}
         >
@@ -141,7 +173,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           type="button"
           variant="ghost"
           size="icon"
-          className={`h-8 w-8 text-white hover:bg-gray-700 ${editor?.isActive({ textAlign: 'right' }) ? 'bg-gray-700' : ''}`}
+          className={`h-8 w-8 text-white hover:bg-gray-700 ${isAlignRight ? 'bg-gray-700' : ''}`}
           onClick={() => editor?.chain().focus().setTextAlign('right').run()}
           disabled={!editor}
         >
