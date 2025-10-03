@@ -66,6 +66,20 @@ export default {
           ring: "var(--sidebar-ring)",
         },
       },
+      typography: {
+        DEFAULT: {
+          css: {
+            strong: {
+              color: 'inherit',
+              fontWeight: '600',
+            },
+            b: {
+              color: 'inherit',
+              fontWeight: '600',
+            },
+          },
+        },
+      },
       keyframes: {
         "accordion-down": {
           from: {

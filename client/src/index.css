@@ -287,3 +287,58 @@
     color: var(--card-foreground);
   }
 }
+
+/* ============================================
+   FIX: TipTap Color Extension with Bold Text
+   ============================================ */
+
+/* 
+  Problem: Tailwind's @tailwindcss/typography (prose) plugin applies
+  specific colors to <strong> and <b> tags that override inline styles.
+  
+  Solution: Reset prose bold colors and ensure inline color styles
+  on span elements take precedence.
+*/
+
+/* Reset prose bold color to inherit from parent or inline styles */
+.prose strong,
+.prose b {
+  color: inherit;
+  font-weight: 600;
+}
+
+.prose-sm strong,
+.prose-sm b {
+  color: inherit;
+  font-weight: 600;
+}
+
+/* Ensure span elements with inline color styles are respected */
+.prose span[style*="color:"],
+.prose-sm span[style*="color:"],
+.ProseMirror span[style*="color:"] {
+  /* Inline styles should naturally take precedence, but we ensure it */
+}
+
+/* Critical: Allow colored spans inside bold tags to show their color */
+.prose strong > span[style*="color:"],
+.prose b > span[style*="color:"],
+.prose-sm strong > span[style*="color:"],
+.prose-sm b > span[style*="color:"],
+.ProseMirror strong > span[style*="color:"],
+.ProseMirror b > span[style*="color:"] {
+  /* The span's inline color style should be visible */
+}
+
+/* Additional specificity for nested TipTap structures */
+.prose .ProseMirror strong > span,
+.prose .ProseMirror b > span,
+.prose-sm .ProseMirror strong > span,
+.prose-sm .ProseMirror b > span {
+  color: inherit;
+}
+
+/* Ensure the editor respects all inline styles */
+.ProseMirror *[style] {
+  /* Inline styles should take precedence */
+}

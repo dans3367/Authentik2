@@ -9,7 +9,8 @@ import { Color } from "@tiptap/extension-color";
 import { Placeholder } from "@tiptap/extension-placeholder";
 import { Image } from "@tiptap/extension-image";
 import { Button } from "@/components/ui/button";
-import { Bold, AlignLeft, AlignCenter, AlignRight, Droplet, User } from "lucide-react";
+import { Bold, AlignLeft, AlignCenter, AlignRight, Droplet, User, Sparkles } from "lucide-react";
+import { generateBirthdayMessage } from "@/lib/aiApi";
 
 interface RichTextEditorProps {
   value: string;
@@ -20,130 +21,167 @@ interface RichTextEditorProps {
     firstName?: string;
     lastName?: string;
   };
+  businessName?: string;
+  onGenerateStart?: () => void;
+  onGenerateEnd?: () => void;
 }
 
-export default function RichTextEditor({ value, onChange, placeholder = "Start typing your message...", className = "", customerInfo }: RichTextEditorProps) {
+export default function RichTextEditor({ value, onChange, placeholder = "Start typing your message...", className = "", customerInfo, businessName, onGenerateStart, onGenerateEnd }: RichTextEditorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [toolbarPos, setToolbarPos] = useState<{ top: number; left: number; visible: boolean }>({ top: 0, left: 0, visible: false });
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Function to insert placeholder text
   // Placeholders are inserted in the format {{firstName}} or {{lastName}}
-  // These can be replaced with actual customer names during email rendering
-  const insertPlaceholder = (placeholder: string) => {
+  const insertPlaceholder = (type: 'firstName' | 'lastName') => {
     if (editor) {
-      editor.chain().focus().insertContent(`{{${placeholder}}}`).run();
+      const placeholderText = `{{${type}}}`;
+      editor.chain().focus().insertContent(placeholderText).run();
+    }
+  };
+
+  // Handle AI message generation
+  const handleGenerateMessage = async () => {
+    if (isGenerating || !editor) return;
+    
+    setIsGenerating(true);
+    if (onGenerateStart) onGenerateStart();
+    
+    try {
+      const result = await generateBirthdayMessage({
+        customerName: customerInfo?.firstName,
+        businessName: businessName,
+      });
+      
+      if (result.success && result.message) {
+        // Insert the generated message into the editor
+        editor.commands.setContent(result.message);
+        onChange(result.message);
+      } else {
+        console.error("Failed to generate message:", result.error);
+        alert(result.error || "Failed to generate message. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error generating message:", error);
+      alert("An error occurred while generating the message. Please try again.");
+    } finally {
+      setIsGenerating(false);
+      if (onGenerateEnd) onGenerateEnd();
     }
   };
 
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({
-        heading: { levels: [1, 2, 3] },
-      }),
+      StarterKit,
       TextStyle,
       Color,
-      TextAlign.configure({ types: ["heading", "paragraph"] }),
       Placeholder.configure({
         placeholder,
-        showOnlyWhenEditable: true,
-        showOnlyCurrent: false,
-        includeChildren: true,
       }),
-      Image.configure({
-        inline: true,
-        allowBase64: true,
+      TextAlign.configure({
+        types: ['heading', 'paragraph'],
       }),
+      Image,
     ],
-    content: value || "",
-    editorProps: {
-      attributes: {
-        dir: "ltr",
-        style: "direction:ltr; text-align:left;",
-        class: `min-h-[140px] leading-relaxed outline-none ${className}`,
-      },
-    },
+    content: value,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
-    onSelectionUpdate: ({ editor }) => {
-      // Position toolbar when there is a selection
-      const { from, to } = editor.state.selection;
-      const hasSelection = from !== to;
-      if (!containerRef.current) return;
-
-      const containerRect = containerRef.current.getBoundingClientRect();
-      if (hasSelection) {
-        const fromCoords = editor.view.coordsAtPos(from);
-        const toCoords = editor.view.coordsAtPos(to);
-
-        // Calculate initial position (centered between selection)
-        let left = (fromCoords.left + toCoords.left) / 2 - containerRect.left;
-
-        // Position toolbar right at the top edge of selected text
-        let top = Math.min(fromCoords.top, toCoords.top) - containerRect.top;
-
-        // Constrain to container bounds
-        const toolbarWidth = 200; // approximate toolbar width
-        const containerWidth = containerRect.width;
-
-        // Keep toolbar within left/right bounds
-        if (left - toolbarWidth / 2 < 0) {
-          left = toolbarWidth / 2; // align to left edge + half toolbar width
-        } else if (left + toolbarWidth / 2 > containerWidth) {
-          left = containerWidth - toolbarWidth / 2; // align to right edge - half toolbar width
-        }
-
-        // If toolbar would go above container, position it at the top
-        if (top < 0) {
-          top = 0;
-        }
-
-        setToolbarPos({ top, left, visible: true });
-      } else {
-        setToolbarPos((p) => ({ ...p, visible: false }));
-      }
+    editorProps: {
+      attributes: {
+        class: `prose prose-sm max-w-none focus:outline-none ${className}`,
+        style: 'min-height: 120px; padding: 8px;'
+      },
     },
   });
 
-  // Keep external value in sync if it changes from outside
   useEffect(() => {
     if (editor && value !== editor.getHTML()) {
-      editor.commands.setContent(value || "", false);
+      editor.commands.setContent(value);
     }
   }, [value, editor]);
 
+  useEffect(() => {
+    if (!editor) return;
 
-  if (!editor) return null;
+    const updateToolbar = () => {
+      const { selection } = editor.state;
+      const { from, to } = selection;
+
+      if (from === to) {
+        setToolbarPos({ top: 0, left: 0, visible: false });
+        return;
+      }
+
+      const start = editor.view.coordsAtPos(from);
+      const end = editor.view.coordsAtPos(to);
+
+      if (!containerRef.current) return;
+
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const top = start.top - containerRect.top - 45;
+      const left = (start.left + end.right) / 2 - containerRect.left;
+
+      setToolbarPos({ top, left, visible: true });
+    };
+
+    editor.on('selectionUpdate', updateToolbar);
+    editor.on('transaction', updateToolbar);
+
+    return () => {
+      editor.off('selectionUpdate', updateToolbar);
+      editor.off('transaction', updateToolbar);
+    };
+  }, [editor]);
 
   return (
-    <div ref={containerRef} className="relative">
-      <style dangerouslySetInnerHTML={{
-        __html: `
-          .ProseMirror p.is-editor-empty:first-child::before {
-            content: attr(data-placeholder);
-            float: left;
-            color: #9ca3af;
-            pointer-events: none;
-            height: 0;
-          }
-        `
-      }} />
+    <div ref={containerRef} className="relative min-h-[150px] border rounded-md bg-white p-2">
+      {/* Bubble toolbar */}
       {toolbarPos.visible && (
         <div
-          className="absolute z-10 bg-white border rounded-md shadow-sm p-1 flex items-center gap-1"
-          style={{ top: toolbarPos.top, left: toolbarPos.left, transform: "translate(-50%, -100%)" }}
-          onMouseDown={(e) => e.preventDefault()}
+          className="absolute z-10 bg-gray-800 text-white rounded-lg shadow-lg px-2 py-1 flex items-center gap-1"
+          style={{
+            top: `${toolbarPos.top}px`,
+            left: `${toolbarPos.left}px`,
+            transform: 'translateX(-50%)',
+            pointerEvents: 'auto',
+          }}
         >
-          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().toggleBold().run()} aria-label="Bold">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={`h-8 w-8 text-white hover:bg-gray-700 ${editor?.isActive('bold') ? 'bg-gray-700' : ''}`}
+            onClick={() => editor?.chain().focus().toggleBold().run()}
+          >
             <Bold className="w-4 h-4" />
           </Button>
-          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().setTextAlign("left").run()} aria-label="Align left">
+          <div className="w-px h-6 bg-gray-600" />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={`h-8 w-8 text-white hover:bg-gray-700 ${editor?.isActive({ textAlign: 'left' }) ? 'bg-gray-700' : ''}`}
+            onClick={() => editor?.chain().focus().setTextAlign('left').run()}
+          >
             <AlignLeft className="w-4 h-4" />
           </Button>
-          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().setTextAlign("center").run()} aria-label="Align center">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={`h-8 w-8 text-white hover:bg-gray-700 ${editor?.isActive({ textAlign: 'center' }) ? 'bg-gray-700' : ''}`}
+            onClick={() => editor?.chain().focus().setTextAlign('center').run()}
+          >
             <AlignCenter className="w-4 h-4" />
           </Button>
-          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().setTextAlign("right").run()} aria-label="Align right">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={`h-8 w-8 text-white hover:bg-gray-700 ${editor?.isActive({ textAlign: 'right' }) ? 'bg-gray-700' : ''}`}
+            onClick={() => editor?.chain().focus().setTextAlign('right').run()}
+          >
             <AlignRight className="w-4 h-4" />
           </Button>
           <div className="relative h-8 w-8">
@@ -154,12 +192,25 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           </div>
 
           {/* Placeholder buttons - always show for design purposes */}
-          <div className="w-px h-6 bg-gray-300 mx-1" />
+          <div className="w-px h-6 bg-gray-600 mx-1" />
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="h-8 px-2 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+            className="h-8 px-2 text-xs font-medium text-purple-300 hover:text-purple-100 hover:bg-gray-700"
+            onClick={handleGenerateMessage}
+            disabled={isGenerating}
+            title="Generate birthday message with AI"
+          >
+            <Sparkles className={`w-3 h-3 mr-1 ${isGenerating ? 'animate-pulse' : ''}`} />
+            {isGenerating ? 'Generating...' : 'Generate'}
+          </Button>
+          <div className="w-px h-6 bg-gray-600 mx-1" />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2 text-xs font-medium text-blue-300 hover:text-blue-100 hover:bg-gray-700"
             onClick={() => insertPlaceholder('firstName')}
             title="Insert First Name placeholder"
           >
@@ -170,7 +221,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
             type="button"
             variant="ghost"
             size="sm"
-            className="h-8 px-2 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+            className="h-8 px-2 text-xs font-medium text-blue-300 hover:text-blue-100 hover:bg-gray-700"
             onClick={() => insertPlaceholder('lastName')}
             title="Insert Last Name placeholder"
           >
@@ -179,10 +230,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           </Button>
         </div>
       )}
-
       <EditorContent editor={editor} />
     </div>
   );
 }
-
-

@@ -28,7 +28,6 @@ interface RichTextEditorProps {
 
 export default function RichTextEditor({ value, onChange, placeholder = "Start typing your message...", className = "", customerInfo, businessName, onGenerateStart, onGenerateEnd }: RichTextEditorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [toolbarPos, setToolbarPos] = useState<{ top: number; left: number; visible: boolean }>({ top: 0, left: 0, visible: false });
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Function to insert placeholder text
@@ -74,7 +73,9 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
     extensions: [
       StarterKit,
       TextStyle,
-      Color,
+      Color.configure({
+        types: ['textStyle'],
+      }),
       Placeholder.configure({
         placeholder,
       }),
@@ -101,136 +102,114 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
     }
   }, [value, editor]);
 
-  useEffect(() => {
-    if (!editor) return;
-
-    const updateToolbar = () => {
-      const { selection } = editor.state;
-      const { from, to } = selection;
-
-      if (from === to) {
-        setToolbarPos({ top: 0, left: 0, visible: false });
-        return;
-      }
-
-      const start = editor.view.coordsAtPos(from);
-      const end = editor.view.coordsAtPos(to);
-
-      if (!containerRef.current) return;
-
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const top = start.top - containerRect.top - 45;
-      const left = (start.left + end.right) / 2 - containerRect.left;
-
-      setToolbarPos({ top, left, visible: true });
-    };
-
-    editor.on('selectionUpdate', updateToolbar);
-    editor.on('transaction', updateToolbar);
-
-    return () => {
-      editor.off('selectionUpdate', updateToolbar);
-      editor.off('transaction', updateToolbar);
-    };
-  }, [editor]);
-
   return (
-    <div ref={containerRef} className="relative min-h-[150px] border rounded-md bg-white p-2">
-      {/* Bubble toolbar */}
-      {toolbarPos.visible && (
-        <div
-          className="absolute z-10 bg-gray-800 text-white rounded-lg shadow-lg px-2 py-1 flex items-center gap-1"
-          style={{
-            top: `${toolbarPos.top}px`,
-            left: `${toolbarPos.left}px`,
-            transform: 'translateX(-50%)',
-            pointerEvents: 'auto',
-          }}
+    <div ref={containerRef} className="relative min-h-[150px] border rounded-md bg-white">
+      {/* Permanent top toolbar */}
+      <div className="bg-gray-800 text-white rounded-t-md shadow-lg px-2 py-1 flex items-center gap-1 border-b">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={`h-8 w-8 text-white hover:bg-gray-700 ${editor?.isActive('bold') ? 'bg-gray-700' : ''}`}
+          onClick={() => editor?.chain().focus().toggleBold().run()}
+          disabled={!editor}
         >
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className={`h-8 w-8 text-white hover:bg-gray-700 ${editor?.isActive('bold') ? 'bg-gray-700' : ''}`}
-            onClick={() => editor?.chain().focus().toggleBold().run()}
-          >
-            <Bold className="w-4 h-4" />
-          </Button>
-          <div className="w-px h-6 bg-gray-600" />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className={`h-8 w-8 text-white hover:bg-gray-700 ${editor?.isActive({ textAlign: 'left' }) ? 'bg-gray-700' : ''}`}
-            onClick={() => editor?.chain().focus().setTextAlign('left').run()}
-          >
-            <AlignLeft className="w-4 h-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className={`h-8 w-8 text-white hover:bg-gray-700 ${editor?.isActive({ textAlign: 'center' }) ? 'bg-gray-700' : ''}`}
-            onClick={() => editor?.chain().focus().setTextAlign('center').run()}
-          >
-            <AlignCenter className="w-4 h-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className={`h-8 w-8 text-white hover:bg-gray-700 ${editor?.isActive({ textAlign: 'right' }) ? 'bg-gray-700' : ''}`}
-            onClick={() => editor?.chain().focus().setTextAlign('right').run()}
-          >
-            <AlignRight className="w-4 h-4" />
-          </Button>
-          <div className="relative h-8 w-8">
-            <input type="color" aria-label="Text color" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => editor.chain().focus().setColor(e.target.value).run()} />
-            <div className="h-8 w-8 flex items-center justify-center">
-              <Droplet className="w-4 h-4" />
-            </div>
+          <Bold className="w-4 h-4" />
+        </Button>
+        <div className="w-px h-6 bg-gray-600" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={`h-8 w-8 text-white hover:bg-gray-700 ${editor?.isActive({ textAlign: 'left' }) ? 'bg-gray-700' : ''}`}
+          onClick={() => editor?.chain().focus().setTextAlign('left').run()}
+          disabled={!editor}
+        >
+          <AlignLeft className="w-4 h-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={`h-8 w-8 text-white hover:bg-gray-700 ${editor?.isActive({ textAlign: 'center' }) ? 'bg-gray-700' : ''}`}
+          onClick={() => editor?.chain().focus().setTextAlign('center').run()}
+          disabled={!editor}
+        >
+          <AlignCenter className="w-4 h-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={`h-8 w-8 text-white hover:bg-gray-700 ${editor?.isActive({ textAlign: 'right' }) ? 'bg-gray-700' : ''}`}
+          onClick={() => editor?.chain().focus().setTextAlign('right').run()}
+          disabled={!editor}
+        >
+          <AlignRight className="w-4 h-4" />
+        </Button>
+        <div className="relative h-8 w-8">
+          <input 
+            type="color" 
+            aria-label="Text color" 
+            className="absolute inset-0 opacity-0 cursor-pointer" 
+            onChange={(e) => {
+              if (editor) {
+                // Apply color using textStyle mark
+                editor.chain().focus().setColor(e.target.value).run();
+              }
+            }}
+            disabled={!editor}
+          />
+          <div className="h-8 w-8 flex items-center justify-center">
+            <Droplet className="w-4 h-4" />
           </div>
-
-          {/* Placeholder buttons - always show for design purposes */}
-          <div className="w-px h-6 bg-gray-600 mx-1" />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2 text-xs font-medium text-purple-300 hover:text-purple-100 hover:bg-gray-700"
-            onClick={handleGenerateMessage}
-            disabled={isGenerating}
-            title="Generate birthday message with AI"
-          >
-            <Sparkles className={`w-3 h-3 mr-1 ${isGenerating ? 'animate-pulse' : ''}`} />
-            {isGenerating ? 'Generating...' : 'Generate'}
-          </Button>
-          <div className="w-px h-6 bg-gray-600 mx-1" />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2 text-xs font-medium text-blue-300 hover:text-blue-100 hover:bg-gray-700"
-            onClick={() => insertPlaceholder('firstName')}
-            title="Insert First Name placeholder"
-          >
-            <User className="w-3 h-3 mr-1" />
-            First Name
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2 text-xs font-medium text-blue-300 hover:text-blue-100 hover:bg-gray-700"
-            onClick={() => insertPlaceholder('lastName')}
-            title="Insert Last Name placeholder"
-          >
-            <User className="w-3 h-3 mr-1" />
-            Last Name
-          </Button>
         </div>
-      )}
-      <EditorContent editor={editor} />
+
+        {/* Placeholder buttons */}
+        <div className="w-px h-6 bg-gray-600 mx-1" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 px-2 text-xs font-medium text-purple-300 hover:text-purple-100 hover:bg-gray-700"
+          onClick={handleGenerateMessage}
+          disabled={isGenerating || !editor}
+          title="Generate birthday message with AI"
+        >
+          <Sparkles className={`w-3 h-3 mr-1 ${isGenerating ? 'animate-pulse' : ''}`} />
+          {isGenerating ? 'Generating...' : 'Generate'}
+        </Button>
+        <div className="w-px h-6 bg-gray-600 mx-1" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 px-2 text-xs font-medium text-blue-300 hover:text-blue-100 hover:bg-gray-700"
+          onClick={() => insertPlaceholder('firstName')}
+          disabled={!editor}
+          title="Insert First Name placeholder"
+        >
+          <User className="w-3 h-3 mr-1" />
+          First Name
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 px-2 text-xs font-medium text-blue-300 hover:text-blue-100 hover:bg-gray-700"
+          onClick={() => insertPlaceholder('lastName')}
+          disabled={!editor}
+          title="Insert Last Name placeholder"
+        >
+          <User className="w-3 h-3 mr-1" />
+          Last Name
+        </Button>
+      </div>
+      
+      {/* Editor content with permanent top padding */}
+      <div className="p-2">
+        <EditorContent editor={editor} />
+      </div>
     </div>
   );
 }

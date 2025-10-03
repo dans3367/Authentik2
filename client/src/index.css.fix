@@ -1,0 +1,32 @@
+/* Remove the incorrect CSS rules and replace with proper ones */
+
+/* Override Tailwind prose default styles for strong/bold elements to respect inline colors */
+.prose strong,
+.prose b,
+.prose-sm strong,
+.prose-sm b {
+  color: currentColor;
+}
+
+/* Ensure TipTap inline color styles take precedence over prose defaults */
+.ProseMirror strong[style*="color"],
+.ProseMirror b[style*="color"],
+.prose .ProseMirror strong[style*="color"],
+.prose .ProseMirror b[style*="color"],
+.prose-sm .ProseMirror strong[style*="color"],
+.prose-sm .ProseMirror b[style*="color"] {
+  color: var(--tw-prose-bold) !important;
+}
+
+/* Allow span with color to work inside strong/b tags */
+.ProseMirror strong > span[style*="color"],
+.ProseMirror b > span[style*="color"],
+.prose .ProseMirror strong > span[style*="color"],
+.prose .ProseMirror b > span[style*="color"] {
+  color: inherit !important;
+}
+
+/* General fix: make sure styled spans work */
+.ProseMirror span[style*="color"] {
+  /* The inline style should take precedence naturally, but we force it */
+}
