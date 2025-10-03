@@ -2082,7 +2082,6 @@ export default function BirthdaysPage() {
                           <TableCell>
                             <div>
                               <p className="font-medium">{getUserName(user)}</p>
-                              <p className="text-sm text-gray-500">ID: {user.id}</p>
                             </div>
                           </TableCell>
                           <TableCell>
