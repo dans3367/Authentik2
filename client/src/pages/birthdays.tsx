@@ -1884,7 +1884,6 @@ export default function BirthdaysPage() {
                         <TableHead>{t('birthdays.table.status')}</TableHead>
                         <TableHead>{t('birthdays.table.birthday')}</TableHead>
 
-                        <TableHead>{t('birthdays.table.activity')}</TableHead>
                         <TableHead>{t('birthdays.table.campaigns')}</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
@@ -1942,12 +1941,7 @@ export default function BirthdaysPage() {
                             )}
                           </TableCell>
 
-                          <TableCell>
-                            <div className="text-sm">
-                              <p>{t('birthdays.table.sent')}: {contact.emailsSent}</p>
-                              <p>{t('birthdays.table.opened')}: {contact.emailsOpened}</p>
-                            </div>
-                          </TableCell>
+
                           <TableCell>
                             {contact.birthday ? (
                               contact.birthdayUnsubscribedAt ? (
@@ -2230,6 +2224,25 @@ export default function BirthdaysPage() {
                       </div>
                     </div>
                   )}
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Birthday Email Status</Label>
+                    {selectedCustomer.birthdayUnsubscribedAt ? (
+                      <div className="space-y-1">
+                        <Badge className="bg-orange-100 text-orange-800">
+                          Unsubscribed from Birthday Emails
+                        </Badge>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Unsubscribed on {new Date(selectedCustomer.birthdayUnsubscribedAt).toLocaleString()}
+                        </p>
+                      </div>
+                    ) : selectedCustomer.birthday ? (
+                      <Badge className="bg-green-100 text-green-800">
+                        Subscribed to Birthday Emails
+                      </Badge>
+                    ) : (
+                      <span className="text-sm text-gray-500">No birthday set</span>
+                    )}
+                  </div>
                 </div>
 
                 <Separator />

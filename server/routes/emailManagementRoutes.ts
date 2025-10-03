@@ -54,6 +54,7 @@ emailManagementRoutes.get("/email-contacts", authenticateToken, requireTenant, a
         emailsOpened: true,
         birthday: true,
         birthdayEmailEnabled: true,
+        birthdayUnsubscribedAt: true,
         consentGiven: true,
         consentDate: true,
         consentMethod: true,
@@ -1526,6 +1527,13 @@ emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken,
           </div>
           
           <p style="margin: 15px 0 0 0; font-size: 14px; color: #666;">This link will expire in 30 days. Your privacy is important to us - we'll only use your birthday to send you special offers and birthday wishes.</p>
+          
+          <div style="margin-top: 20px; padding: 15px; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px;">
+            <p style="margin: 0 0 10px 0; font-size: 13px; color: #666; font-weight: bold;">If the button above doesn't work, copy and paste this link into your browser:</p>
+            <p style="margin: 0; word-break: break-all;">
+              <a href="${profileUpdateUrl}" style="color: #e91e63; text-decoration: none; font-size: 12px;">${profileUpdateUrl}</a>
+            </p>
+          </div>
         </div>
         
         <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #888; text-align: center;">
