@@ -136,6 +136,7 @@ func (h *BirthdayHandler) UpdateBirthdaySettings(c *gin.Context) {
 		CustomThemeData: req.CustomThemeData,
 		SenderName:      getStringValue(req.SenderName),
 		PromotionID:     req.PromotionID,
+		SplitPromotionalEmail: getBoolValue(req.SplitPromotionalEmail),
 		UpdatedAt:       time.Now(),
 	}
 
@@ -511,9 +512,12 @@ func (h *BirthdayHandler) SendTestBirthdayCard(c *gin.Context) {
 	birthdaySettings, err := h.repo.GetBirthdaySettings(context.Background(), tenantID)
 	if err != nil {
 		fmt.Printf("⚠️ [Birthday Test] Failed to fetch birthday settings: %v\n", err)
-	} else if birthdaySettings != nil && birthdaySettings.PromotionID != nil {
-		promotionID = *birthdaySettings.PromotionID
-		fmt.Printf("🎁 [Birthday Test] Found promotion ID in settings: %s\n", promotionID)
+	} else if birthdaySettings != nil {
+		if birthdaySettings.PromotionID != nil {
+			promotionID = *birthdaySettings.PromotionID
+			fmt.Printf("🎁 [Birthday Test] Found promotion ID in settings: %s\n", promotionID)
+		}
+		fmt.Printf("📧 [Birthday Test] Split Promotional Email setting: %v\n", birthdaySettings.SplitPromotionalEmail)
 	}
 
 	// If temporal client is available, use workflow; otherwise, send directly
@@ -534,6 +538,7 @@ func (h *BirthdayHandler) SendTestBirthdayCard(c *gin.Context) {
 			CustomThemeData: customThemeData,
 			SenderName:      req.SenderName,
 			PromotionID:     promotionID,
+			SplitPromotionalEmail: birthdaySettings != nil && birthdaySettings.SplitPromotionalEmail,
 			IsTest:          true,
 		}
 
@@ -579,19 +584,53 @@ func (h *BirthdayHandler) SendTestBirthdayCard(c *gin.Context) {
 		return
 	}
 
-	fmt.Printf("🎂 [Birthday Test] Temporal client not available, using direct mode\n")
+
+	// Check if Temporal is unavailable
+	fmt.Printf("⚠️ [Birthday Test] Temporal client not available or not connected\n")
+	fmt.Printf("🔧 [Birthday Test] Fallback enabled: %v\n", h.config.EnableEmailFallback)
+
+	// Check if fallback is enabled
+	if !h.config.EnableEmailFallback {
+		fmt.Printf("❌ [Birthday Test] Email fallback is DISABLED. Temporal is required but unavailable.\n")
+		fmt.Printf("   └─ Temporal Client: %v\n", h.temporalClient != nil)
+		if h.temporalClient != nil {
+			fmt.Printf("   └─ Temporal Connected: %v\n", h.temporalClient.IsConnected())
+		}
+		fmt.Printf("   └─ To enable fallback for development, set ENABLE_EMAIL_FALLBACK=true in .env\n")
+		fmt.Printf("   └─ WARNING: Fallback should NEVER be enabled in production!\n")
+		
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"success": false,
+			"error":   "Temporal workflow service is unavailable and email fallback is disabled. Please check Temporal connection or enable fallback for development (ENABLE_EMAIL_FALLBACK=true).",
+			"details": gin.H{
+				"temporalAvailable": h.temporalClient != nil && h.temporalClient.IsConnected(),
+				"fallbackEnabled":   h.config.EnableEmailFallback,
+			},
+		})
+		return
+	}
+
+	// Fallback is enabled - log warning
+	fmt.Printf("⚠️ [Birthday Test] Using FALLBACK mode (direct email sending)\n")
+	fmt.Printf("⚠️ WARNING: Fallback mode is active! This bypasses Temporal workflow.\n")
+	fmt.Printf("⚠️ WARNING: This should ONLY be used in development environments!\n")
+	fmt.Printf("⚠️ WARNING: Production deployments must use Temporal for reliability.\n")
 
 	// Fallback: Send email directly (simplified implementation)
 	// TODO: Implement direct email sending as fallback
+	// For now, just return success with a warning
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "Test birthday card sent successfully (direct mode)",
+		"message": "Test birthday card queued (fallback mode - Temporal unavailable)",
+		"warning": "Email sent via fallback mechanism. Temporal workflow service is unavailable.",
 		"recipient": gin.H{
 			"userId":    userID,
 			"userEmail": req.UserEmail,
 		},
+		"fallbackMode": true,
 	})
 }
+
 
 // GenerateBirthdayUnsubscribeToken generates an unsubscribe token for a contact
 func (h *BirthdayHandler) GenerateBirthdayUnsubscribeToken(c *gin.Context) {
@@ -976,4 +1015,12 @@ func (h *BirthdayHandler) ProcessBirthdayResubscribe(c *gin.Context) {
 		"Token":          token,
 		"UnsubscribedAt": "",
 	})
+}
+
+// getBoolValue safely gets a bool value from a pointer, defaulting to false if nil
+func getBoolValue(b *bool) bool {
+	if b == nil {
+		return false
+	}
+	return *b
 }

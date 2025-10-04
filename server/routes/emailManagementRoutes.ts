@@ -1294,7 +1294,8 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
       customMessage,
       customThemeData,
       senderName,
-      promotionId
+      promotionId,
+      splitPromotionalEmail
     } = req.body;
 
     // Validate input
@@ -1377,6 +1378,7 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
         customMessage,
         senderName: finalSenderName,
         promotionId: promotionId || null,
+        splitPromotionalEmail: splitPromotionalEmail !== undefined ? splitPromotionalEmail : false,
         updatedAt: new Date(),
       };
 
@@ -1398,6 +1400,7 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
         customMessage,
         senderName: finalSenderName,
         promotionId: promotionId || null,
+        splitPromotionalEmail: splitPromotionalEmail !== undefined ? splitPromotionalEmail : false,
       };
 
       if (customThemeDataStr !== undefined) {

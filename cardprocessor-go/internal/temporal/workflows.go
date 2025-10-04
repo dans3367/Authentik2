@@ -11,19 +11,20 @@ import (
 
 // BirthdayTestWorkflowInput represents the input for birthday test workflow
 type BirthdayTestWorkflowInput struct {
-	UserID          string                 `json:"userId"`
-	UserEmail       string                 `json:"userEmail"`
-	UserFirstName   string                 `json:"userFirstName"`
-	UserLastName    string                 `json:"userLastName"`
-	TenantID        string                 `json:"tenantId"`
-	TenantName      string                 `json:"tenantName"`
-	FromEmail       string                 `json:"fromEmail"`
-	EmailTemplate   string                 `json:"emailTemplate"`
-	CustomMessage   string                 `json:"customMessage"`
-	CustomThemeData map[string]interface{} `json:"customThemeData"`
-	SenderName      string                 `json:"senderName"`
-	PromotionID     string                 `json:"promotionId"`
-	IsTest          bool                   `json:"isTest"`
+	UserID                string                 `json:"userId"`
+	UserEmail             string                 `json:"userEmail"`
+	UserFirstName         string                 `json:"userFirstName"`
+	UserLastName          string                 `json:"userLastName"`
+	TenantID              string                 `json:"tenantId"`
+	TenantName            string                 `json:"tenantName"`
+	FromEmail             string                 `json:"fromEmail"`
+	EmailTemplate         string                 `json:"emailTemplate"`
+	CustomMessage         string                 `json:"customMessage"`
+	CustomThemeData       map[string]interface{} `json:"customThemeData"`
+	SenderName            string                 `json:"senderName"`
+	PromotionID           string                 `json:"promotionId"`
+	SplitPromotionalEmail bool                   `json:"splitPromotionalEmail"`
+	IsTest                bool                   `json:"isTest"`
 }
 
 // BirthdayTestWorkflowResult represents the result of birthday test workflow
@@ -98,21 +99,7 @@ func BirthdayTestWorkflow(ctx workflow.Context, input BirthdayTestWorkflowInput)
 			"success", unsubscribeTokenResult.Success)
 	}
 
-	// Step 2: Fetch promotion data if promotion ID is provided
-	var promotion *models.Promotion
-	if input.PromotionID != "" {
-		err = workflow.ExecuteActivity(ctx, FetchPromotionData, FetchPromotionInput{
-			PromotionID: input.PromotionID,
-			TenantID:    input.TenantID,
-		}).Get(ctx, &promotion)
-		if err != nil {
-			logger.Error("Failed to fetch promotion data", "error", err)
-			// Continue without promotion rather than failing the entire workflow
-			promotion = nil
-		}
-	}
-
-	// Step 3: Prepare birthday test email content with promotion data
+	// Step 2: Prepare enriched input with unsubscribe token
 	enrichedInput := input
 	// Add unsubscribe token to custom theme data
 	if enrichedInput.CustomThemeData == nil {
@@ -131,6 +118,116 @@ func BirthdayTestWorkflow(ctx workflow.Context, input BirthdayTestWorkflowInput)
 			return tokenToAdd
 		}())
 
+	// Step 3: Fetch promotion data if promotion ID is provided
+	var promotion *models.Promotion
+	logger.Info("📊 [Debug] Workflow settings",
+		"splitPromotionalEmail", input.SplitPromotionalEmail,
+		"hasPromotionID", input.PromotionID != "")
+	if input.PromotionID != "" {
+		err = workflow.ExecuteActivity(ctx, FetchPromotionData, FetchPromotionInput{
+			PromotionID: input.PromotionID,
+			TenantID:    input.TenantID,
+		}).Get(ctx, &promotion)
+		if err != nil {
+			logger.Error("Failed to fetch promotion data", "error", err)
+			// Continue without promotion rather than failing the entire workflow
+			promotion = nil
+		}
+	}
+
+	// Step 4: Check if we should send promotion separately (split email flow)
+	logger.Info("📊 [Debug] Checking split email condition",
+		"splitPromotionalEmail", input.SplitPromotionalEmail,
+		"hasPromotion", promotion != nil,
+		"willSplit", input.SplitPromotionalEmail && promotion != nil)
+	if input.SplitPromotionalEmail && promotion != nil {
+		// SPLIT EMAIL FLOW: Send birthday card WITHOUT promotion, then send promotion separately
+		logger.Info("✅ 📧 [SPLIT FLOW] Sending birthday card and promotion as SEPARATE emails for better deliverability")
+		logger.Info("📧 [SPLIT FLOW] Email 1/2: Preparing birthday card WITHOUT promotion content")
+
+		// Prepare birthday card WITHOUT promotion (PrepareBirthdayTestEmail sets PromotionContent="")
+		var emailContent EmailContent
+		err = workflow.ExecuteActivity(ctx, PrepareBirthdayTestEmail, enrichedInput).Get(ctx, &emailContent)
+		if err != nil {
+			logger.Error("Failed to prepare birthday test email", "error", err)
+			return BirthdayTestWorkflowResult{
+				Success:    false,
+				WorkflowID: workflow.GetInfo(ctx).WorkflowExecution.ID,
+				Error:      err.Error(),
+				SentAt:     time.Now().Format(time.RFC3339),
+			}, nil
+		}
+
+		// Send birthday email first
+		var sendResult EmailSendResult
+		err = workflow.ExecuteActivity(ctx, SendBirthdayTestEmail, emailContent).Get(ctx, &sendResult)
+		if err != nil {
+			logger.Error("Failed to send birthday test email", "error", err)
+			return BirthdayTestWorkflowResult{
+				Success:    false,
+				WorkflowID: workflow.GetInfo(ctx).WorkflowExecution.ID,
+				Error:      err.Error(),
+				SentAt:     time.Now().Format(time.RFC3339),
+			}, nil
+		}
+
+		logger.Info("✅ [SPLIT FLOW] Email 1/2: Birthday card sent successfully (NO promotion included)")
+		logger.Info("⏳ [SPLIT FLOW] Waiting 30 seconds before sending promotional email...")
+
+		// Wait 30 seconds between emails for better deliverability
+		workflow.Sleep(ctx, 30*time.Second)
+
+		logger.Info("📧 [SPLIT FLOW] Email 2/2: Preparing promotional email (promotion content ONLY)")
+		// Prepare and send promotional email separately
+		var promoEmailContent EmailContent
+		err = workflow.ExecuteActivity(ctx, PreparePromotionalEmail, PreparePromotionalEmailInput{
+			ToEmail:          input.UserEmail,
+			FromEmail:        input.FromEmail,
+			Promotion:        promotion,
+			BusinessName:     input.TenantName,
+			UnsubscribeToken: unsubscribeTokenResult.Token,
+		}).Get(ctx, &promoEmailContent)
+		if err != nil {
+			logger.Warn("Failed to prepare promotional email (birthday was sent)", "error", err)
+			// Don't fail the workflow - birthday email was sent successfully
+		} else {
+			var promoSendResult EmailSendResult
+			err = workflow.ExecuteActivity(ctx, SendPromotionalEmail, promoEmailContent).Get(ctx, &promoSendResult)
+			if err != nil {
+				logger.Warn("Failed to send promotional email (birthday was sent)", "error", err)
+				// Don't fail the workflow - birthday email was sent successfully
+			} else {
+				logger.Info("✅ [SPLIT FLOW] Email 2/2: Promotional email sent successfully", "messageId", promoSendResult.MessageID)
+			}
+		}
+
+		// Update status with birthday email send result
+		err = workflow.ExecuteActivity(ctx, UpdateBirthdayTestStatus, UpdateStatusInput{
+			UserID:    input.UserID,
+			TenantID:  input.TenantID,
+			Success:   sendResult.Success,
+			MessageID: sendResult.MessageID,
+			Provider:  sendResult.Provider,
+			Error:     sendResult.Error,
+		}).Get(ctx, nil)
+		if err != nil {
+			logger.Warn("Failed to update birthday test status", "error", err)
+		}
+
+		logger.Info("✅ [SPLIT FLOW] Birthday test workflow completed - TWO separate emails sent", "success", sendResult.Success)
+		return BirthdayTestWorkflowResult{
+			Success:    sendResult.Success,
+			WorkflowID: workflow.GetInfo(ctx).WorkflowExecution.ID,
+			MessageID:  sendResult.MessageID,
+			Provider:   sendResult.Provider,
+			Error:      sendResult.Error,
+			SentAt:     time.Now().Format(time.RFC3339),
+		}, nil
+	}
+
+	// COMBINED EMAIL FLOW: Send birthday card WITH promotion embedded (old behavior)
+	logger.Info("📧 [COMBINED FLOW] Sending COMBINED email (promotion embedded in birthday card)")
+	logger.Info("⚠️  [COMBINED FLOW] Split email is disabled or no promotion - sending single email with promotion embedded")
 	if promotion != nil {
 		logger.Info("Including promotion in birthday test email", "promotionId", promotion.ID, "title", promotion.Title)
 	}
@@ -150,7 +247,7 @@ func BirthdayTestWorkflow(ctx workflow.Context, input BirthdayTestWorkflowInput)
 		}, nil
 	}
 
-	// Step 4: Send birthday test email
+	// Send birthday test email
 	var sendResult EmailSendResult
 	err = workflow.ExecuteActivity(ctx, SendBirthdayTestEmail, emailContent).Get(ctx, &sendResult)
 	if err != nil {
@@ -163,7 +260,7 @@ func BirthdayTestWorkflow(ctx workflow.Context, input BirthdayTestWorkflowInput)
 		}, nil
 	}
 
-	// Step 5: Update tracking status
+	// Update tracking status
 	err = workflow.ExecuteActivity(ctx, UpdateBirthdayTestStatus, UpdateStatusInput{
 		UserID:    input.UserID,
 		TenantID:  input.TenantID,

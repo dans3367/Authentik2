@@ -43,6 +43,7 @@ type BirthdaySettings struct {
 	CustomThemeData *string   `json:"customThemeData" db:"custom_theme_data"`
 	SenderName      string    `json:"senderName" db:"sender_name"`
 	PromotionID     *string   `json:"promotionId" db:"promotion_id"`
+	SplitPromotionalEmail bool      `json:"splitPromotionalEmail" db:"split_promotional_email"`
 	CreatedAt       time.Time `json:"createdAt" db:"created_at"`
 	UpdatedAt       time.Time `json:"updatedAt" db:"updated_at"`
 }
@@ -142,6 +143,7 @@ type UpdateBirthdaySettingsRequest struct {
 	CustomThemeData *string `json:"customThemeData,omitempty"`
 	SenderName      *string `json:"senderName,omitempty"`
 	PromotionID     *string `json:"promotionId,omitempty"`
+	SplitPromotionalEmail *bool   `json:"splitPromotionalEmail,omitempty"`
 }
 
 // UpdateContactBirthdayRequest represents the request to update contact birthday info

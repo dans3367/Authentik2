@@ -12,6 +12,8 @@ func registerActivities(w worker.Worker) {
 	w.RegisterActivity(SendBirthdayTestEmail)
 	w.RegisterActivity(UpdateBirthdayTestStatus)
 	w.RegisterActivity(FetchPromotionData)
+	w.RegisterActivity(PreparePromotionalEmail)
+	w.RegisterActivity(SendPromotionalEmail)
 
 	// Register birthday invitation activities
 	w.RegisterActivity(PrepareBirthdayInvitationEmail)

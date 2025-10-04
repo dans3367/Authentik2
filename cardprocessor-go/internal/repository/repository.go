@@ -28,7 +28,7 @@ func (r *Repository) GetBirthdaySettings(ctx context.Context, tenantID string) (
 	query := `
 		SELECT id, tenant_id, enabled, email_template, segment_filter, 
 		       custom_message, custom_theme_data, sender_name, promotion_id,
-		       created_at, updated_at
+		       split_promotional_email, created_at, updated_at
 		FROM birthday_settings 
 		WHERE tenant_id = $1
 	`
@@ -44,6 +44,7 @@ func (r *Repository) GetBirthdaySettings(ctx context.Context, tenantID string) (
 		&settings.CustomThemeData,
 		&settings.SenderName,
 		&settings.PromotionID,
+		&settings.SplitPromotionalEmail,
 		&settings.CreatedAt,
 		&settings.UpdatedAt,
 	)
@@ -89,6 +90,7 @@ func (r *Repository) CreateBirthdaySettings(tenantID string, req *models.CreateB
 		&settings.CustomThemeData,
 		&settings.SenderName,
 		&settings.PromotionID,
+		&settings.SplitPromotionalEmail,
 		&settings.CreatedAt,
 		&settings.UpdatedAt,
 	)

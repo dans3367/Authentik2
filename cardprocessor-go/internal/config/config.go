@@ -36,6 +36,7 @@ type Config struct {
 	BirthdayMaxRetries    int
 	BirthdayRetryDelay    int // in seconds
 	BirthdayWorkerEnabled bool
+	EnableEmailFallback    bool // Allow direct email sending when Temporal is unavailable
 
 	// Temporal settings
 	TemporalAddress       string
@@ -132,6 +133,7 @@ func Load() *Config {
 		BirthdayMaxRetries:    getEnvAsInt("BIRTHDAY_MAX_RETRIES", 3),
 		BirthdayRetryDelay:    getEnvAsInt("BIRTHDAY_RETRY_DELAY", 300),
 		BirthdayWorkerEnabled: getEnvAsBool("BIRTHDAY_WORKER_ENABLED", true),
+		EnableEmailFallback:    getEnvAsBool("ENABLE_EMAIL_FALLBACK", false),
 
 		// Temporal settings
 		TemporalAddress:       getEnv("TEMPORAL_ADDRESS", "localhost:7233"),

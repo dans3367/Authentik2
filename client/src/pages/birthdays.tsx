@@ -185,6 +185,7 @@ export default function BirthdaysPage() {
 
   // State for promotion selection
   const [selectedPromotions, setSelectedPromotions] = useState<string[]>([]);
+  const [splitPromotionalEmail, setSplitPromotionalEmail] = useState<boolean>(false);
 
   // Customer modal state
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
@@ -471,7 +472,8 @@ export default function BirthdaysPage() {
     } else {
       setSelectedPromotions([]);
     }
-  }, [birthdaySettings?.promotion]);
+    setSplitPromotionalEmail(birthdaySettings?.splitPromotionalEmail || false);
+  }, [birthdaySettings?.promotion, birthdaySettings?.splitPromotionalEmail]);
 
   // Memoized initial data for CardDesignerDialog to prevent re-render loops
   const cardDesignerInitialData = useMemo(() => {
@@ -556,6 +558,7 @@ export default function BirthdaysPage() {
         senderName: birthdaySettings.senderName || '',
         customThemeData: birthdaySettings.customThemeData,
         promotionId: promotionId,
+        splitPromotionalEmail: splitPromotionalEmail,
       });
     }
   };
@@ -2148,6 +2151,46 @@ export default function BirthdaysPage() {
                   />
                 </div>
 
+                {/* Split Email Option */}
+                {selectedPromotions.length > 0 && (
+                  <div className="mt-4 p-4 border rounded-lg bg-white dark:bg-gray-900">
+                    <div className="flex items-start space-x-3">
+                      <Checkbox
+                        id="splitPromotionalEmail"
+                        checked={splitPromotionalEmail}
+                        onCheckedChange={(checked) => {
+                          setSplitPromotionalEmail(checked as boolean);
+                          if (birthdaySettings) {
+                            const promotionId = selectedPromotions.length > 0 ? selectedPromotions[0] : null;
+                            updateSettingsMutation.mutate({
+                              id: birthdaySettings.id,
+                              enabled: birthdaySettings.enabled,
+                              emailTemplate: birthdaySettings.emailTemplate || 'default',
+                              segmentFilter: birthdaySettings.segmentFilter || 'all',
+                              customMessage: birthdaySettings.customMessage || '',
+                              senderName: birthdaySettings.senderName || '',
+                              customThemeData: birthdaySettings.customThemeData,
+                              promotionId: promotionId,
+                              splitPromotionalEmail: checked as boolean,
+                            });
+                          }
+                        }}
+                      />
+                      <div className="flex-1">
+                        <label
+                          htmlFor="splitPromotionalEmail"
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                        >
+                          Send promotion as separate email (Better Deliverability)
+                        </label>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          When enabled, the birthday card and promotion will be sent as two separate emails to improve deliverability rates and avoid spam filters. The birthday card will be sent first, followed by the promotional email shortly after.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Promotion Preview */}
                 {selectedPromotions.length > 0 && birthdaySettings?.promotion && (
                   <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
@@ -2371,3 +2414,5 @@ export default function BirthdaysPage() {
     </div>
   );
 }
+
+

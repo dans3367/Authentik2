@@ -141,6 +141,15 @@ type PrepareBirthdayTestEmailInput struct {
 	Promotion     *models.Promotion         `json:"promotion"`
 }
 
+// PreparePromotionalEmailInput represents input for preparing promotional email
+type PreparePromotionalEmailInput struct {
+	ToEmail          string            `json:"toEmail"`
+	FromEmail        string            `json:"fromEmail"`
+	Promotion        *models.Promotion `json:"promotion"`
+	BusinessName     string            `json:"businessName"`
+	UnsubscribeToken string            `json:"unsubscribeToken"`
+}
+
 // PrepareBirthdayTestEmailWithPromotion prepares birthday test email content with promotion data
 func PrepareBirthdayTestEmailWithPromotion(ctx context.Context, input PrepareBirthdayTestEmailInput) (EmailContent, error) {
 	logger := activity.GetLogger(ctx)
@@ -162,17 +171,22 @@ func PrepareBirthdayTestEmailWithPromotion(ctx context.Context, input PrepareBir
 	}, nil
 }
 
-// PrepareBirthdayTestEmail prepares birthday test email content
+// PrepareBirthdayTestEmail prepares birthday test email content WITHOUT promotion (for split email flow)
 func PrepareBirthdayTestEmail(ctx context.Context, input BirthdayTestWorkflowInput) (EmailContent, error) {
 	logger := activity.GetLogger(ctx)
-	logger.Info("📧 Preparing birthday test email", "userId", input.UserID, "email", input.UserEmail)
+	logger.Info("📧 [SPLIT FLOW] Preparing birthday test email WITHOUT promotion content",
+		"userId", input.UserID,
+		"email", input.UserEmail)
 
-	// Generate HTML content for birthday test card
+	// Generate HTML content for birthday test card (WITHOUT promotion)
 	htmlContent := generateBirthdayTestHTML(input)
 
 	// Generate text content (simplified version)
 	textContent := fmt.Sprintf("Happy Birthday %s!\n\n%s\n\nBest regards,\n%s",
 		input.UserFirstName, input.CustomMessage, input.SenderName)
+
+	logger.Info("✅ [SPLIT FLOW] Birthday email prepared WITHOUT promotion - ready to send",
+		"subject", fmt.Sprintf("🎉 Happy Birthday %s!", input.UserFirstName))
 
 	return EmailContent{
 		Subject:     fmt.Sprintf("🎉 Happy Birthday %s! (Test - %s template)", input.UserFirstName, input.EmailTemplate),
@@ -452,23 +466,37 @@ func generateBirthdayTestHTML(input BirthdayTestWorkflowInput) string {
 		}
 	}
 
-	// Generate unsubscribe token for test emails
+	// Extract unsubscribe token from custom theme data (passed from workflow)
 	var unsubscribeToken string
-	if input.UserID != "" {
-		tokenBytes := make([]byte, 32)
-		if _, err := rand.Read(tokenBytes); err == nil {
-			unsubscribeToken = hex.EncodeToString(tokenBytes)
+	if input.CustomThemeData != nil {
+		if tokenValue, ok := input.CustomThemeData["unsubscribeToken"]; ok {
+			if tokenStr, ok := tokenValue.(string); ok {
+				unsubscribeToken = tokenStr
+				if len(unsubscribeToken) > 16 {
+					fmt.Printf("✅ [generateBirthdayTestHTML] Found unsubscribe token: %s...\n", unsubscribeToken[:16])
+				} else if len(unsubscribeToken) > 0 {
+					fmt.Printf("✅ [generateBirthdayTestHTML] Found unsubscribe token (length: %d)\n", len(unsubscribeToken))
+				} else {
+					fmt.Println("⚠️  [generateBirthdayTestHTML] unsubscribeToken is empty string")
+				}
+			} else {
+				fmt.Printf("⚠️  [generateBirthdayTestHTML] unsubscribeToken exists but is not a string: %T\n", tokenValue)
+			}
+		} else {
+			fmt.Printf("⚠️  [generateBirthdayTestHTML] unsubscribeToken not found in CustomThemeData. Keys: %v\n", getKeys(input.CustomThemeData))
 		}
+	} else {
+		fmt.Println("⚠️  [generateBirthdayTestHTML] CustomThemeData is nil")
 	}
 
-	// Prepare template parameters
+	// Prepare template parameters - NO PROMOTION DATA (for split email flow)
 	params := TemplateParams{
 		RecipientName:        recipientName,
 		Message:              input.CustomMessage,
 		BrandName:            input.TenantName,
 		CustomThemeData:      customThemeData,
 		SenderName:           input.SenderName,
-		PromotionContent:     "", // TODO: Add promotion support
+		PromotionContent:     "", // Empty - promotion sent separately
 		PromotionTitle:       "",
 		PromotionDescription: "",
 		IsTest:               input.IsTest,
@@ -628,4 +656,131 @@ func generateBirthdayInvitationHTML(input PrepareEmailInput) string {
 		input.InvitationToken,
 		template.HTMLEscapeString(input.TenantName),
 	)
+}
+
+// PreparePromotionalEmail prepares a promotional email to be sent separately
+func PreparePromotionalEmail(ctx context.Context, input PreparePromotionalEmailInput) (EmailContent, error) {
+	logger := activity.GetLogger(ctx)
+	logger.Info("📧 Preparing promotional email",
+		"email", input.ToEmail,
+		"promotionId", input.Promotion.ID,
+		"promotionTitle", input.Promotion.Title)
+
+	// Generate promotional email HTML
+	htmlBody := generatePromotionalHTML(input)
+
+	// Handle optional description field
+	description := ""
+	if input.Promotion.Description != nil {
+		description = *input.Promotion.Description
+	}
+
+	return EmailContent{
+		To:          input.ToEmail,
+		From:        input.FromEmail,
+		Subject:     fmt.Sprintf("🎁 Special Offer: %s", input.Promotion.Title),
+		HTMLContent: htmlBody,
+		TextContent: fmt.Sprintf("Special Offer: %s\n\n%s", input.Promotion.Title, description),
+	}, nil
+}
+
+// SendPromotionalEmail sends the promotional email
+func SendPromotionalEmail(ctx context.Context, content EmailContent) (EmailSendResult, error) {
+	logger := activity.GetLogger(ctx)
+	logger.Info("📤 Sending promotional email", "to", content.To, "subject", content.Subject)
+
+	// Record activity heartbeat
+	activity.RecordHeartbeat(ctx, "Sending promotional email")
+
+	// Use the same email sending logic as birthday emails
+	result, err := SendBirthdayTestEmail(ctx, content)
+	if err != nil {
+		logger.Error("Failed to send promotional email", "error", err)
+		return EmailSendResult{
+			Success:   false,
+			Error:     err.Error(),
+			Provider:  "resend",
+			MessageID: "",
+		}, err
+	}
+
+	logger.Info("✅ Promotional email sent successfully",
+		"messageId", result.MessageID,
+		"provider", result.Provider)
+
+	return result, nil
+}
+
+// generatePromotionalHTML generates the HTML content for the promotional email
+func generatePromotionalHTML(input PreparePromotionalEmailInput) string {
+	unsubscribeURL := ""
+	if input.UnsubscribeToken != "" {
+		unsubscribeURL = fmt.Sprintf("%s/api/birthday/unsubscribe/%s",
+			"https://app.example.com",
+			input.UnsubscribeToken)
+	}
+
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>%s</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" style="width: 100%%; border-collapse: collapse;">
+        <tr>
+            <td align="center" style="padding: 40px 0;">
+                <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%);">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">🎁 Special Offer</h1>
+                        </td>
+                    </tr>
+                    
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <h2 style="margin: 0 0 20px; color: #333333; font-size: 24px;">%s</h2>
+                            <div style="color: #666666; font-size: 16px; line-height: 1.6; margin-bottom: 30px;">
+                                %s
+                            </div>
+                            
+                            <!-- CTA Button -->
+                            <div style="text-align: center; margin: 30px 0;">
+                                <a href="#" style="display: inline-block; padding: 15px 40px; background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
+                                    Claim Your Offer
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 30px 40px; background-color: #f8f9fa; border-top: 1px solid #e9ecef;">
+                            <p style="margin: 0 0 10px; color: #6c757d; font-size: 14px; text-align: center;">
+                                %s
+                            </p>
+                            %s
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`,
+		input.Promotion.Title,
+		input.Promotion.Title,
+		input.Promotion.Content,
+		input.BusinessName,
+		func() string {
+			if unsubscribeURL != "" {
+				return fmt.Sprintf(`<p style="margin: 0; color: #6c757d; font-size: 12px; text-align: center;">
+                    <a href="%s" style="color: #6c757d; text-decoration: underline;">Unsubscribe from birthday emails</a>
+                </p>`, unsubscribeURL)
+			}
+			return ""
+		}())
 }
