@@ -1905,12 +1905,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
     // Send birthday cards to each contact
     for (const contact of contacts) {
       try {
-        // Prepare recipient name (needed for both split and combined flows)
-        const recipientName = contact.firstName || contact.lastName
-          ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
-          : contact.email.split('@')[0];
-
-        // Generate unsubscribe token (needed for both split and combined flows)
+        // Generate unsubscribe token
         let unsubscribeToken: string | undefined;
         try {
           // Generate a JWT token for internal API call to cardprocessor
@@ -1943,109 +1938,10 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           console.warn(`⚠️ [ManualBirthdayCard] Error generating unsubscribe token for ${contact.email}:`, error);
         }
 
-        // --- SPLIT EMAIL LOGIC PATCH ---
-        // Check if split promotional email is enabled
-        const shouldSplitEmail = settings.splitPromotionalEmail && settings.promotion;
-        
-        console.log(`📧 [ManualBirthdayCard] Split email enabled: ${settings.splitPromotionalEmail}, Has promotion: ${!!settings.promotion}`);
-        
-        if (shouldSplitEmail) {
-          console.log(`✅ [SPLIT FLOW] Sending birthday and promo as SEPARATE emails to ${contact.email}`);
-          
-          // Send birthday card WITHOUT promotion
-          const htmlBirthday = renderBirthdayTemplate(settings.emailTemplate as any, {
-            recipientName,
-            message: settings.customMessage || 'Wishing you a wonderful birthday!',
-            brandName: req.user.tenantName || 'Your Company',
-            customThemeData: settings.customThemeData ? JSON.parse(settings.customThemeData) : null,
-            senderName: settings.senderName || 'Your Team',
-            // NO promotion fields - these are intentionally omitted
-            unsubscribeToken,
-          });
-
-          const birthdayResult = await enhancedEmailService.sendCustomEmail(
-            contact.email,
-            `🎉 Happy Birthday ${recipientName}!`,
-            htmlBirthday,
-            {
-              text: htmlBirthday.replace(/<[^>]*>/g, ''),
-              from: 'admin@zendwise.work',
-              metadata: {
-                type: 'birthday-card',
-                contactId: contact.id,
-                tenantId: tenantId,
-                manual: true,
-                tags: ['birthday', 'manual', `tenant-${tenantId}`],
-                unsubscribeToken: unsubscribeToken || 'none',
-              },
-            }
-          );
-
-          console.log(`✅ [SPLIT FLOW] Birthday card sent to ${contact.email}`);
-          
-          // Wait 20 seconds before sending promotional email
-          console.log(`⏳ [SPLIT FLOW] Waiting 20 seconds before sending promo...`);
-          await new Promise(resolve => setTimeout(resolve, 20000));
-
-          // Send promotional email separately
-          const promoSubject = settings.promotion.title || 'Special Birthday Offer!';
-          const htmlPromo = `
-            <html>
-              <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-                <div style="max-width: 600px; margin: 20px auto; padding: 32px 24px; background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border-radius: 8px;">
-                  <h2 style="font-size: 1.5rem; font-weight: bold; margin: 0 0 16px 0; color: #2d3748;">${settings.promotion.title || 'Special Birthday Offer!'}</h2>
-                  ${settings.promotion.description ? `<p style="margin: 0 0 20px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${settings.promotion.description}</p>` : ''}
-                  <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${settings.promotion.content || ''}</div>
-                  <hr style="margin: 32px 0 16px 0; border: none; border-top: 1px solid #e2e8f0;">
-                  <p style="margin: 0; font-size: 0.85rem; color: #a0aec0; text-align: center;">
-                    This is a special birthday promotion for valued subscribers.
-                  </p>
-                </div>
-              </body>
-            </html>
-          `;
-
-          const promoResult = await enhancedEmailService.sendCustomEmail(
-            contact.email,
-            `🎁 ${promoSubject}`,
-            htmlPromo,
-            {
-              text: htmlPromo.replace(/<[^>]*>/g, ''),
-              from: 'admin@zendwise.work',
-              metadata: {
-                type: 'birthday-promotion',
-                contactId: contact.id,
-                tenantId: tenantId,
-                manual: true,
-                tags: ['birthday', 'manual', 'promotion', `tenant-${tenantId}`],
-                unsubscribeToken: unsubscribeToken || 'none',
-              },
-            }
-          );
-
-          console.log(`✅ [SPLIT FLOW] Promotional email sent to ${contact.email}`);
-
-          // Record both emails as success
-          if (typeof birthdayResult === 'string' || (birthdayResult && birthdayResult.success)) {
-            results.push({
-              contactId: contact.id,
-              email: contact.email,
-              success: true,
-              messageId: typeof birthdayResult === 'string' ? birthdayResult : birthdayResult.messageId,
-              note: 'Split email: Birthday and promotion sent separately',
-            });
-          } else {
-            results.push({
-              contactId: contact.id,
-              email: contact.email,
-              success: false,
-              error: birthdayResult.error || 'Unknown error',
-            });
-          }
-          
-          continue; // Skip to next contact
-        }
-        // --- END SPLIT EMAIL LOGIC ---
+        // Prepare recipient name
+        const recipientName = contact.firstName || contact.lastName
+          ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
+          : contact.email.split('@')[0];
 
         // Render birthday template
         const htmlContent = renderBirthdayTemplate(settings.emailTemplate as any, {
