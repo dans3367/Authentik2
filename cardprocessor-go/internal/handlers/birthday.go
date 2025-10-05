@@ -17,6 +17,7 @@ import (
 	"cardprocessor-go/internal/models"
 	"cardprocessor-go/internal/repository"
 	"cardprocessor-go/internal/temporal"
+	"cardprocessor-go/internal/i18n"
 
 	"github.com/gin-gonic/gin"
 )
@@ -733,9 +734,22 @@ func (h *BirthdayHandler) GenerateBirthdayUnsubscribeToken(c *gin.Context) {
 // ShowBirthdayUnsubscribePage shows the unsubscribe page
 func (h *BirthdayHandler) ShowBirthdayUnsubscribePage(c *gin.Context) {
 	token := c.Query("token")
+	// Detect language from query param or Accept-Language header
+	lang := c.Query("lang")
+	if lang == "" {
+		acceptLang := c.GetHeader("Accept-Language")
+		lang = i18n.DetectLanguage(acceptLang)
+	}
+	t := i18n.GetTranslations(lang)
+	_ = t // ensure variable is used even if specific branches do not reference it
+	
 	if token == "" {
 		c.HTML(http.StatusBadRequest, "unsubscribe_error.html", gin.H{
-			"ErrorMessage": "Invalid unsubscribe link. Token is missing.",
+			"ErrorTitle":    t.ErrorTitle,
+			"ErrorHeading":  t.ErrorHeading,
+			"ErrorMessage":  t.TokenMissingError,
+			"Lang":          lang,
+			"TemplateText":  i18n.GetTemplateText(lang),
 		})
 		return
 	}
@@ -753,14 +767,18 @@ func (h *BirthdayHandler) ShowBirthdayUnsubscribePage(c *gin.Context) {
 		fmt.Printf("   └─ Stack Trace: %+v\n", err)
 
 		c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
-			"ErrorMessage": "Failed to process unsubscribe request. Please try again later.",
+			"ErrorTitle":    t.ErrorTitle,
+			"ErrorHeading":  t.ErrorHeading,
+						"ErrorMessage": t.ProcessingError,
 		})
 		return
 	}
 
 	if unsubToken == nil {
 		c.HTML(http.StatusNotFound, "unsubscribe_error.html", gin.H{
-			"ErrorMessage": "Invalid unsubscribe link. Token not found.",
+			"ErrorTitle":    t.ErrorTitle,
+			"ErrorHeading":  t.ErrorHeading,
+						"ErrorMessage": t.TokenNotFoundError,
 		})
 		return
 	}
@@ -773,7 +791,7 @@ func (h *BirthdayHandler) ShowBirthdayUnsubscribePage(c *gin.Context) {
 		}
 
 		c.HTML(http.StatusOK, "unsubscribe_success.html", gin.H{
-			"Message": "You have already been unsubscribed from birthday emails.",
+						"Message":        t.AlreadyUnsubscribedMessage,
 			"Contact": contact,
 			"Token":   token, // ensure resubscribe button has a token
 		})
@@ -797,7 +815,9 @@ func (h *BirthdayHandler) ShowBirthdayUnsubscribePage(c *gin.Context) {
 		fmt.Printf("   └─ Client IP: %s\n", c.ClientIP())
 
 		c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
-			"ErrorMessage": "Failed to find contact information.",
+			"ErrorTitle":    t.ErrorTitle,
+			"ErrorHeading":  t.ErrorHeading,
+						"ErrorMessage": t.ContactNotFoundError,
 		})
 		return
 	}
@@ -808,22 +828,43 @@ func (h *BirthdayHandler) ShowBirthdayUnsubscribePage(c *gin.Context) {
 		"Email":     contact.Email,
 		"FirstName": getStringValue(contact.FirstName),
 		"LastName":  getStringValue(contact.LastName),
+		"Lang":          lang,
+		"Translations":  t,
 	})
 }
 
 // ProcessBirthdayUnsubscribe processes the unsubscribe request
 func (h *BirthdayHandler) ProcessBirthdayUnsubscribe(c *gin.Context) {
+	// Detect language
+	lang := c.Query("lang")
+	if lang == "" {
+		lang = c.PostForm("lang")
+	}
+	if lang == "" {
+		acceptLang := c.GetHeader("Accept-Language")
+		lang = i18n.DetectLanguage(acceptLang)
+	}
+	t := i18n.GetTranslations(lang)
+
 	var req models.BirthdayUnsubscribeRequest
 	if err := c.ShouldBind(&req); err != nil {
 		c.HTML(http.StatusBadRequest, "unsubscribe_error.html", gin.H{
-			"ErrorMessage": "Invalid request data",
+			"ErrorTitle":   t.ErrorTitle,
+			"ErrorHeading": t.ErrorHeading,
+			"ErrorMessage": t.InvalidRequestError,
+			"Lang":         lang,
+			"TemplateText": i18n.GetTemplateText(lang),
 		})
 		return
 	}
 
 	if req.Token == "" {
 		c.HTML(http.StatusBadRequest, "unsubscribe_error.html", gin.H{
-			"ErrorMessage": "Token is required",
+			"ErrorTitle":   t.ErrorTitle,
+			"ErrorHeading": t.ErrorHeading,
+			"ErrorMessage": t.TokenRequiredError,
+			"Lang":         lang,
+			"TemplateText": i18n.GetTemplateText(lang),
 		})
 		return
 	}
@@ -841,21 +882,33 @@ func (h *BirthdayHandler) ProcessBirthdayUnsubscribe(c *gin.Context) {
 		fmt.Printf("   └─ Stack Trace: %+v\n", err)
 
 		c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
-			"ErrorMessage": "Failed to process unsubscribe request",
+			"ErrorTitle":   t.ErrorTitle,
+			"ErrorHeading": t.ErrorHeading,
+			"ErrorMessage": t.ProcessingError,
+			"Lang":         lang,
+			"TemplateText": i18n.GetTemplateText(lang),
 		})
 		return
 	}
 
 	if unsubToken == nil {
 		c.HTML(http.StatusNotFound, "unsubscribe_error.html", gin.H{
-			"ErrorMessage": "Invalid unsubscribe token",
+			"ErrorTitle":   t.ErrorTitle,
+			"ErrorHeading": t.ErrorHeading,
+			"ErrorMessage": t.TokenNotFoundError,
+			"Lang":         lang,
+			"TemplateText": i18n.GetTemplateText(lang),
 		})
 		return
 	}
 
 	if unsubToken.Used {
 		c.HTML(http.StatusBadRequest, "unsubscribe_error.html", gin.H{
-			"ErrorMessage": "This unsubscribe link has already been used",
+			"ErrorTitle":   t.ErrorTitle,
+			"ErrorHeading": t.ErrorHeading,
+			"ErrorMessage": t.AlreadyUsedError,
+			"Lang":         lang,
+			"TemplateText": i18n.GetTemplateText(lang),
 		})
 		return
 	}
@@ -877,7 +930,11 @@ func (h *BirthdayHandler) ProcessBirthdayUnsubscribe(c *gin.Context) {
 		fmt.Printf("   └─ Client IP: %s\n", c.ClientIP())
 
 		c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
-			"ErrorMessage": "Failed to find contact information",
+			"ErrorTitle":   t.ErrorTitle,
+			"ErrorHeading": t.ErrorHeading,
+			"ErrorMessage": t.ContactNotFoundError,
+			"Lang":         lang,
+			"TemplateText": i18n.GetTemplateText(lang),
 		})
 		return
 	}
@@ -897,7 +954,11 @@ func (h *BirthdayHandler) ProcessBirthdayUnsubscribe(c *gin.Context) {
 		fmt.Printf("   └─ Stack Trace: %+v\n", err)
 
 		c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
-			"ErrorMessage": "Failed to unsubscribe from birthday emails",
+			"ErrorTitle":   t.ErrorTitle,
+			"ErrorHeading": t.ErrorHeading,
+			"ErrorMessage": t.UnsubscribeFailedError,
+			"Lang":         lang,
+			"TemplateText": i18n.GetTemplateText(lang),
 		})
 		return
 	}
@@ -911,10 +972,14 @@ func (h *BirthdayHandler) ProcessBirthdayUnsubscribe(c *gin.Context) {
 
 	// Return success response
 	c.HTML(http.StatusOK, "unsubscribe_success.html", gin.H{
-		"Message":        "You have been successfully unsubscribed from birthday emails.",
+		"Message":        t.UnsubscribeSuccessMessage,
+		"SuccessTitle":   t.SuccessTitle,
+		"SuccessHeading": t.SuccessHeading,
 		"Contact":        contact,
 		"Token":          unsubToken.Token,
 		"UnsubscribedAt": time.Now().Format("January 2, 2006 at 3:04 PM"),
+		"Lang":           lang,
+		"Translations":   t,
 	})
 }
 
@@ -928,10 +993,22 @@ func getStringValue(s *string) string {
 
 // ProcessBirthdayResubscribe processes the resubscribe request
 func (h *BirthdayHandler) ProcessBirthdayResubscribe(c *gin.Context) {
+	// Detect language
+	lang := c.Query("lang")
+	if lang == "" {
+		acceptLang := c.GetHeader("Accept-Language")
+		lang = i18n.DetectLanguage(acceptLang)
+	}
+	t := i18n.GetTranslations(lang)
+
 	token := c.Query("token")
 	if token == "" {
 		c.HTML(http.StatusBadRequest, "unsubscribe_error.html", gin.H{
-			"ErrorMessage": "Invalid resubscribe link. Token is missing.",
+			"ErrorTitle":    t.ErrorTitle,
+			"ErrorHeading":  t.ErrorHeading,
+			"ErrorMessage":  t.TokenMissingError,
+			"Lang":          lang,
+			"TemplateText":  i18n.GetTemplateText(lang),
 		})
 		return
 	}

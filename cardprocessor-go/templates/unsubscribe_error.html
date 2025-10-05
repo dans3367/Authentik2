@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unsubscribe Error</title>
+    <title>{{.ErrorTitle}}</title>
     <style>
         * {
             margin: 0;
@@ -158,31 +158,31 @@
 <body>
     <div class="container">
         <div class="icon">❌</div>
-        <h1>Unsubscribe Error</h1>
-        <p class="subtitle">We encountered an issue while processing your unsubscribe request.</p>
+        <h1>{{.ErrorHeading}}</h1>
+        <p class="subtitle">{{.TemplateText.ErrorPageSubtitle}}</p>
         
         <div class="error-message">
-            <h3>Error Details:</h3>
+            <h3>{{.TemplateText.ErrorDetailsHeading}}</h3>
             <p>{{.ErrorMessage}}</p>
         </div>
         
         <div class="help-section">
-            <h4>What you can do:</h4>
+            <h4>{{.TemplateText.WhatYouCanDoHeading}}</h4>
             <ul>
-                <li>Check if the unsubscribe link is complete and hasn't been truncated</li>
-                <li>Make sure you're using the most recent unsubscribe link from your email</li>
-                <li>Try refreshing the page and attempting again</li>
-                <li>Contact our support team if the problem persists</li>
+                <li>{{.TemplateText.WhatYouCanDo1}}</li>
+                <li>{{.TemplateText.WhatYouCanDo2}}</li>
+                <li>{{.TemplateText.WhatYouCanDo3}}</li>
+                <li>{{.TemplateText.WhatYouCanDo4}}</li>
             </ul>
         </div>
         
         <div>
-            <button onclick="window.location.reload()" class="btn btn-primary">Try Again</button>
-            <button onclick="window.close()" class="btn">Close Window</button>
+            <button onclick="window.location.reload()" class="btn btn-primary">{{.TemplateText.TryAgainButton}}</button>
+            <button onclick="window.close()" class="btn">{{.TemplateText.CloseWindowButton}}</button>
         </div>
         
         <div class="footer">
-            <p>If you continue to experience issues, please contact our support team for assistance.</p>
+            <p>{{.TemplateText.ContinueIssuesText}}</p>
         </div>
     </div>
 </body>
