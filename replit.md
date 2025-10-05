@@ -75,7 +75,7 @@ The Email Activity Timeline provides comprehensive webhook-based email event tra
 #### Webhook Security
 - **Signature Validation**: Implements HMAC-SHA256 signature verification using Resend webhook secret
 - **Timestamp Verification**: Validates webhook timestamps to prevent replay attacks (5-minute tolerance)
-- **Secret Management**: Uses environment variable RESEND_WEBHOOK_SECRET with fallback to hardcoded secret
+- **Secret Management**: Uses environment variable RESEND_WEBHOOK_SECRET without fallback, via RESEND_WEBHOOK_SECRET
 - **Request Authentication**: Validates resend-signature header format (t=timestamp,v1=signature)
 
 #### Frontend Components

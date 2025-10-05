@@ -187,7 +187,7 @@
       "actions": "ACCIONES",
       "sent": "Enviados",
       "opened": "Abiertos",
-      "notSet": "usar cliente",
+      "notSet": "Establecer manualmente",
       "na": "N/A"
     },
     "filters": {

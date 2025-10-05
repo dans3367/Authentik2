@@ -26,6 +26,11 @@ type Config struct {
 	MailgunDomain  string
 	ResendAPIKey   string
 
+	// Webhooks
+	WebhookPort         string
+	ResendWebhookSecret string
+	DefaultTenantID     string
+
 	// Default email settings
 	DefaultFromEmail string
 	DefaultFromName  string
@@ -122,6 +127,11 @@ func Load() *Config {
 		MailgunAPIKey:  getEnv("MAILGUN_API_KEY", ""),
 		MailgunDomain:  getEnv("MAILGUN_DOMAIN", ""),
 		ResendAPIKey:   getEnv("RESEND_API_KEY", ""),
+
+		// Webhooks
+		WebhookPort:         getEnv("WEBHOOK_PORT", "5006"),
+		ResendWebhookSecret: getEnv("RESEND_WEBHOOK_SECRET", ""),
+		DefaultTenantID:     getEnv("DEFAULT_TENANT_ID", ""),
 
 		// Default email settings
 		DefaultFromEmail: getEnv("DEFAULT_FROM_EMAIL", "admin@zendwise.work"),

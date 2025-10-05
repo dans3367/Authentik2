@@ -598,6 +598,32 @@ func (r *Repository) CreateEmailActivity(activity *models.EmailActivity) error {
 	return nil
 }
 
+// UpdateContactMetrics increments email metrics and updates last_activity for a contact
+// activityType can be: sent, delivered, opened, clicked, bounced, complained
+func (r *Repository) UpdateContactMetrics(ctx context.Context, contactID string, activityType string) error {
+    now := time.Now()
+
+    // Build dynamic SET clause
+    set := "last_activity = $1, updated_at = $1"
+    args := []interface{}{now, contactID}
+
+    switch activityType {
+    case "sent":
+        set += ", emails_sent = emails_sent + 1"
+    case "opened":
+        set += ", emails_opened = emails_opened + 1"
+    case "clicked":
+        // clicks also count as opens
+        set += ", emails_opened = emails_opened + 1"
+    }
+
+    query := fmt.Sprintf(`UPDATE email_contacts SET %s WHERE id = $2`, set)
+    if _, err := r.db.ExecContext(ctx, query, args...); err != nil {
+        return fmt.Errorf("failed to update contact metrics: %w", err)
+    }
+    return nil
+}
+
 // GetTenant retrieves tenant information by ID
 func (r *Repository) GetTenant(tenantID string) (*models.Tenant, error) {
 	query := `

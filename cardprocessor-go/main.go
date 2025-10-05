@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"cardprocessor-go/internal/config"
@@ -60,7 +61,22 @@ func main() {
 	}
 
 	// Initialize and start server
-	router := router.SetupRouter(cfg, repo, temporalClient)
+	apiRouter := router.SetupRouter(cfg, repo, temporalClient)
+
+	// Initialize and start separate webhook server on its own port
+	webhookRouter := router.SetupWebhookRouter(cfg, repo)
+	go func() {
+		// Sanitize WEBHOOK_PORT in case it was set like "=5006" or ":5006"
+		port := strings.TrimSpace(cfg.WebhookPort)
+		port = strings.TrimLeft(port, ":=")
+		if port == "" {
+			port = "5006"
+		}
+		log.Printf("ð Starting webhook server on port %s", port)
+		if err := webhookRouter.Run(":" + port); err != nil {
+			log.Printf("Webhook server stopped: %v", err)
+		}
+	}()
 
 	// Handle shutdown signals
 	sigChan := make(chan os.Signal, 1)
@@ -78,8 +94,8 @@ func main() {
 		os.Exit(0)
 	}()
 
-	log.Printf("🚀 Starting server on port %s", cfg.Port)
-	if err := router.Run(":" + cfg.Port); err != nil {
+	log.Printf("🚀 Starting API server on port %s", cfg.Port)
+	if err := apiRouter.Run(":" + cfg.Port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
