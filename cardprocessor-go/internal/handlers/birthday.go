@@ -824,12 +824,14 @@ func (h *BirthdayHandler) ShowBirthdayUnsubscribePage(c *gin.Context) {
 
 	// Show unsubscribe form
 	c.HTML(http.StatusOK, "unsubscribe.html", gin.H{
-		"Token":     token,
-		"Email":     contact.Email,
-		"FirstName": getStringValue(contact.FirstName),
-		"LastName":  getStringValue(contact.LastName),
+		"Token":         token,
+		"Email":         contact.Email,
+		"FirstName":     getStringValue(contact.FirstName),
+		"LastName":      getStringValue(contact.LastName),
 		"Lang":          lang,
 		"Translations":  t,
+		"TemplateText":  i18n.GetTemplateText(lang),
+		"Contact":       contact,
 	})
 }
 

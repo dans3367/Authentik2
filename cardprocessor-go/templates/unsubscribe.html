@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{.Lang}}">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unsubscribe from Birthday Cards</title>
+    <title>{{.Translations.UnsubscribeTitle}}</title>
     <style>
         * {
             margin: 0;
@@ -187,9 +187,8 @@
 <body>
     <div class="container">
         <div class="icon">🎂</div>
-        <h1>Unsubscribe from Birthday Cards</h1>
-        <p class="subtitle">We're sorry to see you go! You can unsubscribe from receiving birthday card notifications
-            below.</p>
+        <h1>{{.Translations.UnsubscribeHeading}}</h1>
+        <p class="subtitle">{{.Translations.UnsubscribeMessage}}</p>
 
         {{if .Contact}}
         <div class="contact-info">
@@ -199,33 +198,33 @@
         {{end}}
 
         <div class="warning">
-            <strong>Please note:</strong>
-            Once you unsubscribe, you will no longer receive birthday card notifications. You can resubscribe at any time using the same link if you change your mind.
+            <strong>{{.Translations.SuccessHeading}}</strong>
+            {{.TemplateText.UnsubscribeNote}} {{.TemplateText.ResubscribeMessage}}
         </div>
 
         <form method="POST" action="/api/unsubscribe/birthday">
             <input type="hidden" name="token" value="{{.Token}}" />
             <div class="form-group">
-                <label for="reason">Why are you unsubscribing? (Optional)</label>
+                <label for="reason">{{.Translations.UnsubscribeReason}}</label>
                 <select name="reason" id="reason">
-                    <option value="">Select a reason...</option>
-                    <option value="too_many_emails">Too many emails</option>
-                    <option value="not_interested">Not interested in birthday cards</option>
-                    <option value="wrong_email">Wrong email address</option>
-                    <option value="privacy_concerns">Privacy concerns</option>
-                    <option value="other">Other</option>
+                    <option value="">{{.TemplateText.SelectReason}}</option>
+                    <option value="too_many_emails">{{.TemplateText.ReasonTooManyEmails}}</option>
+                    <option value="not_interested">{{.TemplateText.ReasonNotInterested}}</option>
+                    <option value="wrong_email">{{.TemplateText.ReasonWrongEmail}}</option>
+                    <option value="privacy_concerns">{{.TemplateText.ReasonPrivacyConcerns}}</option>
+                    <option value="other">{{.TemplateText.ReasonOther}}</option>
                 </select>
             </div>
 
             <div class="form-group">
-                <label for="feedback">Additional feedback (Optional)</label>
+                <label for="feedback">{{.TemplateText.FeedbackLabel}}</label>
                 <textarea name="feedback" id="feedback"
-                    placeholder="Help us improve by sharing your thoughts..."></textarea>
+                    placeholder="{{.TemplateText.FeedbackPlaceholder}}"></textarea>
             </div>
 
             <div class="button-group">
-                <button type="submit" class="btn btn-primary">Unsubscribe</button>
-                <a href="#" onclick="window.close(); return false;" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">{{.Translations.UnsubscribeButton}}</button>
+                <a href="#" onclick="window.close(); return false;" class="btn btn-secondary">{{.TemplateText.CancelButton}}</a>
             </div>
         </form>
     </div>
