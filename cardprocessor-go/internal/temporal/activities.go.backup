@@ -52,18 +52,6 @@ type EmailSendResult struct {
 	Error     string `json:"error,omitempty"`
 }
 
-// EmailContext contains metadata for tracking outgoing emails
-type EmailContext struct {
-	TenantID     string
-	ContactID    *string
-	EmailType    string // 'birthday_card', 'test_card', 'promotional', etc.
-	NewsletterID *string
-	CampaignID   *string
-	PromotionID  *string
-	Metadata     map[string]interface{}
-}
-
-
 // TokenInput represents input for token generation
 type TokenInput struct {
 	ContactID string `json:"contactId"`
@@ -210,24 +198,15 @@ func PrepareBirthdayTestEmail(ctx context.Context, input BirthdayTestWorkflowInp
 }
 
 // SendBirthdayTestEmail sends birthday test email
-func SendBirthdayTestEmail(ctx context.Context, content EmailContent, tenantID string, emailType string) (EmailSendResult, error) {
+func SendBirthdayTestEmail(ctx context.Context, content EmailContent) (EmailSendResult, error) {
 	logger := activity.GetLogger(ctx)
-	logger.Info("📤 Sending birthday test email", "to", content.To, "tenantId", tenantID, "emailType", emailType)
-
-	// Create EmailContext for tracking
-	emailCtx := &EmailContext{
-		TenantID:  tenantID,
-		EmailType: emailType,
-		Metadata: map[string]interface{}{
-			"recipientEmail": content.To,
-		},
-	}
+	logger.Info("📤 Sending birthday test email", "to", content.To)
 
 	// Try different email providers in order of preference
 	providers := []string{"resend", "sendgrid", "mailgun"}
 
 	for _, provider := range providers {
-		result, err := sendEmailViaProvider(ctx, provider, content, emailCtx)
+		result, err := sendEmailViaProvider(ctx, provider, content)
 		if err == nil && result.Success {
 			logger.Info("✅ Birthday test email sent successfully", "provider", provider, "messageId", result.MessageID)
 			return result, nil
@@ -265,7 +244,7 @@ func PrepareBirthdayInvitationEmail(ctx context.Context, input PrepareEmailInput
 // SendBirthdayInvitationEmail sends birthday invitation email
 func SendBirthdayInvitationEmail(ctx context.Context, input SendEmailInput) (EmailSendResult, error) {
 	logger := activity.GetLogger(ctx)
-	logger.Info("📤 Sending birthday invitation email", "to", input.To, "tenantId", input.TenantID, "contactId", input.ContactID)
+	logger.Info("📤 Sending birthday invitation email", "to", input.To)
 
 	content := EmailContent{
 		Subject:     input.Subject,
@@ -275,22 +254,11 @@ func SendBirthdayInvitationEmail(ctx context.Context, input SendEmailInput) (Ema
 		From:        input.From,
 	}
 
-	// Create EmailContext for tracking
-	emailCtx := &EmailContext{
-		TenantID:  input.TenantID,
-		ContactID: &input.ContactID,
-		EmailType: "invitation",
-		Metadata: map[string]interface{}{
-			"recipientEmail": input.To,
-			"invitationToken": input.InvitationToken,
-		},
-	}
-
 	// Try different email providers in order of preference
 	providers := []string{"resend", "sendgrid", "mailgun"}
 
 	for _, provider := range providers {
-		result, err := sendEmailViaProvider(ctx, provider, content, emailCtx)
+		result, err := sendEmailViaProvider(ctx, provider, content)
 		if err == nil && result.Success {
 			logger.Info("✅ Birthday invitation email sent successfully", "provider", provider, "messageId", result.MessageID)
 			return result, nil
@@ -368,131 +336,22 @@ func UpdateContactInvitationStatus(ctx context.Context, input UpdateStatusInput)
 	return nil
 }
 
-// recordOutgoingEmail records an outgoing email in the database
-// recordOutgoingEmail saves email tracking info to database
-func recordOutgoingEmail(ctx context.Context, content EmailContent, result EmailSendResult, emailCtx *EmailContext) error {
-	logger := activity.GetLogger(ctx)
-	fmt.Printf("DEBUG: Inside recordOutgoingEmail function\\n")
-	logger.Info("🔍 Starting recordOutgoingEmail", 
-		"provider", result.Provider, 
-		"messageId", result.MessageID,
-		"success", result.Success,
-		"recipient", content.To)
-		
-	if activityDeps == nil || activityDeps.Repo == nil {
-		logger.Warn("❌ Skipping email record - dependencies not set", 
-			"activityDeps", activityDeps != nil,
-			"repo", activityDeps != nil && activityDeps.Repo != nil)
-		return nil
-	}
-	if emailCtx == nil {
-		logger.Warn("❌ Skipping email record - EmailContext is nil (no tenantId)")
-		return nil
-	}
-	
-	logger.Info("📝 EmailContext details", 
-		"tenantId", emailCtx.TenantID,
-		"emailType", emailCtx.EmailType,
-		"contactId", emailCtx.ContactID,
-		"promotionId", emailCtx.PromotionID)
-	
-	// Extract recipient name from content if available
-	var recipientName *string
-	if emailCtx.Metadata != nil {
-		if name, ok := emailCtx.Metadata["recipientName"].(string); ok && name != "" {
-			recipientName = &name
-		}
-	}
-	
-	// Serialize metadata
-	var metadataJSON *string
-	if emailCtx.Metadata != nil && len(emailCtx.Metadata) > 0 {
-		if jsonBytes, err := json.Marshal(emailCtx.Metadata); err == nil {
-			metadataStr := string(jsonBytes)
-			metadataJSON = &metadataStr
-		}
-	}
-
-	// Serialize provider response
-	var providerResponse *string
-	if result.Success && result.MessageID != "" {
-		responseData := map[string]interface{}{
-			"message_id": result.MessageID,
-			"provider":   result.Provider,
-		}
-		if jsonBytes, err := json.Marshal(responseData); err == nil {
-			responseStr := string(jsonBytes)
-			providerResponse = &responseStr
-		}
-	}
-
-	status := "sent"
-	var errorMsg *string
-	if !result.Success {
-		status = "failed"
-		errorMsg = &result.Error
-	}
-
-	req := &models.CreateOutgoingEmailRequest{
-		TenantID:          emailCtx.TenantID,
-		RecipientEmail:    content.To,
-		RecipientName:     recipientName,
-		SenderEmail:       content.From,
-		SenderName:        nil,
-		Subject:           content.Subject,
-		EmailType:         emailCtx.EmailType,
-		Provider:          result.Provider,
-		ProviderMessageID: &result.MessageID,
-		ProviderResponse:  providerResponse,
-		Status:            status,
-		SendAttempts:      1,
-		ErrorMessage:      errorMsg,
-		ContactID:         emailCtx.ContactID,
-		NewsletterID:      emailCtx.NewsletterID,
-		CampaignID:        emailCtx.CampaignID,
-		PromotionID:       emailCtx.PromotionID,
-		Metadata:          metadataJSON,
-		HTMLContent:       &content.HTMLContent,
-		TextContent:       &content.TextContent,
-	}
-
-	logger.Info("📤 Attempting to save outgoing email to database",
-		"tenantId", req.TenantID,
-		"emailType", req.EmailType,
-		"provider", req.Provider)
-
-	_, err := activityDeps.Repo.CreateOutgoingEmailRecord(ctx, req)
-	if err != nil {
-		logger.Error("❌ Failed to record outgoing email", 
-			"error", err, 
-			"recipient", content.To,
-			"tenantId", emailCtx.TenantID)
-		// Don't fail the email send if tracking fails
-		return nil
-	}
-
-	logger.Info("✅ Successfully recorded outgoing email to database", 
-		"messageId", result.MessageID, 
-		"type", emailCtx.EmailType, 
-		"recipient", content.To,
-		"tenantId", emailCtx.TenantID)
-	return nil
-}
-func sendEmailViaProvider(ctx context.Context, provider string, content EmailContent, emailCtx *EmailContext) (EmailSendResult, error) {
+// sendEmailViaProvider sends email via a specific provider
+func sendEmailViaProvider(ctx context.Context, provider string, content EmailContent) (EmailSendResult, error) {
 	switch provider {
 	case "resend":
-		return sendViaResend(ctx, content, emailCtx)
+		return sendViaResend(ctx, content)
 	case "sendgrid":
-		return sendViaSendGrid(ctx, content, emailCtx)
+		return sendViaSendGrid(ctx, content)
 	case "mailgun":
-		return sendViaMailgun(ctx, content, emailCtx)
+		return sendViaMailgun(ctx, content)
 	default:
 		return EmailSendResult{Success: false, Error: "Unknown provider"}, fmt.Errorf("unknown provider: %s", provider)
 	}
 }
 
 // sendViaResend sends email via Resend API
-func sendViaResend(ctx context.Context, content EmailContent, emailCtx *EmailContext) (EmailSendResult, error) {
+func sendViaResend(ctx context.Context, content EmailContent) (EmailSendResult, error) {
 	if activityDeps.Config.ResendAPIKey == "" {
 		return EmailSendResult{Success: false, Error: "Resend API key not configured"}, fmt.Errorf("resend API key not configured")
 	}
@@ -545,32 +404,22 @@ func sendViaResend(ctx context.Context, content EmailContent, emailCtx *EmailCon
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 && resp.StatusCode != 201 && resp.StatusCode != 202 {
+	if resp.StatusCode != 200 {
 		return EmailSendResult{Success: false, Error: "Resend API error"}, fmt.Errorf("resend API returned status %d", resp.StatusCode)
 	}
 
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
 
-	// Build result safely
-	msgID := ""
-	if v, ok := result["id"].(string); ok {
-		msgID = v
-	}
-	sendResult := EmailSendResult{
+	return EmailSendResult{
 		Success:   true,
-		MessageID: msgID,
+		MessageID: result["id"].(string),
 		Provider:  "resend",
-	}
-
-	// Record outgoing email (best-effort)
-	fmt.Printf("DEBUG: About to call recordOutgoingEmail - emailCtx: %+v\\n", emailCtx)
-	_ = recordOutgoingEmail(ctx, content, sendResult, emailCtx)
-	return sendResult, nil
+	}, nil
 }
 
 // sendViaSendGrid sends email via SendGrid API
-func sendViaSendGrid(ctx context.Context, content EmailContent, emailCtx *EmailContext) (EmailSendResult, error) {
+func sendViaSendGrid(ctx context.Context, content EmailContent) (EmailSendResult, error) {
 	if activityDeps.Config.SendGridAPIKey == "" {
 		return EmailSendResult{Success: false, Error: "SendGrid API key not configured"}, fmt.Errorf("sendgrid API key not configured")
 	}
@@ -580,7 +429,7 @@ func sendViaSendGrid(ctx context.Context, content EmailContent, emailCtx *EmailC
 }
 
 // sendViaMailgun sends email via Mailgun API
-func sendViaMailgun(ctx context.Context, content EmailContent, emailCtx *EmailContext) (EmailSendResult, error) {
+func sendViaMailgun(ctx context.Context, content EmailContent) (EmailSendResult, error) {
 	if activityDeps.Config.MailgunAPIKey == "" || activityDeps.Config.MailgunDomain == "" {
 		return EmailSendResult{Success: false, Error: "Mailgun API key or domain not configured"}, fmt.Errorf("mailgun not configured")
 	}
@@ -836,15 +685,15 @@ func PreparePromotionalEmail(ctx context.Context, input PreparePromotionalEmailI
 }
 
 // SendPromotionalEmail sends the promotional email
-func SendPromotionalEmail(ctx context.Context, content EmailContent, tenantID string, promotionID string) (EmailSendResult, error) {
+func SendPromotionalEmail(ctx context.Context, content EmailContent) (EmailSendResult, error) {
 	logger := activity.GetLogger(ctx)
-	logger.Info("📤 Sending promotional email", "to", content.To, "subject", content.Subject, "tenantId", tenantID, "promotionId", promotionID)
+	logger.Info("📤 Sending promotional email", "to", content.To, "subject", content.Subject)
 
 	// Record activity heartbeat
 	activity.RecordHeartbeat(ctx, "Sending promotional email")
 
-	// Use the same email sending logic as birthday emails with promotional email type
-	result, err := SendBirthdayTestEmail(ctx, content, tenantID, "promotional")
+	// Use the same email sending logic as birthday emails
+	result, err := SendBirthdayTestEmail(ctx, content)
 	if err != nil {
 		logger.Error("Failed to send promotional email", "error", err)
 		return EmailSendResult{
@@ -934,113 +783,4 @@ func generatePromotionalHTML(input PreparePromotionalEmailInput) string {
 			}
 			return ""
 		}())
-}
-
-// InsertOutgoingEmailInput represents input for inserting outgoing email record
-type InsertOutgoingEmailInput struct {
-	TenantID       string                 `json:"tenantId"`
-	RecipientEmail string                 `json:"recipientEmail"`
-	RecipientName  *string                `json:"recipientName,omitempty"`
-	SenderEmail    string                 `json:"senderEmail"`
-	SenderName     *string                `json::"senderName,omitempty"`
-	Subject        string                 `json:"subject"`
-	EmailType      string                 `json:"emailType"` // 'birthday_card', 'test_card', 'promotional', 'newsletter', 'invitation', 'appointment_reminder'
-	Provider       string                 `json:"provider"`  // 'resend', 'sendgrid', 'mailgun', 'other'
-	HTMLContent    string                 `json:"htmlContent"`
-	TextContent    string                 `json:"textContent"`
-	ContactID      *string                `json:"contactId,omitempty"`
-	NewsletterID   *string                `json:"newsletterId,omitempty"`
-	CampaignID     *string                `json:"campaignId,omitempty"`
-	PromotionID    *string                `json:"promotionId,omitempty"`
-	Metadata       map[string]interface{} `json:"metadata,omitempty"`
-}
-
-// InsertOutgoingEmailResult represents the result of inserting outgoing email
-type InsertOutgoingEmailResult struct {
-	Success       bool   `json:"success"`
-	OutgoingEmailID   *string `json:"outgoingEmailId,omitempty"`
-	Error         string `json:"error,omitempty"`
-}
-
-// InsertOutgoingEmail creates an initial record in the outgoing_emails table
-// This is called BEFORE sending the email, so resendID/provider_message_id is left NULL
-func InsertOutgoingEmail(ctx context.Context, input InsertOutgoingEmailInput) (InsertOutgoingEmailResult, error) {
-	logger := activity.GetLogger(ctx)
-	logger.Info("📝 Inserting outgoing email record (pre-send)", 
-		"recipient", input.RecipientEmail,
-		"tenantId", input.TenantID,
-		"emailType", input.EmailType,
-		"provider", input.Provider)
-
-	if activityDeps == nil || activityDeps.Repo == nil {
-		err := fmt.Errorf("activity dependencies not initialized")
-		logger.Error("❌ Failed to insert outgoing email", "error", err)
-		return InsertOutgoingEmailResult{
-			Success: false,
-			Error:   err.Error(),
-		}, err
-	}
-
-	// Serialize metadata if provided
-	var metadataJSON *string
-	if input.Metadata != nil && len(input.Metadata) > 0 {
-		if jsonBytes, err := json.Marshal(input.Metadata); err == nil {
-			metadataStr := string(jsonBytes)
-			metadataJSON = &metadataStr
-		}
-	}
-
-	// Create the outgoing email record with status 'pending'
-	// provider_message_id is left NULL since we haven't sent yet
-	req := &models.CreateOutgoingEmailRequest{
-		TenantID:          input.TenantID,
-		RecipientEmail:    input.RecipientEmail,
-		RecipientName:     input.RecipientName,
-		SenderEmail:       input.SenderEmail,
-		SenderName:        input.SenderName,
-		Subject:           input.Subject,
-		EmailType:         input.EmailType,
-		Provider:          input.Provider,
-		ProviderMessageID: nil, // NULL - will be updated after email is sent
-		ProviderResponse:  nil, // NULL - will be updated after email is sent
-		Status:            "pending",
-		SendAttempts:      0,
-		ErrorMessage:      nil,
-		ContactID:         input.ContactID,
-		NewsletterID:      input.NewsletterID,
-		CampaignID:        input.CampaignID,
-		PromotionID:       input.PromotionID,
-		Metadata:          metadataJSON,
-		HTMLContent:       &input.HTMLContent,
-		TextContent:       &input.TextContent,
-	}
-
-	logger.Info("📤 Saving outgoing email to database (status=pending)",
-		"tenantId", req.TenantID,
-		"emailType", req.EmailType,
-		"provider", req.Provider,
-		"status", req.Status)
-
-	outgoingEmail, err := activityDeps.Repo.CreateOutgoingEmailRecord(ctx, req)
-	if err != nil {
-		logger.Error("❌ Failed to insert outgoing email record",
-			"error", err,
-			"recipient", input.RecipientEmail,
-			"tenantId", input.TenantID)
-		return InsertOutgoingEmailResult{
-			Success: false,
-			Error:   err.Error(),
-		}, err
-	}
-
-	logger.Info("✅ Successfully inserted outgoing email record",
-		"outgoingEmailId", outgoingEmail.ID,
-		"recipient", input.RecipientEmail,
-		"tenantId", input.TenantID,
-		"status", "pending")
-
-	return InsertOutgoingEmailResult{
-		Success:         true,
-		OutgoingEmailID: &outgoingEmail.ID,
-	}, nil
 }

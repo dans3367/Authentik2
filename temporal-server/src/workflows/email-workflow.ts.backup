@@ -8,8 +8,7 @@ const {
   sendEmail,
   sendEmailViaResend,
   sendEmailViaPostmark,
-  getAvailableEmailProviders,
-  insertOutgoingEmail
+  getAvailableEmailProviders
 } = proxyActivities<typeof activities>({
   startToCloseTimeout: '5 minutes',
   heartbeatTimeout: '1 minute',
@@ -44,7 +43,6 @@ export interface EmailWorkflowResult {
   provider?: string;
   sentAt: string;
   recipient: string;
-  outgoingEmailId?: string; // ID of the record in outgoing_emails table
 }
 
 /**
@@ -57,7 +55,6 @@ export async function emailWorkflow(
   workflowLogger.info(`🚀 Starting email workflow for ${input.emailId} to ${input.recipient}`);
 
   const startTime = new Date().toISOString();
-  let outgoingEmailId: string | undefined;
 
   try {
     // Check if email should be scheduled
@@ -133,61 +130,12 @@ export async function emailWorkflow(
       }
     }
 
-    const textContent = htmlContent.replace(/<[^>]*>/g, ''); // Strip HTML for text version
-
-    // ** NEW STEP 1: Insert outgoing email record into database (BEFORE sending) **
-    if (input.tenantId) {
-      workflowLogger.info(`📝 Step 1: Inserting outgoing email record (status=pending, no resendID yet)`);
-      
-      try {
-        const insertResult = await insertOutgoingEmail({
-          tenantId: input.tenantId,
-          recipientEmail: input.recipient,
-          recipientName: input.metadata?.recipientName,
-          senderEmail: input.fromEmail || 'admin@zendwise.work',
-          senderName: input.metadata?.senderName,
-          subject: input.subject || 'No Subject',
-          emailType: input.templateType || 'general',
-          provider: 'resend', // Default provider - may be overridden by actual send
-          htmlContent: htmlContent,
-          textContent: textContent,
-          contactId: input.metadata?.contactId,
-          newsletterId: input.metadata?.newsletterId,
-          campaignId: input.metadata?.campaignId,
-          promotionId: input.metadata?.promotionId,
-          metadata: {
-            emailId: input.emailId,
-            userId: input.userId,
-            priority: input.priority || 'normal',
-            isScheduled: input.isScheduled || false,
-            ...input.metadata
-          }
-        });
-
-        if (insertResult.success) {
-          outgoingEmailId = insertResult.outgoingEmailId;
-          workflowLogger.info(`✅ Step 1 complete: Outgoing email record created with ID: ${outgoingEmailId}`);
-        } else {
-          workflowLogger.warn(`⚠️  Step 1 failed: Could not insert outgoing email record: ${insertResult.error}`);
-          // Continue anyway - don't fail the workflow if tracking fails
-        }
-      } catch (insertError: any) {
-        workflowLogger.warn(`⚠️  Step 1 failed: Error inserting outgoing email record: ${insertError?.message || String(insertError)}`);
-        // Continue anyway - don't fail the workflow if tracking fails
-      }
-    } else {
-      workflowLogger.info(`ℹ️  Skipping Step 1: No tenantId provided, cannot track in database`);
-    }
-
-    // ** STEP 2: Send the email **
-    workflowLogger.info(`📤 Step 2: Sending email ${input.emailId} to ${input.recipient} via available providers`);
-    
     const emailContent = {
       to: input.recipient,
-      from: input.fromEmail || 'admin@zendwise.work',
+      from: input.fromEmail || 'admin@zendwise.work', // Use provided from email or default
       subject: input.subject || 'No Subject',
       html: htmlContent,
-      text: textContent,
+      text: htmlContent.replace(/<[^>]*>/g, ''), // Strip HTML for text version
       tags: [
         'authentik',
         input.tenantId ? `tenant-${input.tenantId}` : 'no-tenant',
@@ -201,11 +149,12 @@ export async function emailWorkflow(
         templateType: input.templateType,
         priority: input.priority || 'normal',
         isScheduled: input.isScheduled || false,
-        outgoingEmailId: outgoingEmailId, // Link to the tracking record
         ...input.metadata
       }
     };
 
+    // Send the email
+    workflowLogger.info(`📤 Sending email ${input.emailId} to ${input.recipient} via available providers`);
     const result = await sendEmail(
       emailContent.to,
       emailContent.from,
@@ -223,15 +172,13 @@ export async function emailWorkflow(
       error: result.error,
       provider: result.provider,
       sentAt: new Date().toISOString(),
-      recipient: input.recipient,
-      outgoingEmailId: outgoingEmailId
+      recipient: input.recipient
     };
 
     if (result.success) {
-      workflowLogger.info(`✅ Step 2 complete: Email workflow completed successfully for ${input.emailId}: ${result.messageId}`);
-      workflowLogger.info(`📊 Summary: outgoingEmailId=${outgoingEmailId}, resendID=${result.messageId}`);
+      workflowLogger.info(`✅ Email workflow completed successfully for ${input.emailId}: ${result.messageId}`);
     } else {
-      workflowLogger.error(`❌ Step 2 failed: Email workflow failed for ${input.emailId}: ${result.error}`);
+      workflowLogger.error(`❌ Email workflow failed for ${input.emailId}: ${result.error}`);
     }
 
     return workflowResult;
@@ -246,8 +193,7 @@ export async function emailWorkflow(
       success: false,
       error: errorMessage,
       sentAt: new Date().toISOString(),
-      recipient: input.recipient,
-      outgoingEmailId: outgoingEmailId
+      recipient: input.recipient
     };
   }
 }

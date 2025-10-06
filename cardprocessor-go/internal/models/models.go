@@ -261,3 +261,63 @@ type SendTestBirthdayCardRequest struct {
 	CustomThemeData interface{} `json:"customThemeData"`
 	SenderName      string      `json:"senderName"`
 }
+
+// OutgoingEmail represents an outgoing email record in the outgoing_emails table
+type OutgoingEmail struct {
+	ID                 string     `json:"id" db:"id"`
+	TenantID           string     `json:"tenantId" db:"tenant_id"`
+	RecipientEmail     string     `json:"recipientEmail" db:"recipient_email"`
+	RecipientName      *string    `json:"recipientName" db:"recipient_name"`
+	SenderEmail        string     `json:"senderEmail" db:"sender_email"`
+	SenderName         *string    `json:"senderName" db:"sender_name"`
+	Subject            string     `json:"subject" db:"subject"`
+	EmailType          string     `json:"emailType" db:"email_type"`
+	Provider           string     `json:"provider" db:"provider"`
+	ProviderMessageID  *string    `json:"providerMessageId" db:"provider_message_id"`
+	ProviderResponse   *string    `json:"providerResponse" db:"provider_response"`
+	Status             string     `json:"status" db:"status"`
+	SendAttempts       int        `json:"sendAttempts" db:"send_attempts"`
+	ErrorMessage       *string    `json:"errorMessage" db:"error_message"`
+	ContactID          *string    `json:"contactId" db:"contact_id"`
+	NewsletterID       *string    `json:"newsletterId" db:"newsletter_id"`
+	CampaignID         *string    `json:"campaignId" db:"campaign_id"`
+	PromotionID        *string    `json:"promotionId" db:"promotion_id"`
+	Metadata           *string    `json:"metadata" db:"metadata"`
+	SentAt             time.Time  `json:"sentAt" db:"sent_at"`
+	DeliveredAt        *time.Time `json:"deliveredAt" db:"delivered_at"`
+	HTMLContent        *string    `json:"htmlContent" db:"html_content"`
+	TextContent        *string    `json:"textContent" db:"text_content"`
+	CreatedAt          time.Time  `json:"createdAt" db:"created_at"`
+	UpdatedAt          time.Time  `json:"updatedAt" db:"updated_at"`
+}
+
+// CreateOutgoingEmailRequest represents the request to create an outgoing email record
+type CreateOutgoingEmailRequest struct {
+	TenantID          string  `json:"tenantId"`
+	RecipientEmail    string  `json:"recipientEmail"`
+	RecipientName     *string `json:"recipientName,omitempty"`
+	SenderEmail       string  `json:"senderEmail"`
+	SenderName        *string `json:"senderName,omitempty"`
+	Subject           string  `json:"subject"`
+	EmailType         string  `json:"emailType"`
+	Provider          string  `json:"provider"`
+	ProviderMessageID *string `json:"providerMessageId,omitempty"`
+	ProviderResponse  *string `json:"providerResponse,omitempty"`
+	Status            string  `json:"status"`
+	SendAttempts      int     `json:"sendAttempts"`
+	ErrorMessage      *string `json:"errorMessage,omitempty"`
+	ContactID         *string `json:"contactId,omitempty"`
+	NewsletterID      *string `json:"newsletterId,omitempty"`
+	CampaignID        *string `json:"campaignId,omitempty"`
+	PromotionID       *string `json:"promotionId,omitempty"`
+	HTMLContent       *string `json:"htmlContent,omitempty"`
+	TextContent       *string `json:"textContent,omitempty"`
+	Metadata          *string `json:"metadata,omitempty"`
+}
+
+// Update OutgoingEmail struct to include content fields
+// Note: The struct above already exists, but we need to note these fields were added
+// In practice, you should add these fields to the existing OutgoingEmail struct:
+//
+// HTMLContent        *string    `json:"htmlContent" db:"html_content"`
+// TextContent        *string    `json:"textContent" db:"text_content"`

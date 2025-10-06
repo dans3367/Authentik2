@@ -160,7 +160,7 @@ func BirthdayTestWorkflow(ctx workflow.Context, input BirthdayTestWorkflowInput)
 
 		// Send birthday email first
 		var sendResult EmailSendResult
-		err = workflow.ExecuteActivity(ctx, SendBirthdayTestEmail, emailContent).Get(ctx, &sendResult)
+		err = workflow.ExecuteActivity(ctx, SendBirthdayTestEmail, emailContent, input.TenantID, "test_card").Get(ctx, &sendResult)
 		if err != nil {
 			logger.Error("Failed to send birthday test email", "error", err)
 			return BirthdayTestWorkflowResult{
@@ -192,7 +192,7 @@ func BirthdayTestWorkflow(ctx workflow.Context, input BirthdayTestWorkflowInput)
 			// Don't fail the workflow - birthday email was sent successfully
 		} else {
 			var promoSendResult EmailSendResult
-			err = workflow.ExecuteActivity(ctx, SendPromotionalEmail, promoEmailContent).Get(ctx, &promoSendResult)
+			err = workflow.ExecuteActivity(ctx, SendPromotionalEmail, promoEmailContent, input.TenantID, input.PromotionID).Get(ctx, &promoSendResult)
 			if err != nil {
 				logger.Warn("Failed to send promotional email (birthday was sent)", "error", err)
 				// Don't fail the workflow - birthday email was sent successfully
@@ -249,7 +249,7 @@ func BirthdayTestWorkflow(ctx workflow.Context, input BirthdayTestWorkflowInput)
 
 	// Send birthday test email
 	var sendResult EmailSendResult
-	err = workflow.ExecuteActivity(ctx, SendBirthdayTestEmail, emailContent).Get(ctx, &sendResult)
+	err = workflow.ExecuteActivity(ctx, SendBirthdayTestEmail, emailContent, input.TenantID, "test_card").Get(ctx, &sendResult)
 	if err != nil {
 		logger.Error("Failed to send birthday test email", "error", err)
 		return BirthdayTestWorkflowResult{

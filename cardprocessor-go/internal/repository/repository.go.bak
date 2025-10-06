@@ -881,7 +881,7 @@ func (r *Repository) CreateOutgoingEmailRecord(ctx context.Context, req *models.
 			campaign_id, promotion_id, metadata, html_content, text_content, sent_at, created_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 
-			$16, $17, $18, $19, $20, $21, $22, $23, $24
+			$16, $17, $18, $19, $20, $21, $20, $21, $22
 		)
 		RETURNING id, tenant_id, recipient_email, recipient_name, sender_email, 
 		          sender_name, subject, email_type, provider, provider_message_id, 

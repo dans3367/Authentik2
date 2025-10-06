@@ -23,6 +23,9 @@ func registerActivities(w worker.Worker) {
 
 	// Register unsubscribe token generation
 	w.RegisterActivity(GenerateBirthdayUnsubscribeToken)
+	// Register outgoing email tracking
+	w.RegisterActivity(InsertOutgoingEmail)
+
 
 	// Register workflows
 	w.RegisterWorkflow(BirthdayTestWorkflow)
