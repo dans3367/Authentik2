@@ -783,20 +783,8 @@ func (h *BirthdayHandler) ShowBirthdayUnsubscribePage(c *gin.Context) {
 		return
 	}
 
-	if unsubToken.Used {
-		// Try to load contact info for context, but don't fail if missing
-		var contact *models.EmailContact
-		if cinfo, err := h.repo.GetContactByID(c.Request.Context(), unsubToken.TenantID, unsubToken.ContactID); err == nil {
-			contact = cinfo
-		}
-
-		c.HTML(http.StatusOK, "unsubscribe_success.html", gin.H{
-						"Message":        t.AlreadyUnsubscribedMessage,
-			"Contact": contact,
-			"Token":   token, // ensure resubscribe button has a token
-		})
-		return
-	}
+	// Note: Removed automatic success display when token is already used
+	// Users should see the unsubscribe form and be able to resubscribe if needed
 
 	// Get contact information
 	contact, err := h.repo.GetContactByID(c.Request.Context(), unsubToken.TenantID, unsubToken.ContactID)
@@ -832,6 +820,7 @@ func (h *BirthdayHandler) ShowBirthdayUnsubscribePage(c *gin.Context) {
 		"Translations":  t,
 		"TemplateText":  i18n.GetTemplateText(lang),
 		"Contact":       contact,
+		"TokenUsed":     unsubToken.Used, // Pass token status to template
 	})
 }
 
@@ -904,13 +893,49 @@ func (h *BirthdayHandler) ProcessBirthdayUnsubscribe(c *gin.Context) {
 		return
 	}
 
+	// If token is already used, treat this as a resubscribe request
 	if unsubToken.Used {
-		c.HTML(http.StatusBadRequest, "unsubscribe_error.html", gin.H{
-			"ErrorTitle":   t.ErrorTitle,
-			"ErrorHeading": t.ErrorHeading,
-			"ErrorMessage": t.AlreadyUsedError,
-			"Lang":         lang,
-			"TemplateText": i18n.GetTemplateText(lang),
+		// Get contact information for response
+		contact, err := h.repo.GetContactByID(c.Request.Context(), unsubToken.TenantID, unsubToken.ContactID)
+		if err != nil || contact == nil {
+			c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
+				"ErrorTitle":   t.ErrorTitle,
+				"ErrorHeading": t.ErrorHeading,
+				"ErrorMessage": t.ContactNotFoundError,
+				"Lang":         lang,
+				"TemplateText": i18n.GetTemplateText(lang),
+			})
+			return
+		}
+
+		// Resubscribe the contact
+		err = h.repo.ResubscribeContactToBirthdayEmails(c.Request.Context(), unsubToken.ContactID)
+		if err != nil {
+			c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
+				"ErrorTitle":   t.ErrorTitle,
+				"ErrorHeading": t.ErrorHeading,
+				"ErrorMessage": "Failed to resubscribe to birthday emails",
+				"Lang":         lang,
+				"TemplateText": i18n.GetTemplateText(lang),
+			})
+			return
+		}
+
+		// Reset the token's used status so it can be used for future unsubscribe requests
+		err = h.repo.ResetBirthdayUnsubscribeToken(c.Request.Context(), unsubToken.ID)
+		if err != nil {
+			// Log error but don't fail the request since resubscribe was successful
+			fmt.Printf("Warning: Failed to reset unsubscribe token status: %v\n", err)
+		}
+
+		// Return success response for resubscribe
+		c.HTML(http.StatusOK, "unsubscribe_success.html", gin.H{
+			"Message":        "You have been successfully resubscribed to birthday emails.",
+			"Contact":        contact,
+			"Token":          unsubToken.Token,
+			"UnsubscribedAt": "",
+			"Lang":           lang,
+			"Translations":   t,
 		})
 		return
 	}

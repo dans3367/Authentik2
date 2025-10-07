@@ -330,15 +330,23 @@ func GenerateBirthdayUnsubscribeToken(ctx context.Context, input TokenInput) (To
 	}
 	token := hex.EncodeToString(tokenBytes)
 
-	// Store the token in the database (skip for test emails)
-	// For test emails, we skip database storage since the contact doesn't exist in email_contacts table
+	// Store the token in the database
 	if input.TenantID != "" && input.ContactID != "" {
-		// Check if this looks like a test (UserID vs real ContactID)
-		// For production emails, ContactID would be a real email_contacts.id
-		// For test emails, ContactID is actually a UserID, so skip DB storage
-		logger.Info("🧪 Skipping database storage for test email", "contactId", input.ContactID, "tokenLength", len(token))
+		// Store token in the database
+		logger.Info("💾 Storing unsubscribe token in database", "contactId", input.ContactID, "tenantId", input.TenantID)
+		
+		_, err = activityDeps.Repo.CreateBirthdayUnsubscribeToken(ctx, input.TenantID, input.ContactID, token)
+		if err != nil {
+			logger.Error("❌ Failed to store unsubscribe token in database", "error", err)
+			// Continue anyway - token can still be used even if not stored
+			// This allows test emails to work without requiring valid contact IDs
+		} else {
+			logger.Info("✅ Unsubscribe token stored successfully in database")
+		}
 	} else {
-		logger.Info("ℹ️  Skipping database storage (no tenant/contact ID provided)", "tokenLength", len(token))
+		logger.Warn("⚠️  No tenant/contact ID provided - token will not be stored in database", 
+			"tenantId", input.TenantID, 
+			"contactId", input.ContactID)
 	}
 
 	result := TokenResult{Success: true, Token: token}
@@ -373,7 +381,7 @@ func UpdateContactInvitationStatus(ctx context.Context, input UpdateStatusInput)
 func recordOutgoingEmail(ctx context.Context, content EmailContent, result EmailSendResult, emailCtx *EmailContext) error {
 	logger := activity.GetLogger(ctx)
 	fmt.Printf("DEBUG: Inside recordOutgoingEmail function\\n")
-	logger.Info("🔍 Starting recordOutgoingEmail", 
+	logger.Info("🔍 Starting recordOutgoingEmail using new split table structure", 
 		"provider", result.Provider, 
 		"messageId", result.MessageID,
 		"success", result.Success,
@@ -413,7 +421,57 @@ func recordOutgoingEmail(ctx context.Context, content EmailContent, result Email
 		}
 	}
 
-	// Serialize provider response
+	status := "sent"
+	var errorMsg *string
+	if !result.Success {
+		status = "failed"
+		errorMsg = &result.Error
+	}
+
+	req := &models.CreateCompleteEmailRequest{
+		TenantID:          emailCtx.TenantID,
+		RecipientEmail:    content.To,
+		RecipientName:     recipientName,
+		SenderEmail:       content.From,
+		SenderName:        nil,
+		Subject:           content.Subject,
+		EmailType:         emailCtx.EmailType,
+		Provider:          result.Provider,
+		ProviderMessageID: &result.MessageID,
+		Status:            status,
+		SendAttempts:      1,
+		ErrorMessage:      errorMsg,
+		ContactID:         emailCtx.ContactID,
+		NewsletterID:      emailCtx.NewsletterID,
+		CampaignID:        emailCtx.CampaignID,
+		PromotionID:       emailCtx.PromotionID,
+		HTMLContent:       &content.HTMLContent,
+		TextContent:       &content.TextContent,
+		Metadata:          metadataJSON,
+	}
+
+	logger.Info("📤 Attempting to save email using new split table structure",
+		"tenantId", req.TenantID,
+		"emailType", req.EmailType,
+		"provider", req.Provider)
+
+	emailSendWithDetails, err := activityDeps.Repo.CreateCompleteEmail(ctx, req)
+	if err != nil {
+		logger.Error("❌ Failed to record email using split tables", 
+			"error", err, 
+			"recipient", content.To,
+			"tenantId", emailCtx.TenantID)
+		// Don't fail the email send if tracking fails
+		return nil
+	}
+
+	// Create an email event for the send result
+	eventType := "sent"
+	if !result.Success {
+		eventType = "failed"
+	}
+	
+	// Create provider response data
 	var providerResponse *string
 	if result.Success && result.MessageID != "" {
 		responseData := map[string]interface{}{
@@ -426,56 +484,26 @@ func recordOutgoingEmail(ctx context.Context, content EmailContent, result Email
 		}
 	}
 
-	status := "sent"
-	var errorMsg *string
-	if !result.Success {
-		status = "failed"
-		errorMsg = &result.Error
+	eventReq := &models.CreateEmailEventRequest{
+		EmailSendID:      emailSendWithDetails.EmailSend.ID,
+		EventType:        eventType,
+		EventData:        metadataJSON,
+		ProviderResponse: providerResponse,
 	}
 
-	req := &models.CreateOutgoingEmailRequest{
-		TenantID:          emailCtx.TenantID,
-		RecipientEmail:    content.To,
-		RecipientName:     recipientName,
-		SenderEmail:       content.From,
-		SenderName:        nil,
-		Subject:           content.Subject,
-		EmailType:         emailCtx.EmailType,
-		Provider:          result.Provider,
-		ProviderMessageID: &result.MessageID,
-		ProviderResponse:  providerResponse,
-		Status:            status,
-		SendAttempts:      1,
-		ErrorMessage:      errorMsg,
-		ContactID:         emailCtx.ContactID,
-		NewsletterID:      emailCtx.NewsletterID,
-		CampaignID:        emailCtx.CampaignID,
-		PromotionID:       emailCtx.PromotionID,
-		Metadata:          metadataJSON,
-		HTMLContent:       &content.HTMLContent,
-		TextContent:       &content.TextContent,
-	}
-
-	logger.Info("📤 Attempting to save outgoing email to database",
-		"tenantId", req.TenantID,
-		"emailType", req.EmailType,
-		"provider", req.Provider)
-
-	_, err := activityDeps.Repo.CreateOutgoingEmailRecord(ctx, req)
+	_, err = activityDeps.Repo.CreateEmailEvent(ctx, eventReq)
 	if err != nil {
-		logger.Error("❌ Failed to record outgoing email", 
+		logger.Warn("⚠️ Failed to create email event, but email was recorded", 
 			"error", err, 
-			"recipient", content.To,
-			"tenantId", emailCtx.TenantID)
-		// Don't fail the email send if tracking fails
-		return nil
+			"emailSendId", emailSendWithDetails.EmailSend.ID)
 	}
 
-	logger.Info("✅ Successfully recorded outgoing email to database", 
+	logger.Info("✅ Successfully recorded email using split table structure", 
 		"messageId", result.MessageID, 
 		"type", emailCtx.EmailType, 
 		"recipient", content.To,
-		"tenantId", emailCtx.TenantID)
+		"tenantId", emailCtx.TenantID,
+		"emailSendId", emailSendWithDetails.EmailSend.ID)
 	return nil
 }
 func sendEmailViaProvider(ctx context.Context, provider string, content EmailContent, emailCtx *EmailContext) (EmailSendResult, error) {
@@ -962,11 +990,11 @@ type InsertOutgoingEmailResult struct {
 	Error         string `json:"error,omitempty"`
 }
 
-// InsertOutgoingEmail creates an initial record in the outgoing_emails table
-// This is called BEFORE sending the email, so resendID/provider_message_id is left NULL
+// InsertOutgoingEmail creates an initial record in the new split table structure
+// This is called BEFORE sending the email, so provider_message_id is left NULL
 func InsertOutgoingEmail(ctx context.Context, input InsertOutgoingEmailInput) (InsertOutgoingEmailResult, error) {
 	logger := activity.GetLogger(ctx)
-	logger.Info("📝 Inserting outgoing email record (pre-send)", 
+	logger.Info("📝 Inserting email record using new split table structure (pre-send)", 
 		"recipient", input.RecipientEmail,
 		"tenantId", input.TenantID,
 		"emailType", input.EmailType,
@@ -974,7 +1002,7 @@ func InsertOutgoingEmail(ctx context.Context, input InsertOutgoingEmailInput) (I
 
 	if activityDeps == nil || activityDeps.Repo == nil {
 		err := fmt.Errorf("activity dependencies not initialized")
-		logger.Error("❌ Failed to insert outgoing email", "error", err)
+		logger.Error("❌ Failed to insert email record", "error", err)
 		return InsertOutgoingEmailResult{
 			Success: false,
 			Error:   err.Error(),
@@ -990,9 +1018,9 @@ func InsertOutgoingEmail(ctx context.Context, input InsertOutgoingEmailInput) (I
 		}
 	}
 
-	// Create the outgoing email record with status 'pending'
+	// Create the complete email record using new split table structure
 	// provider_message_id is left NULL since we haven't sent yet
-	req := &models.CreateOutgoingEmailRequest{
+	req := &models.CreateCompleteEmailRequest{
 		TenantID:          input.TenantID,
 		RecipientEmail:    input.RecipientEmail,
 		RecipientName:     input.RecipientName,
@@ -1002,7 +1030,6 @@ func InsertOutgoingEmail(ctx context.Context, input InsertOutgoingEmailInput) (I
 		EmailType:         input.EmailType,
 		Provider:          input.Provider,
 		ProviderMessageID: nil, // NULL - will be updated after email is sent
-		ProviderResponse:  nil, // NULL - will be updated after email is sent
 		Status:            "pending",
 		SendAttempts:      0,
 		ErrorMessage:      nil,
@@ -1010,20 +1037,20 @@ func InsertOutgoingEmail(ctx context.Context, input InsertOutgoingEmailInput) (I
 		NewsletterID:      input.NewsletterID,
 		CampaignID:        input.CampaignID,
 		PromotionID:       input.PromotionID,
-		Metadata:          metadataJSON,
 		HTMLContent:       &input.HTMLContent,
 		TextContent:       &input.TextContent,
+		Metadata:          metadataJSON,
 	}
 
-	logger.Info("📤 Saving outgoing email to database (status=pending)",
+	logger.Info("📤 Saving email to new split table structure (status=pending)",
 		"tenantId", req.TenantID,
 		"emailType", req.EmailType,
 		"provider", req.Provider,
 		"status", req.Status)
 
-	outgoingEmail, err := activityDeps.Repo.CreateOutgoingEmailRecord(ctx, req)
+	emailSendWithDetails, err := activityDeps.Repo.CreateCompleteEmail(ctx, req)
 	if err != nil {
-		logger.Error("❌ Failed to insert outgoing email record",
+		logger.Error("❌ Failed to insert email record using split tables",
 			"error", err,
 			"recipient", input.RecipientEmail,
 			"tenantId", input.TenantID)
@@ -1033,14 +1060,20 @@ func InsertOutgoingEmail(ctx context.Context, input InsertOutgoingEmailInput) (I
 		}, err
 	}
 
-	logger.Info("✅ Successfully inserted outgoing email record",
-		"outgoingEmailId", outgoingEmail.ID,
+	contentID := "none"
+	if emailSendWithDetails.Content != nil {
+		contentID = emailSendWithDetails.Content.ID
+	}
+	
+	logger.Info("✅ Successfully inserted email record using split tables",
+		"emailSendId", emailSendWithDetails.EmailSend.ID,
+		"contentId", contentID,
 		"recipient", input.RecipientEmail,
 		"tenantId", input.TenantID,
 		"status", "pending")
 
 	return InsertOutgoingEmailResult{
 		Success:         true,
-		OutgoingEmailID: &outgoingEmail.ID,
+		OutgoingEmailID: &emailSendWithDetails.EmailSend.ID, // Return the email_send ID
 	}, nil
 }

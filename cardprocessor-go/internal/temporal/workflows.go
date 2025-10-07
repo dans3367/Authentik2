@@ -82,8 +82,16 @@ func BirthdayTestWorkflow(ctx workflow.Context, input BirthdayTestWorkflowInput)
 
 	// Step 1: Generate unsubscribe token and store in database (if not a test)
 	var unsubscribeTokenResult TokenResult
+	
+	// For test emails, don't try to store in database since UserID != ContactID
+	// This prevents foreign key constraint violations while still generating tokens
+	contactIDForToken := ""
+	if !input.IsTest {
+		contactIDForToken = input.UserID
+	}
+	
 	err := workflow.ExecuteActivity(ctx, GenerateBirthdayUnsubscribeToken, TokenInput{
-		ContactID: input.UserID, // For test emails, use UserID as ContactID
+		ContactID: contactIDForToken, // Empty for test emails to skip database storage
 		TenantID:  input.TenantID,
 		Action:    "unsubscribe_birthday",
 		ExpiresIn: "never",
@@ -96,7 +104,9 @@ func BirthdayTestWorkflow(ctx workflow.Context, input BirthdayTestWorkflowInput)
 		logger.Info("✅ Unsubscribe token generated successfully",
 			"hasToken", unsubscribeTokenResult.Token != "",
 			"tokenLength", len(unsubscribeTokenResult.Token),
-			"success", unsubscribeTokenResult.Success)
+			"success", unsubscribeTokenResult.Success,
+			"isTest", input.IsTest,
+			"storedInDB", !input.IsTest && contactIDForToken != "")
 	}
 
 	// Step 2: Prepare enriched input with unsubscribe token

@@ -913,6 +913,405 @@ func (r *Repository) CreateOutgoingEmailRecord(ctx context.Context, req *models.
 	return &email, nil
 }
 
+// ===== NEW SPLIT TABLE METHODS =====
+
+// CreateEmailSend creates a new email send record in the email_sends table
+func (r *Repository) CreateEmailSend(ctx context.Context, req *models.CreateEmailSendRequest) (*models.EmailSend, error) {
+	id := uuid.New().String()
+	now := time.Now()
+
+	query := `
+		INSERT INTO email_sends (
+			id, tenant_id, recipient_email, recipient_name, sender_email, sender_name,
+			subject, email_type, provider, provider_message_id, status, send_attempts, 
+			error_message, contact_id, newsletter_id, campaign_id, promotion_id, 
+			sent_at, created_at, updated_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+		)
+		RETURNING id, tenant_id, recipient_email, recipient_name, sender_email, 
+		          sender_name, subject, email_type, provider, provider_message_id, 
+		          status, send_attempts, error_message, contact_id, newsletter_id, 
+		          campaign_id, promotion_id, sent_at, created_at, updated_at
+	`
+
+	var emailSend models.EmailSend
+	err := r.db.QueryRowContext(ctx, query,
+		id, req.TenantID, req.RecipientEmail, req.RecipientName, req.SenderEmail, 
+		req.SenderName, req.Subject, req.EmailType, req.Provider, req.ProviderMessageID,
+		req.Status, req.SendAttempts, req.ErrorMessage, req.ContactID, req.NewsletterID, 
+		req.CampaignID, req.PromotionID, now, now, now,
+	).Scan(
+		&emailSend.ID, &emailSend.TenantID, &emailSend.RecipientEmail, &emailSend.RecipientName,
+		&emailSend.SenderEmail, &emailSend.SenderName, &emailSend.Subject, &emailSend.EmailType,
+		&emailSend.Provider, &emailSend.ProviderMessageID, &emailSend.Status, &emailSend.SendAttempts,
+		&emailSend.ErrorMessage, &emailSend.ContactID, &emailSend.NewsletterID, &emailSend.CampaignID,
+		&emailSend.PromotionID, &emailSend.SentAt, &emailSend.CreatedAt, &emailSend.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create email send record: %w", err)
+	}
+
+	return &emailSend, nil
+}
+
+// CreateEmailContent creates a new email content record in the email_content table
+func (r *Repository) CreateEmailContent(ctx context.Context, req *models.CreateEmailContentRequest) (*models.EmailContent, error) {
+	id := uuid.New().String()
+	now := time.Now()
+
+	query := `
+		INSERT INTO email_content (
+			id, email_send_id, html_content, text_content, metadata, created_at, updated_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7
+		)
+		RETURNING id, email_send_id, html_content, text_content, metadata, created_at, updated_at
+	`
+
+	var emailContent models.EmailContent
+	err := r.db.QueryRowContext(ctx, query,
+		id, req.EmailSendID, req.HTMLContent, req.TextContent, req.Metadata, now, now,
+	).Scan(
+		&emailContent.ID, &emailContent.EmailSendID, &emailContent.HTMLContent, 
+		&emailContent.TextContent, &emailContent.Metadata, &emailContent.CreatedAt, &emailContent.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create email content record: %w", err)
+	}
+
+	return &emailContent, nil
+}
+
+// CreateEmailEvent creates a new email event record in the email_events table
+func (r *Repository) CreateEmailEvent(ctx context.Context, req *models.CreateEmailEventRequest) (*models.EmailEvent, error) {
+	id := uuid.New().String()
+	now := time.Now()
+
+	query := `
+		INSERT INTO email_events (
+			id, email_send_id, event_type, event_data, provider_response, occurred_at, created_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7
+		)
+		RETURNING id, email_send_id, event_type, event_data, provider_response, occurred_at, created_at
+	`
+
+	var emailEvent models.EmailEvent
+	err := r.db.QueryRowContext(ctx, query,
+		id, req.EmailSendID, req.EventType, req.EventData, req.ProviderResponse, now, now,
+	).Scan(
+		&emailEvent.ID, &emailEvent.EmailSendID, &emailEvent.EventType, 
+		&emailEvent.EventData, &emailEvent.ProviderResponse, &emailEvent.OccurredAt, &emailEvent.CreatedAt,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create email event record: %w", err)
+	}
+
+	return &emailEvent, nil
+}
+
+// CreateCompleteEmail creates a complete email record with content in a transaction
+func (r *Repository) CreateCompleteEmail(ctx context.Context, req *models.CreateCompleteEmailRequest) (*models.EmailSendWithDetails, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Create email send record
+	emailSendReq := &models.CreateEmailSendRequest{
+		TenantID:          req.TenantID,
+		RecipientEmail:    req.RecipientEmail,
+		RecipientName:     req.RecipientName,
+		SenderEmail:       req.SenderEmail,
+		SenderName:        req.SenderName,
+		Subject:           req.Subject,
+		EmailType:         req.EmailType,
+		Provider:          req.Provider,
+		ProviderMessageID: req.ProviderMessageID,
+		Status:            req.Status,
+		SendAttempts:      req.SendAttempts,
+		ErrorMessage:      req.ErrorMessage,
+		ContactID:         req.ContactID,
+		NewsletterID:      req.NewsletterID,
+		CampaignID:        req.CampaignID,
+		PromotionID:       req.PromotionID,
+	}
+
+	emailSend, err := r.createEmailSendTx(ctx, tx, emailSendReq)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &models.EmailSendWithDetails{
+		EmailSend: *emailSend,
+	}
+
+	// Create email content if provided
+	if req.HTMLContent != nil || req.TextContent != nil || req.Metadata != nil {
+		emailContentReq := &models.CreateEmailContentRequest{
+			EmailSendID: emailSend.ID,
+			HTMLContent: req.HTMLContent,
+			TextContent: req.TextContent,
+			Metadata:    req.Metadata,
+		}
+
+		emailContent, err := r.createEmailContentTx(ctx, tx, emailContentReq)
+		if err != nil {
+			return nil, err
+		}
+		result.Content = emailContent
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return result, nil
+}
+
+// Helper methods for transaction-based operations
+func (r *Repository) createEmailSendTx(ctx context.Context, tx *sql.Tx, req *models.CreateEmailSendRequest) (*models.EmailSend, error) {
+	id := uuid.New().String()
+	now := time.Now()
+
+	query := `
+		INSERT INTO email_sends (
+			id, tenant_id, recipient_email, recipient_name, sender_email, sender_name,
+			subject, email_type, provider, provider_message_id, status, send_attempts, 
+			error_message, contact_id, newsletter_id, campaign_id, promotion_id, 
+			sent_at, created_at, updated_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+		)
+		RETURNING id, tenant_id, recipient_email, recipient_name, sender_email, 
+		          sender_name, subject, email_type, provider, provider_message_id, 
+		          status, send_attempts, error_message, contact_id, newsletter_id, 
+		          campaign_id, promotion_id, sent_at, created_at, updated_at
+	`
+
+	var emailSend models.EmailSend
+	err := tx.QueryRowContext(ctx, query,
+		id, req.TenantID, req.RecipientEmail, req.RecipientName, req.SenderEmail, 
+		req.SenderName, req.Subject, req.EmailType, req.Provider, req.ProviderMessageID,
+		req.Status, req.SendAttempts, req.ErrorMessage, req.ContactID, req.NewsletterID, 
+		req.CampaignID, req.PromotionID, now, now, now,
+	).Scan(
+		&emailSend.ID, &emailSend.TenantID, &emailSend.RecipientEmail, &emailSend.RecipientName,
+		&emailSend.SenderEmail, &emailSend.SenderName, &emailSend.Subject, &emailSend.EmailType,
+		&emailSend.Provider, &emailSend.ProviderMessageID, &emailSend.Status, &emailSend.SendAttempts,
+		&emailSend.ErrorMessage, &emailSend.ContactID, &emailSend.NewsletterID, &emailSend.CampaignID,
+		&emailSend.PromotionID, &emailSend.SentAt, &emailSend.CreatedAt, &emailSend.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create email send record in transaction: %w", err)
+	}
+
+	return &emailSend, nil
+}
+
+func (r *Repository) createEmailContentTx(ctx context.Context, tx *sql.Tx, req *models.CreateEmailContentRequest) (*models.EmailContent, error) {
+	id := uuid.New().String()
+	now := time.Now()
+
+	query := `
+		INSERT INTO email_content (
+			id, email_send_id, html_content, text_content, metadata, created_at, updated_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7
+		)
+		RETURNING id, email_send_id, html_content, text_content, metadata, created_at, updated_at
+	`
+
+	var emailContent models.EmailContent
+	err := tx.QueryRowContext(ctx, query,
+		id, req.EmailSendID, req.HTMLContent, req.TextContent, req.Metadata, now, now,
+	).Scan(
+		&emailContent.ID, &emailContent.EmailSendID, &emailContent.HTMLContent, 
+		&emailContent.TextContent, &emailContent.Metadata, &emailContent.CreatedAt, &emailContent.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create email content record in transaction: %w", err)
+	}
+
+	return &emailContent, nil
+}
+
+// UpdateEmailSendStatus updates the status of an email send record
+func (r *Repository) UpdateEmailSendStatus(ctx context.Context, emailSendID, status string, errorMessage *string) error {
+	now := time.Now()
+	
+	query := `
+		UPDATE email_sends 
+		SET status = $1, error_message = $2, updated_at = $3
+		WHERE id = $4
+	`
+
+	_, err := r.db.ExecContext(ctx, query, status, errorMessage, now, emailSendID)
+	if err != nil {
+		return fmt.Errorf("failed to update email send status: %w", err)
+	}
+
+	return nil
+}
+
+// GetEmailSendByProviderMessageID retrieves an email send by provider message ID
+func (r *Repository) GetEmailSendByProviderMessageID(ctx context.Context, providerMessageID string) (*models.EmailSend, error) {
+	query := `
+		SELECT id, tenant_id, recipient_email, recipient_name, sender_email, 
+		       sender_name, subject, email_type, provider, provider_message_id, 
+		       status, send_attempts, error_message, contact_id, newsletter_id, 
+		       campaign_id, promotion_id, sent_at, created_at, updated_at
+		FROM email_sends
+		WHERE provider_message_id = $1
+	`
+
+	var emailSend models.EmailSend
+	err := r.db.QueryRowContext(ctx, query, providerMessageID).Scan(
+		&emailSend.ID, &emailSend.TenantID, &emailSend.RecipientEmail, &emailSend.RecipientName,
+		&emailSend.SenderEmail, &emailSend.SenderName, &emailSend.Subject, &emailSend.EmailType,
+		&emailSend.Provider, &emailSend.ProviderMessageID, &emailSend.Status, &emailSend.SendAttempts,
+		&emailSend.ErrorMessage, &emailSend.ContactID, &emailSend.NewsletterID, &emailSend.CampaignID,
+		&emailSend.PromotionID, &emailSend.SentAt, &emailSend.CreatedAt, &emailSend.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get email send by provider message ID: %w", err)
+	}
+
+	return &emailSend, nil
+}
+
+// GetEmailSendWithDetails retrieves a complete email send with content and events
+func (r *Repository) GetEmailSendWithDetails(ctx context.Context, emailSendID string) (*models.EmailSendWithDetails, error) {
+	// Get email send
+	emailSend, err := r.GetEmailSendByID(ctx, emailSendID)
+	if err != nil {
+		return nil, err
+	}
+	if emailSend == nil {
+		return nil, nil
+	}
+
+	result := &models.EmailSendWithDetails{
+		EmailSend: *emailSend,
+	}
+
+	// Get email content
+	content, err := r.GetEmailContentByEmailSendID(ctx, emailSendID)
+	if err != nil {
+		return nil, err
+	}
+	result.Content = content
+
+	// Get email events
+	events, err := r.GetEmailEventsByEmailSendID(ctx, emailSendID)
+	if err != nil {
+		return nil, err
+	}
+	result.Events = events
+
+	return result, nil
+}
+
+// GetEmailSendByID retrieves an email send by ID
+func (r *Repository) GetEmailSendByID(ctx context.Context, emailSendID string) (*models.EmailSend, error) {
+	query := `
+		SELECT id, tenant_id, recipient_email, recipient_name, sender_email, 
+		       sender_name, subject, email_type, provider, provider_message_id, 
+		       status, send_attempts, error_message, contact_id, newsletter_id, 
+		       campaign_id, promotion_id, sent_at, created_at, updated_at
+		FROM email_sends
+		WHERE id = $1
+	`
+
+	var emailSend models.EmailSend
+	err := r.db.QueryRowContext(ctx, query, emailSendID).Scan(
+		&emailSend.ID, &emailSend.TenantID, &emailSend.RecipientEmail, &emailSend.RecipientName,
+		&emailSend.SenderEmail, &emailSend.SenderName, &emailSend.Subject, &emailSend.EmailType,
+		&emailSend.Provider, &emailSend.ProviderMessageID, &emailSend.Status, &emailSend.SendAttempts,
+		&emailSend.ErrorMessage, &emailSend.ContactID, &emailSend.NewsletterID, &emailSend.CampaignID,
+		&emailSend.PromotionID, &emailSend.SentAt, &emailSend.CreatedAt, &emailSend.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get email send by ID: %w", err)
+	}
+
+	return &emailSend, nil
+}
+
+// GetEmailContentByEmailSendID retrieves email content by email send ID
+func (r *Repository) GetEmailContentByEmailSendID(ctx context.Context, emailSendID string) (*models.EmailContent, error) {
+	query := `
+		SELECT id, email_send_id, html_content, text_content, metadata, created_at, updated_at
+		FROM email_content
+		WHERE email_send_id = $1
+	`
+
+	var emailContent models.EmailContent
+	err := r.db.QueryRowContext(ctx, query, emailSendID).Scan(
+		&emailContent.ID, &emailContent.EmailSendID, &emailContent.HTMLContent, 
+		&emailContent.TextContent, &emailContent.Metadata, &emailContent.CreatedAt, &emailContent.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get email content by email send ID: %w", err)
+	}
+
+	return &emailContent, nil
+}
+
+// GetEmailEventsByEmailSendID retrieves email events by email send ID
+func (r *Repository) GetEmailEventsByEmailSendID(ctx context.Context, emailSendID string) ([]models.EmailEvent, error) {
+	query := `
+		SELECT id, email_send_id, event_type, event_data, provider_response, occurred_at, created_at
+		FROM email_events
+		WHERE email_send_id = $1
+		ORDER BY occurred_at DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, emailSendID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get email events by email send ID: %w", err)
+	}
+	defer rows.Close()
+
+	var events []models.EmailEvent
+	for rows.Next() {
+		var event models.EmailEvent
+		err := rows.Scan(
+			&event.ID, &event.EmailSendID, &event.EventType, 
+			&event.EventData, &event.ProviderResponse, &event.OccurredAt, &event.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan email event: %w", err)
+		}
+		events = append(events, event)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating email events: %w", err)
+	}
+
+	return events, nil
+}
+
 // UpdateOutgoingEmailStatus updates the status of an outgoing email record
 func (r *Repository) UpdateOutgoingEmailStatus(ctx context.Context, emailID, status string, errorMessage *string) error {
 	now := time.Now()

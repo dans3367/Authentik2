@@ -262,7 +262,60 @@ type SendTestBirthdayCardRequest struct {
 	SenderName      string      `json:"senderName"`
 }
 
-// OutgoingEmail represents an outgoing email record in the outgoing_emails table
+// EmailSend represents the core email sending record in the email_sends table
+type EmailSend struct {
+	ID                string     `json:"id" db:"id"`
+	TenantID          string     `json:"tenantId" db:"tenant_id"`
+	RecipientEmail    string     `json:"recipientEmail" db:"recipient_email"`
+	RecipientName     *string    `json:"recipientName" db:"recipient_name"`
+	SenderEmail       string     `json:"senderEmail" db:"sender_email"`
+	SenderName        *string    `json:"senderName" db:"sender_name"`
+	Subject           string     `json:"subject" db:"subject"`
+	EmailType         string     `json:"emailType" db:"email_type"`
+	Provider          string     `json:"provider" db:"provider"`
+	ProviderMessageID *string    `json:"providerMessageId" db:"provider_message_id"`
+	Status            string     `json:"status" db:"status"`
+	SendAttempts      int        `json:"sendAttempts" db:"send_attempts"`
+	ErrorMessage      *string    `json:"errorMessage" db:"error_message"`
+	ContactID         *string    `json:"contactId" db:"contact_id"`
+	NewsletterID      *string    `json:"newsletterId" db:"newsletter_id"`
+	CampaignID        *string    `json:"campaignId" db:"campaign_id"`
+	PromotionID       *string    `json:"promotionId" db:"promotion_id"`
+	SentAt            time.Time  `json:"sentAt" db:"sent_at"`
+	CreatedAt         time.Time  `json:"createdAt" db:"created_at"`
+	UpdatedAt         time.Time  `json:"updatedAt" db:"updated_at"`
+}
+
+// EmailContent represents email content storage in the email_content table
+type EmailContent struct {
+	ID          string     `json:"id" db:"id"`
+	EmailSendID string     `json:"emailSendId" db:"email_send_id"`
+	HTMLContent *string    `json:"htmlContent" db:"html_content"`
+	TextContent *string    `json:"textContent" db:"text_content"`
+	Metadata    *string    `json:"metadata" db:"metadata"`
+	CreatedAt   time.Time  `json:"createdAt" db:"created_at"`
+	UpdatedAt   time.Time  `json:"updatedAt" db:"updated_at"`
+}
+
+// EmailEvent represents email events and provider responses in the email_events table
+type EmailEvent struct {
+	ID               string     `json:"id" db:"id"`
+	EmailSendID      string     `json:"emailSendId" db:"email_send_id"`
+	EventType        string     `json:"eventType" db:"event_type"`
+	EventData        *string    `json:"eventData" db:"event_data"`
+	ProviderResponse *string    `json:"providerResponse" db:"provider_response"`
+	OccurredAt       time.Time  `json:"occurredAt" db:"occurred_at"`
+	CreatedAt        time.Time  `json:"createdAt" db:"created_at"`
+}
+
+// EmailSendWithDetails represents a complete email send with content and events
+type EmailSendWithDetails struct {
+	EmailSend
+	Content *EmailContent  `json:"content,omitempty"`
+	Events  []EmailEvent   `json:"events,omitempty"`
+}
+
+// OutgoingEmail represents an outgoing email record in the outgoing_emails table (DEPRECATED - use EmailSend instead)
 type OutgoingEmail struct {
 	ID                 string     `json:"id" db:"id"`
 	TenantID           string     `json:"tenantId" db:"tenant_id"`
@@ -291,7 +344,66 @@ type OutgoingEmail struct {
 	UpdatedAt          time.Time  `json:"updatedAt" db:"updated_at"`
 }
 
-// CreateOutgoingEmailRequest represents the request to create an outgoing email record
+// CreateEmailSendRequest represents the request to create an email send record
+type CreateEmailSendRequest struct {
+	TenantID          string  `json:"tenantId"`
+	RecipientEmail    string  `json:"recipientEmail"`
+	RecipientName     *string `json:"recipientName,omitempty"`
+	SenderEmail       string  `json:"senderEmail"`
+	SenderName        *string `json:"senderName,omitempty"`
+	Subject           string  `json:"subject"`
+	EmailType         string  `json:"emailType"`
+	Provider          string  `json:"provider"`
+	ProviderMessageID *string `json:"providerMessageId,omitempty"`
+	Status            string  `json:"status"`
+	SendAttempts      int     `json:"sendAttempts"`
+	ErrorMessage      *string `json:"errorMessage,omitempty"`
+	ContactID         *string `json:"contactId,omitempty"`
+	NewsletterID      *string `json:"newsletterId,omitempty"`
+	CampaignID        *string `json:"campaignId,omitempty"`
+	PromotionID       *string `json:"promotionId,omitempty"`
+}
+
+// CreateEmailContentRequest represents the request to create email content
+type CreateEmailContentRequest struct {
+	EmailSendID string  `json:"emailSendId"`
+	HTMLContent *string `json:"htmlContent,omitempty"`
+	TextContent *string `json:"textContent,omitempty"`
+	Metadata    *string `json:"metadata,omitempty"`
+}
+
+// CreateEmailEventRequest represents the request to create an email event
+type CreateEmailEventRequest struct {
+	EmailSendID      string  `json:"emailSendId"`
+	EventType        string  `json:"eventType"`
+	EventData        *string `json:"eventData,omitempty"`
+	ProviderResponse *string `json:"providerResponse,omitempty"`
+}
+
+// CreateCompleteEmailRequest represents the request to create a complete email with content
+type CreateCompleteEmailRequest struct {
+	TenantID          string  `json:"tenantId"`
+	RecipientEmail    string  `json:"recipientEmail"`
+	RecipientName     *string `json:"recipientName,omitempty"`
+	SenderEmail       string  `json:"senderEmail"`
+	SenderName        *string `json:"senderName,omitempty"`
+	Subject           string  `json:"subject"`
+	EmailType         string  `json:"emailType"`
+	Provider          string  `json:"provider"`
+	ProviderMessageID *string `json:"providerMessageId,omitempty"`
+	Status            string  `json:"status"`
+	SendAttempts      int     `json:"sendAttempts"`
+	ErrorMessage      *string `json:"errorMessage,omitempty"`
+	ContactID         *string `json:"contactId,omitempty"`
+	NewsletterID      *string `json:"newsletterId,omitempty"`
+	CampaignID        *string `json:"campaignId,omitempty"`
+	PromotionID       *string `json:"promotionId,omitempty"`
+	HTMLContent       *string `json:"htmlContent,omitempty"`
+	TextContent       *string `json:"textContent,omitempty"`
+	Metadata          *string `json:"metadata,omitempty"`
+}
+
+// CreateOutgoingEmailRequest represents the request to create an outgoing email record (DEPRECATED - use CreateCompleteEmailRequest instead)
 type CreateOutgoingEmailRequest struct {
 	TenantID          string  `json:"tenantId"`
 	RecipientEmail    string  `json:"recipientEmail"`

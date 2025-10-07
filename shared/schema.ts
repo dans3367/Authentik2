@@ -212,6 +212,78 @@ export const tenantLimits = pgTable("tenant_limits", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Email tracking split tables - replacing the monolithic outgoing_emails table
+export const emailSends = pgTable("email_sends", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  
+  // Email details
+  recipientEmail: text("recipient_email").notNull(),
+  recipientName: text("recipient_name"),
+  senderEmail: text("sender_email").notNull(),
+  senderName: text("sender_name"),
+  subject: text("subject").notNull(),
+  emailType: text("email_type").notNull(), // 'birthday_card', 'test_card', 'promotional', 'newsletter', 'invitation', 'appointment_reminder'
+  
+  // Provider details
+  provider: text("provider").notNull(), // 'resend', 'sendgrid', 'mailgun'
+  providerMessageId: text("provider_message_id"), // Provider's unique message ID (e.g., Resend email ID)
+  
+  // Status tracking
+  status: text("status").notNull().default('pending'), // 'pending', 'sent', 'delivered', 'bounced', 'failed'
+  sendAttempts: integer("send_attempts").default(1),
+  errorMessage: text("error_message"),
+  
+  // Related records
+  contactId: varchar("contact_id").references(() => emailContacts.id, { onDelete: 'set null' }),
+  newsletterId: varchar("newsletter_id").references(() => newsletters.id, { onDelete: 'set null' }),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'set null' }),
+  promotionId: varchar("promotion_id").references(() => promotions.id, { onDelete: 'set null' }),
+  
+  // Timestamps
+  sentAt: timestamp("sent_at"),
+  deliveredAt: timestamp("delivered_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const emailContent = pgTable("email_content", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  emailSendId: varchar("email_send_id").notNull().references(() => emailSends.id, { onDelete: 'cascade' }),
+  
+  // Email content
+  htmlContent: text("html_content"),
+  textContent: text("text_content"),
+  
+  // Provider response data
+  providerResponse: text("provider_response"), // JSON response from provider
+  
+  // Metadata
+  metadata: text("metadata"), // JSON for additional custom data
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const emailEvents = pgTable("email_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  emailSendId: varchar("email_send_id").notNull().references(() => emailSends.id, { onDelete: 'cascade' }),
+  
+  // Event details
+  eventType: text("event_type").notNull(), // 'sent', 'delivered', 'opened', 'clicked', 'bounced', 'complained', 'unsubscribed'
+  eventData: text("event_data"), // JSON webhook payload or event data
+  
+  // Event metadata
+  userAgent: text("user_agent"),
+  ipAddress: text("ip_address"),
+  webhookId: text("webhook_id"), // Provider webhook event ID
+  
+  // Timestamps
+  occurredAt: timestamp("occurred_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations for tenant limits (used by relational queries with `with:`)
 export const tenantLimitsRelations = relations(tenantLimits, ({ one }) => ({
   tenant: one(tenants, {
@@ -1094,6 +1166,42 @@ export const bouncedEmailRelations = relations(bouncedEmails, ({ one }) => ({
   }),
 }));
 
+// New split table relations
+export const emailSendsRelations = relations(emailSends, ({ one, many }) => ({
+  tenant: one(tenants, {
+    fields: [emailSends.tenantId],
+    references: [tenants.id],
+  }),
+  contact: one(emailContacts, {
+    fields: [emailSends.contactId],
+    references: [emailContacts.id],
+  }),
+  campaign: one(campaigns, {
+    fields: [emailSends.campaignId],
+    references: [campaigns.id],
+  }),
+  newsletter: one(newsletters, {
+    fields: [emailSends.newsletterId],
+    references: [newsletters.id],
+  }),
+  content: one(emailContent),
+  events: many(emailEvents),
+}));
+
+export const emailContentRelations = relations(emailContent, ({ one, many }) => ({
+  emailSend: one(emailSends, {
+    fields: [emailContent.emailSendId],
+    references: [emailSends.id],
+  }),
+}));
+
+export const emailEventsRelations = relations(emailEvents, ({ one }) => ({
+  send: one(emailSends, {
+    fields: [emailEvents.emailSendId],
+    references: [emailSends.id],
+  }),
+}));
+
 // Email contact schemas
 export const createEmailContactSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -1171,6 +1279,87 @@ export const insertEmailActivitySchema = createInsertSchema(emailActivity).omit(
 export type EmailActivity = typeof emailActivity.$inferSelect;
 export type InsertEmailActivity = z.infer<typeof insertEmailActivitySchema>;
 export type CreateEmailActivityData = z.infer<typeof createEmailActivitySchema>;
+
+// New split table types and schemas
+export const createEmailSendSchema = z.object({
+  contactId: z.string().uuid(),
+  campaignId: z.string().uuid().optional(),
+  newsletterId: z.string().uuid().optional(),
+  contentId: z.string().uuid(),
+  provider: z.enum(['resend', 'sendgrid', 'mailgun', 'ses']),
+  providerId: z.string(),
+  status: z.enum(['pending', 'sent', 'delivered', 'failed', 'bounced']).default('pending'),
+  sentAt: z.date().optional(),
+  deliveredAt: z.date().optional(),
+  failedAt: z.date().optional(),
+  errorMessage: z.string().optional(),
+  metadata: z.string().optional(),
+});
+
+export const createEmailContentSchema = z.object({
+  subject: z.string().min(1, "Subject is required"),
+  htmlContent: z.string().min(1, "HTML content is required"),
+  textContent: z.string().optional(),
+  templateId: z.string().optional(),
+  templateData: z.string().optional(),
+  attachments: z.string().optional(),
+});
+
+export const createEmailEventSchema = z.object({
+  sendId: z.string().uuid(),
+  eventType: z.enum(['sent', 'delivered', 'opened', 'clicked', 'bounced', 'complained', 'unsubscribed']),
+  eventData: z.string().optional(),
+  userAgent: z.string().optional(),
+  ipAddress: z.string().optional(),
+  webhookId: z.string().optional(),
+  webhookData: z.string().optional(),
+  occurredAt: z.date(),
+});
+
+export const insertEmailSendSchema = createInsertSchema(emailSends).omit({
+  id: true,
+  tenantId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEmailContentSchema = createInsertSchema(emailContent).omit({
+  id: true,
+  tenantId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEmailEventSchema = createInsertSchema(emailEvents).omit({
+  id: true,
+  tenantId: true,
+  createdAt: true,
+});
+
+export type EmailSend = typeof emailSends.$inferSelect;
+export type InsertEmailSend = z.infer<typeof insertEmailSendSchema>;
+export type CreateEmailSendData = z.infer<typeof createEmailSendSchema>;
+
+export type EmailContent = typeof emailContent.$inferSelect;
+export type InsertEmailContent = z.infer<typeof insertEmailContentSchema>;
+export type CreateEmailContentData = z.infer<typeof createEmailContentSchema>;
+
+export type EmailEvent = typeof emailEvents.$inferSelect;
+export type InsertEmailEvent = z.infer<typeof insertEmailEventSchema>;
+export type CreateEmailEventData = z.infer<typeof createEmailEventSchema>;
+
+// Extended types for the new split tables
+export interface EmailSendWithDetails extends EmailSend {
+  contact: EmailContact;
+  content: EmailContent;
+  campaign?: Campaign;
+  newsletter?: Newsletter;
+  events?: EmailEvent[];
+}
+
+export interface EmailContentWithSends extends EmailContent {
+  sends: EmailSend[];
+}
 
 // Extended types for email contacts
 export interface EmailContactWithDetails extends EmailContact {
@@ -1422,6 +1611,16 @@ export const birthdaySettings = pgTable("birthday_settings", {
   splitPromotionalEmail: boolean("split_promotional_email").default(false), // Send promotion as separate email for better deliverability
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const birthdayUnsubscribeTokens = pgTable("birthday_unsubscribe_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  contactId: varchar("contact_id").notNull().references(() => emailContacts.id, { onDelete: 'cascade' }),
+  token: text("token").notNull().unique(),
+  used: boolean("used").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  usedAt: timestamp("used_at"),
 });
 
 // Extended types for bounced emails with relations
@@ -1745,6 +1944,9 @@ export const tenantRelationsUpdated = relations(tenants, ({ many }) => ({
   campaigns: many(campaigns),
   emailActivities: many(emailActivity),
   bouncedEmails: many(bouncedEmails),
+  emailSends: many(emailSends),
+  emailContent: many(emailContent),
+  emailEvents: many(emailEvents),
   birthdaySettings: many(birthdaySettings),
   appointments: many(appointments),
   appointmentReminders: many(appointmentReminders),

@@ -187,8 +187,13 @@
 <body>
     <div class="container">
         <div class="icon">🎂</div>
+        {{if .TokenUsed}}
+        <h1>You're Already Unsubscribed</h1>
+        <p class="subtitle">You have already unsubscribed from birthday card notifications. You can resubscribe below if you'd like to receive them again.</p>
+        {{else}}
         <h1>{{.Translations.UnsubscribeHeading}}</h1>
         <p class="subtitle">{{.Translations.UnsubscribeMessage}}</p>
+        {{end}}
 
         {{if .Contact}}
         <div class="contact-info">
@@ -197,13 +202,11 @@
         </div>
         {{end}}
 
-        <div class="warning">
-            <strong>{{.Translations.SuccessHeading}}</strong>
-            {{.TemplateText.UnsubscribeNote}} {{.TemplateText.ResubscribeMessage}}
-        </div>
+
 
         <form method="POST" action="/api/unsubscribe/birthday">
             <input type="hidden" name="token" value="{{.Token}}" />
+            {{if not .TokenUsed}}
             <div class="form-group">
                 <label for="reason">{{.Translations.UnsubscribeReason}}</label>
                 <select name="reason" id="reason">
@@ -221,9 +224,14 @@
                 <textarea name="feedback" id="feedback"
                     placeholder="{{.TemplateText.FeedbackPlaceholder}}"></textarea>
             </div>
+            {{end}}
 
             <div class="button-group">
+                {{if .TokenUsed}}
+                <button type="submit" class="btn btn-primary">Resubscribe to Birthday Emails</button>
+                {{else}}
                 <button type="submit" class="btn btn-primary">{{.Translations.UnsubscribeButton}}</button>
+                {{end}}
                 <a href="#" onclick="window.close(); return false;" class="btn btn-secondary">{{.TemplateText.CancelButton}}</a>
             </div>
         </form>
