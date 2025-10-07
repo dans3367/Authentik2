@@ -60,6 +60,7 @@ interface BirthdaySettings {
   customThemeData?: string | null;
   senderName: string;
   promotionId?: string | null;
+  splitPromotionalEmail?: boolean;
   promotion?: {
     id: string;
     title: string;
@@ -769,7 +770,9 @@ export default function BirthdaysPage() {
         emailTemplate: birthdaySettings?.emailTemplate || 'default',
         customMessage: birthdaySettings?.customMessage || '',
         customThemeData: birthdaySettings?.customThemeData || null,
-        senderName: birthdaySettings?.senderName || ''
+        senderName: birthdaySettings?.senderName || '',
+        promotionId: birthdaySettings?.promotionId || null,
+        splitPromotionalEmail: splitPromotionalEmail
       };
 
       console.log('🎂 [Birthday Test] Starting test birthday card request:', {

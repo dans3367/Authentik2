@@ -508,17 +508,37 @@ func (h *BirthdayHandler) SendTestBirthdayCard(c *gin.Context) {
 		fmt.Printf("🎂 [Birthday Test] Temporal client connected: %v\n", h.temporalClient.IsConnected())
 	}
 
-	// Fetch birthday settings to get promotion ID
+	// Determine promotion ID and split email setting
+	// Priority: request fields > database settings
 	var promotionID string
+	var splitPromotionalEmail bool
+	
+	// First, try to get from request
+	if req.PromotionID != nil && *req.PromotionID != "" {
+		promotionID = *req.PromotionID
+		fmt.Printf("🎁 [Birthday Test] Using promotion ID from request: %s\n", promotionID)
+	}
+	
+	if req.SplitPromotionalEmail != nil {
+		splitPromotionalEmail = *req.SplitPromotionalEmail
+		fmt.Printf("📧 [Birthday Test] Using split promotional email from request: %v\n", splitPromotionalEmail)
+	}
+	
+	// Fetch birthday settings as fallback
 	birthdaySettings, err := h.repo.GetBirthdaySettings(context.Background(), tenantID)
 	if err != nil {
 		fmt.Printf("⚠️ [Birthday Test] Failed to fetch birthday settings: %v\n", err)
 	} else if birthdaySettings != nil {
-		if birthdaySettings.PromotionID != nil {
+		// Use database settings as fallback if not provided in request
+		if promotionID == "" && birthdaySettings.PromotionID != nil {
 			promotionID = *birthdaySettings.PromotionID
-			fmt.Printf("🎁 [Birthday Test] Found promotion ID in settings: %s\n", promotionID)
+			fmt.Printf("🎁 [Birthday Test] Using promotion ID from settings: %s\n", promotionID)
 		}
-		fmt.Printf("📧 [Birthday Test] Split Promotional Email setting: %v\n", birthdaySettings.SplitPromotionalEmail)
+		
+		if req.SplitPromotionalEmail == nil {
+			splitPromotionalEmail = birthdaySettings.SplitPromotionalEmail
+			fmt.Printf("📧 [Birthday Test] Using split promotional email from settings: %v\n", splitPromotionalEmail)
+		}
 	}
 
 	// If temporal client is available, use workflow; otherwise, send directly
@@ -539,7 +559,7 @@ func (h *BirthdayHandler) SendTestBirthdayCard(c *gin.Context) {
 			CustomThemeData: customThemeData,
 			SenderName:      req.SenderName,
 			PromotionID:     promotionID,
-			SplitPromotionalEmail: birthdaySettings != nil && birthdaySettings.SplitPromotionalEmail,
+			SplitPromotionalEmail: splitPromotionalEmail,
 			IsTest:          true,
 		}
 

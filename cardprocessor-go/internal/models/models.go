@@ -253,13 +253,15 @@ type BirthdayUnsubscribeResponse struct {
 
 // SendTestBirthdayCardRequest represents test birthday card request
 type SendTestBirthdayCardRequest struct {
-	UserEmail       string      `json:"userEmail"`
-	UserFirstName   string      `json:"userFirstName"`
-	UserLastName    string      `json:"userLastName"`
-	EmailTemplate   string      `json:"emailTemplate"`
-	CustomMessage   string      `json:"customMessage"`
-	CustomThemeData interface{} `json:"customThemeData"`
-	SenderName      string      `json:"senderName"`
+	UserEmail             string      `json:"userEmail"`
+	UserFirstName         string      `json:"userFirstName"`
+	UserLastName          string      `json:"userLastName"`
+	EmailTemplate         string      `json:"emailTemplate"`
+	CustomMessage         string      `json:"customMessage"`
+	CustomThemeData       interface{} `json:"customThemeData"`
+	SenderName            string      `json:"senderName"`
+	PromotionID           *string     `json:"promotionId"`
+	SplitPromotionalEmail *bool       `json:"splitPromotionalEmail"`
 }
 
 // EmailSend represents the core email sending record in the email_sends table
