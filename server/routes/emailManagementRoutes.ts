@@ -2592,3 +2592,126 @@ function renderBirthdayTemplate(
     </body>
   </html>`;
 }
+
+// Send individual email to a contact
+emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { subject, content } = req.body;
+    const tenantId = req.user.tenantId;
+
+    // Validate input
+    if (!subject || !content) {
+      return res.status(400).json({
+        success: false,
+        message: "Subject and content are required"
+      });
+    }
+
+    // Get contact details
+    const contact = await db.query.emailContacts.findFirst({
+      where: and(
+        eq(emailContacts.id, id),
+        eq(emailContacts.tenantId, tenantId)
+      ),
+    });
+
+    if (!contact) {
+      return res.status(404).json({
+        success: false,
+        message: "Contact not found"
+      });
+    }
+
+    // Check if contact can receive emails
+    if (contact.status === 'unsubscribed') {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot send email to unsubscribed contact"
+      });
+    }
+
+    if (contact.status === 'bounced') {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot send email to bounced contact"
+      });
+    }
+
+    // Get tenant info for from email
+    const tenant = await db.query.tenants.findFirst({
+      where: eq(tenants.id, tenantId),
+    });
+
+    // Format content as HTML
+    const htmlContent = `
+      <html>
+        <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: #f7fafc;">
+          <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <div style="padding: 30px;">
+              <div style="font-size: 1rem; line-height: 1.6; color: #2d3748; white-space: pre-wrap;">${content.replace(/\n/g, '<br>')}</div>
+            </div>
+            <div style="padding: 20px 30px; background-color: #f7fafc; border-top: 1px solid #e2e8f0; text-align: center;">
+              <p style="margin: 0; font-size: 0.875rem; color: #718096;">
+                Sent from ${tenant?.name || 'Authentik'}
+              </p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    // Import email service
+    const { enhancedEmailService } = await import('../providers/enhancedEmailService');
+
+    // Send email
+    const result = await enhancedEmailService.sendCustomEmail(
+      contact.email,
+      subject,
+      htmlContent,
+      {
+        text: content,
+        metadata: {
+          type: 'individual_contact_email',
+          contactId: contact.id,
+          tenantId: tenantId,
+          sentBy: req.user.id
+        }
+      }
+    );
+
+    // Log email activity
+    await db.insert(emailActivity).values({
+      contactId: contact.id,
+      tenantId: tenantId,
+      eventType: 'sent',
+      emailSubject: subject,
+      timestamp: new Date(),
+      metadata: {
+        source: 'individual_send',
+        sentBy: req.user.id
+      }
+    });
+
+    // Update contact stats
+    await db.update(emailContacts)
+      .set({
+        emailsSent: sql`${emailContacts.emailsSent} + 1`,
+        lastActivity: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(emailContacts.id, contact.id));
+
+    res.json({
+      success: true,
+      message: "Email sent successfully",
+      result
+    });
+  } catch (error: any) {
+    console.error('[EmailManagementRoutes] Send individual email error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to send email"
+    });
+  }
+});
