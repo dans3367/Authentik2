@@ -758,37 +758,23 @@ export default function EmailActivityTimeline({ contactId, limit = 50 }: EmailAc
 
                   {/* Timeline content */}
                   <div className="flex-1 min-w-0 pb-4">
-                    {/* Primary Info: Badge, Subject, and DateTime */}
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
                         <Badge className={colorClass}>
                           {activity.activityType}
                         </Badge>
-                        {parsedActivityData?.subject ? (
-                          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
-                            {parsedActivityData.subject}
-                          </p>
-                        ) : (
-                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                            {description}
-                          </p>
-                        )}
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {description}
+                        </p>
                       </div>
-                      <time className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      <time className="text-xs text-gray-500 dark:text-gray-400">
                         {formatDateTime(activity.occurredAt)}
                       </time>
                     </div>
                     
-                    {/* Recipient Info - Always show if available */}
-                    {parsedActivityData?.recipient && (
-                      <div className="mb-2 text-sm text-gray-700 dark:text-gray-300">
-                        <span className="font-medium">To:</span> {parsedActivityData.recipient}
-                      </div>
-                    )}
-                    
                     {/* Campaign and Newsletter info */}
                     {(activity.campaign || activity.newsletter) && (
-                      <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                      <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
                         {activity.campaign && (
                           <p><span className="font-medium">Campaign:</span> {activity.campaign.name}</p>
                         )}
@@ -798,17 +784,20 @@ export default function EmailActivityTimeline({ contactId, limit = 50 }: EmailAc
                       </div>
                     )}
 
-                    {/* Additional details - Collapsible */}
+                    {/* Additional details */}
                     {parsedActivityData && (
-                      <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                      <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                        {parsedActivityData.subject && (
+                          <p><span className="font-medium">Subject:</span> {parsedActivityData.subject}</p>
+                        )}
+                        {parsedActivityData.email_id && (
+                          <p><span className="font-medium">Email ID:</span> {parsedActivityData.email_id}</p>
+                        )}
                         {parsedActivityData.from && (
                           <p><span className="font-medium">From:</span> {parsedActivityData.from}</p>
                         )}
-                        {parsedActivityData.email_id && (
-                          <p><span className="font-medium">Email ID:</span> <span className="font-mono text-xs">{parsedActivityData.email_id}</span></p>
-                        )}
-                        {parsedActivityData.messageId && parsedActivityData.messageId !== parsedActivityData.email_id && (
-                          <p><span className="font-medium">Message ID:</span> <span className="font-mono text-xs">{parsedActivityData.messageId}</span></p>
+                        {parsedActivityData.messageId && (
+                          <p><span className="font-medium">Message ID:</span> {parsedActivityData.messageId}</p>
                         )}
                       </div>
                     )}

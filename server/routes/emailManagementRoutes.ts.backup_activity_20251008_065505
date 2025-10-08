@@ -1989,7 +1989,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               tenantId: tenantId,
               contactId: contact.id,
               activityType: 'sent',
-              activityData: JSON.stringify({ type: 'birthday-card', manual: true, split: true, subject: `🎉 Happy Birthday ${recipientName}!`, recipient: contact.email, from: 'admin@zendwise.work' }),
+              activityData: JSON.stringify({ type: 'birthday-card', manual: true, split: true }),
               occurredAt: new Date(),
             });
             console.log(`📝 [SPLIT FLOW] Logged birthday card activity for ${contact.email}`);
@@ -2082,7 +2082,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               tenantId: tenantId,
               contactId: contact.id,
               activityType: 'sent',
-              activityData: JSON.stringify({ type: 'birthday-promotion', manual: true, split: true, subject: `🎁 ${promoSubject}`, recipient: contact.email, from: 'admin@zendwise.work' }),
+              activityData: JSON.stringify({ type: 'birthday-promotion', manual: true, split: true }),
               occurredAt: new Date(),
             });
             console.log(`📝 [SPLIT FLOW] Logged promotional email activity for ${contact.email}`);
@@ -2190,7 +2190,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               tenantId: tenantId,
               contactId: contact.id,
               activityType: 'sent',
-              activityData: JSON.stringify({ type: 'birthday-card', manual: true, queued: true, subject: `🎉 Happy Birthday ${recipientName}!`, recipient: contact.email, from: 'admin@zendwise.work' }),
+              activityData: JSON.stringify({ type: 'birthday-card', manual: true, queued: true }),
               occurredAt: new Date(),
             });
             console.log(`📝 [ManualBirthdayCard] Logged queued birthday card activity for ${contact.email}`);
@@ -2251,7 +2251,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               tenantId: tenantId,
               contactId: contact.id,
               activityType: 'sent',
-              activityData: JSON.stringify({ type: 'birthday-card', manual: true, subject: `🎉 Happy Birthday ${recipientName}!`, recipient: contact.email, from: 'admin@zendwise.work' }),
+              activityData: JSON.stringify({ type: 'birthday-card', manual: true }),
               occurredAt: new Date(),
             });
             console.log(`📝 [ManualBirthdayCard] Logged birthday card activity for ${contact.email}`);

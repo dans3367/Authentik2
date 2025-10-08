@@ -534,6 +534,7 @@ async function updateContactMetrics(contactId: string, activityType: string) {
 }
 
 // Helper function to create email activity record
+// Helper function to create email activity record
 async function createEmailActivity(contactId: string, webhookData: any, activityType: string, recipientEmail: string) {
   try {
     // Get tenant ID from environment or request context
@@ -543,6 +544,11 @@ async function createEmailActivity(contactId: string, webhookData: any, activity
     const userAgent = webhookData.user_agent || webhookData.UserAgent;
     const ipAddress = webhookData.ip_address || webhookData.IPAddress;
     const webhookId = webhookData.id || webhookData.MessageID;
+    
+    // Extract subject and other email details from webhook
+    const subject = webhookData.subject || webhookData.Subject || '';
+    const from = webhookData.from || webhookData.From || '';
+    const messageId = webhookData.email_id || webhookData.MessageID || webhookId;
 
     // Try to find related newsletter/campaign from webhook data
     let newsletterId = null;
@@ -562,13 +568,23 @@ async function createEmailActivity(contactId: string, webhookData: any, activity
       campaignId = webhookData.metadata.campaignId;
     }
 
+    // Create structured activity data with key information
+    const structuredActivityData = {
+      subject: subject,
+      recipient: recipientEmail,
+      from: from,
+      messageId: messageId,
+      email_id: messageId,
+      ...webhookData // Include all webhook data
+    };
+
     await db.insert(db.emailActivity).values({
       tenantId,
       contactId,
       campaignId,
       newsletterId,
       activityType,
-      activityData: JSON.stringify(webhookData),
+      activityData: JSON.stringify(structuredActivityData),
       userAgent,
       ipAddress,
       webhookId,
@@ -576,7 +592,7 @@ async function createEmailActivity(contactId: string, webhookData: any, activity
       occurredAt: new Date(),
     });
 
-    console.log(`Created ${activityType} activity record for contact ${contactId}`);
+    console.log(`Created ${activityType} activity record for contact ${contactId} with subject: ${subject}`);
   } catch (error) {
     console.error('Error creating email activity record:', error);
   }
