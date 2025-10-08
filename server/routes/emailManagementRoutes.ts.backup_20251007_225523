@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, and } from 'drizzle-orm';
-import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, emailActivity, tenants, emailSends, emailContent } from '@shared/schema';
+import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, emailActivity, tenants } from '@shared/schema';
 import { deleteImageFromR2 } from '../config/r2';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { type ContactFilters, type BouncedEmailFilters } from '@shared/schema';
@@ -1983,57 +1983,6 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
 
           console.log(`✅ [SPLIT FLOW] Birthday card sent to ${contact.email}`);
           
-          // Log birthday card to database
-          try {
-            await db.insert(emailActivity).values({
-              tenantId: tenantId,
-              contactId: contact.id,
-              activityType: 'sent',
-              activityData: JSON.stringify({ type: 'birthday-card', manual: true, split: true }),
-              occurredAt: new Date(),
-            });
-            console.log(`📝 [SPLIT FLOW] Logged birthday card activity for ${contact.email}`);
-          } catch (logError) {
-            console.error(`⚠️ [SPLIT FLOW] Failed to log birthday card activity:`, logError);
-          }
-          
-          // Log to email_sends table
-          try {
-            const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
-            await db.insert(emailSends).values({
-              id: emailSendId,
-              tenantId: tenantId,
-              recipientEmail: contact.email,
-              recipientName: recipientName,
-              senderEmail: 'admin@zendwise.work',
-              senderName: settings.senderName || 'Your Team',
-              subject: `🎉 Happy Birthday ${recipientName}!`,
-              emailType: 'birthday_card',
-              provider: 'resend',
-              providerMessageId: typeof birthdayResult === 'string' ? birthdayResult : birthdayResult?.messageId,
-              status: 'sent',
-              contactId: contact.id,
-              promotionId: null,
-              sentAt: new Date(),
-            });
-            
-            // Also store the content
-            await db.insert(emailContent).values({
-              emailSendId: emailSendId,
-              htmlContent: htmlBirthday,
-              textContent: htmlBirthday.replace(/<[^>]*>/g, ''),
-              metadata: JSON.stringify({
-                split: true,
-                manual: true,
-                birthdayCard: true,
-                promotional: false
-              })
-            });
-            console.log(`📧 [EmailSends] Logged birthday email to email_sends for ${contact.email}`);
-          } catch (logError) {
-            console.error(`⚠️ [EmailSends] Failed to log to email_sends table:`, logError);
-          }
-          
           // Wait 20 seconds before sending promotional email
           console.log(`⏳ [SPLIT FLOW] Waiting 20 seconds before sending promo...`);
           await new Promise(resolve => setTimeout(resolve, 20000));
@@ -2075,57 +2024,6 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           );
 
           console.log(`✅ [SPLIT FLOW] Promotional email sent to ${contact.email}`);
-          
-          // Log promotional email to database
-          try {
-            await db.insert(emailActivity).values({
-              tenantId: tenantId,
-              contactId: contact.id,
-              activityType: 'sent',
-              activityData: JSON.stringify({ type: 'birthday-promotion', manual: true, split: true }),
-              occurredAt: new Date(),
-            });
-            console.log(`📝 [SPLIT FLOW] Logged promotional email activity for ${contact.email}`);
-          } catch (logError) {
-            console.error(`⚠️ [SPLIT FLOW] Failed to log promotional email activity:`, logError);
-          }
-          
-          // Log to email_sends table
-          try {
-            const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
-            await db.insert(emailSends).values({
-              id: emailSendId,
-              tenantId: tenantId,
-              recipientEmail: contact.email,
-              recipientName: recipientName,
-              senderEmail: 'admin@zendwise.work',
-              senderName: settings.senderName || 'Your Team',
-              subject: `🎁 ${settings.promotion?.title || 'Special Birthday Offer!'}`,
-              emailType: 'birthday_promotion',
-              provider: 'resend',
-              providerMessageId: typeof promoResult === 'string' ? promoResult : promoResult.messageId,
-              status: 'sent',
-              contactId: contact.id,
-              promotionId: settings.promotion?.id || null,
-              sentAt: new Date(),
-            });
-            
-            // Also store the content
-            await db.insert(emailContent).values({
-              emailSendId: emailSendId,
-              htmlContent: htmlPromo,
-              textContent: htmlPromo.replace(/<[^>]*>/g, ''),
-              metadata: JSON.stringify({
-                split: true,
-                manual: true,
-                birthdayCard: false,
-                promotional: true
-              })
-            });
-            console.log(`📧 [EmailSends] Logged promotional email to email_sends for ${contact.email}`);
-          } catch (logError) {
-            console.error(`⚠️ [EmailSends] Failed to log to email_sends table:`, logError);
-          }
 
           // Record both emails as success
           if (typeof birthdayResult === 'string' || (birthdayResult && birthdayResult.success)) {
@@ -2184,57 +2082,6 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
         // Handle result - can be EmailSendResult or string (queue ID)
         if (typeof result === 'string') {
           // Queued
-          // Log to database
-          try {
-            await db.insert(emailActivity).values({
-              tenantId: tenantId,
-              contactId: contact.id,
-              activityType: 'sent',
-              activityData: JSON.stringify({ type: 'birthday-card', manual: true, queued: true }),
-              occurredAt: new Date(),
-            });
-            console.log(`📝 [ManualBirthdayCard] Logged queued birthday card activity for ${contact.email}`);
-          } catch (logError) {
-            console.error(`⚠️ [ManualBirthdayCard] Failed to log queued birthday card activity:`, logError);
-          }
-          
-          // Log to email_sends table
-          try {
-            const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
-            await db.insert(emailSends).values({
-              id: emailSendId,
-              tenantId: tenantId,
-              recipientEmail: contact.email,
-              recipientName: recipientName,
-              senderEmail: 'admin@zendwise.work',
-              senderName: settings.senderName || 'Your Team',
-              subject: `🎉 Happy Birthday ${recipientName}!`,
-              emailType: 'birthday_card',
-              provider: 'resend',
-              providerMessageId: typeof result === 'string' ? result : result.messageId,
-              status: 'sent',
-              contactId: contact.id,
-              promotionId: null,
-              sentAt: new Date(),
-            });
-            
-            // Also store the content
-            await db.insert(emailContent).values({
-              emailSendId: emailSendId,
-              htmlContent: htmlContent,
-              textContent: htmlContent.replace(/<[^>]*>/g, ''),
-              metadata: JSON.stringify({
-                split: false,
-                manual: true,
-                birthdayCard: true,
-                promotional: false
-              })
-            });
-            console.log(`📧 [EmailSends] Logged birthday email to email_sends for ${contact.email}`);
-          } catch (logError) {
-            console.error(`⚠️ [EmailSends] Failed to log to email_sends table:`, logError);
-          }
-          
           console.log(`✅ [ManualBirthdayCard] Birthday card queued for ${contact.email}: ${result}`);
           results.push({
             contactId: contact.id,
@@ -2244,57 +2091,6 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           });
         } else if (result.success) {
           console.log(`✅ [ManualBirthdayCard] Birthday card sent to ${contact.email}`);
-          
-          // Log to database
-          try {
-            await db.insert(emailActivity).values({
-              tenantId: tenantId,
-              contactId: contact.id,
-              activityType: 'sent',
-              activityData: JSON.stringify({ type: 'birthday-card', manual: true }),
-              occurredAt: new Date(),
-            });
-            console.log(`📝 [ManualBirthdayCard] Logged birthday card activity for ${contact.email}`);
-          } catch (logError) {
-            console.error(`⚠️ [ManualBirthdayCard] Failed to log birthday card activity:`, logError);
-          }
-          
-          // Log to email_sends table
-          try {
-            const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
-            await db.insert(emailSends).values({
-              id: emailSendId,
-              tenantId: tenantId,
-              recipientEmail: contact.email,
-              recipientName: recipientName,
-              senderEmail: 'admin@zendwise.work',
-              senderName: settings.senderName || 'Your Team',
-              subject: `🎉 Happy Birthday ${recipientName}!`,
-              emailType: 'birthday_card',
-              provider: 'resend',
-              providerMessageId: result.messageId,
-              status: 'sent',
-              contactId: contact.id,
-              promotionId: settings.promotion?.id || null,
-              sentAt: new Date(),
-            });
-            
-            // Also store the content
-            await db.insert(emailContent).values({
-              emailSendId: emailSendId,
-              htmlContent: htmlContent,
-              textContent: htmlContent.replace(/<[^>]*>/g, ''),
-              metadata: JSON.stringify({
-                split: false,
-                manual: true,
-                birthdayCard: true,
-                promotional: !!settings.promotion
-              })
-            });
-            console.log(`📧 [EmailSends] Logged birthday email to email_sends for ${contact.email}`);
-          } catch (logError) {
-            console.error(`⚠️ [EmailSends] Failed to log to email_sends table:`, logError);
-          }
           results.push({
             contactId: contact.id,
             email: contact.email,
