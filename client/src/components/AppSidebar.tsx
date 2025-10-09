@@ -20,6 +20,7 @@ import {
   X,
   Megaphone,
   Bell,
+  FileText,
 } from "lucide-react";
 import logoUrl from "@assets/logo.png";
 import { cn } from "@/lib/utils";
@@ -74,6 +75,7 @@ const getNavigation = (userRole?: string, t?: any) => {
     { name: t?.('navigation.newsletter') || "Newsletter", href: "/newsletter", icon: Newspaper },
     { name: t?.('navigation.promotions') || "Promotions", href: "/promotions", icon: Megaphone },
     { name: t?.('navigation.forms') || "Forms", href: "/forms", icon: ClipboardList },
+    { name: t?.('navigation.templates') || "Templates", href: "/templates", icon: FileText },
     { name: t?.('navigation.emailCampaigns') || "Email Campaigns", href: "/email-campaigns", icon: Mail },
     { name: t?.('navigation.emailTest') || "Email Test", href: "/email-test", icon: Settings },
     { name: t?.('navigation.birthdays') || "Birthdays", href: "/birthdays", icon: Gift },

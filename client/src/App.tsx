@@ -49,6 +49,7 @@ const RemindersPage = lazy(() => import("@/pages/reminders"));
 const ConfirmAppointmentPage = lazy(() => import("@/pages/confirm-appointment"));
 const PromotionsPage = lazy(() => import("@/pages/promotions"));
 const CreatePromotionPage = lazy(() => import("@/pages/promotions/create"));
+const TemplatesPage = lazy(() => import("@/pages/templates"));
 const EditEmailCampaignPage = lazy(() => import("@/pages/email-campaigns/edit"));
 const UpdateProfilePage = lazy(() => import("@/pages/update-profile"));
 
@@ -213,6 +214,7 @@ function Router() {
                   <Route path="/newsletters/:id" component={NewsletterViewPage} />
                   <Route path="/promotions" component={PromotionsPage} />
                   <Route path="/promotions/create" component={CreatePromotionPage} />
+                  <Route path="/templates" component={TemplatesPage} />
                   <Route path="/company" component={CompanyPage} />
                   <Route path="/campaigns/create" component={CreateCampaignPage} />
                   <Route path="/email-campaigns" component={EmailCampaignsPage} />

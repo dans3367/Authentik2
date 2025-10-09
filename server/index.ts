@@ -27,7 +27,14 @@ app.use(helmetMiddleware);
 
 // Static CORS and security headers
 app.use((req, res, next) => {
-  const allowedOrigin = process.env.CORS_ORIGIN || '*';
+  const origin = req.headers.origin;
+  let allowedOrigin = process.env.CORS_ORIGIN || '*';
+  
+  // Allow localhost and 127.0.0.1 on any port to support browser previews
+  if (origin && (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:'))) {
+    allowedOrigin = origin;
+  }
+  
   res.header('Access-Control-Allow-Origin', allowedOrigin);
   res.header('Vary', 'Origin');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
