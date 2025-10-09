@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -160,6 +160,7 @@ interface TemplateCardProps {
   onDuplicate: (template: Template) => void;
   onDelete: (id: string) => void;
   onUse: (template: Template) => void;
+  onEdit: (template: Template) => void;
 }
 
 function getChannelBadgeClasses(channel: TemplateChannel) {
@@ -177,7 +178,7 @@ function getChannelBadgeClasses(channel: TemplateChannel) {
   }
 }
 
-function TemplateCard({ template, onToggleFavorite, onDuplicate, onDelete, onUse }: TemplateCardProps) {
+function TemplateCard({ template, onToggleFavorite, onDuplicate, onDelete, onUse, onEdit }: TemplateCardProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
 
   return (
@@ -223,6 +224,7 @@ function TemplateCard({ template, onToggleFavorite, onDuplicate, onDelete, onUse
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => onEdit(template)}>Edit</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setPreviewOpen(true)}>Preview</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onDuplicate(template)}>Duplicate</DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -453,12 +455,187 @@ function CreateTemplateDialog({ onCreate }: CreateTemplateDialogProps) {
   );
 }
 
+interface EditTemplateDialogProps {
+  template: Template | null;
+  onSave: (id: string, payload: CreateTemplatePayload) => void;
+  onCancel: () => void;
+}
+
+function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogProps) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [channel, setChannel] = useState<TemplateChannel>("individual");
+  const [category, setCategory] = useState<TemplateCategory>("welcome");
+  const [subjectLine, setSubjectLine] = useState("");
+  const [content, setContent] = useState("");
+  const [tagInput, setTagInput] = useState("");
+
+  // Initialize form when template changes
+  useEffect(() => {
+    if (template) {
+      setName(template.name);
+      setChannel(template.channel);
+      setCategory(template.category);
+      setSubjectLine(template.subjectLine);
+      setContent(template.body);
+      setTagInput(template.tags.join(", "));
+      setOpen(true);
+    }
+  }, [template]);
+
+  const resetForm = () => {
+    setName("");
+    setChannel("individual");
+    setCategory("welcome");
+    setSubjectLine("");
+    setContent("");
+    setTagInput("");
+  };
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!template || !name.trim() || !subjectLine.trim() || !hasContent(content)) {
+      return;
+    }
+
+    const tags = tagInput
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+
+    onSave(template.id, {
+      name: name.trim(),
+      channel,
+      category,
+      subjectLine: subjectLine.trim(),
+      content: content.trim(),
+      tags,
+    });
+
+    resetForm();
+    setOpen(false);
+    onCancel();
+  };
+
+  const handleCancel = () => {
+    resetForm();
+    setOpen(false);
+    onCancel();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleCancel}>
+      <DialogContent className="sm:max-w-[650px] max-h-[85vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="space-y-6 pb-2">
+          <DialogHeader>
+            <DialogTitle>Edit template</DialogTitle>
+            <DialogDescription>
+              Update your template content, channel, or category.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-template-name">Template name</Label>
+              <Input
+                id="edit-template-name"
+                placeholder="e.g. New customer welcome"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                required
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="edit-template-channel">Channel</Label>
+              <Select value={channel} onValueChange={(value: TemplateChannel) => setChannel(value)}>
+                <SelectTrigger id="edit-template-channel">
+                  <SelectValue placeholder="Select channel" />
+                </SelectTrigger>
+                <SelectContent>
+                  {channelOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{option.label}</span>
+                        <span className="text-xs text-muted-foreground">{option.description}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="edit-template-category">Category</Label>
+              <Select value={category} onValueChange={(value: TemplateCategory) => setCategory(value)}>
+                <SelectTrigger id="edit-template-category">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categoryOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="edit-template-subject">Subject line</Label>
+              <Input
+                id="edit-template-subject"
+                placeholder="e.g. Welcome to {{company_name}}"
+                value={subjectLine}
+                onChange={(event) => setSubjectLine(event.target.value)}
+                required
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="edit-template-content">Content</Label>
+              <RichTextEditor
+                value={content}
+                onChange={setContent}
+                placeholder="Write your email content or paste HTML"
+                className="min-h-[200px]"
+              />
+              <p className="text-xs text-muted-foreground">
+                {"Use liquid-style variables such as {{first_name}} or {{order_number}} to personalise your message."}
+              </p>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="edit-template-tags">Tags</Label>
+              <Input
+                id="edit-template-tags"
+                placeholder="Comma separated e.g. onboarding, v1"
+                value={tagInput}
+                onChange={(event) => setTagInput(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 justify-end">
+            <Button type="button" variant="outline" onClick={handleCancel}>
+              Cancel
+            </Button>
+            <Button type="submit">Save changes</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>(initialTemplates);
   const [searchTerm, setSearchTerm] = useState("");
   const [channelFilter, setChannelFilter] = useState<"all" | TemplateChannel>("all");
   const [categoryFilter, setCategoryFilter] = useState<"all" | TemplateCategory>("all");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const { toast } = useToast();
 
   const filteredTemplates = useMemo(() => {
@@ -567,6 +744,35 @@ export default function TemplatesPage() {
     toast({
       title: "Template duplicated",
       description: `${template.name} copy is ready to edit.`,
+    });
+  };
+
+  const handleEditTemplate = (template: Template) => {
+    setEditingTemplate(template);
+  };
+
+  const handleSaveEdit = (id: string, payload: CreateTemplatePayload) => {
+    const now = new Date().toISOString();
+    setTemplates((previous) =>
+      previous.map((template) =>
+        template.id === id
+          ? {
+              ...template,
+              name: payload.name,
+              channel: payload.channel,
+              category: payload.category,
+              subjectLine: payload.subjectLine,
+              preview: payload.content.slice(0, 160),
+              body: payload.content,
+              updatedAt: now,
+              tags: payload.tags,
+            }
+          : template
+      )
+    );
+    toast({
+      title: "Template updated",
+      description: `${payload.name} has been saved.`,
     });
   };
 
@@ -683,12 +889,18 @@ export default function TemplatesPage() {
                     onDuplicate={handleDuplicateTemplate}
                     onDelete={handleDeleteTemplate}
                     onUse={handleUseTemplate}
+                    onEdit={handleEditTemplate}
                   />
                 ))}
               </div>
             )}
           </div>
         </section>
+        <EditTemplateDialog
+          template={editingTemplate}
+          onSave={handleSaveEdit}
+          onCancel={() => setEditingTemplate(null)}
+        />
       </div>
     </div>
   );

@@ -698,6 +698,43 @@ func (r *Repository) GetTenant(tenantID string) (*models.Tenant, error) {
 	return &tenant, nil
 }
 
+// GetCompany retrieves company information by tenant ID
+func (r *Repository) GetCompany(ctx context.Context, tenantID string) (*models.Company, error) {
+	query := `
+		SELECT id, tenant_id, owner_id, name, address, company_type, company_email, 
+		       phone, website, description, is_active, created_at, updated_at
+		FROM companies 
+		WHERE tenant_id = $1 AND is_active = true
+		LIMIT 1
+	`
+
+	var company models.Company
+	err := r.db.QueryRowContext(ctx, query, tenantID).Scan(
+		&company.ID,
+		&company.TenantID,
+		&company.OwnerID,
+		&company.Name,
+		&company.Address,
+		&company.CompanyType,
+		&company.CompanyEmail,
+		&company.Phone,
+		&company.Website,
+		&company.Description,
+		&company.IsActive,
+		&company.CreatedAt,
+		&company.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // No company found
+		}
+		return nil, fmt.Errorf("failed to get company: %w", err)
+	}
+
+	return &company, nil
+}
+
 // CreateBirthdayUnsubscribeToken creates a new unsubscribe token for a contact
 func (r *Repository) CreateBirthdayUnsubscribeToken(ctx context.Context, tenantID, contactID, token string) (*models.BirthdayUnsubscribeToken, error) {
 	id := uuid.New().String()

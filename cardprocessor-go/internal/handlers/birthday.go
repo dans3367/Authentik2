@@ -500,7 +500,16 @@ func (h *BirthdayHandler) SendTestBirthdayCard(c *gin.Context) {
 
 	// Get tenant name for the workflow
 	tenantName := "Your Company" // Default fallback
-	// TODO: Get actual tenant name from database if needed
+	// Get actual tenant name from company table
+	company, err := h.repo.GetCompany(context.Background(), tenantID)
+	if err != nil {
+		fmt.Printf("⚠️ [Birthday Test] Failed to fetch company: %v\n", err)
+	} else if company != nil {
+		tenantName = company.Name
+		fmt.Printf("✅ [Birthday Test] Using company name: %s\n", tenantName)
+	} else {
+		fmt.Printf("⚠️ [Birthday Test] No active company found for tenant %s, using default\n", tenantID)
+	}
 
 	fmt.Printf("🎂 [Birthday Test] Checking Temporal client availability...\n")
 	fmt.Printf("🎂 [Birthday Test] Temporal client: %v\n", h.temporalClient != nil)

@@ -27,9 +27,13 @@ const getBaseURL = () => {
     return import.meta.env.VITE_BETTER_AUTH_URL;
   }
   
-  // In browser, use current origin (for Replit and other hosted environments)
+  // In browser, check if we're in a browser preview (127.0.0.1:35145) and redirect to localhost:5000
   if (typeof window !== 'undefined') {
-    return window.location.origin;
+    const origin = window.location.origin;
+    if (origin === 'http://127.0.0.1:35145') {
+      return 'http://localhost:5000';
+    }
+    return origin;
   }
   
   // Fallback for localhost development

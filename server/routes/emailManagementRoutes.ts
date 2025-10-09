@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, and } from 'drizzle-orm';
-import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, emailActivity, tenants, emailSends, emailContent } from '@shared/schema';
+import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, emailActivity, tenants, emailSends, emailContent, companies } from '@shared/schema';
 import { deleteImageFromR2 } from '../config/r2';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { type ContactFilters, type BouncedEmailFilters } from '@shared/schema';
@@ -1246,6 +1246,11 @@ emailManagementRoutes.get("/birthday-settings", authenticateToken, requireTenant
       },
     });
 
+    // Get company information to get company name
+    const company = await db.query.companies.findFirst({
+      where: sql`${companies.tenantId} = ${req.user.tenantId} AND ${companies.isActive} = true`,
+    });
+
     // If no settings exist, return default settings
     if (!settings) {
       console.log('🎨 [Birthday Settings GET] No settings found, returning defaults');
@@ -1255,7 +1260,7 @@ emailManagementRoutes.get("/birthday-settings", authenticateToken, requireTenant
         emailTemplate: 'default',
         segmentFilter: 'all',
         customMessage: '',
-        senderName: 'Birthday Team',
+        senderName: company?.name || 'Your Company',
         promotionId: null,
         promotion: null,
         created_at: new Date().toISOString(),
@@ -1267,7 +1272,7 @@ emailManagementRoutes.get("/birthday-settings", authenticateToken, requireTenant
     // Ensure senderName is always present with a default value
     const settingsWithDefaults = {
       ...settings,
-      senderName: settings.senderName || 'Birthday Team'
+      senderName: settings.senderName || company?.name || 'Your Company'
     };
 
     console.log('🎨 [Birthday Settings GET] Returning settings:', {
@@ -1317,9 +1322,16 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
     }
 
     // Handle senderName - use default if not provided, null, or empty
-    const finalSenderName = (senderName && typeof senderName === 'string' && senderName.trim() !== '')
-      ? senderName.trim()
-      : 'Birthday Team';
+    let finalSenderName: string;
+    if (senderName && typeof senderName === 'string' && senderName.trim() !== '') {
+      finalSenderName = senderName.trim();
+    } else {
+      // Get company name as fallback
+      const company = await db.query.companies.findFirst({
+        where: sql`${companies.tenantId} = ${req.user.tenantId} AND ${companies.isActive} = true`,
+      });
+      finalSenderName = company?.name || 'Your Company';
+    }
 
     // Validate promotionId if provided
     if (promotionId !== null && promotionId !== undefined && typeof promotionId !== 'string') {

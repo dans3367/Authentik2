@@ -40,6 +40,7 @@ const authInstance = betterAuth({
   trustedOrigins: [
     `http://localhost:${process.env.PORT || "5000"}`,
     "http://localhost:5173",
+    "http://127.0.0.1:35145", // Browser preview URL
     "https://weby.zendwise.work",
     "http://weby.zendwise.work:3001",
     "http://websy.zendwise.work:3001",
