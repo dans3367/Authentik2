@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import RichTextEditor from "@/components/RichTextEditor";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Search, ZoomIn, ZoomOut, Move, RotateCcw, Smile, RefreshCw, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Search, ZoomIn, ZoomOut, Move, RotateCcw, Smile, RefreshCw, ChevronLeft, ChevronRight, X, AlertTriangle } from "lucide-react";
 import { uploadCardImage, validateCardImageFile } from "@/lib/cardImageUpload";
 
 type DesignerData = {
@@ -45,6 +45,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   const [imageUrl, setImageUrl] = useState<string | null>(initialData?.imageUrl ??
     (initialThemeId === "sparkle-cake" ? "/images/birthday-sparkle.jpg" : null));
   const [signature, setSignature] = useState(initialData?.signature ?? "");
+  const [emojiCount, setEmojiCount] = useState<number>(0);
   const [customImage, setCustomImage] = useState<boolean>(initialData?.customImage ?? false);
   const [unsplashOpen, setUnsplashOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -166,6 +167,29 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     setHasUnsavedChanges(false);
 
   }, [open, initialThemeId, initialData]);
+
+  // Emoji count: compute based on plain text extracted from the rich text HTML
+  useEffect(() => {
+    if (!open) return;
+    const extractText = (html: string): string => {
+      const div = document.createElement('div');
+      div.innerHTML = html || '';
+      return div.textContent || div.innerText || '';
+    };
+    const countEmojis = (text: string): number => {
+      try {
+        // Prefer modern Unicode property escape when available
+        const re = /\p{Extended_Pictographic}/gu;
+        return (text.match(re) || []).length;
+      } catch {
+        // Fallback broad ranges covering most emoji blocks
+        const re = /[\u203C-\u3299\u00A9\u00AE\u2122\u231A-\u231B\u23E9-\u23EC\u23F0\u23F3\u25FD-\u25FE\u2600-\u27BF\u2B50\u2B55\u2934-\u2935\u2194-\u2199\u1F004\u1F0CF\u1F170-\u1F171\u1F17E-\u1F17F\u1F18E\u1F191-\u1F19A\u1F1E6-\u1F1FF\u1F201-\u1F202\u1F21A\u1F22F\u1F232-\u1F23A\u1F250-\u1F251\u1F300-\u1F6FF\u1F900-\u1F9FF\u1FA70-\u1FAFF]/g;
+        return (text.match(re) || []).length;
+      }
+    };
+    const plain = extractText(message);
+    setEmojiCount(countEmojis(plain));
+  }, [open, message]);
 
   // Load persistent Unsplash search state only once when modal opens
   useEffect(() => {
@@ -1062,6 +1086,19 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                 customerInfo={customerInfo}
                 businessName={businessName}
               />
+
+              {/* Emoji counter and deliverability warning */}
+              <div className="mt-2">
+                <div className="text-xs text-gray-500">Emojis detected in message: {emojiCount}</div>
+                {emojiCount > 1 && (
+                  <div className="mt-2 flex items-start gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 rounded p-2">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 text-orange-700" />
+                    <span>
+                      <strong>Warning:</strong> More than one emoji could affect email delivery to inbox and place your mail under Promotions or Spam.
+                    </span>
+                  </div>
+                )}
+              </div>
 
               <div className="flex items-center justify-end text-gray-500 text-xs sm:text-sm">
                 <Input
