@@ -389,7 +389,6 @@ export default function EmailTestPage() {
         templateType: campaignData.templateType,
         priority: campaignData.priority,
         isScheduled: campaignData.isScheduled,
-        scheduledAt: scheduledAtISO,
         tenantId: campaignData.tenantId,
         userId: campaignData.userId,
         metadata: {

@@ -328,7 +328,7 @@ async function generateBirthdayInvitationHTML(input: any): Promise<string> {
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5000'],
+  origin: ['http://localhost:5173', 'http://localhost:5000', 'http://100.96.48.14:5001'],
   credentials: true
 }));
 app.use(morgan('combined'));

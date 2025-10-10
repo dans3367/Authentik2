@@ -1,12 +1,11 @@
-import { useState } from 'react';
-import { useLocation } from 'wouter';
+import { useState, useEffect } from 'react';
+import { useLocation, useRoute } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Plus, Loader2, Calendar, Megaphone, Settings, ChevronDown, ChevronUp, Save, Upload, Wand2, Code, Copy, RefreshCw } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, Loader2, Megaphone, ChevronDown, ChevronUp, Save, Upload, Wand2, Code, Copy, RefreshCw } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { Badge } from '@/components/ui/badge';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { generatePromotionalCodes, parseUserCodes, validatePromotionalCodes, formatCodesForDisplay, CODE_GENERATION_PRESETS, type CodeFormat } from '@/utils/codeGeneration';
+import { generatePromotionalCodes, parseUserCodes, validatePromotionalCodes, formatCodesForDisplay, type CodeFormat } from '@/utils/codeGeneration';
 import RichTextEditor from '@/components/RichTextEditor';
 
 const promotionTypeColors = {
@@ -26,10 +25,16 @@ const promotionTypeColors = {
   event: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300',
 };
 
-export default function CreatePromotionPage() {
+export default function EditPromotionPage() {
   const [, setLocation] = useLocation();
+  const [match, params] = useRoute('/promotions/:id/edit');
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const promotionId = params?.id;
+
+  // Debug logging
+  console.log('🔍 Edit page - Route match:', { match, params, promotionId });
 
   const [formData, setFormData] = useState({
     title: '',
@@ -57,23 +62,66 @@ export default function CreatePromotionPage() {
   });
   const [isCodeSectionOpen, setIsCodeSectionOpen] = useState(false);
 
-  const createPromotionMutation = useMutation({
+  // Fetch promotion data
+  const { data: promotion, isLoading, error } = useQuery({
+    queryKey: [`/api/promotions/${promotionId}`],
+    queryFn: async () => {
+      console.log('🔍 Fetching promotion with ID:', promotionId);
+      const res = await apiRequest('GET', `/api/promotions/${promotionId}`);
+      const json = await res.json();
+      console.log('🔍 Promotion data received (JSON):', json);
+      return json;
+    },
+    enabled: !!promotionId,
+  });
+
+  console.log('🔍 Query state:', { promotion, isLoading, error, enabled: !!promotionId });
+
+  // Populate form when promotion data loads
+  useEffect(() => {
+    if (promotion) {
+      const promotionData = promotion as any;
+      const validFrom = promotionData.validFrom ? new Date(promotionData.validFrom).toISOString().split('T')[0] : '';
+      const validTo = promotionData.validTo ? new Date(promotionData.validTo).toISOString().split('T')[0] : '';
+      
+      setFormData({
+        title: promotionData.title || '',
+        description: promotionData.description || '',
+        content: promotionData.content || '',
+        type: promotionData.type || 'newsletter',
+        targetAudience: promotionData.targetAudience || 'all',
+        isActive: promotionData.isActive ?? true,
+        maxUses: promotionData.maxUses ? String(promotionData.maxUses) : '',
+        validFrom,
+        validTo,
+        promotionalCodes: promotionData.promotionalCodes || [],
+      });
+
+      // Set user codes input if codes exist
+      if (promotionData.promotionalCodes && promotionData.promotionalCodes.length > 0) {
+        setUserCodesInput(formatCodesForDisplay(promotionData.promotionalCodes));
+      }
+    }
+  }, [promotion]);
+
+  const updatePromotionMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest('POST', '/api/promotions', data);
+      return apiRequest('PATCH', `/api/promotions/${promotionId}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/promotions'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/promotions/${promotionId}`] });
       queryClient.invalidateQueries({ queryKey: ['/api/promotion-stats'] });
       toast({
         title: "Success",
-        description: "Promotion created successfully",
+        description: "Promotion updated successfully",
       });
       setLocation('/promotions');
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to create promotion",
+        description: error.message || "Failed to update promotion",
         variant: "destructive",
       });
     },
@@ -86,7 +134,6 @@ export default function CreatePromotionPage() {
     const validation = validatePromotionalCodes(codes);
     
     if (validation.errors.length > 0) {
-      // Don't show toast for every keystroke, just update the codes
       setFormData({ ...formData, promotionalCodes: validation.valid });
     } else {
       setFormData({ ...formData, promotionalCodes: validation.valid });
@@ -171,12 +218,41 @@ export default function CreatePromotionPage() {
       return;
     }
 
-    createPromotionMutation.mutate(submitData);
+    updatePromotionMutation.mutate(submitData);
   };
 
   const handleCancel = () => {
     setLocation('/promotions');
   };
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-4 lg:p-6 flex items-center justify-center min-h-[400px]">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="text-muted-foreground">Loading promotion...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !promotion) {
+    return (
+      <div className="container mx-auto p-4 lg:p-6">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <p className="text-destructive">Failed to load promotion</p>
+              <Button onClick={handleCancel} variant="outline">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Promotions
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-4 lg:p-6 space-y-6 lg:space-y-8 max-w-4xl">
@@ -193,10 +269,10 @@ export default function CreatePromotionPage() {
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
-            Create New Promotion
+            Edit Promotion
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Create promotional content template for your email campaigns
+            Update promotional content template for your email campaigns
           </p>
         </div>
       </div>
@@ -321,6 +397,11 @@ export default function CreatePromotionPage() {
                       <div className="flex items-center gap-2">
                         <Code className="h-4 w-4" />
                         Code Generation Options
+                        {formData.promotionalCodes.length > 0 && (
+                          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
+                            {formData.promotionalCodes.length} codes
+                          </span>
+                        )}
                       </div>
                       {isCodeSectionOpen ? (
                         <ChevronUp className="h-4 w-4" />
@@ -415,28 +496,26 @@ export default function CreatePromotionPage() {
                         </div>
 
                         <div className="space-y-2">
-                          <Label>Code Format</Label>
+                          <Label htmlFor="codeFormat">Code Format</Label>
                           <Select 
                             value={generateOptions.format} 
-                            onValueChange={(value: CodeFormat) => setGenerateOptions({ 
-                              ...generateOptions, 
-                              format: value 
-                            })}
+                            onValueChange={(value: CodeFormat) => setGenerateOptions({ ...generateOptions, format: value })}
                           >
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="alphanumeric">Alphanumeric (A-Z, 0-9)</SelectItem>
-                              <SelectItem value="alphabetic">Alphabetic only (A-Z)</SelectItem>
-                              <SelectItem value="numeric">Numbers only (0-9)</SelectItem>
+                              <SelectItem value="alphabetic">Alphabetic (A-Z only)</SelectItem>
+                              <SelectItem value="numeric">Numeric (0-9 only)</SelectItem>
+                              <SelectItem value="hex">Hexadecimal (0-9, A-F)</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <Label htmlFor="codePrefix">Prefix (Optional)</Label>
+                            <Label htmlFor="codePrefix">Prefix (optional)</Label>
                             <Input
                               id="codePrefix"
                               value={generateOptions.prefix}
@@ -444,12 +523,12 @@ export default function CreatePromotionPage() {
                                 ...generateOptions, 
                                 prefix: e.target.value.toUpperCase() 
                               })}
-                              placeholder="e.g., SALE"
+                              placeholder="e.g., SAVE"
                               maxLength={10}
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="codeSuffix">Suffix (Optional)</Label>
+                            <Label htmlFor="codeSuffix">Suffix (optional)</Label>
                             <Input
                               id="codeSuffix"
                               value={generateOptions.suffix}
@@ -457,48 +536,58 @@ export default function CreatePromotionPage() {
                                 ...generateOptions, 
                                 suffix: e.target.value.toUpperCase() 
                               })}
-                              placeholder="e.g., OFF"
+                              placeholder="e.g., 2024"
                               maxLength={10}
                             />
                           </div>
                         </div>
 
-                        <Button
-                          type="button"
+                        <Button 
+                          type="button" 
                           onClick={handleGenerateCodes}
                           className="w-full"
+                          variant="secondary"
                         >
-                          <RefreshCw className="h-4 w-4 mr-2" />
+                          <Wand2 className="h-4 w-4 mr-2" />
                           Generate Codes
                         </Button>
                       </div>
                     )}
 
-                    {/* Generated/Uploaded Codes Display */}
+                    {/* Display Generated/Uploaded Codes */}
                     {formData.promotionalCodes.length > 0 && (
-                      <div className="space-y-3">
+                      <div className="space-y-3 pt-4 border-t">
                         <div className="flex items-center justify-between">
                           <Label>Generated Codes ({formData.promotionalCodes.length})</Label>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handleCopyCodesList}
-                          >
-                            <Copy className="h-4 w-4 mr-2" />
-                            Copy All
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={handleCopyCodesList}
+                            >
+                              <Copy className="h-4 w-4 mr-2" />
+                              Copy All
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setFormData({ ...formData, promotionalCodes: [] });
+                                setUserCodesInput('');
+                              }}
+                            >
+                              <RefreshCw className="h-4 w-4 mr-2" />
+                              Clear
+                            </Button>
+                          </div>
                         </div>
-                        <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded-lg border max-h-32 overflow-y-auto">
-                          <code className="text-xs text-wrap break-all">
+                        <div className="bg-muted p-3 rounded-md max-h-40 overflow-y-auto">
+                          <pre className="text-xs font-mono whitespace-pre-wrap break-all">
                             {formatCodesForDisplay(formData.promotionalCodes)}
-                          </code>
+                          </pre>
                         </div>
-                        {codeGenerationMode === 'upload' && (
-                          <p className="text-xs text-muted-foreground">
-                            Codes have been parsed and validated. Invalid codes were automatically removed.
-                          </p>
-                        )}
                       </div>
                     )}
                   </CollapsibleContent>
@@ -506,210 +595,137 @@ export default function CreatePromotionPage() {
               </CardContent>
             </Card>
 
-            {/* Advanced Settings Card */}
+            {/* Advanced Settings */}
             <Card>
               <CardHeader>
-                <CardTitle>Advanced Settings</CardTitle>
-              </CardHeader>
-              <CardContent>
                 <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
                   <CollapsibleTrigger asChild>
                     <Button 
                       type="button" 
-                      variant="outline" 
-                      size="sm" 
-                      className="w-full justify-between"
+                      variant="ghost" 
+                      className="w-full justify-between p-0 h-auto hover:bg-transparent"
                     >
-                      <div className="flex items-center gap-2">
-                        <Settings className="h-4 w-4" />
-                        Advanced Options
-                      </div>
+                      <CardTitle className="flex items-center gap-2">
+                        Advanced Settings
+                      </CardTitle>
                       {isAdvancedOpen ? (
-                        <ChevronUp className="h-4 w-4" />
+                        <ChevronUp className="h-5 w-5" />
                       ) : (
-                        <ChevronDown className="h-4 w-4" />
+                        <ChevronDown className="h-5 w-5" />
                       )}
                     </Button>
                   </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-4 pt-4">
-                    <div className="grid grid-cols-1 gap-4">
-                      {/* Max Uses */}
+                </Collapsible>
+              </CardHeader>
+              <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
+                <CollapsibleContent>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="maxUses">Maximum Uses</Label>
+                        <Label htmlFor="validFrom">Valid From</Label>
                         <Input
-                          id="maxUses"
-                          type="number"
-                          min="1"
-                          value={formData.maxUses}
-                          onChange={(e) => setFormData({ ...formData, maxUses: e.target.value })}
-                          placeholder="Leave empty for unlimited uses"
+                          id="validFrom"
+                          type="date"
+                          value={formData.validFrom}
+                          onChange={(e) => setFormData({ ...formData, validFrom: e.target.value })}
                         />
-                        <p className="text-xs text-muted-foreground">
-                          Limit how many times this promotion can be used across all campaigns
-                        </p>
                       </div>
-
-                      {/* Date Range */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="validFrom">Valid From</Label>
-                          <Input
-                            id="validFrom"
-                            type="date"
-                            value={formData.validFrom}
-                            onChange={(e) => setFormData({ ...formData, validFrom: e.target.value })}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Promotion becomes active from this date
-                          </p>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="validTo">Valid To</Label>
-                          <Input
-                            id="validTo"
-                            type="date"
-                            value={formData.validTo}
-                            onChange={(e) => setFormData({ ...formData, validTo: e.target.value })}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Promotion expires after this date
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Additional Information */}
-                      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                        <div className="flex items-start gap-2">
-                          <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
-                          <div className="text-xs text-blue-800 dark:text-blue-200">
-                            <p className="font-medium mb-1">Advanced Settings Help:</p>
-                            <ul className="list-disc list-inside space-y-1">
-                              <li>Max uses limit applies globally across all campaigns</li>
-                              <li>Date range controls when the promotion is available for selection</li>
-                              <li>Expired promotions are automatically hidden from selection</li>
-                            </ul>
-                          </div>
-                        </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="validTo">Valid To</Label>
+                        <Input
+                          id="validTo"
+                          type="date"
+                          value={formData.validTo}
+                          onChange={(e) => setFormData({ ...formData, validTo: e.target.value })}
+                        />
                       </div>
                     </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              </CardContent>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="maxUses">Maximum Uses (optional)</Label>
+                      <Input
+                        id="maxUses"
+                        type="number"
+                        min="1"
+                        value={formData.maxUses}
+                        onChange={(e) => setFormData({ ...formData, maxUses: e.target.value })}
+                        placeholder="Leave empty for unlimited"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Limit how many times this promotion can be used across all campaigns
+                      </p>
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Collapsible>
             </Card>
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Preview Card */}
+            {/* Actions Card */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Preview</CardTitle>
+                <CardTitle>Actions</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="space-y-2">
-                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Title
-                    </div>
-                    <div className="text-sm font-medium">
-                      {formData.title || "Your promotion title will appear here"}
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Type
-                    </div>
-                    <Badge className={promotionTypeColors[formData.type]}>
-                      {formData.type}
-                    </Badge>
-                  </div>
-
-                  {formData.description && (
-                    <div className="space-y-2">
-                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        Description
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {formData.description}
-                      </div>
-                    </div>
+              <CardContent className="space-y-3">
+                <Button 
+                  type="submit" 
+                  className="w-full"
+                  disabled={updatePromotionMutation.isPending}
+                >
+                  {updatePromotionMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Update Promotion
+                    </>
                   )}
-                  
-                  <div className="space-y-2">
-                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Content Preview
-                    </div>
-                    <div className="text-sm text-muted-foreground max-h-32 overflow-y-auto leading-relaxed bg-gray-50 dark:bg-gray-900 p-3 rounded border">
-                      {formData.content ? (
-                        <div dangerouslySetInnerHTML={{ __html: formData.content }} className="prose prose-sm max-w-none" />
-                      ) : (
-                        <span className="text-xs italic">Your promotional content will appear here as you type...</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Target Audience
-                    </div>
-                    <div className="text-sm">
-                      {formData.targetAudience}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Status
-                    </div>
-                    <Badge variant={formData.isActive ? "default" : "secondary"}>
-                      {formData.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  </div>
-
-                  {formData.promotionalCodes.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        Promotional Codes
-                      </div>
-                      <div className="text-sm">
-                        {formData.promotionalCodes.length} code{formData.promotionalCodes.length !== 1 ? 's' : ''} added
-                      </div>
-                      <div className="bg-gray-50 dark:bg-gray-900 p-2 rounded text-xs max-h-20 overflow-y-auto">
-                        <code className="text-wrap break-all">
-                          {formData.promotionalCodes.slice(0, 5).join(' ')}
-                          {formData.promotionalCodes.length > 5 && ' ...'}
-                        </code>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={handleCancel}
+                  disabled={updatePromotionMutation.isPending}
+                >
+                  Cancel
+                </Button>
               </CardContent>
             </Card>
 
-            {/* Action Buttons */}
+            {/* Info Card */}
             <Card>
-              <CardContent className="pt-6">
-                <div className="space-y-3">
-                  <Button 
-                    type="submit" 
-                    className="w-full"
-                    disabled={createPromotionMutation.isPending}
-                  >
-                    {createPromotionMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    <Save className="h-4 w-4 mr-2" />
-                    Create Promotion
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    className="w-full"
-                    onClick={handleCancel}
-                    disabled={createPromotionMutation.isPending}
-                  >
-                    Cancel
-                  </Button>
+              <CardHeader>
+                <CardTitle>Promotion Info</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Created</p>
+                  <p className="font-medium">
+                    {(promotion as any)?.createdAt ? new Date((promotion as any).createdAt).toLocaleDateString() : 'N/A'}
+                  </p>
                 </div>
+                <div>
+                  <p className="text-muted-foreground">Last Updated</p>
+                  <p className="font-medium">
+                    {(promotion as any)?.updatedAt ? new Date((promotion as any).updatedAt).toLocaleDateString() : 'N/A'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Times Used</p>
+                  <p className="font-medium">{(promotion as any)?.usageCount || 0}</p>
+                </div>
+                {(promotion as any)?.maxUses && (
+                  <div>
+                    <p className="text-muted-foreground">Max Uses</p>
+                    <p className="font-medium">{(promotion as any).maxUses}</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

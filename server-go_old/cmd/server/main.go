@@ -238,6 +238,7 @@ func enableCORS(next http.Handler) http.Handler {
 		// Define allowed origins
 		allowedOrigins := []string{
 			"http://localhost:5173",           // Local development (Vite)
+			"http://100.96.48.14:5001",        // Local development (Vite)
 			"http://localhost:3500",           // Local development (main app)
 			"https://app.zendwise.work",       // Production main app
 			"https://zendwise.work",           // Production main domain

@@ -9,7 +9,8 @@ const {
   sendEmailViaResend,
   sendEmailViaPostmark,
   getAvailableEmailProviders,
-  insertOutgoingEmail
+  insertOutgoingEmail,
+  getCompanyName
 } = proxyActivities<typeof activities>({
   startToCloseTimeout: '5 minutes',
   heartbeatTimeout: '1 minute',
@@ -93,6 +94,22 @@ export async function emailWorkflow(
     // Render birthday templates if requested and not pre-rendered
     let htmlContent = input.content;
     if ((input.templateType === 'birthday' || input.templateType === 'birthday-ecard') && typeof input.metadata?.birthdayTemplate === 'string') {
+      // Fetch company name if senderName is missing
+      let resolvedSenderName = input.metadata?.senderName;
+      if (!resolvedSenderName && input.tenantId) {
+        try {
+          const companyResult = await getCompanyName({ tenantId: input.tenantId });
+          if (companyResult.success) {
+            resolvedSenderName = companyResult.companyName;
+            workflowLogger.info(`🏢 Fetched company name for sender: ${resolvedSenderName}`);
+          } else {
+            workflowLogger.warn(`⚠️ Failed to fetch company name: ${companyResult.error}`);
+          }
+        } catch (error) {
+          workflowLogger.warn(`⚠️ Error fetching company name: ${error}`);
+        }
+      }
+
       // Skip template rendering if content was pre-rendered (marked in metadata)
       if (input.metadata?.preRendered) {
         workflowLogger.info(`🎂 Using pre-rendered birthday template: ${input.metadata.birthdayTemplate}`);
@@ -104,7 +121,7 @@ export async function emailWorkflow(
             message: input.metadata?.message,
             imageUrl: input.metadata?.imageUrl,
             customThemeData: input.metadata?.customThemeData,
-            senderName: input.metadata?.senderName || 'Your Team',
+            senderName: resolvedSenderName,
             promotionContent: input.metadata?.promotionContent,
             promotionTitle: input.metadata?.promotionTitle,
             promotionDescription: input.metadata?.promotionDescription,
@@ -119,7 +136,7 @@ export async function emailWorkflow(
               message: input.metadata?.message || 'Happy Birthday!',
               brandName: input.metadata?.brandName || 'Your Company',
               customThemeData: input.metadata?.customThemeData,
-              senderName: input.metadata?.senderName || 'Your Team',
+              senderName: resolvedSenderName || 'Your Team',
               promotionContent: input.metadata?.promotionContent,
               promotionTitle: input.metadata?.promotionTitle,
               promotionDescription: input.metadata?.promotionDescription,

@@ -7,25 +7,30 @@ const router = Router();
 // Other models: meta/llama-3.1-8b, google/gemini-2.0-flash-lite, xai/grok-3-mini, meta/llama-4-scout
 const AI_MODEL = 'google/gemini-2.5-flash-lite';
 
+function ensureApiKey(res: any) {
+  const apiKey = process.env.AI_GATEWAY_API_KEY;
+  if (!apiKey) {
+    res.status(500).json({
+      success: false,
+      error: "AI Gateway API key not configured",
+    });
+    return false;
+  }
+  return true;
+}
+
 // POST /api/ai/generate-birthday-message
-// Generate a birthday card message using AI
+// Generate a promotional message using AI
 router.post("/generate-birthday-message", async (req, res) => {
   try {
     const { customerName, businessName } = req.body;
 
-    // Validate API key
-    const apiKey = process.env.AI_GATEWAY_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({
-        success: false,
-        error: "AI Gateway API key not configured"
-      });
+    if (!ensureApiKey(res)) {
+      return;
     }
 
-    // Construct the prompt
-    const promptText = `Create a warm and professional happy birthday card greeting from ${businessName || "our business"} to our customer${customerName ? ` ${customerName}` : ""}. The message should be friendly, sincere, and appropriate for a business-to-customer relationship. Keep it concise (2-3 sentences) and celebratory. Do not include a greeting like "Dear" or a signature - just the birthday message body. Do not use phrases like "At [Company Name]" or similar company references. Format the output as a single HTML <p> tag containing all the text. Do not use multiple paragraph tags or add extra line breaks. Return only the raw HTML content - do not wrap it in markdown code blocks (\`\`\`html or \`\`\`), backticks, or any other formatting. Return the HTML directly.`;
+    const promptText = `Create a warm and professional promotional message from ${businessName || "our business"} to our customer${customerName ? ` ${customerName}` : ""}. Highlight the value of the promotion in a friendly, sincere tone suitable for a business-to-customer relationship. Keep it concise (2-3 sentences) and focused on the offer. Do not include a greeting like "Dear" or a signature—just the promotional message body. Do not use phrases like "At [Company Name]" or similar company references. Format the output as a single HTML <p> tag containing all the text. Do not use multiple paragraph tags or add extra line breaks. Return only the raw HTML content without markdown code fences or backticks.`;
 
-    // Generate the text using AI Gateway with plain model string
     const { text } = await generateText({
       model: AI_MODEL,
       prompt: promptText,
@@ -36,10 +41,10 @@ router.post("/generate-birthday-message", async (req, res) => {
       message: text,
     });
   } catch (error: any) {
-    console.error("Error generating birthday message:", error);
+    console.error("Error generating promotional message:", error);
     res.status(500).json({
       success: false,
-      error: error.message || "Failed to generate birthday message",
+      error: error.message || "Failed to generate promotional message",
     });
   }
 });
@@ -50,26 +55,21 @@ router.post("/improve-text", async (req, res) => {
   try {
     const { text } = req.body;
 
-    if (!text || typeof text !== 'string') {
+    if (!text || typeof text !== "string") {
       return res.status(400).json({
         success: false,
-        error: "Text is required"
+        error: "Text is required",
       });
     }
 
-    // Validate API key
-    const apiKey = process.env.AI_GATEWAY_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({
-        success: false,
-        error: "AI Gateway API key not configured"
-      });
+    if (!ensureApiKey(res)) {
+      return;
     }
 
-    // Construct the prompt for improving the text
-    const promptText = `Improve the following birthday greeting from a business to a customer. Make it more engaging, clear, and professional while maintaining its original meaning and tone. Change any first-person singular pronouns (I, me, my) to first-person plural (we, us, our) to reflect that this message is from a business. Keep the improved version concise and natural. Do not use phrases like "At [Company Name]" or similar company references. Format the output as HTML, using one <p> tag per logical paragraph (group related sentences together). Do not put each sentence in its own <p> tag. Do not add extra line breaks between paragraphs. Return only the raw HTML content - do not wrap it in markdown code blocks (\`\`\`html or \`\`\`), backticks, or any other formatting. Return the HTML directly.\n\n${text}`;
+    const promptText = `Improve the following promotional message from a business to a customer. Make it more engaging, clear, and professional while maintaining its original meaning and tone. Change any first-person singular pronouns (I, me, my) to first-person plural (we, us, our) to reflect that this copy is from a business. Keep the improved version concise and natural. Do not use phrases like "At [Company Name]" or similar company references. Format the output as HTML, using one <p> tag per logical paragraph (group related sentences together). Do not put each sentence in its own <p> tag. Do not add extra line breaks between paragraphs. Return only the raw HTML content without markdown code fences or backticks.
 
-    // Generate the improved text using AI Gateway
+${text}`;
+
     const { text: improvedText } = await generateText({
       model: AI_MODEL,
       prompt: promptText,
@@ -101,15 +101,13 @@ router.post("/emojify-text", async (req, res) => {
       });
     }
 
-    const apiKey = process.env.AI_GATEWAY_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({
-        success: false,
-        error: "AI Gateway API key not configured",
-      });
+    if (!ensureApiKey(res)) {
+      return;
     }
 
-    const promptText = `Add tasteful, celebratory emojis to the following birthday greeting from a business to a customer. Change any first-person singular pronouns (I, me, my) to first-person plural (we, us, our) to reflect that this message is from a business. Keep the original wording otherwise intact, only add or swap in emojis where they naturally enhance the sentiment. Avoid overusing emojis and do not include explanations. Do not use phrases like "At [Company Name]" or similar company references. Format the output as HTML, using one <p> tag per logical paragraph (group related sentences together). Do not put each sentence in its own <p> tag. Do not add extra line breaks between paragraphs. Return only the raw HTML content - do not wrap it in markdown code blocks (\`\`\`html or \`\`\`), backticks, or any other formatting. Return the HTML directly.\n\n${text}`;
+    const promptText = `Add tasteful, celebratory emojis to the following promotional message from a business to a customer. Change any first-person singular pronouns (I, me, my) to first-person plural (we, us, our) to reflect that this copy is from a business. Keep the original wording otherwise intact—only add or swap in emojis where they naturally enhance the sentiment. Avoid overusing emojis and do not include explanations. Do not use phrases like "At [Company Name]" or similar company references. Format the output as HTML, using one <p> tag per logical paragraph (group related sentences together). Do not put each sentence in its own <p> tag. Do not add extra line breaks between paragraphs. Return only the raw HTML content without markdown code fences or backticks.
+
+${text}`;
 
     const { text: emojified } = await generateText({
       model: AI_MODEL,
@@ -142,15 +140,13 @@ router.post("/expand-text", async (req, res) => {
       });
     }
 
-    const apiKey = process.env.AI_GATEWAY_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({
-        success: false,
-        error: "AI Gateway API key not configured",
-      });
+    if (!ensureApiKey(res)) {
+      return;
     }
 
-    const promptText = `Expand the following birthday greeting from a business to a customer to be slightly longer (around 30-40% more words) while keeping the original tone, message, and professionalism. Change any first-person singular pronouns (I, me, my) to first-person plural (we, us, our) to reflect that this message is from a business. Do not add a salutation or signature. Do not use phrases like "At [Company Name]" or similar company references. Format the output as HTML, using one <p> tag per logical paragraph (group related sentences together). Do not put each sentence in its own <p> tag. Do not add extra line breaks between paragraphs. Return only the raw HTML content - do not wrap it in markdown code blocks (\`\`\`html or \`\`\`), backticks, or any other formatting. Return the HTML directly.\n\n${text}`;
+    const promptText = `Expand the following promotional message from a business to a customer to be slightly longer (around 30-40% more words) while keeping the original tone, message, and professionalism. Change any first-person singular pronouns (I, me, my) to first-person plural (we, us, our) to reflect that this copy is from a business. Do not add a salutation or signature. Do not use phrases like "At [Company Name]" or similar company references. Format the output as HTML, using one <p> tag per logical paragraph (group related sentences together). Do not put each sentence in its own <p> tag. Do not add extra line breaks between paragraphs. Return only the raw HTML content without markdown code fences or backticks.
+
+${text}`;
 
     const { text: expanded } = await generateText({
       model: AI_MODEL,
@@ -183,31 +179,28 @@ router.post("/shorten-text", async (req, res) => {
       });
     }
 
-    const apiKey = process.env.AI_GATEWAY_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({
-        success: false,
-        error: "AI Gateway API key not configured",
-      });
+    if (!ensureApiKey(res)) {
+      return;
     }
 
-    const promptText = `You are a text editor. Your task is to make the following birthday greeting shorter and more concise.
+    const promptText = `You are a text editor. Your task is to make the following promotional message shorter and more concise.
 
 RULES:
 1. Remove unnecessary words while keeping the core message
-2. Change "I/me/my" to "we/us/our" 
+2. Change "I/me/my" to "we/us/our"
 3. Keep the warm, friendly tone
 4. Do NOT add greetings, signatures, or company references like "At [Company Name]"
 5. Format as HTML with <p> tags (one per paragraph, group related sentences)
-6. Return ONLY the shortened HTML - no explanations, no markdown code blocks
+6. Return ONLY the shortened HTML—no explanations and no markdown code fences
 
 TEXT TO SHORTEN:
 ${text}`;
-console.log(text);
+
     const { text: shortened } = await generateText({
       model: AI_MODEL,
       prompt: promptText,
     });
+
     res.json({
       success: true,
       shortenedText: shortened.trim(),
@@ -234,15 +227,13 @@ router.post("/more-casual-text", async (req, res) => {
       });
     }
 
-    const apiKey = process.env.AI_GATEWAY_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({
-        success: false,
-        error: "AI Gateway API key not configured",
-      });
+    if (!ensureApiKey(res)) {
+      return;
     }
 
-    const promptText = `Rewrite the following birthday greeting from a business to a customer in a slightly more casual, conversational tone while keeping it professional and warm. Maintain the original intent and replace any first-person singular pronouns (I, me, my) with first-person plural (we, us, our). Do not add a salutation or signature and keep the length similar. Do not use phrases like "At [Company Name]" or similar company references. Format the output as HTML, using one <p> tag per logical paragraph (group related sentences together). Do not put each sentence in its own <p> tag. Do not add extra line breaks between paragraphs. Return only the raw HTML content - do not wrap it in markdown code blocks (\`\`\`html or \`\`\`), backticks, or any other formatting. Return the HTML directly.\n\n${text}`;
+    const promptText = `Rewrite the following promotional message from a business to a customer in a slightly more casual, conversational tone while keeping it professional and warm. Maintain the original intent and replace any first-person singular pronouns (I, me, my) with first-person plural (we, us, our). Do not add a salutation or signature and keep the length similar. Do not use phrases like "At [Company Name]" or similar company references. Format the output as HTML, using one <p> tag per logical paragraph (group related sentences together). Do not put each sentence in its own <p> tag. Do not add extra line breaks between paragraphs. Return only the raw HTML content without markdown code fences or backticks.
+
+${text}`;
 
     const { text: casual } = await generateText({
       model: AI_MODEL,
@@ -275,15 +266,13 @@ router.post("/more-formal-text", async (req, res) => {
       });
     }
 
-    const apiKey = process.env.AI_GATEWAY_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({
-        success: false,
-        error: "AI Gateway API key not configured",
-      });
+    if (!ensureApiKey(res)) {
+      return;
     }
 
-    const promptText = `Rewrite the following birthday greeting from a business to a customer in a more formal, polished tone while keeping it warm and sincere. Maintain the original meaning and replace any first-person singular pronouns (I, me, my) with first-person plural (we, us, our). Do not add a salutation or signature and keep the length similar. Do not use phrases like "At [Company Name]" or similar company references. Format the output as HTML, using one <p> tag per logical paragraph (group related sentences together). Do not put each sentence in its own <p> tag. Do not add extra line breaks between paragraphs. Return only the raw HTML content - do not wrap it in markdown code blocks (\`\`\`html or \`\`\`), backticks, or any other formatting. Return the HTML directly.\n\n${text}`;
+    const promptText = `Rewrite the following promotional message from a business to a customer in a more formal, polished tone while keeping it warm and sincere. Maintain the original meaning and replace any first-person singular pronouns (I, me, my) with first-person plural (we, us, our). Do not add a salutation or signature and keep the length similar. Do not use phrases like "At [Company Name]" or similar company references. Format the output as HTML, using one <p> tag per logical paragraph (group related sentences together). Do not put each sentence in its own <p> tag. Do not add extra line breaks between paragraphs. Return only the raw HTML content without markdown code fences or backticks.
+
+${text}`;
 
     const { text: formal } = await generateText({
       model: AI_MODEL,
@@ -323,32 +312,28 @@ router.post("/translate", async (req, res) => {
       });
     }
 
-    const apiKey = process.env.AI_GATEWAY_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({
-        success: false,
-        error: "AI Gateway API key not configured",
-      });
+    if (!ensureApiKey(res)) {
+      return;
     }
 
     const languageMap: { [key: string]: string } = {
-      "english": "English",
-      "spanish": "Spanish (Español)",
-      "mandarin": "Chinese (简体中文)",
-      "hindi": "Hindi (हिन्दी)",
-      "bengali": "Bengali (বাংলা)"
+      english: "English",
+      spanish: "Spanish (Español)",
+      mandarin: "Chinese (简体中文)",
+      hindi: "Hindi (हिन्दी)",
+      bengali: "Bengali (বাংলা)",
     };
 
     const targetLanguageName = languageMap[targetLanguage] || targetLanguage;
 
-    const promptText = `You are a professional translator. Translate the following birthday greeting to ${targetLanguageName}.
+    const promptText = `You are a professional translator. Translate the following promotional message to ${targetLanguageName}.
 
 RULES:
 1. Keep the same warm, friendly tone
 2. Make it natural and culturally appropriate for ${targetLanguageName} speakers
 3. Maintain any HTML formatting from the input
 4. Do NOT add greetings, signatures, or explanations
-5. Return ONLY the translated HTML - no markdown code blocks
+5. Return ONLY the translated HTML—no markdown code fences or backticks
 
 TEXT TO TRANSLATE:
 ${text}`;

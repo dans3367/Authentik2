@@ -10,7 +10,7 @@ import { Placeholder } from "@tiptap/extension-placeholder";
 import { Image } from "@tiptap/extension-image";
 import { Button } from "@/components/ui/button";
 import { Bold, AlignLeft, AlignCenter, AlignRight, Droplet, User, Sparkles, Wand2, PartyPopper, ArrowRightFromLine, ArrowLeftToLine, Tag, Undo, Redo, Languages } from "lucide-react";
-import { generateBirthdayMessage, improveText, emojifyText, expandText, shortenText, makeMoreCasualText, makeMoreFormalText, translateText } from "@/lib/aiApi";
+import { improveText, emojifyText, expandText, shortenText, makeMoreCasualText, makeMoreFormalText, translateText } from "@/lib/aiApi";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,14 +30,10 @@ interface RichTextEditorProps {
     firstName?: string;
     lastName?: string;
   };
-  businessName?: string;
-  onGenerateStart?: () => void;
-  onGenerateEnd?: () => void;
 }
 
-export default function RichTextEditor({ value, onChange, placeholder = "Start typing your message...", className = "", customerInfo, businessName, onGenerateStart, onGenerateEnd }: RichTextEditorProps) {
+export default function RichTextEditor({ value, onChange, placeholder = "Start typing your message...", className = "", customerInfo }: RichTextEditorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [isImproving, setIsImproving] = useState(false);
   const [isEmojifying, setIsEmojifying] = useState(false);
   const [isExpanding, setIsExpanding] = useState(false);
@@ -70,36 +66,6 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
     if (editor) {
       const placeholderText = `{{${type}}}`;
       editor.chain().focus().insertContent(placeholderText).run();
-    }
-  };
-
-  // Handle AI message generation
-  const handleGenerateMessage = async () => {
-    if (isGenerating || !editor) return;
-    
-    setIsGenerating(true);
-    if (onGenerateStart) onGenerateStart();
-    
-    try {
-      const result = await generateBirthdayMessage({
-        customerName: customerInfo?.firstName,
-        businessName: businessName,
-      });
-      
-      if (result.success && result.message) {
-        // Insert the generated message into the editor
-        editor.commands.setContent(result.message);
-        onChange(result.message);
-      } else {
-        console.error("Failed to generate message:", result.error);
-        alert(result.error || "Failed to generate message. Please try again.");
-      }
-    } catch (error) {
-      console.error("Error generating message:", error);
-      alert("An error occurred while generating the message. Please try again.");
-    } finally {
-      setIsGenerating(false);
-      if (onGenerateEnd) onGenerateEnd();
     }
   };
 
@@ -497,20 +463,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           </div>
         </div>
 
-        {/* AI Generate and Tags dropdown */}
-        <div className="w-px h-6 bg-gray-600 mx-1" />
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8 px-2 text-xs font-medium text-purple-300 hover:text-purple-100 hover:bg-gray-700"
-          onClick={handleGenerateMessage}
-          disabled={isGenerating || !editor}
-          title="Generate birthday message with AI"
-        >
-          <Sparkles className={`w-3 h-3 mr-1 ${isGenerating ? 'animate-pulse' : ''}`} />
-          {isGenerating ? 'Generating...' : 'Generate'}
-        </Button>
+        {/* Tags dropdown */}
         <div className="w-px h-6 bg-gray-600 mx-1" />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

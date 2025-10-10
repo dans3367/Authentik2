@@ -1260,7 +1260,7 @@ emailManagementRoutes.get("/birthday-settings", authenticateToken, requireTenant
         emailTemplate: 'default',
         segmentFilter: 'all',
         customMessage: '',
-        senderName: company?.name || 'Your Company',
+        senderName: company?.name || '',
         promotionId: null,
         promotion: null,
         created_at: new Date().toISOString(),
@@ -1272,7 +1272,7 @@ emailManagementRoutes.get("/birthday-settings", authenticateToken, requireTenant
     // Ensure senderName is always present with a default value
     const settingsWithDefaults = {
       ...settings,
-      senderName: settings.senderName || company?.name || 'Your Company'
+      senderName: settings.senderName || company?.name || ''
     };
 
     console.log('🎨 [Birthday Settings GET] Returning settings:', {
@@ -1893,6 +1893,17 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
       });
     }
 
+    // Fetch company information for branding
+    const company = await db.query.companies.findFirst({
+      where: and(
+        eq(companies.tenantId, tenantId),
+        eq(companies.isActive, true)
+      ),
+    });
+
+    const companyName = company?.name || settings.senderName || 'Your Company';
+    const resolvedSenderName = settings.senderName || companyName || 'Your Team';
+
     // Fetch the selected contacts
     const contacts = await db.query.emailContacts.findMany({
       where: and(
@@ -1968,9 +1979,9 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           const htmlBirthday = renderBirthdayTemplate(settings.emailTemplate as any, {
             recipientName,
             message: settings.customMessage || 'Wishing you a wonderful birthday!',
-            brandName: req.user.tenantName || 'Your Company',
+            brandName: companyName,
             customThemeData: settings.customThemeData ? JSON.parse(settings.customThemeData) : null,
-            senderName: settings.senderName || 'Your Team',
+            senderName: resolvedSenderName,
             // NO promotion fields - these are intentionally omitted
             unsubscribeToken,
           });
@@ -2018,7 +2029,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               recipientEmail: contact.email,
               recipientName: recipientName,
               senderEmail: 'admin@zendwise.work',
-              senderName: settings.senderName || 'Your Team',
+              senderName: resolvedSenderName,
               subject: `🎉 Happy Birthday ${recipientName}!`,
               emailType: 'birthday_card',
               provider: 'resend',
@@ -2111,7 +2122,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               recipientEmail: contact.email,
               recipientName: recipientName,
               senderEmail: 'admin@zendwise.work',
-              senderName: settings.senderName || 'Your Team',
+              senderName: resolvedSenderName,
               subject: `🎁 ${settings.promotion?.title || 'Special Birthday Offer!'}`,
               emailType: 'birthday_promotion',
               provider: 'resend',
@@ -2165,9 +2176,9 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
         const htmlContent = renderBirthdayTemplate(settings.emailTemplate as any, {
           recipientName,
           message: settings.customMessage || 'Wishing you a wonderful birthday!',
-          brandName: req.user.tenantName || 'Your Company',
+          brandName: companyName,
           customThemeData: settings.customThemeData ? JSON.parse(settings.customThemeData) : null,
-          senderName: settings.senderName || 'Your Team',
+          senderName: resolvedSenderName,
           promotionContent: settings.promotion?.content,
           promotionTitle: settings.promotion?.title,
           promotionDescription: settings.promotion?.description,
@@ -2219,7 +2230,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               recipientEmail: contact.email,
               recipientName: recipientName,
               senderEmail: 'admin@zendwise.work',
-              senderName: settings.senderName || 'Your Team',
+              senderName: resolvedSenderName,
               subject: `🎉 Happy Birthday ${recipientName}!`,
               emailType: 'birthday_card',
               provider: 'resend',
@@ -2280,7 +2291,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               recipientEmail: contact.email,
               recipientName: recipientName,
               senderEmail: 'admin@zendwise.work',
-              senderName: settings.senderName || 'Your Team',
+              senderName: resolvedSenderName,
               subject: `🎉 Happy Birthday ${recipientName}!`,
               emailType: 'birthday_card',
               provider: 'resend',
