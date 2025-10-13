@@ -17,7 +17,9 @@ import {
   Zap,
   RefreshCw,
   CalendarDays,
-  X
+  X,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import ActivityIcon from "@assets/28_new.svg";
 import { useEffect, useState } from "react";
@@ -45,7 +47,8 @@ interface EmailActivity {
 
 interface EmailActivityTimelineProps {
   contactId: string;
-  limit?: number;
+  pageSize?: number;
+  initialPage?: number;
 }
 
 // Custom clock icon component for fallback
@@ -106,10 +109,11 @@ const formatDateTime = (dateString: string) => {
   });
 };
 
-export default function EmailActivityTimeline({ contactId, limit = 50 }: EmailActivityTimelineProps) {
+export default function EmailActivityTimeline({ contactId, pageSize = 20, initialPage = 1 }: EmailActivityTimelineProps) {
   const queryClient = useQueryClient();
   const [dateRange, setDateRange] = useState<{from?: Date; to?: Date}>({});
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(initialPage);
   const [holdScrollLock, setHoldScrollLock] = useState(false);
   const [showManualLoading, setShowManualLoading] = useState(false);
   
@@ -137,11 +141,12 @@ export default function EmailActivityTimeline({ contactId, limit = 50 }: EmailAc
     staleTime: 30000, // Keep calendar data for 30 seconds as it changes less frequently
   });
   
-  const { data: response, isLoading, error, refetch, dataUpdatedAt } = useQuery({
-    queryKey: ['/api/email-contacts', contactId, 'activity', { limit, dateRange }],
+  const { data: response, isLoading, error, refetch, dataUpdatedAt, isFetching } = useQuery({
+    queryKey: ['/api/email-contacts', contactId, 'activity', { page: currentPage, limit: pageSize, dateRange }],
     queryFn: async () => {
       const params = new URLSearchParams();
-      params.append('limit', limit.toString());
+      params.append('page', currentPage.toString());
+      params.append('limit', pageSize.toString());
       
       if (dateRange.from) {
         // Send from date as start of day in local timezone
@@ -166,6 +171,13 @@ export default function EmailActivityTimeline({ contactId, limit = 50 }: EmailAc
   });
 
   const activities: EmailActivity[] = (response as any)?.activities || [];
+  const pagination = (response as any)?.pagination || {
+    page: currentPage,
+    limit: pageSize,
+    total: 0,
+    pages: 0,
+  };
+  const totalPages = pagination.pages || 0;
 
   const handleRefresh = () => {
     // Show loading spinner for 2 seconds minimum
@@ -186,6 +198,24 @@ export default function EmailActivityTimeline({ contactId, limit = 50 }: EmailAc
     setHoldScrollLock(true);
     setTimeout(() => setHoldScrollLock(false), 150);
   };
+
+  const goToPage = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+    // Scroll to top of timeline
+    const timelineElement = document.querySelector('[data-component="email-activity-timeline"]');
+    if (timelineElement) {
+      timelineElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const handleNextPage = () => goToPage(currentPage + 1);
+  const handlePrevPage = () => goToPage(currentPage - 1);
+
+  // Reset to page 1 when date filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [dateRange.from, dateRange.to]);
 
   const hasDateFilter = dateRange.from || dateRange.to;
   
@@ -278,7 +308,7 @@ export default function EmailActivityTimeline({ contactId, limit = 50 }: EmailAc
     });
   };
 
-  if (isLoading || showManualLoading) {
+  if ((isLoading && !isFetching) || showManualLoading) {
     return (
       <Card>
         <CardHeader>
@@ -316,7 +346,7 @@ export default function EmailActivityTimeline({ contactId, limit = 50 }: EmailAc
     );
   }
 
-  if (activities.length === 0) {
+  if (activities.length === 0 && !isFetching) {
     return (
       <Card>
         <CardHeader>
@@ -838,14 +868,107 @@ export default function EmailActivityTimeline({ contactId, limit = 50 }: EmailAc
           </div>
         </div>
 
-        {activities.length >= limit && (
-          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Showing latest {limit} activities. 
-              <span className="ml-1 text-blue-600 dark:text-blue-400 cursor-pointer hover:underline">
-                Load more
-              </span>
-            </p>
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              {/* Pagination Info */}
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Showing {activities.length > 0 ? ((currentPage - 1) * pageSize + 1) : 0} to{' '}
+                {Math.min(currentPage * pageSize, pagination.total)} of {pagination.total} activities
+              </div>
+
+              {/* Pagination Controls */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePrevPage}
+                  disabled={currentPage === 1 || isFetching}
+                  className="gap-1"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Previous
+                </Button>
+
+                {/* Page Numbers */}
+                <div className="flex items-center gap-1">
+                  {/* Show first page if not nearby */}
+                  {currentPage > 3 && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => goToPage(1)}
+                        disabled={isFetching}
+                        className="w-9 h-9 p-0"
+                      >
+                        1
+                      </Button>
+                      {currentPage > 4 && <span className="px-2 text-gray-400">...</span>}
+                    </>
+                  )}
+
+                  {/* Show pages around current page */}
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    if (pageNum < 1 || pageNum > totalPages) return null;
+                    if (currentPage > 3 && pageNum === 1) return null;
+                    if (currentPage < totalPages - 2 && pageNum === totalPages) return null;
+                    
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={pageNum === currentPage ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => goToPage(pageNum)}
+                        disabled={isFetching}
+                        className="w-9 h-9 p-0"
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+
+                  {/* Show last page if not nearby */}
+                  {currentPage < totalPages - 2 && (
+                    <>
+                      {currentPage < totalPages - 3 && <span className="px-2 text-gray-400">...</span>}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => goToPage(totalPages)}
+                        disabled={isFetching}
+                        className="w-9 h-9 p-0"
+                      >
+                        {totalPages}
+                      </Button>
+                    </>
+                  )}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages || isFetching}
+                  className="gap-1"
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </CardContent>

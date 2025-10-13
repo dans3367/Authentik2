@@ -8,6 +8,7 @@ import { type ContactFilters, type BouncedEmailFilters } from '@shared/schema';
 import { sanitizeString, sanitizeEmail } from '../utils/sanitization';
 import { storage } from '../storage';
 import jwt from 'jsonwebtoken';
+import { enhancedEmailService } from '../emailService';
 
 export const emailManagementRoutes = Router();
 
@@ -190,17 +191,52 @@ emailManagementRoutes.get("/email-contacts/:id/stats", authenticateToken, requir
       return res.status(404).json({ message: 'Contact not found' });
     }
 
-    // Get contact activity statistics
+    // Compute primary metrics from existing counters updated by webhooks
+    const emailsSent = Number(contact.emailsSent || 0);
+    const emailsOpened = Number(contact.emailsOpened || 0);
+
+    // Derive rates
+    const openRate = emailsSent > 0 ? Math.round((emailsOpened / emailsSent) * 100) : 0;
+
+    // Optional: clicks from emailActivity table
+    let emailsClicked = 0;
+    try {
+      const clickedResult = await db
+        .select({ count: sql<number>`cast(count(*) as int)` })
+        .from(db.emailActivity)
+        .where(sql`${db.emailActivity.contactId} = ${id} AND ${db.emailActivity.activityType} = 'clicked'`);
+      emailsClicked = clickedResult?.[0]?.count ?? 0;
+    } catch (e) {
+      // Fallback silently if emailActivity is unavailable
+      emailsClicked = 0;
+    }
+    const clickRate = emailsSent > 0 ? Math.round((emailsClicked / emailsSent) * 100) : 0;
+
+    // Optional: basic bounce indicator from bouncedEmails table (by email)
+    let emailsBounced = 0;
+    try {
+      if (contact.email) {
+        const bounceCheck = await db.query.bouncedEmails?.findFirst?.({
+          where: sql`${db.bouncedEmails.email} = ${contact.email}`,
+        });
+        emailsBounced = bounceCheck ? 1 : 0;
+      }
+    } catch (e) {
+      emailsBounced = 0;
+    }
+    const bounceRate = emailsSent > 0 ? Math.round((emailsBounced / emailsSent) * 100) : 0;
+
     const stats = {
-      totalEmails: 0, // Placeholder - you might have email activity tracking
-      lastEmailSent: null,
-      lastEmailOpened: null,
-      lastEmailClicked: null,
-      bounceCount: 0,
-      unsubscribeCount: 0,
+      emailsSent,
+      emailsOpened,
+      openRate,
+      emailsClicked,
+      clickRate,
+      emailsBounced,
+      bounceRate,
     };
 
-    res.json(stats);
+    res.json({ stats });
   } catch (error) {
     console.error('Get contact stats error:', error);
     res.status(500).json({ message: 'Failed to get contact statistics' });
@@ -2666,6 +2702,12 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       where: eq(tenants.id, tenantId),
     });
 
+    // Get company info for footer label (no fallback if missing)
+    const company = await db.query.companies.findFirst({
+      where: eq(companies.tenantId, tenantId),
+    });
+    const companyName = (company?.name || '').trim();
+
     // Format content as HTML
     const htmlContent = `
       <html>
@@ -2676,16 +2718,13 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
             </div>
             <div style="padding: 20px 30px; background-color: #f7fafc; border-top: 1px solid #e2e8f0; text-align: center;">
               <p style="margin: 0; font-size: 0.875rem; color: #718096;">
-                Sent from ${tenant?.name || 'Authentik'}
+                ${companyName ? `Sent from ${companyName}` : ''}
               </p>
             </div>
           </div>
         </body>
       </html>
     `;
-
-    // Import email service
-    const { enhancedEmailService } = await import('../providers/enhancedEmailService');
 
     // Send email
     const result = await enhancedEmailService.sendCustomEmail(
@@ -2707,13 +2746,13 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     await db.insert(emailActivity).values({
       contactId: contact.id,
       tenantId: tenantId,
-      eventType: 'sent',
-      emailSubject: subject,
-      timestamp: new Date(),
-      metadata: {
+      activityType: 'sent',
+      activityData: JSON.stringify({
         source: 'individual_send',
-        sentBy: req.user.id
-      }
+        sentBy: req.user.id,
+        emailSubject: subject
+      }),
+      occurredAt: new Date(),
     });
 
     // Update contact stats

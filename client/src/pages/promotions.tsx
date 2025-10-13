@@ -232,139 +232,143 @@ export default function PromotionsPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="space-y-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-2 flex-1">
-                      <div className="h-5 w-1/3 bg-gray-200 rounded animate-pulse" />
-                      <div className="h-4 w-1/4 bg-gray-200 rounded animate-pulse" />
-                      <div className="h-3 w-1/2 bg-gray-200 rounded animate-pulse" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Card key={i} className="animate-pulse">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <div className="h-5 w-1/3 bg-gray-200 rounded" />
+                      <div className="h-8 w-8 bg-gray-200 rounded" />
                     </div>
-                    <div className="h-8 w-8 bg-gray-200 rounded animate-pulse" />
-                  </div>
-                </div>
+                    <div className="mt-2 h-4 w-1/4 bg-gray-200 rounded" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-3 w-3/4 bg-gray-200 rounded mb-2" />
+                    <div className="h-3 w-2/3 bg-gray-200 rounded" />
+                  </CardContent>
+                </Card>
               ))}
             </div>
           ) : promotions && promotions.length > 0 ? (
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
               {promotions.map((promotion: Promotion) => {
                 const TypeIcon = promotionTypeIcons[promotion.type];
                 return (
-                  <div key={promotion.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <TypeIcon className="h-5 w-5 text-gray-500" />
-                          <h3 className="font-semibold text-gray-900 dark:text-white">
-                            {promotion.title}
-                          </h3>
-                          <Badge 
-                            className={promotionTypeColors[promotion.type]}
-                          >
-                            {promotion.type}
-                          </Badge>
-                          {promotion.isActive ? (
-                            <Badge variant="outline" className="text-green-600 border-green-600">
-                              Active
+                  <Card key={promotion.id} className="hover:shadow-md transition-shadow">
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="flex items-center gap-3 mb-2">
+                            <TypeIcon className="h-5 w-5 text-gray-500" />
+                            <CardTitle className="text-base font-semibold text-gray-900 dark:text-white">
+                              {promotion.title}
+                            </CardTitle>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge className={promotionTypeColors[promotion.type]}>
+                              {promotion.type}
                             </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-gray-600 border-gray-600">
-                              Inactive
-                            </Badge>
-                          )}
-                        </div>
-                        {promotion.description && (
-                          <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">
-                            {promotion.description}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                          <span>Used {promotion.usageCount}{promotion.maxUses ? `/${promotion.maxUses}` : ''} times</span>
-                          <span>Created {format(new Date(promotion.createdAt), 'MMM d, yyyy')}</span>
-                          <span>Target: {promotion.targetAudience}</span>
-                        </div>
-                        {(promotion.validFrom || promotion.validTo || promotion.maxUses) && (
-                          <div className="flex items-center gap-4 text-xs text-blue-600 dark:text-blue-400 mt-1">
-                            {promotion.maxUses && (
-                              <span className="flex items-center gap-1">
-                                <Settings className="h-3 w-3" />
-                                Max: {promotion.maxUses} uses
-                              </span>
-                            )}
-                            {promotion.validFrom && (
-                              <span className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                From: {format(new Date(promotion.validFrom), 'MMM d, yyyy')}
-                              </span>
-                            )}
-                            {promotion.validTo && (
-                              <span className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                Until: {format(new Date(promotion.validTo), 'MMM d, yyyy')}
-                              </span>
+                            {promotion.isActive ? (
+                              <Badge variant="outline" className="text-green-600 border-green-600">
+                                Active
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-gray-600 border-gray-600">
+                                Inactive
+                              </Badge>
                             )}
                           </div>
-                        )}
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="h-4 w-4 mr-2" />
-                            Preview
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => setLocation(`/promotions/${promotion.id}/edit`)}
-                          >
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => togglePromotionMutation.mutate({ 
-                              id: promotion.id, 
-                              isActive: !promotion.isActive 
-                            })}
-                          >
-                            {promotion.isActive ? 'Deactivate' : 'Activate'}
-                          </DropdownMenuItem>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <DropdownMenuItem
-                                className="text-red-600 focus:text-red-600"
-                                onSelect={(e) => e.preventDefault()}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete the promotion
-                                  "{promotion.title}" and remove it from all campaigns.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => deletePromotionMutation.mutate(promotion.id)}
-                                  className="bg-red-600 hover:bg-red-700"
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Eye className="h-4 w-4 mr-2" />
+                              Preview
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setLocation(`/promotions/${promotion.id}/edit`)}
+                            >
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => togglePromotionMutation.mutate({ id: promotion.id, isActive: !promotion.isActive })}
+                            >
+                              {promotion.isActive ? 'Deactivate' : 'Activate'}
+                            </DropdownMenuItem>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <DropdownMenuItem
+                                  className="text-red-600 focus:text-red-600"
+                                  onSelect={(e) => e.preventDefault()}
                                 >
+                                  <Trash2 className="h-4 w-4 mr-2" />
                                   Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
+                                </DropdownMenuItem>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete the promotion
+                                    "{promotion.title}" and remove it from all campaigns.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => deletePromotionMutation.mutate(promotion.id)}
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {promotion.description && (
+                        <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">
+                          {promotion.description}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                        <span>Used {promotion.usageCount}{promotion.maxUses ? `/${promotion.maxUses}` : ''} times</span>
+                        <span>Created {format(new Date(promotion.createdAt), 'MMM d, yyyy')}</span>
+                        <span>Target: {promotion.targetAudience}</span>
+                      </div>
+                      {(promotion.validFrom || promotion.validTo || promotion.maxUses) && (
+                        <div className="flex flex-wrap items-center gap-4 text-xs text-blue-600 dark:text-blue-400 mt-2">
+                          {promotion.maxUses && (
+                            <span className="flex items-center gap-1">
+                              <Settings className="h-3 w-3" />
+                              Max: {promotion.maxUses} uses
+                            </span>
+                          )}
+                          {promotion.validFrom && (
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              From: {format(new Date(promotion.validFrom), 'MMM d, yyyy')}
+                            </span>
+                          )}
+                          {promotion.validTo && (
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              Until: {format(new Date(promotion.validTo), 'MMM d, yyyy')}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 );
               })}
             </div>
