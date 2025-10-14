@@ -37,7 +37,6 @@ const PendingVerificationPage = lazy(() => import("@/pages/pending-verification"
 const NotFound = lazy(() => import("@/pages/not-found"));
 const CreateCampaignPage = lazy(() => import("@/pages/campaigns/create"));
 const EmailCampaignsPage = lazy(() => import("@/pages/email-campaigns"));
-const EmailTestPage = lazy(() => import("@/pages/email-test"));
 const EmailApprovalsPage = lazy(() => import("@/pages/email-approvals"));
 const EmailContactsPage = lazy(() => import("@/pages/email-contacts"));
 const NewEmailContactPage = lazy(() => import("@/pages/email-contacts/new"));
@@ -45,6 +44,7 @@ const ViewEmailContactPage = lazy(() => import("@/pages/email-contacts/view"));
 const EditEmailContactPage = lazy(() => import("@/pages/email-contacts/edit"));
 const EmailAnalyticsPage = lazy(() => import("@/pages/email-analytics"));
 const BirthdaysPage = lazy(() => import("@/pages/birthdays"));
+const ECardsPage = lazy(() => import("@/pages/e-cards"));
 const RemindersPage = lazy(() => import("@/pages/reminders"));
 const ConfirmAppointmentPage = lazy(() => import("@/pages/confirm-appointment"));
 const PromotionsPage = lazy(() => import("@/pages/promotions"));
@@ -221,7 +221,6 @@ function Router() {
                   <Route path="/campaigns/create" component={CreateCampaignPage} />
                   <Route path="/email-campaigns" component={EmailCampaignsPage} />
                   <Route path="/email-campaigns/edit/:id" component={EditEmailCampaignPage} />
-                  <Route path="/email-test" component={EmailTestPage} />
                   <Route path="/email-approvals" component={EmailApprovalsPage} />
                   <Route path="/email-contacts" component={EmailContactsPage} />
                   <Route path="/email-contacts/new" component={NewEmailContactPage} />
@@ -229,6 +228,7 @@ function Router() {
                   <Route path="/email-contacts/edit/:id" component={EditEmailContactPage} />
                   <Route path="/email-analytics" component={EmailAnalyticsPage} />
                   <Route path="/birthdays" component={BirthdaysPage} />
+                  <Route path="/e-cards" component={ECardsPage} />
                   <Route path="/reminders" component={RemindersPage} />
                   <Route path="/shops" component={ShopsPage} />
                   <Route path="/shops/new" component={NewShopPage} />

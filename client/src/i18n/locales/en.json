@@ -229,6 +229,48 @@
       "sendInvitation": "Send Birthday Invitation"
     }
   },
+  "ecards": {
+    "preview": {
+      "defaultTitle": "Merry Christmas!"
+    },
+    "themes": {
+      "christmas": {
+        "classic": "Classic Christmas",
+        "snowyNight": "Snowy Night",
+        "cozyFireplace": "Cozy Fireplace"
+      },
+      "valentine": {
+        "roses": "Romantic Roses",
+        "sweetHearts": "Sweet Hearts",
+        "starlitSky": "Starlit Sky"
+      },
+      "easter": {
+        "pastelEggs": "Pastel Eggs",
+        "springBloom": "Spring Bloom",
+        "bunnyJoy": "Bunny Joy"
+      },
+      "newYear": {
+        "midnightSparkles": "Midnight Sparkles",
+        "cityFireworks": "City Fireworks",
+        "goldenCountdown": "Golden Countdown"
+      },
+      "independenceDay": {
+        "starsAndStripes": "Stars and Stripes",
+        "fireworksNight": "Fireworks Night",
+        "patrioticParade": "Patriotic Parade"
+      },
+      "mothersDay": {
+        "floralDelight": "Floral Delight",
+        "breakfastInBed": "Breakfast in Bed",
+        "heartfeltMoments": "Heartfelt Moments"
+      },
+      "fathersDay": {
+        "classicTools": "Classic Tools",
+        "grillMaster": "Grill Master",
+        "sportsDay": "Sports Day"
+      }
+    }
+  },
   "toast": {
     "profileUpdated": "Profile updated successfully",
     "passwordChanged": "Password changed successfully",

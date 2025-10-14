@@ -1619,6 +1619,8 @@ export const birthdaySettings = pgTable("birthday_settings", {
   customThemeData: text("custom_theme_data"), // JSON data for custom theme
   promotionId: varchar("promotion_id").references(() => promotions.id, { onDelete: 'set null' }), // Optional promotion to include in birthday emails
   splitPromotionalEmail: boolean("split_promotional_email").default(false), // Send promotion as separate email for better deliverability
+  disabledHolidays: text("disabled_holidays").array(), // Array of disabled holiday IDs (e.g., ['valentine', 'stpatrick'])
+  senderName: text("sender_name").default(''), // Sender name for birthday emails
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

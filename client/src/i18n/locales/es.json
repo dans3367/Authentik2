@@ -224,6 +224,48 @@
       "bulkUpdateError": "Error al actualizar campañas de cumpleaños"
     }
   },
+  "ecards": {
+    "preview": {
+      "defaultTitle": "¡Feliz Navidad!"
+    },
+    "themes": {
+      "christmas": {
+        "classic": "Navidad Clásica",
+        "snowyNight": "Noche Nevada",
+        "cozyFireplace": "Chimenea Acogedora"
+      },
+      "valentine": {
+        "roses": "Rosas Románticas",
+        "sweetHearts": "Corazones Dulces",
+        "starlitSky": "Cielo Estrellado"
+      },
+      "easter": {
+        "pastelEggs": "Huevos Pastel",
+        "springBloom": "Floración de Primavera",
+        "bunnyJoy": "Alegría Conejita"
+      },
+      "newYear": {
+        "midnightSparkles": "Brillos de Medianoche",
+        "cityFireworks": "Fuegos Artificiales en la Ciudad",
+        "goldenCountdown": "Cuenta Regresiva Dorada"
+      },
+      "independenceDay": {
+        "starsAndStripes": "Estrellas y Franjas",
+        "fireworksNight": "Noche de Fuegos Artificiales",
+        "patrioticParade": "Desfile Patriótico"
+      },
+      "mothersDay": {
+        "floralDelight": "Delicia Floral",
+        "breakfastInBed": "Desayuno en la Cama",
+        "heartfeltMoments": "Momentos Emotivos"
+      },
+      "fathersDay": {
+        "classicTools": "Herramientas Clásicas",
+        "grillMaster": "Maestro de la Parrilla",
+        "sportsDay": "Día Deportivo"
+      }
+    }
+  },
   "toast": {
     "profileUpdated": "Perfil actualizado exitosamente",
     "passwordChanged": "Contraseña cambiada exitosamente",

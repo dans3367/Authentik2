@@ -152,29 +152,16 @@ app.use((req, res, next) => {
   */
   serverLogger.info('🚫 Birthday Worker Service: DISABLED (handled by cardprocessor-go)');
 
-  // Check server-node connectivity
-  serverLogger.info('🔄 Checking service connectivity...');
-  try {
-    serverLogger.info('📊 Service Architecture:');
-    serverLogger.info('   🌐 Main Server: localhost:5000 (Authentication & Proxy)');
-    serverLogger.info('   🤖 server-node: localhost:3502 (Temporal Client)');
-    serverLogger.info('   ⚡ temporal-server: localhost:50051 (GRPC Bridge)');
-    serverLogger.info('   🎂 cardprocessor-go: localhost:5004 (Birthday & Unsubscribe)');
-    
-    // Test connectivity to server-node
-    try {
-      const response = await fetch('http://localhost:3502/health');
-      if (response.ok) {
-        serverLogger.info('   ✅ server-node: Connected');
-      } else {
-        serverLogger.warn('   ⚠️  server-node: Responding but not healthy');
-      }
-    } catch (error) {
-      serverLogger.warn('   ❌ server-node: Disconnected (will proxy anyway)');
-    }
-  } catch (error) {
-    serverLogger.info('   🔧 Continuing with proxy setup...');
-  }
+  // Display service architecture
+  serverLogger.info('🔄 Service Architecture:');
+  serverLogger.info('   🌐 Main Server: localhost:5000 (Authentication & API)');
+  serverLogger.info('   🎂 cardprocessor-go: localhost:5004 (Birthday Cards, Email Tracking & Unsubscribe)');
+  serverLogger.info('   📝 Form Server: localhost:3004 (Form Serving)');
+  serverLogger.info('   🪝 Webhook Server: localhost:3505 (Webhook Handling)');
+  serverLogger.info('   ⚡ Temporal Server: localhost:50051 (GRPC Bridge - Optional)');
+  serverLogger.info('');
+  serverLogger.info('📊 Email Tracking: Handled automatically by cardprocessor-go → Database');
+  serverLogger.info('   Tables: email_sends, email_events, email_content');
 
   const server = await registerRoutes(app);
 
