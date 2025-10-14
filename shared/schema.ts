@@ -527,6 +527,16 @@ export const emailActivity = pgTable("email_activity", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Per-contact unsubscribe tokens (long-lived until used once)
+export const unsubscribeTokens = pgTable("unsubscribe_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  contactId: varchar("contact_id").notNull().references(() => emailContacts.id, { onDelete: 'cascade' }),
+  token: text("token").notNull().unique(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Universal bounced emails list - prevents sending to any email that has ever bounced
 export const bouncedEmails = pgTable("bounced_emails", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

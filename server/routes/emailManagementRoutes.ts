@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, and } from 'drizzle-orm';
-import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, emailActivity, tenants, emailSends, emailContent, companies } from '@shared/schema';
+import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, emailActivity, tenants, emailSends, emailContent, companies, unsubscribeTokens } from '@shared/schema';
 import { deleteImageFromR2 } from '../config/r2';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { type ContactFilters, type BouncedEmailFilters } from '@shared/schema';
@@ -9,6 +9,7 @@ import { sanitizeString, sanitizeEmail } from '../utils/sanitization';
 import { storage } from '../storage';
 import jwt from 'jsonwebtoken';
 import { enhancedEmailService } from '../emailService';
+import crypto from 'crypto';
 
 export const emailManagementRoutes = Router();
 
@@ -2708,6 +2709,17 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     });
     const companyName = (company?.name || '').trim();
 
+    // Generate or reuse unsubscribe token
+    let unsub = await db.query.unsubscribeTokens.findFirst({
+      where: and(eq(unsubscribeTokens.tenantId, tenantId), eq(unsubscribeTokens.contactId, contact.id), sql`${unsubscribeTokens.usedAt} IS NULL`),
+    });
+    if (!unsub) {
+      const token = crypto.randomBytes(24).toString('base64url');
+      const created = await db.insert(unsubscribeTokens).values({ tenantId, contactId: contact.id, token }).returning();
+      unsub = created[0];
+    }
+    const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(unsub.token)}`;
+
     // Format content as HTML
     const htmlContent = `
       <html>
@@ -2719,6 +2731,9 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
             <div style="padding: 20px 30px; background-color: #f7fafc; border-top: 1px solid #e2e8f0; text-align: center;">
               <p style="margin: 0; font-size: 0.875rem; color: #718096;">
                 ${companyName ? `Sent from ${companyName}` : ''}
+              </p>
+              <p style="margin: 8px 0 0; font-size: 0.75rem; color: #94a3b8;">
+                <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
               </p>
             </div>
           </div>
@@ -2732,7 +2747,11 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       subject,
       htmlContent,
       {
-        text: content,
+        text: `${content}\n\nUnsubscribe: ${unsubscribeUrl}`,
+        headers: {
+          'List-Unsubscribe': `<${unsubscribeUrl}>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
+        },
         metadata: {
           type: 'individual_contact_email',
           contactId: contact.id,
