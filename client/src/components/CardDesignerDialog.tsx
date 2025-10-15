@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import RichTextEditor from "@/components/RichTextEditor";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Search, ZoomIn, ZoomOut, Move, RotateCcw, Smile, RefreshCw, ChevronLeft, ChevronRight, X, AlertTriangle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { uploadCardImage, validateCardImageFile } from "@/lib/cardImageUpload";
 
 type DesignerData = {
@@ -20,6 +22,8 @@ type DesignerData = {
   customImage?: boolean;
   imagePosition?: { x: number; y: number };
   imageScale?: number;
+  cardName?: string;
+  sendDate?: string; // ISO date string (YYYY-MM-DD)
 };
 
 interface CardDesignerDialogProps {
@@ -39,7 +43,7 @@ interface CardDesignerDialogProps {
   businessName?: string;
 }
 
-export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initialData, onSave, onPreviewChange, onMakeActive, isCurrentlyActive, senderName, customerInfo, businessName }: CardDesignerDialogProps) {
+export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initialData, onSave, onPreviewChange, onMakeActive, isCurrentlyActive, senderName, customerInfo, businessName, holidayId, isHolidayDisabled, onToggleHoliday, customCardActive, onToggleCustomCardActive }: CardDesignerDialogProps) {
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [message, setMessage] = useState(initialData?.message ?? "");
   const [imageUrl, setImageUrl] = useState<string | null>(initialData?.imageUrl ??
@@ -47,6 +51,8 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   const [signature, setSignature] = useState(initialData?.signature ?? "");
   const [emojiCount, setEmojiCount] = useState<number>(0);
   const [customImage, setCustomImage] = useState<boolean>(initialData?.customImage ?? false);
+  const [cardName, setCardName] = useState(initialData?.cardName ?? "");
+  const [sendDate, setSendDate] = useState(initialData?.sendDate ?? "");
   const [unsplashOpen, setUnsplashOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [unsplashImages, setUnsplashImages] = useState<Array<{ id: string; urls: { small: string; regular: string }; alt_description: string }>>([]);
@@ -92,6 +98,8 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     setTitle(initialData?.title ?? "");
     setMessage(initialData?.message ?? "");
     setSignature(initialData?.signature ?? "");
+    setCardName(initialData?.cardName ?? "");
+    setSendDate(initialData?.sendDate ?? "");
 
     // Default theme header images (seasonal: Christmas)
     const defaultThemeImages = {
@@ -102,7 +110,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
 
     // Determine if this should use custom image based on initialData
     const hasCustomImageData = initialData?.customImage === true && initialData?.imageUrl;
-    const isCustomTheme = initialThemeId === 'custom';
+    const isCustomTheme = initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'));
 
     console.log('🎨 [Card Designer] Initializing with:', {
       initialThemeId,
@@ -119,8 +127,8 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       setImageUrl(initialData.imageUrl);
       setCustomImage(true);
     } else if (isCustomTheme && initialData?.imageUrl) {
-      // Custom theme with saved image URL (even if customImage flag is missing)
-      console.log('📸 Setting custom theme image from saved data:', initialData.imageUrl);
+      // Custom theme/card with saved image URL (even if customImage flag is missing)
+      console.log('📸 Setting custom theme/card image from saved data:', initialData.imageUrl);
       setImageUrl(initialData.imageUrl);
       setCustomImage(true);
     } else if (!isCustomTheme && initialThemeId && initialThemeId in defaultThemeImages) {
@@ -766,7 +774,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
 
   // Reset functionality
   const handleReset = () => {
-    const isCustomTheme = initialThemeId === 'custom';
+    const isCustomTheme = initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'));
     const resetMessage = isCustomTheme
       ? "Are you sure you want to reset the card? This will clear all content including the image, title, message, and signature."
       : "Are you sure you want to reset the text? This will clear the title, message, and signature.";
@@ -779,7 +787,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       setMessage("");
       setSignature("");
 
-      // Only reset image for custom theme
+      // Only reset image for custom theme/cards
       if (isCustomTheme) {
         console.log('🔄 [Card Designer] Resetting custom theme');
 
@@ -811,6 +819,18 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   };
 
   const handleSave = () => {
+    // Validate required fields for custom cards
+    if (initialThemeId && initialThemeId.startsWith('custom-')) {
+      if (!cardName.trim()) {
+        alert('Please enter a card name');
+        return;
+      }
+      if (!sendDate) {
+        alert('Please select a send date');
+        return;
+      }
+    }
+
     onSave?.({
       title,
       message,
@@ -819,7 +839,9 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       themeId: initialThemeId,
       customImage,
       imagePosition,
-      imageScale
+      imageScale,
+      cardName,
+      sendDate
     } as DesignerData);
     setHasUnsavedChanges(false); // Reset change tracking after save
     onOpenChange(false);
@@ -851,6 +873,38 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
             <DialogTitle className="text-lg sm:text-xl">Design your birthday card</DialogTitle>
             <DialogDescription className="text-sm sm:text-base">Customize the image, header and message.</DialogDescription>
           </DialogHeader>
+
+          {/* Card Name and Send Date - Only for custom cards */}
+          {initialThemeId && initialThemeId.startsWith('custom-') && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div className="space-y-2">
+                <label htmlFor="cardName" className="text-sm font-medium text-gray-700">
+                  Card Name <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  id="cardName"
+                  value={cardName}
+                  onChange={(e) => setCardName(e.target.value)}
+                  placeholder="e.g., Mother's Day Card"
+                  className="w-full"
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="sendDate" className="text-sm font-medium text-gray-700">
+                  Send Date <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  id="sendDate"
+                  type="date"
+                  value={sendDate}
+                  onChange={(e) => setSendDate(e.target.value)}
+                  className="w-full"
+                  min={new Date().toISOString().split('T')[0]}
+                />
+                <p className="text-xs text-gray-500">The card will be sent on this date</p>
+              </div>
+            </div>
+          )}
 
           {/* Designer Canvas - responsive width with forced LTR */}
           <div className="mx-auto w-full max-w-[600px] rounded-2xl overflow-hidden border bg-white" dir="ltr" style={{ direction: 'ltr' }}>
@@ -1004,8 +1058,8 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
-                    {/* Image controls only for custom theme */}
-                    {initialThemeId === 'custom' && (
+                    {/* Image controls for custom theme and custom cards */}
+                    {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) && (
                       <>
                         <DropdownMenuItem onClick={handlePickImage} disabled={uploading}>
                           <Edit className="w-4 h-4 mr-2" />
@@ -1023,7 +1077,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                     )}
                     <DropdownMenuItem className="text-red-600" onClick={handleReset}>
                       <RefreshCw className="w-4 h-4 mr-2" />
-                      Reset {initialThemeId === 'custom' ? 'Card' : 'Text'}
+                      Reset {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) ? 'Card' : 'Text'}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -1037,7 +1091,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                   ref={titleInputRef}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="🎉 Happy Birthday! 🎂"
+                  placeholder="Add your greeting here..."
                   className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold border-0 shadow-none px-0 pr-8 sm:pr-12 focus-visible:ring-0 text-center placeholder:text-gray-400 placeholder:font-normal h-auto min-h-[3rem] sm:min-h-[4rem] md:min-h-[5rem] lg:min-h-[6rem] py-2 sm:py-3 md:py-4 leading-tight"
                 />
                 <div className="absolute right-0 top-1/2 transform -translate-y-1/2">
@@ -1119,6 +1173,40 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
             onChange={handleFileChange}
             className="hidden"
           />
+
+          {/* Holiday Enable/Disable Checkbox - Only show for holiday themes */}
+          {holidayId && onToggleHoliday && !initialThemeId?.startsWith('custom-') && (
+            <div className="flex items-center space-x-2 py-3 border-t">
+              <Checkbox
+                id="enable-holiday-card"
+                checked={!isHolidayDisabled}
+                onCheckedChange={() => onToggleHoliday(holidayId)}
+              />
+              <Label
+                htmlFor="enable-holiday-card"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                Enable this holiday card
+              </Label>
+            </div>
+          )}
+          {/* Custom Card Active/Inactive Checkbox - Only show for custom cards */}
+          {initialThemeId?.startsWith('custom-') && onToggleCustomCardActive && (
+            <div className="flex items-center space-x-2 py-3 border-t">
+              <Checkbox
+                id="enable-custom-card"
+                checked={customCardActive !== false}
+                onCheckedChange={onToggleCustomCardActive}
+              />
+              <Label
+                htmlFor="enable-custom-card"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                Card is active
+              </Label>
+            </div>
+          )}
+
 
           {/* Footer actions */}
           <div className="flex justify-between items-center pt-4 border-t">

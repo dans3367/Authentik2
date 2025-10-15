@@ -230,8 +230,53 @@
     }
   },
   "ecards": {
+    "title": "Birthday E-Cards",
+    "cardsSent": "Birthday Cards Sent",
     "preview": {
       "defaultTitle": "Merry Christmas!"
+    },
+    "table": {
+      "name": "NAME",
+      "status": "STATUS",
+      "birthday": "BIRTH DATE",
+      "campaigns": "BIRTHDAY CARDS",
+      "actions": "ACTIONS",
+      "notSet": "Set Manually",
+      "na": "N/A"
+    },
+    "filters": {
+      "searchPlaceholder": "Search customers...",
+      "allStatuses": "All Statuses",
+      "active": "Active",
+      "unsubscribed": "Unsubscribed",
+      "bounced": "Bounced",
+      "pending": "Pending"
+    },
+    "bulkActions": {
+      "selected": "selected",
+      "clearSelection": "Clear Selection",
+      "enableBirthdayEmails": "Enable Birthday Emails",
+      "disableBirthdayEmails": "Disable Birthday Emails",
+      "sendBirthdayCard": "Send Birthday Card",
+      "requestBirthdays": "Request Birthdays",
+      "exportSelected": "Export Selected",
+      "removeSelected": "Remove Selected",
+      "sending": "Sending..."
+    },
+    "empty": {
+      "noCustomers": "No customers found",
+      "noCustomersDescription": "Start by adding your first customer to begin managing birthday emails",
+      "addFirstCustomer": "Add Your First Customer"
+    },
+    "customer": "Customer",
+    "selectAllCustomers": "Select all customers",
+    "unsubscribed": "unsubscribed",
+    "requestBirthday": "Request Birthday",
+    "refreshing": "Refreshing...",
+    "toasts": {
+      "noActionNeeded": "No Action Needed",
+      "noBirthdaysSelected": "Selected customers don't have birthday dates set.",
+      "invitationSent": "Birthday invitation sent successfully"
     },
     "themes": {
       "christmas": {

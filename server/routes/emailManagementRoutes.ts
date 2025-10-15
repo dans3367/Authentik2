@@ -1300,16 +1300,18 @@ emailManagementRoutes.get("/birthday-settings", authenticateToken, requireTenant
         senderName: company?.name || '',
         promotionId: null,
         promotion: null,
+        disabledHolidays: [],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
       return res.json(defaultSettings);
     }
 
-    // Ensure senderName is always present with a default value
+    // Ensure senderName and disabledHolidays are always present with default values
     const settingsWithDefaults = {
       ...settings,
-      senderName: settings.senderName || company?.name || ''
+      senderName: settings.senderName || company?.name || '',
+      disabledHolidays: settings.disabledHolidays || []
     };
 
     console.log('🎨 [Birthday Settings GET] Returning settings:', {
@@ -1337,7 +1339,8 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
       customThemeData,
       senderName,
       promotionId,
-      splitPromotionalEmail
+      splitPromotionalEmail,
+      disabledHolidays
     } = req.body;
 
     // Validate input
@@ -1375,8 +1378,16 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
       return res.status(400).json({ message: 'promotionId must be a string or null' });
     }
 
-
-
+    // Validate disabledHolidays if provided
+    if (disabledHolidays !== undefined && disabledHolidays !== null) {
+      if (!Array.isArray(disabledHolidays)) {
+        return res.status(400).json({ message: 'disabledHolidays must be an array' });
+      }
+      // Validate each element is a string
+      if (!disabledHolidays.every((id: any) => typeof id === 'string')) {
+        return res.status(400).json({ message: 'disabledHolidays array must contain only strings' });
+      }
+    }
 
 
     // Validate custom theme data if provided
@@ -1428,6 +1439,7 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
         senderName: finalSenderName,
         promotionId: promotionId || null,
         splitPromotionalEmail: splitPromotionalEmail !== undefined ? splitPromotionalEmail : false,
+        disabledHolidays: disabledHolidays !== undefined ? disabledHolidays : [],
         updatedAt: new Date(),
       };
 
@@ -1450,6 +1462,7 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
         senderName: finalSenderName,
         promotionId: promotionId || null,
         splitPromotionalEmail: splitPromotionalEmail !== undefined ? splitPromotionalEmail : false,
+        disabledHolidays: disabledHolidays !== undefined ? disabledHolidays : [],
       };
 
       if (customThemeDataStr !== undefined) {

@@ -221,12 +221,62 @@
       "noActionNeeded": "No se Requiere Acción",
       "noBirthdaysSelected": "Los clientes seleccionados no tienen fechas de cumpleaños configuradas.",
       "bulkUpdateSuccess": "Campañas de cumpleaños actualizadas exitosamente",
-      "bulkUpdateError": "Error al actualizar campañas de cumpleaños"
+      "bulkUpdateError": "Error al actualizar campañas de cumpleaños",
+      "invitationSent": "Invitación de cumpleaños enviada exitosamente",
+      "invitationError": "Error al enviar invitación de cumpleaños"
+    },
+    "buttons": {
+      "sendInvitation": "Enviar Invitación de Cumpleaños"
     }
   },
   "ecards": {
+    "title": "Tarjetas Electrónicas de Cumpleaños",
+    "cardsSent": "Tarjetas de Cumpleaños Enviadas",
     "preview": {
       "defaultTitle": "¡Feliz Navidad!"
+    },
+    "table": {
+      "name": "NOMBRE",
+      "status": "ESTADO",
+      "birthday": "FECHA DE NACIMIENTO",
+      "campaigns": "TARJETAS DE CUMPLEAÑOS",
+      "actions": "ACCIONES",
+      "notSet": "Establecer Manualmente",
+      "na": "N/A"
+    },
+    "filters": {
+      "searchPlaceholder": "Buscar clientes...",
+      "allStatuses": "Todos los Estados",
+      "active": "Activo",
+      "unsubscribed": "Desuscrito",
+      "bounced": "Rebotado",
+      "pending": "Pendiente"
+    },
+    "bulkActions": {
+      "selected": "seleccionados",
+      "clearSelection": "Limpiar Selección",
+      "enableBirthdayEmails": "Habilitar Emails de Cumpleaños",
+      "disableBirthdayEmails": "Deshabilitar Emails de Cumpleaños",
+      "sendBirthdayCard": "Enviar Tarjeta de Cumpleaños",
+      "requestBirthdays": "Solicitar Cumpleaños",
+      "exportSelected": "Exportar Seleccionados",
+      "removeSelected": "Eliminar Seleccionados",
+      "sending": "Enviando..."
+    },
+    "empty": {
+      "noCustomers": "No se encontraron clientes",
+      "noCustomersDescription": "Comienza agregando tu primer cliente para empezar a gestionar emails de cumpleaños",
+      "addFirstCustomer": "Agregar Tu Primer Cliente"
+    },
+    "customer": "Cliente",
+    "selectAllCustomers": "Seleccionar todos los clientes",
+    "unsubscribed": "desuscrito",
+    "requestBirthday": "Solicitar Cumpleaños",
+    "refreshing": "Actualizando...",
+    "toasts": {
+      "noActionNeeded": "No se Requiere Acción",
+      "noBirthdaysSelected": "Los clientes seleccionados no tienen fechas de cumpleaños configuradas.",
+      "invitationSent": "Invitación de cumpleaños enviada exitosamente"
     },
     "themes": {
       "christmas": {
