@@ -146,21 +146,9 @@ export function PromotionSelector({
   };
 
   const handleInsertContent = (promotion: Promotion) => {
-    if (selectedPromotions.includes(promotion.id)) {
-      // Remove the promotion
-      onPromotionsChange(selectedPromotions.filter(id => id !== promotion.id));
-    } else {
-      // Add the promotion
-      if (onPromotionContentInsert) {
-        onPromotionContentInsert(promotion.content);
-      }
-      if (singleSelection) {
-        // In single selection mode, replace the current selection
-        onPromotionsChange([promotion.id]);
-      } else {
-        // In multi-selection mode, add to existing selection
-        onPromotionsChange([...selectedPromotions, promotion.id]);
-      }
+    // Only insert the content, do not auto-attach the promotion
+    if (onPromotionContentInsert) {
+      onPromotionContentInsert(promotion.content);
     }
     setIsDialogOpen(false);
   };
@@ -275,6 +263,7 @@ export function PromotionSelector({
                 {filteredPromotions.map((promotion: Promotion) => (
                   <div
                     key={promotion.id}
+                    onClick={() => handlePromotionToggle(promotion.id)}
                     className={cn(
                       "border rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow",
                       selectedPromotions.includes(promotion.id) && "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
@@ -314,23 +303,14 @@ export function PromotionSelector({
                         {onPromotionContentInsert && (
                           <Button
                             size="sm"
-                            variant={selectedPromotions.includes(promotion.id) ? "destructive" : "secondary"}
+                            variant="secondary"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleInsertContent(promotion);
                             }}
                           >
-                            {selectedPromotions.includes(promotion.id) ? (
-                              <>
-                                <X className="h-4 w-4 mr-1" />
-                                Remove
-                              </>
-                            ) : (
-                              <>
-                                <Plus className="h-4 w-4 mr-1" />
-                                Insert
-                              </>
-                            )}
+                            <Plus className="h-4 w-4 mr-1" />
+                            Insert
                           </Button>
                         )}
                       </div>

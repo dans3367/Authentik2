@@ -1652,6 +1652,8 @@ export default function BirthdaysPage() {
           })()}
           senderName={birthdaySettings?.senderName}
           businessName={company?.name || currentUser?.name}
+          hidePromotionsTab={true}
+          hideTabs={true}
         />
 
         {/* Settings Tab */}
