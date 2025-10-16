@@ -295,7 +295,7 @@ export default function CreatePromotionPage() {
                     className="min-h-[300px]"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Use the rich text editor to format your promotional content. You can use bold text, alignment, colors, and AI-powered features.
+                    Use the rich text editor to format your promotional content. You can use the toolbar for formatting, insert placeholders, and use AI features.
                   </p>
                 </div>
               </CardContent>
@@ -640,13 +640,10 @@ export default function CreatePromotionPage() {
                     <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Content Preview
                     </div>
-                    <div className="text-sm text-muted-foreground max-h-32 overflow-y-auto leading-relaxed bg-gray-50 dark:bg-gray-900 p-3 rounded border">
-                      {formData.content ? (
-                        <div dangerouslySetInnerHTML={{ __html: formData.content }} className="prose prose-sm max-w-none" />
-                      ) : (
-                        <span className="text-xs italic">Your promotional content will appear here as you type...</span>
-                      )}
-                    </div>
+                    <div 
+                      className="text-sm text-muted-foreground max-h-32 overflow-y-auto leading-relaxed bg-gray-50 dark:bg-gray-900 p-2 rounded text-xs prose prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{ __html: formData.content || "<p class='text-gray-400'>Your promotional content will appear here as you type...</p>" }}
+                    />
                   </div>
 
                   <div className="space-y-2">
