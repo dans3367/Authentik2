@@ -721,25 +721,18 @@ export default function ECardsPage() {
     // Resolve current theme id once and use it for namespaced draft keys
     const currentThemeId = designerThemeId || 'default';
 
-    // Load persistent, theme-scoped draft first
-    try {
-      const raw = localStorage.getItem(`birthdayCardDesignerDraft:${currentThemeId}`);
-      if (raw) return JSON.parse(raw);
-    } catch { }
-
-    // Parse existing customThemeData and load theme-specific data
+    // PRIORITY 1: Load from database first (customThemeData)
     if (birthdaySettings?.customThemeData) {
       try {
         const parsed = JSON.parse(birthdaySettings.customThemeData);
-        // currentThemeId already declared above
 
         let themeSpecificData = null;
 
         // Check if it's the new structure (has themes property)
-        console.log('🔍 [Card Designer Initial Data] Loading for theme:', currentThemeId, 'Available themes:', Object.keys(parsed.themes || {}));
+        console.log('🔍 [Card Designer Initial Data] Loading from DB for theme:', currentThemeId, 'Available themes:', Object.keys(parsed.themes || {}));
         if (parsed.themes && parsed.themes[currentThemeId]) {
           themeSpecificData = parsed.themes[currentThemeId];
-          console.log('✅ [Card Designer Initial Data] Found theme-specific data:', themeSpecificData);
+          console.log('✅ [Card Designer Initial Data] Found theme-specific data from DB:', themeSpecificData);
         } else if (!parsed.themes) {
           // Old structure - assume it's for custom theme if we're loading custom
           if (currentThemeId === 'custom') {
@@ -748,6 +741,7 @@ export default function ECardsPage() {
         }
 
         if (themeSpecificData) {
+          console.log('📤 [Card Designer Initial Data] Returning DB data for theme:', currentThemeId);
           return {
             title: themeSpecificData.title || '',
             message: themeSpecificData.message || birthdaySettings?.customMessage || '',
@@ -758,12 +752,25 @@ export default function ECardsPage() {
             imageScale: themeSpecificData.imageScale || 1,
           };
         }
-      } catch {
-        // Fall through to default if parsing fails
+      } catch (error) {
+        console.warn('⚠️ [Card Designer Initial Data] Failed to parse customThemeData:', error);
+        // Fall through to localStorage fallback
       }
     }
 
-    // Default data if no theme-specific customizations found
+    // PRIORITY 2: Fallback to localStorage draft (for unsaved changes)
+    try {
+      const raw = localStorage.getItem(`birthdayCardDesignerDraft:${currentThemeId}`);
+      if (raw) {
+        console.log('📥 [Card Designer Initial Data] No DB data found, using localStorage draft for theme:', currentThemeId);
+        return JSON.parse(raw);
+      }
+    } catch (error) {
+      console.warn('⚠️ [Card Designer Initial Data] Failed to parse localStorage draft:', error);
+    }
+
+    // PRIORITY 3: Default empty data if no saved data found
+    console.log('🆕 [Card Designer Initial Data] No saved data found, returning defaults for theme:', currentThemeId);
     return {
       title: '',
       message: birthdaySettings?.customMessage || '',
@@ -790,13 +797,27 @@ export default function ECardsPage() {
     }
   };
 
+  // Helper function to get parent holiday ID from theme variant ID
+  const getParentHolidayId = (themeId: string): string | null => {
+    // Check each holiday theme array to find which one contains this theme ID
+    if (valentineThemes.some(t => t.id === themeId)) return 'valentine';
+    if (stPatrickThemes.some(t => t.id === themeId)) return 'stpatrick';
+    if (newYearThemes.some(t => t.id === themeId)) return 'newyear';
+    if (easterThemes.some(t => t.id === themeId)) return 'easter';
+    if (independenceThemes.some(t => t.id === themeId)) return 'independence';
+    // If it's already a parent holiday ID or not found, return the original ID
+    return themeId;
+  };
+
   // Handler for toggling holiday disabled state
   const handleToggleHoliday = (holidayId: string) => {
     if (birthdaySettings) {
+      // Get the parent holiday ID if this is a theme variant
+      const parentHolidayId = getParentHolidayId(holidayId);
       const currentDisabled = disabledHolidays || [];
-      const newDisabled = currentDisabled.includes(holidayId)
-        ? currentDisabled.filter(id => id !== holidayId)
-        : [...currentDisabled, holidayId];
+      const newDisabled = currentDisabled.includes(parentHolidayId)
+        ? currentDisabled.filter(id => id !== parentHolidayId)
+        : [...currentDisabled, parentHolidayId];
       
       setDisabledHolidays(newDisabled);
       
@@ -2217,6 +2238,13 @@ export default function ECardsPage() {
           open={designerOpen}
           onOpenChange={(open) => {
             setDesignerOpen(open);
+            
+            // When opening, refetch latest data from database
+            if (open) {
+              console.log('🔄 [Card Designer] Dialog opened, refetching latest data from DB');
+              refetchSettings();
+            }
+            
             // When closing, preserve preview data so users can see their changes
             // Only clear preview data if the user explicitly cancels without saving
             // The preview data will be useful for showing real-time updates
@@ -2344,16 +2372,46 @@ export default function ECardsPage() {
                 emailTemplate: 'custom',
                 customMessage: data.message,
                 customThemeData: JSON.stringify(updatedThemeData),
+              }, {
+                onSuccess: () => {
+                  // Clear localStorage draft since data is now saved to DB
+                  try {
+                    localStorage.removeItem(`birthdayCardDesignerDraft:${currentThemeId}`);
+                    console.log('🗑️ [Card Save] Cleared localStorage draft for theme:', currentThemeId);
+                  } catch (error) {
+                    console.warn('⚠️ [Card Save] Failed to clear localStorage draft:', error);
+                  }
+                  
+                  toast({
+                    title: "Card Saved",
+                    description: "Your custom card has been saved.",
+                  });
+                }
               });
             } else if (hasTextCustomizations || data.message !== (latestBirthdaySettings?.customMessage || '')) {
               // For holiday theme variants with any customizations, save the theme-specific data
               // and set emailTemplate to the specific theme variant ID
-              console.log('🎨 [Birthday Cards] Saving theme-specific customizations for', currentThemeId);
+              console.log('🎨 [Birthday Cards] Saving theme-specific customizations for', currentThemeId, 'with data:', themeData);
               updateSettingsMutation.mutate({
                 ...latestBirthdaySettings,
                 emailTemplate: currentThemeId, // Set to the specific theme variant ID
                 customMessage: data.message,
                 customThemeData: JSON.stringify(updatedThemeData), // Save theme-specific data
+              }, {
+                onSuccess: () => {
+                  // Clear localStorage draft since data is now saved to DB
+                  try {
+                    localStorage.removeItem(`birthdayCardDesignerDraft:${currentThemeId}`);
+                    console.log('🗑️ [Card Save] Cleared localStorage draft for theme:', currentThemeId);
+                  } catch (error) {
+                    console.warn('⚠️ [Card Save] Failed to clear localStorage draft:', error);
+                  }
+                  
+                  toast({
+                    title: "Card Saved",
+                    description: "Your card customizations have been saved.",
+                  });
+                }
               });
             } else {
               // For default themes with no customizations, just save the message
@@ -2362,13 +2420,28 @@ export default function ECardsPage() {
                 ...latestBirthdaySettings,
                 emailTemplate: currentThemeId || 'default', // Use current theme ID
                 customMessage: data.message,
+              }, {
+                onSuccess: () => {
+                  // Clear localStorage draft since data is now saved to DB
+                  try {
+                    localStorage.removeItem(`birthdayCardDesignerDraft:${currentThemeId}`);
+                    console.log('🗑️ [Card Save] Cleared localStorage draft for theme:', currentThemeId);
+                  } catch (error) {
+                    console.warn('⚠️ [Card Save] Failed to clear localStorage draft:', error);
+                  }
+                  
+                  toast({
+                    title: "Card Saved",
+                    description: "Your card has been saved.",
+                  });
+                }
               });
             }
           }}
           senderName={birthdaySettings?.senderName}
           businessName={company?.name || currentUser?.name}
           holidayId={designerThemeId || undefined}
-          isHolidayDisabled={designerThemeId ? disabledHolidays.includes(designerThemeId) : false}
+          isHolidayDisabled={designerThemeId ? disabledHolidays.includes(getParentHolidayId(designerThemeId) || designerThemeId) : false}
           onToggleHoliday={handleToggleHoliday}
           customCardActive={designerThemeId?.startsWith("custom-") ? customCards.find(c => c.id === designerThemeId)?.active : undefined}
           onToggleCustomCardActive={designerThemeId?.startsWith("custom-") ? handleToggleCustomCardActive : undefined}
@@ -3053,6 +3126,7 @@ export default function ECardsPage() {
     </div>
   );
 }
+
 
 
 
