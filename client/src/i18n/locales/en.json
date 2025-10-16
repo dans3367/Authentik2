@@ -233,7 +233,12 @@
     "title": "Birthday E-Cards",
     "cardsSent": "Birthday Cards Sent",
     "preview": {
-      "defaultTitle": "Merry Christmas!"
+      "defaultTitle": "Merry Christmas!",
+      "valentinesDay": "Happy Valentine's Day!",
+      "stPatricksDay": "Happy St. Patrick's Day!",
+      "newYearsDay": "Happy New Year!",
+      "easter": "Celebrate Easter with Joy!",
+      "independenceDay": "Happy Independence Day!"
     },
     "table": {
       "name": "NAME",
@@ -313,7 +318,39 @@
         "classicTools": "Classic Tools",
         "grillMaster": "Grill Master",
         "sportsDay": "Sports Day"
+      },
+      "stPatricksDay": {
+        "shamrockCharm": "Shamrock Charm"
       }
+    },
+    "previewLabel": "preview",
+    "sectionLabels": {
+      "valentinesDay": "Valentine's Day",
+      "stPatricksDay": "St. Patrick's Day",
+      "newYearsDay": "New Year's Day",
+      "easter": "Easter",
+      "independenceDay": "Independence Day",
+      "mothersDay": "Mother's Day",
+      "fathersDay": "Father's Day",
+      "christmas": "Christmas"
+    },
+    "tabs": {
+      "themes": "Themes",
+      "settings": "Settings",
+      "customers": "Customers",
+      "test": "Test"
+    },
+    "cards": {
+      "active": "Active Cards",
+      "inactive": "Inactive Cards",
+      "custom": "Custom Cards",
+      "inactiveCustom": "Inactive Custom Cards",
+      "createCustom": "Create Custom Card",
+      "noCustomCards": "No custom cards yet",
+      "noCustomCardsDescription": "Create your own personalized e-cards with custom images and messages",
+      "createFirstCard": "Create Your First Card",
+      "noInactiveCards": "No inactive custom cards",
+      "noInactiveCardsDescription": "Custom cards marked as inactive will appear here"
     }
   },
   "toast": {

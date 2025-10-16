@@ -1509,7 +1509,7 @@ export default function ECardsPage() {
             className="flex items-center gap-2"
           >
             <Palette className="h-4 w-4" />
-            Themes
+            {t('ecards.tabs.themes')}
           </Button>
           <Button
             variant={activeTab === "settings" ? "default" : "ghost"}
@@ -1518,7 +1518,7 @@ export default function ECardsPage() {
             className="flex items-center gap-2"
           >
             <Settings className="h-4 w-4" />
-            Settings
+            {t('ecards.tabs.settings')}
           </Button>
 
           <Button
@@ -1528,7 +1528,7 @@ export default function ECardsPage() {
             className="flex items-center gap-2"
           >
             <Users className="h-4 w-4" />
-            Customers
+            {t('ecards.tabs.customers')}
             {contacts.length > 0 && (
               <Badge variant="secondary" className="ml-1">
                 {contacts.length}
@@ -1542,7 +1542,7 @@ export default function ECardsPage() {
             className="flex items-center gap-2"
           >
             <Mail className="h-4 w-4" />
-            Test
+            {t('ecards.tabs.test')}
           </Button>
         </div>
 
@@ -1552,7 +1552,7 @@ export default function ECardsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Palette className="h-5 w-5" />
-                Themes
+                {t('ecards.tabs.themes')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -1565,7 +1565,7 @@ export default function ECardsPage() {
                   className="flex items-center gap-2"
                 >
                   <CheckCircle className="h-4 w-4" />
-                  Active Cards
+                  {t('ecards.cards.active')}
                   <Badge variant="secondary" className="ml-1">
                     {5 - disabledHolidays.length + customCards.filter(c => c.active !== false).length}
                   </Badge>
@@ -1577,7 +1577,7 @@ export default function ECardsPage() {
                   className="flex items-center gap-2"
                 >
                   <XCircle className="h-4 w-4" />
-                  Inactive Cards (None)
+                  {t('ecards.cards.inactive')}
                   <Badge variant="secondary" className="ml-1">
                     {disabledHolidays.length + customCards.filter(c => c.active === false).length}
                   </Badge>
@@ -1589,7 +1589,7 @@ export default function ECardsPage() {
                 {((cardFilter === "active" && !disabledHolidays.includes('valentine')) || 
                   (cardFilter === "inactive" && disabledHolidays.includes('valentine'))) && (
                 <div className="mt-6">
-                  <Label className="text-sm">Valentine's Day</Label>
+                  <Label className="text-sm">{t('ecards.sectionLabels.valentinesDay')}</Label>
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
                     {valentineThemes.map((theme) => {
                       const themeId = theme.id;
@@ -1659,12 +1659,12 @@ export default function ECardsPage() {
                                   {(() => {
                                     try {
                                       const saved = birthdaySettings?.customThemeData ? JSON.parse(birthdaySettings.customThemeData) : null;
-                                      const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || 'Happy Valentine\'s Day!';
+                                      const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || t('ecards.preview.valentinesDay');
                                       return title;
-                                    } catch { return 'Happy Valentine\'s Day!'; }
+                                    } catch { return t('ecards.preview.valentinesDay'); }
                                   })()}
                                 </div>
-                                <div className="text-xs text-white/90 drop-shadow">{theme.name} preview</div>
+                                <div className="text-xs text-white/90 drop-shadow">{theme.name} {t('ecards.previewLabel')}</div>
                               </div>
                             </div>
                           </div>
@@ -1682,7 +1682,7 @@ export default function ECardsPage() {
                 {((cardFilter === "active" && !disabledHolidays.includes('stpatrick')) || 
                   (cardFilter === "inactive" && disabledHolidays.includes('stpatrick'))) && (
                 <div className="mt-6">
-                  <Label className="text-sm">St. Patrick's Day</Label>
+                  <Label className="text-sm">{t('ecards.sectionLabels.stPatricksDay')}</Label>
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
                     {stPatrickThemes.map((theme) => {
                       const themeId = theme.id;
@@ -1751,12 +1751,12 @@ export default function ECardsPage() {
                                   {(() => {
                                     try {
                                       const saved = birthdaySettings?.customThemeData ? JSON.parse(birthdaySettings.customThemeData) : null;
-                                      const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || "Happy St. Patrick's Day!";
+                                      const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || t('ecards.preview.stPatricksDay');
                                       return title;
-                                    } catch { return "Happy St. Patrick's Day!"; }
+                                    } catch { return t('ecards.preview.stPatricksDay'); }
                                   })()}
                                 </div>
-                                <div className="text-xs text-white/90 drop-shadow">{theme.name} preview</div>
+                                <div className="text-xs text-white/90 drop-shadow">{theme.name} {t('ecards.previewLabel')}</div>
                               </div>
                             </div>
                           </div>
@@ -1774,7 +1774,7 @@ export default function ECardsPage() {
                 {((cardFilter === "active" && !disabledHolidays.includes('newyear')) || 
                   (cardFilter === "inactive" && disabledHolidays.includes('newyear'))) && (
                 <div className="mt-6">
-                  <Label className="text-sm">New Year's Day</Label>
+                  <Label className="text-sm">{t('ecards.sectionLabels.newYearsDay')}</Label>
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
                     {newYearThemes.map((theme) => {
                       const themeId = theme.id;
@@ -1843,12 +1843,12 @@ export default function ECardsPage() {
                                   {(() => {
                                     try {
                                       const saved = birthdaySettings?.customThemeData ? JSON.parse(birthdaySettings.customThemeData) : null;
-                                      const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || 'Happy New Year!';
+                                      const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || t('ecards.preview.newYearsDay');
                                       return title;
-                                    } catch { return 'Happy New Year!'; }
+                                    } catch { return t('ecards.preview.newYearsDay'); }
                                   })()}
                                 </div>
-                                <div className="text-xs text-white/90 drop-shadow">{theme.name} preview</div>
+                                <div className="text-xs text-white/90 drop-shadow">{theme.name} {t('ecards.previewLabel')}</div>
                               </div>
                             </div>
                           </div>
@@ -1866,7 +1866,7 @@ export default function ECardsPage() {
                 {((cardFilter === "active" && !disabledHolidays.includes('easter')) || 
                   (cardFilter === "inactive" && disabledHolidays.includes('easter'))) && (
                 <div className="mt-6">
-                  <Label className="text-sm">Easter</Label>
+                  <Label className="text-sm">{t('ecards.sectionLabels.easter')}</Label>
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
                     {easterThemes.map((theme) => {
                       const themeId = theme.id;
@@ -1935,12 +1935,12 @@ export default function ECardsPage() {
                                   {(() => {
                                     try {
                                       const saved = birthdaySettings?.customThemeData ? JSON.parse(birthdaySettings.customThemeData) : null;
-                                      const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || 'Celebrate Easter with Joy!';
+                                      const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || t('ecards.preview.easter');
                                       return title;
-                                    } catch { return 'Celebrate Easter with Joy!'; }
+                                    } catch { return t('ecards.preview.easter'); }
                                   })()}
                                 </div>
-                                <div className="text-xs text-white/90 drop-shadow">{theme.name} preview</div>
+                                <div className="text-xs text-white/90 drop-shadow">{theme.name} {t('ecards.previewLabel')}</div>
                               </div>
                             </div>
                           </div>
@@ -1958,7 +1958,7 @@ export default function ECardsPage() {
                 {((cardFilter === "active" && !disabledHolidays.includes('independence')) || 
                   (cardFilter === "inactive" && disabledHolidays.includes('independence'))) && (
                 <div className="mt-6">
-                  <Label className="text-sm">Independence Day</Label>
+                  <Label className="text-sm">{t('ecards.sectionLabels.independenceDay')}</Label>
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
                     {independenceThemes.map((theme) => {
                       const themeId = theme.id;
@@ -2027,12 +2027,12 @@ export default function ECardsPage() {
                                   {(() => {
                                     try {
                                       const saved = birthdaySettings?.customThemeData ? JSON.parse(birthdaySettings.customThemeData) : null;
-                                      const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || 'Happy Independence Day!';
+                                      const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || t('ecards.preview.independenceDay');
                                       return title;
-                                    } catch { return 'Happy Independence Day!'; }
+                                    } catch { return t('ecards.preview.independenceDay'); }
                                   })()}
                                 </div>
-                                <div className="text-xs text-white/90 drop-shadow">{theme.name} preview</div>
+                                <div className="text-xs text-white/90 drop-shadow">{theme.name} {t('ecards.previewLabel')}</div>
                               </div>
                             </div>
                           </div>
@@ -2050,7 +2050,7 @@ export default function ECardsPage() {
                 {cardFilter === "active" && (
                 <div className="mt-8">
                   <div className="flex items-center justify-between mb-4">
-                    <Label className="text-lg font-semibold">Custom Cards</Label>
+                    <Label className="text-lg font-semibold">{t('ecards.cards.custom')}</Label>
                     <Button
                       onClick={() => {
                         const newCardId = `custom-${Date.now()}`;
@@ -2061,15 +2061,15 @@ export default function ECardsPage() {
                       className="flex items-center gap-2"
                     >
                       <Plus className="h-4 w-4" />
-                      Create Custom Card
+                      {t('ecards.cards.createCustom')}
                     </Button>
                   </div>
                   
                   {customCards.filter(c => c.active !== false).length === 0 ? (
                     <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50">
                       <Palette className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                      <p className="text-gray-600 font-medium mb-1">No custom cards yet</p>
-                      <p className="text-sm text-gray-500 mb-4">Create your own personalized e-cards with custom images and messages</p>
+                      <p className="text-gray-600 font-medium mb-1">{t('ecards.cards.noCustomCards')}</p>
+                      <p className="text-sm text-gray-500 mb-4">{t('ecards.cards.noCustomCardsDescription')}</p>
                       <Button
                         onClick={() => {
                           const newCardId = `custom-${Date.now()}`;
@@ -2079,7 +2079,7 @@ export default function ECardsPage() {
                         size="sm"
                       >
                         <Plus className="h-4 w-4 mr-2" />
-                        Create Your First Card
+                        {t('ecards.cards.createFirstCard')}
                       </Button>
                     </div>
                   ) : (
@@ -2162,12 +2162,12 @@ export default function ECardsPage() {
                 {/* Inactive custom cards section */}
                 {cardFilter === "inactive" && (
                   <div className="mt-8">
-                    <Label className="text-lg font-semibold">Inactive Custom Cards</Label>
+                    <Label className="text-lg font-semibold">{t('ecards.cards.inactiveCustom')}</Label>
                     {customCards.filter(card => card.active === false).length === 0 ? (
                       <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 mt-4">
                         <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                        <p className="text-gray-600 font-medium mb-1">No inactive custom cards</p>
-                        <p className="text-sm text-gray-500">Custom cards marked as inactive will appear here</p>
+                        <p className="text-gray-600 font-medium mb-1">{t('ecards.cards.noInactiveCards')}</p>
+                        <p className="text-sm text-gray-500">{t('ecards.cards.noInactiveCardsDescription')}</p>
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-4">

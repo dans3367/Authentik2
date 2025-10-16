@@ -233,7 +233,12 @@
     "title": "Tarjetas Electrónicas de Cumpleaños",
     "cardsSent": "Tarjetas de Cumpleaños Enviadas",
     "preview": {
-      "defaultTitle": "¡Feliz Navidad!"
+      "defaultTitle": "¡Feliz Navidad!",
+      "valentinesDay": "¡Feliz Día de San Valentín!",
+      "stPatricksDay": "¡Feliz Día de San Patricio!",
+      "newYearsDay": "¡Feliz Año Nuevo!",
+      "easter": "¡Celebra la Pascua con Alegría!",
+      "independenceDay": "¡Feliz Día de la Independencia!"
     },
     "table": {
       "name": "NOMBRE",
@@ -313,7 +318,39 @@
         "classicTools": "Herramientas Clásicas",
         "grillMaster": "Maestro de la Parrilla",
         "sportsDay": "Día Deportivo"
+      },
+      "stPatricksDay": {
+        "shamrockCharm": "Encanto de Trébol"
       }
+    },
+    "previewLabel": "vista previa",
+    "sectionLabels": {
+      "valentinesDay": "Día de San Valentín",
+      "stPatricksDay": "Día de San Patricio",
+      "newYearsDay": "Día de Año Nuevo",
+      "easter": "Pascua",
+      "independenceDay": "Día de la Independencia",
+      "mothersDay": "Día de las Madres",
+      "fathersDay": "Día del Padre",
+      "christmas": "Navidad"
+    },
+    "tabs": {
+      "themes": "Temas",
+      "settings": "Configuración",
+      "customers": "Clientes",
+      "test": "Prueba"
+    },
+    "cards": {
+      "active": "Tarjetas Activas",
+      "inactive": "Tarjetas Inactivas",
+      "custom": "Tarjetas Personalizadas",
+      "inactiveCustom": "Tarjetas Personalizadas Inactivas",
+      "createCustom": "Crear Tarjeta Personalizada",
+      "noCustomCards": "Aún no hay tarjetas personalizadas",
+      "noCustomCardsDescription": "Crea tus propias tarjetas electrónicas personalizadas con imágenes y mensajes personalizados",
+      "createFirstCard": "Crea Tu Primera Tarjeta",
+      "noInactiveCards": "No hay tarjetas personalizadas inactivas",
+      "noInactiveCardsDescription": "Las tarjetas personalizadas marcadas como inactivas aparecerán aquí"
     }
   },
   "toast": {
