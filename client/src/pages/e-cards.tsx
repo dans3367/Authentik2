@@ -1739,38 +1739,8 @@ export default function ECardsPage() {
                           type="button"
                           onClick={() => {
                             setDesignerThemeId(themeId);
-                            const draft = {
-                              title: '',
-                              message: eCardSettings?.customMessage || '',
-                              signature: '',
-                              imageUrl: theme.image,
-                              themeId: themeId,
-                              customImage: true,
-                            };
-                            try {
-                              localStorage.setItem(`eCardDesignerDraft:${themeId}`, JSON.stringify(draft));
-                            } catch {}
-                            setThemePreviewData(prev => ({
-                              ...prev,
-                              [themeId]: {
-                                title: '',
-                                message: eCardSettings?.customMessage || '',
-                                signature: '',
-                                imageUrl: theme.image,
-                                customImage: true,
-                                imagePosition: { x: 0, y: 0 },
-                                imageScale: 1,
-                              }
-                            }));
-                            setCustomThemePreview({
-                              title: '',
-                              message: eCardSettings?.customMessage || '',
-                              signature: '',
-                              imageUrl: theme.image,
-                              customImage: true,
-                              imagePosition: { x: 0, y: 0 },
-                              imageScale: 1,
-                            });
+                            // Don't write to localStorage when opening - let the designer load from DB
+                            // This prevents overwriting saved customizations
                             setDesignerOpen(true);
                           }}
                           disabled={updateSettingsMutation.isPending}
@@ -1832,38 +1802,8 @@ export default function ECardsPage() {
                           type="button"
                           onClick={() => {
                             setDesignerThemeId(themeId);
-                            const draft = {
-                              title: '',
-                              message: eCardSettings?.customMessage || '',
-                              signature: '',
-                              imageUrl: theme.image,
-                              themeId: themeId,
-                              customImage: true,
-                            };
-                            try {
-                              localStorage.setItem(`eCardDesignerDraft:${themeId}`, JSON.stringify(draft));
-                            } catch {}
-                            setThemePreviewData(prev => ({
-                              ...prev,
-                              [themeId]: {
-                                title: '',
-                                message: eCardSettings?.customMessage || '',
-                                signature: '',
-                                imageUrl: theme.image,
-                                customImage: true,
-                                imagePosition: { x: 0, y: 0 },
-                                imageScale: 1,
-                              }
-                            }));
-                            setCustomThemePreview({
-                              title: '',
-                              message: eCardSettings?.customMessage || '',
-                              signature: '',
-                              imageUrl: theme.image,
-                              customImage: true,
-                              imagePosition: { x: 0, y: 0 },
-                              imageScale: 1,
-                            });
+                            // Don't write to localStorage when opening - let the designer load from DB
+                            // This prevents overwriting saved customizations
                             setDesignerOpen(true);
                           }}
                           disabled={updateSettingsMutation.isPending}
@@ -1924,38 +1864,8 @@ export default function ECardsPage() {
                           type="button"
                           onClick={() => {
                             setDesignerThemeId(themeId);
-                            const draft = {
-                              title: '',
-                              message: eCardSettings?.customMessage || '',
-                              signature: '',
-                              imageUrl: theme.image,
-                              themeId: themeId,
-                              customImage: true,
-                            };
-                            try {
-                              localStorage.setItem(`eCardDesignerDraft:${themeId}`, JSON.stringify(draft));
-                            } catch {}
-                            setThemePreviewData(prev => ({
-                              ...prev,
-                              [themeId]: {
-                                title: '',
-                                message: eCardSettings?.customMessage || '',
-                                signature: '',
-                                imageUrl: theme.image,
-                                customImage: true,
-                                imagePosition: { x: 0, y: 0 },
-                                imageScale: 1,
-                              }
-                            }));
-                            setCustomThemePreview({
-                              title: '',
-                              message: eCardSettings?.customMessage || '',
-                              signature: '',
-                              imageUrl: theme.image,
-                              customImage: true,
-                              imagePosition: { x: 0, y: 0 },
-                              imageScale: 1,
-                            });
+                            // Don't write to localStorage when opening - let the designer load from DB
+                            // This prevents overwriting saved customizations
                             setDesignerOpen(true);
                           }}
                           disabled={updateSettingsMutation.isPending}
@@ -2016,38 +1926,8 @@ export default function ECardsPage() {
                           type="button"
                           onClick={() => {
                             setDesignerThemeId(themeId);
-                            const draft = {
-                              title: '',
-                              message: eCardSettings?.customMessage || '',
-                              signature: '',
-                              imageUrl: theme.image,
-                              themeId: themeId,
-                              customImage: true,
-                            };
-                            try {
-                              localStorage.setItem(`eCardDesignerDraft:${themeId}`, JSON.stringify(draft));
-                            } catch {}
-                            setThemePreviewData(prev => ({
-                              ...prev,
-                              [themeId]: {
-                                title: '',
-                                message: eCardSettings?.customMessage || '',
-                                signature: '',
-                                imageUrl: theme.image,
-                                customImage: true,
-                                imagePosition: { x: 0, y: 0 },
-                                imageScale: 1,
-                              }
-                            }));
-                            setCustomThemePreview({
-                              title: '',
-                              message: eCardSettings?.customMessage || '',
-                              signature: '',
-                              imageUrl: theme.image,
-                              customImage: true,
-                              imagePosition: { x: 0, y: 0 },
-                              imageScale: 1,
-                            });
+                            // Don't write to localStorage when opening - let the designer load from DB
+                            // This prevents overwriting saved customizations
                             setDesignerOpen(true);
                           }}
                           disabled={updateSettingsMutation.isPending}
@@ -2108,38 +1988,8 @@ export default function ECardsPage() {
                           type="button"
                           onClick={() => {
                             setDesignerThemeId(themeId);
-                            const draft = {
-                              title: '',
-                              message: eCardSettings?.customMessage || '',
-                              signature: '',
-                              imageUrl: theme.image,
-                              themeId: themeId,
-                              customImage: true,
-                            };
-                            try {
-                              localStorage.setItem(`eCardDesignerDraft:${themeId}`, JSON.stringify(draft));
-                            } catch {}
-                            setThemePreviewData(prev => ({
-                              ...prev,
-                              [themeId]: {
-                                title: '',
-                                message: eCardSettings?.customMessage || '',
-                                signature: '',
-                                imageUrl: theme.image,
-                                customImage: true,
-                                imagePosition: { x: 0, y: 0 },
-                                imageScale: 1,
-                              }
-                            }));
-                            setCustomThemePreview({
-                              title: '',
-                              message: eCardSettings?.customMessage || '',
-                              signature: '',
-                              imageUrl: theme.image,
-                              customImage: true,
-                              imagePosition: { x: 0, y: 0 },
-                              imageScale: 1,
-                            });
+                            // Don't write to localStorage when opening - let the designer load from DB
+                            // This prevents overwriting saved customizations
                             setDesignerOpen(true);
                           }}
                           disabled={updateSettingsMutation.isPending}
