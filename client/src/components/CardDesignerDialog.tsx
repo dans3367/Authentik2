@@ -1210,23 +1210,19 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
-                    {/* Image controls - only available for custom cards */}
-                    {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) && (
-                      <>
-                        <DropdownMenuItem onClick={handlePickImage} disabled={uploading}>
-                          <Edit className="w-4 h-4 mr-2" />
-                          {uploading ? 'Uploading...' : 'Upload Image'}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setUnsplashOpen(true)}>
-                          <Search className="w-4 h-4 mr-2" />
-                          Browse Unsplash
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={handleRemoveImage}>
-                          <ImageOff className="w-4 h-4 mr-2" />
-                          Remove Image
-                        </DropdownMenuItem>
-                      </>
-                    )}
+                    {/* Image controls - available for all cards */}
+                    <DropdownMenuItem onClick={handlePickImage} disabled={uploading}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      {uploading ? 'Uploading...' : 'Upload Image'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setUnsplashOpen(true)}>
+                      <Search className="w-4 h-4 mr-2" />
+                      Browse Unsplash
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleRemoveImage}>
+                      <ImageOff className="w-4 h-4 mr-2" />
+                      Remove Image
+                    </DropdownMenuItem>
                     <DropdownMenuItem className="text-red-600" onClick={handleReset}>
                       <RefreshCw className="w-4 h-4 mr-2" />
                       Reset {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) ? 'Card' : 'Text'}
@@ -1541,23 +1537,19 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
-                    {/* Image controls - only available for custom cards */}
-                    {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) && (
-                      <>
-                        <DropdownMenuItem onClick={handlePickImage} disabled={uploading}>
-                          <Edit className="w-4 h-4 mr-2" />
-                          {uploading ? 'Uploading...' : 'Upload Image'}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setUnsplashOpen(true)}>
-                          <Search className="w-4 h-4 mr-2" />
-                          Browse Unsplash
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={handleRemoveImage}>
-                          <ImageOff className="w-4 h-4 mr-2" />
-                          Remove Image
-                        </DropdownMenuItem>
-                      </>
-                    )}
+                    {/* Image controls - available for all cards */}
+                    <DropdownMenuItem onClick={handlePickImage} disabled={uploading}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      {uploading ? 'Uploading...' : 'Upload Image'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setUnsplashOpen(true)}>
+                      <Search className="w-4 h-4 mr-2" />
+                      Browse Unsplash
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleRemoveImage}>
+                      <ImageOff className="w-4 h-4 mr-2" />
+                      Remove Image
+                    </DropdownMenuItem>
                     <DropdownMenuItem className="text-red-600" onClick={handleReset}>
                       <RefreshCw className="w-4 h-4 mr-2" />
                       Reset {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) ? 'Card' : 'Text'}
