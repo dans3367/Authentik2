@@ -927,7 +927,7 @@ export default function ECardsPage() {
   const handleToggleHoliday = (holidayId: string) => {
     if (birthdaySettings) {
       // Get the parent holiday ID if this is a theme variant
-      const parentHolidayId = getParentHolidayId(holidayId);
+      const parentHolidayId = getParentHolidayId(holidayId) || holidayId;
       const currentDisabled = disabledHolidays || [];
       const newDisabled = currentDisabled.includes(parentHolidayId)
         ? currentDisabled.filter(id => id !== parentHolidayId)
@@ -961,8 +961,8 @@ export default function ECardsPage() {
           throw new Error('Failed to update card status');
         }
 
-        // Refetch custom cards to update the list
-        await refetchCustomCards();
+        // Invalidate and refetch custom cards to update the list with fresh data
+        await queryClient.invalidateQueries({ queryKey: ['/api/custom-cards'] });
 
         toast({
           title: "Card Updated",
@@ -2514,8 +2514,8 @@ export default function ECardsPage() {
                   throw new Error('Failed to save custom card');
                 }
 
-                // Refetch custom cards to update the list
-                await refetchCustomCards();
+                // Invalidate and refetch custom cards to update the list with fresh data
+                await queryClient.invalidateQueries({ queryKey: ['/api/custom-cards'] });
 
                 toast({
                   title: existing ? "Card Updated" : "Card Created",
