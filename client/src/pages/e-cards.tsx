@@ -940,7 +940,12 @@ export default function ECardsPage() {
 
   // Handler for toggling custom card active state
   const handleToggleCustomCardActive = async () => {
-    if (designerThemeId && designerThemeId.startsWith('custom-')) {
+    const isCustomCard = designerThemeId && (
+      designerThemeId.startsWith('custom-') || 
+      customCards.some(c => c.id === designerThemeId)
+    );
+    
+    if (isCustomCard) {
       const card = customCards.find(c => c.id === designerThemeId);
       if (!card) return;
 
@@ -2457,15 +2462,35 @@ export default function ECardsPage() {
             console.log('💾 [onSave] Created themeData:', {
               imageUrl: themeData.imageUrl,
               customImage: themeData.customImage,
-              hasImageUrl: !!themeData.imageUrl
+              hasImageUrl: !!themeData.imageUrl,
+              title: themeData.title,
+              message: themeData.message,
+              signature: themeData.signature,
+              description: themeData.description
             });
 
-            // Check if this is a custom card
-            if (designerThemeId && designerThemeId.startsWith('custom-')) {
+            // Check if this is a custom card - either starts with 'custom-' or is found in customCards array
+            const isCustomCard = designerThemeId && (
+              designerThemeId.startsWith('custom-') || 
+              customCards.some(c => c.id === designerThemeId)
+            );
+
+            if (isCustomCard) {
               const existingCard = customCards.find(c => c.id === designerThemeId);
               const cardName = (data as any).cardName || existingCard?.name || '';
               const sendDate = (data as any).sendDate || existingCard?.sendDate || '';
               const occasionType = (data as any).occasionType || existingCard?.occasionType || '';
+
+              console.log('💾 [Custom Card Save] Preparing to save custom card:', {
+                designerThemeId,
+                cardName,
+                sendDate,
+                occasionType,
+                themeDataTitle: themeData.title,
+                themeDataMessage: themeData.message,
+                themeDataSignature: themeData.signature,
+                dataReceived: data
+              });
 
               // Validation is now handled in ECardDesignerDialog
               if (!cardName || !sendDate || !occasionType) {
@@ -2488,6 +2513,11 @@ export default function ECardsPage() {
                   cardData: JSON.stringify(themeData),
                   promotionIds: [], // TODO: Add promotion support
                 };
+
+                console.log('💾 [Custom Card Save] Payload being sent to API:', {
+                  ...cardPayload,
+                  cardDataParsed: JSON.parse(cardPayload.cardData)
+                });
 
                 let response;
                 if (existing) {
@@ -2675,8 +2705,16 @@ export default function ECardsPage() {
           holidayId={designerThemeId || undefined}
           isHolidayDisabled={designerThemeId ? disabledHolidays.includes(getParentHolidayId(designerThemeId) || designerThemeId) : false}
           onToggleHoliday={handleToggleHoliday}
-          customCardActive={designerThemeId?.startsWith("custom-") ? customCards.find(c => c.id === designerThemeId)?.active : undefined}
-          onToggleCustomCardActive={designerThemeId?.startsWith("custom-") ? handleToggleCustomCardActive : undefined}
+          customCardActive={
+            designerThemeId && (designerThemeId.startsWith("custom-") || customCards.some(c => c.id === designerThemeId))
+              ? customCards.find(c => c.id === designerThemeId)?.active 
+              : undefined
+          }
+          onToggleCustomCardActive={
+            designerThemeId && (designerThemeId.startsWith("custom-") || customCards.some(c => c.id === designerThemeId))
+              ? handleToggleCustomCardActive 
+              : undefined
+          }
           selectedPromotions={designerThemeId ? (cardPromotions[designerThemeId] || []) : []}
           onPromotionsChange={designerThemeId ? (promotionIds) => handleCardPromotionsChange(designerThemeId, promotionIds) : undefined}
           hideDescription={false}
