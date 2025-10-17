@@ -2608,6 +2608,8 @@ export default function ECardsPage() {
                     title: "Card Saved",
                     description: "Your custom card has been saved.",
                   });
+                  
+                  setDesignerOpen(false);
                 }
               });
             } else if (hasTextCustomizations || data.message !== (latestECardSettings?.customMessage || '')) {
@@ -2637,6 +2639,8 @@ export default function ECardsPage() {
                     title: "Card Saved",
                     description: "Your card customizations have been saved.",
                   });
+                  
+                  setDesignerOpen(false);
                 }
               });
             } else {
@@ -2660,6 +2664,8 @@ export default function ECardsPage() {
                     title: "Card Saved",
                     description: "Your card has been saved.",
                   });
+                  
+                  setDesignerOpen(false);
                 }
               });
             }
