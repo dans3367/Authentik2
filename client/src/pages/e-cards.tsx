@@ -632,20 +632,18 @@ export default function ECardsPage() {
     },
     onSuccess: (updatedSettings) => {
       console.log('✅ [Birthday Settings] Update success, updating cache with:', updatedSettings);
-      console.log('📌 [Birthday Settings] New emailTemplate should be:', updatedSettings?.emailTemplate);
+      console.log('📌 [Birthday Settings] customThemeData value:', updatedSettings?.customThemeData);
+      console.log('📌 [Birthday Settings] customThemeData type:', typeof updatedSettings?.customThemeData);
       
       toast({
         title: "Success",
         description: "E-card settings updated successfully",
       });
       
-      // Update the query cache immediately with the server response (now returns settings directly)
-      queryClient.setQueryData(['/api/birthday-settings'], updatedSettings);
-      console.log('💾 [Birthday Settings] Cache updated');
-      
-      // Force a re-render by invalidating the query
+      // Invalidate the query to force a fresh fetch from the server
+      // This ensures we get the latest data without any cache inconsistencies
       queryClient.invalidateQueries({ queryKey: ['/api/birthday-settings'] });
-      console.log('🔄 [Birthday Settings] Query invalidated, will refetch');
+      console.log('🔄 [Birthday Settings] Query invalidated, will refetch fresh data');
     },
     onError: (error: any) => {
       console.error('🎨 [Birthday Cards] Update settings error:', error);
@@ -821,9 +819,11 @@ export default function ECardsPage() {
     const themeMetadata = themeMetadataById[currentThemeId];
 
     // PRIORITY 1: Load from database first (customThemeData)
+    console.log('🔍 [Card Designer Initial Data] birthdaySettings.customThemeData:', birthdaySettings?.customThemeData, 'Type:', typeof birthdaySettings?.customThemeData);
     if (birthdaySettings?.customThemeData) {
       try {
         const parsed = JSON.parse(birthdaySettings.customThemeData);
+        console.log('✅ [Card Designer Initial Data] Parsed customThemeData:', parsed);
 
         let themeSpecificData = null;
 
@@ -2589,13 +2589,16 @@ export default function ECardsPage() {
               // Update real-time preview immediately for instant visual feedback
               setCustomThemePreview(themeData);
 
-              // Update both the custom theme data and keep the email template as custom
-              updateSettingsMutation.mutate({
+              const savePayload = {
                 ...latestBirthdaySettings,
                 emailTemplate: 'custom',
                 customMessage: data.message,
                 customThemeData: JSON.stringify(updatedThemeData),
-              }, {
+              };
+              console.log('📤 [Card Save] Sending to server:', { customThemeData: savePayload.customThemeData });
+
+              // Update both the custom theme data and keep the email template as custom
+              updateSettingsMutation.mutate(savePayload, {
                 onSuccess: () => {
                   // Clear localStorage draft since data is now saved to DB
                   try {
@@ -2615,12 +2618,16 @@ export default function ECardsPage() {
               // For holiday theme variants with any customizations, save the theme-specific data
               // and set emailTemplate to the specific theme variant ID
               console.log('🎨 [Birthday Cards] Saving theme-specific customizations for', currentThemeId, 'with data:', themeData);
-              updateSettingsMutation.mutate({
+              
+              const savePayload = {
                 ...latestBirthdaySettings,
                 emailTemplate: currentThemeId, // Set to the specific theme variant ID
                 customMessage: data.message,
                 customThemeData: JSON.stringify(updatedThemeData), // Save theme-specific data
-              }, {
+              };
+              console.log('📤 [Card Save] Sending to server (customizations):', { customThemeData: savePayload.customThemeData });
+
+              updateSettingsMutation.mutate(savePayload, {
                 onSuccess: () => {
                   // Clear localStorage draft since data is now saved to DB
                   try {
