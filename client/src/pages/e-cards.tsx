@@ -775,28 +775,31 @@ export default function ECardsPage() {
 
   // Memoized initial data for CardDesignerDialog to prevent re-render loops
   const cardDesignerInitialData = useMemo(() => {
-    // Check if we're editing a custom card
+    // Check if we're editing a custom card by looking for it in customCards array
+    const existingCard = designerThemeId ? customCards.find(c => c.id === designerThemeId) : null;
+    
+    if (existingCard) {
+      // Editing an existing custom card
+      const hasImage = Boolean(existingCard.data.imageUrl);
+      console.log('🔍 [Edit Custom Card] Loading data for:', existingCard.id, {
+        name: existingCard.name,
+        hasImageUrl: hasImage,
+        imageUrl: existingCard.data.imageUrl,
+        originalCustomImage: existingCard.data.customImage,
+        willSetCustomImage: hasImage ? true : (existingCard.data.customImage || false),
+        fullData: existingCard.data
+      });
+      return {
+        ...existingCard.data,
+        customImage: hasImage ? true : (existingCard.data.customImage || false),
+        cardName: existingCard.name,
+        sendDate: existingCard.sendDate,
+        occasionType: existingCard.occasionType || '',
+      };
+    }
+    
+    // Check if creating a new custom card (designerThemeId starts with 'custom-')
     if (designerThemeId && designerThemeId.startsWith('custom-')) {
-      const existingCard = customCards.find(c => c.id === designerThemeId);
-      if (existingCard) {
-        // Ensure customImage is set to true if imageUrl exists (for proper image display in edit mode)
-        const hasImage = Boolean(existingCard.data.imageUrl);
-        console.log('🔍 [Edit Custom Card] Loading data for:', existingCard.id, {
-          name: existingCard.name,
-          hasImageUrl: hasImage,
-          imageUrl: existingCard.data.imageUrl,
-          originalCustomImage: existingCard.data.customImage,
-          willSetCustomImage: hasImage ? true : (existingCard.data.customImage || false),
-          fullData: existingCard.data
-        });
-        return {
-          ...existingCard.data,
-          customImage: hasImage ? true : (existingCard.data.customImage || false),
-          cardName: existingCard.name,
-          sendDate: existingCard.sendDate,
-          occasionType: existingCard.occasionType || '',
-        };
-      }
       // New custom card - return empty data
       return {
         title: '',
