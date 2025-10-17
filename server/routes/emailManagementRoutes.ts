@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, and } from 'drizzle-orm';
-import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, emailActivity, tenants, emailSends, emailContent, companies, unsubscribeTokens } from '@shared/schema';
+import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, eCardSettings, emailActivity, tenants, emailSends, emailContent, companies, unsubscribeTokens } from '@shared/schema';
 import { deleteImageFromR2 } from '../config/r2';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { type ContactFilters, type BouncedEmailFilters } from '@shared/schema';
@@ -1511,6 +1511,160 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
   } catch (error) {
     console.error('Update birthday settings error:', error);
     res.status(500).json({ message: 'Failed to update birthday settings' });
+  }
+});
+
+// Get e-card settings
+emailManagementRoutes.get("/e-card-settings", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const settings = await db.query.eCardSettings.findFirst({
+      where: sql`${eCardSettings.tenantId} = ${req.user.tenantId}`,
+    });
+
+    // If no settings exist, return default settings
+    if (!settings) {
+      console.log('🎴 [E-Card Settings GET] No settings found, returning defaults');
+      const defaultSettings = {
+        id: '',
+        enabled: false,
+        emailTemplate: 'default',
+        customMessage: '',
+        senderName: '',
+        customThemeData: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      return res.json(defaultSettings);
+    }
+
+    console.log('🎴 [E-Card Settings GET] Returning settings:', {
+      id: settings.id,
+      emailTemplate: settings.emailTemplate,
+      enabled: settings.enabled,
+      customThemeData: settings.customThemeData ? 'present' : 'null'
+    });
+
+    res.json(settings);
+  } catch (error) {
+    console.error('Get e-card settings error:', error);
+    res.status(500).json({ message: 'Failed to get e-card settings' });
+  }
+});
+
+// Update e-card settings
+emailManagementRoutes.put("/e-card-settings", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const {
+      enabled,
+      emailTemplate,
+      customMessage,
+      customThemeData,
+      senderName,
+    } = req.body;
+
+    // Validate input
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ message: 'enabled field must be a boolean' });
+    }
+
+    // Validate customThemeData if provided (should be valid JSON string or null)
+    let customThemeDataStr = customThemeData;
+    if (customThemeData !== undefined && customThemeData !== null && customThemeData !== 'null') {
+      try {
+        // If it's already a string, try to parse it to validate
+        if (typeof customThemeData === 'string') {
+          JSON.parse(customThemeData);
+          customThemeDataStr = customThemeData;
+        } else {
+          // If it's an object, stringify it
+          customThemeDataStr = JSON.stringify(customThemeData);
+        }
+      } catch (error) {
+        return res.status(400).json({ message: 'customThemeData must be valid JSON' });
+      }
+    } else if (customThemeData === 'null') {
+      customThemeDataStr = null;
+    }
+
+    // Get existing settings to extract old image URL for cleanup
+    const existingSettings = await db.query.eCardSettings.findFirst({
+      where: sql`${eCardSettings.tenantId} = ${req.user.tenantId}`,
+    });
+
+    const oldImageUrl = existingSettings?.customThemeData 
+      ? (() => {
+          try {
+            const data = JSON.parse(existingSettings.customThemeData);
+            return data?.imageUrl || null;
+          } catch {
+            return null;
+          }
+        })()
+      : null;
+
+    let updatedSettings;
+
+    if (existingSettings) {
+      // Update existing settings
+      updatedSettings = await db.update(eCardSettings)
+        .set({
+          enabled,
+          emailTemplate: emailTemplate || 'default',
+          customMessage: customMessage || '',
+          customThemeData: customThemeDataStr,
+          senderName: senderName || '',
+          updatedAt: new Date(),
+        })
+        .where(sql`${eCardSettings.id} = ${existingSettings.id}`)
+        .returning();
+    } else {
+      // Create new settings if they don't exist
+      const insertData = {
+        tenantId: req.user.tenantId,
+        enabled,
+        emailTemplate: emailTemplate || 'default',
+        customMessage: customMessage || '',
+        customThemeData: customThemeDataStr,
+        senderName: senderName || '',
+      };
+
+      updatedSettings = await db.insert(eCardSettings)
+        .values(insertData)
+        .returning();
+    }
+
+    // Clean up old image after successful database update
+    if (oldImageUrl && customThemeDataStr) {
+      try {
+        const newCustomData = typeof customThemeData === 'string' ? JSON.parse(customThemeData) : customThemeData;
+        const newImageUrl = newCustomData?.imageUrl || null;
+
+        // Only delete old image if a new different image is being set or image is being removed
+        if (newImageUrl !== oldImageUrl) {
+          console.log('📸 [E-Card Settings] Cleaning up old image:', oldImageUrl);
+          // Delete old image asynchronously (don't wait for it to complete)
+          deleteImageFromR2(oldImageUrl).catch(error => {
+            console.error('📸 [E-Card Settings] Failed to delete old image:', oldImageUrl, error);
+          });
+        }
+      } catch (error) {
+        console.warn('Failed to compare image URLs for cleanup:', error);
+      }
+    }
+
+    // Log what we're about to return
+    console.log('🎴 [E-Card Settings PUT] Returning updated settings:', {
+      id: updatedSettings[0]?.id,
+      emailTemplate: updatedSettings[0]?.emailTemplate,
+      enabled: updatedSettings[0]?.enabled,
+      customThemeData: updatedSettings[0]?.customThemeData ? 'present' : 'null'
+    });
+
+    // Return just the settings object to match GET endpoint structure
+    res.json(updatedSettings[0]);
+  } catch (error) {
+    console.error('Update e-card settings error:', error);
+    res.status(500).json({ message: 'Failed to update e-card settings' });
   }
 });
 
