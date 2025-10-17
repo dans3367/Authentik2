@@ -111,6 +111,7 @@ export class EnhancedEmailService {
       from?: string;
       preferredProvider?: string;
       useQueue?: boolean;
+      headers?: Record<string, string>;
       metadata?: Record<string, any>;
     } = {}
   ): Promise<EmailSendResult | string> {
@@ -122,6 +123,7 @@ export class EnhancedEmailService {
       subject,
       html,
       text: options.text,
+      headers: options.headers,
       metadata: {
         type: 'custom',
         ...options.metadata
@@ -142,6 +144,7 @@ export class EnhancedEmailService {
       subject: string;
       html: string;
       text?: string;
+      headers?: Record<string, string>;
       metadata?: Record<string, any>;
     }>,
     options: {
@@ -168,6 +171,7 @@ export class EnhancedEmailService {
             subject: emailData.subject,
             html: emailData.html,
             text: emailData.text,
+            headers: emailData.headers,
             metadata: {
               type: 'batch',
               ...emailData.metadata

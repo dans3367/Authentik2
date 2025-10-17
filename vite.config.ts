@@ -9,6 +9,9 @@ export default defineConfig({
   plugins: [
     react(),
   ],
+  optimizeDeps: {
+    exclude: ['stripe','framer-motion']
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "client", "src"),

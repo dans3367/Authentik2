@@ -9,7 +9,7 @@ import { Color } from "@tiptap/extension-color";
 import { Placeholder } from "@tiptap/extension-placeholder";
 import { Image } from "@tiptap/extension-image";
 import { Button } from "@/components/ui/button";
-import { Bold, AlignLeft, AlignCenter, AlignRight, Droplet, User, Sparkles, Wand2, PartyPopper, ArrowRightFromLine, ArrowLeftToLine, Tag, Undo, Redo, Languages } from "lucide-react";
+import { Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, Droplet, User, Sparkles, Wand2, PartyPopper, ArrowRightFromLine, ArrowLeftToLine, Tag, Undo, Redo, Languages, List, ListOrdered, Heading1, Heading2, Link as LinkIcon, Minus } from "lucide-react";
 import { generateBirthdayMessage, improveText, emojifyText, expandText, shortenText, makeMoreCasualText, makeMoreFormalText, translateText } from "@/lib/aiApi";
 import {
   DropdownMenu,
@@ -31,11 +31,10 @@ interface RichTextEditorProps {
     lastName?: string;
   };
   businessName?: string;
-  onGenerateStart?: () => void;
-  onGenerateEnd?: () => void;
+  occasionType?: string;
 }
 
-export default function RichTextEditor({ value, onChange, placeholder = "Start typing your message...", className = "", customerInfo, businessName, onGenerateStart, onGenerateEnd }: RichTextEditorProps) {
+export default function RichTextEditor({ value, onChange, placeholder = "Start typing your message...", className = "", customerInfo, businessName, occasionType }: RichTextEditorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isImproving, setIsImproving] = useState(false);
@@ -56,13 +55,20 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
     position: 'absolute' | 'fixed';
   } | null>(null);
 
-  const isProcessing = isImproving || isEmojifying || isExpanding || isShortening || isCasualizing || isFormalizing || isTranslating;
+  const isProcessing = isGenerating || isImproving || isEmojifying || isExpanding || isShortening || isCasualizing || isFormalizing || isTranslating;
   
   // Track active states for toolbar buttons
   const [isBold, setIsBold] = useState(false);
+  const [isItalic, setIsItalic] = useState(false);
+  const [isUnderline, setIsUnderline] = useState(false);
+  const [isStrike, setIsStrike] = useState(false);
   const [isAlignLeft, setIsAlignLeft] = useState(false);
   const [isAlignCenter, setIsAlignCenter] = useState(false);
   const [isAlignRight, setIsAlignRight] = useState(false);
+  const [isBulletList, setIsBulletList] = useState(false);
+  const [isOrderedList, setIsOrderedList] = useState(false);
+  const [isHeading1, setIsHeading1] = useState(false);
+  const [isHeading2, setIsHeading2] = useState(false);
 
   // Function to insert placeholder text
   // Placeholders are inserted in the format {{firstName}} or {{lastName}}
@@ -75,15 +81,15 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
 
   // Handle AI message generation
   const handleGenerateMessage = async () => {
-    if (isGenerating || !editor) return;
+    if (isProcessing || !editor) return;
     
     setIsGenerating(true);
-    if (onGenerateStart) onGenerateStart();
     
     try {
       const result = await generateBirthdayMessage({
         customerName: customerInfo?.firstName,
         businessName: businessName,
+        occasionType: occasionType,
       });
       
       if (result.success && result.message) {
@@ -99,7 +105,6 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
       alert("An error occurred while generating the message. Please try again.");
     } finally {
       setIsGenerating(false);
-      if (onGenerateEnd) onGenerateEnd();
     }
   };
 
@@ -375,9 +380,16 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
 
     const updateToolbarStates = () => {
       setIsBold(editor.isActive('bold'));
+      setIsItalic(editor.isActive('italic'));
+      setIsUnderline(editor.isActive('underline'));
+      setIsStrike(editor.isActive('strike'));
       setIsAlignLeft(editor.isActive({ textAlign: 'left' }));
       setIsAlignCenter(editor.isActive({ textAlign: 'center' }));
       setIsAlignRight(editor.isActive({ textAlign: 'right' }));
+      setIsBulletList(editor.isActive('bulletList'));
+      setIsOrderedList(editor.isActive('orderedList'));
+      setIsHeading1(editor.isActive('heading', { level: 1 }));
+      setIsHeading2(editor.isActive('heading', { level: 2 }));
     };
 
     // Update states initially
@@ -414,7 +426,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
   return (
     <div ref={containerRef} className="relative min-h-[150px] border rounded-md bg-white">
       {/* Permanent top toolbar */}
-      <div className="bg-gray-800 text-white rounded-t-md shadow-lg px-2 py-1 flex items-center gap-1 border-b">
+      <div className="bg-gray-800 text-white rounded-t-md shadow-lg px-2 py-1 flex flex-wrap items-center gap-1 border-b overflow-x-auto">
         <Button
           type="button"
           variant="ghost"
@@ -445,8 +457,99 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           className={`h-8 w-8 text-white hover:bg-gray-700 ${isBold ? 'bg-gray-700' : ''}`}
           onClick={() => editor?.chain().focus().toggleBold().run()}
           disabled={!editor}
+          title="Bold"
         >
           <Bold className="w-4 h-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={`h-8 w-8 text-white hover:bg-gray-700 ${isItalic ? 'bg-gray-700' : ''}`}
+          onClick={() => editor?.chain().focus().toggleItalic().run()}
+          disabled={!editor}
+          title="Italic"
+        >
+          <Italic className="w-4 h-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={`h-8 w-8 text-white hover:bg-gray-700 ${isUnderline ? 'bg-gray-700' : ''}`}
+          onClick={() => editor?.chain().focus().toggleUnderline().run()}
+          disabled={!editor}
+          title="Underline"
+        >
+          <Underline className="w-4 h-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={`h-8 w-8 text-white hover:bg-gray-700 ${isStrike ? 'bg-gray-700' : ''}`}
+          onClick={() => editor?.chain().focus().toggleStrike().run()}
+          disabled={!editor}
+          title="Strikethrough"
+        >
+          <Strikethrough className="w-4 h-4" />
+        </Button>
+        <div className="w-px h-6 bg-gray-600" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={`h-8 w-8 text-white hover:bg-gray-700 ${isHeading1 ? 'bg-gray-700' : ''}`}
+          onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
+          disabled={!editor}
+          title="Heading 1"
+        >
+          <Heading1 className="w-4 h-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={`h-8 w-8 text-white hover:bg-gray-700 ${isHeading2 ? 'bg-gray-700' : ''}`}
+          onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+          disabled={!editor}
+          title="Heading 2"
+        >
+          <Heading2 className="w-4 h-4" />
+        </Button>
+        <div className="w-px h-6 bg-gray-600" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={`h-8 w-8 text-white hover:bg-gray-700 ${isBulletList ? 'bg-gray-700' : ''}`}
+          onClick={() => editor?.chain().focus().toggleBulletList().run()}
+          disabled={!editor}
+          title="Bullet List"
+        >
+          <List className="w-4 h-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={`h-8 w-8 text-white hover:bg-gray-700 ${isOrderedList ? 'bg-gray-700' : ''}`}
+          onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+          disabled={!editor}
+          title="Numbered List"
+        >
+          <ListOrdered className="w-4 h-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-white hover:bg-gray-700"
+          onClick={() => editor?.chain().focus().setHorizontalRule().run()}
+          disabled={!editor}
+          title="Horizontal Rule"
+        >
+          <Minus className="w-4 h-4" />
         </Button>
         <div className="w-px h-6 bg-gray-600" />
         <Button
@@ -456,6 +559,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           className={`h-8 w-8 text-white hover:bg-gray-700 ${isAlignLeft ? 'bg-gray-700' : ''}`}
           onClick={() => editor?.chain().focus().setTextAlign('left').run()}
           disabled={!editor}
+          title="Align Left"
         >
           <AlignLeft className="w-4 h-4" />
         </Button>
@@ -466,6 +570,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           className={`h-8 w-8 text-white hover:bg-gray-700 ${isAlignCenter ? 'bg-gray-700' : ''}`}
           onClick={() => editor?.chain().focus().setTextAlign('center').run()}
           disabled={!editor}
+          title="Align Center"
         >
           <AlignCenter className="w-4 h-4" />
         </Button>
@@ -476,6 +581,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           className={`h-8 w-8 text-white hover:bg-gray-700 ${isAlignRight ? 'bg-gray-700' : ''}`}
           onClick={() => editor?.chain().focus().setTextAlign('right').run()}
           disabled={!editor}
+          title="Align Right"
         >
           <AlignRight className="w-4 h-4" />
         </Button>
@@ -497,7 +603,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           </div>
         </div>
 
-        {/* AI Generate and Tags dropdown */}
+        {/* Generate Message button */}
         <div className="w-px h-6 bg-gray-600 mx-1" />
         <Button
           type="button"
@@ -506,11 +612,13 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           className="h-8 px-2 text-xs font-medium text-purple-300 hover:text-purple-100 hover:bg-gray-700"
           onClick={handleGenerateMessage}
           disabled={isGenerating || !editor}
-          title="Generate birthday message with AI"
+          title={`Generate ${occasionType || 'greeting'} message with AI`}
         >
           <Sparkles className={`w-3 h-3 mr-1 ${isGenerating ? 'animate-pulse' : ''}`} />
           {isGenerating ? 'Generating...' : 'Generate'}
         </Button>
+
+        {/* Tags dropdown */}
         <div className="w-px h-6 bg-gray-600 mx-1" />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

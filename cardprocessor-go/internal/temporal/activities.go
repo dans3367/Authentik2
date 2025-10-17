@@ -1077,3 +1077,51 @@ func InsertOutgoingEmail(ctx context.Context, input InsertOutgoingEmailInput) (I
 		OutgoingEmailID: &emailSendWithDetails.EmailSend.ID, // Return the email_send ID
 	}, nil
 }
+
+// GetCompanyNameInput represents input for getting company name
+type GetCompanyNameInput struct {
+	TenantID string `json:"tenantId"`
+}
+
+// GetCompanyNameResult represents the result of getting company name
+type GetCompanyNameResult struct {
+	Success     bool   `json:"success"`
+	CompanyName string `json:"companyName,omitempty"`
+	Error       string `json:"error,omitempty"`
+}
+
+// GetCompanyNameActivity fetches the company name for a given tenant ID
+func GetCompanyNameActivity(ctx context.Context, input GetCompanyNameInput) (GetCompanyNameResult, error) {
+	logger := activity.GetLogger(ctx)
+	logger.Info("🏢 Fetching company name", "tenantId", input.TenantID)
+
+	if input.TenantID == "" {
+		return GetCompanyNameResult{
+			Success: false,
+			Error:   "Tenant ID is required",
+		}, fmt.Errorf("tenant ID is required")
+	}
+
+	company, err := activityDeps.Repo.GetCompany(ctx, input.TenantID)
+	if err != nil {
+		logger.Error("Failed to fetch company", "error", err)
+		return GetCompanyNameResult{
+			Success: false,
+			Error:   "Failed to fetch company",
+		}, fmt.Errorf("failed to fetch company: %w", err)
+	}
+
+	if company == nil || company.Name == "" {
+		logger.Info("No company found or name is empty", "tenantId", input.TenantID)
+		return GetCompanyNameResult{
+			Success: false,
+			Error:   "Company not found or name is empty",
+		}, fmt.Errorf("company not found or name is empty")
+	}
+
+	logger.Info("✅ Company name fetched successfully", "companyName", company.Name)
+	return GetCompanyNameResult{
+		Success:     true,
+		CompanyName: company.Name,
+	}, nil
+}

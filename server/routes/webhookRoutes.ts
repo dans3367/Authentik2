@@ -20,18 +20,15 @@ webhookRoutes.get("/resend", async (req, res) => {
 // Test webhook endpoint for testing email events
 webhookRoutes.post("/test/webhook-event", authenticateToken, async (req: any, res) => {
   try {
-    const { email, eventType, newsletterId, campaignId, metadata } = req.body;
+    const { email_id, eventType, metadata } = req.body;
 
-    if (!email || !eventType) {
-      return res.status(400).json({ message: 'Email and eventType are required' });
+    if (!email_id || !eventType) {
+      return res.status(400).json({ message: 'email_id and eventType are required' });
     }
 
     // Create test webhook data based on the event type
     const testWebhookData = {
-      to: [email],
-      email,
-      newsletterId,
-      campaignId,
+      email_id,
       metadata,
       id: `test-webhook-${Date.now()}`,
       timestamp: new Date().toISOString(),
@@ -61,10 +58,8 @@ webhookRoutes.post("/test/webhook-event", authenticateToken, async (req: any, re
     res.json({
       message: `Test webhook ${eventType} event processed successfully`,
       received: {
-        email,
+        email_id,
         eventType,
-        newsletterId,
-        campaignId,
         metadata,
       },
     });
@@ -240,33 +235,40 @@ async function handleEmailSent(data: any) {
   try {
     console.log('Email sent event:', data);
 
-    // Extract recipient email from webhook data
-    const recipientEmail = extractRecipientEmail(data);
-    if (!recipientEmail) {
-      console.error('Could not extract recipient email from webhook data');
+    // Extract provider_message_id from webhook data
+    const providerMessageId = extractProviderMessageId(data);
+    if (!providerMessageId) {
+      console.error('Could not extract provider_message_id from webhook data');
       return;
     }
 
-    console.log(`Processing sent event for: ${recipientEmail}`);
+    console.log(`Processing sent event for provider_message_id: ${providerMessageId}`);
 
-    // Find the contact record
-    const contact = await findContactByEmail(recipientEmail);
-    if (!contact) {
-      console.log(`Contact not found for email: ${recipientEmail}`);
+    // Find the email_sends record
+    const emailSend = await findEmailSendByProviderId(providerMessageId);
+    if (!emailSend) {
+      console.log(`Email send record not found for provider_message_id: ${providerMessageId}`);
       return;
     }
 
-    // Update contact metrics
-    await updateContactMetrics(contact.id, 'sent');
+    // Update email_sends status
+    await db.update(db.emailSends)
+      .set({
+        status: 'sent',
+        sentAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(sql`${db.emailSends.id} = ${emailSend.id}`);
 
-    // Create email activity record
-    await createEmailActivity(contact.id, data, 'sent', recipientEmail);
+    // Create email_events record
+    await createEmailEvent(emailSend.id, data, 'sent');
 
-    // Update newsletter statistics if newsletterId is provided
-    if (data.newsletterId) {
-      console.log(`Newsletter ${data.newsletterId} email sent to ${recipientEmail}`);
-      // TODO: Update newsletter send count in newsletters table
+    // Update contact metrics if contact is linked
+    if (emailSend.contactId) {
+      await updateContactMetrics(emailSend.contactId, 'sent');
     }
+
+    console.log(`Successfully processed sent event for email_send: ${emailSend.id}`);
   } catch (error) {
     console.error('Error handling email sent event:', error);
   }
@@ -276,32 +278,40 @@ async function handleEmailDelivered(data: any) {
   try {
     console.log('Email delivered event:', data);
 
-    // Extract recipient email from webhook data
-    const recipientEmail = extractRecipientEmail(data);
-    if (!recipientEmail) {
-      console.error('Could not extract recipient email from webhook data');
+    // Extract provider_message_id from webhook data
+    const providerMessageId = extractProviderMessageId(data);
+    if (!providerMessageId) {
+      console.error('Could not extract provider_message_id from webhook data');
       return;
     }
 
-    console.log(`Processing delivered event for: ${recipientEmail}`);
+    console.log(`Processing delivered event for provider_message_id: ${providerMessageId}`);
 
-    // Find the contact record
-    const contact = await findContactByEmail(recipientEmail);
-    if (!contact) {
-      console.log(`Contact not found for email: ${recipientEmail}`);
+    // Find the email_sends record
+    const emailSend = await findEmailSendByProviderId(providerMessageId);
+    if (!emailSend) {
+      console.log(`Email send record not found for provider_message_id: ${providerMessageId}`);
       return;
     }
 
-    // Update contact metrics
-    await updateContactMetrics(contact.id, 'delivered');
+    // Update email_sends status
+    await db.update(db.emailSends)
+      .set({
+        status: 'delivered',
+        deliveredAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(sql`${db.emailSends.id} = ${emailSend.id}`);
 
-    // Create email activity record
-    await createEmailActivity(contact.id, data, 'delivered', recipientEmail);
+    // Create email_events record
+    await createEmailEvent(emailSend.id, data, 'delivered');
 
-    // Update newsletter statistics if newsletterId is provided
-    if (data.newsletterId) {
-      console.log(`Newsletter ${data.newsletterId} email delivered to ${recipientEmail}`);
+    // Update contact metrics if contact is linked
+    if (emailSend.contactId) {
+      await updateContactMetrics(emailSend.contactId, 'delivered');
     }
+
+    console.log(`Successfully processed delivered event for email_send: ${emailSend.id}`);
   } catch (error) {
     console.error('Error handling email delivered event:', error);
   }
@@ -311,11 +321,32 @@ async function handleEmailBounced(data: any) {
   try {
     console.log('Email bounced event:', data);
     
-    // Add to bounced emails table
+    // Extract provider_message_id from webhook data
+    const providerMessageId = extractProviderMessageId(data);
     const email = data.email || data.Email;
     const reason = data.reason || data.Type || 'bounce';
     const description = data.description || data.Description || 'Email bounced';
 
+    // Update email_sends if we have provider_message_id
+    if (providerMessageId) {
+      const emailSend = await findEmailSendByProviderId(providerMessageId);
+      if (emailSend) {
+        await db.update(db.emailSends)
+          .set({
+            status: 'bounced',
+            errorMessage: description,
+            updatedAt: new Date(),
+          })
+          .where(sql`${db.emailSends.id} = ${emailSend.id}`);
+
+        // Create email_events record
+        await createEmailEvent(emailSend.id, data, 'bounced');
+
+        console.log(`Updated email_send ${emailSend.id} as bounced`);
+      }
+    }
+
+    // Add to bounced emails table
     if (email) {
       // Check if already exists
       const existingBounce = await db.query.bouncedEmails.findFirst({
@@ -341,11 +372,24 @@ async function handleEmailComplained(data: any) {
   try {
     console.log('Email complained event:', data);
     
-    // Add to bounced emails table with spam complaint reason
+    // Extract provider_message_id from webhook data
+    const providerMessageId = extractProviderMessageId(data);
     const email = data.email || data.Email;
     const reason = 'spam_complaint';
     const description = 'Spam complaint received';
 
+    // Update email_sends if we have provider_message_id
+    if (providerMessageId) {
+      const emailSend = await findEmailSendByProviderId(providerMessageId);
+      if (emailSend) {
+        // Create email_events record
+        await createEmailEvent(emailSend.id, data, 'complained');
+
+        console.log(`Recorded complaint event for email_send ${emailSend.id}`);
+      }
+    }
+
+    // Add to bounced emails table
     if (email) {
       // Check if already exists
       const existingBounce = await db.query.bouncedEmails.findFirst({
@@ -371,32 +415,31 @@ async function handleEmailOpened(data: any) {
   try {
     console.log('Email opened event:', data);
 
-    // Extract recipient email from webhook data
-    const recipientEmail = extractRecipientEmail(data);
-    if (!recipientEmail) {
-      console.error('Could not extract recipient email from webhook data');
+    // Extract provider_message_id from webhook data
+    const providerMessageId = extractProviderMessageId(data);
+    if (!providerMessageId) {
+      console.error('Could not extract provider_message_id from webhook data');
       return;
     }
 
-    console.log(`Processing opened event for: ${recipientEmail}`);
+    console.log(`Processing opened event for provider_message_id: ${providerMessageId}`);
 
-    // Find the contact record
-    const contact = await findContactByEmail(recipientEmail);
-    if (!contact) {
-      console.log(`Contact not found for email: ${recipientEmail}`);
+    // Find the email_sends record
+    const emailSend = await findEmailSendByProviderId(providerMessageId);
+    if (!emailSend) {
+      console.log(`Email send record not found for provider_message_id: ${providerMessageId}`);
       return;
     }
 
-    // Update contact metrics
-    await updateContactMetrics(contact.id, 'opened');
+    // Create email_events record
+    await createEmailEvent(emailSend.id, data, 'opened');
 
-    // Create email activity record
-    await createEmailActivity(contact.id, data, 'opened', recipientEmail);
-
-    // Update newsletter statistics if newsletterId is provided
-    if (data.newsletterId) {
-      console.log(`Newsletter ${data.newsletterId} email opened by ${recipientEmail}`);
+    // Update contact metrics if contact is linked
+    if (emailSend.contactId) {
+      await updateContactMetrics(emailSend.contactId, 'opened');
     }
+
+    console.log(`Successfully processed opened event for email_send: ${emailSend.id}`);
   } catch (error) {
     console.error('Error handling email opened event:', error);
   }
@@ -406,94 +449,67 @@ async function handleEmailClicked(data: any) {
   try {
     console.log('Email clicked event:', data);
 
-    // Extract recipient email from webhook data
-    const recipientEmail = extractRecipientEmail(data);
-    if (!recipientEmail) {
-      console.error('Could not extract recipient email from webhook data');
+    // Extract provider_message_id from webhook data
+    const providerMessageId = extractProviderMessageId(data);
+    if (!providerMessageId) {
+      console.error('Could not extract provider_message_id from webhook data');
       return;
     }
 
-    console.log(`Processing clicked event for: ${recipientEmail}`);
+    console.log(`Processing clicked event for provider_message_id: ${providerMessageId}`);
 
-    // Find the contact record
-    const contact = await findContactByEmail(recipientEmail);
-    if (!contact) {
-      console.log(`Contact not found for email: ${recipientEmail}`);
+    // Find the email_sends record
+    const emailSend = await findEmailSendByProviderId(providerMessageId);
+    if (!emailSend) {
+      console.log(`Email send record not found for provider_message_id: ${providerMessageId}`);
       return;
     }
 
-    // Update contact metrics
-    await updateContactMetrics(contact.id, 'clicked');
+    // Create email_events record
+    await createEmailEvent(emailSend.id, data, 'clicked');
 
-    // Create email activity record
-    await createEmailActivity(contact.id, data, 'clicked', recipientEmail);
-
-    // Update newsletter statistics if newsletterId is provided
-    if (data.newsletterId) {
-      console.log(`Newsletter ${data.newsletterId} email clicked by ${recipientEmail}`);
+    // Update contact metrics if contact is linked
+    if (emailSend.contactId) {
+      await updateContactMetrics(emailSend.contactId, 'clicked');
     }
+
+    console.log(`Successfully processed clicked event for email_send: ${emailSend.id}`);
   } catch (error) {
     console.error('Error handling email clicked event:', error);
   }
 }
 
-// Helper function to extract recipient email from webhook data
-function extractRecipientEmail(data: any): string | null {
-  // Handle different webhook formats
-
-  // Resend format
-  if (data.to && Array.isArray(data.to)) {
-    // Resend webhook has 'to' as array of recipients
-    const recipient = data.to[0];
-    if (typeof recipient === 'string') {
-      return recipient;
-    } else if (recipient && recipient.email) {
-      return recipient.email;
-    }
-  } else if (data.to && typeof data.to === 'string') {
-    return data.to;
-  } else if (data.email) {
-    // Fallback for direct email field
-    return data.email;
+// Helper function to extract provider_message_id from webhook data
+function extractProviderMessageId(data: any): string | null {
+  // Resend format - uses email_id
+  if (data.email_id) {
+    return data.email_id;
   }
 
-  // Postmark format
-  if (data.Email) {
-    return data.Email;
+  // Postmark format - uses MessageID
+  if (data.MessageID) {
+    return data.MessageID;
   }
 
-  // Check for 'to' field in various formats
-  if (data.to) {
-    if (Array.isArray(data.to)) {
-      const firstRecipient = data.to[0];
-      if (typeof firstRecipient === 'string') {
-        return firstRecipient;
-      } else if (firstRecipient && firstRecipient.email) {
-        return firstRecipient.email;
-      }
-    } else if (typeof data.to === 'string') {
-      return data.to;
-    }
+  // Fallback for generic id field
+  if (data.id) {
+    return data.id;
   }
 
-  console.error('Could not find recipient email in webhook data:', JSON.stringify(data, null, 2));
+  console.error('Could not find provider_message_id in webhook data:', JSON.stringify(data, null, 2));
   return null;
 }
 
-// Helper function to find contact by email
-async function findContactByEmail(email: string) {
+// Helper function to find email_sends by provider_message_id
+async function findEmailSendByProviderId(providerMessageId: string) {
   try {
-    // Get tenant ID from environment or request context
-    // For now, using default tenant ID - this should be improved to handle multi-tenancy properly
-    const tenantId = process.env.DEFAULT_TENANT_ID || '29c69b4f-3129-4aa4-a475-7bf892e5c5b9';
-
-    const contact = await db.query.emailContacts.findFirst({
-      where: sql`${db.emailContacts.email} = ${email} AND ${db.emailContacts.tenantId} = ${tenantId}`,
+    const emailSend = await db.query.emailSends.findFirst({
+      where: sql`${db.emailSends.providerMessageId} = ${providerMessageId}`,
     });
 
-    return contact;
+    return emailSend;
   } catch (error) {
-    console.error('Error finding contact by email:', error);
+    console.error('Error finding email_send by provider_message_id:', error);
     return null;
   }
 }
@@ -533,67 +549,26 @@ async function updateContactMetrics(contactId: string, activityType: string) {
   }
 }
 
-// Helper function to create email activity record
-// Helper function to create email activity record
-async function createEmailActivity(contactId: string, webhookData: any, activityType: string, recipientEmail: string) {
+// Helper function to create email_events record
+async function createEmailEvent(emailSendId: string, webhookData: any, eventType: string) {
   try {
-    // Get tenant ID from environment or request context
-    const tenantId = process.env.DEFAULT_TENANT_ID || '29c69b4f-3129-4aa4-a475-7bf892e5c5b9';
-
     // Extract additional data from webhook
     const userAgent = webhookData.user_agent || webhookData.UserAgent;
     const ipAddress = webhookData.ip_address || webhookData.IPAddress;
-    const webhookId = webhookData.id || webhookData.MessageID;
-    
-    // Extract subject and other email details from webhook
-    const subject = webhookData.subject || webhookData.Subject || '';
-    const from = webhookData.from || webhookData.From || '';
-    const messageId = webhookData.email_id || webhookData.MessageID || webhookId;
+    const webhookId = webhookData.id || webhookData.MessageID || webhookData.email_id;
 
-    // Try to find related newsletter/campaign from webhook data
-    let newsletterId = null;
-    let campaignId = null;
-
-    // Look for newsletter ID in webhook data
-    if (webhookData.newsletterId) {
-      newsletterId = webhookData.newsletterId;
-    } else if (webhookData.metadata && webhookData.metadata.newsletterId) {
-      newsletterId = webhookData.metadata.newsletterId;
-    }
-
-    // Look for campaign ID in webhook data
-    if (webhookData.campaignId) {
-      campaignId = webhookData.campaignId;
-    } else if (webhookData.metadata && webhookData.metadata.campaignId) {
-      campaignId = webhookData.metadata.campaignId;
-    }
-
-    // Create structured activity data with key information
-    const structuredActivityData = {
-      subject: subject,
-      recipient: recipientEmail,
-      from: from,
-      messageId: messageId,
-      email_id: messageId,
-      ...webhookData // Include all webhook data
-    };
-
-    await db.insert(db.emailActivity).values({
-      tenantId,
-      contactId,
-      campaignId,
-      newsletterId,
-      activityType,
-      activityData: JSON.stringify(structuredActivityData),
+    await db.insert(db.emailEvents).values({
+      emailSendId,
+      eventType,
+      eventData: JSON.stringify(webhookData),
       userAgent,
       ipAddress,
       webhookId,
-      webhookData: JSON.stringify(webhookData),
       occurredAt: new Date(),
     });
 
-    console.log(`Created ${activityType} activity record for contact ${contactId} with subject: ${subject}`);
+    console.log(`Created ${eventType} event record for email_send ${emailSendId}`);
   } catch (error) {
-    console.error('Error creating email activity record:', error);
+    console.error('Error creating email event record:', error);
   }
 }

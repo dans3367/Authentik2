@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import EmailActivityTimeline from "@/components/EmailActivityTimeline";
 import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
+import SendEmailModal from "@/components/SendEmailModal";
 import {
   ArrowLeft,
   Mail,
@@ -219,6 +220,12 @@ export default function ViewContact() {
     return contact.email?.split('@')[0] || 'Unknown Contact';
   };
 
+  const handleEmailSent = () => {
+    queryClient.invalidateQueries({ queryKey: ['/api/email-contacts'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/email-contacts', id] });
+    queryClient.invalidateQueries({ queryKey: ['/api/email-contacts', id, 'stats'] });
+  };
+
   // Debug logging
   console.log('ViewContact render:', { 
     id, 
@@ -309,6 +316,17 @@ export default function ViewContact() {
     );
   }
 
+  const isSendEmailDisabled = contact.status === 'unsubscribed' || contact.status === 'bounced' || !!bouncedCheck?.isBounced;
+  const sendEmailDisabledReason = (() => {
+    if (contact.status === 'unsubscribed') {
+      return 'This contact has unsubscribed from emails.';
+    }
+    if (contact.status === 'bounced' || !!bouncedCheck?.isBounced) {
+      return 'This email address is marked as bounced or globally suppressed.';
+    }
+    return undefined;
+  })();
+
   return (
     <div className="max-w-6xl mx-auto p-4">
       {/* Header */}
@@ -343,10 +361,20 @@ export default function ViewContact() {
           </div>
           
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 lg:flex-shrink-0">
-            <Button variant="outline" className="justify-center">
-              <Send className="w-4 h-4 mr-2" />
-              Send Email
-            </Button>
+            <SendEmailModal
+              contactId={contact.id}
+              contactEmail={contact.email}
+              contactName={getFullName(contact)}
+              disabled={isSendEmailDisabled}
+              disabledReason={sendEmailDisabledReason}
+              onEmailSent={handleEmailSent}
+              trigger={
+                <Button variant="outline" className="justify-center">
+                  <Send className="w-4 h-4 mr-2" />
+                  Send Email
+                </Button>
+              }
+            />
             <Button 
               variant="outline"
               className="justify-center"
@@ -671,10 +699,20 @@ export default function ViewContact() {
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Button variant="outline" className="w-full justify-start">
-                <Mail className="w-4 h-4 mr-2" />
-                Send Email
-              </Button>
+              <SendEmailModal
+                contactId={contact.id}
+                contactEmail={contact.email}
+                contactName={getFullName(contact)}
+                disabled={isSendEmailDisabled}
+                disabledReason={sendEmailDisabledReason}
+                onEmailSent={handleEmailSent}
+                trigger={
+                  <Button variant="outline" className="w-full justify-start">
+                    <Mail className="w-4 h-4 mr-2" />
+                    Send Email
+                  </Button>
+                }
+              />
               <EmailActivityTimelineModal
                 contactId={contact.id}
                 contactEmail={contact.email}

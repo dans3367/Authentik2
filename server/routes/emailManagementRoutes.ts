@@ -1,13 +1,15 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, and } from 'drizzle-orm';
-import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, emailActivity, tenants, emailSends, emailContent } from '@shared/schema';
+import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, emailActivity, tenants, emailSends, emailContent, companies, unsubscribeTokens } from '@shared/schema';
 import { deleteImageFromR2 } from '../config/r2';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { type ContactFilters, type BouncedEmailFilters } from '@shared/schema';
 import { sanitizeString, sanitizeEmail } from '../utils/sanitization';
 import { storage } from '../storage';
 import jwt from 'jsonwebtoken';
+import { enhancedEmailService } from '../emailService';
+import crypto from 'crypto';
 
 export const emailManagementRoutes = Router();
 
@@ -190,17 +192,52 @@ emailManagementRoutes.get("/email-contacts/:id/stats", authenticateToken, requir
       return res.status(404).json({ message: 'Contact not found' });
     }
 
-    // Get contact activity statistics
+    // Compute primary metrics from existing counters updated by webhooks
+    const emailsSent = Number(contact.emailsSent || 0);
+    const emailsOpened = Number(contact.emailsOpened || 0);
+
+    // Derive rates
+    const openRate = emailsSent > 0 ? Math.round((emailsOpened / emailsSent) * 100) : 0;
+
+    // Optional: clicks from emailActivity table
+    let emailsClicked = 0;
+    try {
+      const clickedResult = await db
+        .select({ count: sql<number>`cast(count(*) as int)` })
+        .from(db.emailActivity)
+        .where(sql`${db.emailActivity.contactId} = ${id} AND ${db.emailActivity.activityType} = 'clicked'`);
+      emailsClicked = clickedResult?.[0]?.count ?? 0;
+    } catch (e) {
+      // Fallback silently if emailActivity is unavailable
+      emailsClicked = 0;
+    }
+    const clickRate = emailsSent > 0 ? Math.round((emailsClicked / emailsSent) * 100) : 0;
+
+    // Optional: basic bounce indicator from bouncedEmails table (by email)
+    let emailsBounced = 0;
+    try {
+      if (contact.email) {
+        const bounceCheck = await db.query.bouncedEmails?.findFirst?.({
+          where: sql`${db.bouncedEmails.email} = ${contact.email}`,
+        });
+        emailsBounced = bounceCheck ? 1 : 0;
+      }
+    } catch (e) {
+      emailsBounced = 0;
+    }
+    const bounceRate = emailsSent > 0 ? Math.round((emailsBounced / emailsSent) * 100) : 0;
+
     const stats = {
-      totalEmails: 0, // Placeholder - you might have email activity tracking
-      lastEmailSent: null,
-      lastEmailOpened: null,
-      lastEmailClicked: null,
-      bounceCount: 0,
-      unsubscribeCount: 0,
+      emailsSent,
+      emailsOpened,
+      openRate,
+      emailsClicked,
+      clickRate,
+      emailsBounced,
+      bounceRate,
     };
 
-    res.json(stats);
+    res.json({ stats });
   } catch (error) {
     console.error('Get contact stats error:', error);
     res.status(500).json({ message: 'Failed to get contact statistics' });
@@ -1246,6 +1283,11 @@ emailManagementRoutes.get("/birthday-settings", authenticateToken, requireTenant
       },
     });
 
+    // Get company information to get company name
+    const company = await db.query.companies.findFirst({
+      where: sql`${companies.tenantId} = ${req.user.tenantId} AND ${companies.isActive} = true`,
+    });
+
     // If no settings exist, return default settings
     if (!settings) {
       console.log('🎨 [Birthday Settings GET] No settings found, returning defaults');
@@ -1255,19 +1297,21 @@ emailManagementRoutes.get("/birthday-settings", authenticateToken, requireTenant
         emailTemplate: 'default',
         segmentFilter: 'all',
         customMessage: '',
-        senderName: 'Birthday Team',
+        senderName: company?.name || '',
         promotionId: null,
         promotion: null,
+        disabledHolidays: [],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
       return res.json(defaultSettings);
     }
 
-    // Ensure senderName is always present with a default value
+    // Ensure senderName and disabledHolidays are always present with default values
     const settingsWithDefaults = {
       ...settings,
-      senderName: settings.senderName || 'Birthday Team'
+      senderName: settings.senderName || company?.name || '',
+      disabledHolidays: settings.disabledHolidays || []
     };
 
     console.log('🎨 [Birthday Settings GET] Returning settings:', {
@@ -1295,7 +1339,8 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
       customThemeData,
       senderName,
       promotionId,
-      splitPromotionalEmail
+      splitPromotionalEmail,
+      disabledHolidays
     } = req.body;
 
     // Validate input
@@ -1317,17 +1362,32 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
     }
 
     // Handle senderName - use default if not provided, null, or empty
-    const finalSenderName = (senderName && typeof senderName === 'string' && senderName.trim() !== '')
-      ? senderName.trim()
-      : 'Birthday Team';
+    let finalSenderName: string;
+    if (senderName && typeof senderName === 'string' && senderName.trim() !== '') {
+      finalSenderName = senderName.trim();
+    } else {
+      // Get company name as fallback
+      const company = await db.query.companies.findFirst({
+        where: sql`${companies.tenantId} = ${req.user.tenantId} AND ${companies.isActive} = true`,
+      });
+      finalSenderName = company?.name || 'Your Company';
+    }
 
     // Validate promotionId if provided
     if (promotionId !== null && promotionId !== undefined && typeof promotionId !== 'string') {
       return res.status(400).json({ message: 'promotionId must be a string or null' });
     }
 
-
-
+    // Validate disabledHolidays if provided
+    if (disabledHolidays !== undefined && disabledHolidays !== null) {
+      if (!Array.isArray(disabledHolidays)) {
+        return res.status(400).json({ message: 'disabledHolidays must be an array' });
+      }
+      // Validate each element is a string
+      if (!disabledHolidays.every((id: any) => typeof id === 'string')) {
+        return res.status(400).json({ message: 'disabledHolidays array must contain only strings' });
+      }
+    }
 
 
     // Validate custom theme data if provided
@@ -1379,6 +1439,7 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
         senderName: finalSenderName,
         promotionId: promotionId || null,
         splitPromotionalEmail: splitPromotionalEmail !== undefined ? splitPromotionalEmail : false,
+        disabledHolidays: disabledHolidays !== undefined ? disabledHolidays : [],
         updatedAt: new Date(),
       };
 
@@ -1401,6 +1462,7 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
         senderName: finalSenderName,
         promotionId: promotionId || null,
         splitPromotionalEmail: splitPromotionalEmail !== undefined ? splitPromotionalEmail : false,
+        disabledHolidays: disabledHolidays !== undefined ? disabledHolidays : [],
       };
 
       if (customThemeDataStr !== undefined) {
@@ -1881,6 +1943,17 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
       });
     }
 
+    // Fetch company information for branding
+    const company = await db.query.companies.findFirst({
+      where: and(
+        eq(companies.tenantId, tenantId),
+        eq(companies.isActive, true)
+      ),
+    });
+
+    const companyName = company?.name || settings.senderName || 'Your Company';
+    const resolvedSenderName = settings.senderName || companyName || 'Your Team';
+
     // Fetch the selected contacts
     const contacts = await db.query.emailContacts.findMany({
       where: and(
@@ -1956,9 +2029,9 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           const htmlBirthday = renderBirthdayTemplate(settings.emailTemplate as any, {
             recipientName,
             message: settings.customMessage || 'Wishing you a wonderful birthday!',
-            brandName: req.user.tenantName || 'Your Company',
+            brandName: companyName,
             customThemeData: settings.customThemeData ? JSON.parse(settings.customThemeData) : null,
-            senderName: settings.senderName || 'Your Team',
+            senderName: resolvedSenderName,
             // NO promotion fields - these are intentionally omitted
             unsubscribeToken,
           });
@@ -2006,7 +2079,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               recipientEmail: contact.email,
               recipientName: recipientName,
               senderEmail: 'admin@zendwise.work',
-              senderName: settings.senderName || 'Your Team',
+              senderName: resolvedSenderName,
               subject: `🎉 Happy Birthday ${recipientName}!`,
               emailType: 'birthday_card',
               provider: 'resend',
@@ -2099,7 +2172,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               recipientEmail: contact.email,
               recipientName: recipientName,
               senderEmail: 'admin@zendwise.work',
-              senderName: settings.senderName || 'Your Team',
+              senderName: resolvedSenderName,
               subject: `🎁 ${settings.promotion?.title || 'Special Birthday Offer!'}`,
               emailType: 'birthday_promotion',
               provider: 'resend',
@@ -2153,9 +2226,9 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
         const htmlContent = renderBirthdayTemplate(settings.emailTemplate as any, {
           recipientName,
           message: settings.customMessage || 'Wishing you a wonderful birthday!',
-          brandName: req.user.tenantName || 'Your Company',
+          brandName: companyName,
           customThemeData: settings.customThemeData ? JSON.parse(settings.customThemeData) : null,
-          senderName: settings.senderName || 'Your Team',
+          senderName: resolvedSenderName,
           promotionContent: settings.promotion?.content,
           promotionTitle: settings.promotion?.title,
           promotionDescription: settings.promotion?.description,
@@ -2207,7 +2280,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               recipientEmail: contact.email,
               recipientName: recipientName,
               senderEmail: 'admin@zendwise.work',
-              senderName: settings.senderName || 'Your Team',
+              senderName: resolvedSenderName,
               subject: `🎉 Happy Birthday ${recipientName}!`,
               emailType: 'birthday_card',
               provider: 'resend',
@@ -2268,7 +2341,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               recipientEmail: contact.email,
               recipientName: recipientName,
               senderEmail: 'admin@zendwise.work',
-              senderName: settings.senderName || 'Your Team',
+              senderName: resolvedSenderName,
               subject: `🎉 Happy Birthday ${recipientName}!`,
               emailType: 'birthday_card',
               provider: 'resend',
@@ -2592,3 +2665,147 @@ function renderBirthdayTemplate(
     </body>
   </html>`;
 }
+
+// Send individual email to a contact
+emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { subject, content } = req.body;
+    const tenantId = req.user.tenantId;
+
+    // Validate input
+    if (!subject || !content) {
+      return res.status(400).json({
+        success: false,
+        message: "Subject and content are required"
+      });
+    }
+
+    // Get contact details
+    const contact = await db.query.emailContacts.findFirst({
+      where: and(
+        eq(emailContacts.id, id),
+        eq(emailContacts.tenantId, tenantId)
+      ),
+    });
+
+    if (!contact) {
+      return res.status(404).json({
+        success: false,
+        message: "Contact not found"
+      });
+    }
+
+    // Check if contact can receive emails
+    if (contact.status === 'unsubscribed') {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot send email to unsubscribed contact"
+      });
+    }
+
+    if (contact.status === 'bounced') {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot send email to bounced contact"
+      });
+    }
+
+    // Get tenant info for from email
+    const tenant = await db.query.tenants.findFirst({
+      where: eq(tenants.id, tenantId),
+    });
+
+    // Get company info for footer label (no fallback if missing)
+    const company = await db.query.companies.findFirst({
+      where: eq(companies.tenantId, tenantId),
+    });
+    const companyName = (company?.name || '').trim();
+
+    // Generate or reuse unsubscribe token
+    let unsub = await db.query.unsubscribeTokens.findFirst({
+      where: and(eq(unsubscribeTokens.tenantId, tenantId), eq(unsubscribeTokens.contactId, contact.id), sql`${unsubscribeTokens.usedAt} IS NULL`),
+    });
+    if (!unsub) {
+      const token = crypto.randomBytes(24).toString('base64url');
+      const created = await db.insert(unsubscribeTokens).values({ tenantId, contactId: contact.id, token }).returning();
+      unsub = created[0];
+    }
+    const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(unsub.token)}`;
+
+    // Format content as HTML
+    const htmlContent = `
+      <html>
+        <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: #f7fafc;">
+          <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <div style="padding: 30px;">
+              <div style="font-size: 1rem; line-height: 1.6; color: #2d3748; white-space: pre-wrap;">${content.replace(/\n/g, '<br>')}</div>
+            </div>
+            <div style="padding: 20px 30px; background-color: #f7fafc; border-top: 1px solid #e2e8f0; text-align: center;">
+              <p style="margin: 0; font-size: 0.875rem; color: #718096;">
+                ${companyName ? `Sent from ${companyName}` : ''}
+              </p>
+              <p style="margin: 8px 0 0; font-size: 0.75rem; color: #94a3b8;">
+                <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
+              </p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    // Send email
+    const result = await enhancedEmailService.sendCustomEmail(
+      contact.email,
+      subject,
+      htmlContent,
+      {
+        text: `${content}\n\nUnsubscribe: ${unsubscribeUrl}`,
+        headers: {
+          'List-Unsubscribe': `<${unsubscribeUrl}>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
+        },
+        metadata: {
+          type: 'individual_contact_email',
+          contactId: contact.id,
+          tenantId: tenantId,
+          sentBy: req.user.id
+        }
+      }
+    );
+
+    // Log email activity
+    await db.insert(emailActivity).values({
+      contactId: contact.id,
+      tenantId: tenantId,
+      activityType: 'sent',
+      activityData: JSON.stringify({
+        source: 'individual_send',
+        sentBy: req.user.id,
+        emailSubject: subject
+      }),
+      occurredAt: new Date(),
+    });
+
+    // Update contact stats
+    await db.update(emailContacts)
+      .set({
+        emailsSent: sql`${emailContacts.emailsSent} + 1`,
+        lastActivity: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(emailContacts.id, contact.id));
+
+    res.json({
+      success: true,
+      message: "Email sent successfully",
+      result
+    });
+  } catch (error: any) {
+    console.error('[EmailManagementRoutes] Send individual email error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to send email"
+    });
+  }
+});

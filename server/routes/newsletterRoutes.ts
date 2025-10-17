@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, and, like, desc, inArray } from 'drizzle-orm';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
-import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, betterAuthUser, emailContacts, contactTagAssignments, bouncedEmails } from '@shared/schema';
+import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, betterAuthUser, emailContacts, contactTagAssignments, bouncedEmails, unsubscribeTokens } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 import { emailService, enhancedEmailService } from '../emailService';
 // Temporal service removed - now using server-node proxy
@@ -792,20 +792,49 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
         // Fallback to direct sending if temporal server is unavailable
         console.log(`[Newsletter] Falling back to direct email sending`);
         
-        // Prepare emails for batch sending
-        const emails = allowedRecipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => ({
-          to: contact.email,
-          subject: newsletter.subject,
-          html: newsletter.content,
-          text: newsletter.content.replace(/<[^>]*>/g, ''), // Strip HTML for text version
-          metadata: {
-            type: 'newsletter',
-            newsletterId: newsletter.id,
-            groupUUID,
-            recipientId: contact.id,
-            tags: [`newsletter-${newsletter.id}`, `groupUUID-${groupUUID}`]
+        // Generate or reuse unsubscribe tokens per recipient (single-use, long-lived until used)
+        const tokenMap = new Map<string, string>();
+        for (const r of allowedRecipients) {
+          let unsub = await db.query.unsubscribeTokens.findFirst({
+            where: and(eq(unsubscribeTokens.tenantId, req.user.tenantId), eq(unsubscribeTokens.contactId, r.id), sql`${unsubscribeTokens.usedAt} IS NULL`),
+          });
+          if (!unsub) {
+            const token = crypto.randomBytes(24).toString('base64url');
+            const created = await db.insert(unsubscribeTokens).values({ tenantId: req.user.tenantId, contactId: r.id, token }).returning();
+            unsub = created[0];
           }
-        }));
+          tokenMap.set(r.id, unsub.token);
+        }
+
+        // Prepare emails for batch sending (append unsubscribe link)
+        const emails = allowedRecipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => {
+          const token = tokenMap.get(contact.id)!;
+          const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(token)}`;
+          const html = `${newsletter.content}
+            <div style="padding: 16px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
+              <p style="margin: 0; font-size: 12px; color: #94a3b8;">
+                <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
+              </p>
+            </div>`;
+          const text = `${newsletter.content.replace(/<[^>]*>/g, '')}\n\nUnsubscribe: ${unsubscribeUrl}`;
+          return {
+            to: contact.email,
+            subject: newsletter.subject,
+            html,
+            text,
+            headers: {
+              'List-Unsubscribe': `<${unsubscribeUrl}>`,
+              'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
+            },
+            metadata: {
+              type: 'newsletter',
+              newsletterId: newsletter.id,
+              groupUUID,
+              recipientId: contact.id,
+              tags: [`newsletter-${newsletter.id}`, `groupUUID-${groupUUID}`]
+            }
+          };
+        });
 
         // Send emails in batches
         console.log(`[Newsletter] Sending ${emails.length} emails for newsletter ${id} (after suppression filter)`);
@@ -905,10 +934,26 @@ newsletterRoutes.post('/:id/send-single', async (req, res) => {
     }
 
     // Prepare the email message
+    // Generate or reuse unsubscribe token (single-use, long-lived until used)
+    let unsub = await db.query.unsubscribeTokens.findFirst({
+      where: and(eq(unsubscribeTokens.tenantId, tenantId), eq(unsubscribeTokens.contactId, recipient.id), sql`${unsubscribeTokens.usedAt} IS NULL`),
+    });
+    if (!unsub) {
+      const token = crypto.randomBytes(24).toString('base64url');
+      const created = await db.insert(unsubscribeTokens).values({ tenantId, contactId: recipient.id, token }).returning();
+      unsub = created[0];
+    }
+    const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(unsub.token)}`;
+
     const email = {
       to: recipient.email,
       subject: subject,
-      html: content,
+      html: `${content}
+        <div style="padding: 16px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
+          <p style="margin: 0; font-size: 12px; color: #94a3b8;">
+            <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
+          </p>
+        </div>`,
       from: process.env.EMAIL_FROM || 'noreply@saas-app.com',
       tags: [
         `newsletter-${id}`,
@@ -926,13 +971,11 @@ newsletterRoutes.post('/:id/send-single', async (req, res) => {
         email.html,
         {
           from: email.from,
-          tags: email.tags,
-          metadata: {
-            newsletterId: id,
-            groupUUID: groupUUID,
-            recipientId: recipient.id,
-            tenantId: tenantId
-          }
+          headers: {
+            'List-Unsubscribe': `<${unsubscribeUrl}>`,
+            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
+          },
+          metadata: { tags: email.tags },
         }
       );
 

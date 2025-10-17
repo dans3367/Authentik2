@@ -28,4 +28,4 @@ server-go/*.log
 cardprocessor-go/tmp/main
 cardprocessor-go/cardprocessor-go
 cardprocessor-go/test-build
-cardprocessor-go/cardprocessor
+xxcardprocessor-go/cardprocessor

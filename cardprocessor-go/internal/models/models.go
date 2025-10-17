@@ -73,6 +73,23 @@ type Tenant struct {
 	UpdatedAt time.Time `json:"updatedAt" db:"updated_at"`
 }
 
+// Company represents the companies table
+type Company struct {
+	ID          string    `json:"id" db:"id"`
+	TenantID    string    `json:"tenantId" db:"tenant_id"`
+	OwnerID     string    `json:"ownerId" db:"owner_id"`
+	Name        string    `json:"name" db:"name"`
+	Address     *string   `json:"address" db:"address"`
+	CompanyType *string   `json:"companyType" db:"company_type"`
+	CompanyEmail *string  `json:"companyEmail" db:"company_email"`
+	Phone       *string   `json:"phone" db:"phone"`
+	Website     *string   `json:"website" db:"website"`
+	Description *string   `json:"description" db:"description"`
+	IsActive    bool      `json:"isActive" db:"is_active"`
+	CreatedAt   time.Time `json:"createdAt" db:"created_at"`
+	UpdatedAt   time.Time `json:"updatedAt" db:"updated_at"`
+}
+
 // CustomThemeData represents the JSON structure for custom theme data
 type CustomThemeData struct {
 	PrimaryColor   string `json:"primaryColor,omitempty"`

@@ -8,11 +8,21 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import RichTextEditor from "@/components/RichTextEditor";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Search, ZoomIn, ZoomOut, Move, RotateCcw, Smile, RefreshCw, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Search, ZoomIn, ZoomOut, Move, RotateCcw, Smile, RefreshCw, ChevronLeft, ChevronRight, X, AlertTriangle, Palette, Gift, CalendarIcon } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { uploadCardImage, validateCardImageFile } from "@/lib/cardImageUpload";
+import { PromotionSelector } from "@/components/PromotionSelector";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 type DesignerData = {
   title: string;
+  description?: string;
   message: string;
   imageUrl?: string | null;
   signature?: string;
@@ -20,6 +30,9 @@ type DesignerData = {
   customImage?: boolean;
   imagePosition?: { x: number; y: number };
   imageScale?: number;
+  cardName?: string;
+  sendDate?: string; // ISO date string (YYYY-MM-DD)
+  occasionType?: string; // Type of occasion/holiday (e.g., "Mother's Day", "Christmas", "Valentine's Day")
 };
 
 interface CardDesignerDialogProps {
@@ -37,16 +50,54 @@ interface CardDesignerDialogProps {
     lastName?: string;
   };
   businessName?: string;
+  holidayId?: string;
+  isHolidayDisabled?: boolean;
+  onToggleHoliday?: (holidayId: string) => void;
+  customCardActive?: boolean;
+  onToggleCustomCardActive?: () => void;
+  // Promotion props
+  selectedPromotions?: string[];
+  onPromotionsChange?: (promotionIds: string[]) => void;
+  // Hide promotions tab (for birthday cards)
+  hidePromotionsTab?: boolean;
+  // Hide tabs entirely and show design content directly
+  hideTabs?: boolean;
+  // Hide description field (for birthday cards)
+  hideDescription?: boolean;
 }
 
-export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initialData, onSave, onPreviewChange, onMakeActive, isCurrentlyActive, senderName, customerInfo, businessName }: CardDesignerDialogProps) {
+export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initialData, onSave, onPreviewChange, onMakeActive, isCurrentlyActive, senderName, customerInfo, businessName, holidayId, isHolidayDisabled, onToggleHoliday, customCardActive, onToggleCustomCardActive, selectedPromotions = [], onPromotionsChange, hidePromotionsTab = false, hideTabs = false, hideDescription = false }: CardDesignerDialogProps) {
   const [title, setTitle] = useState(initialData?.title ?? "");
+  const [description, setDescription] = useState(initialData?.description ?? "");
   const [message, setMessage] = useState(initialData?.message ?? "");
-  const [imageUrl, setImageUrl] = useState<string | null>(initialData?.imageUrl ??
-    (initialThemeId === "sparkle-cake" ? "/images/birthday-sparkle.jpg" : null));
+  const [imageUrl, setImageUrl] = useState<string | null>(() => {
+    // First check if we have an explicit imageUrl in initialData
+    if (initialData?.imageUrl) {
+      console.log('🖼️ [CardDesignerDialog] Initializing with imageUrl from initialData:', initialData.imageUrl);
+      return initialData.imageUrl;
+    }
+    // Special case for sparkle-cake theme
+    if (initialThemeId === "sparkle-cake") {
+      return "/images/birthday-sparkle.jpg";
+    }
+    return null;
+  });
   const [signature, setSignature] = useState(initialData?.signature ?? "");
-  const [customImage, setCustomImage] = useState<boolean>(initialData?.customImage ?? false);
+  const [emojiCount, setEmojiCount] = useState<number>(0);
+  // Initialize customImage properly based on whether this is a custom card with an image
+  const [customImage, setCustomImage] = useState<boolean>(() => {
+    const isCustomCard = initialThemeId && initialThemeId.startsWith('custom-');
+    // If it's a custom card and has an imageUrl, it's a custom image
+    if (isCustomCard && initialData?.imageUrl) return true;
+    // Otherwise use the explicit customImage flag if provided
+    return initialData?.customImage ?? false;
+  });
+  const [cardName, setCardName] = useState(initialData?.cardName ?? "");
+  const [sendDate, setSendDate] = useState(initialData?.sendDate ?? "");
+  const [occasionType, setOccasionType] = useState(initialData?.occasionType ?? "");
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [unsplashOpen, setUnsplashOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"design" | "promotions">("design");
   const [searchQuery, setSearchQuery] = useState("");
   const [unsplashImages, setUnsplashImages] = useState<Array<{ id: string; urls: { small: string; regular: string }; alt_description: string }>>([]);
   const [loading, setLoading] = useState(false);
@@ -56,6 +107,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [initialValues, setInitialValues] = useState<{
     title: string;
+    description: string;
     message: string;
     imageUrl: string | null;
     signature: string;
@@ -89,37 +141,45 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   useEffect(() => {
     if (!open) return;
     setTitle(initialData?.title ?? "");
+    setDescription(initialData?.description ?? "");
     setMessage(initialData?.message ?? "");
     setSignature(initialData?.signature ?? "");
+    setCardName(initialData?.cardName ?? "");
+    setSendDate(initialData?.sendDate ?? "");
+    setOccasionType(initialData?.occasionType ?? "");
 
-    // Default theme header images
+    // Default theme header images (seasonal: Christmas)
     const defaultThemeImages = {
-      'default': 'https://images.unsplash.com/photo-1588195538326-c5b1e9f80a1b?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-      'confetti': 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-      'balloons': 'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'
+      'default': 'https://images.unsplash.com/photo-1478479474071-8a3014c1c15a?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+      'confetti': 'https://images.unsplash.com/photo-1512317052271-03dcd8aefb21?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+      'balloons': 'https://images.unsplash.com/photo-1454372182658-c712e4c5a1db?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'
     };
 
     // Determine if this should use custom image based on initialData
     const hasCustomImageData = initialData?.customImage === true && initialData?.imageUrl;
-    const isCustomTheme = initialThemeId === 'custom';
+    const isCustomTheme = initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'));
 
     console.log('🎨 [Card Designer] Initializing with:', {
       initialThemeId,
       hasCustomImageData,
       isCustomTheme,
       initialImageUrl: initialData?.imageUrl,
-      initialCustomImage: initialData?.customImage
+      initialCustomImage: initialData?.customImage,
+      currentImageUrlState: imageUrl,
+      fullInitialData: initialData,
+      condition1: `hasCustomImageData (${hasCustomImageData})`,
+      condition2: `isCustomTheme (${isCustomTheme}) && imageUrl (${!!initialData?.imageUrl})`
     });
 
     // Set image state based on theme and data - PRESERVE CUSTOM IMAGES
     if (hasCustomImageData) {
       // Has explicit custom image data - always preserve this
       console.log('📸 Setting custom image:', initialData.imageUrl);
-      setImageUrl(initialData.imageUrl);
+      setImageUrl(initialData.imageUrl ?? null);
       setCustomImage(true);
     } else if (isCustomTheme && initialData?.imageUrl) {
-      // Custom theme with saved image URL (even if customImage flag is missing)
-      console.log('📸 Setting custom theme image from saved data:', initialData.imageUrl);
+      // Custom theme/card with saved image URL (even if customImage flag is missing)
+      console.log('📸 Setting custom theme/card image from saved data:', initialData.imageUrl);
       setImageUrl(initialData.imageUrl);
       setCustomImage(true);
     } else if (!isCustomTheme && initialThemeId && initialThemeId in defaultThemeImages) {
@@ -131,7 +191,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       // Custom theme without custom image or unknown theme
       console.log('🎨 Custom theme without image - clearing state');
       setImageUrl(null);
-      setCustomImage(isCustomTheme);
+      setCustomImage(Boolean(isCustomTheme));
     }
 
     const finalImagePosition = initialData?.imagePosition ?? { x: 0, y: 0 };
@@ -144,16 +204,16 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     setImageError(false);
 
     // Store initial values for change tracking
-    const finalImageUrl = hasCustomImageData ? initialData.imageUrl :
+    const finalImageUrl: string | null = hasCustomImageData ? (initialData.imageUrl ?? null) :
       (isCustomTheme && initialData?.imageUrl) ? initialData.imageUrl :
         (!isCustomTheme && initialThemeId && initialThemeId in defaultThemeImages) ?
           defaultThemeImages[initialThemeId as keyof typeof defaultThemeImages] : null;
 
-    const finalCustomImage = hasCustomImageData || (isCustomTheme && initialData?.imageUrl) ||
-      (!isCustomTheme && initialThemeId && initialThemeId in defaultThemeImages) ? false : isCustomTheme;
+    const finalCustomImage: boolean = Boolean(hasCustomImageData) || (Boolean(isCustomTheme) && Boolean(initialData?.imageUrl));
 
     setInitialValues({
       title: initialData?.title ?? "",
+      description: initialData?.description ?? "",
       message: initialData?.message ?? "",
       imageUrl: finalImageUrl,
       signature: initialData?.signature ?? "",
@@ -166,6 +226,29 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     setHasUnsavedChanges(false);
 
   }, [open, initialThemeId, initialData]);
+
+  // Emoji count: compute based on plain text extracted from the rich text HTML
+  useEffect(() => {
+    if (!open) return;
+    const extractText = (html: string): string => {
+      const div = document.createElement('div');
+      div.innerHTML = html || '';
+      return div.textContent || div.innerText || '';
+    };
+    const countEmojis = (text: string): number => {
+      try {
+        // Prefer modern Unicode property escape when available
+        const re = /\p{Extended_Pictographic}/gu;
+        return (text.match(re) || []).length;
+      } catch {
+        // Fallback broad ranges covering most emoji blocks
+        const re = /[\u203C-\u3299\u00A9\u00AE\u2122\u231A-\u231B\u23E9-\u23EC\u23F0\u23F3\u25FD-\u25FE\u2600-\u27BF\u2B50\u2B55\u2934-\u2935\u2194-\u2199\u1F004\u1F0CF\u1F170-\u1F171\u1F17E-\u1F17F\u1F18E\u1F191-\u1F19A\u1F1E6-\u1F1FF\u1F201-\u1F202\u1F21A\u1F22F\u1F232-\u1F23A\u1F250-\u1F251\u1F300-\u1F6FF\u1F900-\u1F9FF\u1FA70-\u1FAFF]/g;
+        return (text.match(re) || []).length;
+      }
+    };
+    const plain = extractText(message);
+    setEmojiCount(countEmojis(plain));
+  }, [open, message]);
 
   // Load persistent Unsplash search state only once when modal opens
   useEffect(() => {
@@ -190,6 +273,15 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   // If theme changes while open and no custom image chosen, update to theme's default image
   useEffect(() => {
     if (!open) return;
+
+    // Check if this is a custom card (starts with 'custom-')
+    const isCustomCard = initialThemeId && initialThemeId.startsWith('custom-');
+    
+    // Don't run this effect for custom cards - they manage their own images
+    if (isCustomCard) {
+      console.log('🔒 [Card Designer] Custom card detected, skipping theme change effect');
+      return;
+    }
 
     // Don't override custom images - this is the key fix
     if (customImage && imageUrl) {
@@ -230,6 +322,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     if (!open) return;
     const draft: DesignerData = {
       title,
+      description,
       message,
       imageUrl: imageUrl ?? undefined,
       signature,
@@ -239,9 +332,10 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       imageScale,
     };
     try {
-      localStorage.setItem("birthdayCardDesignerDraft", JSON.stringify(draft));
+      const key = `birthdayCardDesignerDraft:${initialThemeId || 'default'}`;
+      localStorage.setItem(key, JSON.stringify(draft));
     } catch { }
-  }, [open, title, message, imageUrl, signature, initialThemeId, customImage, imagePosition, imageScale]);
+  }, [open, title, description, message, imageUrl, signature, initialThemeId, customImage, imagePosition, imageScale]);
 
   // Call preview change callback for real-time updates
   useEffect(() => {
@@ -249,6 +343,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
 
     const previewData: DesignerData = {
       title,
+      description,
       message,
       imageUrl: imageUrl ?? undefined,
       signature,
@@ -268,7 +363,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [open, title, message, imageUrl, signature, initialThemeId, customImage, imagePosition, imageScale]); // Removed onPreviewChange from dependencies
+  }, [open, title, description, message, imageUrl, signature, initialThemeId, customImage, imagePosition, imageScale]); // Removed onPreviewChange from dependencies
 
   // Debug effect to track image state changes
   useEffect(() => {
@@ -289,6 +384,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
 
     const hasChanges =
       title !== initialValues.title ||
+      description !== initialValues.description ||
       message !== initialValues.message ||
       imageUrl !== initialValues.imageUrl ||
       signature !== initialValues.signature ||
@@ -742,7 +838,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
 
   // Reset functionality
   const handleReset = () => {
-    const isCustomTheme = initialThemeId === 'custom';
+    const isCustomTheme = initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'));
     const resetMessage = isCustomTheme
       ? "Are you sure you want to reset the card? This will clear all content including the image, title, message, and signature."
       : "Are you sure you want to reset the text? This will clear the title, message, and signature.";
@@ -755,7 +851,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       setMessage("");
       setSignature("");
 
-      // Only reset image for custom theme
+      // Only reset image for custom theme/cards
       if (isCustomTheme) {
         console.log('🔄 [Card Designer] Resetting custom theme');
 
@@ -787,15 +883,35 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   };
 
   const handleSave = () => {
+    // Validate required fields for custom cards
+    if (initialThemeId && initialThemeId.startsWith('custom-')) {
+      if (!cardName.trim()) {
+        alert('Please enter a card name');
+        return;
+      }
+      if (!sendDate) {
+        alert('Please select a send date');
+        return;
+      }
+      if (!occasionType.trim()) {
+        alert('Please enter an occasion type');
+        return;
+      }
+    }
+
     onSave?.({
       title,
+      description,
       message,
       imageUrl,
       signature,
       themeId: initialThemeId,
       customImage,
       imagePosition,
-      imageScale
+      imageScale,
+      cardName,
+      sendDate,
+      occasionType
     } as DesignerData);
     setHasUnsavedChanges(false); // Reset change tracking after save
     onOpenChange(false);
@@ -824,10 +940,435 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
           style={{ direction: 'ltr' }}
         >
           <DialogHeader className="space-y-2">
-            <DialogTitle className="text-lg sm:text-xl">Design your birthday card</DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl">Design your card</DialogTitle>
             <DialogDescription className="text-sm sm:text-base">Customize the image, header and message.</DialogDescription>
           </DialogHeader>
 
+          {/* Card Name, Send Date, and Occasion Type - Only for custom cards */}
+          {initialThemeId && initialThemeId.startsWith('custom-') && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+              <div className="space-y-2">
+                <label htmlFor="cardName" className="text-sm font-medium text-gray-700">
+                  Card Name <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  id="cardName"
+                  value={cardName}
+                  onChange={(e) => setCardName(e.target.value)}
+                  placeholder="e.g., Mother's Day Card"
+                  className="w-full"
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="sendDate" className="text-sm font-medium text-gray-700">
+                  Send Date <span className="text-red-500">*</span>
+                </label>
+                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !sendDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {sendDate ? format(new Date(sendDate + 'T00:00:00'), "MMMM d") : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      selected={sendDate ? new Date(sendDate + 'T00:00:00') : undefined}
+                      onSelect={(date) => {
+                        if (date) {
+                          const year = date.getFullYear();
+                          const month = String(date.getMonth() + 1).padStart(2, '0');
+                          const day = String(date.getDate()).padStart(2, '0');
+                          setSendDate(`${year}-${month}-${day}`);
+                          setCalendarOpen(false);
+                        }
+                      }}
+                      fromYear={new Date().getFullYear()}
+                      toYear={new Date().getFullYear() + 10}
+                      hideYear={true}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <p className="text-xs text-gray-500">The card will be sent on this date</p>
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="occasionType" className="text-sm font-medium text-gray-700">
+                  Occasion Type <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  id="occasionType"
+                  value={occasionType}
+                  onChange={(e) => setOccasionType(e.target.value)}
+                  placeholder="e.g., Mother's Day, Christmas"
+                  className="w-full"
+                  list="occasion-suggestions"
+                />
+                <datalist id="occasion-suggestions">
+                  <option value="Mother's Day" />
+                  <option value="Father's Day" />
+                  <option value="Christmas" />
+                  <option value="Valentine's Day" />
+                  <option value="Easter" />
+                  <option value="New Year" />
+                  <option value="St. Patrick's Day" />
+                  <option value="Independence Day" />
+                  <option value="Thanksgiving" />
+                  <option value="Halloween" />
+                </datalist>
+                <p className="text-xs text-gray-500">Type of holiday or occasion</p>
+              </div>
+            </div>
+          )}
+
+          {/* Tabs for Design and Promotions - or just design content if hideTabs is true */}
+          {hideTabs ? (
+            <div className="w-full mt-4">
+          {/* Designer Canvas - responsive width with forced LTR */}
+          <div className="mx-auto w-full max-w-[600px] rounded-2xl overflow-hidden border bg-white" dir="ltr" style={{ direction: 'ltr' }}>
+            {/* Image header */}
+            <div
+              ref={imageContainerRef}
+              className={`relative bg-gray-100 overflow-hidden transition-all duration-200 ${showImageControls && imageUrl && !imageError
+                ? 'ring-2 ring-blue-400 ring-opacity-50'
+                : ''
+                }`}
+              // TEMPORARILY DISABLED - Image manipulation event handlers
+              // onClick={imageUrl && !imageError ? handleImageClick : undefined}
+              // onMouseDown={imageUrl && !imageError ? handleMouseDown : undefined}
+              // onMouseMove={isDragging ? handleMouseMove : undefined}
+              // onMouseUp={handleMouseUp}
+              // onMouseLeave={handleMouseUp}
+              // onWheel={imageUrl && !imageError ? handleWheel : undefined}
+              style={{
+                // cursor: isDragging ? 'grabbing' : (imageUrl && !imageError ? 'grab' : 'default'),
+                cursor: 'default',
+                height: 'clamp(200px, 40vw, 300px)',
+                willChange: isDragging ? 'transform' : 'auto'
+              }}
+            >
+              {(() => {
+                console.log('🔍 [Card Designer] Render state:', {
+                  uploading,
+                  imageUrl,
+                  imageError,
+                  customImage,
+                  hasImageUrl: !!imageUrl,
+                  condition: imageUrl && !imageError ? 'SHOW IMAGE' : imageUrl && imageError ? 'SHOW ERROR' : 'SHOW ADD IMAGE'
+                });
+                return null;
+              })()}
+              {uploading ? (
+                <div className="w-full h-full flex items-center justify-center text-blue-500 bg-blue-50">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                    <div className="text-xs sm:text-sm">Uploading image...</div>
+                  </div>
+                </div>
+              ) : imageUrl && !imageError ? (
+                <img
+                  key={`card-image-${imageUrl}-${customImage}`} // Force re-render on image change
+                  src={imageUrl}
+                  alt="Card header"
+                  className="w-full h-full object-cover select-none"
+                  onLoadStart={() => {
+                    console.log('🔄 [Card Designer] Image loading started:', imageUrl);
+                  }}
+                  style={{
+                    transform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale})`,
+                    transformOrigin: 'center center',
+                    transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+                    imageRendering: 'crisp-edges',
+                    backfaceVisibility: 'hidden',
+                    WebkitBackfaceVisibility: 'hidden',
+                    WebkitTransform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale})`,
+                    MozTransform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale})`,
+                    msTransform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale})`,
+                    filter: 'none',
+                    WebkitFilter: 'none'
+                  }}
+                  onLoad={() => {
+                    console.log('📸 [Card Designer] Image loaded successfully:', imageUrl);
+                    setImageError(false);
+                  }}
+                  onError={(e) => {
+                    console.error('❌ [Card Designer] Image failed to load:', imageUrl);
+                    console.error('Error event:', e);
+                    setImageError(true);
+                  }}
+                  onDragStart={(e) => e.preventDefault()}
+                />
+              ) : imageUrl && imageError ? (
+                <div className="w-full h-full flex items-center justify-center text-red-400 bg-red-50">
+                  <div className="text-center px-4">
+                    <ImageOff className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2" />
+                    <div className="text-xs sm:text-sm">Failed to load image</div>
+                    <Button variant="outline" size="sm" className="mt-2 text-xs" onClick={() => setImageError(false)}>
+                      Retry
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm">
+                    <ImagePlus className="w-3 h-3 sm:w-4 sm:h-4" />
+                    Add an image
+                  </div>
+                </div>
+              )}
+
+              {/* Image Overlay Controls - only show when focused */}
+              {/* TEMPORARILY DISABLED - Image zoom and position controls
+            {imageUrl && !imageError && !uploading && showImageControls && (
+              <div className="absolute top-2 right-2 sm:top-3 sm:right-3 flex flex-col gap-1 sm:gap-2 animate-in fade-in-0 duration-200">
+                <div className="bg-black/70 backdrop-blur-sm rounded-lg p-1.5 sm:p-2 flex flex-col gap-0.5 sm:gap-1 shadow-lg">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 sm:h-8 sm:w-8 text-white hover:bg-white/20 hover:text-white"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleZoomIn();
+                    }}
+                    title="Zoom In"
+                  >
+                    <ZoomIn className="w-3 h-3 sm:w-4 sm:h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 sm:h-8 sm:w-8 text-white hover:bg-white/20 hover:text-white"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleZoomOut();
+                    }}
+                    title="Zoom Out"
+                  >
+                    <ZoomOut className="w-3 h-3 sm:w-4 sm:h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 sm:h-8 sm:w-8 text-white hover:bg-white/20 hover:text-white"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleResetPosition();
+                    }}
+                    title="Reset Position & Zoom"
+                  >
+                    <RotateCcw className="w-3 h-3 sm:w-4 sm:h-4" />
+                  </Button>
+                </div>
+                <div className="bg-black/70 backdrop-blur-sm rounded-lg px-2 py-1 sm:px-3 sm:py-1 shadow-lg">
+                  <div className="flex items-center gap-1 sm:gap-2 text-white text-xs">
+                    <Move className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                    <span className="hidden sm:inline">Drag to move • Scroll to zoom</span>
+                    <span className="sm:hidden">Drag • Scroll</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            */}
+
+              {/* Click to focus hint - only show when not focused and image is present */}
+              {/* TEMPORARILY DISABLED - Click to show controls hint
+            {imageUrl && !imageError && !uploading && !showImageControls && (
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-300">
+                <div className="bg-black/50 backdrop-blur-sm rounded-lg px-3 py-2 sm:px-4 text-white text-xs sm:text-sm">
+                  <span className="hidden sm:inline">Click to show controls</span>
+                  <span className="sm:hidden">Tap for controls</span>
+                </div>
+              </div>
+            )}
+            */}
+
+              <div className="absolute left-3 bottom-3 flex items-center gap-3">
+                {/* Card Active/Inactive Switch - Show for custom cards */}
+                {onToggleCustomCardActive && (
+                  <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm">
+                    <Switch
+                      id="enable-custom-card-inline"
+                      checked={customCardActive !== false}
+                      onCheckedChange={onToggleCustomCardActive}
+                    />
+                    <Label
+                      htmlFor="enable-custom-card-inline"
+                      className="text-sm font-medium cursor-pointer whitespace-nowrap"
+                    >
+                      Card is active
+                    </Label>
+                  </div>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="secondary" size="icon" className="rounded-full">
+                      <MoreVertical className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    {/* Image controls - available for all cards */}
+                    <DropdownMenuItem onClick={handlePickImage} disabled={uploading}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      {uploading ? 'Uploading...' : 'Upload Image'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setUnsplashOpen(true)}>
+                      <Search className="w-4 h-4 mr-2" />
+                      Browse Unsplash
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleRemoveImage}>
+                      <ImageOff className="w-4 h-4 mr-2" />
+                      Remove Image
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="text-red-600" onClick={handleReset}>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Reset {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) ? 'Card' : 'Text'}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
+              <div className="relative">
+                <Input
+                  ref={titleInputRef}
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Add your greeting here..."
+                  className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold border-0 shadow-none px-0 pr-8 sm:pr-12 focus-visible:ring-0 text-center placeholder:text-gray-400 placeholder:font-normal h-auto min-h-[3rem] sm:min-h-[4rem] md:min-h-[5rem] lg:min-h-[6rem] py-2 sm:py-3 md:py-4 leading-tight"
+                />
+                <div className="absolute right-0 top-1/2 transform -translate-y-1/2">
+                  <DropdownMenu open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-gray-400 hover:text-gray-600"
+                        onClick={() => setShowEmojiPicker(true)}
+                      >
+                        <Smile className="w-4 h-4 sm:w-5 sm:h-5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-72 sm:w-80 p-3 sm:p-4"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="space-y-2 sm:space-y-3">
+                        <div className="text-xs sm:text-sm font-medium text-gray-700">Birthday Emojis</div>
+                        <div className="grid grid-cols-6 sm:grid-cols-8 gap-1 sm:gap-2">
+                          {birthdayEmojis.map((emoji, index) => (
+                            <button
+                              key={index}
+                              onClick={() => insertEmoji(emoji)}
+                              className="w-7 h-7 sm:w-8 sm:h-8 text-base sm:text-lg hover:bg-gray-100 rounded transition-colors flex items-center justify-center"
+                              title={`Insert ${emoji}`}
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+
+              {/* Description */}
+              {!hideDescription && (
+                <div>
+                  <Input
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Add a short description (optional)..."
+                    className="text-sm sm:text-base border-0 shadow-none px-0 focus-visible:ring-0 text-center placeholder:text-gray-400"
+                  />
+                </div>
+              )}
+
+              {/* Rich text editor with bubble (tooltip) menu */}
+              <RichTextEditor
+                value={typeof message === 'string' ? message : ''}
+                onChange={(html) => setMessage(html)}
+                placeholder="Type your birthday message here..."
+                className="text-sm sm:text-base text-gray-800"
+                customerInfo={customerInfo}
+                businessName={businessName}
+                occasionType={occasionType}
+              />
+
+              {/* Emoji counter and deliverability warning */}
+              <div className="mt-2">
+                <div className="text-xs text-gray-500">Emojis detected in message: {emojiCount}</div>
+                {emojiCount > 1 && (
+                  <div className="mt-2 flex items-start gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 rounded p-2">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 text-orange-700" />
+                    <span>
+                      <strong>Warning:</strong> More than one emoji could affect email delivery to inbox and place your mail under Promotions or Spam.
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end text-gray-500 text-xs sm:text-sm">
+                <Input
+                  value={signature}
+                  onChange={(e) => setSignature(e.target.value)}
+                  placeholder={senderName ? `From ${senderName}` : "From [Your Name]"}
+                  className="w-full max-w-[180px] sm:max-w-[220px] text-right border-0 shadow-none px-0 focus-visible:ring-0 placeholder:text-gray-400"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+
+          {/* Holiday Enable/Disable Checkbox - Only show for holiday themes */}
+          {holidayId && onToggleHoliday && !initialThemeId?.startsWith('custom-') && (
+            <div className="flex items-center space-x-2 py-3 border-t">
+              <Checkbox
+                id="enable-holiday-card"
+                checked={!isHolidayDisabled}
+                onCheckedChange={() => onToggleHoliday?.(holidayId)}
+              />
+              <Label
+                htmlFor="enable-holiday-card"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                Enable this holiday card
+              </Label>
+            </div>
+          )}
+
+            </div>
+          ) : (
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "design" | "promotions")} className="w-full">
+              <TabsList className={`grid w-full ${hidePromotionsTab ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                <TabsTrigger value="design" className="flex items-center gap-2">
+                  <Palette className="h-4 w-4" />
+                  Design
+                </TabsTrigger>
+                {!hidePromotionsTab && (
+                  <TabsTrigger value="promotions" className="flex items-center gap-2">
+                    <Gift className="h-4 w-4" />
+                    Promotions
+                  </TabsTrigger>
+                )}
+              </TabsList>
+
+              <TabsContent value="design" className="mt-4">
           {/* Designer Canvas - responsive width with forced LTR */}
           <div className="mx-auto w-full max-w-[600px] rounded-2xl overflow-hidden border bg-white" dir="ltr" style={{ direction: 'ltr' }}>
             {/* Image header */}
@@ -972,7 +1513,23 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
             )}
             */}
 
-              <div className="absolute left-3 bottom-3">
+              <div className="absolute left-3 bottom-3 flex items-center gap-3">
+                {/* Card Active/Inactive Switch - Show for custom cards */}
+                {onToggleCustomCardActive && (
+                  <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm">
+                    <Switch
+                      id="enable-custom-card-inline-tabs"
+                      checked={customCardActive !== false}
+                      onCheckedChange={onToggleCustomCardActive}
+                    />
+                    <Label
+                      htmlFor="enable-custom-card-inline-tabs"
+                      className="text-sm font-medium cursor-pointer whitespace-nowrap"
+                    >
+                      Card is active
+                    </Label>
+                  </div>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="secondary" size="icon" className="rounded-full">
@@ -980,26 +1537,22 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
-                    {/* Image controls only for custom theme */}
-                    {initialThemeId === 'custom' && (
-                      <>
-                        <DropdownMenuItem onClick={handlePickImage} disabled={uploading}>
-                          <Edit className="w-4 h-4 mr-2" />
-                          {uploading ? 'Uploading...' : 'Upload Image'}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setUnsplashOpen(true)}>
-                          <Search className="w-4 h-4 mr-2" />
-                          Browse Unsplash
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={handleRemoveImage}>
-                          <ImageOff className="w-4 h-4 mr-2" />
-                          Remove Image
-                        </DropdownMenuItem>
-                      </>
-                    )}
+                    {/* Image controls - available for all cards */}
+                    <DropdownMenuItem onClick={handlePickImage} disabled={uploading}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      {uploading ? 'Uploading...' : 'Upload Image'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setUnsplashOpen(true)}>
+                      <Search className="w-4 h-4 mr-2" />
+                      Browse Unsplash
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleRemoveImage}>
+                      <ImageOff className="w-4 h-4 mr-2" />
+                      Remove Image
+                    </DropdownMenuItem>
                     <DropdownMenuItem className="text-red-600" onClick={handleReset}>
                       <RefreshCw className="w-4 h-4 mr-2" />
-                      Reset {initialThemeId === 'custom' ? 'Card' : 'Text'}
+                      Reset {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) ? 'Card' : 'Text'}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -1013,7 +1566,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                   ref={titleInputRef}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="🎉 Happy Birthday! 🎂"
+                  placeholder="Add your greeting here..."
                   className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold border-0 shadow-none px-0 pr-8 sm:pr-12 focus-visible:ring-0 text-center placeholder:text-gray-400 placeholder:font-normal h-auto min-h-[3rem] sm:min-h-[4rem] md:min-h-[5rem] lg:min-h-[6rem] py-2 sm:py-3 md:py-4 leading-tight"
                 />
                 <div className="absolute right-0 top-1/2 transform -translate-y-1/2">
@@ -1061,7 +1614,21 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                 className="text-sm sm:text-base text-gray-800"
                 customerInfo={customerInfo}
                 businessName={businessName}
+                occasionType={occasionType}
               />
+
+              {/* Emoji counter and deliverability warning */}
+              <div className="mt-2">
+                <div className="text-xs text-gray-500">Emojis detected in message: {emojiCount}</div>
+                {emojiCount > 1 && (
+                  <div className="mt-2 flex items-start gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 rounded p-2">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 text-orange-700" />
+                    <span>
+                      <strong>Warning:</strong> More than one emoji could affect email delivery to inbox and place your mail under Promotions or Spam.
+                    </span>
+                  </div>
+                )}
+              </div>
 
               <div className="flex items-center justify-end text-gray-500 text-xs sm:text-sm">
                 <Input
@@ -1083,48 +1650,100 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
             className="hidden"
           />
 
-          {/* Footer actions */}
-          <div className="flex justify-between items-center pt-4 border-t">
-            <div className="flex gap-2">
-              {onMakeActive && (
-                <Button
-                  variant={isCurrentlyActive ? "secondary" : "default"}
-                  onClick={() => {
-                    // Determine the correct theme ID based on current state
-                    let currentThemeId = initialThemeId || 'default';
-
-                    // Set to custom theme if user has uploaded a custom image OR if we're explicitly in custom theme mode
-                    if (customImage || initialThemeId === 'custom') {
-                      currentThemeId = 'custom';
-                    }
-                    // Otherwise, preserve the default theme (default, confetti, balloons)
-
-                    const currentData = {
-                      title,
-                      message,
-                      imageUrl,
-                      signature,
-                      themeId: currentThemeId,
-                      customImage,
-                      imagePosition,
-                      imageScale,
-                    };
-                    onMakeActive(currentThemeId, currentData);
-                  }}
-                  className="text-sm"
-                  disabled={isCurrentlyActive}
-                >
-                  {isCurrentlyActive ? 'Currently Active' : 'Make Active'}
-                </Button>
-              )}
+          {/* Holiday Enable/Disable Checkbox - Only show for holiday themes */}
+          {holidayId && onToggleHoliday && !initialThemeId?.startsWith('custom-') && (
+            <div className="flex items-center space-x-2 py-3 border-t">
+              <Checkbox
+                id="enable-holiday-card"
+                checked={!isHolidayDisabled}
+                onCheckedChange={() => onToggleHoliday?.(holidayId)}
+              />
+              <Label
+                htmlFor="enable-holiday-card"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                Enable this holiday card
+              </Label>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleClose} className="text-sm">
-                Close
-              </Button>
-              <Button onClick={handleSave} className="text-sm">
-                Save
-              </Button>
+          )}
+
+              </TabsContent>
+
+              {!hidePromotionsTab && (
+                <TabsContent value="promotions" className="mt-4">
+                  <div className="space-y-4">
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">Select Promotions to Send</h4>
+                      <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1">
+                        <li>• <strong>Click on a promotion</strong> to select/deselect it</li>
+                        <li>• <strong>Selected promotions</strong> will be sent with this card email</li>
+                        <li>• You can select multiple promotions per card</li>
+                        <li>• Click the <strong>eye icon</strong> to preview promotion content</li>
+                      </ul>
+                    </div>
+                    {onPromotionsChange ? (
+                      <PromotionSelector
+                        selectedPromotions={selectedPromotions}
+                        onPromotionsChange={onPromotionsChange}
+                        campaignType="birthday"
+                        singleSelection={false}
+                      />
+                    ) : (
+                      <div className="text-sm text-gray-500 italic">
+                        Promotion management is not available for this card.
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+              )}
+            </Tabs>
+          )}
+
+          {/* Action Buttons */}
+          <div className="mt-6">
+            <div className="flex justify-between items-center">
+              <div className="flex gap-2">
+                {onMakeActive && (
+                  <Button
+                    variant={isCurrentlyActive ? "secondary" : "default"}
+                    onClick={() => {
+                      // Determine the correct theme ID based on current state
+                      let currentThemeId = initialThemeId || 'default';
+
+                      // Set to custom theme if user has uploaded a custom image OR if we're explicitly in custom theme mode
+                      if (customImage || initialThemeId === 'custom') {
+                        currentThemeId = 'custom';
+                      }
+                      // Otherwise, preserve the default theme (default, confetti, balloons)
+
+                      const currentData = {
+                        title,
+                        description,
+                        message,
+                        imageUrl,
+                        signature,
+                        themeId: currentThemeId,
+                        customImage,
+                        imagePosition,
+                        imageScale,
+                      };
+                      onMakeActive(currentThemeId, currentData);
+                    }}
+                    className="text-sm"
+                    disabled={isCurrentlyActive}
+                  >
+                    {isCurrentlyActive ? 'Currently Active' : 'Make Active'}
+                  </Button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleClose} className="text-sm">
+                  Close
+                </Button>
+                <Button onClick={handleSave} className="text-sm">
+                  Save
+                </Button>
+              </div>
             </div>
           </div>
 

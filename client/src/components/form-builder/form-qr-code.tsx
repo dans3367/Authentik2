@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import QRCode from 'qrcode';
 import { Button } from '@/components/ui/button';
 import { Copy, Download, ExternalLink, Loader2 } from 'lucide-react';
@@ -13,6 +13,7 @@ export function FormQRCode({ formId, formTitle }: FormQRCodeProps) {
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(true);
   const { toast } = useToast();
+  const inputRef = useRef<HTMLInputElement | null>(null);
   
   // Use the form server URL - defaults to localhost:3004 if not configured
   const formServerUrl = import.meta.env.VITE_FORMS_URL || 'http://localhost:3004';
@@ -54,19 +55,64 @@ export function FormQRCode({ formId, formTitle }: FormQRCodeProps) {
     }
   }, [formId, formServerUrl, toast]);
 
+  const fallbackCopy = (text: string) => {
+    // Prefer copying from the visible input to give visual feedback
+    if (inputRef.current) {
+      const input = inputRef.current;
+      input.focus();
+      input.select();
+      // For iOS support
+      input.setSelectionRange(0, input.value.length);
+      const ok = document.execCommand('copy');
+      // Clear selection
+      input.setSelectionRange(0, 0);
+      if (!ok) throw new Error('execCommand copy failed');
+      return;
+    }
+
+    // Hidden textarea fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.top = '0';
+    ta.style.left = '0';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    if (!ok) throw new Error('execCommand copy failed');
+  };
+
   const copyToClipboard = async () => {
     try {
-      await navigator.clipboard.writeText(formUrl);
+      if (navigator.clipboard?.writeText && window.isSecureContext) {
+        await navigator.clipboard.writeText(formUrl);
+      } else {
+        // In non-secure contexts or older browsers, use fallback
+        fallbackCopy(formUrl);
+      }
       toast({
         title: "Copied!",
         description: "Form URL copied to clipboard.",
       });
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to copy URL to clipboard.",
-        variant: "destructive",
-      });
+      console.error('Clipboard copy failed, attempting fallback:', error);
+      try {
+        fallbackCopy(formUrl);
+        toast({
+          title: "Copied!",
+          description: "Form URL copied to clipboard.",
+        });
+      } catch (err2) {
+        console.error('Clipboard fallback copy failed:', err2);
+        toast({
+          title: "Error",
+          description: "Failed to copy URL. Please select the URL and press Ctrl/Cmd+C.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -118,6 +164,7 @@ export function FormQRCode({ formId, formTitle }: FormQRCodeProps) {
             value={formUrl}
             readOnly
             className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-800 text-sm font-mono"
+            ref={inputRef}
           />
           <Button
             variant="outline"

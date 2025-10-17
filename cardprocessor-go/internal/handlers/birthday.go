@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,11 +14,11 @@ import (
 	"time"
 
 	"cardprocessor-go/internal/config"
+	"cardprocessor-go/internal/i18n"
 	"cardprocessor-go/internal/middleware"
 	"cardprocessor-go/internal/models"
 	"cardprocessor-go/internal/repository"
 	"cardprocessor-go/internal/temporal"
-	"cardprocessor-go/internal/i18n"
 
 	"github.com/gin-gonic/gin"
 )
@@ -43,10 +44,14 @@ func (h *BirthdayHandler) GetBirthdaySettings(c *gin.Context) {
 	tenantID, err := middleware.GetTenantID(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"error":   "Tenant ID not found",
+			"error": "Tenant ID not found",
 		})
 		return
+	}
+
+	company, companyErr := h.repo.GetCompany(c.Request.Context(), tenantID)
+	if companyErr != nil {
+		fmt.Printf("⚠️ [Birthday Settings] Failed to fetch company for tenant %s: %v\n", tenantID, companyErr)
 	}
 
 	settings, err := h.repo.GetBirthdaySettings(c.Request.Context(), tenantID)
@@ -64,8 +69,25 @@ func (h *BirthdayHandler) GetBirthdaySettings(c *gin.Context) {
 			CreatedAt:     time.Now(),
 			UpdatedAt:     time.Now(),
 		}
+
+		if companyErr == nil && company != nil && company.Name != "" {
+			defaultSettings.SenderName = company.Name
+			fmt.Printf("✅ [Birthday Settings] Using company name as default sender name: %s\n", company.Name)
+		} else {
+			senderFallback := defaultSettings.SenderName
+			if senderFallback == "" {
+				senderFallback = "Your Team"
+			}
+			defaultSettings.SenderName = senderFallback
+			fmt.Printf("⚠️ [Birthday Settings] Using fallback sender name '%s' for tenant %s\n", defaultSettings.SenderName, tenantID)
+		}
 		c.JSON(http.StatusOK, defaultSettings)
 		return
+	}
+
+	if settings.SenderName == "" && companyErr == nil && company != nil && company.Name != "" {
+		settings.SenderName = company.Name
+		fmt.Printf("✅ [Birthday Settings] Populating missing sender name with company name: %s\n", company.Name)
 	}
 
 	c.JSON(http.StatusOK, settings)
@@ -129,16 +151,16 @@ func (h *BirthdayHandler) UpdateBirthdaySettings(c *gin.Context) {
 	}
 
 	settings := &models.BirthdaySettings{
-		TenantID:        tenantID,
-		Enabled:         *req.Enabled,
-		EmailTemplate:   *req.EmailTemplate,
-		SegmentFilter:   *req.SegmentFilter,
-		CustomMessage:   getStringValue(req.CustomMessage),
-		CustomThemeData: req.CustomThemeData,
-		SenderName:      getStringValue(req.SenderName),
-		PromotionID:     req.PromotionID,
+		TenantID:              tenantID,
+		Enabled:               *req.Enabled,
+		EmailTemplate:         *req.EmailTemplate,
+		SegmentFilter:         *req.SegmentFilter,
+		CustomMessage:         getStringValue(req.CustomMessage),
+		CustomThemeData:       req.CustomThemeData,
+		SenderName:            getStringValue(req.SenderName),
+		PromotionID:           req.PromotionID,
 		SplitPromotionalEmail: getBoolValue(req.SplitPromotionalEmail),
-		UpdatedAt:       time.Now(),
+		UpdatedAt:             time.Now(),
 	}
 
 	updatedSettings, err := h.repo.UpdateBirthdaySettings(c.Request.Context(), settings)
@@ -500,7 +522,16 @@ func (h *BirthdayHandler) SendTestBirthdayCard(c *gin.Context) {
 
 	// Get tenant name for the workflow
 	tenantName := "Your Company" // Default fallback
-	// TODO: Get actual tenant name from database if needed
+	// Get actual tenant name from company table
+	company, err := h.repo.GetCompany(context.Background(), tenantID)
+	if err != nil {
+		fmt.Printf("⚠️ [Birthday Test] Failed to fetch company: %v\n", err)
+	} else if company != nil {
+		tenantName = company.Name
+		fmt.Printf("✅ [Birthday Test] Using company name: %s\n", tenantName)
+	} else {
+		fmt.Printf("⚠️ [Birthday Test] No active company found for tenant %s, using default\n", tenantID)
+	}
 
 	fmt.Printf("🎂 [Birthday Test] Checking Temporal client availability...\n")
 	fmt.Printf("🎂 [Birthday Test] Temporal client: %v\n", h.temporalClient != nil)
@@ -512,18 +543,18 @@ func (h *BirthdayHandler) SendTestBirthdayCard(c *gin.Context) {
 	// Priority: request fields > database settings
 	var promotionID string
 	var splitPromotionalEmail bool
-	
+
 	// First, try to get from request
 	if req.PromotionID != nil && *req.PromotionID != "" {
 		promotionID = *req.PromotionID
 		fmt.Printf("🎁 [Birthday Test] Using promotion ID from request: %s\n", promotionID)
 	}
-	
+
 	if req.SplitPromotionalEmail != nil {
 		splitPromotionalEmail = *req.SplitPromotionalEmail
 		fmt.Printf("📧 [Birthday Test] Using split promotional email from request: %v\n", splitPromotionalEmail)
 	}
-	
+
 	// Fetch birthday settings as fallback
 	birthdaySettings, err := h.repo.GetBirthdaySettings(context.Background(), tenantID)
 	if err != nil {
@@ -534,7 +565,7 @@ func (h *BirthdayHandler) SendTestBirthdayCard(c *gin.Context) {
 			promotionID = *birthdaySettings.PromotionID
 			fmt.Printf("🎁 [Birthday Test] Using promotion ID from settings: %s\n", promotionID)
 		}
-		
+
 		if req.SplitPromotionalEmail == nil {
 			splitPromotionalEmail = birthdaySettings.SplitPromotionalEmail
 			fmt.Printf("📧 [Birthday Test] Using split promotional email from settings: %v\n", splitPromotionalEmail)
@@ -547,20 +578,20 @@ func (h *BirthdayHandler) SendTestBirthdayCard(c *gin.Context) {
 
 		// Prepare workflow input
 		workflowInput := temporal.BirthdayTestWorkflowInput{
-			UserID:          userID,
-			UserEmail:       req.UserEmail,
-			UserFirstName:   req.UserFirstName,
-			UserLastName:    req.UserLastName,
-			TenantID:        tenantID,
-			TenantName:      tenantName,
-			FromEmail:       h.config.DefaultFromEmail,
-			EmailTemplate:   req.EmailTemplate,
-			CustomMessage:   req.CustomMessage,
-			CustomThemeData: customThemeData,
-			SenderName:      req.SenderName,
-			PromotionID:     promotionID,
+			UserID:                userID,
+			UserEmail:             req.UserEmail,
+			UserFirstName:         req.UserFirstName,
+			UserLastName:          req.UserLastName,
+			TenantID:              tenantID,
+			TenantName:            tenantName,
+			FromEmail:             h.config.DefaultFromEmail,
+			EmailTemplate:         req.EmailTemplate,
+			CustomMessage:         req.CustomMessage,
+			CustomThemeData:       customThemeData,
+			SenderName:            req.SenderName,
+			PromotionID:           promotionID,
 			SplitPromotionalEmail: splitPromotionalEmail,
-			IsTest:          true,
+			IsTest:                true,
 		}
 
 		fmt.Printf("🎂 [Birthday Test] Workflow input prepared: %+v\n", workflowInput)
@@ -605,7 +636,6 @@ func (h *BirthdayHandler) SendTestBirthdayCard(c *gin.Context) {
 		return
 	}
 
-
 	// Check if Temporal is unavailable
 	fmt.Printf("⚠️ [Birthday Test] Temporal client not available or not connected\n")
 	fmt.Printf("🔧 [Birthday Test] Fallback enabled: %v\n", h.config.EnableEmailFallback)
@@ -619,7 +649,7 @@ func (h *BirthdayHandler) SendTestBirthdayCard(c *gin.Context) {
 		}
 		fmt.Printf("   └─ To enable fallback for development, set ENABLE_EMAIL_FALLBACK=true in .env\n")
 		fmt.Printf("   └─ WARNING: Fallback should NEVER be enabled in production!\n")
-		
+
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"success": false,
 			"error":   "Temporal workflow service is unavailable and email fallback is disabled. Please check Temporal connection or enable fallback for development (ENABLE_EMAIL_FALLBACK=true).",
@@ -651,7 +681,6 @@ func (h *BirthdayHandler) SendTestBirthdayCard(c *gin.Context) {
 		"fallbackMode": true,
 	})
 }
-
 
 // GenerateBirthdayUnsubscribeToken generates an unsubscribe token for a contact
 func (h *BirthdayHandler) GenerateBirthdayUnsubscribeToken(c *gin.Context) {
@@ -762,14 +791,14 @@ func (h *BirthdayHandler) ShowBirthdayUnsubscribePage(c *gin.Context) {
 	}
 	t := i18n.GetTranslations(lang)
 	_ = t // ensure variable is used even if specific branches do not reference it
-	
+
 	if token == "" {
 		c.HTML(http.StatusBadRequest, "unsubscribe_error.html", gin.H{
-			"ErrorTitle":    t.ErrorTitle,
-			"ErrorHeading":  t.ErrorHeading,
-			"ErrorMessage":  t.TokenMissingError,
-			"Lang":          lang,
-			"TemplateText":  i18n.GetTemplateText(lang),
+			"ErrorTitle":   t.ErrorTitle,
+			"ErrorHeading": t.ErrorHeading,
+			"ErrorMessage": t.TokenMissingError,
+			"Lang":         lang,
+			"TemplateText": i18n.GetTemplateText(lang),
 		})
 		return
 	}
@@ -787,18 +816,18 @@ func (h *BirthdayHandler) ShowBirthdayUnsubscribePage(c *gin.Context) {
 		fmt.Printf("   └─ Stack Trace: %+v\n", err)
 
 		c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
-			"ErrorTitle":    t.ErrorTitle,
-			"ErrorHeading":  t.ErrorHeading,
-						"ErrorMessage": t.ProcessingError,
+			"ErrorTitle":   t.ErrorTitle,
+			"ErrorHeading": t.ErrorHeading,
+			"ErrorMessage": t.ProcessingError,
 		})
 		return
 	}
 
 	if unsubToken == nil {
 		c.HTML(http.StatusNotFound, "unsubscribe_error.html", gin.H{
-			"ErrorTitle":    t.ErrorTitle,
-			"ErrorHeading":  t.ErrorHeading,
-						"ErrorMessage": t.TokenNotFoundError,
+			"ErrorTitle":   t.ErrorTitle,
+			"ErrorHeading": t.ErrorHeading,
+			"ErrorMessage": t.TokenNotFoundError,
 		})
 		return
 	}
@@ -823,24 +852,24 @@ func (h *BirthdayHandler) ShowBirthdayUnsubscribePage(c *gin.Context) {
 		fmt.Printf("   └─ Client IP: %s\n", c.ClientIP())
 
 		c.HTML(http.StatusInternalServerError, "unsubscribe_error.html", gin.H{
-			"ErrorTitle":    t.ErrorTitle,
-			"ErrorHeading":  t.ErrorHeading,
-						"ErrorMessage": t.ContactNotFoundError,
+			"ErrorTitle":   t.ErrorTitle,
+			"ErrorHeading": t.ErrorHeading,
+			"ErrorMessage": t.ContactNotFoundError,
 		})
 		return
 	}
 
 	// Show unsubscribe form
 	c.HTML(http.StatusOK, "unsubscribe.html", gin.H{
-		"Token":         token,
-		"Email":         contact.Email,
-		"FirstName":     getStringValue(contact.FirstName),
-		"LastName":      getStringValue(contact.LastName),
-		"Lang":          lang,
-		"Translations":  t,
-		"TemplateText":  i18n.GetTemplateText(lang),
-		"Contact":       contact,
-		"TokenUsed":     unsubToken.Used, // Pass token status to template
+		"Token":        token,
+		"Email":        contact.Email,
+		"FirstName":    getStringValue(contact.FirstName),
+		"LastName":     getStringValue(contact.LastName),
+		"Lang":         lang,
+		"Translations": t,
+		"TemplateText": i18n.GetTemplateText(lang),
+		"Contact":      contact,
+		"TokenUsed":    unsubToken.Used, // Pass token status to template
 	})
 }
 
@@ -1051,11 +1080,11 @@ func (h *BirthdayHandler) ProcessBirthdayResubscribe(c *gin.Context) {
 	token := c.Query("token")
 	if token == "" {
 		c.HTML(http.StatusBadRequest, "unsubscribe_error.html", gin.H{
-			"ErrorTitle":    t.ErrorTitle,
-			"ErrorHeading":  t.ErrorHeading,
-			"ErrorMessage":  t.TokenMissingError,
-			"Lang":          lang,
-			"TemplateText":  i18n.GetTemplateText(lang),
+			"ErrorTitle":   t.ErrorTitle,
+			"ErrorHeading": t.ErrorHeading,
+			"ErrorMessage": t.TokenMissingError,
+			"Lang":         lang,
+			"TemplateText": i18n.GetTemplateText(lang),
 		})
 		return
 	}
@@ -1147,4 +1176,16 @@ func getBoolValue(b *bool) bool {
 		return false
 	}
 	return *b
+}
+
+// GetCompanyNameActivity fetches the company name for a given tenant ID
+func (h *BirthdayHandler) GetCompanyNameActivity(ctx context.Context, tenantID string) (string, error) {
+	company, err := h.repo.GetCompany(ctx, tenantID)
+	if err != nil {
+		return "", err
+	}
+	if company == nil || company.Name == "" {
+		return "", errors.New("company not found or name is empty")
+	}
+	return company.Name, nil
 }

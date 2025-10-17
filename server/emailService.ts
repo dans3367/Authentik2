@@ -1,5 +1,10 @@
 import { Resend } from 'resend';
 import { EnhancedEmailService } from './providers/enhancedEmailService';
+import {
+  buildFooterHtml,
+  buildFooterText,
+  getTenantBrandingForEmail,
+} from './utils/emailBranding';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 'dummy-key-for-development');
 
@@ -37,6 +42,7 @@ export class EmailService {
     // Legacy service implementation
     const verificationUrl = `${this.baseUrl}/verify-email?token=${verificationToken}`;
     const displayName = firstName ? ` ${firstName}` : '';
+    const branding = await getTenantBrandingForEmail(email);
 
     // In development or when email fails, log the verification URL to console
     console.log('\n🔗 EMAIL VERIFICATION URL:');
@@ -74,7 +80,7 @@ export class EmailService {
               </div>
               <div class="content">
                 <h2>Hi${displayName}!</h2>
-                <p>Thank you for signing up for ${this.appName}. To complete your registration and start using your account, please verify your email address by clicking the button below:</p>
+                <p>Thank you for signing up for ${branding.displayName}. To complete your registration and start using your account, please verify your email address by clicking the button below:</p>
                 
                 <div style="text-align: center;">
                   <a href="${verificationUrl}" class="button">Verify Email Address</a>
@@ -90,11 +96,9 @@ export class EmailService {
                 <p>If you didn't create an account with us, you can safely ignore this email.</p>
                 
                 <p>Welcome aboard!</p>
-                <p>The ${this.appName} Team</p>
+                <p>The ${branding.displayName} Team</p>
               </div>
-              <div class="footer">
-                <p>This email was sent to ${email}. If you have any questions, please contact our support team.</p>
-              </div>
+              ${buildFooterHtml(branding.displayName)}
             </div>
           </body>
           </html>
@@ -135,6 +139,7 @@ export class EmailService {
 
     // Legacy service implementation
     const finalSubject = subject || `Review required: Email campaign`;
+    const branding = await getTenantBrandingForEmail(email);
     try {
       console.log('[EmailService] Using legacy Resend service for approval email');
       const { data, error } = await resend.emails.send({
@@ -172,9 +177,7 @@ export class EmailService {
                 <p style="background: #e9ecef; padding: 10px; border-radius: 4px; word-break: break-all;">${approveUrl}</p>
                 <p>This link will expire in 7 days.</p>
               </div>
-              <div class="footer">
-                <p>This message was sent to ${email}.</p>
-              </div>
+              ${buildFooterHtml(branding.displayName)}
             </div>
           </body>
           </html>
@@ -215,20 +218,28 @@ export class EmailService {
 
     // Legacy service implementation
     const displayName = firstName ? ` ${firstName}` : '';
+    const branding = await getTenantBrandingForEmail(email);
 
     try {
       console.log('[EmailService] Using legacy Resend service for welcome email');
       const { data, error } = await resend.emails.send({
         from: this.fromEmail,
         to: [email],
-        subject: `Welcome to ${this.appName}! Your account is now verified`,
+        subject: `Welcome to ${branding.displayName}! Your account is now verified`,
+        text: [
+          `Hi${displayName}!`,
+          'Your email address has been verified and your account is now active.',
+          'Visit your dashboard to explore all available features.',
+          '',
+          buildFooterText(branding.displayName),
+        ].join('\n'),
         html: `
           <!DOCTYPE html>
           <html>
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Welcome to ${this.appName}</title>
+            <title>Welcome to ${branding.displayName}</title>
             <style>
               body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
               .container { max-width: 600px; margin: 0 auto; padding: 20px; }
@@ -242,7 +253,7 @@ export class EmailService {
             <div class="container">
               <div class="header">
                 <h1>🎉 Account Verified!</h1>
-                <p>Welcome to ${this.appName}</p>
+                <p>Welcome to ${branding.displayName}</p>
               </div>
               <div class="content">
                 <h2>Hi${displayName}!</h2>
@@ -250,7 +261,7 @@ export class EmailService {
                 
                 <p>You can now:</p>
                 <ul>
-                  <li>Access all features of ${this.appName}</li>
+                  <li>Access all features of ${branding.displayName}</li>
                   <li>Manage your profile and account settings</li>
                   <li>Enable two-factor authentication for extra security</li>
                   <li>Manage your active sessions across devices</li>
@@ -263,11 +274,9 @@ export class EmailService {
                 <p>If you have any questions or need help getting started, feel free to reach out to our support team.</p>
                 
                 <p>Thank you for joining us!</p>
-                <p>The ${this.appName} Team</p>
+                <p>The ${branding.displayName} Team</p>
               </div>
-              <div class="footer">
-                <p>This email was sent to ${email}. If you have any questions, please contact our support team.</p>
-              </div>
+              ${buildFooterHtml(branding.displayName)}
             </div>
           </body>
           </html>

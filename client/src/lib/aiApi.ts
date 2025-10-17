@@ -3,6 +3,7 @@
 interface GenerateBirthdayMessageParams {
   customerName?: string;
   businessName?: string;
+  occasionType?: string;
 }
 
 interface GenerateBirthdayMessageResponse {
@@ -12,7 +13,7 @@ interface GenerateBirthdayMessageResponse {
 }
 
 /**
- * Generate a birthday card message using AI
+ * Generate an occasion-specific greeting card message using AI
  */
 export async function generateBirthdayMessage(
   params: GenerateBirthdayMessageParams
@@ -29,16 +30,16 @@ export async function generateBirthdayMessage(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || "Failed to generate birthday message");
+      throw new Error(errorData.error || "Failed to generate occasion message");
     }
 
     const data = await response.json();
     return data;
   } catch (error: any) {
-    console.error("Error generating birthday message:", error);
+    console.error("Error generating occasion message:", error);
     return {
       success: false,
-      error: error.message || "Failed to generate birthday message",
+      error: error.message || "Failed to generate occasion message",
     };
   }
 }

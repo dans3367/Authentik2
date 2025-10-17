@@ -15,6 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { generatePromotionalCodes, parseUserCodes, validatePromotionalCodes, formatCodesForDisplay, CODE_GENERATION_PRESETS, type CodeFormat } from '@/utils/codeGeneration';
+import RichTextEditor from '@/components/RichTextEditor';
 
 const promotionTypeColors = {
   newsletter: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
@@ -287,17 +288,14 @@ export default function CreatePromotionPage() {
               <CardContent>
                 <div className="space-y-2">
                   <Label htmlFor="content">Content *</Label>
-                  <Textarea
-                    id="content"
+                  <RichTextEditor
                     value={formData.content}
-                    onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                    placeholder="Enter the promotional content (HTML supported)"
-                    rows={12}
-                    required
-                    className="font-mono text-sm"
+                    onChange={(html) => setFormData({ ...formData, content: html })}
+                    placeholder="Enter the promotional content..."
+                    className="min-h-[300px]"
                   />
                   <p className="text-xs text-muted-foreground">
-                    You can use HTML tags for rich formatting in your promotional content.
+                    Use the rich text editor to format your promotional content. You can use the toolbar for formatting, insert placeholders, and use AI features.
                   </p>
                 </div>
               </CardContent>
@@ -642,9 +640,10 @@ export default function CreatePromotionPage() {
                     <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Content Preview
                     </div>
-                    <div className="text-sm text-muted-foreground max-h-32 overflow-y-auto leading-relaxed bg-gray-50 dark:bg-gray-900 p-2 rounded text-xs">
-                      {formData.content || "Your promotional content will appear here as you type..."}
-                    </div>
+                    <div 
+                      className="text-sm text-muted-foreground max-h-32 overflow-y-auto leading-relaxed bg-gray-50 dark:bg-gray-900 p-2 rounded text-xs prose prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{ __html: formData.content || "<p class='text-gray-400'>Your promotional content will appear here as you type...</p>" }}
+                    />
                   </div>
 
                   <div className="space-y-2">

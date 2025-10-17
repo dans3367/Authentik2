@@ -164,7 +164,7 @@ authRoutes.post("/logout-all", authenticateToken, async (req: any, res) => {
 });
 
 // Update user profile (language, theme, menu preferences)
-authRoutes.patch("/user/profile", authenticateToken, async (req: any, res) => {
+authRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
   try {
     const userId = req.user.id;
     const updateData = req.body;

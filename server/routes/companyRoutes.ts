@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import { betterAuthUser, tenants, shops, stores } from '@shared/schema';
+import { betterAuthUser, tenants, shops, stores, companies, forms, formResponses } from '@shared/schema';
 import { authenticateToken, requireRole } from '../middleware/auth-middleware';
 import { createCompanySchema, updateCompanySchema } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
@@ -12,7 +12,7 @@ export const companyRoutes = Router();
 companyRoutes.get("/", authenticateToken, async (req: any, res) => {
   try {
     const company = await db.query.companies.findFirst({
-      where: sql`${db.companies.id} = ${req.user.tenantId}`,
+      where: sql`${companies.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!company) {
@@ -30,28 +30,26 @@ companyRoutes.get("/", authenticateToken, async (req: any, res) => {
 companyRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator"]), async (req: any, res) => {
   try {
     const validatedData = createCompanySchema.parse(req.body);
-    const { name, description, website, industry } = validatedData;
+    const { name, description, website } = validatedData;
 
-    const sanitizedName = sanitizeString(name);
+    const sanitizedName = sanitizeString(name) ?? name.trim();
     const sanitizedDescription = description ? sanitizeString(description) : null;
     const sanitizedWebsite = website ? sanitizeString(website) : null;
-    const sanitizedIndustry = industry ? sanitizeString(industry) : null;
 
     // Check if company name is already taken (tenant isolation not needed for global uniqueness)
     const existingCompany = await db.query.companies.findFirst({
-      where: sql`${db.companies.name} = ${sanitizedName}`,
+      where: sql`${companies.name} = ${sanitizedName}`,
     });
 
     if (existingCompany) {
       return res.status(400).json({ message: 'Company name already exists' });
     }
 
-    const newCompany = await db.insert(db.companies).values({
+    const newCompany = await db.insert(companies).values({
+      tenantId: req.user.tenantId,
       name: sanitizedName,
       description: sanitizedDescription,
       website: sanitizedWebsite,
-      industry: sanitizedIndustry,
-      slug: sanitizedName.toLowerCase().replace(/\s+/g, '-'),
       ownerId: req.user.id,
       createdAt: new Date(),
     }).returning();
@@ -67,10 +65,10 @@ companyRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator"
 companyRoutes.patch("/", authenticateToken, requireRole(["Owner", "Administrator"]), async (req: any, res) => {
   try {
     const validatedData = updateCompanySchema.parse(req.body);
-    const { name, description, website, industry } = validatedData;
+    const { name, description, website } = validatedData;
 
     const company = await db.query.companies.findFirst({
-      where: sql`${db.companies.id} = ${req.user.tenantId}`,
+      where: sql`${companies.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!company) {
@@ -82,11 +80,11 @@ companyRoutes.patch("/", authenticateToken, requireRole(["Owner", "Administrator
     };
 
     if (name !== undefined) {
-      const sanitizedName = sanitizeString(name);
+      const sanitizedName = sanitizeString(name) ?? name.trim();
       
       // Check if new name is already taken by another company
       const existingCompany = await db.query.companies.findFirst({
-        where: sql`${db.companies.name} = ${sanitizedName} AND ${db.companies.tenantId} != ${req.user.tenantId}`,
+        where: sql`${companies.name} = ${sanitizedName} AND ${companies.tenantId} != ${req.user.tenantId}`,
       });
 
       if (existingCompany) {
@@ -94,7 +92,6 @@ companyRoutes.patch("/", authenticateToken, requireRole(["Owner", "Administrator
       }
 
       updateData.name = sanitizedName;
-      updateData.slug = sanitizedName.toLowerCase().replace(/\s+/g, '-');
     }
 
     if (description !== undefined) {
@@ -105,13 +102,11 @@ companyRoutes.patch("/", authenticateToken, requireRole(["Owner", "Administrator
       updateData.website = website ? sanitizeString(website) : null;
     }
 
-    if (industry !== undefined) {
-      updateData.industry = industry ? sanitizeString(industry) : null;
-    }
+    // No 'industry' field in schema
 
-    const updatedCompany = await db.update(db.companies)
+    const updatedCompany = await db.update(companies)
       .set(updateData)
-      .where(sql`${db.companies.id} = ${req.user.tenantId}`)
+      .where(sql`${companies.tenantId} = ${req.user.tenantId}`)
       .returning();
 
     res.json(updatedCompany[0]);
@@ -139,10 +134,10 @@ companyRoutes.get("/stats", authenticateToken, async (req: any, res) => {
       // Form statistics
       db.select({
         totalForms: sql<number>`count(*)`,
-        publishedForms: sql<number>`count(*) filter (where published = true)`,
-        draftForms: sql<number>`count(*) filter (where published = false)`,
+        activeForms: sql<number>`count(*) filter (where is_active = true)`,
+        inactiveForms: sql<number>`count(*) filter (where is_active = false)`,
         newForms: sql<number>`count(*) filter (where created_at > current_date - interval '30 days')`,
-      }).from(db.forms).where(sql`${db.forms.companyId} = ${req.user.tenantId}`),
+      }).from(forms).where(sql`${forms.tenantId} = ${req.user.tenantId}`),
 
       // Response statistics
       db.select({
@@ -150,9 +145,9 @@ companyRoutes.get("/stats", authenticateToken, async (req: any, res) => {
         responsesToday: sql<number>`count(*) filter (where submitted_at >= current_date)`,
         responsesThisWeek: sql<number>`count(*) filter (where submitted_at >= current_date - interval '7 days')`,
         responsesThisMonth: sql<number>`count(*) filter (where submitted_at >= current_date - interval '30 days')`,
-      }).from(db.formResponses)
-        .innerJoin(db.forms, sql`${db.forms.id} = ${db.formResponses.formId}`)
-        .where(sql`${db.forms.companyId} = ${req.user.tenantId}`),
+      }).from(formResponses)
+        .innerJoin(forms, sql`${forms.id} = ${formResponses.formId}`)
+        .where(sql`${forms.tenantId} = ${req.user.tenantId}`),
     ]);
 
     res.json({

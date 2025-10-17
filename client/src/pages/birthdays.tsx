@@ -258,7 +258,7 @@ export default function BirthdaysPage() {
           emailTemplate: 'default',
           segmentFilter: 'all',
           customMessage: '',
-          senderName: 'Birthday Team',
+          senderName: company?.name || 'Your Company',
           promotionId: null,
           promotion: null,
           created_at: new Date().toISOString(),
@@ -272,7 +272,7 @@ export default function BirthdaysPage() {
           emailTemplate: 'default',
           segmentFilter: 'all',
           customMessage: '',
-          senderName: 'Birthday Team',
+          senderName: company?.name || 'Your Company',
           promotionId: null,
           promotion: null,
           created_at: new Date().toISOString(),
@@ -326,6 +326,17 @@ export default function BirthdaysPage() {
 
   // Extract users array from response data
   const users: User[] = usersData?.users || [];
+
+  // Fetch user's company for business name
+  const { data: company } = useQuery({
+    queryKey: ["/api/company"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/company");
+      const data = await response.json();
+      return data.company as { id: string; name: string; owner: any } | null;
+    },
+    staleTime: 10 * 60 * 1000, // Cache for 10 minutes
+  });
 
   // Update birthday settings
   const updateSettingsMutation = useMutation({
@@ -1417,6 +1428,7 @@ export default function BirthdaysPage() {
           initialThemeId={designerThemeId || undefined}
           onPreviewChange={handlePreviewChange}
           initialData={cardDesignerInitialData}
+          hideDescription={true}
           onSave={(data) => {
             try {
               localStorage.setItem('birthdayCardDesignerDraft', JSON.stringify({ title: data.title, message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId, customImage: (data as any).customImage }));
@@ -1581,7 +1593,7 @@ export default function BirthdaysPage() {
                 segmentFilter: birthdaySettings?.segmentFilter || 'all',
                 customMessage: data.message,
                 customThemeData: JSON.stringify(updatedThemeData),
-                senderName: birthdaySettings?.senderName || 'Birthday Team',
+                senderName: birthdaySettings?.senderName || company?.name || 'Your Company',
               };
               
               console.log('🎨 [Birthday Cards] Custom theme payload:', payload);
@@ -1596,7 +1608,7 @@ export default function BirthdaysPage() {
                 segmentFilter: birthdaySettings?.segmentFilter || 'all',
                 customMessage: data.message,
                 customThemeData: JSON.stringify(updatedThemeData), // Save theme-specific data
-                senderName: birthdaySettings?.senderName || 'Birthday Team',
+                senderName: birthdaySettings?.senderName || company?.name || 'Your Company',
               };
               
               console.log('🎨 [Birthday Cards] Default theme with customizations payload:', payload);
@@ -1610,7 +1622,7 @@ export default function BirthdaysPage() {
                 emailTemplate: themeId || 'default',
                 segmentFilter: birthdaySettings?.segmentFilter || 'all',
                 customMessage: data.message,
-                senderName: birthdaySettings?.senderName || 'Birthday Team',
+                senderName: birthdaySettings?.senderName || company?.name || 'Your Company',
               };
               
               console.log('🎨 [Birthday Cards] Default theme payload:', payload);
@@ -1640,7 +1652,9 @@ export default function BirthdaysPage() {
             return currentTemplate === selectedTheme;
           })()}
           senderName={birthdaySettings?.senderName}
-          businessName={currentUser?.name}
+          businessName={company?.name || currentUser?.name}
+          hidePromotionsTab={true}
+          hideTabs={true}
         />
 
         {/* Settings Tab */}

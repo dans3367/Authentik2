@@ -7,6 +7,7 @@ export interface EmailMessage {
   html: string;
   text?: string;
   attachments?: EmailAttachment[];
+  headers?: Record<string, string>;
   metadata?: Record<string, any>;
 }
 

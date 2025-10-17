@@ -126,8 +126,7 @@ func renderCustomTemplate(params TemplateParams) string {
 					<div style="font-size: 0.9rem; color: #718096;">
 						<p style="margin: 0; font-weight: 600; color: #4a5568;">%s</p>
 					</div>
-					%s
-				</div>`, template.HTMLEscapeString(fromMessage), renderUnsubscribeSection(params))
+				</div>`, template.HTMLEscapeString(fromMessage))
 	}
 
 	// Always render unsubscribe section if token exists

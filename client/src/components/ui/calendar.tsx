@@ -9,6 +9,7 @@ interface CalendarProps {
   fromYear?: number
   toYear?: number
   className?: string
+  hideYear?: boolean
 }
 
 const months = [
@@ -18,7 +19,7 @@ const months = [
 
 const weekDays = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
 
-function Calendar({ selected, onSelect, disabled, fromYear = 1900, toYear = new Date().getFullYear(), className }: CalendarProps) {
+function Calendar({ selected, onSelect, disabled, fromYear = 1900, toYear = new Date().getFullYear(), className, hideYear = false }: CalendarProps) {
   const [currentMonth, setCurrentMonth] = React.useState(selected?.getMonth() ?? new Date().getMonth())
   const [currentYear, setCurrentYear] = React.useState(selected?.getFullYear() ?? new Date().getFullYear())
 
@@ -127,21 +128,23 @@ function Calendar({ selected, onSelect, disabled, fromYear = 1900, toYear = new 
             <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
           </div>
 
-          {/* Year Dropdown */}
-          <div className="relative">
-            <select
-              value={currentYear}
-              onChange={(e) => setCurrentYear(parseInt(e.target.value))}
-              className="appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              {Array.from({ length: toYear - fromYear + 1 }, (_, i) => fromYear + i).map(year => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-          </div>
+          {/* Year Dropdown - hide if hideYear is true */}
+          {!hideYear && (
+            <div className="relative">
+              <select
+                value={currentYear}
+                onChange={(e) => setCurrentYear(parseInt(e.target.value))}
+                className="appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                {Array.from({ length: toYear - fromYear + 1 }, (_, i) => fromYear + i).map(year => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            </div>
+          )}
         </div>
 
         <button

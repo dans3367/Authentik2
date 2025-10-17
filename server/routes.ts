@@ -26,6 +26,7 @@ import { twoFactorRoutes } from "./routes/twoFactorRoutes";
 import { loginRoutes } from "./routes/loginRoutes";
 import { tenantLimitsRoutes } from "./routes/tenantLimitsRoutes";
 import { promotionRoutes } from "./routes/promotionRoutes";
+import customCardsRoutes from "./routes/customCardsRoutes";
 import appointmentRoutes from "./routes/appointmentRoutes";
 import appointmentRemindersRoutes from "./routes/appointmentRemindersRoutes";
 import newsletterWorkerRoutes from "./routes/newsletterWorkerRoutes";
@@ -59,6 +60,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/newsletters", newsletterRoutes);
   app.use("/api/card-images", cardImageRoutes);
   app.use("/api/promotions", promotionRoutes);
+  app.use("/api/custom-cards", customCardsRoutes);
   app.use("/api/appointments", appointmentRoutes);
   app.use("/api/appointment-reminders", appointmentRemindersRoutes);
   app.use("/api/newsletter-worker", newsletterWorkerRoutes);
@@ -281,82 +283,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Email tracking endpoints - proxy to server-node
+  // Email tracking endpoints - DISABLED (legacy server-node service no longer exists)
+  // Email tracking is now handled directly in the database via email_sends, email_events, and email_content tables
+  // Data is tracked automatically by cardprocessor-go when emails are sent
+  // To query email tracking data, query these tables directly or create new API endpoints
+  
   app.get("/api/email-tracking", authenticateToken, async (req: any, res) => {
-    try {
-      console.log('📧 [Email Tracking Proxy] Forwarding GET request to server-node for tenant:', req.user.tenantId);
-      
-      // Forward request to server-node with authentication
-      const response = await fetch('http://localhost:3502/api/email-tracking', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': req.headers.authorization || '',
-        }
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ [Email Tracking Proxy] server-node returned error:', response.status, errorText);
-        return res.status(response.status).json({
-          success: false,
-          message: 'server-node request failed',
-          error: errorText
-        });
-      }
-
-      const result = await response.json();
-      res.json(result);
-    } catch (error) {
-      console.error('❌ [Email Tracking Proxy] Failed to communicate with server-node:', error);
-      res.status(500).json({ message: 'Failed to get email tracking data' });
-    }
+    res.status(501).json({ 
+      success: false,
+      message: 'Email tracking endpoints are disabled. Use database queries on email_sends, email_events, and email_content tables instead.',
+      note: 'Legacy server-node service has been replaced. Email tracking is now in the database.'
+    });
   });
 
   app.post("/api/email-tracking", authenticateToken, async (req: any, res) => {
-    try {
-      console.log('📧 [Email Tracking Proxy] Forwarding POST request to server-node for tenant:', req.user.tenantId);
-      
-      // Add user context to request body
-      const requestBody = {
-        ...req.body,
-        tenantId: req.user.tenantId,
-        userId: req.user.id
-      };
-
-      // Forward request to server-node with authentication
-      const sessionToken = req.cookies?.['better-auth.session_token'];
-      const response = await fetch('http://localhost:3502/api/email-tracking', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': sessionToken ? `Bearer ${sessionToken}` : '',
-          'Cookie': sessionToken ? `better-auth.session_token=${sessionToken}` : '',
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ [Email Tracking Proxy] server-node returned error:', response.status, errorText);
-        return res.status(response.status).json({
-          success: false,
-          message: 'server-node request failed',
-          error: errorText
-        });
-      }
-
-      const result = await response.json();
-      console.log('✅ [Email Tracking Proxy] server-node response:', result);
-      res.json(result);
-    } catch (error) {
-      console.error('❌ [Email Tracking Proxy] Failed to communicate with server-node:', error);
-      res.status(500).json({ 
-        success: false,
-        message: 'Failed to process email request',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
+    res.status(501).json({ 
+      success: false,
+      message: 'Email tracking endpoints are disabled. Email tracking is handled automatically by cardprocessor-go.',
+      note: 'Legacy server-node service has been replaced. Check email_sends table for tracking data.'
+    });
   });
 
   // Legacy routes for backward compatibility (if needed)
@@ -408,37 +353,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('External token generation error:', error);
       res.status(500).json({ message: 'Failed to generate external service token' });
-    }
-  });
-
-  // Local email test endpoint (fallback when Go server is unavailable)
-  app.post("/api/email-test/send", authenticateToken, async (req: any, res) => {
-    try {
-      const { recipient, subject, content, templateType, priority } = req.body;
-      
-      // Simulate email sending locally
-      const emailId = `email-${Date.now()}`;
-      
-      console.log('📧 [Email Test] Processing email locally:', {
-        emailId,
-        recipient,
-        subject,
-        user: req.user.email
-      });
-      
-      // You can integrate with your actual email service here
-      // For now, just return a success response
-      res.json({
-        id: emailId,
-        status: 'queued',
-        message: 'Email queued for sending (local processing)',
-        recipient,
-        subject,
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('Email test error:', error);
-      res.status(500).json({ message: 'Failed to process email' });
     }
   });
 

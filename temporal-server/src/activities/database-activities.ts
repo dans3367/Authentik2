@@ -27,14 +27,23 @@ export interface InsertOutgoingEmailResult {
   error?: string;
 }
 
+export interface GetCompanyNameInput {
+  tenantId: string;
+}
+
+export interface GetCompanyNameResult {
+  success: boolean;
+  companyName?: string;
+  error?: string;
+}
+
 /**
  * Activity stub - actual implementation is in Go cardprocessor-go server
- * This inserts a record into outgoing_emails table BEFORE sending the email
- * The provider_message_id (resendID) will be NULL and updated later after sending
+ * This fetches the company name for a given tenant ID
  */
-export async function insertOutgoingEmail(
-  input: InsertOutgoingEmailInput
-): Promise<InsertOutgoingEmailResult> {
+export async function getCompanyName(
+  input: GetCompanyNameInput
+): Promise<GetCompanyNameResult> {
   // This is a stub - the actual implementation is in Go
   // Temporal will route this to the Go worker
   throw new Error('This activity should be executed by the Go worker');
