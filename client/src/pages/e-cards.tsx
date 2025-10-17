@@ -345,11 +345,11 @@ export default function ECardsPage() {
   const accessToken = tokenData?.token;
 
   // Initialize activeTab based on URL parameter or default to "themes"
-  const [activeTab, setActiveTab] = useState<"themes" | "settings" | "customers" | "test">(() => {
+  const [activeTab, setActiveTab] = useState<"themes" | "settings" | "test">(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tab = urlParams.get('tab');
-    if (tab && ['themes', 'settings', 'customers', 'test'].includes(tab)) {
-      return tab as "themes" | "settings" | "customers" | "test";
+    if (tab && ['themes', 'settings', 'test'].includes(tab)) {
+      return tab as "themes" | "settings" | "test";
     }
     return "themes";
   });
@@ -476,8 +476,8 @@ export default function ECardsPage() {
     const handlePopState = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const tab = urlParams.get('tab');
-      if (tab && ['themes', 'settings', 'customers', 'test'].includes(tab)) {
-        setActiveTab(tab as "themes" | "settings" | "customers" | "test");
+      if (tab && ['themes', 'settings', 'test'].includes(tab)) {
+        setActiveTab(tab as "themes" | "settings" | "test");
       } else {
         setActiveTab("themes");
       }
@@ -1662,21 +1662,6 @@ export default function ECardsPage() {
             <Settings className="h-4 w-4" />
             {t('ecards.tabs.settings')}
           </Button>
-
-          <Button
-            variant={activeTab === "customers" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setActiveTab("customers")}
-            className="flex items-center gap-2"
-          >
-            <Users className="h-4 w-4" />
-            {t('ecards.tabs.customers')}
-            {contacts.length > 0 && (
-              <Badge variant="secondary" className="ml-1">
-                {contacts.length}
-              </Badge>
-            )}
-          </Button>
           <Button
             variant={activeTab === "test" ? "default" : "ghost"}
             size="sm"
@@ -2800,241 +2785,6 @@ export default function ECardsPage() {
         )}
 
 
-
-        {/* Customers Tab */}
-        {activeTab === "customers" && (
-          <Card className="w-11/12">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  {t('ecards.title')}
-                </CardTitle>
-                <Button onClick={handleAddCustomer}>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  {t('common.add')} {t('ecards.customer')}
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {/* Search and Filter Controls */}
-              <div className="flex items-center gap-4 p-6 border-b">
-                <div className="relative flex-1 max-w-sm">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder={t('ecards.filters.searchPlaceholder')}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t('ecards.filters.allStatuses')}</SelectItem>
-                    <SelectItem value="active">{t('ecards.filters.active')}</SelectItem>
-                    <SelectItem value="unsubscribed">{t('ecards.filters.unsubscribed')}</SelectItem>
-                    <SelectItem value="bounced">{t('ecards.filters.bounced')}</SelectItem>
-                    <SelectItem value="pending">{t('ecards.filters.pending')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Bulk Actions */}
-              {selectedContacts.length > 0 && (
-                <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-4 border-b">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{selectedContacts.length} {t('ecards.bulkActions.selected')}</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSelectedContacts([])}
-                    >
-                      {t('ecards.bulkActions.clearSelection')}
-                    </Button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleBulkEnableBirthdayEmail}
-                      disabled={bulkUpdateBirthdayEmailMutation.isPending}
-                    >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      {t('ecards.bulkActions.enableBirthdayEmails')}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleBulkDisableBirthdayEmail}
-                      disabled={bulkUpdateBirthdayEmailMutation.isPending}
-                    >
-                      <XCircle className="h-4 w-4 mr-2" />
-                      {t('ecards.bulkActions.disableBirthdayEmails')}
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem onClick={handleSendBirthdayCard} disabled={sendBirthdayCardMutation.isPending}>
-                          <CakeIcon className="h-4 w-4 mr-2" />
-                          {sendBirthdayCardMutation.isPending ? t('ecards.bulkActions.sending') : t('ecards.bulkActions.sendBirthdayCard')}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={handleBulkRequestBirthdays} disabled={sendInvitationMutation.isPending}>
-                          <Mail className="h-4 w-4 mr-2" />
-                          {sendInvitationMutation.isPending ? t('ecards.bulkActions.sending') : t('ecards.bulkActions.requestBirthdays')}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem>
-                          <Download className="h-4 w-4 mr-2" />
-                          {t('ecards.bulkActions.exportSelected')}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-red-600">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          {t('ecards.bulkActions.removeSelected')}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              )}
-
-              {contactsLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
-                </div>
-              ) : contacts.length === 0 ? (
-                <div className="text-center py-12">
-                  <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">{t('ecards.empty.noCustomers')}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">{t('ecards.empty.noCustomersDescription')}</p>
-                  <Button onClick={handleAddCustomer}>
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    {t('ecards.empty.addFirstCustomer')}
-                  </Button>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-12">
-                          <Checkbox
-                            checked={isAllSelected}
-                            onCheckedChange={handleSelectAll}
-                            aria-label={t('ecards.selectAllCustomers')}
-                          />
-                        </TableHead>
-                        <TableHead>{t('ecards.table.name')}</TableHead>
-                        <TableHead>{t('ecards.table.status')}</TableHead>
-                        <TableHead>{t('ecards.table.birthday')}</TableHead>
-
-                        <TableHead>{t('ecards.table.campaigns')}</TableHead>
-                        <TableHead>{t('ecards.table.actions')}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {contacts.map((contact) => (
-                        <TableRow key={contact.id}>
-                          <TableCell>
-                            <Checkbox
-                              checked={selectedContacts.includes(contact.id)}
-                              onCheckedChange={(checked) => handleSelectContact(contact.id, checked as boolean)}
-                              aria-label={`Select ${getContactName(contact)}`}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <button
-                                type="button"
-                                onClick={() => handleCustomerClick(contact)}
-                                className="font-medium text-left hover:text-blue-600 hover:underline transition-colors cursor-pointer"
-                              >
-                                {getContactName(contact)}
-                              </button>
-                              <p className="text-sm text-gray-500">{contact.email}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={getStatusColor(contact.status)}>
-                              {contact.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {contact.birthday ? (
-                              <button
-                                type="button"
-                                onClick={() => openBirthdayModal(contact.id)}
-                                className="flex items-center gap-2 text-left hover:bg-gray-50 p-1 rounded transition-colors"
-                              >
-                                <CakeIcon className="h-4 w-4 text-pink-500" />
-                                <span className="text-sm">{(() => {
-                                  // Parse date as local to avoid timezone shifts
-                                  const [year, month, day] = contact.birthday.split('-').map(Number);
-                                  const localDate = new Date(year, month - 1, day);
-                                  return localDate.toLocaleDateString();
-                                })()}</span>
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => openBirthdayModal(contact.id)}
-                                className="text-gray-400 text-sm underline underline-offset-2 hover:text-gray-600"
-                              >
-                                {t('ecards.table.notSet')}
-                              </button>
-                            )}
-                          </TableCell>
-
-
-                          <TableCell>
-                            {contact.birthday ? (
-                              contact.birthdayUnsubscribedAt ? (
-                                <Badge className="bg-orange-100 text-orange-800">
-                                  {t('ecards.unsubscribed')}
-                                </Badge>
-                              ) : (
-                                <Switch
-                                  checked={contact.birthdayEmailEnabled || false}
-                                  onCheckedChange={() => handleToggleBirthdayEmail(contact.id, contact.birthdayEmailEnabled || false)}
-                                  disabled={toggleBirthdayEmailMutation.isPending}
-                                />
-                              )
-                            ) : (
-                              <span className="text-gray-400 text-sm">{t('ecards.table.na')}</span>
-                            )}
-                          </TableCell>
-
-                        
-                          <TableCell>
-                            {!contact.birthday && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleSendBirthdayInvitation(contact.id)}
-                                disabled={sendInvitationMutation.isPending || tokenLoading}
-                                className="flex items-center gap-2"
-                              >
-                                <Mail className="h-4 w-4" />
-                                {tokenLoading ? t('ecards.refreshing') : sendInvitationMutation.isPending ? t('ecards.bulkActions.sending') : t('ecards.requestBirthday')}
-                              </Button>
-                            )}
-                          </TableCell>
-</TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
 
         {/* Test Tab */}
         {activeTab === "test" && (
