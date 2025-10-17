@@ -1391,11 +1391,16 @@ emailManagementRoutes.put("/birthday-settings", authenticateToken, requireTenant
 
 
     // Validate custom theme data if provided
-    if (customThemeData !== undefined) {
+    if (customThemeData !== undefined && customThemeData !== null) {
       try {
         if (typeof customThemeData === 'string') {
-          JSON.parse(customThemeData);
-        } else if (typeof customThemeData === 'object' && customThemeData !== null) {
+          // Handle the string 'null' as a special case (treat it as null/undefined)
+          if (customThemeData === 'null') {
+            // This is valid - the string 'null' will be stored as-is or can be converted to null
+          } else {
+            JSON.parse(customThemeData);
+          }
+        } else if (typeof customThemeData === 'object') {
           // Allow any valid object structure for customThemeData
           // The frontend sends nested theme data which is valid
         } else {
