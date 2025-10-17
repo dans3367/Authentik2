@@ -640,10 +640,13 @@ export default function ECardsPage() {
         description: "E-card settings updated successfully",
       });
       
-      // Invalidate the query to force a fresh fetch from the server
-      // This ensures we get the latest data without any cache inconsistencies
+      // Update the query cache immediately with the server response (same as /birthdays)
+      queryClient.setQueryData(['/api/birthday-settings'], updatedSettings);
+      console.log('💾 [Birthday Settings] Cache updated');
+      
+      // Force a re-render by invalidating the query
       queryClient.invalidateQueries({ queryKey: ['/api/birthday-settings'] });
-      console.log('🔄 [Birthday Settings] Query invalidated, will refetch fresh data');
+      console.log('🔄 [Birthday Settings] Query invalidated, will refetch');
     },
     onError: (error: any) => {
       console.error('🎨 [Birthday Cards] Update settings error:', error);
@@ -818,7 +821,19 @@ export default function ECardsPage() {
     const currentThemeId = designerThemeId || 'default';
     const themeMetadata = themeMetadataById[currentThemeId];
 
-    // PRIORITY 1: Load from database first (customThemeData)
+    // PRIORITY 1: Load from localStorage draft first (for most recent changes)
+    try {
+      const raw = localStorage.getItem(`birthdayCardDesignerDraft:${currentThemeId}`);
+      if (raw) {
+        console.log('📥 [Card Designer Initial Data] Using localStorage draft for theme:', currentThemeId);
+        const draftData = JSON.parse(raw);
+        return draftData;
+      }
+    } catch (error) {
+      console.warn('⚠️ [Card Designer Initial Data] Failed to parse localStorage draft:', error);
+    }
+
+    // PRIORITY 2: Load from database (customThemeData)
     console.log('🔍 [Card Designer Initial Data] birthdaySettings.customThemeData:', birthdaySettings?.customThemeData, 'Type:', typeof birthdaySettings?.customThemeData);
     if (birthdaySettings?.customThemeData) {
       try {
@@ -854,26 +869,7 @@ export default function ECardsPage() {
         }
       } catch (error) {
         console.warn('⚠️ [Card Designer Initial Data] Failed to parse customThemeData:', error);
-        // Fall through to localStorage fallback
       }
-    }
-
-    // PRIORITY 2: Fallback to localStorage draft (for unsaved changes)
-    try {
-      const raw = localStorage.getItem(`birthdayCardDesignerDraft:${currentThemeId}`);
-      if (raw) {
-        console.log('📥 [Card Designer Initial Data] No DB data found, using localStorage draft for theme:', currentThemeId);
-        const draftData = JSON.parse(raw);
-        if ((draftData.imageUrl === undefined || draftData.imageUrl === null) && themeMetadata?.image && draftData.customImage !== true) {
-          return {
-            ...draftData,
-            imageUrl: themeMetadata.image,
-          };
-        }
-        return draftData;
-      }
-    } catch (error) {
-      console.warn('⚠️ [Card Designer Initial Data] Failed to parse localStorage draft:', error);
     }
 
     // PRIORITY 3: Default empty data if no saved data found
