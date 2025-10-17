@@ -30,10 +30,13 @@ interface RichTextEditorProps {
     firstName?: string;
     lastName?: string;
   };
+  businessName?: string;
+  occasionType?: string;
 }
 
-export default function RichTextEditor({ value, onChange, placeholder = "Start typing your message...", className = "", customerInfo }: RichTextEditorProps) {
+export default function RichTextEditor({ value, onChange, placeholder = "Start typing your message...", className = "", customerInfo, businessName, occasionType }: RichTextEditorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [isImproving, setIsImproving] = useState(false);
   const [isEmojifying, setIsEmojifying] = useState(false);
   const [isExpanding, setIsExpanding] = useState(false);
@@ -52,7 +55,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
     position: 'absolute' | 'fixed';
   } | null>(null);
 
-  const isProcessing = isImproving || isEmojifying || isExpanding || isShortening || isCasualizing || isFormalizing || isTranslating;
+  const isProcessing = isGenerating || isImproving || isEmojifying || isExpanding || isShortening || isCasualizing || isFormalizing || isTranslating;
   
   // Track active states for toolbar buttons
   const [isBold, setIsBold] = useState(false);
@@ -73,6 +76,35 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
     if (editor) {
       const placeholderText = `{{${type}}}`;
       editor.chain().focus().insertContent(placeholderText).run();
+    }
+  };
+
+  // Handle AI message generation
+  const handleGenerateMessage = async () => {
+    if (isProcessing || !editor) return;
+    
+    setIsGenerating(true);
+    
+    try {
+      const result = await generateBirthdayMessage({
+        customerName: customerInfo?.firstName,
+        businessName: businessName,
+        occasionType: occasionType,
+      });
+      
+      if (result.success && result.message) {
+        // Insert the generated message into the editor
+        editor.commands.setContent(result.message);
+        onChange(result.message);
+      } else {
+        console.error("Failed to generate message:", result.error);
+        alert(result.error || "Failed to generate message. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error generating message:", error);
+      alert("An error occurred while generating the message. Please try again.");
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -570,6 +602,21 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
             <Droplet className="w-4 h-4" />
           </div>
         </div>
+
+        {/* Generate Message button */}
+        <div className="w-px h-6 bg-gray-600 mx-1" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 px-2 text-xs font-medium text-purple-300 hover:text-purple-100 hover:bg-gray-700"
+          onClick={handleGenerateMessage}
+          disabled={isGenerating || !editor}
+          title={`Generate ${occasionType || 'greeting'} message with AI`}
+        >
+          <Sparkles className={`w-3 h-3 mr-1 ${isGenerating ? 'animate-pulse' : ''}`} />
+          {isGenerating ? 'Generating...' : 'Generate'}
+        </Button>
 
         {/* Tags dropdown */}
         <div className="w-px h-6 bg-gray-600 mx-1" />

@@ -1779,6 +1779,7 @@ export type UpdateBirthdaySettingsData = z.infer<typeof updateBirthdaySettingsSc
 // Custom theme data structure for birthday cards
 export interface CustomThemeData {
   title: string;
+  description?: string;
   message: string;
   signature: string;
   imageUrl?: string | null;

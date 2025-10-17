@@ -1428,6 +1428,7 @@ export default function BirthdaysPage() {
           initialThemeId={designerThemeId || undefined}
           onPreviewChange={handlePreviewChange}
           initialData={cardDesignerInitialData}
+          hideDescription={true}
           onSave={(data) => {
             try {
               localStorage.setItem('birthdayCardDesignerDraft', JSON.stringify({ title: data.title, message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId, customImage: (data as any).customImage }));

@@ -20,16 +20,46 @@ function ensureApiKey(res: any) {
 }
 
 // POST /api/ai/generate-birthday-message
-// Generate a promotional message using AI
+// Generate an occasion-specific greeting message using AI
 router.post("/generate-birthday-message", async (req, res) => {
   try {
-    const { customerName, businessName } = req.body;
+    const { customerName, businessName, occasionType } = req.body;
 
     if (!ensureApiKey(res)) {
       return;
     }
 
-    const promptText = `Create a warm and professional promotional message from ${businessName || "our business"} to our customer${customerName ? ` ${customerName}` : ""}. Highlight the value of the promotion in a friendly, sincere tone suitable for a business-to-customer relationship. Keep it concise (2-3 sentences) and focused on the offer. Do not include a greeting like "Dear" or a signature—just the promotional message body. Do not use phrases like "At [Company Name]" or similar company references. Format the output as a single HTML <p> tag containing all the text. Do not use multiple paragraph tags or add extra line breaks. Return only the raw HTML content without markdown code fences or backticks.`;
+    // Determine the occasion context for the prompt
+    const occasion = occasionType || "birthday";
+    
+    // Create occasion-specific greeting templates
+    const occasionGreetings: { [key: string]: string } = {
+      "birthday": "happy birthday",
+      "mother's day": "Happy Mother's Day",
+      "father's day": "Happy Father's Day",
+      "christmas": "Merry Christmas",
+      "valentine's day": "Happy Valentine's Day",
+      "easter": "Happy Easter",
+      "new year": "Happy New Year",
+      "st. patrick's day": "Happy St. Patrick's Day",
+      "independence day": "Happy Independence Day",
+      "thanksgiving": "Happy Thanksgiving",
+      "halloween": "Happy Halloween",
+    };
+
+    const greeting = occasionGreetings[occasion.toLowerCase()] || `Happy ${occasion}`;
+
+    const promptText = `Create a warm and professional ${occasion} greeting card message from ${businessName || "our business"} to our customer${customerName ? ` ${customerName}` : ""}. The message should be:
+- Celebratory and appropriate for ${occasion}
+- Friendly and sincere, suitable for a business-to-customer relationship
+- Concise (2-3 sentences)
+- Focused on celebrating the occasion and expressing good wishes
+- Do NOT include a greeting like "Dear" or a signature—just the ${occasion} message body
+- Do NOT use phrases like "At [Company Name]" or similar company references
+- Incorporate the essence of ${occasion} in the message
+- Format the output as a single HTML <p> tag containing all the text
+- Do not use multiple paragraph tags or add extra line breaks
+- Return only the raw HTML content without markdown code fences or backticks`;
 
     const { text } = await generateText({
       model: AI_MODEL,
@@ -41,10 +71,10 @@ router.post("/generate-birthday-message", async (req, res) => {
       message: text,
     });
   } catch (error: any) {
-    console.error("Error generating promotional message:", error);
+    console.error("Error generating occasion message:", error);
     res.status(500).json({
       success: false,
-      error: error.message || "Failed to generate promotional message",
+      error: error.message || "Failed to generate occasion message",
     });
   }
 });

@@ -76,6 +76,7 @@ interface BirthdaySettings {
 
 interface CustomThemeData {
   title: string;
+  description?: string | null;
   message: string;
   signature: string;
   imageUrl?: string | null;
@@ -357,6 +358,7 @@ export default function ECardsPage() {
     active: boolean;
     name: string;
     sendDate: string; // ISO date string (YYYY-MM-DD)
+    occasionType?: string; // Type of occasion/holiday
     data: CustomThemeData;
   }>>([]);
 
@@ -704,17 +706,26 @@ export default function ECardsPage() {
     if (designerThemeId && designerThemeId.startsWith('custom-')) {
       const existingCard = customCards.find(c => c.id === designerThemeId);
       if (existingCard) {
-        return existingCard.data;
+        return {
+          ...existingCard.data,
+          cardName: existingCard.name,
+          sendDate: existingCard.sendDate,
+          occasionType: existingCard.occasionType || '',
+        };
       }
       // New custom card - return empty data
       return {
         title: '',
+        description: '',
         message: '',
         signature: '',
         imageUrl: null,
         customImage: false,
         imagePosition: { x: 0, y: 0 },
         imageScale: 1,
+        cardName: '',
+        sendDate: '',
+        occasionType: '',
       };
     }
 
@@ -744,6 +755,7 @@ export default function ECardsPage() {
           console.log('📤 [Card Designer Initial Data] Returning DB data for theme:', currentThemeId);
           return {
             title: themeSpecificData.title || '',
+            description: themeSpecificData.description || '',
             message: themeSpecificData.message || birthdaySettings?.customMessage || '',
             signature: themeSpecificData.signature || '',
             imageUrl: themeSpecificData.imageUrl || null,
@@ -763,7 +775,8 @@ export default function ECardsPage() {
       const raw = localStorage.getItem(`birthdayCardDesignerDraft:${currentThemeId}`);
       if (raw) {
         console.log('📥 [Card Designer Initial Data] No DB data found, using localStorage draft for theme:', currentThemeId);
-        return JSON.parse(raw);
+        const draftData = JSON.parse(raw);
+        return draftData;
       }
     } catch (error) {
       console.warn('⚠️ [Card Designer Initial Data] Failed to parse localStorage draft:', error);
@@ -773,6 +786,7 @@ export default function ECardsPage() {
     console.log('🆕 [Card Designer Initial Data] No saved data found, returning defaults for theme:', currentThemeId);
     return {
       title: '',
+      description: '',
       message: birthdaySettings?.customMessage || '',
       signature: '',
       imageUrl: null, // Let CardDesignerDialog load the default theme image
@@ -1261,6 +1275,7 @@ export default function ECardsPage() {
   // Callback for real-time preview updates
   const handlePreviewChange = useCallback((previewData: {
     title?: string;
+    description?: string;
     message?: string;
     signature?: string;
     imageUrl?: string | null;
@@ -1274,6 +1289,7 @@ export default function ECardsPage() {
 
       const previewThemeData: CustomThemeData = {
         title: previewData.title || '',
+        description: previewData.description || '',
         message: previewData.message || '',
         signature: previewData.signature || '',
         imageUrl: previewData.imageUrl || null,
@@ -2116,6 +2132,11 @@ export default function ECardsPage() {
                               <div>
                                 <span className="text-sm font-medium text-gray-900 truncate">{card.name}</span>
                               </div>
+                              {card.occasionType && (
+                                <div className="text-xs text-gray-600 font-medium">
+                                  🎉 {card.occasionType}
+                                </div>
+                              )}
                               <div className="text-xs text-gray-500">
                                 📅 Sends on: {new Date(card.sendDate).toLocaleDateString()}
                               </div>
@@ -2202,6 +2223,11 @@ export default function ECardsPage() {
                                 <span className="text-sm font-medium text-gray-900 truncate">{card.name}</span>
                                 <span className="text-xs font-semibold text-gray-500">Inactive</span>
                               </div>
+                              {card.occasionType && (
+                                <div className="text-xs text-gray-600 font-medium">
+                                  🎉 {card.occasionType}
+                                </div>
+                              )}
                               <div className="text-xs text-gray-500">
                                 📅 Sends on: {new Date(card.sendDate).toLocaleDateString()}
                               </div>
@@ -2259,12 +2285,13 @@ export default function ECardsPage() {
           initialData={cardDesignerInitialData}
           onSave={(data) => {
             try {
-              localStorage.setItem(`birthdayCardDesignerDraft:${data.themeId || designerThemeId || 'default'}`, JSON.stringify({ title: data.title, message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId, customImage: (data as any).customImage }));
+              localStorage.setItem(`birthdayCardDesignerDraft:${data.themeId || designerThemeId || 'default'}`, JSON.stringify({ title: data.title, description: data.description, message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId, customImage: (data as any).customImage }));
             } catch { }
 
             // Create theme data for preview updates
             const themeData: CustomThemeData = {
               title: data.title,
+              description: data.description,
               message: data.message,
               signature: data.signature || '',
               imageUrl: data.imageUrl || null,
@@ -2278,12 +2305,13 @@ export default function ECardsPage() {
               const existingCard = customCards.find(c => c.id === designerThemeId);
               const cardName = (data as any).cardName || existingCard?.name || '';
               const sendDate = (data as any).sendDate || existingCard?.sendDate || '';
+              const occasionType = (data as any).occasionType || existingCard?.occasionType || '';
 
               // Validation is now handled in CardDesignerDialog
-              if (!cardName || !sendDate) {
+              if (!cardName || !sendDate || !occasionType) {
                 toast({
                   title: "Save Failed",
-                  description: "Card name and send date are required.",
+                  description: "Card name, send date, and occasion type are required.",
                   variant: "destructive",
                 });
                 return;
@@ -2295,17 +2323,17 @@ export default function ECardsPage() {
                 if (existing) {
                   // Update existing card
                   return prev.map(c => c.id === designerThemeId 
-                    ? { ...c, name: cardName, sendDate, data: themeData } 
+                    ? { ...c, name: cardName, sendDate, occasionType, data: themeData } 
                     : c);
                 } else {
                   // Add new card
-                  return [...prev, { id: designerThemeId, name: cardName, sendDate, data: themeData }];
+                  return [...prev, { id: designerThemeId, name: cardName, sendDate, occasionType, data: themeData }];
                 }
               });
 
               toast({
                 title: existingCard ? "Card Updated" : "Card Created",
-                description: `"${cardName}" will be sent on ${new Date(sendDate).toLocaleDateString()}.`,
+                description: `"${cardName}" (${occasionType}) will be sent on ${new Date(sendDate).toLocaleDateString()}.`,
               });
 
               setDesignerOpen(false);
@@ -2447,6 +2475,7 @@ export default function ECardsPage() {
           onToggleCustomCardActive={designerThemeId?.startsWith("custom-") ? handleToggleCustomCardActive : undefined}
           selectedPromotions={designerThemeId ? (cardPromotions[designerThemeId] || []) : []}
           onPromotionsChange={designerThemeId ? (promotionIds) => handleCardPromotionsChange(designerThemeId, promotionIds) : undefined}
+          hideDescription={false}
         />
 
         {/* Settings Tab */}

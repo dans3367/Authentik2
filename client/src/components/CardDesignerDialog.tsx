@@ -17,6 +17,7 @@ import { PromotionSelector } from "@/components/PromotionSelector";
 
 type DesignerData = {
   title: string;
+  description?: string;
   message: string;
   imageUrl?: string | null;
   signature?: string;
@@ -26,6 +27,7 @@ type DesignerData = {
   imageScale?: number;
   cardName?: string;
   sendDate?: string; // ISO date string (YYYY-MM-DD)
+  occasionType?: string; // Type of occasion/holiday (e.g., "Mother's Day", "Christmas", "Valentine's Day")
 };
 
 interface CardDesignerDialogProps {
@@ -55,10 +57,13 @@ interface CardDesignerDialogProps {
   hidePromotionsTab?: boolean;
   // Hide tabs entirely and show design content directly
   hideTabs?: boolean;
+  // Hide description field (for birthday cards)
+  hideDescription?: boolean;
 }
 
-export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initialData, onSave, onPreviewChange, onMakeActive, isCurrentlyActive, senderName, customerInfo, businessName, holidayId, isHolidayDisabled, onToggleHoliday, customCardActive, onToggleCustomCardActive, selectedPromotions = [], onPromotionsChange, hidePromotionsTab = false, hideTabs = false }: CardDesignerDialogProps) {
+export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initialData, onSave, onPreviewChange, onMakeActive, isCurrentlyActive, senderName, customerInfo, businessName, holidayId, isHolidayDisabled, onToggleHoliday, customCardActive, onToggleCustomCardActive, selectedPromotions = [], onPromotionsChange, hidePromotionsTab = false, hideTabs = false, hideDescription = false }: CardDesignerDialogProps) {
   const [title, setTitle] = useState(initialData?.title ?? "");
+  const [description, setDescription] = useState(initialData?.description ?? "");
   const [message, setMessage] = useState(initialData?.message ?? "");
   const [imageUrl, setImageUrl] = useState<string | null>(initialData?.imageUrl ??
     (initialThemeId === "sparkle-cake" ? "/images/birthday-sparkle.jpg" : null));
@@ -67,6 +72,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   const [customImage, setCustomImage] = useState<boolean>(initialData?.customImage ?? false);
   const [cardName, setCardName] = useState(initialData?.cardName ?? "");
   const [sendDate, setSendDate] = useState(initialData?.sendDate ?? "");
+  const [occasionType, setOccasionType] = useState(initialData?.occasionType ?? "");
   const [unsplashOpen, setUnsplashOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"design" | "promotions">("design");
   const [searchQuery, setSearchQuery] = useState("");
@@ -78,6 +84,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [initialValues, setInitialValues] = useState<{
     title: string;
+    description: string;
     message: string;
     imageUrl: string | null;
     signature: string;
@@ -111,10 +118,12 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   useEffect(() => {
     if (!open) return;
     setTitle(initialData?.title ?? "");
+    setDescription(initialData?.description ?? "");
     setMessage(initialData?.message ?? "");
     setSignature(initialData?.signature ?? "");
     setCardName(initialData?.cardName ?? "");
     setSendDate(initialData?.sendDate ?? "");
+    setOccasionType(initialData?.occasionType ?? "");
 
     // Default theme header images (seasonal: Christmas)
     const defaultThemeImages = {
@@ -178,6 +187,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
 
     setInitialValues({
       title: initialData?.title ?? "",
+      description: initialData?.description ?? "",
       message: initialData?.message ?? "",
       imageUrl: finalImageUrl,
       signature: initialData?.signature ?? "",
@@ -277,6 +287,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     if (!open) return;
     const draft: DesignerData = {
       title,
+      description,
       message,
       imageUrl: imageUrl ?? undefined,
       signature,
@@ -289,7 +300,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       const key = `birthdayCardDesignerDraft:${initialThemeId || 'default'}`;
       localStorage.setItem(key, JSON.stringify(draft));
     } catch { }
-  }, [open, title, message, imageUrl, signature, initialThemeId, customImage, imagePosition, imageScale]);
+  }, [open, title, description, message, imageUrl, signature, initialThemeId, customImage, imagePosition, imageScale]);
 
   // Call preview change callback for real-time updates
   useEffect(() => {
@@ -297,6 +308,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
 
     const previewData: DesignerData = {
       title,
+      description,
       message,
       imageUrl: imageUrl ?? undefined,
       signature,
@@ -316,7 +328,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [open, title, message, imageUrl, signature, initialThemeId, customImage, imagePosition, imageScale]); // Removed onPreviewChange from dependencies
+  }, [open, title, description, message, imageUrl, signature, initialThemeId, customImage, imagePosition, imageScale]); // Removed onPreviewChange from dependencies
 
   // Debug effect to track image state changes
   useEffect(() => {
@@ -337,6 +349,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
 
     const hasChanges =
       title !== initialValues.title ||
+      description !== initialValues.description ||
       message !== initialValues.message ||
       imageUrl !== initialValues.imageUrl ||
       signature !== initialValues.signature ||
@@ -845,10 +858,15 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
         alert('Please select a send date');
         return;
       }
+      if (!occasionType.trim()) {
+        alert('Please enter an occasion type');
+        return;
+      }
     }
 
     onSave?.({
       title,
+      description,
       message,
       imageUrl,
       signature,
@@ -857,7 +875,8 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       imagePosition,
       imageScale,
       cardName,
-      sendDate
+      sendDate,
+      occasionType
     } as DesignerData);
     setHasUnsavedChanges(false); // Reset change tracking after save
     onOpenChange(false);
@@ -890,9 +909,9 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
             <DialogDescription className="text-sm sm:text-base">Customize the image, header and message.</DialogDescription>
           </DialogHeader>
 
-          {/* Card Name and Send Date - Only for custom cards */}
+          {/* Card Name, Send Date, and Occasion Type - Only for custom cards */}
           {initialThemeId && initialThemeId.startsWith('custom-') && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
               <div className="space-y-2">
                 <label htmlFor="cardName" className="text-sm font-medium text-gray-700">
                   Card Name <span className="text-red-500">*</span>
@@ -918,6 +937,32 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                   min={new Date().toISOString().split('T')[0]}
                 />
                 <p className="text-xs text-gray-500">The card will be sent on this date</p>
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="occasionType" className="text-sm font-medium text-gray-700">
+                  Occasion Type <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  id="occasionType"
+                  value={occasionType}
+                  onChange={(e) => setOccasionType(e.target.value)}
+                  placeholder="e.g., Mother's Day, Christmas"
+                  className="w-full"
+                  list="occasion-suggestions"
+                />
+                <datalist id="occasion-suggestions">
+                  <option value="Mother's Day" />
+                  <option value="Father's Day" />
+                  <option value="Christmas" />
+                  <option value="Valentine's Day" />
+                  <option value="Easter" />
+                  <option value="New Year" />
+                  <option value="St. Patrick's Day" />
+                  <option value="Independence Day" />
+                  <option value="Thanksgiving" />
+                  <option value="Halloween" />
+                </datalist>
+                <p className="text-xs text-gray-500">Type of holiday or occasion</p>
               </div>
             </div>
           )}
@@ -1150,6 +1195,18 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                 </div>
               </div>
 
+              {/* Description */}
+              {!hideDescription && (
+                <div>
+                  <Input
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Add a short description (optional)..."
+                    className="text-sm sm:text-base border-0 shadow-none px-0 focus-visible:ring-0 text-center placeholder:text-gray-400"
+                  />
+                </div>
+              )}
+
               {/* Rich text editor with bubble (tooltip) menu */}
               <RichTextEditor
                 value={typeof message === 'string' ? message : ''}
@@ -1158,6 +1215,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                 className="text-sm sm:text-base text-gray-800"
                 customerInfo={customerInfo}
                 businessName={businessName}
+                occasionType={occasionType}
               />
 
               {/* Emoji counter and deliverability warning */}
@@ -1476,6 +1534,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                 className="text-sm sm:text-base text-gray-800"
                 customerInfo={customerInfo}
                 businessName={businessName}
+                occasionType={occasionType}
               />
 
               {/* Emoji counter and deliverability warning */}
@@ -1595,6 +1654,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
 
                       const currentData = {
                         title,
+                        description,
                         message,
                         imageUrl,
                         signature,
