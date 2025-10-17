@@ -49,10 +49,10 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CardDesignerDialog } from "@/components/CardDesignerDialog";
+import { ECardDesignerDialog } from "@/components/ECardDesignerDialog";
 import { PromotionSelector } from "@/components/PromotionSelector";
 
-interface BirthdaySettings {
+interface ECardSettings {
   id: string;
   enabled: boolean;
   emailTemplate: string;
@@ -514,14 +514,14 @@ export default function ECardsPage() {
 
   // Fetch birthday settings
   const {
-    data: birthdaySettings,
+    data: eCardSettings,
     isLoading: settingsLoading,
     refetch: refetchSettings
-  } = useQuery<BirthdaySettings>({
-    queryKey: ['/api/birthday-settings'],
+  } = useQuery<ECardSettings>({
+    queryKey: ['/api/e-card-settings'],
     queryFn: async () => {
       try {
-        const response = await fetch('/api/birthday-settings');
+        const response = await fetch('/api/e-card-settings');
         if (!response.ok) throw new Error('Failed to fetch settings');
         const data = await response.json();
         console.log('📥 [Birthday Settings] Fetched settings:', data);
@@ -613,9 +613,9 @@ export default function ECardsPage() {
 
   // Update birthday settings
   const updateSettingsMutation = useMutation({
-    mutationFn: async (settings: Partial<BirthdaySettings>) => {
+    mutationFn: async (settings: Partial<ECardSettings>) => {
       console.log('📤 [Birthday Settings] Sending update:', settings);
-      const response = await fetch('/api/birthday-settings', {
+      const response = await fetch('/api/e-card-settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings),
@@ -641,11 +641,11 @@ export default function ECardsPage() {
       });
       
       // Update the query cache immediately with the server response (same as /birthdays)
-      queryClient.setQueryData(['/api/birthday-settings'], updatedSettings);
+      queryClient.setQueryData(['/api/e-card-settings'], updatedSettings);
       console.log('💾 [Birthday Settings] Cache updated');
       
       // Force a re-render by invalidating the query
-      queryClient.invalidateQueries({ queryKey: ['/api/birthday-settings'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/e-card-settings'] });
       console.log('🔄 [Birthday Settings] Query invalidated, will refetch');
     },
     onError: (error: any) => {
@@ -753,18 +753,18 @@ export default function ECardsPage() {
 
   // Initialize selected promotions when birthday settings are loaded
   useEffect(() => {
-    if (birthdaySettings?.promotion) {
-      setSelectedPromotions([birthdaySettings.promotion.id]);
+    if (eCardSettings?.promotion) {
+      setSelectedPromotions([eCardSettings.promotion.id]);
     } else {
       setSelectedPromotions([]);
     }
-    setSplitPromotionalEmail(birthdaySettings?.splitPromotionalEmail || false);
-    setDisabledHolidays(birthdaySettings?.disabledHolidays || []);
+    setSplitPromotionalEmail(eCardSettings?.splitPromotionalEmail || false);
+    setDisabledHolidays(eCardSettings?.disabledHolidays || []);
 
     // Load card-specific promotions from customThemeData
-    if (birthdaySettings?.customThemeData) {
+    if (eCardSettings?.customThemeData) {
       try {
-        const parsed = JSON.parse(birthdaySettings.customThemeData);
+        const parsed = JSON.parse(eCardSettings.customThemeData);
         if (parsed.cardPromotions) {
           setCardPromotions(parsed.cardPromotions);
         }
@@ -772,9 +772,9 @@ export default function ECardsPage() {
         console.warn('Failed to parse card promotions from customThemeData:', error);
       }
     }
-  }, [birthdaySettings?.promotion, birthdaySettings?.splitPromotionalEmail, birthdaySettings?.disabledHolidays, birthdaySettings?.customThemeData]);
+  }, [eCardSettings?.promotion, eCardSettings?.splitPromotionalEmail, eCardSettings?.disabledHolidays, eCardSettings?.customThemeData]);
 
-  // Memoized initial data for CardDesignerDialog to prevent re-render loops
+  // Memoized initial data for ECardDesignerDialog to prevent re-render loops
   const cardDesignerInitialData = useMemo(() => {
     // Check if we're editing a custom card by looking for it in customCards array
     const existingCard = designerThemeId ? customCards.find(c => c.id === designerThemeId) : null;
@@ -823,7 +823,7 @@ export default function ECardsPage() {
 
     // PRIORITY 1: Load from localStorage draft first (for most recent changes)
     try {
-      const raw = localStorage.getItem(`birthdayCardDesignerDraft:${currentThemeId}`);
+      const raw = localStorage.getItem(`eCardDesignerDraft:${currentThemeId}`);
       if (raw) {
         console.log('📥 [Card Designer Initial Data] Using localStorage draft for theme:', currentThemeId);
         const draftData = JSON.parse(raw);
@@ -834,10 +834,10 @@ export default function ECardsPage() {
     }
 
     // PRIORITY 2: Load from database (customThemeData)
-    console.log('🔍 [Card Designer Initial Data] birthdaySettings.customThemeData:', birthdaySettings?.customThemeData, 'Type:', typeof birthdaySettings?.customThemeData);
-    if (birthdaySettings?.customThemeData) {
+    console.log('🔍 [Card Designer Initial Data] eCardSettings.customThemeData:', eCardSettings?.customThemeData, 'Type:', typeof eCardSettings?.customThemeData);
+    if (eCardSettings?.customThemeData) {
       try {
-        const parsed = JSON.parse(birthdaySettings.customThemeData);
+        const parsed = JSON.parse(eCardSettings.customThemeData);
         console.log('✅ [Card Designer Initial Data] Parsed customThemeData:', parsed);
 
         let themeSpecificData = null;
@@ -859,7 +859,7 @@ export default function ECardsPage() {
           return {
             title: themeSpecificData.title || '',
             description: themeSpecificData.description || '',
-            message: themeSpecificData.message || birthdaySettings?.customMessage || '',
+            message: themeSpecificData.message || eCardSettings?.customMessage || '',
             signature: themeSpecificData.signature || '',
             imageUrl: themeSpecificData.imageUrl || themeMetadata?.image || null,
             customImage: Boolean(themeSpecificData.customImage && themeSpecificData.imageUrl),
@@ -877,7 +877,7 @@ export default function ECardsPage() {
     return {
       title: '',
       description: '',
-      message: birthdaySettings?.customMessage || '',
+      message: eCardSettings?.customMessage || '',
       signature: '',
       imageUrl: themeMetadata?.image ?? null,
       customImage: false, // This is key - tells the dialog it's NOT a custom image
@@ -885,25 +885,25 @@ export default function ECardsPage() {
       imageScale: 1,
     };
   }, [
-    birthdaySettings?.customThemeData,
-    birthdaySettings?.customMessage,
+    eCardSettings?.customThemeData,
+    eCardSettings?.customMessage,
     designerThemeId,
     customCards,
     themeMetadataById,
   ]);
 
-  const handleSettingsUpdate = (field: keyof BirthdaySettings, value: any) => {
-    if (birthdaySettings) {
+  const handleSettingsUpdate = (field: keyof ECardSettings, value: any) => {
+    if (eCardSettings) {
       updateSettingsMutation.mutate({
-        ...birthdaySettings,
+        ...eCardSettings,
         [field]: value,
       });
     }
   };
 
   const handleToggleGlobalEnabled = () => {
-    if (birthdaySettings) {
-      handleSettingsUpdate('enabled', !birthdaySettings.enabled);
+    if (eCardSettings) {
+      handleSettingsUpdate('enabled', !eCardSettings.enabled);
     }
   };
 
@@ -921,7 +921,7 @@ export default function ECardsPage() {
 
   // Handler for toggling holiday disabled state
   const handleToggleHoliday = (holidayId: string) => {
-    if (birthdaySettings) {
+    if (eCardSettings) {
       // Get the parent holiday ID if this is a theme variant
       const parentHolidayId = getParentHolidayId(holidayId) || holidayId;
       const currentDisabled = disabledHolidays || [];
@@ -932,7 +932,7 @@ export default function ECardsPage() {
       setDisabledHolidays(newDisabled);
       
       updateSettingsMutation.mutate({
-        ...birthdaySettings,
+        ...eCardSettings,
         disabledHolidays: newDisabled,
       });
     }
@@ -978,16 +978,16 @@ export default function ECardsPage() {
   // Handler for promotion selection changes (legacy)
   const handlePromotionsChange = (promotionIds: string[]) => {
     setSelectedPromotions(promotionIds);
-    if (birthdaySettings) {
+    if (eCardSettings) {
       const promotionId = promotionIds.length > 0 ? promotionIds[0] : null;
       updateSettingsMutation.mutate({
-        id: birthdaySettings.id,
-        enabled: birthdaySettings.enabled,
-        emailTemplate: birthdaySettings.emailTemplate || 'default',
-        segmentFilter: birthdaySettings.segmentFilter || 'all',
-        customMessage: birthdaySettings.customMessage || '',
-        senderName: birthdaySettings.senderName || '',
-        customThemeData: birthdaySettings.customThemeData,
+        id: eCardSettings.id,
+        enabled: eCardSettings.enabled,
+        emailTemplate: eCardSettings.emailTemplate || 'default',
+        segmentFilter: eCardSettings.segmentFilter || 'all',
+        customMessage: eCardSettings.customMessage || '',
+        senderName: eCardSettings.senderName || '',
+        customThemeData: eCardSettings.customThemeData,
         promotionId: promotionId,
         splitPromotionalEmail: splitPromotionalEmail,
       });
@@ -1002,12 +1002,12 @@ export default function ECardsPage() {
     };
     setCardPromotions(updatedCardPromotions);
 
-    if (birthdaySettings) {
+    if (eCardSettings) {
       // Parse existing customThemeData or create new structure
       let existingThemeData: Record<string, any> = {};
-      if (birthdaySettings.customThemeData) {
+      if (eCardSettings.customThemeData) {
         try {
-          existingThemeData = JSON.parse(birthdaySettings.customThemeData);
+          existingThemeData = JSON.parse(eCardSettings.customThemeData);
         } catch {
           existingThemeData = {};
         }
@@ -1020,7 +1020,7 @@ export default function ECardsPage() {
       };
 
       updateSettingsMutation.mutate({
-        ...birthdaySettings,
+        ...eCardSettings,
         customThemeData: JSON.stringify(updatedThemeData),
       });
     }
@@ -1229,11 +1229,11 @@ export default function ECardsPage() {
         userEmail: user.email,
         userFirstName: user.firstName,
         userLastName: user.lastName,
-        emailTemplate: birthdaySettings?.emailTemplate || 'default',
-        customMessage: birthdaySettings?.customMessage || '',
-        customThemeData: birthdaySettings?.customThemeData || null,
-        senderName: birthdaySettings?.senderName || '',
-        promotionId: birthdaySettings?.promotionId || null,
+        emailTemplate: eCardSettings?.emailTemplate || 'default',
+        customMessage: eCardSettings?.customMessage || '',
+        customThemeData: eCardSettings?.customThemeData || null,
+        senderName: eCardSettings?.senderName || '',
+        promotionId: eCardSettings?.promotionId || null,
         splitPromotionalEmail: splitPromotionalEmail
       };
 
@@ -1245,11 +1245,11 @@ export default function ECardsPage() {
         userLastName: user.lastName,
         accessTokenLength: currentToken?.length,
         accessTokenPreview: currentToken ? `${currentToken.substring(0, 20)}...` : 'null',
-        birthdaySettings: {
-          emailTemplate: birthdaySettings?.emailTemplate,
-          customMessage: birthdaySettings?.customMessage,
-          customThemeData: birthdaySettings?.customThemeData,
-          senderName: birthdaySettings?.senderName
+        eCardSettings: {
+          emailTemplate: eCardSettings?.emailTemplate,
+          customMessage: eCardSettings?.customMessage,
+          customThemeData: eCardSettings?.customThemeData,
+          senderName: eCardSettings?.senderName
         },
         requestPayload: requestPayload
       });
@@ -1339,9 +1339,9 @@ export default function ECardsPage() {
 
   // Initialize custom theme preview from birthday settings
   useEffect(() => {
-    if (birthdaySettings?.customThemeData) {
+    if (eCardSettings?.customThemeData) {
       try {
-        const parsedData = JSON.parse(birthdaySettings.customThemeData);
+        const parsedData = JSON.parse(eCardSettings.customThemeData);
 
         // Extract the custom theme data from the themes structure
         const customThemeData = parsedData.themes?.custom;
@@ -1392,7 +1392,7 @@ export default function ECardsPage() {
         return newData;
       });
     }
-  }, [birthdaySettings?.customThemeData]);
+  }, [eCardSettings?.customThemeData]);
 
   // Callback for real-time preview updates
   const handlePreviewChange = useCallback((previewData: {
@@ -1716,11 +1716,11 @@ export default function ECardsPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
                     {valentineThemes.map((theme) => {
                       const themeId = theme.id;
-                      const isSelected = (birthdaySettings?.emailTemplate === themeId) && (() => {
+                      const isSelected = (eCardSettings?.emailTemplate === themeId) && (() => {
                         try {
                           if (themePreviewData[themeId]?.imageUrl) return themePreviewData[themeId]?.imageUrl === theme.image;
-                          if (birthdaySettings?.customThemeData) {
-                            const parsed = JSON.parse(birthdaySettings.customThemeData);
+                          if (eCardSettings?.customThemeData) {
+                            const parsed = JSON.parse(eCardSettings.customThemeData);
                             const customData = parsed.themes?.[themeId];
                             return customData?.imageUrl === theme.image;
                           }
@@ -1736,20 +1736,20 @@ export default function ECardsPage() {
                             setDesignerThemeId(themeId);
                             const draft = {
                               title: '',
-                              message: birthdaySettings?.customMessage || '',
+                              message: eCardSettings?.customMessage || '',
                               signature: '',
                               imageUrl: theme.image,
                               themeId: themeId,
                               customImage: true,
                             };
                             try {
-                              localStorage.setItem(`birthdayCardDesignerDraft:${themeId}`, JSON.stringify(draft));
+                              localStorage.setItem(`eCardDesignerDraft:${themeId}`, JSON.stringify(draft));
                             } catch {}
                             setThemePreviewData(prev => ({
                               ...prev,
                               [themeId]: {
                                 title: '',
-                                message: birthdaySettings?.customMessage || '',
+                                message: eCardSettings?.customMessage || '',
                                 signature: '',
                                 imageUrl: theme.image,
                                 customImage: true,
@@ -1759,7 +1759,7 @@ export default function ECardsPage() {
                             }));
                             setCustomThemePreview({
                               title: '',
-                              message: birthdaySettings?.customMessage || '',
+                              message: eCardSettings?.customMessage || '',
                               signature: '',
                               imageUrl: theme.image,
                               customImage: true,
@@ -1781,7 +1781,7 @@ export default function ECardsPage() {
                                   {/* Default to a Valentine message; if custom title saved, show it */}
                                   {(() => {
                                     try {
-                                      const saved = birthdaySettings?.customThemeData ? JSON.parse(birthdaySettings.customThemeData) : null;
+                                      const saved = eCardSettings?.customThemeData ? JSON.parse(eCardSettings.customThemeData) : null;
                                       const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || t('ecards.preview.valentinesDay');
                                       return title;
                                     } catch { return t('ecards.preview.valentinesDay'); }
@@ -1809,11 +1809,11 @@ export default function ECardsPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
                     {stPatrickThemes.map((theme) => {
                       const themeId = theme.id;
-                      const isSelected = (birthdaySettings?.emailTemplate === themeId) && (() => {
+                      const isSelected = (eCardSettings?.emailTemplate === themeId) && (() => {
                         try {
                           if (themePreviewData[themeId]?.imageUrl) return themePreviewData[themeId]?.imageUrl === theme.image;
-                          if (birthdaySettings?.customThemeData) {
-                            const parsed = JSON.parse(birthdaySettings.customThemeData);
+                          if (eCardSettings?.customThemeData) {
+                            const parsed = JSON.parse(eCardSettings.customThemeData);
                             const customData = parsed.themes?.[themeId];
                             return customData?.imageUrl === theme.image;
                           }
@@ -1829,20 +1829,20 @@ export default function ECardsPage() {
                             setDesignerThemeId(themeId);
                             const draft = {
                               title: '',
-                              message: birthdaySettings?.customMessage || '',
+                              message: eCardSettings?.customMessage || '',
                               signature: '',
                               imageUrl: theme.image,
                               themeId: themeId,
                               customImage: true,
                             };
                             try {
-                              localStorage.setItem(`birthdayCardDesignerDraft:${themeId}`, JSON.stringify(draft));
+                              localStorage.setItem(`eCardDesignerDraft:${themeId}`, JSON.stringify(draft));
                             } catch {}
                             setThemePreviewData(prev => ({
                               ...prev,
                               [themeId]: {
                                 title: '',
-                                message: birthdaySettings?.customMessage || '',
+                                message: eCardSettings?.customMessage || '',
                                 signature: '',
                                 imageUrl: theme.image,
                                 customImage: true,
@@ -1852,7 +1852,7 @@ export default function ECardsPage() {
                             }));
                             setCustomThemePreview({
                               title: '',
-                              message: birthdaySettings?.customMessage || '',
+                              message: eCardSettings?.customMessage || '',
                               signature: '',
                               imageUrl: theme.image,
                               customImage: true,
@@ -1873,7 +1873,7 @@ export default function ECardsPage() {
                                 <div className="font-bold text-white drop-shadow-lg text-shadow">
                                   {(() => {
                                     try {
-                                      const saved = birthdaySettings?.customThemeData ? JSON.parse(birthdaySettings.customThemeData) : null;
+                                      const saved = eCardSettings?.customThemeData ? JSON.parse(eCardSettings.customThemeData) : null;
                                       const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || t('ecards.preview.stPatricksDay');
                                       return title;
                                     } catch { return t('ecards.preview.stPatricksDay'); }
@@ -1901,11 +1901,11 @@ export default function ECardsPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
                     {newYearThemes.map((theme) => {
                       const themeId = theme.id;
-                      const isSelected = (birthdaySettings?.emailTemplate === themeId) && (() => {
+                      const isSelected = (eCardSettings?.emailTemplate === themeId) && (() => {
                         try {
                           if (themePreviewData[themeId]?.imageUrl) return themePreviewData[themeId]?.imageUrl === theme.image;
-                          if (birthdaySettings?.customThemeData) {
-                            const parsed = JSON.parse(birthdaySettings.customThemeData);
+                          if (eCardSettings?.customThemeData) {
+                            const parsed = JSON.parse(eCardSettings.customThemeData);
                             const customData = parsed.themes?.[themeId];
                             return customData?.imageUrl === theme.image;
                           }
@@ -1921,20 +1921,20 @@ export default function ECardsPage() {
                             setDesignerThemeId(themeId);
                             const draft = {
                               title: '',
-                              message: birthdaySettings?.customMessage || '',
+                              message: eCardSettings?.customMessage || '',
                               signature: '',
                               imageUrl: theme.image,
                               themeId: themeId,
                               customImage: true,
                             };
                             try {
-                              localStorage.setItem(`birthdayCardDesignerDraft:${themeId}`, JSON.stringify(draft));
+                              localStorage.setItem(`eCardDesignerDraft:${themeId}`, JSON.stringify(draft));
                             } catch {}
                             setThemePreviewData(prev => ({
                               ...prev,
                               [themeId]: {
                                 title: '',
-                                message: birthdaySettings?.customMessage || '',
+                                message: eCardSettings?.customMessage || '',
                                 signature: '',
                                 imageUrl: theme.image,
                                 customImage: true,
@@ -1944,7 +1944,7 @@ export default function ECardsPage() {
                             }));
                             setCustomThemePreview({
                               title: '',
-                              message: birthdaySettings?.customMessage || '',
+                              message: eCardSettings?.customMessage || '',
                               signature: '',
                               imageUrl: theme.image,
                               customImage: true,
@@ -1965,7 +1965,7 @@ export default function ECardsPage() {
                                 <div className="font-bold text-white drop-shadow-lg text-shadow">
                                   {(() => {
                                     try {
-                                      const saved = birthdaySettings?.customThemeData ? JSON.parse(birthdaySettings.customThemeData) : null;
+                                      const saved = eCardSettings?.customThemeData ? JSON.parse(eCardSettings.customThemeData) : null;
                                       const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || t('ecards.preview.newYearsDay');
                                       return title;
                                     } catch { return t('ecards.preview.newYearsDay'); }
@@ -1993,11 +1993,11 @@ export default function ECardsPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
                     {easterThemes.map((theme) => {
                       const themeId = theme.id;
-                      const isSelected = (birthdaySettings?.emailTemplate === themeId) && (() => {
+                      const isSelected = (eCardSettings?.emailTemplate === themeId) && (() => {
                         try {
                           if (themePreviewData[themeId]?.imageUrl) return themePreviewData[themeId]?.imageUrl === theme.image;
-                          if (birthdaySettings?.customThemeData) {
-                            const parsed = JSON.parse(birthdaySettings.customThemeData);
+                          if (eCardSettings?.customThemeData) {
+                            const parsed = JSON.parse(eCardSettings.customThemeData);
                             const customData = parsed.themes?.[themeId];
                             return customData?.imageUrl === theme.image;
                           }
@@ -2013,20 +2013,20 @@ export default function ECardsPage() {
                             setDesignerThemeId(themeId);
                             const draft = {
                               title: '',
-                              message: birthdaySettings?.customMessage || '',
+                              message: eCardSettings?.customMessage || '',
                               signature: '',
                               imageUrl: theme.image,
                               themeId: themeId,
                               customImage: true,
                             };
                             try {
-                              localStorage.setItem(`birthdayCardDesignerDraft:${themeId}`, JSON.stringify(draft));
+                              localStorage.setItem(`eCardDesignerDraft:${themeId}`, JSON.stringify(draft));
                             } catch {}
                             setThemePreviewData(prev => ({
                               ...prev,
                               [themeId]: {
                                 title: '',
-                                message: birthdaySettings?.customMessage || '',
+                                message: eCardSettings?.customMessage || '',
                                 signature: '',
                                 imageUrl: theme.image,
                                 customImage: true,
@@ -2036,7 +2036,7 @@ export default function ECardsPage() {
                             }));
                             setCustomThemePreview({
                               title: '',
-                              message: birthdaySettings?.customMessage || '',
+                              message: eCardSettings?.customMessage || '',
                               signature: '',
                               imageUrl: theme.image,
                               customImage: true,
@@ -2057,7 +2057,7 @@ export default function ECardsPage() {
                                 <div className="font-bold text-white drop-shadow-lg text-shadow">
                                   {(() => {
                                     try {
-                                      const saved = birthdaySettings?.customThemeData ? JSON.parse(birthdaySettings.customThemeData) : null;
+                                      const saved = eCardSettings?.customThemeData ? JSON.parse(eCardSettings.customThemeData) : null;
                                       const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || t('ecards.preview.easter');
                                       return title;
                                     } catch { return t('ecards.preview.easter'); }
@@ -2085,11 +2085,11 @@ export default function ECardsPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
                     {independenceThemes.map((theme) => {
                       const themeId = theme.id;
-                      const isSelected = (birthdaySettings?.emailTemplate === themeId) && (() => {
+                      const isSelected = (eCardSettings?.emailTemplate === themeId) && (() => {
                         try {
                           if (themePreviewData[themeId]?.imageUrl) return themePreviewData[themeId]?.imageUrl === theme.image;
-                          if (birthdaySettings?.customThemeData) {
-                            const parsed = JSON.parse(birthdaySettings.customThemeData);
+                          if (eCardSettings?.customThemeData) {
+                            const parsed = JSON.parse(eCardSettings.customThemeData);
                             const customData = parsed.themes?.[themeId];
                             return customData?.imageUrl === theme.image;
                           }
@@ -2105,20 +2105,20 @@ export default function ECardsPage() {
                             setDesignerThemeId(themeId);
                             const draft = {
                               title: '',
-                              message: birthdaySettings?.customMessage || '',
+                              message: eCardSettings?.customMessage || '',
                               signature: '',
                               imageUrl: theme.image,
                               themeId: themeId,
                               customImage: true,
                             };
                             try {
-                              localStorage.setItem(`birthdayCardDesignerDraft:${themeId}`, JSON.stringify(draft));
+                              localStorage.setItem(`eCardDesignerDraft:${themeId}`, JSON.stringify(draft));
                             } catch {}
                             setThemePreviewData(prev => ({
                               ...prev,
                               [themeId]: {
                                 title: '',
-                                message: birthdaySettings?.customMessage || '',
+                                message: eCardSettings?.customMessage || '',
                                 signature: '',
                                 imageUrl: theme.image,
                                 customImage: true,
@@ -2128,7 +2128,7 @@ export default function ECardsPage() {
                             }));
                             setCustomThemePreview({
                               title: '',
-                              message: birthdaySettings?.customMessage || '',
+                              message: eCardSettings?.customMessage || '',
                               signature: '',
                               imageUrl: theme.image,
                               customImage: true,
@@ -2149,7 +2149,7 @@ export default function ECardsPage() {
                                 <div className="font-bold text-white drop-shadow-lg text-shadow">
                                   {(() => {
                                     try {
-                                      const saved = birthdaySettings?.customThemeData ? JSON.parse(birthdaySettings.customThemeData) : null;
+                                      const saved = eCardSettings?.customThemeData ? JSON.parse(eCardSettings.customThemeData) : null;
                                       const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || t('ecards.preview.independenceDay');
                                       return title;
                                     } catch { return t('ecards.preview.independenceDay'); }
@@ -2209,7 +2209,7 @@ export default function ECardsPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                       {customCards.filter(c => c.active !== false).map((card) => {
                         console.log('🖼️ Rendering custom card:', { id: card.id, name: card.name, imageUrl: card.data.imageUrl, hasImageUrl: !!card.data.imageUrl });
-                        const isSelected = birthdaySettings?.emailTemplate === card.id;
+                        const isSelected = eCardSettings?.emailTemplate === card.id;
                         return (
                           <div
                             key={card.id}
@@ -2407,7 +2407,7 @@ export default function ECardsPage() {
         )}
 
         {/* Card Designer */}
-        <CardDesignerDialog
+        <ECardDesignerDialog
           open={designerOpen}
           onOpenChange={(open) => {
             setDesignerOpen(open);
@@ -2431,7 +2431,7 @@ export default function ECardsPage() {
           onPreviewChange={handlePreviewChange}
           initialData={cardDesignerInitialData}
           onSave={async (data) => {
-            console.log('💾 [onSave] Received data from CardDesignerDialog:', {
+            console.log('💾 [onSave] Received data from ECardDesignerDialog:', {
               imageUrl: data.imageUrl,
               customImage: (data as any).customImage,
               title: data.title,
@@ -2439,7 +2439,7 @@ export default function ECardsPage() {
             });
 
             try {
-              localStorage.setItem(`birthdayCardDesignerDraft:${data.themeId || designerThemeId || 'default'}`, JSON.stringify({ title: data.title, description: data.description, message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId, customImage: (data as any).customImage }));
+              localStorage.setItem(`eCardDesignerDraft:${data.themeId || designerThemeId || 'default'}`, JSON.stringify({ title: data.title, description: data.description, message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId, customImage: (data as any).customImage }));
             } catch { }
 
             // Create theme data for preview updates
@@ -2467,7 +2467,7 @@ export default function ECardsPage() {
               const sendDate = (data as any).sendDate || existingCard?.sendDate || '';
               const occasionType = (data as any).occasionType || existingCard?.occasionType || '';
 
-              // Validation is now handled in CardDesignerDialog
+              // Validation is now handled in ECardDesignerDialog
               if (!cardName || !sendDate || !occasionType) {
                 toast({
                   title: "Save Failed",
@@ -2539,12 +2539,12 @@ export default function ECardsPage() {
 
             // Parse existing customThemeData or create new structure
             // IMPORTANT: Get the latest birthday settings from the cache, not from closure
-            const latestBirthdaySettings = queryClient.getQueryData<BirthdaySettings>(['/api/birthday-settings']) || birthdaySettings;
-            console.log('🔄 [Card Save] Using latest settings from cache. Has themes:', !!latestBirthdaySettings?.customThemeData);
+            const latestECardSettings = queryClient.getQueryData<ECardSettings>(['/api/e-card-settings']) || eCardSettings;
+            console.log('🔄 [Card Save] Using latest settings from cache. Has themes:', !!latestECardSettings?.customThemeData);
             let existingThemeData: Record<string, any> = {};
-            if (latestBirthdaySettings?.customThemeData) {
+            if (latestECardSettings?.customThemeData) {
               try {
-                const parsed = JSON.parse(latestBirthdaySettings.customThemeData);
+                const parsed = JSON.parse(latestECardSettings.customThemeData);
                 // Check if it's the new structure (has themes property) or old structure
                 if (parsed.themes) {
                   existingThemeData = parsed;
@@ -2586,7 +2586,7 @@ export default function ECardsPage() {
               setCustomThemePreview(themeData);
 
               const savePayload = {
-                ...latestBirthdaySettings,
+                ...latestECardSettings,
                 emailTemplate: 'custom',
                 customMessage: data.message,
                 customThemeData: JSON.stringify(updatedThemeData),
@@ -2598,7 +2598,7 @@ export default function ECardsPage() {
                 onSuccess: () => {
                   // Clear localStorage draft since data is now saved to DB
                   try {
-                    localStorage.removeItem(`birthdayCardDesignerDraft:${currentThemeId}`);
+                    localStorage.removeItem(`eCardDesignerDraft:${currentThemeId}`);
                     console.log('🗑️ [Card Save] Cleared localStorage draft for theme:', currentThemeId);
                   } catch (error) {
                     console.warn('⚠️ [Card Save] Failed to clear localStorage draft:', error);
@@ -2610,13 +2610,13 @@ export default function ECardsPage() {
                   });
                 }
               });
-            } else if (hasTextCustomizations || data.message !== (latestBirthdaySettings?.customMessage || '')) {
+            } else if (hasTextCustomizations || data.message !== (latestECardSettings?.customMessage || '')) {
               // For holiday theme variants with any customizations, save the theme-specific data
               // and set emailTemplate to the specific theme variant ID
               console.log('🎨 [Birthday Cards] Saving theme-specific customizations for', currentThemeId, 'with data:', themeData);
               
               const savePayload = {
-                ...latestBirthdaySettings,
+                ...latestECardSettings,
                 emailTemplate: currentThemeId, // Set to the specific theme variant ID
                 customMessage: data.message,
                 customThemeData: JSON.stringify(updatedThemeData), // Save theme-specific data
@@ -2627,7 +2627,7 @@ export default function ECardsPage() {
                 onSuccess: () => {
                   // Clear localStorage draft since data is now saved to DB
                   try {
-                    localStorage.removeItem(`birthdayCardDesignerDraft:${currentThemeId}`);
+                    localStorage.removeItem(`eCardDesignerDraft:${currentThemeId}`);
                     console.log('🗑️ [Card Save] Cleared localStorage draft for theme:', currentThemeId);
                   } catch (error) {
                     console.warn('⚠️ [Card Save] Failed to clear localStorage draft:', error);
@@ -2643,14 +2643,14 @@ export default function ECardsPage() {
               // For default themes with no customizations, just save the message
               // but still update emailTemplate if we're editing a specific theme
               updateSettingsMutation.mutate({
-                ...latestBirthdaySettings,
+                ...latestECardSettings,
                 emailTemplate: currentThemeId || 'default', // Use current theme ID
                 customMessage: data.message,
               }, {
                 onSuccess: () => {
                   // Clear localStorage draft since data is now saved to DB
                   try {
-                    localStorage.removeItem(`birthdayCardDesignerDraft:${currentThemeId}`);
+                    localStorage.removeItem(`eCardDesignerDraft:${currentThemeId}`);
                     console.log('🗑️ [Card Save] Cleared localStorage draft for theme:', currentThemeId);
                   } catch (error) {
                     console.warn('⚠️ [Card Save] Failed to clear localStorage draft:', error);
@@ -2664,7 +2664,7 @@ export default function ECardsPage() {
               });
             }
           }}
-          senderName={birthdaySettings?.senderName}
+          senderName={eCardSettings?.senderName}
           businessName={company?.name || currentUser?.name}
           holidayId={designerThemeId || undefined}
           isHolidayDisabled={designerThemeId ? disabledHolidays.includes(getParentHolidayId(designerThemeId) || designerThemeId) : false}
@@ -2698,7 +2698,7 @@ export default function ECardsPage() {
                       </p>
                     </div>
                     <Switch
-                      checked={birthdaySettings?.enabled || false}
+                      checked={eCardSettings?.enabled || false}
                       onCheckedChange={handleToggleGlobalEnabled}
                       disabled={updateSettingsMutation.isPending}
                     />
