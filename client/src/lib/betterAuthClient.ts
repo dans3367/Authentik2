@@ -22,21 +22,17 @@ export interface ExtendedUser {
 
 // Dynamically determine the base URL based on the current environment
 const getBaseURL = () => {
-  // If VITE_BETTER_AUTH_URL is explicitly set, use it
+  // Always use window.location.origin if available (prevents CORS issues)
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+  
+  // Server-side fallback
   if (import.meta.env.VITE_BETTER_AUTH_URL) {
     return import.meta.env.VITE_BETTER_AUTH_URL;
   }
   
-  // In browser, check if we're in a browser preview (127.0.0.1:35145) and redirect to localhost:5000
-  if (typeof window !== 'undefined') {
-    const origin = window.location.origin;
-    if (origin === 'http://127.0.0.1:35145') {
-      return 'http://localhost:5000';
-    }
-    return origin;
-  }
-  
-  // Fallback for localhost development
+  // Final fallback for localhost development
   return "http://localhost:5000";
 };
 

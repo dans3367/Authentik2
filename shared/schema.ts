@@ -1625,6 +1625,18 @@ export const birthdaySettings = pgTable("birthday_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const eCardSettings = pgTable("e_card_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  enabled: boolean("enabled").default(false),
+  emailTemplate: text("email_template").default('default'), // Email template to use
+  customMessage: text("custom_message").default(''), // Custom e-card message
+  customThemeData: text("custom_theme_data"), // JSON data for custom themes (separate from birthday cards)
+  senderName: text("sender_name").default(''), // Sender name for e-cards
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const birthdayUnsubscribeTokens = pgTable("birthday_unsubscribe_tokens", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
@@ -1744,6 +1756,13 @@ export const birthdaySettingsRelations = relations(birthdaySettings, ({ one }) =
   }),
 }));
 
+export const eCardSettingsRelations = relations(eCardSettings, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [eCardSettings.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
 // Birthday settings schemas
 export const createBirthdaySettingsSchema = z.object({
   enabled: z.boolean().default(false),
@@ -1775,6 +1794,35 @@ export type BirthdaySettings = typeof birthdaySettings.$inferSelect;
 export type InsertBirthdaySettings = z.infer<typeof insertBirthdaySettingsSchema>;
 export type CreateBirthdaySettingsData = z.infer<typeof createBirthdaySettingsSchema>;
 export type UpdateBirthdaySettingsData = z.infer<typeof updateBirthdaySettingsSchema>;
+
+// E-Card settings schemas
+export const createECardSettingsSchema = z.object({
+  enabled: z.boolean().default(false),
+  emailTemplate: z.string().default('default'),
+  customMessage: z.string().default(''),
+  senderName: z.string().default(''),
+});
+
+export const updateECardSettingsSchema = z.object({
+  enabled: z.boolean().optional(),
+  emailTemplate: z.string().optional(),
+  customMessage: z.string().optional(),
+  senderName: z.string().optional(),
+  customThemeData: z.string().optional(),
+});
+
+export const insertECardSettingsSchema = createInsertSchema(eCardSettings).omit({
+  id: true,
+  tenantId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// E-Card settings types
+export type ECardSettings = typeof eCardSettings.$inferSelect;
+export type InsertECardSettings = z.infer<typeof insertECardSettingsSchema>;
+export type CreateECardSettingsData = z.infer<typeof createECardSettingsSchema>;
+export type UpdateECardSettingsData = z.infer<typeof updateECardSettingsSchema>;
 
 // Custom theme data structure for birthday cards
 export interface CustomThemeData {
