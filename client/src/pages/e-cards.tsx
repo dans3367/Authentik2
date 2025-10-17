@@ -2605,8 +2605,20 @@ export default function ECardsPage() {
             };
             console.log('💾 [Card Save] Updated theme data structure:', JSON.stringify(updatedThemeData));
 
-            // Check if user has made any text customizations (title or signature)
+            // Check if user has made any customizations (title, signature, or image)
+            const defaultThemeImage = themeMetadataById[currentThemeId]?.image;
+            const hasImageCustomization = themeData.imageUrl !== defaultThemeImage;
             const hasTextCustomizations = data.title !== '' || data.signature !== '';
+            const hasCustomizations = hasTextCustomizations || hasImageCustomization;
+
+            console.log('🔍 [Card Save] Customization check:', {
+              currentThemeId,
+              defaultThemeImage,
+              currentImageUrl: themeData.imageUrl,
+              hasImageCustomization,
+              hasTextCustomizations,
+              hasCustomizations
+            });
 
             // Save button should save theme-specific data and update emailTemplate to the specific theme variant
             if (designerThemeId === 'custom') {
@@ -2642,8 +2654,8 @@ export default function ECardsPage() {
                   setDesignerOpen(false);
                 }
               });
-            } else if (hasTextCustomizations || data.message !== (latestECardSettings?.customMessage || '')) {
-              // For holiday theme variants with any customizations, save the theme-specific data
+            } else if (hasCustomizations || data.message !== (latestECardSettings?.customMessage || '')) {
+              // For holiday theme variants with any customizations (text or image), save the theme-specific data
               // and set emailTemplate to the specific theme variant ID
               console.log('🎨 [Birthday Cards] Saving theme-specific customizations for', currentThemeId, 'with data:', themeData);
               
