@@ -52,7 +52,7 @@ interface CardDesignerDialogProps {
   businessName?: string;
   holidayId?: string;
   isHolidayDisabled?: boolean;
-  onToggleHoliday?: () => void;
+  onToggleHoliday?: (holidayId: string) => void;
   customCardActive?: boolean;
   onToggleCustomCardActive?: () => void;
   // Promotion props
@@ -70,11 +70,28 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [description, setDescription] = useState(initialData?.description ?? "");
   const [message, setMessage] = useState(initialData?.message ?? "");
-  const [imageUrl, setImageUrl] = useState<string | null>(initialData?.imageUrl ??
-    (initialThemeId === "sparkle-cake" ? "/images/birthday-sparkle.jpg" : null));
+  const [imageUrl, setImageUrl] = useState<string | null>(() => {
+    // First check if we have an explicit imageUrl in initialData
+    if (initialData?.imageUrl) {
+      console.log('🖼️ [CardDesignerDialog] Initializing with imageUrl from initialData:', initialData.imageUrl);
+      return initialData.imageUrl;
+    }
+    // Special case for sparkle-cake theme
+    if (initialThemeId === "sparkle-cake") {
+      return "/images/birthday-sparkle.jpg";
+    }
+    return null;
+  });
   const [signature, setSignature] = useState(initialData?.signature ?? "");
   const [emojiCount, setEmojiCount] = useState<number>(0);
-  const [customImage, setCustomImage] = useState<boolean>(initialData?.customImage ?? false);
+  // Initialize customImage properly based on whether this is a custom card with an image
+  const [customImage, setCustomImage] = useState<boolean>(() => {
+    const isCustomCard = initialThemeId && initialThemeId.startsWith('custom-');
+    // If it's a custom card and has an imageUrl, it's a custom image
+    if (isCustomCard && initialData?.imageUrl) return true;
+    // Otherwise use the explicit customImage flag if provided
+    return initialData?.customImage ?? false;
+  });
   const [cardName, setCardName] = useState(initialData?.cardName ?? "");
   const [sendDate, setSendDate] = useState(initialData?.sendDate ?? "");
   const [occasionType, setOccasionType] = useState(initialData?.occasionType ?? "");
@@ -147,14 +164,18 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       hasCustomImageData,
       isCustomTheme,
       initialImageUrl: initialData?.imageUrl,
-      initialCustomImage: initialData?.customImage
+      initialCustomImage: initialData?.customImage,
+      currentImageUrlState: imageUrl,
+      fullInitialData: initialData,
+      condition1: `hasCustomImageData (${hasCustomImageData})`,
+      condition2: `isCustomTheme (${isCustomTheme}) && imageUrl (${!!initialData?.imageUrl})`
     });
 
     // Set image state based on theme and data - PRESERVE CUSTOM IMAGES
     if (hasCustomImageData) {
       // Has explicit custom image data - always preserve this
       console.log('📸 Setting custom image:', initialData.imageUrl);
-      setImageUrl(initialData.imageUrl);
+      setImageUrl(initialData.imageUrl ?? null);
       setCustomImage(true);
     } else if (isCustomTheme && initialData?.imageUrl) {
       // Custom theme/card with saved image URL (even if customImage flag is missing)
@@ -170,7 +191,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       // Custom theme without custom image or unknown theme
       console.log('🎨 Custom theme without image - clearing state');
       setImageUrl(null);
-      setCustomImage(isCustomTheme);
+      setCustomImage(Boolean(isCustomTheme));
     }
 
     const finalImagePosition = initialData?.imagePosition ?? { x: 0, y: 0 };
@@ -183,13 +204,12 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     setImageError(false);
 
     // Store initial values for change tracking
-    const finalImageUrl = hasCustomImageData ? initialData.imageUrl :
+    const finalImageUrl: string | null = hasCustomImageData ? (initialData.imageUrl ?? null) :
       (isCustomTheme && initialData?.imageUrl) ? initialData.imageUrl :
         (!isCustomTheme && initialThemeId && initialThemeId in defaultThemeImages) ?
           defaultThemeImages[initialThemeId as keyof typeof defaultThemeImages] : null;
 
-    const finalCustomImage = hasCustomImageData || (isCustomTheme && initialData?.imageUrl) ||
-      (!isCustomTheme && initialThemeId && initialThemeId in defaultThemeImages) ? false : isCustomTheme;
+    const finalCustomImage: boolean = Boolean(hasCustomImageData) || (Boolean(isCustomTheme) && Boolean(initialData?.imageUrl));
 
     setInitialValues({
       title: initialData?.title ?? "",
@@ -253,6 +273,15 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   // If theme changes while open and no custom image chosen, update to theme's default image
   useEffect(() => {
     if (!open) return;
+
+    // Check if this is a custom card (starts with 'custom-')
+    const isCustomCard = initialThemeId && initialThemeId.startsWith('custom-');
+    
+    // Don't run this effect for custom cards - they manage their own images
+    if (isCustomCard) {
+      console.log('🔒 [Card Designer] Custom card detected, skipping theme change effect');
+      return;
+    }
 
     // Don't override custom images - this is the key fix
     if (customImage && imageUrl) {
@@ -1022,6 +1051,17 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                 willChange: isDragging ? 'transform' : 'auto'
               }}
             >
+              {(() => {
+                console.log('🔍 [Card Designer] Render state:', {
+                  uploading,
+                  imageUrl,
+                  imageError,
+                  customImage,
+                  hasImageUrl: !!imageUrl,
+                  condition: imageUrl && !imageError ? 'SHOW IMAGE' : imageUrl && imageError ? 'SHOW ERROR' : 'SHOW ADD IMAGE'
+                });
+                return null;
+              })()}
               {uploading ? (
                 <div className="w-full h-full flex items-center justify-center text-blue-500 bg-blue-50">
                   <div className="text-center">
@@ -1035,6 +1075,9 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                   src={imageUrl}
                   alt="Card header"
                   className="w-full h-full object-cover select-none"
+                  onLoadStart={() => {
+                    console.log('🔄 [Card Designer] Image loading started:', imageUrl);
+                  }}
                   style={{
                     transform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale})`,
                     transformOrigin: 'center center',
@@ -1298,7 +1341,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
               <Checkbox
                 id="enable-holiday-card"
                 checked={!isHolidayDisabled}
-                onCheckedChange={() => onToggleHoliday(holidayId)}
+                onCheckedChange={() => onToggleHoliday?.(holidayId)}
               />
               <Label
                 htmlFor="enable-holiday-card"
@@ -1613,7 +1656,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
               <Checkbox
                 id="enable-holiday-card"
                 checked={!isHolidayDisabled}
-                onCheckedChange={() => onToggleHoliday(holidayId)}
+                onCheckedChange={() => onToggleHoliday?.(holidayId)}
               />
               <Label
                 htmlFor="enable-holiday-card"

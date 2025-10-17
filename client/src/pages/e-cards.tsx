@@ -287,6 +287,37 @@ export default function ECardsPage() {
     },
   ]), [t]);
 
+  const themeMetadataById = useMemo(() => {
+    const map: Record<string, { image?: string | null }> = {};
+    const registerThemes = (themes: Array<{ id: string; image?: string | null }>) => {
+      themes.forEach((theme) => {
+        map[theme.id] = {
+          image: theme.image ?? null,
+        };
+      });
+    };
+
+    registerThemes(christmasThemes);
+    registerThemes(stPatrickThemes);
+    registerThemes(mothersThemes);
+    registerThemes(fathersThemes);
+    registerThemes(independenceThemes);
+    registerThemes(easterThemes);
+    registerThemes(newYearThemes);
+    registerThemes(valentineThemes);
+
+    return map;
+  }, [
+    christmasThemes,
+    stPatrickThemes,
+    mothersThemes,
+    fathersThemes,
+    independenceThemes,
+    easterThemes,
+    newYearThemes,
+    valentineThemes,
+  ]);
+
   // Use Better Auth session to get external token
   const { data: session } = useSession();
 
@@ -393,7 +424,14 @@ export default function ECardsPage() {
       const transformed = customCardsData.map((card: any) => {
         try {
           const parsedData = JSON.parse(card.cardData);
-          console.log('📋 Parsed card data:', { id: card.id, name: card.name, parsedData });
+          console.log('📦 [Custom Card API] Parsed card data:', {
+            id: card.id,
+            name: card.name,
+            hasImageUrl: !!parsedData.imageUrl,
+            imageUrl: parsedData.imageUrl,
+            customImage: parsedData.customImage,
+            parsedData
+          });
           return {
             id: card.id,
             active: card.active ?? true,
@@ -403,7 +441,7 @@ export default function ECardsPage() {
             data: parsedData,
           };
         } catch (error) {
-          console.error('❌ Error parsing card data for card:', card.id, card.name, error);
+          console.error('Error parsing card data:', error);
           // Return card with empty data if parsing fails
           return {
             id: card.id,
@@ -741,8 +779,19 @@ export default function ECardsPage() {
     if (designerThemeId && designerThemeId.startsWith('custom-')) {
       const existingCard = customCards.find(c => c.id === designerThemeId);
       if (existingCard) {
+        // Ensure customImage is set to true if imageUrl exists (for proper image display in edit mode)
+        const hasImage = Boolean(existingCard.data.imageUrl);
+        console.log('🔍 [Edit Custom Card] Loading data for:', existingCard.id, {
+          name: existingCard.name,
+          hasImageUrl: hasImage,
+          imageUrl: existingCard.data.imageUrl,
+          originalCustomImage: existingCard.data.customImage,
+          willSetCustomImage: hasImage ? true : (existingCard.data.customImage || false),
+          fullData: existingCard.data
+        });
         return {
           ...existingCard.data,
+          customImage: hasImage ? true : (existingCard.data.customImage || false),
           cardName: existingCard.name,
           sendDate: existingCard.sendDate,
           occasionType: existingCard.occasionType || '',
@@ -766,6 +815,7 @@ export default function ECardsPage() {
 
     // Resolve current theme id once and use it for namespaced draft keys
     const currentThemeId = designerThemeId || 'default';
+    const themeMetadata = themeMetadataById[currentThemeId];
 
     // PRIORITY 1: Load from database first (customThemeData)
     if (birthdaySettings?.customThemeData) {
@@ -793,7 +843,7 @@ export default function ECardsPage() {
             description: themeSpecificData.description || '',
             message: themeSpecificData.message || birthdaySettings?.customMessage || '',
             signature: themeSpecificData.signature || '',
-            imageUrl: themeSpecificData.imageUrl || null,
+            imageUrl: themeSpecificData.imageUrl || themeMetadata?.image || null,
             customImage: Boolean(themeSpecificData.customImage && themeSpecificData.imageUrl),
             imagePosition: themeSpecificData.imagePosition || { x: 0, y: 0 },
             imageScale: themeSpecificData.imageScale || 1,
@@ -811,6 +861,12 @@ export default function ECardsPage() {
       if (raw) {
         console.log('📥 [Card Designer Initial Data] No DB data found, using localStorage draft for theme:', currentThemeId);
         const draftData = JSON.parse(raw);
+        if ((draftData.imageUrl === undefined || draftData.imageUrl === null) && themeMetadata?.image && draftData.customImage !== true) {
+          return {
+            ...draftData,
+            imageUrl: themeMetadata.image,
+          };
+        }
         return draftData;
       }
     } catch (error) {
@@ -824,12 +880,18 @@ export default function ECardsPage() {
       description: '',
       message: birthdaySettings?.customMessage || '',
       signature: '',
-      imageUrl: null, // Let CardDesignerDialog load the default theme image
+      imageUrl: themeMetadata?.image ?? null,
       customImage: false, // This is key - tells the dialog it's NOT a custom image
       imagePosition: { x: 0, y: 0 },
       imageScale: 1,
     };
-  }, [birthdaySettings?.customThemeData, birthdaySettings?.customMessage, designerThemeId, customCards]);
+  }, [
+    birthdaySettings?.customThemeData,
+    birthdaySettings?.customMessage,
+    designerThemeId,
+    customCards,
+    themeMetadataById,
+  ]);
 
   const handleSettingsUpdate = (field: keyof BirthdaySettings, value: any) => {
     if (birthdaySettings) {
@@ -2161,7 +2223,8 @@ export default function ECardsPage() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                      {customCards.map((card) => {
+                      {customCards.filter(c => c.active !== false).map((card) => {
+                        console.log('🖼️ Rendering custom card:', { id: card.id, name: card.name, imageUrl: card.data.imageUrl, hasImageUrl: !!card.data.imageUrl });
                         const isSelected = birthdaySettings?.emailTemplate === card.id;
                         return (
                           <div
@@ -2170,24 +2233,34 @@ export default function ECardsPage() {
                           >
                             <div className="relative h-40 rounded-lg overflow-hidden bg-gray-100">
                               {card.data.imageUrl ? (
-                                <img
-                                  src={card.data.imageUrl}
-                                  alt={card.name}
-                                  className="absolute inset-0 h-full w-full object-cover"
-                                />
+                                <>
+                                  <img
+                                    src={card.data.imageUrl}
+                                    alt={card.name}
+                                    className="absolute inset-0 h-full w-full object-cover z-0"
+                                    onError={(e) => {
+                                      console.error('🖼️ Image failed to load:', card.data.imageUrl, e);
+                                      // Hide the failed image
+                                      (e.target as HTMLImageElement).style.display = 'none';
+                                    }}
+                                    onLoad={() => {
+                                      console.log('🖼️ Image loaded successfully:', card.data.imageUrl);
+                                    }}
+                                  />
+                                  <div className="absolute inset-0 bg-black/20 z-10" />
+                                  <div className="absolute inset-0 flex items-center justify-center z-20">
+                                    <div className="text-center px-2">
+                                      <div className="font-bold text-white drop-shadow-lg text-shadow line-clamp-2">
+                                        {card.data.title || card.name}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </>
                               ) : (
                                 <div className="absolute inset-0 flex items-center justify-center">
                                   <Palette className="h-12 w-12 text-gray-400" />
                                 </div>
                               )}
-                              <div className="absolute inset-0 bg-black/20" />
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <div className="text-center px-2">
-                                  <div className="font-bold text-white drop-shadow-lg text-shadow line-clamp-2">
-                                    {card.data.title || card.name}
-                                  </div>
-                                </div>
-                              </div>
                             </div>
                             <div className="mt-2 space-y-1">
                               <div>
@@ -2279,24 +2352,34 @@ export default function ECardsPage() {
                           >
                             <div className="relative h-40 rounded-lg overflow-hidden bg-gray-100">
                               {card.data.imageUrl ? (
-                                <img
-                                  src={card.data.imageUrl}
-                                  alt={card.name}
-                                  className="absolute inset-0 h-full w-full object-cover"
-                                />
+                                <>
+                                  <img
+                                    src={card.data.imageUrl}
+                                    alt={card.name}
+                                    className="absolute inset-0 h-full w-full object-cover z-0"
+                                    onError={(e) => {
+                                      console.error('🖼️ Inactive card image failed to load:', card.data.imageUrl, e);
+                                      // Hide the failed image
+                                      (e.target as HTMLImageElement).style.display = 'none';
+                                    }}
+                                    onLoad={() => {
+                                      console.log('🖼️ Inactive card image loaded successfully:', card.data.imageUrl);
+                                    }}
+                                  />
+                                  <div className="absolute inset-0 bg-black/20 z-10" />
+                                  <div className="absolute inset-0 flex items-center justify-center z-20">
+                                    <div className="text-center px-2">
+                                      <div className="font-bold text-white drop-shadow-lg text-shadow line-clamp-2">
+                                        {card.data.title || card.name}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </>
                               ) : (
                                 <div className="absolute inset-0 flex items-center justify-center">
                                   <Palette className="h-12 w-12 text-gray-400" />
                                 </div>
                               )}
-                              <div className="absolute inset-0 bg-black/20" />
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <div className="text-center px-2">
-                                  <div className="font-bold text-white drop-shadow-lg text-shadow line-clamp-2">
-                                    {card.data.title || card.name}
-                                  </div>
-                                </div>
-                              </div>
                             </div>
                             <div className="mt-2 space-y-1">
                               <div className="flex items-center justify-between">
@@ -2364,6 +2447,13 @@ export default function ECardsPage() {
           onPreviewChange={handlePreviewChange}
           initialData={cardDesignerInitialData}
           onSave={async (data) => {
+            console.log('💾 [onSave] Received data from CardDesignerDialog:', {
+              imageUrl: data.imageUrl,
+              customImage: (data as any).customImage,
+              title: data.title,
+              hasImageUrl: !!data.imageUrl
+            });
+
             try {
               localStorage.setItem(`birthdayCardDesignerDraft:${data.themeId || designerThemeId || 'default'}`, JSON.stringify({ title: data.title, description: data.description, message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId, customImage: (data as any).customImage }));
             } catch { }
@@ -2379,6 +2469,12 @@ export default function ECardsPage() {
               imagePosition: (data as any).imagePosition || { x: 0, y: 0 },
               imageScale: (data as any).imageScale || 1,
             };
+
+            console.log('💾 [onSave] Created themeData:', {
+              imageUrl: themeData.imageUrl,
+              customImage: themeData.customImage,
+              hasImageUrl: !!themeData.imageUrl
+            });
 
             // Check if this is a custom card
             if (designerThemeId && designerThemeId.startsWith('custom-')) {
@@ -2408,12 +2504,6 @@ export default function ECardsPage() {
                   cardData: JSON.stringify(themeData),
                   promotionIds: [], // TODO: Add promotion support
                 };
-
-                console.log('💾 Saving custom card:', { 
-                  existing: !!existing, 
-                  themeData, 
-                  cardPayload: { ...cardPayload, cardData: themeData } 
-                });
 
                 let response;
                 if (existing) {

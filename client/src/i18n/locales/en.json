@@ -346,6 +346,14 @@
       "customers": "Customers",
       "test": "Test"
     },
+    "modal": {
+      "addTitle": "Add Special Date",
+      "editTitle": "Edit Special Date",
+      "addDescription": "Select a date to save as the contact's special date.",
+      "editDescription": "Update the contact's special date.",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
     "cards": {
       "active": "Active Cards",
       "inactive": "Inactive Cards",
