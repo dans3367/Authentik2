@@ -379,6 +379,9 @@ export default function ECardsPage() {
   // State for disabled holidays
   const [disabledHolidays, setDisabledHolidays] = useState<string[]>([]);
 
+  // State for custom card toggle loading
+  const [customCardToggleLoading, setCustomCardToggleLoading] = useState(false);
+
   // Customer modal state
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Contact | null>(null);
@@ -949,6 +952,7 @@ export default function ECardsPage() {
       const card = customCards.find(c => c.id === designerThemeId);
       if (!card) return;
 
+      setCustomCardToggleLoading(true);
       try {
         const response = await fetch(`/api/custom-cards/${designerThemeId}`, {
           method: 'PUT',
@@ -976,6 +980,8 @@ export default function ECardsPage() {
           description: "Failed to update card status. Please try again.",
           variant: "destructive",
         });
+      } finally {
+        setCustomCardToggleLoading(false);
       }
     }
   };
@@ -2677,6 +2683,7 @@ export default function ECardsPage() {
               ? handleToggleCustomCardActive 
               : undefined
           }
+          customCardToggleLoading={customCardToggleLoading}
           selectedPromotions={designerThemeId ? (cardPromotions[designerThemeId] || []) : []}
           onPromotionsChange={designerThemeId ? (promotionIds) => handleCardPromotionsChange(designerThemeId, promotionIds) : undefined}
           hideDescription={false}

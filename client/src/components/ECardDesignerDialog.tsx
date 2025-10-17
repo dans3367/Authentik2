@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import RichTextEditor from "@/components/RichTextEditor";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Search, ZoomIn, ZoomOut, Move, RotateCcw, Smile, RefreshCw, ChevronLeft, ChevronRight, X, AlertTriangle, Palette, Gift, CalendarIcon } from "lucide-react";
+import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Search, ZoomIn, ZoomOut, Move, RotateCcw, Smile, RefreshCw, ChevronLeft, ChevronRight, X, AlertTriangle, Palette, Gift, CalendarIcon, Loader2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -55,6 +55,7 @@ interface CardDesignerDialogProps {
   onToggleHoliday?: (holidayId: string) => void;
   customCardActive?: boolean;
   onToggleCustomCardActive?: () => void;
+  customCardToggleLoading?: boolean;
   // Promotion props
   selectedPromotions?: string[];
   onPromotionsChange?: (promotionIds: string[]) => void;
@@ -66,7 +67,7 @@ interface CardDesignerDialogProps {
   hideDescription?: boolean;
 }
 
-export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initialData, onSave, onPreviewChange, onMakeActive, isCurrentlyActive, senderName, customerInfo, businessName, holidayId, isHolidayDisabled, onToggleHoliday, customCardActive, onToggleCustomCardActive, selectedPromotions = [], onPromotionsChange, hidePromotionsTab = false, hideTabs = false, hideDescription = false }: CardDesignerDialogProps) {
+export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initialData, onSave, onPreviewChange, onMakeActive, isCurrentlyActive, senderName, customerInfo, businessName, holidayId, isHolidayDisabled, onToggleHoliday, customCardActive, onToggleCustomCardActive, customCardToggleLoading = false, selectedPromotions = [], onPromotionsChange, hidePromotionsTab = false, hideTabs = false, hideDescription = false }: CardDesignerDialogProps) {
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [description, setDescription] = useState(initialData?.description ?? "");
   const [message, setMessage] = useState(initialData?.message ?? "");
@@ -1190,16 +1191,21 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                 {/* Card Active/Inactive Switch - Show for custom cards */}
                 {onToggleCustomCardActive && (
                   <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm">
-                    <Switch
-                      id="enable-custom-card-inline"
-                      checked={customCardActive !== false}
-                      onCheckedChange={onToggleCustomCardActive}
-                    />
+                    {customCardToggleLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-gray-600" />
+                    ) : (
+                      <Switch
+                        id="enable-custom-card-inline"
+                        checked={customCardActive !== false}
+                        onCheckedChange={onToggleCustomCardActive}
+                        disabled={customCardToggleLoading}
+                      />
+                    )}
                     <Label
                       htmlFor="enable-custom-card-inline"
                       className="text-sm font-medium cursor-pointer whitespace-nowrap"
                     >
-                      Card is active
+                      {customCardToggleLoading ? 'Updating...' : 'Card is active'}
                     </Label>
                   </div>
                 )}
@@ -1517,16 +1523,21 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                 {/* Card Active/Inactive Switch - Show for custom cards */}
                 {onToggleCustomCardActive && (
                   <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm">
-                    <Switch
-                      id="enable-custom-card-inline-tabs"
-                      checked={customCardActive !== false}
-                      onCheckedChange={onToggleCustomCardActive}
-                    />
+                    {customCardToggleLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-gray-600" />
+                    ) : (
+                      <Switch
+                        id="enable-custom-card-inline-tabs"
+                        checked={customCardActive !== false}
+                        onCheckedChange={onToggleCustomCardActive}
+                        disabled={customCardToggleLoading}
+                      />
+                    )}
                     <Label
                       htmlFor="enable-custom-card-inline-tabs"
                       className="text-sm font-medium cursor-pointer whitespace-nowrap"
                     >
-                      Card is active
+                      {customCardToggleLoading ? 'Updating...' : 'Card is active'}
                     </Label>
                   </div>
                 )}
