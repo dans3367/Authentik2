@@ -1747,7 +1747,27 @@ export default function ECardsPage() {
                           className="relative rounded-xl border border-gray-200 hover:border-gray-300 p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
                         >
                           <div className="relative h-40 rounded-lg overflow-hidden">
-                            <img src={theme.image} alt={theme.name} className="absolute inset-0 h-full w-full object-cover" />
+                            <img 
+                              src={(() => {
+                                try {
+                                  // Check for custom image in preview data first
+                                  if (themePreviewData[themeId]?.imageUrl) {
+                                    return themePreviewData[themeId].imageUrl;
+                                  }
+                                  // Then check in saved database data
+                                  if (eCardSettings?.customThemeData) {
+                                    const saved = JSON.parse(eCardSettings.customThemeData);
+                                    if (saved?.themes?.[themeId]?.imageUrl) {
+                                      return saved.themes[themeId].imageUrl;
+                                    }
+                                  }
+                                } catch {}
+                                // Fall back to default theme image
+                                return theme.image;
+                              })()} 
+                              alt={theme.name} 
+                              className="absolute inset-0 h-full w-full object-cover" 
+                            />
                             <div className={`absolute inset-0 ${theme.overlay}`} />
                             {theme.decorations}
                             <div className="absolute inset-0 flex items-center justify-center">
