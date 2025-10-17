@@ -230,8 +230,14 @@
     }
   },
   "ecards": {
-    "title": "Tarjetas Electrónicas de Cumpleaños",
-    "cardsSent": "Tarjetas de Cumpleaños Enviadas",
+    "title": "Tarjetas Electrónicas de Festividades",
+    "cardsSent": "Tarjetas Electrónicas Enviadas",
+    "hero": {
+      "celebration": "Celebra Cada",
+      "dayWith": "Ocasión Especial Con",
+      "ecard": "¡Tarjetas Personalizadas!",
+      "description": "Crea y envía hermosas tarjetas de festividades y ocasiones a tus clientes. Desde cumpleaños hasta Navidad, Día de San Valentín hasta Día de las Madres - ¡celebra cada momento con tus clientes!"
+    },
     "preview": {
       "defaultTitle": "¡Feliz Navidad!",
       "valentinesDay": "¡Feliz Día de San Valentín!",

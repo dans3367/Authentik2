@@ -230,8 +230,14 @@
     }
   },
   "ecards": {
-    "title": "Birthday E-Cards",
-    "cardsSent": "Birthday Cards Sent",
+    "title": "Holiday E-Cards",
+    "cardsSent": "E-Cards Sent",
+    "hero": {
+      "celebration": "Celebrate Every",
+      "dayWith": "Special Occasion With",
+      "ecard": "Personalized E-Cards!",
+      "description": "Create and send beautiful holiday and occasion cards to your customers. From birthdays to Christmas, Valentine's Day to Mother's Day - celebrate every moment with your customers!"
+    },
     "preview": {
       "defaultTitle": "Merry Christmas!",
       "valentinesDay": "Happy Valentine's Day!",
