@@ -8,12 +8,17 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import RichTextEditor from "@/components/RichTextEditor";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Search, ZoomIn, ZoomOut, Move, RotateCcw, Smile, RefreshCw, ChevronLeft, ChevronRight, X, AlertTriangle, Palette, Gift } from "lucide-react";
+import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Search, ZoomIn, ZoomOut, Move, RotateCcw, Smile, RefreshCw, ChevronLeft, ChevronRight, X, AlertTriangle, Palette, Gift, CalendarIcon } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { uploadCardImage, validateCardImageFile } from "@/lib/cardImageUpload";
 import { PromotionSelector } from "@/components/PromotionSelector";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 type DesignerData = {
   title: string;
@@ -73,6 +78,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   const [cardName, setCardName] = useState(initialData?.cardName ?? "");
   const [sendDate, setSendDate] = useState(initialData?.sendDate ?? "");
   const [occasionType, setOccasionType] = useState(initialData?.occasionType ?? "");
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [unsplashOpen, setUnsplashOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"design" | "promotions">("design");
   const [searchQuery, setSearchQuery] = useState("");
@@ -905,7 +911,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
           style={{ direction: 'ltr' }}
         >
           <DialogHeader className="space-y-2">
-            <DialogTitle className="text-lg sm:text-xl">Design your birthday card</DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl">Design your card</DialogTitle>
             <DialogDescription className="text-sm sm:text-base">Customize the image, header and message.</DialogDescription>
           </DialogHeader>
 
@@ -928,14 +934,37 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                 <label htmlFor="sendDate" className="text-sm font-medium text-gray-700">
                   Send Date <span className="text-red-500">*</span>
                 </label>
-                <Input
-                  id="sendDate"
-                  type="date"
-                  value={sendDate}
-                  onChange={(e) => setSendDate(e.target.value)}
-                  className="w-full"
-                  min={new Date().toISOString().split('T')[0]}
-                />
+                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !sendDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {sendDate ? format(new Date(sendDate + 'T00:00:00'), "MMMM d") : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      selected={sendDate ? new Date(sendDate + 'T00:00:00') : undefined}
+                      onSelect={(date) => {
+                        if (date) {
+                          const year = date.getFullYear();
+                          const month = String(date.getMonth() + 1).padStart(2, '0');
+                          const day = String(date.getDate()).padStart(2, '0');
+                          setSendDate(`${year}-${month}-${day}`);
+                          setCalendarOpen(false);
+                        }
+                      }}
+                      fromYear={new Date().getFullYear()}
+                      toYear={new Date().getFullYear() + 10}
+                      hideYear={true}
+                    />
+                  </PopoverContent>
+                </Popover>
                 <p className="text-xs text-gray-500">The card will be sent on this date</p>
               </div>
               <div className="space-y-2">
@@ -1114,7 +1143,23 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
             )}
             */}
 
-              <div className="absolute left-3 bottom-3">
+              <div className="absolute left-3 bottom-3 flex items-center gap-3">
+                {/* Card Active/Inactive Switch - Show for custom cards */}
+                {onToggleCustomCardActive && (
+                  <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm">
+                    <Switch
+                      id="enable-custom-card-inline"
+                      checked={customCardActive !== false}
+                      onCheckedChange={onToggleCustomCardActive}
+                    />
+                    <Label
+                      htmlFor="enable-custom-card-inline"
+                      className="text-sm font-medium cursor-pointer whitespace-nowrap"
+                    >
+                      Card is active
+                    </Label>
+                  </div>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="secondary" size="icon" className="rounded-full">
@@ -1122,23 +1167,19 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
-                    {/* Image controls for custom theme and custom cards */}
-                    {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) && (
-                      <>
-                        <DropdownMenuItem onClick={handlePickImage} disabled={uploading}>
-                          <Edit className="w-4 h-4 mr-2" />
-                          {uploading ? 'Uploading...' : 'Upload Image'}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setUnsplashOpen(true)}>
-                          <Search className="w-4 h-4 mr-2" />
-                          Browse Unsplash
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={handleRemoveImage}>
-                          <ImageOff className="w-4 h-4 mr-2" />
-                          Remove Image
-                        </DropdownMenuItem>
-                      </>
-                    )}
+                    {/* Image controls - available for all cards */}
+                    <DropdownMenuItem onClick={handlePickImage} disabled={uploading}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      {uploading ? 'Uploading...' : 'Upload Image'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setUnsplashOpen(true)}>
+                      <Search className="w-4 h-4 mr-2" />
+                      Browse Unsplash
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleRemoveImage}>
+                      <ImageOff className="w-4 h-4 mr-2" />
+                      Remove Image
+                    </DropdownMenuItem>
                     <DropdownMenuItem className="text-red-600" onClick={handleReset}>
                       <RefreshCw className="w-4 h-4 mr-2" />
                       Reset {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) ? 'Card' : 'Text'}
@@ -1264,22 +1305,6 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
               >
                 Enable this holiday card
-              </Label>
-            </div>
-          )}
-          {/* Custom Card Active/Inactive Checkbox - Only show for custom cards */}
-          {initialThemeId?.startsWith('custom-') && onToggleCustomCardActive && (
-            <div className="flex items-center space-x-2 py-3 border-t">
-              <Checkbox
-                id="enable-custom-card"
-                checked={customCardActive !== false}
-                onCheckedChange={onToggleCustomCardActive}
-              />
-              <Label
-                htmlFor="enable-custom-card"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-              >
-                Card is active
               </Label>
             </div>
           )}
@@ -1445,7 +1470,23 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
             )}
             */}
 
-              <div className="absolute left-3 bottom-3">
+              <div className="absolute left-3 bottom-3 flex items-center gap-3">
+                {/* Card Active/Inactive Switch - Show for custom cards */}
+                {onToggleCustomCardActive && (
+                  <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm">
+                    <Switch
+                      id="enable-custom-card-inline-tabs"
+                      checked={customCardActive !== false}
+                      onCheckedChange={onToggleCustomCardActive}
+                    />
+                    <Label
+                      htmlFor="enable-custom-card-inline-tabs"
+                      className="text-sm font-medium cursor-pointer whitespace-nowrap"
+                    >
+                      Card is active
+                    </Label>
+                  </div>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="secondary" size="icon" className="rounded-full">
@@ -1453,23 +1494,19 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
-                    {/* Image controls for custom theme and custom cards */}
-                    {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) && (
-                      <>
-                        <DropdownMenuItem onClick={handlePickImage} disabled={uploading}>
-                          <Edit className="w-4 h-4 mr-2" />
-                          {uploading ? 'Uploading...' : 'Upload Image'}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setUnsplashOpen(true)}>
-                          <Search className="w-4 h-4 mr-2" />
-                          Browse Unsplash
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={handleRemoveImage}>
-                          <ImageOff className="w-4 h-4 mr-2" />
-                          Remove Image
-                        </DropdownMenuItem>
-                      </>
-                    )}
+                    {/* Image controls - available for all cards */}
+                    <DropdownMenuItem onClick={handlePickImage} disabled={uploading}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      {uploading ? 'Uploading...' : 'Upload Image'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setUnsplashOpen(true)}>
+                      <Search className="w-4 h-4 mr-2" />
+                      Browse Unsplash
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleRemoveImage}>
+                      <ImageOff className="w-4 h-4 mr-2" />
+                      Remove Image
+                    </DropdownMenuItem>
                     <DropdownMenuItem className="text-red-600" onClick={handleReset}>
                       <RefreshCw className="w-4 h-4 mr-2" />
                       Reset {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) ? 'Card' : 'Text'}
@@ -1583,22 +1620,6 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
               >
                 Enable this holiday card
-              </Label>
-            </div>
-          )}
-          {/* Custom Card Active/Inactive Checkbox - Only show for custom cards */}
-          {initialThemeId?.startsWith('custom-') && onToggleCustomCardActive && (
-            <div className="flex items-center space-x-2 py-3 border-t">
-              <Checkbox
-                id="enable-custom-card"
-                checked={customCardActive !== false}
-                onCheckedChange={onToggleCustomCardActive}
-              />
-              <Label
-                htmlFor="enable-custom-card"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-              >
-                Card is active
               </Label>
             </div>
           )}

@@ -365,32 +365,67 @@ export default function ECardsPage() {
   // Card filter state for themes tab
   const [cardFilter, setCardFilter] = useState<"active" | "inactive">("active");
 
-  // Load custom cards from localStorage on mount
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('customEcards');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Migrate old cards without active property
-        const migrated = parsed.map((card: any) => ({
-          ...card,
-          active: card.active ?? true
-        }));
-        setCustomCards(migrated);
+  // Fetch custom cards from API with React Query
+  const {
+    data: customCardsData,
+    isLoading: customCardsLoading,
+    refetch: refetchCustomCards
+  } = useQuery({
+    queryKey: ['/api/custom-cards'],
+    queryFn: async () => {
+      try {
+        const response = await fetch('/api/custom-cards');
+        if (!response.ok) {
+          throw new Error('Failed to fetch custom cards');
+        }
+        return await response.json();
+      } catch (error) {
+        console.warn('Failed to fetch custom cards:', error);
+        return [];
       }
-    } catch (error) {
-      console.warn('Failed to load custom cards:', error);
-    }
-  }, []);
+    },
+  });
 
-  // Persist custom cards to localStorage whenever they change
+  // Update local state when data is fetched
   useEffect(() => {
-    try {
-      localStorage.setItem('customEcards', JSON.stringify(customCards));
-    } catch (error) {
-      console.warn('Failed to save custom cards:', error);
+    if (customCardsData) {
+      // Transform API data to match local state format
+      const transformed = customCardsData.map((card: any) => {
+        try {
+          const parsedData = JSON.parse(card.cardData);
+          console.log('📋 Parsed card data:', { id: card.id, name: card.name, parsedData });
+          return {
+            id: card.id,
+            active: card.active ?? true,
+            name: card.name,
+            sendDate: card.sendDate,
+            occasionType: card.occasionType,
+            data: parsedData,
+          };
+        } catch (error) {
+          console.error('❌ Error parsing card data for card:', card.id, card.name, error);
+          // Return card with empty data if parsing fails
+          return {
+            id: card.id,
+            active: card.active ?? true,
+            name: card.name,
+            sendDate: card.sendDate,
+            occasionType: card.occasionType,
+            data: {
+              title: '',
+              message: '',
+              signature: '',
+              imageUrl: null,
+              customImage: false,
+              imagePosition: { x: 0, y: 0 },
+              imageScale: 1,
+            },
+          };
+        }
+      });
+      setCustomCards(transformed);
     }
-  }, [customCards]);
+  }, [customCardsData]);
 
   // Reset modal state when location changes (prevents frozen modal on navigation back)
   useEffect(() => {
@@ -563,7 +598,7 @@ export default function ECardsPage() {
       
       toast({
         title: "Success",
-        description: "Birthday settings updated successfully",
+        description: "E-card settings updated successfully",
       });
       
       // Update the query cache immediately with the server response (now returns settings directly)
@@ -578,7 +613,7 @@ export default function ECardsPage() {
       console.error('🎨 [Birthday Cards] Update settings error:', error);
 
       // Try to extract error message from response
-      let errorMessage = "Failed to update birthday settings";
+      let errorMessage = "Failed to update e-card settings";
       if (error?.message) {
         errorMessage = error.message;
       } else if (error?.response?.data?.message) {
@@ -603,7 +638,7 @@ export default function ECardsPage() {
     onSuccess: () => {
       toast({
         title: "Success",
-        description: "Birthday email preference updated",
+        description: "E-card email preference updated",
       });
       refetchContacts();
     },
@@ -627,26 +662,26 @@ export default function ECardsPage() {
       setSelectedContacts([]);
       const summary = data.summary || { successful: 0, failed: 0, total: contactIds.length };
       toast({
-        title: t('ecards.cardsSent') || "Birthday Cards Sent",
-        description: `Successfully sent ${summary.successful} of ${summary.total} birthday cards${summary.failed > 0 ? ` (${summary.failed} failed)` : ''}`,
+        title: t('ecards.cardsSent') || "E-Cards Sent",
+        description: `Successfully sent ${summary.successful} of ${summary.total} e-cards${summary.failed > 0 ? ` (${summary.failed} failed)` : ''}`,
       });
     },
     onError: (error: any) => {
       toast({
         title: t('common.error') || "Error",
-        description: error.message || "Failed to send birthday cards",
+        description: error.message || "Failed to send e-cards",
         variant: "destructive",
       });
     },
   });
 
-  // Handle send birthday card
+  // Handle send e-card
   const handleSendBirthdayCard = () => {
     if (selectedContacts.length === 0) return;
 
     const confirmMessage = selectedContacts.length === 1
-      ? 'Are you sure you want to send a birthday card to this customer?'
-      : `Are you sure you want to send birthday cards to ${selectedContacts.length} customers?`;
+      ? 'Are you sure you want to send an e-card to this customer?'
+      : `Are you sure you want to send e-cards to ${selectedContacts.length} customers?`;
 
     if (window.confirm(confirmMessage)) {
       sendBirthdayCardMutation.mutate(selectedContacts);
@@ -663,7 +698,7 @@ export default function ECardsPage() {
     onSuccess: (_, variables) => {
       toast({
         title: "Success",
-        description: `Birthday email preferences updated for ${variables.contactIds.length} customer(s)`,
+        description: `E-card email preferences updated for ${variables.contactIds.length} customer(s)`,
       });
       refetchContacts();
       setSelectedContacts([]);
@@ -843,13 +878,39 @@ export default function ECardsPage() {
   };
 
   // Handler for toggling custom card active state
-  const handleToggleCustomCardActive = () => {
+  const handleToggleCustomCardActive = async () => {
     if (designerThemeId && designerThemeId.startsWith('custom-')) {
-      setCustomCards(prev => prev.map(card => 
-        card.id === designerThemeId 
-          ? { ...card, active: !card.active }
-          : card
-      ));
+      const card = customCards.find(c => c.id === designerThemeId);
+      if (!card) return;
+
+      try {
+        const response = await fetch(`/api/custom-cards/${designerThemeId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            active: !card.active,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update card status');
+        }
+
+        // Refetch custom cards to update the list
+        await refetchCustomCards();
+
+        toast({
+          title: "Card Updated",
+          description: `Card is now ${!card.active ? 'active' : 'inactive'}.`,
+        });
+      } catch (error) {
+        console.error('Error toggling custom card active state:', error);
+        toast({
+          title: "Update Failed",
+          description: "Failed to update card status. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -1051,7 +1112,7 @@ export default function ECardsPage() {
         }
 
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send birthday invitation');
+        throw new Error(errorData.error || 'Failed to send invitation');
       }
 
       return response.json();
@@ -1208,10 +1269,10 @@ export default function ECardsPage() {
       return responseData;
     },
     onSuccess: () => {
-      toast({ title: "Test Birthday Card Sent", description: "Test birthday card has been sent successfully" });
+      toast({ title: "Test E-Card Sent", description: "Test e-card has been sent successfully" });
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error?.message || "Failed to send test birthday card", variant: "destructive" });
+      toast({ title: "Error", description: error?.message || "Failed to send test e-card", variant: "destructive" });
     },
   });
 
@@ -1347,7 +1408,7 @@ export default function ECardsPage() {
     if (selectedContacts.length === 0) {
       toast({
         title: "No Selection",
-        description: "Please select customers without birthdays first",
+        description: "Please select customers first",
         variant: "destructive",
       });
       return;
@@ -1362,15 +1423,15 @@ export default function ECardsPage() {
     if (contactsWithoutBirthdays.length === 0) {
       toast({
         title: "No Eligible Customers",
-        description: "All selected customers already have birthdays set",
+        description: "All selected customers already have dates set",
         variant: "destructive",
       });
       return;
     }
 
     const confirmMessage = contactsWithoutBirthdays.length === 1
-      ? 'Are you sure you want to send a birthday request email to 1 customer?'
-      : `Are you sure you want to send birthday request emails to ${contactsWithoutBirthdays.length} customers?`;
+      ? 'Are you sure you want to send a date request email to 1 customer?'
+      : `Are you sure you want to send date request emails to ${contactsWithoutBirthdays.length} customers?`;
 
     if (window.confirm(confirmMessage)) {
       // Send invitations sequentially
@@ -1508,7 +1569,7 @@ export default function ECardsPage() {
               <div className="justify-self-center lg:justify-self-end lg:col-span-4 mt-4 lg:mt-0">
                 <img
                   src="/guy_present.svg"
-                  alt="Person with birthday present illustration"
+                  alt="Person with present illustration"
                   className="w-[280px] sm:w-[320px] md:w-[360px] xl:w-[420px] max-w-full h-auto"
                 />
               </div>
@@ -2158,13 +2219,32 @@ export default function ECardsPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => {
+                                  onClick={async () => {
                                     if (confirm(`Delete "${card.name}"? This cannot be undone.`)) {
-                                      setCustomCards(prev => prev.filter(c => c.id !== card.id));
-                                      toast({
-                                        title: "Card Deleted",
-                                        description: `"${card.name}" has been deleted.`,
-                                      });
+                                      try {
+                                        const response = await fetch(`/api/custom-cards/${card.id}`, {
+                                          method: 'DELETE',
+                                        });
+
+                                        if (!response.ok) {
+                                          throw new Error('Failed to delete card');
+                                        }
+
+                                        // Refetch custom cards to update the list
+                                        await refetchCustomCards();
+
+                                        toast({
+                                          title: "Card Deleted",
+                                          description: `"${card.name}" has been deleted.`,
+                                        });
+                                      } catch (error) {
+                                        console.error('Error deleting custom card:', error);
+                                        toast({
+                                          title: "Delete Failed",
+                                          description: "Failed to delete card. Please try again.",
+                                          variant: "destructive",
+                                        });
+                                      }
                                     }
                                   }}
                                 >
@@ -2283,7 +2363,7 @@ export default function ECardsPage() {
           initialThemeId={designerThemeId || undefined}
           onPreviewChange={handlePreviewChange}
           initialData={cardDesignerInitialData}
-          onSave={(data) => {
+          onSave={async (data) => {
             try {
               localStorage.setItem(`birthdayCardDesignerDraft:${data.themeId || designerThemeId || 'default'}`, JSON.stringify({ title: data.title, description: data.description, message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId, customImage: (data as any).customImage }));
             } catch { }
@@ -2317,27 +2397,64 @@ export default function ECardsPage() {
                 return;
               }
 
-              // Save or update the custom card
-              setCustomCards(prev => {
-                const existing = prev.find(c => c.id === designerThemeId);
+              // Save or update the custom card via API
+              try {
+                const existing = customCards.find(c => c.id === designerThemeId);
+                const cardPayload = {
+                  name: cardName,
+                  sendDate,
+                  occasionType,
+                  active: existing?.active ?? true,
+                  cardData: JSON.stringify(themeData),
+                  promotionIds: [], // TODO: Add promotion support
+                };
+
+                console.log('💾 Saving custom card:', { 
+                  existing: !!existing, 
+                  themeData, 
+                  cardPayload: { ...cardPayload, cardData: themeData } 
+                });
+
+                let response;
                 if (existing) {
                   // Update existing card
-                  return prev.map(c => c.id === designerThemeId 
-                    ? { ...c, name: cardName, sendDate, occasionType, data: themeData } 
-                    : c);
+                  response = await fetch(`/api/custom-cards/${designerThemeId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cardPayload),
+                  });
                 } else {
-                  // Add new card
-                  return [...prev, { id: designerThemeId, name: cardName, sendDate, occasionType, data: themeData }];
+                  // Create new card
+                  response = await fetch('/api/custom-cards', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cardPayload),
+                  });
                 }
-              });
 
-              toast({
-                title: existingCard ? "Card Updated" : "Card Created",
-                description: `"${cardName}" (${occasionType}) will be sent on ${new Date(sendDate).toLocaleDateString()}.`,
-              });
+                if (!response.ok) {
+                  throw new Error('Failed to save custom card');
+                }
 
-              setDesignerOpen(false);
-              return;
+                // Refetch custom cards to update the list
+                await refetchCustomCards();
+
+                toast({
+                  title: existing ? "Card Updated" : "Card Created",
+                  description: `"${cardName}" (${occasionType}) will be sent on ${new Date(sendDate).toLocaleDateString()}.`,
+                });
+
+                setDesignerOpen(false);
+                return;
+              } catch (error) {
+                console.error('Error saving custom card:', error);
+                toast({
+                  title: "Save Failed",
+                  description: "Failed to save custom card. Please try again.",
+                  variant: "destructive",
+                });
+                return;
+              }
             }
 
             // Update preview state immediately for instant visual feedback
@@ -2487,16 +2604,16 @@ export default function ECardsPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Settings className="h-5 w-5" />
-                    Birthday Email Settings
+                    E-Card Email Settings
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Global Enable/Disable */}
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label className="text-base font-medium">Enable Birthday Emails</Label>
+                      <Label className="text-base font-medium">Enable E-Card Emails</Label>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Automatically send birthday emails to customers
+                        Automatically send e-card emails to customers
                       </p>
                     </div>
                     <Switch
@@ -2534,7 +2651,7 @@ export default function ECardsPage() {
                     <Badge variant="outline">{customersWithBirthdays.length}</Badge>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Birthday Emails Enabled</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">E-Card Emails Enabled</span>
                     <Badge variant="outline">
                       {customersWithBirthdays.filter(c => c.birthdayEmailEnabled).length}
                     </Badge>
@@ -2833,7 +2950,7 @@ export default function ECardsPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Mail className="h-5 w-5" />
-                  Test Birthday Cards
+                  Test E-Cards
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="bg-blue-50 text-blue-700">
@@ -2845,7 +2962,7 @@ export default function ECardsPage() {
                 </div>
               </div>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Send test birthday cards to users individually or select multiple users for bulk sending. Test emails will be sent to the selected user's actual email address.
+                Send test e-cards to users individually or select multiple users for bulk sending. Test emails will be sent to the selected user's actual email address.
               </p>
             </CardHeader>
             <CardContent className="p-0">
@@ -2875,7 +2992,7 @@ export default function ECardsPage() {
                       disabled={sendTestBirthdayMutation.isPending || tokenLoading}
                     >
                       <Mail className="h-4 w-4 mr-2" />
-                      {tokenLoading ? "Refreshing..." : sendTestBirthdayMutation.isPending ? "Sending..." : "Send Test Cards to Selected"}
+                      {tokenLoading ? "Refreshing..." : sendTestBirthdayMutation.isPending ? "Sending..." : "Send Test E-Cards to Selected"}
                     </Button>
                   </div>
                 </div>
@@ -2947,7 +3064,7 @@ export default function ECardsPage() {
                               className="flex items-center gap-2"
                             >
                               <Mail className="h-4 w-4" />
-                              {tokenLoading ? "Refreshing..." : sendTestBirthdayMutation.isPending ? "Sending..." : "Send Test Card"}
+                              {tokenLoading ? "Refreshing..." : sendTestBirthdayMutation.isPending ? "Sending..." : "Send Test E-Card"}
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -2995,7 +3112,7 @@ export default function ECardsPage() {
                   </div>
                   {selectedCustomer.birthday && (
                     <div>
-                      <Label className="text-sm font-medium text-gray-700">Birthday</Label>
+                      <Label className="text-sm font-medium text-gray-700">Special Date</Label>
                       <div className="flex items-center gap-2">
                         <CakeIcon className="h-4 w-4 text-pink-500" />
                         <span className="text-sm">{(() => {
@@ -3008,11 +3125,11 @@ export default function ECardsPage() {
                     </div>
                   )}
                   <div>
-                    <Label className="text-sm font-medium text-gray-700">Birthday Email Status</Label>
+                    <Label className="text-sm font-medium text-gray-700">E-Card Email Status</Label>
                     {selectedCustomer.birthdayUnsubscribedAt ? (
                       <div className="space-y-1">
                         <Badge className="bg-orange-100 text-orange-800">
-                          Unsubscribed from Birthday Emails
+                          Unsubscribed from E-Card Emails
                         </Badge>
                         <p className="text-xs text-gray-500 mt-1">
                           Unsubscribed on {new Date(selectedCustomer.birthdayUnsubscribedAt).toLocaleString()}
@@ -3020,10 +3137,10 @@ export default function ECardsPage() {
                       </div>
                     ) : selectedCustomer.birthday ? (
                       <Badge className="bg-green-100 text-green-800">
-                        Subscribed to Birthday Emails
+                        Subscribed to E-Card Emails
                       </Badge>
                     ) : (
-                      <span className="text-sm text-gray-500">No birthday set</span>
+                      <span className="text-sm text-gray-500">No date set</span>
                     )}
                   </div>
                 </div>
@@ -3097,7 +3214,7 @@ export default function ECardsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Birthday Modal */}
+        {/* Special Date Modal */}
         <Dialog open={birthdayModalOpen} onOpenChange={setBirthdayModalOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
@@ -3114,7 +3231,7 @@ export default function ECardsPage() {
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="birthday-date">Birthday Date</Label>
+                <Label htmlFor="birthday-date">Special Date</Label>
                 <Input
                   id="birthday-date"
                   type="date"

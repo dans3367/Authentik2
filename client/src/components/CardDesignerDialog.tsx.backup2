@@ -823,7 +823,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
           style={{ direction: 'ltr' }}
         >
           <DialogHeader className="space-y-2">
-            <DialogTitle className="text-lg sm:text-xl">Design your birthday card</DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl">Design your card</DialogTitle>
             <DialogDescription className="text-sm sm:text-base">Customize the image, header and message.</DialogDescription>
           </DialogHeader>
 

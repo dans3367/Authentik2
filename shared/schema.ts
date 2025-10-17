@@ -1788,6 +1788,21 @@ export interface CustomThemeData {
   imageScale: number;
 }
 
+// Custom e-cards table for storing user-created custom holiday/occasion cards
+export const customCards = pgTable("custom_cards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
+  name: text("name").notNull(), // Card name (e.g., "Mother's Day Card")
+  occasionType: text("occasion_type"), // Type of occasion (e.g., "Mother's Day", "Christmas")
+  sendDate: text("send_date").notNull(), // Date to send card in YYYY-MM-DD format
+  active: boolean("active").default(true), // Whether the card is active/enabled
+  cardData: text("card_data").notNull(), // JSON string containing CustomThemeData
+  promotionIds: text("promotion_ids").array(), // Array of promotion IDs to attach to this card
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Promotions table for managing promotional content templates
 export const promotions = pgTable("promotions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1808,6 +1823,18 @@ export const promotions = pgTable("promotions", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Custom card relations
+export const customCardRelations = relations(customCards, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [customCards.tenantId],
+    references: [tenants.id],
+  }),
+  user: one(betterAuthUser, {
+    fields: [customCards.userId],
+    references: [betterAuthUser.id],
+  }),
+}));
 
 // Promotion relations
 export const promotionRelations = relations(promotions, ({ one }) => ({
@@ -1864,6 +1891,39 @@ export type Promotion = typeof promotions.$inferSelect;
 export type InsertPromotion = z.infer<typeof insertPromotionSchema>;
 export type CreatePromotionData = z.infer<typeof createPromotionSchema>;
 export type UpdatePromotionData = z.infer<typeof updatePromotionSchema>;
+
+// Custom card schemas
+export const createCustomCardSchema = z.object({
+  name: z.string().min(1, "Card name is required"),
+  occasionType: z.string().optional(),
+  sendDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Send date must be in YYYY-MM-DD format"),
+  active: z.boolean().default(true),
+  cardData: z.string().min(1, "Card data is required"), // JSON string
+  promotionIds: z.array(z.string()).optional(),
+});
+
+export const updateCustomCardSchema = z.object({
+  name: z.string().min(1, "Card name is required").optional(),
+  occasionType: z.string().optional(),
+  sendDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Send date must be in YYYY-MM-DD format").optional(),
+  active: z.boolean().optional(),
+  cardData: z.string().optional(),
+  promotionIds: z.array(z.string()).optional(),
+});
+
+export const insertCustomCardSchema = createInsertSchema(customCards).omit({
+  id: true,
+  tenantId: true,
+  userId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Custom card types
+export type CustomCard = typeof customCards.$inferSelect;
+export type InsertCustomCard = z.infer<typeof insertCustomCardSchema>;
+export type CreateCustomCardData = z.infer<typeof createCustomCardSchema>;
+export type UpdateCustomCardData = z.infer<typeof updateCustomCardSchema>;
 
 // Appointments table for managing appointments and reminders
 export const appointments = pgTable("appointments", {

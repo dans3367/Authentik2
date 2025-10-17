@@ -26,6 +26,7 @@ import { twoFactorRoutes } from "./routes/twoFactorRoutes";
 import { loginRoutes } from "./routes/loginRoutes";
 import { tenantLimitsRoutes } from "./routes/tenantLimitsRoutes";
 import { promotionRoutes } from "./routes/promotionRoutes";
+import customCardsRoutes from "./routes/customCardsRoutes";
 import appointmentRoutes from "./routes/appointmentRoutes";
 import appointmentRemindersRoutes from "./routes/appointmentRemindersRoutes";
 import newsletterWorkerRoutes from "./routes/newsletterWorkerRoutes";
@@ -59,6 +60,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/newsletters", newsletterRoutes);
   app.use("/api/card-images", cardImageRoutes);
   app.use("/api/promotions", promotionRoutes);
+  app.use("/api/custom-cards", customCardsRoutes);
   app.use("/api/appointments", appointmentRoutes);
   app.use("/api/appointment-reminders", appointmentRemindersRoutes);
   app.use("/api/newsletter-worker", newsletterWorkerRoutes);
