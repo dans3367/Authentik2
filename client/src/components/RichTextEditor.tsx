@@ -11,6 +11,7 @@ import { Image } from "@tiptap/extension-image";
 import { Button } from "@/components/ui/button";
 import { Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, Droplet, User, Sparkles, Wand2, PartyPopper, ArrowRightFromLine, ArrowLeftToLine, Tag, Undo, Redo, Languages, List, ListOrdered, Heading1, Heading2, Link as LinkIcon, Minus } from "lucide-react";
 import { generateBirthdayMessage, improveText, emojifyText, expandText, shortenText, makeMoreCasualText, makeMoreFormalText, translateText } from "@/lib/aiApi";
+import { useTranslation } from "react-i18next";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +36,7 @@ interface RichTextEditorProps {
 }
 
 export default function RichTextEditor({ value, onChange, placeholder = "Start typing your message...", className = "", customerInfo, businessName, occasionType }: RichTextEditorProps) {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isImproving, setIsImproving] = useState(false);
@@ -434,7 +436,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           className="h-8 w-8 text-white hover:bg-gray-700"
           onClick={() => editor?.chain().focus().undo().run()}
           disabled={!editor}
-          title="Undo"
+          title={t('ecards.editor.undo')}
         >
           <Undo className="w-4 h-4" />
         </Button>
@@ -445,7 +447,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           className="h-8 w-8 text-white hover:bg-gray-700"
           onClick={() => editor?.chain().focus().redo().run()}
           disabled={!editor}
-          title="Redo"
+          title={t('ecards.editor.redo')}
         >
           <Redo className="w-4 h-4" />
         </Button>
@@ -457,7 +459,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           className={`h-8 w-8 text-white hover:bg-gray-700 ${isBold ? 'bg-gray-700' : ''}`}
           onClick={() => editor?.chain().focus().toggleBold().run()}
           disabled={!editor}
-          title="Bold"
+          title={t('ecards.editor.bold')}
         >
           <Bold className="w-4 h-4" />
         </Button>
@@ -468,7 +470,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           className={`h-8 w-8 text-white hover:bg-gray-700 ${isItalic ? 'bg-gray-700' : ''}`}
           onClick={() => editor?.chain().focus().toggleItalic().run()}
           disabled={!editor}
-          title="Italic"
+          title={t('ecards.editor.italic')}
         >
           <Italic className="w-4 h-4" />
         </Button>
@@ -479,7 +481,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           className={`h-8 w-8 text-white hover:bg-gray-700 ${isUnderline ? 'bg-gray-700' : ''}`}
           onClick={() => editor?.chain().focus().toggleUnderline().run()}
           disabled={!editor}
-          title="Underline"
+          title={t('ecards.editor.underline')}
         >
           <Underline className="w-4 h-4" />
         </Button>
@@ -490,7 +492,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           className={`h-8 w-8 text-white hover:bg-gray-700 ${isStrike ? 'bg-gray-700' : ''}`}
           onClick={() => editor?.chain().focus().toggleStrike().run()}
           disabled={!editor}
-          title="Strikethrough"
+          title={t('ecards.editor.strikethrough')}
         >
           <Strikethrough className="w-4 h-4" />
         </Button>
@@ -502,7 +504,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           className={`h-8 w-8 text-white hover:bg-gray-700 ${isHeading1 ? 'bg-gray-700' : ''}`}
           onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
           disabled={!editor}
-          title="Heading 1"
+          title={t('ecards.editor.heading1')}
         >
           <Heading1 className="w-4 h-4" />
         </Button>
@@ -513,7 +515,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           className={`h-8 w-8 text-white hover:bg-gray-700 ${isHeading2 ? 'bg-gray-700' : ''}`}
           onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
           disabled={!editor}
-          title="Heading 2"
+          title={t('ecards.editor.heading2')}
         >
           <Heading2 className="w-4 h-4" />
         </Button>
@@ -525,7 +527,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           className={`h-8 w-8 text-white hover:bg-gray-700 ${isBulletList ? 'bg-gray-700' : ''}`}
           onClick={() => editor?.chain().focus().toggleBulletList().run()}
           disabled={!editor}
-          title="Bullet List"
+          title={t('ecards.editor.bulletList')}
         >
           <List className="w-4 h-4" />
         </Button>
@@ -536,7 +538,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           className={`h-8 w-8 text-white hover:bg-gray-700 ${isOrderedList ? 'bg-gray-700' : ''}`}
           onClick={() => editor?.chain().focus().toggleOrderedList().run()}
           disabled={!editor}
-          title="Numbered List"
+          title={t('ecards.editor.numberedList')}
         >
           <ListOrdered className="w-4 h-4" />
         </Button>
@@ -547,7 +549,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           className="h-8 w-8 text-white hover:bg-gray-700"
           onClick={() => editor?.chain().focus().setHorizontalRule().run()}
           disabled={!editor}
-          title="Horizontal Rule"
+          title={t('ecards.editor.horizontalRule')}
         >
           <Minus className="w-4 h-4" />
         </Button>
@@ -559,7 +561,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           className={`h-8 w-8 text-white hover:bg-gray-700 ${isAlignLeft ? 'bg-gray-700' : ''}`}
           onClick={() => editor?.chain().focus().setTextAlign('left').run()}
           disabled={!editor}
-          title="Align Left"
+          title={t('ecards.editor.alignLeft')}
         >
           <AlignLeft className="w-4 h-4" />
         </Button>
@@ -570,7 +572,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           className={`h-8 w-8 text-white hover:bg-gray-700 ${isAlignCenter ? 'bg-gray-700' : ''}`}
           onClick={() => editor?.chain().focus().setTextAlign('center').run()}
           disabled={!editor}
-          title="Align Center"
+          title={t('ecards.editor.alignCenter')}
         >
           <AlignCenter className="w-4 h-4" />
         </Button>
@@ -581,14 +583,14 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           className={`h-8 w-8 text-white hover:bg-gray-700 ${isAlignRight ? 'bg-gray-700' : ''}`}
           onClick={() => editor?.chain().focus().setTextAlign('right').run()}
           disabled={!editor}
-          title="Align Right"
+          title={t('ecards.editor.alignRight')}
         >
           <AlignRight className="w-4 h-4" />
         </Button>
         <div className="relative h-8 w-8">
           <input 
             type="color" 
-            aria-label="Text color" 
+            aria-label={t('ecards.editor.textColor')}
             className="absolute inset-0 opacity-0 cursor-pointer" 
             onChange={(e) => {
               if (editor) {
@@ -612,10 +614,10 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           className="h-8 px-2 text-xs font-medium text-purple-300 hover:text-purple-100 hover:bg-gray-700"
           onClick={handleGenerateMessage}
           disabled={isGenerating || !editor}
-          title={`Generate ${occasionType || 'greeting'} message with AI`}
+          title={t('ecards.editor.generateMessage', { occasion: occasionType || 'greeting' })}
         >
           <Sparkles className={`w-3 h-3 mr-1 ${isGenerating ? 'animate-pulse' : ''}`} />
-          {isGenerating ? 'Generating...' : 'Generate'}
+          {isGenerating ? t('ecards.editor.generating') : t('ecards.editor.generate')}
         </Button>
 
         {/* Tags dropdown */}
@@ -628,10 +630,10 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
               size="sm"
               className="h-8 px-2 text-xs font-medium text-blue-300 hover:text-blue-100 hover:bg-gray-700"
               disabled={!editor}
-              title="Insert placeholders"
+              title={t('ecards.editor.insertPlaceholders')}
             >
               <Tag className="w-3 h-3 mr-1" />
-              Tags
+              {t('ecards.editor.tags')}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="bg-gray-800 border-gray-700">
@@ -640,14 +642,14 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
               className="text-white hover:bg-gray-700 cursor-pointer"
             >
               <User className="w-3 h-3 mr-2" />
-              First Name
+              {t('ecards.editor.firstName')}
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => insertPlaceholder('lastName')}
               className="text-white hover:bg-gray-700 cursor-pointer"
             >
               <User className="w-3 h-3 mr-2" />
-              Last Name
+              {t('ecards.editor.lastName')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -674,7 +676,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
             disabled={isProcessing}
           >
             <Wand2 className={`w-4 h-4 ${isImproving ? 'animate-pulse' : ''}`} />
-            {isImproving ? 'Improving...' : 'Improve with AI'}
+            {isImproving ? t('ecards.editor.improving') : t('ecards.editor.improveWithAI')}
           </button>
           <button
             className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 flex items-center gap-2 text-gray-700 hover:text-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -682,7 +684,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
             disabled={isProcessing}
           >
             <Sparkles className={`w-4 h-4 ${isCasualizing ? 'animate-pulse' : ''}`} />
-            {isCasualizing ? 'Tuning tone...' : 'More casual'}
+            {isCasualizing ? t('ecards.editor.tuningTone') : t('ecards.editor.moreCasual')}
           </button>
           <button
             className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 flex items-center gap-2 text-gray-700 hover:text-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -690,7 +692,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
             disabled={isProcessing}
           >
             <Sparkles className={`w-4 h-4 ${isFormalizing ? 'animate-pulse' : ''}`} />
-            {isFormalizing ? 'Polishing...' : 'More formal'}
+            {isFormalizing ? t('ecards.editor.polishing') : t('ecards.editor.moreFormal')}
           </button>
           <button
             className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 flex items-center gap-2 text-gray-700 hover:text-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -698,7 +700,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
             disabled={isProcessing}
           >
             <PartyPopper className={`w-4 h-4 ${isEmojifying ? 'animate-pulse' : ''}`} />
-            {isEmojifying ? 'Adding emojis...' : 'Emojify'}
+            {isEmojifying ? t('ecards.editor.addingEmojis') : t('ecards.editor.emojify')}
           </button>
           <button
             className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 flex items-center gap-2 text-gray-700 hover:text-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -706,7 +708,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
             disabled={isProcessing}
           >
             <ArrowRightFromLine className={`w-4 h-4 ${isExpanding ? 'animate-pulse' : ''}`} />
-            {isExpanding ? 'Expanding...' : 'Make longer'}
+            {isExpanding ? t('ecards.editor.expanding') : t('ecards.editor.makeLonger')}
           </button>
           <button
             className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 flex items-center gap-2 text-gray-700 hover:text-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -714,7 +716,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
             disabled={isProcessing}
           >
             <ArrowLeftToLine className={`w-4 h-4 ${isShortening ? 'animate-pulse' : ''}`} />
-            {isShortening ? 'Shortening...' : 'Make shorter'}
+            {isShortening ? t('ecards.editor.shortening') : t('ecards.editor.makeShorter')}
           </button>
           
           {/* Translate submenu */}
@@ -729,7 +731,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
             >
               <div className="flex items-center gap-2">
                 <Languages className={`w-4 h-4 ${isTranslating ? 'animate-pulse' : ''}`} />
-                {isTranslating ? 'Translating...' : 'Translate'}
+                {isTranslating ? t('ecards.editor.translating') : t('ecards.editor.translate')}
               </div>
               <span className="ml-auto text-xs">›</span>
             </button>
@@ -744,35 +746,35 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
                 onClick={() => handleTranslate('english')}
                 disabled={isProcessing}
               >
-                English
+                {t('ecards.editor.english')}
               </button>
               <button
                 className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 text-gray-700 hover:text-purple-700 disabled:opacity-50"
                 onClick={() => handleTranslate('spanish')}
                 disabled={isProcessing}
               >
-                Spanish
+                {t('ecards.editor.spanish')}
               </button>
               <button
                 className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 text-gray-700 hover:text-purple-700 disabled:opacity-50"
                 onClick={() => handleTranslate('mandarin')}
                 disabled={isProcessing}
               >
-                Chinese
+                {t('ecards.editor.chinese')}
               </button>
               <button
                 className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 text-gray-700 hover:text-purple-700 disabled:opacity-50"
                 onClick={() => handleTranslate('hindi')}
                 disabled={isProcessing}
               >
-                Hindi
+                {t('ecards.editor.hindi')}
               </button>
               <button
                 className="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 text-gray-700 hover:text-purple-700 disabled:opacity-50"
                 onClick={() => handleTranslate('bengali')}
                 disabled={isProcessing}
               >
-                Bengali
+                {t('ecards.editor.bengali')}
               </button>
             </div>
           </div>

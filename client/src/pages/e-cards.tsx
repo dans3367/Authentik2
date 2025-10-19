@@ -2217,7 +2217,7 @@ export default function ECardsPage() {
                                 </div>
                               )}
                               <div className="text-xs text-gray-500">
-                                📅 Sends on: {new Date(card.sendDate).toLocaleDateString()}
+                                📅 {t('ecards.cards.sendsOn')} {new Date(card.sendDate).toLocaleDateString()}
                               </div>
                             </div>
                             <div className="mt-2 space-y-2">
@@ -2232,7 +2232,7 @@ export default function ECardsPage() {
                                   }}
                                 >
                                   <Edit className="h-3 w-3 mr-1" />
-                                  Edit
+                                  {t('common.edit')}
                                 </Button>
                                 <Button
                                   variant="outline"
@@ -2337,7 +2337,7 @@ export default function ECardsPage() {
                                 </div>
                               )}
                               <div className="text-xs text-gray-500">
-                                📅 Sends on: {new Date(card.sendDate).toLocaleDateString()}
+                                📅 {t('ecards.cards.sendsOn')} {new Date(card.sendDate).toLocaleDateString()}
                               </div>
                             </div>
                             <div className="mt-2">
@@ -2351,7 +2351,7 @@ export default function ECardsPage() {
                                 }}
                               >
                                 <Edit className="h-3 w-3 mr-1" />
-                                Edit
+                                {t('common.edit')}
                               </Button>
                             </div>
                           </div>
