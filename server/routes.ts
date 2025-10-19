@@ -34,6 +34,7 @@ import suppressionManagementRoutes from "./routes/suppressionManagementRoutes";
 import aiRoutes from "./routes/aiRoutes";
 import { birthdayWorkerRoutes } from "./routes/birthdayWorkerRoutes";
 import { templateRoutes } from "./routes/templateRoutes";
+import { signupRoutes } from "./routes/signupRoutes";
 
 // Import middleware
 import { authRateLimiter, apiRateLimiter, jwtTokenRateLimiter } from "./middleware/security";
@@ -51,6 +52,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // API Routes
   // Note: Auth routes handled by better-auth middleware
+  app.use("/api/signup", signupRoutes); // Signup helper endpoints
   app.use("/api/admin", adminRoutes);
   app.use("/api/user", authRoutes); // User-facing session endpoints
   app.use("/api/forms", formsRoutes);

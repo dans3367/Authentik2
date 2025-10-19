@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "./db";
-import { betterAuthUser, betterAuthSession, betterAuthAccount, betterAuthVerification, tenants } from "@shared/schema";
+import { betterAuthUser, betterAuthSession, betterAuthAccount, betterAuthVerification, tenants, companies } from "@shared/schema";
 import { emailService } from "./emailService";
 import { eq, sql } from "drizzle-orm";
 
@@ -98,10 +98,15 @@ const authInstance = betterAuth({
           if (context.type === "user.created") {
             try {
               const user = context.user;
-              console.log(`🔧 Creating tenant for new user: ${user.email}`);
+              console.log(`🔧 Creating tenant and company for new user: ${user.email}`);
 
+              // Get company name from pending signups (stored by /api/signup/store-company-name)
+              const pendingCompanyName = (global as any).pendingCompanyNames?.[user.email.toLowerCase()];
+              
               // Create a tenant for the new user
-              const companyName = user.name ? `${user.name}'s Organization` : "My Organization";
+              const companyName = pendingCompanyName || (user.name ? `${user.name}'s Organization` : "My Organization");
+              
+              console.log(`📝 Company name for ${user.email}: ${companyName}${pendingCompanyName ? ' (from signup form)' : ' (auto-generated)'}`);
               
               // Generate a unique slug
               let baseSlug = user.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '-');
@@ -136,10 +141,25 @@ const authInstance = betterAuth({
                 })
                 .where(eq(betterAuthUser.id, user.id));
 
-              console.log(`✅ Tenant created for ${user.email}:`, {
+              // Create company record for onboarding
+              await db.insert(companies).values({
+                tenantId: newTenant.id,
+                ownerId: user.id,
+                name: companyName,
+                setupCompleted: false, // This will trigger the onboarding modal
+                isActive: true,
+              });
+
+              // Clean up the pending company name
+              if ((global as any).pendingCompanyNames && (global as any).pendingCompanyNames[user.email.toLowerCase()]) {
+                delete (global as any).pendingCompanyNames[user.email.toLowerCase()];
+              }
+
+              console.log(`✅ Tenant and company created for ${user.email}:`, {
                 tenantId: newTenant.id,
                 tenantName: newTenant.name,
                 tenantSlug: newTenant.slug,
+                companyName: companyName,
               });
             } catch (error) {
               console.error('❌ Failed to create tenant for new user:', error);

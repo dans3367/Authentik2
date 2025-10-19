@@ -548,6 +548,21 @@ export default function AuthPage() {
                     </div>
 
                     <div>
+                      <Label htmlFor="companyName">Company name</Label>
+                      <Input
+                        id="companyName"
+                        placeholder="Acme Inc."
+                        className="mt-2"
+                        {...registerForm.register("companyName")}
+                      />
+                      {registerForm.formState.errors.companyName && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {registerForm.formState.errors.companyName.message}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
                       <Label htmlFor="registerEmail">Email address</Label>
                       <div className="relative mt-2">
                         <Input

@@ -306,6 +306,11 @@ export const companies = pgTable("companies", {
     phone: text("phone"),
     website: text("website"),
     description: text("description"),
+    // Onboarding wizard fields
+    setupCompleted: boolean("setup_completed").default(false),
+    geographicalLocation: text("geographical_location"),
+    language: text("language").default('en'), // Language for outgoing communications
+    businessDescription: text("business_description"), // AI context for platform personalization
     isActive: boolean("is_active").default(true),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
@@ -584,6 +589,7 @@ export const registerSchema = z.object({
         .regex(/[0-9]/, "Password must contain at least one number"),
     firstName: z.string().min(1, "First name is required"),
     lastName: z.string().min(1, "Last name is required"),
+    companyName: z.string().min(2, "Company name must be at least 2 characters"),
     confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
