@@ -2391,6 +2391,7 @@ export default function ECardsPage() {
           initialThemeId={designerThemeId || undefined}
           onPreviewChange={handlePreviewChange}
           initialData={cardDesignerInitialData}
+          themeMetadataById={themeMetadataById}
           onSave={async (data) => {
             console.log('💾 [onSave] Received data from ECardDesignerDialog:', {
               imageUrl: data.imageUrl,

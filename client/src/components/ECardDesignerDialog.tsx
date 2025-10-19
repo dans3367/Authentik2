@@ -66,9 +66,11 @@ interface CardDesignerDialogProps {
   hideTabs?: boolean;
   // Hide description field (for birthday cards)
   hideDescription?: boolean;
+  // Pass theme metadata from parent to ensure consistency
+  themeMetadataById?: Record<string, { image?: string | null }>;
 }
 
-export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initialData, onSave, onPreviewChange, onMakeActive, isCurrentlyActive, senderName, customerInfo, businessName, holidayId, isHolidayDisabled, onToggleHoliday, customCardActive, onToggleCustomCardActive, customCardToggleLoading = false, selectedPromotions = [], onPromotionsChange, hidePromotionsTab = false, hideTabs = false, hideDescription = false }: CardDesignerDialogProps) {
+export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initialData, onSave, onPreviewChange, onMakeActive, isCurrentlyActive, senderName, customerInfo, businessName, holidayId, isHolidayDisabled, onToggleHoliday, customCardActive, onToggleCustomCardActive, customCardToggleLoading = false, selectedPromotions = [], onPromotionsChange, hidePromotionsTab = false, hideTabs = false, hideDescription = false, themeMetadataById = {} }: CardDesignerDialogProps) {
   const { t } = useTranslation();
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [description, setDescription] = useState(initialData?.description ?? "");
@@ -181,11 +183,18 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
       console.log('📸 Setting custom theme/card image from saved data:', initialData.imageUrl);
       setImageUrl(initialData.imageUrl);
       setCustomImage(true);
-    } else if (!isCustomTheme && initialThemeId && initialData?.imageUrl) {
-      // Default theme with its header image from parent component
-      console.log('🎭 Setting default theme image for:', initialThemeId, 'URL:', initialData.imageUrl);
-      setImageUrl(initialData.imageUrl);
-      setCustomImage(false);
+    } else if (!isCustomTheme && initialThemeId) {
+      // Default theme - use image from initialData or fallback to themeMetadataById
+      const themeImage = initialData?.imageUrl || themeMetadataById[initialThemeId]?.image;
+      if (themeImage) {
+        console.log('🎭 Setting default theme image for:', initialThemeId, 'URL:', themeImage);
+        setImageUrl(themeImage);
+        setCustomImage(false);
+      } else {
+        console.log('⚠️ No theme image found for:', initialThemeId);
+        setImageUrl(null);
+        setCustomImage(false);
+      }
     } else {
       // Custom theme without custom image or unknown theme
       console.log('🎨 Custom theme without image - clearing state');
@@ -205,7 +214,8 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
     // Store initial values for change tracking
     const finalImageUrl: string | null = hasCustomImageData ? (initialData.imageUrl ?? null) :
       (isCustomTheme && initialData?.imageUrl) ? initialData.imageUrl :
-        (!isCustomTheme && initialData?.imageUrl) ? initialData.imageUrl : null;
+        (!isCustomTheme && initialThemeId) ? 
+          (initialData?.imageUrl || themeMetadataById[initialThemeId]?.image || null) : null;
 
     const finalCustomImage: boolean = Boolean(hasCustomImageData) || (Boolean(isCustomTheme) && Boolean(initialData?.imageUrl));
 
@@ -303,11 +313,14 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
         setImageUrl(null);
         setImageError(false);
       }
-    } else if (initialThemeId && initialData?.imageUrl && !customImage) {
+    } else if (initialThemeId && !customImage) {
       // For default themes, only set if not using a custom image
-      console.log('🎭 Setting default theme image for:', initialThemeId, 'from initialData');
-      setImageUrl(initialData.imageUrl);
-      setImageError(false);
+      const themeImage = initialData?.imageUrl || themeMetadataById[initialThemeId]?.image;
+      if (themeImage) {
+        console.log('🎭 Setting default theme image for:', initialThemeId, 'URL:', themeImage);
+        setImageUrl(themeImage);
+        setImageError(false);
+      }
     }
   }, [initialThemeId, open]);
 
