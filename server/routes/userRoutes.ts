@@ -126,6 +126,11 @@ userRoutes.put("/:userId", authenticateToken, requireRole(['Owner', 'Administrat
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Disallow editing Owner accounts via this endpoint
+    if (existingUser.role === 'Owner') {
+      return res.status(403).json({ message: 'Owner account is view-only and cannot be edited' });
+    }
+
     // Check if email is already taken by another user in the same tenant
     if (email !== existingUser.email) {
       const emailCheck = await db.query.betterAuthUser.findFirst({
@@ -203,6 +208,11 @@ userRoutes.patch("/:userId/status", authenticateToken, requireRole(['Owner', 'Ad
       return res.status(400).json({ message: 'Cannot deactivate your own account' });
     }
 
+    // Disallow changing status for Owner accounts
+    if (user.role === 'Owner') {
+      return res.status(403).json({ message: 'Owner account status cannot be changed' });
+    }
+
     // Prevent deactivating the only owner
     if (user.role === 'Owner' && !isActive) {
       const ownerCount = await db.select({
@@ -262,18 +272,9 @@ userRoutes.delete("/:userId", authenticateToken, requireRole(['Owner', 'Administ
       return res.status(400).json({ message: 'Cannot delete your own account' });
     }
 
-    // Prevent deleting the only owner
+    // Disallow deleting Owner accounts entirely
     if (user.role === 'Owner') {
-      const ownerCount = await db.select({
-        count: sql<number>`count(*)`,
-      }).from(betterAuthUser).where(and(
-        eq(betterAuthUser.role, 'Owner'),
-        eq(betterAuthUser.tenantId, req.user.tenantId)
-      ));
-
-      if (ownerCount[0].count <= 1) {
-        return res.status(400).json({ message: 'Cannot delete the only owner' });
-      }
+      return res.status(403).json({ message: 'Owner account cannot be deleted' });
     }
 
     // Delete user (this will cascade to related records)

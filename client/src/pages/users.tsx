@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Users as UsersIcon, Plus, Search, Filter, Edit, Trash2, Shield, UserCheck, UserX, Calendar, Mail, MapPin, Eye, EyeOff, X } from "lucide-react";
+import { Users as UsersIcon, Plus, Search, Filter, Edit, Trash2, Shield, UserCheck, UserX, Calendar, Mail, MapPin, Eye, EyeOff, X, User as UserIcon } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -41,6 +41,7 @@ interface ExtendedUser {
 }
 import { DataTable, DataTableColumnHeader, DataTableRowActions } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
+import { Link } from "wouter";
 import { Checkbox } from "@/components/ui/checkbox";
 
 interface UserStats {
@@ -95,6 +96,7 @@ export default function UsersPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [isViewMode, setIsViewMode] = useState(false);
   
   // State for tracking unsaved changes in edit dialog
   const [hasUnsavedEditChanges, setHasUnsavedEditChanges] = useState(false);
@@ -399,13 +401,36 @@ export default function UsersPage() {
     createUserMutation.mutate(data);
   };
 
-  const handleEditUser = (user: User) => {
+  const handleViewUser = (user: User) => {
+    setIsViewMode(true);
     setSelectedUser(user);
     const initialValues = {
       firstName: user.firstName || "",
       lastName: user.lastName || "",
       email: user.email,
-      role: user.role === 'Owner' ? 'Administrator' : user.role as 'Administrator' | 'Manager' | 'Employee',
+      // For view mode, keep the displayed role as the user's current role where possible
+      role: (user.role === 'Owner' ? 'Administrator' : (user.role as 'Administrator' | 'Manager' | 'Employee')),
+      isActive: user.isActive ?? true,
+    };
+    editForm.reset(initialValues);
+    setInitialEditValues(initialValues);
+    setHasUnsavedEditChanges(false);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditUser = (user: User) => {
+    if (user.role === 'Owner') {
+      // View-only for Owner accounts
+      handleViewUser(user);
+      return;
+    }
+    setIsViewMode(false);
+    setSelectedUser(user);
+    const initialValues = {
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
+      email: user.email,
+      role: user.role as 'Administrator' | 'Manager' | 'Employee',
       isActive: user.isActive ?? true,
     };
     editForm.reset(initialValues);
@@ -441,6 +466,7 @@ export default function UsersPage() {
     setIsEditDialogOpen(open);
     if (!open) {
       setSelectedUser(null);
+      setIsViewMode(false);
       setHasUnsavedEditChanges(false);
       setInitialEditValues(null);
       editForm.reset();
@@ -451,6 +477,7 @@ export default function UsersPage() {
     setShowEditConfirmDialog(false);
     setIsEditDialogOpen(false);
     setSelectedUser(null);
+    setIsViewMode(false);
     setHasUnsavedEditChanges(false);
     setInitialEditValues(null);
     editForm.reset();
@@ -463,6 +490,8 @@ export default function UsersPage() {
       header: "USER",
       cell: ({ row }) => {
         const user = row.original;
+        const name = user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'No name';
+        const isOwnerSelf = user.role === 'Owner' && user.id === currentUser?.id;
         return (
           <div className="flex items-center space-x-3">
             <div className="relative">
@@ -474,12 +503,23 @@ export default function UsersPage() {
               </Avatar>
               <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-white"></div>
             </div>
-            <div>
-              <div className="font-medium text-gray-900">
-                {user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'No name'}
+            {isOwnerSelf ? (
+              <Link href="/profile" className="group">
+                <div>
+                  <div className="font-medium text-blue-700 group-hover:underline">
+                    {name}
+                  </div>
+                  <div className="text-sm text-blue-600/80">{user.email}</div>
+                </div>
+              </Link>
+            ) : (
+              <div>
+                <div className="font-medium text-gray-900">
+                  {name}
+                </div>
+                <div className="text-sm text-gray-500">{user.email}</div>
               </div>
-              <div className="text-sm text-gray-500">{user.email}</div>
-            </div>
+            )}
           </div>
         );
       },
@@ -569,7 +609,45 @@ export default function UsersPage() {
       header: "ACTIONS",
       cell: ({ row }) => {
         const user = row.original;
-        if (!isAdmin || user.id === currentUser.id) return null;
+        if (!isAdmin) return null;
+
+        // Current Owner: show profile link
+        if (user.id === currentUser.id && user.role === 'Owner') {
+          return (
+            <div className="flex items-center space-x-2">
+              <Link href="/profile">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                  title="Go to Profile"
+                >
+                  <UserIcon className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          );
+        }
+
+        // No actions for current non-owner
+        if (user.id === currentUser.id) return null;
+        
+        // Owner accounts (not current user) are view-only
+        if (user.role === 'Owner') {
+          return (
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
+                onClick={() => handleViewUser(user)}
+                title="View User"
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+            </div>
+          );
+        }
         
         return (
           <div className="flex items-center space-x-2">
@@ -997,55 +1075,91 @@ export default function UsersPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <h3 className="font-medium text-gray-900 dark:text-white truncate" data-testid={`text-user-name-card-${user.id}`}>
-                              {user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'No name'}
+                              {user.role === 'Owner' && user.id === currentUser.id ? (
+                                <Link href="/profile" className="text-blue-700 hover:underline">
+                                  {user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'No name'}
+                                </Link>
+                              ) : (
+                                user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'No name'
+                              )}
                             </h3>
                             <p className="text-sm text-gray-500 dark:text-gray-400 truncate" data-testid={`text-user-email-card-${user.id}`}>
-                              {user.email}
+                              {user.role === 'Owner' && user.id === currentUser.id ? (
+                                <Link href="/profile" className="text-blue-600 hover:underline">{user.email}</Link>
+                              ) : (
+                                user.email
+                              )}
                             </p>
                           </div>
                         </div>
                         
-                        {/* Actions - only show for admins and not for current user */}
-                        {isAdmin && user.id !== currentUser.id && (
+                        {/* Actions */}
+                        {isAdmin && (
                           <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/20"
-                              onClick={() => handleEditUser(user)}
-                              data-testid={`button-edit-user-card-${user.id}`}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
+                            {user.id === currentUser.id && user.role === 'Owner' ? (
+                              <Link href="/profile">
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
-                                  data-testid={`button-delete-user-card-${user.id}`}
+                                  className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+                                  data-testid={`button-profile-owner-card-${user.id}`}
+                                  title="Go to Profile"
                                 >
-                                  <Trash2 className="h-4 w-4" />
+                                  <UserIcon className="h-4 w-4" />
                                 </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete User</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete {user.firstName} {user.lastName}? This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleDeleteUser(user.id)}
-                                    className="bg-red-600 hover:bg-red-700"
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                              </Link>
+                            ) : user.role === 'Owner' ? (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-gray-600 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-950/20"
+                                onClick={() => handleViewUser(user)}
+                                data-testid={`button-view-user-card-${user.id}`}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            ) : user.id !== currentUser.id ? (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/20"
+                                  onClick={() => handleEditUser(user)}
+                                  data-testid={`button-edit-user-card-${user.id}`}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                                      data-testid={`button-delete-user-card-${user.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete User</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete {user.firstName} {user.lastName}? This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleDeleteUser(user.id)}
+                                        className="bg-red-600 hover:bg-red-700"
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </>
+                            ) : null}
                           </div>
                         )}
                       </div>
@@ -1115,7 +1229,7 @@ export default function UsersPage() {
                         </div>
 
                         {/* Status Toggle for Admins */}
-                        {isAdmin && user.id !== currentUser.id && (
+                        {isAdmin && user.id !== currentUser.id && user.role !== 'Owner' && (
                           <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Account Status</span>
@@ -1141,9 +1255,9 @@ export default function UsersPage() {
         <Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogClose}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle>Edit User</DialogTitle>
+              <DialogTitle>{isViewMode ? 'View User' : 'Edit User'}</DialogTitle>
               <DialogDescription>
-                Update user information and permissions.
+                {isViewMode ? 'View user information.' : 'Update user information and permissions.'}
               </DialogDescription>
             </DialogHeader>
             <Form {...editForm}>
@@ -1156,7 +1270,7 @@ export default function UsersPage() {
                       <FormItem>
                         <FormLabel>First Name</FormLabel>
                         <FormControl>
-                          <Input {...field} />
+                          <Input {...field} disabled={isViewMode} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1169,7 +1283,7 @@ export default function UsersPage() {
                       <FormItem>
                         <FormLabel>Last Name</FormLabel>
                         <FormControl>
-                          <Input {...field} />
+                          <Input {...field} disabled={isViewMode} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1183,7 +1297,7 @@ export default function UsersPage() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input type="email" {...field} />
+                        <Input type="email" {...field} disabled={isViewMode} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1195,20 +1309,26 @@ export default function UsersPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Role</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      {isViewMode && selectedUser?.role === 'Owner' ? (
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a role" />
-                          </SelectTrigger>
+                          <Input value="Owner" disabled />
                         </FormControl>
-                        <SelectContent>
-                          {nonOwnerRoles.map((role) => (
-                            <SelectItem key={role} value={role}>
-                              {role}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      ) : (
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger disabled={isViewMode}>
+                              <SelectValue placeholder="Select a role" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {nonOwnerRoles.map((role) => (
+                              <SelectItem key={role} value={role}>
+                                {role}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
@@ -1228,20 +1348,23 @@ export default function UsersPage() {
                         <Switch
                           checked={field.value ?? true}
                           onCheckedChange={field.onChange}
+                          disabled={isViewMode}
                         />
                       </FormControl>
                     </FormItem>
                   )}
                 />
-                <DialogFooter>
-                  <Button 
-                    type="submit" 
-                    disabled={updateUserMutation.isPending}
-                    className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-                  >
-                    {updateUserMutation.isPending ? "Updating..." : "Update User"}
-                  </Button>
-                </DialogFooter>
+                {!isViewMode && (
+                  <DialogFooter>
+                    <Button 
+                      type="submit" 
+                      disabled={updateUserMutation.isPending}
+                      className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                    >
+                      {updateUserMutation.isPending ? "Updating..." : "Update User"}
+                    </Button>
+                  </DialogFooter>
+                )}
               </form>
             </Form>
           </DialogContent>

@@ -363,11 +363,11 @@ export default function Subscribe() {
 
   // Fetch subscription plans
   const { data: plans, isLoading: plansLoading, error: plansError, refetch: refetchPlans } = useQuery<SubscriptionPlan[]>({
-    queryKey: ['/api/subscription-plans'],
+    queryKey: ['/api/subscription/plans'],
     queryFn: async () => {
       // Use direct fetch for subscription plans since it doesn't require auth
       try {
-        const response = await fetch('/api/subscription-plans');
+        const response = await fetch('/api/subscription/plans');
         if (!response.ok) {
           throw new Error(`Failed to fetch subscription plans: ${response.statusText}`);
         }
@@ -377,7 +377,7 @@ export default function Subscribe() {
         // Retry once after a short delay
         if (Array.isArray(data) && data.length === 0) {
           await new Promise(resolve => setTimeout(resolve, 1000));
-          const retryResponse = await fetch('/api/subscription-plans');
+          const retryResponse = await fetch('/api/subscription/plans');
           if (retryResponse.ok) {
             const retryData = await retryResponse.json();
             return retryData;

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth, useUpdateTheme, useUpdateMenuPreference, useUpdateProfile, useChangePassword, useDeleteAccount, useSetup2FA, useEnable2FA, useDisable2FA } from "@/hooks/useAuth";
@@ -349,11 +350,11 @@ export default function ProfilePage() {
 
   // Fetch subscription plans
   const { data: plans, isLoading: plansLoading, error: plansError, refetch: refetchPlans } = useQuery<SubscriptionPlan[]>({
-    queryKey: ['/api/subscription-plans'],
+    queryKey: ['/api/subscription/plans'],
     queryFn: async () => {
       // Use direct fetch for subscription plans since it doesn't require auth
       try {
-        const response = await fetch('/api/subscription-plans');
+        const response = await fetch('/api/subscription/plans');
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -445,6 +446,9 @@ export default function ProfilePage() {
   } | null>(null);
   const [twoFactorToken, setTwoFactorToken] = useState("");
   const [disableTwoFactorToken, setDisableTwoFactorToken] = useState("");
+
+  // Security tips dialog
+  const [isSecurityTipsOpen, setIsSecurityTipsOpen] = useState(false);
 
   const profileForm = useForm<UpdateProfileData>({
     resolver: zodResolver(updateProfileSchema),
@@ -605,16 +609,63 @@ export default function ProfilePage() {
               <p className="text-gray-600 dark:text-gray-400 mt-1">
                 Manage your account information and security settings
               </p>
-              {/* Debug info */}
-              {process.env.NODE_ENV === 'development' && user && (
-                <div className="mt-2 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded px-2 py-1">
-                  <strong>Debug:</strong> Email: {user.email || 'none'} | Name: {user.name || 'none'} | 
-                  FirstName: {user.firstName || 'none'} | LastName: {user.lastName || 'none'}
-                </div>
-              )}
             </div>
           </div>
         </div>
+
+        {/* Security Tips Modal */}
+        <Dialog open={isSecurityTipsOpen} onOpenChange={setIsSecurityTipsOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-blue-600" />
+                Security Tips
+              </DialogTitle>
+              <DialogDescription>
+                Follow these best practices to keep your account safe.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2">
+              <div className="flex items-start gap-3">
+                <Lock className="w-5 h-5 text-purple-600 mt-0.5" />
+                <div>
+                  <p className="font-medium">Use strong, unique passwords</p>
+                  <p className="text-sm text-muted-foreground">At least 12 characters with a mix of upper/lowercase, numbers, and symbols. Avoid reuse across sites.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Smartphone className="w-5 h-5 text-emerald-600 mt-0.5" />
+                <div>
+                  <p className="font-medium">Enable Two‑Factor Authentication (2FA)</p>
+                  <p className="text-sm text-muted-foreground">Add a second verification step for logins. Store backup codes in a safe place.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Eye className="w-5 h-5 text-orange-600 mt-0.5" />
+                <div>
+                  <p className="font-medium">Beware of phishing</p>
+                  <p className="text-sm text-muted-foreground">Check sender domains, avoid clicking suspicious links, and never share verification codes.</p>
+                </div>
+              </div>
+
+
+              <div className="flex items-start gap-3">
+                <QrCode className="w-5 h-5 text-teal-600 mt-0.5" />
+                <div>
+                  <p className="font-medium">Use an authenticator app</p>
+                  <p className="text-sm text-muted-foreground">Prefer app‑based codes over SMS where possible for stronger security.</p>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="flex items-center justify-end gap-2">
+              <Button variant="secondary" onClick={() => setIsSecurityTipsOpen(false)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <Tabs defaultValue="profile" className="space-y-8">
           <TabsList className="grid w-full grid-cols-6 bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 p-1 h-auto">
@@ -876,7 +927,7 @@ export default function ProfilePage() {
                       <span className="sm:hidden"> </span>Safety
                     </h3>
                     <p className="text-gray-600 dark:text-gray-400 mb-6 text-sm">
-                      Transform your living space beautifully with our Restyle Your Space: Soft Goods Makeover Ideas tutorial
+                      Follow these best practices to keep your account safe.
                     </p>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6 sm:mb-8">
@@ -884,32 +935,36 @@ export default function ProfilePage() {
                         <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
                           <Check className="w-4 h-4 text-white" />
                         </div>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Strong Passwords</span>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Use strong, unique passwords</span>
                       </div>
                       
                       <div className="flex items-center space-x-3">
                         <div className="w-6 h-6 border-2 border-gray-300 dark:border-gray-600 rounded-full flex items-center justify-center flex-shrink-0">
                           <div className="w-2 h-2 bg-green-500 rounded-full opacity-60"></div>
                         </div>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Two-Factor Authentication</span>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable Two‑Factor Authentication (2FA)</span>
                       </div>
                       
                       <div className="flex items-center space-x-3">
                         <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
                           <Check className="w-4 h-4 text-white" />
                         </div>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Budget-Friendly</span>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Beware of phishing</span>
                       </div>
                       
                       <div className="flex items-center space-x-3">
                         <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
                           <Check className="w-4 h-4 text-white" />
                         </div>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Fresh Look</span>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Use an authenticator app</span>
                       </div>
                     </div>
                     
-                    <Button variant="link" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 p-0 h-auto font-semibold underline">
+                    <Button 
+                      variant="link" 
+                      className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 p-0 h-auto font-semibold underline"
+                      onClick={() => setIsSecurityTipsOpen(true)}
+                    >
                       Review Security Tips
                     </Button>
                   </div>
