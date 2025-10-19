@@ -126,6 +126,7 @@ interface SubscriptionManagementProps {
 }
 
 const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }: SubscriptionManagementProps) => {
+  const { t } = useLanguage();
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>(
     subscription?.isYearly ? 'yearly' : 'monthly'
   );
@@ -141,7 +142,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
   if (!currentPlan) {
     return (
       <div className="text-center">
-        <h2 className="text-xl font-bold mb-4">Loading subscription details...</h2>
+        <h2 className="text-xl font-bold mb-4">{t('profile.subscription.loading')}</h2>
       </div>
     );
   }
@@ -168,7 +169,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
               ${subscription.isYearly ? currentPlan.yearlyPrice : currentPlan.price}
             </div>
             <div className="text-sm text-blue-700 dark:text-blue-300">
-              per {subscription.isYearly ? 'year' : 'month'}
+              {t(subscription.isYearly ? 'profile.subscription.perYear' : 'profile.subscription.perMonth')}
             </div>
           </div>
         </div>
@@ -176,28 +177,28 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
         {isTrialing && daysLeft && (
           <div className="bg-yellow-100 dark:bg-yellow-900/50 border border-yellow-300 dark:border-yellow-700 rounded-md p-3 mb-4">
             <p className="text-yellow-800 dark:text-yellow-200 text-sm">
-              <strong>Trial Active:</strong> {daysLeft} day{daysLeft !== 1 ? 's' : ''} remaining until {formatDate(trialEndsAt!)}
+              <strong>{t('profile.subscription.trialActive')}:</strong> {daysLeft} {t('profile.subscription.daysRemaining')} {formatDate(trialEndsAt!)}
             </p>
           </div>
         )}
         
         <div className="text-sm text-blue-600 dark:text-blue-400">
-          {isTrialing ? 'Trial ends' : 'Next billing'}: {formatDate(isTrialing && trialEndsAt ? trialEndsAt : currentPeriodEnd)}
+          {isTrialing ? t('profile.subscription.trialEnds') : t('profile.subscription.nextBilling')}: {formatDate(isTrialing && trialEndsAt ? trialEndsAt : currentPeriodEnd)}
         </div>
       </div>
 
       {/* Upgrade Options */}
       <div>
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-lg font-semibold">Available Plans</h3>
+          <h3 className="text-lg font-semibold">{t('profile.subscription.availablePlans')}</h3>
           <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600 dark:text-gray-400">Billing cycle:</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">{t('profile.subscription.billingCycle')}:</span>
             <Tabs value={billingCycle} onValueChange={(value) => setBillingCycle(value as 'monthly' | 'yearly')}>
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="monthly">Monthly</TabsTrigger>
+                <TabsTrigger value="monthly">{t('profile.subscription.monthly')}</TabsTrigger>
                 <TabsTrigger value="yearly">
-                  Yearly
-                  <Badge variant="secondary" className="ml-2">Save 20%</Badge>
+                  {t('profile.subscription.yearly')}
+                  <Badge variant="secondary" className="ml-2">{t('profile.subscription.save20')}</Badge>
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -216,7 +217,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
                   <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                     <Badge className="bg-primary text-primary-foreground px-3 py-1">
                       <Star className="w-3 h-3 mr-1" />
-                      Most Popular
+                      {t('profile.subscription.mostPopular')}
                     </Badge>
                   </div>
                 )}
@@ -230,11 +231,11 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
                       ${billingCycle === 'yearly' ? plan.yearlyPrice : plan.price}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      per {billingCycle === 'yearly' ? 'year' : 'month'}
+                      {t(billingCycle === 'yearly' ? 'profile.subscription.perYear' : 'profile.subscription.perMonth')}
                     </div>
                     {billingCycle === 'yearly' && plan.yearlyPrice && (
                       <div className="text-xs text-green-600 mt-1">
-                        Save ${((parseFloat(plan.price) * 12) - parseFloat(plan.yearlyPrice)).toFixed(2)}/year
+                        {t('profile.subscription.savePerYear')} ${((parseFloat(plan.price) * 12) - parseFloat(plan.yearlyPrice)).toFixed(2)}/year
                       </div>
                     )}
                   </div>
@@ -250,14 +251,14 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
                     {isUpgrading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing...
+                        {t('profile.subscription.processing')}
                       </>
                     ) : isCurrent ? (
-                      "Current Plan"
+                      t('profile.subscription.currentPlanButton')
                     ) : isUpgrade ? (
-                      "Upgrade to This Plan"
+                      t('profile.subscription.upgrade')
                     ) : (
-                      "Downgrade to This Plan"
+                      t('profile.subscription.downgrade')
                     )}
                   </Button>
 
@@ -272,11 +273,11 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
 
                   <div className="mt-4 pt-4 border-t text-xs text-muted-foreground">
                     <div className="space-y-1">
-                      {plan.maxUsers && <div>Up to {plan.maxUsers} users</div>}
-                      {plan.maxShops && <div>Up to {plan.maxShops} shops</div>}
-                      {plan.maxProjects && <div>Up to {plan.maxProjects} projects</div>}
-                      {plan.storageLimit && <div>{plan.storageLimit}GB storage</div>}
-                      <div className="capitalize">{plan.supportLevel} support</div>
+                      {plan.maxUsers && <div>{t('profile.subscription.upTo')} {plan.maxUsers} {t('profile.subscription.users')}</div>}
+                      {plan.maxShops && <div>{t('profile.subscription.upTo')} {plan.maxShops} {t('profile.subscription.shops')}</div>}
+                      {plan.maxProjects && <div>{t('profile.subscription.upTo')} {plan.maxProjects} {t('profile.subscription.projects')}</div>}
+                      {plan.storageLimit && <div>{plan.storageLimit}GB {t('profile.subscription.storage')}</div>}
+                      <div className="capitalize">{plan.supportLevel} {t('profile.subscription.support')}</div>
                     </div>
                   </div>
                 </CardContent>
@@ -287,7 +288,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
       </div>
 
       <div className="text-center text-sm text-muted-foreground">
-        <p>Need help choosing? <a href="mailto:support@example.com" className="text-primary hover:underline">Contact our support team</a></p>
+        <p>{t('profile.subscription.needHelp')} <a href="mailto:support@example.com" className="text-primary hover:underline">{t('profile.subscription.contactSupport')}</a></p>
       </div>
     </div>
   );
@@ -503,7 +504,7 @@ export default function ProfilePage() {
       <div className="max-w-4xl mx-auto p-6">
         <div className="flex items-center justify-center min-h-[400px]">
           <Loader2 className="h-8 w-8 animate-spin" />
-          <span className="ml-4">Authenticating...</span>
+          <span className="ml-4">{t('profile.loading')}</span>
         </div>
       </div>
     );
@@ -585,7 +586,7 @@ export default function ProfilePage() {
       <div className="mt-2">
         <div className="flex space-x-1">{strengthBars}</div>
         <p className={`text-xs mt-1 ${getPasswordStrengthColor(passwordStrength)}`}>
-          Password strength: {getPasswordStrengthText(passwordStrength)}
+          {t('profile.security.passwordStrength')}: {getPasswordStrengthText(passwordStrength)}
         </p>
       </div>
     );
@@ -604,10 +605,10 @@ export default function ProfilePage() {
             </div>
             <div>
               <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-                Account Settings
+                {t('profile.title')}
               </h1>
               <p className="text-gray-600 dark:text-gray-400 mt-1">
-                Manage your account information and security settings
+                {t('profile.subtitle')}
               </p>
             </div>
           </div>
@@ -619,10 +620,10 @@ export default function ProfilePage() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Shield className="w-5 h-5 text-blue-600" />
-                Security Tips
+                {t('profile.securityTips.title')}
               </DialogTitle>
               <DialogDescription>
-                Follow these best practices to keep your account safe.
+                {t('profile.securityTips.description')}
               </DialogDescription>
             </DialogHeader>
 
@@ -630,24 +631,24 @@ export default function ProfilePage() {
               <div className="flex items-start gap-3">
                 <Lock className="w-5 h-5 text-purple-600 mt-0.5" />
                 <div>
-                  <p className="font-medium">Use strong, unique passwords</p>
-                  <p className="text-sm text-muted-foreground">At least 12 characters with a mix of upper/lowercase, numbers, and symbols. Avoid reuse across sites.</p>
+                  <p className="font-medium">{t('profile.securityTips.strongPasswords')}</p>
+                  <p className="text-sm text-muted-foreground">{t('profile.securityTips.strongPasswordsDescription')}</p>
                 </div>
               </div>
 
               <div className="flex items-start gap-3">
                 <Smartphone className="w-5 h-5 text-emerald-600 mt-0.5" />
                 <div>
-                  <p className="font-medium">Enable Two‑Factor Authentication (2FA)</p>
-                  <p className="text-sm text-muted-foreground">Add a second verification step for logins. Store backup codes in a safe place.</p>
+                  <p className="font-medium">{t('profile.securityTips.enable2FA')}</p>
+                  <p className="text-sm text-muted-foreground">{t('profile.securityTips.enable2FADescription')}</p>
                 </div>
               </div>
 
               <div className="flex items-start gap-3">
                 <Eye className="w-5 h-5 text-orange-600 mt-0.5" />
                 <div>
-                  <p className="font-medium">Beware of phishing</p>
-                  <p className="text-sm text-muted-foreground">Check sender domains, avoid clicking suspicious links, and never share verification codes.</p>
+                  <p className="font-medium">{t('profile.securityTips.bewarePhishing')}</p>
+                  <p className="text-sm text-muted-foreground">{t('profile.securityTips.bewarePhishingDescription')}</p>
                 </div>
               </div>
 
@@ -655,14 +656,14 @@ export default function ProfilePage() {
               <div className="flex items-start gap-3">
                 <QrCode className="w-5 h-5 text-teal-600 mt-0.5" />
                 <div>
-                  <p className="font-medium">Use an authenticator app</p>
-                  <p className="text-sm text-muted-foreground">Prefer app‑based codes over SMS where possible for stronger security.</p>
+                  <p className="font-medium">{t('profile.securityTips.useAuthenticator')}</p>
+                  <p className="text-sm text-muted-foreground">{t('profile.securityTips.useAuthenticatorDescription')}</p>
                 </div>
               </div>
             </div>
 
             <DialogFooter className="flex items-center justify-end gap-2">
-              <Button variant="secondary" onClick={() => setIsSecurityTipsOpen(false)}>Close</Button>
+              <Button variant="secondary" onClick={() => setIsSecurityTipsOpen(false)}>{t('profile.securityTips.close')}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -671,29 +672,29 @@ export default function ProfilePage() {
           <TabsList className="grid w-full grid-cols-6 bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 p-1 h-auto">
             <TabsTrigger value="profile" className="flex items-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-50 data-[state=active]:to-blue-100 data-[state=active]:dark:from-blue-900/30 data-[state=active]:dark:to-blue-800/30 data-[state=active]:text-blue-700 data-[state=active]:dark:text-blue-300 py-3">
               <User className="w-4 h-4" />
-              <span className="hidden sm:inline">Profile</span>
+              <span className="hidden sm:inline">{t('profile.tabs.profile')}</span>
             </TabsTrigger>
             <TabsTrigger value="preferences" className="flex items-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-50 data-[state=active]:to-green-100 data-[state=active]:dark:from-green-900/30 data-[state=active]:dark:to-green-800/30 data-[state=active]:text-green-700 data-[state=active]:dark:text-green-300 py-3">
               <Settings className="w-4 h-4" />
-              <span className="hidden sm:inline">Preferences</span>
+              <span className="hidden sm:inline">{t('profile.tabs.preferences')}</span>
             </TabsTrigger>
             <TabsTrigger value="security" className="flex items-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-50 data-[state=active]:to-purple-100 data-[state=active]:dark:from-purple-900/30 data-[state=active]:dark:to-purple-800/30 data-[state=active]:text-purple-700 data-[state=active]:dark:text-purple-300 py-3">
               <Shield className="w-4 h-4" />
-              <span className="hidden sm:inline">Security</span>
+              <span className="hidden sm:inline">{t('profile.tabs.security')}</span>
             </TabsTrigger>
             <TabsTrigger value="2fa" className="flex items-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-50 data-[state=active]:to-orange-100 data-[state=active]:dark:from-orange-900/30 data-[state=active]:dark:to-orange-800/30 data-[state=active]:text-orange-700 data-[state=active]:dark:text-orange-300 py-3">
               <Lock className="w-4 h-4" />
-              <span className="hidden sm:inline">2FA</span>
+              <span className="hidden sm:inline">{t('profile.tabs.twoFactor')}</span>
             </TabsTrigger>
             {user?.role === 'Owner' && (
               <TabsTrigger value="subscription" className="flex items-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-50 data-[state=active]:to-indigo-100 data-[state=active]:dark:from-indigo-900/30 data-[state=active]:dark:to-indigo-800/30 data-[state=active]:text-indigo-700 data-[state=active]:dark:text-indigo-300 py-3">
                 <CreditCard className="w-4 h-4" />
-                <span className="hidden sm:inline">Subscription</span>
+                <span className="hidden sm:inline">{t('profile.tabs.subscription')}</span>
               </TabsTrigger>
             )}
             <TabsTrigger value="danger" className="flex items-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-red-50 data-[state=active]:to-red-100 data-[state=active]:dark:from-red-900/30 data-[state=active]:dark:to-red-800/30 data-[state=active]:text-red-700 data-[state=active]:dark:text-red-300 py-3">
               <AlertTriangle className="w-4 h-4" />
-              <span className="hidden sm:inline">Danger</span>
+              <span className="hidden sm:inline">{t('profile.tabs.danger')}</span>
             </TabsTrigger>
           </TabsList>
 
@@ -705,7 +706,7 @@ export default function ProfilePage() {
                   <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 rounded-lg flex items-center justify-center">
                     <User className="w-5 h-5 text-white" />
                   </div>
-                  <span>Personal Information</span>
+                  <span>{t('profile.profileTab.title')}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -720,7 +721,7 @@ export default function ProfilePage() {
                       />
                     </div>
                     <div className="text-center">
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Click to update your profile picture</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{t('profile.profileTab.avatarHint')}</p>
                     </div>
                   </div>
 
@@ -730,7 +731,7 @@ export default function ProfilePage() {
                       <div className="space-y-2">
                         <Label htmlFor="firstName" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
                           <User className="w-4 h-4 mr-2 text-blue-500 dark:text-blue-400" />
-                          First Name
+                          {t('profile.profileTab.firstName')}
                         </Label>
                         <Input
                           id="firstName"
@@ -747,7 +748,7 @@ export default function ProfilePage() {
                       <div className="space-y-2">
                         <Label htmlFor="lastName" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
                           <User className="w-4 h-4 mr-2 text-blue-500 dark:text-blue-400" />
-                          Last Name
+                          {t('profile.profileTab.lastName')}
                         </Label>
                         <Input
                           id="lastName"
@@ -766,7 +767,7 @@ export default function ProfilePage() {
                     <div className="space-y-2">
                       <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
                         <Mail className="w-4 h-4 mr-2 text-blue-500 dark:text-blue-400" />
-                        Email Address
+                        {t('profile.profileTab.email')}
                       </Label>
                       <div className="relative">
                         <Input
@@ -794,12 +795,12 @@ export default function ProfilePage() {
                         {updateProfileMutation.isPending ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Updating...</span>
+                            <span>{t('profile.profileTab.updating')}</span>
                           </>
                         ) : (
                           <>
                             <Save className="w-4 h-4" />
-                            <span>Save Changes</span>
+                            <span>{t('profile.profileTab.saveChanges')}</span>
                           </>
                         )}
                       </Button>
@@ -818,7 +819,7 @@ export default function ProfilePage() {
                   <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 dark:from-green-400 dark:to-green-500 rounded-lg flex items-center justify-center">
                     <Settings className="w-5 h-5 text-white" />
                   </div>
-                  <span>Application Preferences</span>
+                  <span>{t('profile.preferences.title')}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -922,12 +923,10 @@ export default function ProfilePage() {
                 <div className="sm:flex sm:items-center sm:justify-between">
                   <div className="flex-1">
                     <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
-                      Essential Personal Security Tips for Enhanced
-                      <br className="hidden sm:block" />
-                      <span className="sm:hidden"> </span>Safety
+                      {t('profile.security.tipsTitle')}
                     </h3>
                     <p className="text-gray-600 dark:text-gray-400 mb-6 text-sm">
-                      Follow these best practices to keep your account safe.
+                      {t('profile.security.tipsDescription')}
                     </p>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6 sm:mb-8">
@@ -935,28 +934,28 @@ export default function ProfilePage() {
                         <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
                           <Check className="w-4 h-4 text-white" />
                         </div>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Use strong, unique passwords</span>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('profile.security.tip1')}</span>
                       </div>
                       
                       <div className="flex items-center space-x-3">
                         <div className="w-6 h-6 border-2 border-gray-300 dark:border-gray-600 rounded-full flex items-center justify-center flex-shrink-0">
                           <div className="w-2 h-2 bg-green-500 rounded-full opacity-60"></div>
                         </div>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable Two‑Factor Authentication (2FA)</span>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('profile.security.tip2')}</span>
                       </div>
                       
                       <div className="flex items-center space-x-3">
                         <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
                           <Check className="w-4 h-4 text-white" />
                         </div>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Beware of phishing</span>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('profile.security.tip3')}</span>
                       </div>
                       
                       <div className="flex items-center space-x-3">
                         <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
                           <Check className="w-4 h-4 text-white" />
                         </div>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Use an authenticator app</span>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('profile.security.tip4')}</span>
                       </div>
                     </div>
                     
@@ -965,7 +964,7 @@ export default function ProfilePage() {
                       className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 p-0 h-auto font-semibold underline"
                       onClick={() => setIsSecurityTipsOpen(true)}
                     >
-                      Review Security Tips
+                      {t('profile.security.reviewTips')}
                     </Button>
                   </div>
                   
@@ -995,7 +994,7 @@ export default function ProfilePage() {
                   <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 dark:from-purple-400 dark:to-purple-500 rounded-lg flex items-center justify-center">
                     <Lock className="w-5 h-5 text-white" />
                   </div>
-                  <span>Change Password</span>
+                  <span>{t('profile.security.title')}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -1003,7 +1002,7 @@ export default function ProfilePage() {
                   <div className="space-y-2">
                     <Label htmlFor="currentPassword" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
                       <Lock className="w-4 h-4 mr-2 text-purple-500 dark:text-purple-400" />
-                      Current Password
+                      {t('profile.security.currentPassword')}
                     </Label>
                     <div className="relative">
                       <Input
@@ -1032,7 +1031,7 @@ export default function ProfilePage() {
                   <div className="space-y-2">
                     <Label htmlFor="newPassword" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
                       <Lock className="w-4 h-4 mr-2 text-purple-500 dark:text-purple-400" />
-                      New Password
+                      {t('profile.security.newPassword')}
                     </Label>
                     <div className="relative">
                       <Input
@@ -1062,7 +1061,7 @@ export default function ProfilePage() {
                   <div className="space-y-2">
                     <Label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
                       <Lock className="w-4 h-4 mr-2 text-purple-500 dark:text-purple-400" />
-                      Confirm New Password
+                      {t('profile.security.confirmPassword')}
                     </Label>
                     <div className="relative">
                       <Input
@@ -1097,12 +1096,12 @@ export default function ProfilePage() {
                       {changePasswordMutation.isPending ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Changing...</span>
+                          <span>{t('profile.security.changing')}</span>
                         </>
                       ) : (
                         <>
                           <Lock className="w-4 h-4" />
-                          <span>Change Password</span>
+                          <span>{t('profile.security.changePassword')}</span>
                         </>
                       )}
                     </Button>
@@ -1120,18 +1119,18 @@ export default function ProfilePage() {
                   <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 dark:from-orange-400 dark:to-orange-500 rounded-lg flex items-center justify-center">
                     <Lock className="w-5 h-5 text-white" />
                   </div>
-                  <span>Two-Factor Authentication</span>
+                  <span>{t('profile.twoFactor.title')}</span>
                   {twoFactorEnabled && (
                     <div className="ml-auto flex items-center space-x-2">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="text-sm text-green-600 dark:text-green-400 font-medium">Enabled</span>
+                      <span className="text-sm text-green-600 dark:text-green-400 font-medium">{t('profile.twoFactor.enabled')}</span>
                     </div>
                   )}
                 </CardTitle>
                 <CardDescription>
                   {twoFactorEnabled
-                    ? "Your account is protected with two-factor authentication."
-                    : "Add an extra layer of security to your account with two-factor authentication."
+                    ? t('profile.twoFactor.enabledDescription')
+                    : t('profile.twoFactor.disabledDescription')
                   }
                 </CardDescription>
               </CardHeader>
@@ -1144,8 +1143,8 @@ export default function ProfilePage() {
                           <Shield className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                          <h3 className="text-lg font-semibold text-green-800 dark:text-green-300">2FA is enabled</h3>
-                          <p className="text-sm text-green-700 dark:text-green-400">Your account is protected with two-factor authentication</p>
+                          <h3 className="text-lg font-semibold text-green-800 dark:text-green-300">{t('profile.twoFactor.isEnabled')}</h3>
+                          <p className="text-sm text-green-700 dark:text-green-400">{t('profile.twoFactor.isEnabledDescription')}</p>
                         </div>
                       </div>
                     </div>
@@ -1153,10 +1152,10 @@ export default function ProfilePage() {
                     <div className="bg-orange-50/50 dark:bg-orange-900/20 border border-orange-200/50 dark:border-orange-700/30 rounded-lg p-6 space-y-4">
                       <h4 className="font-medium text-gray-900 dark:text-gray-100 flex items-center">
                         <Lock className="w-4 h-4 mr-2 text-orange-500 dark:text-orange-400" />
-                        Disable Two-Factor Authentication
+                        {t('profile.twoFactor.disable')}
                       </h4>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Enter a code from your authenticator app to disable 2FA protection
+                        {t('profile.twoFactor.disableDescription')}
                       </p>
                       <div className="flex items-center space-x-3">
                         <Input
@@ -1176,12 +1175,12 @@ export default function ProfilePage() {
                           {disable2FAMutation.isPending ? (
                             <>
                               <Loader2 className="w-4 h-4 animate-spin" />
-                              <span>Disabling...</span>
+                              <span>{t('profile.twoFactor.disabling')}</span>
                             </>
                           ) : (
                             <>
                               <Lock className="w-4 h-4" />
-                              <span>Disable 2FA</span>
+                              <span>{t('profile.twoFactor.disableButton')}</span>
                             </>
                           )}
                         </Button>
@@ -1196,8 +1195,8 @@ export default function ProfilePage() {
                           <Shield className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                          <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-300">2FA is disabled</h3>
-                          <p className="text-sm text-yellow-700 dark:text-yellow-400">Add an extra layer of security to your account</p>
+                          <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-300">{t('profile.twoFactor.isDisabled')}</h3>
+                          <p className="text-sm text-yellow-700 dark:text-yellow-400">{t('profile.twoFactor.disabledDescription')}</p>
                         </div>
                       </div>
                     </div>
@@ -1206,10 +1205,10 @@ export default function ProfilePage() {
                       <div className="bg-orange-50/50 dark:bg-orange-900/20 border border-orange-200/50 dark:border-orange-700/30 rounded-lg p-6 space-y-4">
                         <h4 className="font-medium text-gray-900 dark:text-gray-100 flex items-center">
                           <Shield className="w-4 h-4 mr-2 text-orange-500 dark:text-orange-400" />
-                          Enable Two-Factor Authentication
+                          {t('profile.twoFactor.setup')}
                         </h4>
                         <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Two-factor authentication adds an extra layer of security to your account by requiring a code from your phone in addition to your password.
+                          {t('profile.twoFactor.setupDescription')}
                         </p>
                         <Button
                           onClick={onSetup2FA}
@@ -1219,12 +1218,12 @@ export default function ProfilePage() {
                           {setup2FAMutation.isPending ? (
                             <>
                               <Loader2 className="w-4 h-4 animate-spin" />
-                              <span>Setting up...</span>
+                              <span>{t('profile.twoFactor.enabling')}</span>
                             </>
                           ) : (
                             <>
                               <Shield className="w-4 h-4" />
-                              <span>Set up 2FA</span>
+                              <span>{t('profile.twoFactor.setupButton')}</span>
                             </>
                           )}
                         </Button>
@@ -1234,10 +1233,10 @@ export default function ProfilePage() {
                         <div className="bg-orange-50/50 dark:bg-orange-900/20 border border-orange-200/50 dark:border-orange-700/30 rounded-lg p-6">
                           <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3 flex items-center">
                             <QrCode className="w-4 h-4 mr-2 text-orange-500 dark:text-orange-400" />
-                            Step 1: Scan QR Code
+                            {t('profile.twoFactor.scanQR')}
                           </h4>
                           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                            Scan this QR code with your authenticator app (Google Authenticator, Authy, Microsoft Authenticator, etc.)
+                            {t('profile.twoFactor.setupDescription')}
                           </p>
 
                           {/* QR Code Display */}
@@ -1254,10 +1253,10 @@ export default function ProfilePage() {
                           {/* Manual Entry Option */}
                           <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
                             <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                              Can't scan the QR code?
+                              {t('profile.twoFactor.manualEntry')}
                             </p>
                             <p className="text-xs text-gray-500 dark:text-gray-500 mb-2">
-                              Enter this code manually in your authenticator app:
+                              {t('profile.twoFactor.manualEntry')}:
                             </p>
                             <div className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-3 py-2 font-mono text-sm break-all">
                               {twoFactorSetup.secret}
@@ -1268,10 +1267,10 @@ export default function ProfilePage() {
                         <div className="bg-orange-50/50 dark:bg-orange-900/20 border border-orange-200/50 dark:border-orange-700/30 rounded-lg p-6">
                           <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3 flex items-center">
                             <Lock className="w-4 h-4 mr-2 text-orange-500 dark:text-orange-400" />
-                            Step 2: Enter Verification Code
+                            {t('profile.twoFactor.verificationCode')}
                           </h4>
                           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                            Enter the 6-digit code from your authenticator app to complete setup
+                            {t('profile.twoFactor.setupDescription')}
                           </p>
                           <div className="flex items-center space-x-3">
                             <Input
@@ -1290,12 +1289,12 @@ export default function ProfilePage() {
                               {enable2FAMutation.isPending ? (
                                 <>
                                   <Loader2 className="w-4 h-4 animate-spin" />
-                                  <span>Enabling...</span>
+                                  <span>{t('profile.twoFactor.enabling')}</span>
                                 </>
                               ) : (
                                 <>
                                   <Shield className="w-4 h-4" />
-                                  <span>Enable 2FA</span>
+                                  <span>{t('profile.twoFactor.enableButton')}</span>
                                 </>
                               )}
                             </Button>
@@ -1311,7 +1310,7 @@ export default function ProfilePage() {
                             }}
                             className="bg-white/50 dark:bg-gray-700/50 border-orange-200 dark:border-orange-700/50 hover:bg-orange-50 dark:hover:bg-orange-900/20 px-6 h-11"
                           >
-                            Cancel
+                            {t('profile.danger.cancel')}
                           </Button>
                         </div>
                       </div>
@@ -1479,7 +1478,7 @@ export default function ProfilePage() {
                   <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-red-600 dark:from-red-400 dark:to-red-500 rounded-lg flex items-center justify-center">
                     <AlertTriangle className="w-5 h-5 text-white" />
                   </div>
-                  <span>Danger Zone</span>
+                  <span>{t('profile.danger.title')}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -1490,9 +1489,9 @@ export default function ProfilePage() {
                     </div>
                     <div className="flex-1 space-y-4">
                       <div>
-                        <h3 className="text-xl font-semibold text-red-800 dark:text-red-300 mb-2">Delete Account</h3>
+                        <h3 className="text-xl font-semibold text-red-800 dark:text-red-300 mb-2">{t('profile.danger.deleteAccount')}</h3>
                         <p className="text-red-700 dark:text-red-400 leading-relaxed">
-                          Once you delete your account, there is no going back. This will permanently deactivate your account and remove all your data including your profile, settings, and all associated information.
+                          {t('profile.danger.deleteDescription')}
                         </p>
                       </div>
                       <div className="pt-2">
@@ -1505,12 +1504,12 @@ export default function ProfilePage() {
                           {deleteAccountMutation.isPending ? (
                             <>
                               <Loader2 className="w-4 h-4 animate-spin" />
-                              <span>Deleting...</span>
+                              <span>{t('profile.danger.deleting')}</span>
                             </>
                           ) : (
                             <>
                               <Trash2 className="w-4 h-4" />
-                              <span>Delete Account</span>
+                              <span>{t('profile.danger.deleteButton')}</span>
                             </>
                           )}
                         </Button>
@@ -1529,19 +1528,19 @@ export default function ProfilePage() {
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center space-x-2 text-red-600">
                 <AlertTriangle className="w-5 h-5" />
-                <span>Delete Account</span>
+                <span>{t('profile.danger.deleteAccount')}</span>
               </AlertDialogTitle>
               <AlertDialogDescription>
-                Are you absolutely sure you want to delete your account? This action cannot be undone and will permanently remove all your data.
+                {t('profile.danger.confirmDescription')}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel>{t('profile.danger.cancel')}</AlertDialogCancel>
               <AlertDialogAction
                 onClick={onDeleteAccount}
                 className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
               >
-                Yes, delete my account
+                {t('profile.danger.confirmDelete')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

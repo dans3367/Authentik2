@@ -561,6 +561,360 @@
       "generateMessage": "Generate {{occasion}} message with AI"
     }
   },
+  "emailContacts": {
+    "title": "Contacts",
+    "subtitle": "Manage your email subscribers and contact lists",
+    "addContact": "Add Contact",
+    "loading": "Loading contacts...",
+    "errorLoading": "Error Loading Contacts",
+    "errorLoadingDescription": "There was an error loading your email contacts. Please try again.",
+    "retry": "Retry",
+    "stats": {
+      "totalContacts": "Total Contacts",
+      "activeSubscribers": "Active Subscribers",
+      "lists": "Lists",
+      "avgEngagement": "Avg Engagement"
+    },
+    "filters": {
+      "searchPlaceholder": "Search contacts...",
+      "filterByStatus": "Filter by status",
+      "allStatus": "All Status",
+      "active": "Active",
+      "inactive": "Inactive",
+      "unsubscribed": "Unsubscribed",
+      "bounced": "Bounced",
+      "pending": "Pending",
+      "export": "Export"
+    },
+    "bulkActions": {
+      "selected": "contact(s) selected",
+      "addTags": "Add Tags",
+      "addToList": "Add to List",
+      "delete": "Delete",
+      "deleting": "Deleting..."
+    },
+    "table": {
+      "contact": "Contact",
+      "status": "Status",
+      "tags": "Tags",
+      "engagement": "Engagement",
+      "added": "Added",
+      "openRate": "open rate",
+      "emails": "emails",
+      "active": "Active"
+    },
+    "statusBadges": {
+      "active": "Active",
+      "unsubscribed": "Unsubscribed",
+      "bounced": "Bounced",
+      "pending": "Pending"
+    },
+    "actions": {
+      "viewContact": "View Contact",
+      "editContact": "Edit Contact",
+      "sendEmail": "Send Email",
+      "viewActivityTimeline": "View Activity Timeline"
+    },
+    "empty": {
+      "noContacts": "No contacts found",
+      "noContactsMatching": "No contacts found matching \"{{query}}\"",
+      "searching": "Searching..."
+    },
+    "selectAll": {
+      "selectAllContacts": "Select all contacts",
+      "selectAll": "Select all"
+    },
+    "newBadge": "New",
+    "toasts": {
+      "success": "Success",
+      "error": "Error",
+      "deleteSuccess": "{{count}} contact(s) deleted successfully",
+      "deleteError": "Failed to delete contacts",
+      "deleteConfirm": "Are you sure you want to delete this contact? This action cannot be undone.",
+      "deleteConfirmMultiple": "Are you sure you want to delete {{count}} contacts? This action cannot be undone."
+    },
+    "newContact": {
+      "title": "Add New Contact",
+      "subtitle": "Add a new subscriber to your email lists",
+      "backToContacts": "Back to Contacts",
+      "cardTitle": "Contact Information",
+      "form": {
+        "emailLabel": "Email Address",
+        "emailPlaceholder": "contact@example.com",
+        "emailRequired": "Please enter a valid email address",
+        "firstNameLabel": "First Name",
+        "firstNamePlaceholder": "John",
+        "lastNameLabel": "Last Name",
+        "lastNamePlaceholder": "Doe",
+        "statusLabel": "Status",
+        "statusPlaceholder": "Select contact status",
+        "emailListsLabel": "Email Lists",
+        "emailListsDescription": "Select which lists this contact should be added to",
+        "tagsLabel": "Tags",
+        "tagsDescription": "Add tags to organize and categorize this contact",
+        "consentLabel": "Consent Acknowledgment",
+        "consentDescription": "I acknowledge that I have express consent from this contact to add their email address to our mailing lists. I understand that I am legally liable for ensuring proper consent has been obtained before adding any email address to our email marketing lists. This includes having explicit permission to send marketing communications to this email address in compliance with applicable laws (CAN-SPAM, GDPR, etc.).",
+        "consentRequired": "You must acknowledge consent before adding this contact",
+        "createButton": "Create Contact",
+        "creating": "Creating...",
+        "cancelButton": "Cancel"
+      },
+      "toasts": {
+        "createSuccess": "Contact \"{{name}}\" has been created and added to your list!",
+        "createError": "Failed to create contact"
+      }
+    }
+  },
+  "users": {
+    "title": "Users",
+    "subtitle": "Manage user accounts and permissions",
+    "loadingSubtitle": "Loading user management",
+    "accessDenied": "Access Denied",
+    "accessDeniedMessage": "You don't have permission to access the user management system.",
+    "addUser": "Add User",
+    "userLimitReached": "User limit reached ({{current}}/{{max}}). Please upgrade your {{plan}} to add more users.",
+    "stats": {
+      "totalUsers": "Total Users",
+      "acrossAllRoles": "Across all roles",
+      "activeUsers": "Active Users",
+      "ofTotalUsers": "of total users",
+      "roles": "Roles",
+      "differentRoles": "Different user roles",
+      "planLimits": "Plan Limits",
+      "remaining": "remaining",
+      "unlimited": "Unlimited"
+    },
+    "filters": {
+      "searchPlaceholder": "Search users by name or email...",
+      "filterByRole": "Filter by role",
+      "allRoles": "All Roles",
+      "filterByStatus": "Filter by status",
+      "allStatus": "All Status",
+      "active": "Active",
+      "inactive": "Inactive",
+      "showInactive": "Show Inactive"
+    },
+    "table": {
+      "user": "USER",
+      "role": "ROLE",
+      "status": "STATUS",
+      "location": "LOCATION",
+      "lastLogin": "LAST LOGIN",
+      "joined": "JOINED",
+      "actions": "ACTIONS",
+      "never": "Never",
+      "noName": "No name"
+    },
+    "roles": {
+      "owner": "Owner",
+      "administrator": "Administrator",
+      "manager": "Manager",
+      "employee": "Employee"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "actions": {
+      "goToProfile": "Go to Profile",
+      "viewUser": "View User",
+      "editUser": "Edit User",
+      "deleteUser": "Delete User"
+    },
+    "createDialog": {
+      "title": "Create New User",
+      "description": "Add a new user to the system. The user will be automatically verified.",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email",
+      "role": "Role",
+      "selectRole": "Select a role",
+      "password": "Password",
+      "confirmPassword": "Confirm Password",
+      "emailVerified": "Email Verified",
+      "emailVerifiedDescription": "Mark this user's email as verified",
+      "creating": "Creating...",
+      "createUser": "Create User"
+    },
+    "editDialog": {
+      "titleView": "View User",
+      "titleEdit": "Edit User",
+      "descriptionView": "View user information.",
+      "descriptionEdit": "Update user information and permissions.",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email",
+      "role": "Role",
+      "selectRole": "Select a role",
+      "activeStatus": "Active Status",
+      "activeStatusDescription": "Enable or disable this user account",
+      "updating": "Updating...",
+      "updateUser": "Update User"
+    },
+    "deleteDialog": {
+      "title": "Delete User",
+      "description": "Are you sure you want to delete {{name}}? This action cannot be undone.",
+      "cancel": "Cancel",
+      "delete": "Delete"
+    },
+    "unsavedChangesDialog": {
+      "title": "Unsaved Changes",
+      "description": "You have unsaved changes. Are you sure you want to discard them?",
+      "cancel": "Cancel",
+      "discard": "Discard Changes"
+    },
+    "cardView": {
+      "role": "Role",
+      "status": "Status",
+      "lastLogin": "Last Login",
+      "joined": "Joined",
+      "accountStatus": "Account Status",
+      "noUsersFound": "No users found",
+      "tryAdjustingFilters": "Try adjusting your filters"
+    },
+    "toasts": {
+      "userCreated": "User created successfully",
+      "userUpdated": "User updated successfully",
+      "userDeleted": "User deleted successfully",
+      "statusUpdated": "User status updated successfully",
+      "error": "Error"
+    }
+  },
+  "profile": {
+    "title": "Account Settings",
+    "subtitle": "Manage your account information and security settings",
+    "loading": "Authenticating...",
+    "tabs": {
+      "profile": "Profile",
+      "preferences": "Preferences",
+      "security": "Security",
+      "twoFactor": "2FA",
+      "subscription": "Subscription",
+      "danger": "Danger"
+    },
+    "profileTab": {
+      "title": "Personal Information",
+      "avatarHint": "Click to update your profile picture",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email Address",
+      "updating": "Updating...",
+      "saveChanges": "Save Changes"
+    },
+    "avatar": {
+      "dropHere": "Drop here",
+      "change": "Change",
+      "saveAvatar": "Save Avatar",
+      "uploading": "Uploading...",
+      "changePhoto": "Change Photo",
+      "uploadPhoto": "Upload Photo",
+      "clickOrDrag": "Click or drag image to upload",
+      "fileTypes": "JPEG, PNG or WebP • Max 5MB"
+    },
+    "preferences": {
+      "title": "Application Preferences",
+      "expandedMenu": {
+        "title": "Expanded Menu",
+        "description": "Keep the sidebar menu expanded by default"
+      },
+      "language": {
+        "title": "Language",
+        "description": "Choose your preferred language"
+      }
+    },
+    "security": {
+      "title": "Change Password",
+      "tipsTitle": "Essential Personal Security Tips for Enhanced Safety",
+      "tipsDescription": "Follow these best practices to keep your account safe.",
+      "tip1": "Use strong, unique passwords",
+      "tip2": "Enable Two‑Factor Authentication (2FA)",
+      "tip3": "Beware of phishing",
+      "tip4": "Use an authenticator app",
+      "reviewTips": "Review Security Tips",
+      "currentPassword": "Current Password",
+      "newPassword": "New Password",
+      "confirmPassword": "Confirm New Password",
+      "passwordStrength": "Password strength",
+      "changing": "Changing...",
+      "changePassword": "Change Password"
+    },
+    "twoFactor": {
+      "title": "Two-Factor Authentication",
+      "enabled": "Enabled",
+      "enabledDescription": "Your account is protected with two-factor authentication.",
+      "disabledDescription": "Add an extra layer of security to your account with two-factor authentication.",
+      "isEnabled": "2FA is enabled",
+      "isEnabledDescription": "Your account is protected with two-factor authentication",
+      "isDisabled": "2FA is disabled",
+      "disable": "Disable Two-Factor Authentication",
+      "disableDescription": "Enter a code from your authenticator app to disable 2FA protection",
+      "disabling": "Disabling...",
+      "disableButton": "Disable 2FA",
+      "setup": "Set Up Two-Factor Authentication",
+      "setupDescription": "Scan the QR code with your authenticator app and enter the verification code",
+      "scanQR": "Scan QR Code",
+      "manualEntry": "Or enter this code manually",
+      "backupCodes": "Backup Codes",
+      "backupCodesDescription": "Save these backup codes in a safe place. Each code can be used once if you lose access to your authenticator app.",
+      "verificationCode": "Verification Code",
+      "enabling": "Enabling...",
+      "enableButton": "Enable 2FA",
+      "setupButton": "Set Up 2FA"
+    },
+    "subscription": {
+      "loading": "Loading subscription details...",
+      "currentPlan": "Current Subscription Status",
+      "perMonth": "per month",
+      "perYear": "per year",
+      "trialActive": "Trial Active",
+      "daysRemaining": "day(s) remaining until",
+      "trialEnds": "Trial ends",
+      "nextBilling": "Next billing",
+      "availablePlans": "Available Plans",
+      "billingCycle": "Billing cycle",
+      "monthly": "Monthly",
+      "yearly": "Yearly",
+      "save20": "Save 20%",
+      "mostPopular": "Most Popular",
+      "savePerYear": "Save",
+      "processing": "Processing...",
+      "currentPlanButton": "Current Plan",
+      "upgrade": "Upgrade to This Plan",
+      "downgrade": "Downgrade to This Plan",
+      "upTo": "Up to",
+      "users": "users",
+      "shops": "shops",
+      "projects": "projects",
+      "storage": "storage",
+      "support": "support",
+      "needHelp": "Need help choosing?",
+      "contactSupport": "Contact our support team"
+    },
+    "danger": {
+      "title": "Danger Zone",
+      "deleteAccount": "Delete Account",
+      "deleteDescription": "Permanently delete your account and all associated data. This action cannot be undone.",
+      "deleteButton": "Delete My Account",
+      "confirmTitle": "Are you absolutely sure?",
+      "confirmDescription": "This action cannot be undone. This will permanently delete your account and remove all your data from our servers.",
+      "cancel": "Cancel",
+      "confirmDelete": "Yes, Delete My Account",
+      "deleting": "Deleting..."
+    },
+    "securityTips": {
+      "title": "Security Tips",
+      "description": "Follow these best practices to keep your account safe.",
+      "strongPasswords": "Use strong, unique passwords",
+      "strongPasswordsDescription": "At least 12 characters with a mix of upper/lowercase, numbers, and symbols. Avoid reuse across sites.",
+      "enable2FA": "Enable Two‑Factor Authentication (2FA)",
+      "enable2FADescription": "Add a second verification step for logins. Store backup codes in a safe place.",
+      "bewarePhishing": "Beware of phishing",
+      "bewarePhishingDescription": "Check sender domains, avoid clicking suspicious links, and never share verification codes.",
+      "useAuthenticator": "Use an authenticator app",
+      "useAuthenticatorDescription": "Prefer app‑based codes over SMS where possible for stronger security.",
+      "close": "Close"
+    }
+  },
   "toast": {
     "profileUpdated": "Profile updated successfully",
     "passwordChanged": "Password changed successfully",

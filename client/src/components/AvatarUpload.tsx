@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { useDispatch } from 'react-redux'
 import { updateUser } from '@/store/authSlice'
 import { useQueryClient } from '@tanstack/react-query'
+import { useLanguage } from '@/hooks/useLanguage'
 
 interface AvatarUploadProps {
   currentAvatarUrl?: string | null
@@ -24,6 +25,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
 }) => {
   const dispatch = useDispatch()
   const queryClient = useQueryClient()
+  const { t } = useLanguage()
   const [isUploading, setIsUploading] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -218,7 +220,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
           )}>
             <Camera className={cn("text-white mb-1", iconSizes[size])} />
             <span className="text-white text-xs font-medium">
-              {isDragOver ? 'Drop here' : 'Change'}
+              {isDragOver ? t('profile.avatar.dropHere') : t('profile.avatar.change')}
             </span>
           </div>
 
@@ -258,7 +260,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
               variant="default"
             >
               <Check className="w-4 h-4 mr-2" />
-              Save Avatar
+              {t('profile.avatar.saveAvatar')}
             </Button>
             <Button
               onClick={() => {
@@ -285,7 +287,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
               ) : (
                 <ImageIcon className="w-4 h-4 mr-2" />
               )}
-              {isUploading ? 'Uploading...' : hasCurrentAvatar ? 'Change Photo' : 'Upload Photo'}
+              {isUploading ? t('profile.avatar.uploading') : hasCurrentAvatar ? t('profile.avatar.changePhoto') : t('profile.avatar.uploadPhoto')}
             </Button>
             
             {hasCurrentAvatar && !previewUrl && (
@@ -308,10 +310,10 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
         {/* Drag & Drop Hint */}
         <div className="text-center">
           <p className="text-sm text-gray-600">
-            Click or drag image to upload
+            {t('profile.avatar.clickOrDrag')}
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            JPEG, PNG or WebP • Max 5MB
+            {t('profile.avatar.fileTypes')}
           </p>
         </div>
       </div>

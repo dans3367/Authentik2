@@ -553,6 +553,360 @@
       "generateMessage": "Generar mensaje de {{occasion}} con IA"
     }
   },
+  "emailContacts": {
+    "title": "Contactos",
+    "subtitle": "Administra tus suscriptores de correo y listas de contactos",
+    "addContact": "Agregar Contacto",
+    "loading": "Cargando contactos...",
+    "errorLoading": "Error al Cargar Contactos",
+    "errorLoadingDescription": "Hubo un error al cargar tus contactos de correo. Por favor intenta de nuevo.",
+    "retry": "Reintentar",
+    "stats": {
+      "totalContacts": "Total de Contactos",
+      "activeSubscribers": "Suscriptores Activos",
+      "lists": "Listas",
+      "avgEngagement": "Compromiso Promedio"
+    },
+    "filters": {
+      "searchPlaceholder": "Buscar contactos...",
+      "filterByStatus": "Filtrar por estado",
+      "allStatus": "Todos los Estados",
+      "active": "Activo",
+      "inactive": "Inactivo",
+      "unsubscribed": "Dado de Baja",
+      "bounced": "Rebotado",
+      "pending": "Pendiente",
+      "export": "Exportar"
+    },
+    "bulkActions": {
+      "selected": "contacto(s) seleccionado(s)",
+      "addTags": "Agregar Etiquetas",
+      "addToList": "Agregar a Lista",
+      "delete": "Eliminar",
+      "deleting": "Eliminando..."
+    },
+    "table": {
+      "contact": "Contacto",
+      "status": "Estado",
+      "tags": "Etiquetas",
+      "engagement": "Compromiso",
+      "added": "Agregado",
+      "openRate": "tasa de apertura",
+      "emails": "correos",
+      "active": "Activo"
+    },
+    "statusBadges": {
+      "active": "Activo",
+      "unsubscribed": "Dado de Baja",
+      "bounced": "Rebotado",
+      "pending": "Pendiente"
+    },
+    "actions": {
+      "viewContact": "Ver Contacto",
+      "editContact": "Editar Contacto",
+      "sendEmail": "Enviar Correo",
+      "viewActivityTimeline": "Ver Línea de Tiempo de Actividad"
+    },
+    "empty": {
+      "noContacts": "No se encontraron contactos",
+      "noContactsMatching": "No se encontraron contactos que coincidan con \"{{query}}\"",
+      "searching": "Buscando..."
+    },
+    "selectAll": {
+      "selectAllContacts": "Seleccionar todos los contactos",
+      "selectAll": "Seleccionar todo"
+    },
+    "newBadge": "Nuevo",
+    "toasts": {
+      "success": "Éxito",
+      "error": "Error",
+      "deleteSuccess": "{{count}} contacto(s) eliminado(s) exitosamente",
+      "deleteError": "Error al eliminar contactos",
+      "deleteConfirm": "¿Estás seguro de que quieres eliminar este contacto? Esta acción no se puede deshacer.",
+      "deleteConfirmMultiple": "¿Estás seguro de que quieres eliminar {{count}} contactos? Esta acción no se puede deshacer."
+    },
+    "newContact": {
+      "title": "Agregar Nuevo Contacto",
+      "subtitle": "Agregar un nuevo suscriptor a tus listas de correo",
+      "backToContacts": "Volver a Contactos",
+      "cardTitle": "Información del Contacto",
+      "form": {
+        "emailLabel": "Dirección de Correo Electrónico",
+        "emailPlaceholder": "contacto@ejemplo.com",
+        "emailRequired": "Por favor ingresa una dirección de correo electrónico válida",
+        "firstNameLabel": "Nombre",
+        "firstNamePlaceholder": "Juan",
+        "lastNameLabel": "Apellido",
+        "lastNamePlaceholder": "Pérez",
+        "statusLabel": "Estado",
+        "statusPlaceholder": "Seleccionar estado del contacto",
+        "emailListsLabel": "Listas de Correo",
+        "emailListsDescription": "Selecciona a qué listas se debe agregar este contacto",
+        "tagsLabel": "Etiquetas",
+        "tagsDescription": "Agrega etiquetas para organizar y categorizar este contacto",
+        "consentLabel": "Reconocimiento de Consentimiento",
+        "consentDescription": "Reconozco que tengo el consentimiento expreso de este contacto para agregar su dirección de correo electrónico a nuestras listas de correo. Entiendo que soy legalmente responsable de asegurar que se haya obtenido el consentimiento adecuado antes de agregar cualquier dirección de correo electrónico a nuestras listas de marketing por correo electrónico. Esto incluye tener permiso explícito para enviar comunicaciones de marketing a esta dirección de correo electrónico en cumplimiento con las leyes aplicables (CAN-SPAM, GDPR, etc.).",
+        "consentRequired": "Debes reconocer el consentimiento antes de agregar este contacto",
+        "createButton": "Crear Contacto",
+        "creating": "Creando...",
+        "cancelButton": "Cancelar"
+      },
+      "toasts": {
+        "createSuccess": "¡El contacto \"{{name}}\" ha sido creado y agregado a tu lista!",
+        "createError": "Error al crear contacto"
+      }
+    }
+  },
+  "users": {
+    "title": "Usuarios",
+    "subtitle": "Administra cuentas de usuario y permisos",
+    "loadingSubtitle": "Cargando administración de usuarios",
+    "accessDenied": "Acceso Denegado",
+    "accessDeniedMessage": "No tienes permiso para acceder al sistema de administración de usuarios.",
+    "addUser": "Agregar Usuario",
+    "userLimitReached": "Límite de usuarios alcanzado ({{current}}/{{max}}). Por favor actualiza tu plan {{plan}} para agregar más usuarios.",
+    "stats": {
+      "totalUsers": "Total de Usuarios",
+      "acrossAllRoles": "En todos los roles",
+      "activeUsers": "Usuarios Activos",
+      "ofTotalUsers": "del total de usuarios",
+      "roles": "Roles",
+      "differentRoles": "Diferentes roles de usuario",
+      "planLimits": "Límites del Plan",
+      "remaining": "restantes",
+      "unlimited": "Ilimitado"
+    },
+    "filters": {
+      "searchPlaceholder": "Buscar usuarios por nombre o correo...",
+      "filterByRole": "Filtrar por rol",
+      "allRoles": "Todos los Roles",
+      "filterByStatus": "Filtrar por estado",
+      "allStatus": "Todos los Estados",
+      "active": "Activo",
+      "inactive": "Inactivo",
+      "showInactive": "Mostrar Inactivos"
+    },
+    "table": {
+      "user": "USUARIO",
+      "role": "ROL",
+      "status": "ESTADO",
+      "location": "UBICACIÓN",
+      "lastLogin": "ÚLTIMO ACCESO",
+      "joined": "SE UNIÓ",
+      "actions": "ACCIONES",
+      "never": "Nunca",
+      "noName": "Sin nombre"
+    },
+    "roles": {
+      "owner": "Propietario",
+      "administrator": "Administrador",
+      "manager": "Gerente",
+      "employee": "Empleado"
+    },
+    "status": {
+      "active": "Activo",
+      "inactive": "Inactivo"
+    },
+    "actions": {
+      "goToProfile": "Ir al Perfil",
+      "viewUser": "Ver Usuario",
+      "editUser": "Editar Usuario",
+      "deleteUser": "Eliminar Usuario"
+    },
+    "createDialog": {
+      "title": "Crear Nuevo Usuario",
+      "description": "Agregar un nuevo usuario al sistema. El usuario será verificado automáticamente.",
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "email": "Correo Electrónico",
+      "role": "Rol",
+      "selectRole": "Seleccionar un rol",
+      "password": "Contraseña",
+      "confirmPassword": "Confirmar Contraseña",
+      "emailVerified": "Correo Verificado",
+      "emailVerifiedDescription": "Marcar el correo de este usuario como verificado",
+      "creating": "Creando...",
+      "createUser": "Crear Usuario"
+    },
+    "editDialog": {
+      "titleView": "Ver Usuario",
+      "titleEdit": "Editar Usuario",
+      "descriptionView": "Ver información del usuario.",
+      "descriptionEdit": "Actualizar información y permisos del usuario.",
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "email": "Correo Electrónico",
+      "role": "Rol",
+      "selectRole": "Seleccionar un rol",
+      "activeStatus": "Estado Activo",
+      "activeStatusDescription": "Habilitar o deshabilitar esta cuenta de usuario",
+      "updating": "Actualizando...",
+      "updateUser": "Actualizar Usuario"
+    },
+    "deleteDialog": {
+      "title": "Eliminar Usuario",
+      "description": "¿Estás seguro de que quieres eliminar a {{name}}? Esta acción no se puede deshacer.",
+      "cancel": "Cancelar",
+      "delete": "Eliminar"
+    },
+    "unsavedChangesDialog": {
+      "title": "Cambios Sin Guardar",
+      "description": "Tienes cambios sin guardar. ¿Estás seguro de que quieres descartarlos?",
+      "cancel": "Cancelar",
+      "discard": "Descartar Cambios"
+    },
+    "cardView": {
+      "role": "Rol",
+      "status": "Estado",
+      "lastLogin": "Último Acceso",
+      "joined": "Se Unió",
+      "accountStatus": "Estado de la Cuenta",
+      "noUsersFound": "No se encontraron usuarios",
+      "tryAdjustingFilters": "Intenta ajustar tus filtros"
+    },
+    "toasts": {
+      "userCreated": "Usuario creado exitosamente",
+      "userUpdated": "Usuario actualizado exitosamente",
+      "userDeleted": "Usuario eliminado exitosamente",
+      "statusUpdated": "Estado del usuario actualizado exitosamente",
+      "error": "Error"
+    }
+  },
+  "profile": {
+    "title": "Configuración de Cuenta",
+    "subtitle": "Administra la información de tu cuenta y configuración de seguridad",
+    "loading": "Autenticando...",
+    "tabs": {
+      "profile": "Perfil",
+      "preferences": "Preferencias",
+      "security": "Seguridad",
+      "twoFactor": "2FA",
+      "subscription": "Suscripción",
+      "danger": "Peligro"
+    },
+    "profileTab": {
+      "title": "Información Personal",
+      "avatarHint": "Haz clic para actualizar tu foto de perfil",
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "email": "Correo Electrónico",
+      "updating": "Actualizando...",
+      "saveChanges": "Guardar Cambios"
+    },
+    "avatar": {
+      "dropHere": "Suelta aquí",
+      "change": "Cambiar",
+      "saveAvatar": "Guardar Avatar",
+      "uploading": "Subiendo...",
+      "changePhoto": "Cambiar Foto",
+      "uploadPhoto": "Subir Foto",
+      "clickOrDrag": "Haz clic o arrastra una imagen para subir",
+      "fileTypes": "JPEG, PNG o WebP • Máx 5MB"
+    },
+    "preferences": {
+      "title": "Preferencias de Aplicación",
+      "expandedMenu": {
+        "title": "Menú Expandido",
+        "description": "Mantener el menú lateral expandido por defecto"
+      },
+      "language": {
+        "title": "Idioma",
+        "description": "Elige tu idioma preferido"
+      }
+    },
+    "security": {
+      "title": "Cambiar Contraseña",
+      "tipsTitle": "Consejos Esenciales de Seguridad Personal para Mayor Protección",
+      "tipsDescription": "Sigue estas mejores prácticas para mantener tu cuenta segura.",
+      "tip1": "Usa contraseñas fuertes y únicas",
+      "tip2": "Habilita la Autenticación de Dos Factores (2FA)",
+      "tip3": "Ten cuidado con el phishing",
+      "tip4": "Usa una aplicación de autenticación",
+      "reviewTips": "Revisar Consejos de Seguridad",
+      "currentPassword": "Contraseña Actual",
+      "newPassword": "Nueva Contraseña",
+      "confirmPassword": "Confirmar Nueva Contraseña",
+      "passwordStrength": "Fortaleza de la contraseña",
+      "changing": "Cambiando...",
+      "changePassword": "Cambiar Contraseña"
+    },
+    "twoFactor": {
+      "title": "Autenticación de Dos Factores",
+      "enabled": "Habilitado",
+      "enabledDescription": "Tu cuenta está protegida con autenticación de dos factores.",
+      "disabledDescription": "Agrega una capa adicional de seguridad a tu cuenta con autenticación de dos factores.",
+      "isEnabled": "2FA está habilitado",
+      "isEnabledDescription": "Tu cuenta está protegida con autenticación de dos factores",
+      "isDisabled": "2FA está deshabilitado",
+      "disable": "Deshabilitar Autenticación de Dos Factores",
+      "disableDescription": "Ingresa un código de tu aplicación de autenticación para deshabilitar la protección 2FA",
+      "disabling": "Deshabilitando...",
+      "disableButton": "Deshabilitar 2FA",
+      "setup": "Configurar Autenticación de Dos Factores",
+      "setupDescription": "Escanea el código QR con tu aplicación de autenticación e ingresa el código de verificación",
+      "scanQR": "Escanear Código QR",
+      "manualEntry": "O ingresa este código manualmente",
+      "backupCodes": "Códigos de Respaldo",
+      "backupCodesDescription": "Guarda estos códigos de respaldo en un lugar seguro. Cada código se puede usar una vez si pierdes acceso a tu aplicación de autenticación.",
+      "verificationCode": "Código de Verificación",
+      "enabling": "Habilitando...",
+      "enableButton": "Habilitar 2FA",
+      "setupButton": "Configurar 2FA"
+    },
+    "subscription": {
+      "loading": "Cargando detalles de suscripción...",
+      "currentPlan": "Estado de Suscripción Actual",
+      "perMonth": "por mes",
+      "perYear": "por año",
+      "trialActive": "Prueba Activa",
+      "daysRemaining": "día(s) restante(s) hasta",
+      "trialEnds": "La prueba termina",
+      "nextBilling": "Próxima facturación",
+      "availablePlans": "Planes Disponibles",
+      "billingCycle": "Ciclo de facturación",
+      "monthly": "Mensual",
+      "yearly": "Anual",
+      "save20": "Ahorra 20%",
+      "mostPopular": "Más Popular",
+      "savePerYear": "Ahorra",
+      "processing": "Procesando...",
+      "currentPlanButton": "Plan Actual",
+      "upgrade": "Actualizar a Este Plan",
+      "downgrade": "Cambiar a Este Plan",
+      "upTo": "Hasta",
+      "users": "usuarios",
+      "shops": "tiendas",
+      "projects": "proyectos",
+      "storage": "almacenamiento",
+      "support": "soporte",
+      "needHelp": "¿Necesitas ayuda para elegir?",
+      "contactSupport": "Contacta a nuestro equipo de soporte"
+    },
+    "danger": {
+      "title": "Zona de Peligro",
+      "deleteAccount": "Eliminar Cuenta",
+      "deleteDescription": "Elimina permanentemente tu cuenta y todos los datos asociados. Esta acción no se puede deshacer.",
+      "deleteButton": "Eliminar Mi Cuenta",
+      "confirmTitle": "¿Estás absolutamente seguro?",
+      "confirmDescription": "Esta acción no se puede deshacer. Esto eliminará permanentemente tu cuenta y removerá todos tus datos de nuestros servidores.",
+      "cancel": "Cancelar",
+      "confirmDelete": "Sí, Eliminar Mi Cuenta",
+      "deleting": "Eliminando..."
+    },
+    "securityTips": {
+      "title": "Consejos de Seguridad",
+      "description": "Sigue estas mejores prácticas para mantener tu cuenta segura.",
+      "strongPasswords": "Usa contraseñas fuertes y únicas",
+      "strongPasswordsDescription": "Al menos 12 caracteres con una combinación de mayúsculas/minúsculas, números y símbolos. Evita reutilizarlas en diferentes sitios.",
+      "enable2FA": "Habilita la Autenticación de Dos Factores (2FA)",
+      "enable2FADescription": "Agrega un segundo paso de verificación para inicios de sesión. Guarda los códigos de respaldo en un lugar seguro.",
+      "bewarePhishing": "Ten cuidado con el phishing",
+      "bewarePhishingDescription": "Verifica los dominios de los remitentes, evita hacer clic en enlaces sospechosos y nunca compartas códigos de verificación.",
+      "useAuthenticator": "Usa una aplicación de autenticación",
+      "useAuthenticatorDescription": "Prefiere códigos basados en aplicaciones sobre SMS cuando sea posible para mayor seguridad.",
+      "close": "Cerrar"
+    }
+  },
   "toast": {
     "profileUpdated": "Perfil actualizado exitosamente",
     "passwordChanged": "Contraseña cambiada exitosamente",
