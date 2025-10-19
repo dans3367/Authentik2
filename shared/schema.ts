@@ -403,6 +403,11 @@ export const companies = pgTable("companies", {
   phone: text("phone"),
   website: text("website"),
   description: text("description"),
+  // Onboarding wizard fields
+  setupCompleted: boolean("setup_completed").default(false),
+  geographicalLocation: text("geographical_location"),
+  language: text("language").default('en'), // Language for outgoing communications
+  businessDescription: text("business_description"), // AI context for platform personalization
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -920,6 +925,10 @@ export const updateCompanySchema = z.object({
   phone: z.string().optional(),
   website: z.string().url("Please enter a valid website URL").optional().or(z.literal("")),
   description: z.string().optional(),
+  setupCompleted: z.boolean().optional(),
+  geographicalLocation: z.string().optional(),
+  language: z.string().optional(),
+  businessDescription: z.string().optional(),
   isActive: z.boolean().default(true),
 });
 
@@ -933,11 +942,19 @@ export const createCompanySchema = z.object({
   description: z.string().optional(),
 });
 
+// Onboarding wizard schemas
+export const completeOnboardingSchema = z.object({
+  geographicalLocation: z.string().min(1, "Geographical location is required"),
+  language: z.string().min(1, "Language is required"),
+  businessDescription: z.string().min(10, "Please provide at least 10 characters describing your business"),
+});
+
 // Company types
 export type Company = typeof companies.$inferSelect;
 export type InsertCompany = z.infer<typeof insertCompanySchema>;
 export type CreateCompanyData = z.infer<typeof createCompanySchema>;
 export type UpdateCompanyData = z.infer<typeof updateCompanySchema>;
+export type CompleteOnboardingData = z.infer<typeof completeOnboardingSchema>;
 
 // Multi-tenancy schemas and types
 export const tenantSchema = createInsertSchema(tenants).omit({

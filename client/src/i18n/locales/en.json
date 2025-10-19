@@ -227,6 +227,83 @@
     },
     "buttons": {
       "sendInvitation": "Send Birthday Invitation"
+    },
+    "tabs": {
+      "themes": "Themes",
+      "settings": "Settings",
+      "customers": "Customers",
+      "promotions": "Promotions",
+      "test": "Test"
+    },
+    "test": {
+      "title": "Test Birthday Cards",
+      "testMode": "Test Mode",
+      "users": "Users",
+      "description": "Send test birthday cards to users individually or select multiple users for bulk sending. Test emails will be sent to the selected user's actual email address.",
+      "usersSelected": "user(s) selected",
+      "clearSelection": "Clear Selection",
+      "sendTestCards": "Send Test Cards to Selected",
+      "refreshing": "Refreshing...",
+      "sending": "Sending...",
+      "noUsers": "No users found",
+      "noUsersDescription": "No users available in your tenant for testing",
+      "selectAllUsers": "Select all users",
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "emailVerified": "Email Verified",
+      "actions": "Actions",
+      "sendTestCard": "Send Test Card"
+    },
+    "promotions": {
+      "title": "Promotions",
+      "description": "Select promotions to include in birthday emails",
+      "promotionLabel": "Promotion (Optional)",
+      "promotionDescription": "Select a promotion to include in birthday emails. This will add promotional content to your birthday cards.",
+      "splitEmailLabel": "Send promotion as separate email (Better Deliverability)",
+      "splitEmailDescription": "When enabled, the birthday card and promotion will be sent as two separate emails to improve deliverability rates and avoid spam filters. The birthday card will be sent first, followed by the promotional email shortly after.",
+      "selectedPromotionPreview": "Selected Promotion Preview",
+      "howItWorks": "How Promotions Work",
+      "howItWorksList": {
+        "included": "Promotions are automatically included in birthday email templates",
+        "oneActive": "Only one promotion can be active at a time",
+        "appears": "Promotions will appear alongside your birthday message",
+        "change": "You can change or remove promotions at any time"
+      },
+      "selector": {
+        "selectedPromotion": "Selected Promotion",
+        "selectedPromotions": "Selected Promotions",
+        "managePromotion": "Manage Promotion",
+        "managePromotions": "Manage Promotions",
+        "addPromotion": "Add Promotion",
+        "addPromotions": "Add Promotions",
+        "selectPromotion": "Select Promotion",
+        "selectPromotions": "Select Promotions",
+        "filterByType": "Filter by type",
+        "allTypes": "All Types",
+        "searchPlaceholder": "Search promotions...",
+        "loading": "Loading promotions...",
+        "failedToLoad": "Failed to load promotions",
+        "noPromotions": "No promotions found",
+        "selected": "Selected",
+        "target": "Target",
+        "used": "Used",
+        "times": "times",
+        "insert": "Insert",
+        "contentPreview": "Content Preview:",
+        "targetAudience": "Target Audience"
+      }
+    },
+    "settings": {
+      "title": "Birthday Email Settings",
+      "enableBirthdayEmails": "Enable Birthday Emails",
+      "enableBirthdayEmailsDescription": "Automatically send birthday emails to customers",
+      "overviewTitle": "Overview",
+      "totalCustomers": "Total Customers",
+      "withBirthdays": "With Birthdays",
+      "birthdayEmailsEnabled": "Birthday Emails Enabled",
+      "upcomingBirthdays": "Upcoming Birthdays",
+      "noBirthdays30Days": "No birthdays in the next 30 days"
     }
   },
   "ecards": {

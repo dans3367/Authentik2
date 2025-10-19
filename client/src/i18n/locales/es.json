@@ -227,6 +227,83 @@
     },
     "buttons": {
       "sendInvitation": "Enviar Invitación de Cumpleaños"
+    },
+    "tabs": {
+      "themes": "Temas",
+      "settings": "Configuración",
+      "customers": "Clientes",
+      "promotions": "Promociones",
+      "test": "Prueba"
+    },
+    "test": {
+      "title": "Tarjetas de Cumpleaños de Prueba",
+      "testMode": "Modo de Prueba",
+      "users": "Usuarios",
+      "description": "Envía tarjetas de cumpleaños de prueba a usuarios individualmente o selecciona múltiples usuarios para envío masivo. Los correos de prueba se enviarán a la dirección de correo real del usuario.",
+      "usersSelected": "usuario(s) seleccionado(s)",
+      "clearSelection": "Limpiar Selección",
+      "sendTestCards": "Enviar Tarjetas de Prueba a Seleccionados",
+      "refreshing": "Actualizando...",
+      "sending": "Enviando...",
+      "noUsers": "No se encontraron usuarios",
+      "noUsersDescription": "No hay usuarios disponibles en tu tenant para pruebas",
+      "selectAllUsers": "Seleccionar todos los usuarios",
+      "name": "Nombre",
+      "email": "Email",
+      "role": "Rol",
+      "emailVerified": "Email Verificado",
+      "actions": "Acciones",
+      "sendTestCard": "Enviar Tarjeta de Prueba"
+    },
+    "promotions": {
+      "title": "Promociones",
+      "description": "Selecciona promociones para incluir en los correos de cumpleaños",
+      "promotionLabel": "Promoción (Opcional)",
+      "promotionDescription": "Selecciona una promoción para incluir en los correos de cumpleaños. Esto agregará contenido promocional a tus tarjetas de cumpleaños.",
+      "splitEmailLabel": "Enviar promoción como correo separado (Mejor Entregabilidad)",
+      "splitEmailDescription": "Cuando está habilitado, la tarjeta de cumpleaños y la promoción se enviarán como dos correos separados para mejorar las tasas de entrega y evitar filtros de spam. La tarjeta de cumpleaños se enviará primero, seguida del correo promocional poco después.",
+      "selectedPromotionPreview": "Vista Previa de Promoción Seleccionada",
+      "howItWorks": "Cómo Funcionan las Promociones",
+      "howItWorksList": {
+        "included": "Las promociones se incluyen automáticamente en las plantillas de correo de cumpleaños",
+        "oneActive": "Solo una promoción puede estar activa a la vez",
+        "appears": "Las promociones aparecerán junto con tu mensaje de cumpleaños",
+        "change": "Puedes cambiar o eliminar promociones en cualquier momento"
+      },
+      "selector": {
+        "selectedPromotion": "Promoción Seleccionada",
+        "selectedPromotions": "Promociones Seleccionadas",
+        "managePromotion": "Gestionar Promoción",
+        "managePromotions": "Gestionar Promociones",
+        "addPromotion": "Agregar Promoción",
+        "addPromotions": "Agregar Promociones",
+        "selectPromotion": "Seleccionar Promoción",
+        "selectPromotions": "Seleccionar Promociones",
+        "filterByType": "Filtrar por tipo",
+        "allTypes": "Todos los Tipos",
+        "searchPlaceholder": "Buscar promociones...",
+        "loading": "Cargando promociones...",
+        "failedToLoad": "Error al cargar promociones",
+        "noPromotions": "No se encontraron promociones",
+        "selected": "Seleccionado",
+        "target": "Objetivo",
+        "used": "Usado",
+        "times": "veces",
+        "insert": "Insertar",
+        "contentPreview": "Vista Previa del Contenido:",
+        "targetAudience": "Público Objetivo"
+      }
+    },
+    "settings": {
+      "title": "Configuración de Emails de Cumpleaños",
+      "enableBirthdayEmails": "Habilitar Emails de Cumpleaños",
+      "enableBirthdayEmailsDescription": "Enviar automáticamente emails de cumpleaños a los clientes",
+      "overviewTitle": "Resumen",
+      "totalCustomers": "Total de Clientes",
+      "withBirthdays": "Con Cumpleaños",
+      "birthdayEmailsEnabled": "Emails de Cumpleaños Habilitados",
+      "upcomingBirthdays": "Próximos Cumpleaños",
+      "noBirthdays30Days": "No hay cumpleaños en los próximos 30 días"
     }
   },
   "ecards": {

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { apiRequest } from '@/lib/queryClient';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface Promotion {
   id: string;
@@ -50,6 +51,8 @@ function PromotionPreviewModal({ promotion, isOpen, onClose }: {
   isOpen: boolean;
   onClose: () => void;
 }) {
+  const { t } = useLanguage();
+  
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
@@ -69,14 +72,14 @@ function PromotionPreviewModal({ promotion, isOpen, onClose }: {
             </p>
           )}
           <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-900">
-            <h4 className="font-medium mb-2">Content Preview:</h4>
+            <h4 className="font-medium mb-2">{t('birthdays.promotions.selector.contentPreview')}</h4>
             <div
               className="prose prose-sm max-w-none dark:prose-invert"
               dangerouslySetInnerHTML={{ __html: promotion.content }}
             />
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">
-            Target Audience: {promotion.targetAudience} • Used {promotion.usageCount} times
+            {t('birthdays.promotions.selector.targetAudience')}: {promotion.targetAudience} • {t('birthdays.promotions.selector.used')} {promotion.usageCount} {t('birthdays.promotions.selector.times')}
           </div>
         </div>
       </DialogContent>
@@ -92,6 +95,7 @@ export function PromotionSelector({
   className,
   singleSelection = false
 }: PromotionSelectorProps) {
+  const { t } = useLanguage();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [filterType, setFilterType] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -167,7 +171,7 @@ export function PromotionSelector({
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-medium">
-              {singleSelection ? 'Selected Promotion' : 'Selected Promotions'}
+              {singleSelection ? t('birthdays.promotions.selector.selectedPromotion') : t('birthdays.promotions.selector.selectedPromotions')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -200,18 +204,18 @@ export function PromotionSelector({
             <Megaphone className="h-4 w-4 mr-2" />
             {selectedPromotions.length > 0
               ? singleSelection
-                ? `Manage Promotion (${selectedPromotions.length} selected)`
-                : `Manage Promotions (${selectedPromotions.length} selected)`
+                ? `${t('birthdays.promotions.selector.managePromotion')} (${selectedPromotions.length} ${t('birthdays.promotions.selector.selected')})`
+                : `${t('birthdays.promotions.selector.managePromotions')} (${selectedPromotions.length} ${t('birthdays.promotions.selector.selected')})`
               : singleSelection
-                ? 'Add Promotion'
-                : 'Add Promotions'
+                ? t('birthdays.promotions.selector.addPromotion')
+                : t('birthdays.promotions.selector.addPromotions')
             }
           </Button>
         </DialogTrigger>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
-              {singleSelection ? 'Select Promotion' : 'Select Promotions'}
+              {singleSelection ? t('birthdays.promotions.selector.selectPromotion') : t('birthdays.promotions.selector.selectPromotions')}
             </DialogTitle>
           </DialogHeader>
 
@@ -219,10 +223,10 @@ export function PromotionSelector({
           <div className="flex gap-4 pb-4">
             <Select value={filterType} onValueChange={setFilterType}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by type" />
+                <SelectValue placeholder={t('birthdays.promotions.selector.filterByType')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="all">{t('birthdays.promotions.selector.allTypes')}</SelectItem>
                 <SelectItem value="newsletter">Newsletter</SelectItem>
                 <SelectItem value="survey">Survey</SelectItem>
                 <SelectItem value="birthday">Birthday</SelectItem>
@@ -232,7 +236,7 @@ export function PromotionSelector({
               </SelectContent>
             </Select>
             <Input
-              placeholder="Search promotions..."
+              placeholder={t('birthdays.promotions.selector.searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="flex-1"
@@ -252,11 +256,11 @@ export function PromotionSelector({
               </div>
             ) : error ? (
               <div className="text-center py-8 text-gray-500">
-                Failed to load promotions
+                {t('birthdays.promotions.selector.failedToLoad')}
               </div>
             ) : filteredPromotions.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                No promotions found
+                {t('birthdays.promotions.selector.noPromotions')}
               </div>
             ) : (
               <div className="space-y-3">
@@ -277,7 +281,7 @@ export function PromotionSelector({
                             {promotion.type}
                           </Badge>
                           {selectedPromotions.includes(promotion.id) && (
-                            <Badge variant="default" className="bg-blue-600">Selected</Badge>
+                            <Badge variant="default" className="bg-blue-600">{t('birthdays.promotions.selector.selected')}</Badge>
                           )}
                         </div>
                         {promotion.description && (
@@ -286,7 +290,7 @@ export function PromotionSelector({
                           </p>
                         )}
                         <div className="text-xs text-gray-500 dark:text-gray-400">
-                          Target: {promotion.targetAudience} • Used {promotion.usageCount} times
+                          {t('birthdays.promotions.selector.target')}: {promotion.targetAudience} • {t('birthdays.promotions.selector.used')} {promotion.usageCount} {t('birthdays.promotions.selector.times')}
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -310,7 +314,7 @@ export function PromotionSelector({
                             }}
                           >
                             <Plus className="h-4 w-4 mr-1" />
-                            Insert
+                            {t('birthdays.promotions.selector.insert')}
                           </Button>
                         )}
                       </div>

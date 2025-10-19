@@ -12,6 +12,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { OnboardingWizard } from "@/components/OnboardingWizard";
 
 
 
@@ -26,6 +27,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { updateProfile } = useReduxUpdateProfile();
   const updateMenuPreferenceMutation = useUpdateMenuPreference();
   const [isThemeChanging, setIsThemeChanging] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [companyData, setCompanyData] = useState<any>(null);
   
   // Initialize sidebar open state
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -71,6 +74,52 @@ export function AppLayout({ children }: AppLayoutProps) {
       setLastUserId(user.id);
     }
   }, [user, setUserTheme, hasInitializedTheme, isThemeChanging, lastUserId]);
+
+  // Check if company needs onboarding
+  useEffect(() => {
+    const checkOnboardingStatus = async () => {
+      if (!user) return;
+
+      try {
+        const response = await fetch('/api/company', {
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          const company = await response.json();
+          setCompanyData(company);
+          
+          // Show onboarding wizard if setup is not completed
+          if (company && !company.setupCompleted) {
+            setShowOnboarding(true);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check onboarding status:', error);
+      }
+    };
+
+    checkOnboardingStatus();
+  }, [user]);
+
+  // Handle onboarding completion
+  const handleOnboardingComplete = async () => {
+    setShowOnboarding(false);
+    
+    // Refresh company data
+    try {
+      const response = await fetch('/api/company', {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const company = await response.json();
+        setCompanyData(company);
+      }
+    } catch (error) {
+      console.error('Failed to refresh company data:', error);
+    }
+  };
 
   // Listen for localStorage changes from other tabs and immediate changes
   useEffect(() => {
@@ -125,17 +174,25 @@ export function AppLayout({ children }: AppLayoutProps) {
   }
 
   return (
-    <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarOpenChange}>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1" />
-          <div className="flex-1" />
-        </header>
-        <div className="flex flex-1 flex-col">
-          {children}
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+    <>
+      <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarOpenChange}>
+        <AppSidebar />
+        <SidebarInset>
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+            <SidebarTrigger className="-ml-1" />
+            <div className="flex-1" />
+          </header>
+          <div className="flex flex-1 flex-col">
+            {children}
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+      
+      {/* Onboarding wizard */}
+      <OnboardingWizard 
+        open={showOnboarding} 
+        onComplete={handleOnboardingComplete}
+      />
+    </>
   );
 }
