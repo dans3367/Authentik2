@@ -12,8 +12,8 @@ export const betterAuthUser = pgTable("better_auth_user", {
     image: text("image"),
     createdAt: timestamp("created_at").notNull(),
     updatedAt: timestamp("updated_at").notNull(),
-    role: text("role").default('Employee').notNull(), // Keep our existing role system
-    tenantId: varchar("tenant_id").default(sql`'29c69b4f-3129-4aa4-a475-7bf892e5c5b9'`).notNull(), // Default value for multi-tenancy
+    role: text("role").default('Owner').notNull(), // New users default to Owner role
+    tenantId: varchar("tenant_id").default(sql`'2f6f5ec2-a56f-47d0-887d-c6b9c1bb56ff'`).notNull(), // Temporary default, will be updated by signup hook
     // Additional fields from users table
     firstName: text("first_name"),
     lastName: text("last_name"),

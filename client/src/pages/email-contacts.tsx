@@ -334,10 +334,6 @@ export default function EmailContacts() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline">
-              <Upload className="w-4 h-4 mr-2" />
-              Import
-            </Button>
             <Button 
               className="bg-blue-600 hover:bg-blue-700"
               onClick={() => setLocation('/email-contacts/new')}

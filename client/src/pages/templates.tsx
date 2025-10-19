@@ -61,83 +61,195 @@ type TemplateChannel = (typeof channelOptions)[number]["value"];
 
 type TemplateCategory = (typeof categoryOptions)[number]["value"];
 
+// Template types from API
 interface Template {
   id: string;
+  tenantId: string;
+  userId: string;
   name: string;
   channel: TemplateChannel;
   category: TemplateCategory;
   subjectLine: string;
-  preview: string;
+  preview?: string | null;
   body: string;
   usageCount: number;
-  createdAt: string;
-  updatedAt: string;
   lastUsed?: string | null;
   isFavorite: boolean;
   tags: string[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  user?: {
+    id: string;
+    name: string | null;
+    firstName: string | null;
+    lastName: string | null;
+  };
 }
 
-const initialTemplates: Template[] = [
-  {
-    id: "tmpl-individual-welcome",
-    name: "Personal Welcome",
-    channel: "individual",
-    category: "welcome",
-    subjectLine: "Welcome aboard, {{first_name}}!",
-    preview: "Hi {{first_name}}, it was great connecting with you today. Here's a quick recap of what we discussed and the next steps...",
-    body: `Hi {{first_name}},\n\nIt was great connecting with you today. This email includes a quick recap of what we covered and some helpful links to get started.\n\n• Account portal: {{account_portal_url}}\n• Next steps: {{next_steps}}\n\nLet me know if you need anything else!\n\nBest,\n{{sender_name}}`,
-    usageCount: 42,
-    createdAt: "2025-07-10T09:24:00.000Z",
-    updatedAt: "2025-07-28T15:02:00.000Z",
-    lastUsed: "2025-07-28T09:12:00.000Z",
-    isFavorite: true,
-    tags: ["follow-up", "sales"],
-  },
-  {
-    id: "tmpl-promo-summer",
-    name: "Summer Campaign Blast",
-    channel: "promotional",
-    category: "seasonal",
-    subjectLine: "☀️ Summer deals inside: save up to 40%",
-    preview: "Kick off the season with a curated collection of limited-time offers. Free shipping included on orders over $50...",
-    body: `<h1>Summer Savings Are Here!</h1><p>Kick off the season with a curated collection of limited-time offers.</p><ul><li>25% off new arrivals</li><li>Free shipping on orders over $50</li><li>Bonus gift on purchases above $100</li></ul><p>Shop before {{sale_end_date}} to secure your favorites.</p>`,
-    usageCount: 18,
-    createdAt: "2025-06-01T16:45:00.000Z",
-    updatedAt: "2025-07-15T11:10:00.000Z",
-    lastUsed: "2025-07-20T14:30:00.000Z",
-    isFavorite: false,
-    tags: ["seasonal", "discount"],
-  },
-  {
-    id: "tmpl-newsletter-monthly",
-    name: "Monthly Product Digest",
-    channel: "newsletter",
-    category: "update",
-    subjectLine: "{{month}} highlights: new releases and tips",
-    preview: "A look back at what we shipped this month, along with best practices to help your team get the most out of our platform...",
-    body: `{{month}} Highlights\n\n• Feature spotlight: {{feature_name}}\n• Customer story: {{customer_name}}\n• Pro tip: {{pro_tip}}\n\nHave feedback? Reply directly — we read every message.`,
-    usageCount: 9,
-    createdAt: "2025-04-05T08:12:00.000Z",
-    updatedAt: "2025-07-01T10:40:00.000Z",
-    lastUsed: "2025-07-01T10:40:00.000Z",
-    isFavorite: false,
-    tags: ["product", "monthly"],
-  },
-  {
-    id: "tmpl-transactional-order",
-    name: "Order Confirmation",
-    channel: "transactional",
-    category: "retention",
-    subjectLine: "Order #{{order_number}} confirmed",
-    preview: "Thanks for shopping with us! We received your order and it's already being prepared. Track progress in your customer portal...",
-    body: `Hi {{first_name}},\n\nThank you for your order! We're preparing your items and will let you know once they ship.\n\nOrder summary:\n• Order number: {{order_number}}\n• Estimated arrival: {{delivery_date}}\n\nTrack your order anytime at {{tracking_url}}.`,
-    usageCount: 312,
-    createdAt: "2025-02-18T13:08:00.000Z",
-    updatedAt: "2025-06-22T20:18:00.000Z",
-    isFavorite: true,
-    tags: ["confirmation", "orders"],
-  },
-];
+interface TemplateStats {
+  totalTemplates: number;
+  activeTemplates: number;
+  favoriteTemplates: number;
+  individualTemplates: number;
+  promotionalTemplates: number;
+  newsletterTemplates: number;
+  transactionalTemplates: number;
+  averageUsageCount: number;
+}
+
+interface TemplatePagination {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
+// API helper functions
+const fetchTemplates = async (params: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  channel?: string;
+  category?: string;
+  favoritesOnly?: boolean;
+  sortBy?: string;
+  sortOrder?: string;
+}) => {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== '' && value !== 'all') {
+      searchParams.append(key, value.toString());
+    }
+  });
+
+  const response = await fetch(`/api/templates?${searchParams}`, {
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch templates');
+  }
+
+  return response.json();
+};
+
+const fetchTemplateStats = async (): Promise<TemplateStats> => {
+  const response = await fetch('/api/templates/stats', {
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch template stats');
+  }
+
+  return response.json();
+};
+
+const createTemplate = async (templateData: CreateTemplatePayload) => {
+  const response = await fetch('/api/templates', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(templateData),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to create template');
+  }
+
+  return response.json();
+};
+
+const updateTemplate = async (id: string, templateData: Partial<CreateTemplatePayload>) => {
+  const response = await fetch(`/api/templates/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(templateData),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to update template');
+  }
+
+  return response.json();
+};
+
+const deleteTemplate = async (id: string) => {
+  const response = await fetch(`/api/templates/${id}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to delete template');
+  }
+
+  return response.json();
+};
+
+const toggleTemplateFavorite = async (id: string) => {
+  const response = await fetch(`/api/templates/${id}/favorite`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to toggle favorite');
+  }
+
+  return response.json();
+};
+
+const useTemplate = async (id: string) => {
+  const response = await fetch(`/api/templates/${id}/use`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to record template usage');
+  }
+
+  return response.json();
+};
+
+const duplicateTemplate = async (id: string, name?: string) => {
+  const response = await fetch(`/api/templates/${id}/duplicate`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ name }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to duplicate template');
+  }
+
+  return response.json();
+};
 
 function hasContent(html: string): boolean {
   // Remove HTML tags and check if there's actual text content
@@ -250,7 +362,7 @@ function TemplateCard({ template, onToggleFavorite, onDuplicate, onDelete, onUse
         <div>
           <p className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Preview</p>
           <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-3">
-            {template.preview}
+            {template.preview || 'No preview available'}
           </p>
         </div>
         {template.tags.length > 0 && (
@@ -630,83 +742,133 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
 }
 
 export default function TemplatesPage() {
-  const [templates, setTemplates] = useState<Template[]>(initialTemplates);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [pagination, setPagination] = useState<TemplatePagination>({ page: 1, limit: 50, total: 0, pages: 0 });
+  const [stats, setStats] = useState<TemplateStats | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [channelFilter, setChannelFilter] = useState<"all" | TemplateChannel>("all");
   const [categoryFilter, setCategoryFilter] = useState<"all" | TemplateCategory>("all");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const filteredTemplates = useMemo(() => {
-    return templates.filter((template) => {
-      const matchesSearch =
-        template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        template.subjectLine.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        template.tags.some((tag) => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-      const matchesChannel = channelFilter === "all" || template.channel === channelFilter;
-      const matchesCategory = categoryFilter === "all" || template.category === categoryFilter;
-      const matchesFavorites = !favoritesOnly || template.isFavorite;
-
-      return matchesSearch && matchesChannel && matchesCategory && matchesFavorites;
-    });
-  }, [templates, searchTerm, channelFilter, categoryFilter, favoritesOnly]);
-
-  const stats = useMemo(() => {
-    const total = templates.length;
-    const favorites = templates.filter((template) => template.isFavorite).length;
-    const byChannel = channelOptions.map((option) => ({
-      channel: option.value,
-      label: option.label,
-      count: templates.filter((template) => template.channel === option.value).length,
-    }));
-
-    return { total, favorites, byChannel };
-  }, [templates]);
-
-  const handleCreateTemplate = (payload: CreateTemplatePayload) => {
-    const now = new Date().toISOString();
-    const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `tmpl-${Date.now()}`;
-
-    const newTemplate: Template = {
-      id,
-      name: payload.name,
-      channel: payload.channel,
-      category: payload.category,
-      subjectLine: payload.subjectLine,
-      preview: payload.content.slice(0, 160),
-      body: payload.content,
-      usageCount: 0,
-      createdAt: now,
-      updatedAt: now,
-      lastUsed: null,
-      isFavorite: false,
-      tags: payload.tags,
-    };
-
-    setTemplates((previous) => [newTemplate, ...previous]);
-    toast({
-      title: "Template created",
-      description: `${payload.name} is ready to use across your campaigns.`,
-    });
+  // Load templates and stats on component mount and when filters change
+  const loadTemplates = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await fetchTemplates({
+        page: pagination.page,
+        limit: pagination.limit,
+        search: searchTerm || undefined,
+        channel: channelFilter !== 'all' ? channelFilter : undefined,
+        category: categoryFilter !== 'all' ? categoryFilter : undefined,
+        favoritesOnly: favoritesOnly || undefined,
+      });
+      setTemplates(result.templates);
+      setPagination(result.pagination);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load templates');
+      toast({
+        title: "Error",
+        description: "Failed to load templates. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleToggleFavorite = (id: string) => {
-    setTemplates((previous) =>
-      previous.map((template) =>
-        template.id === id ? { ...template, isFavorite: !template.isFavorite } : template
-      )
-    );
+  const loadStats = async () => {
+    try {
+      const statsData = await fetchTemplateStats();
+      setStats(statsData);
+    } catch (err) {
+      console.error('Failed to load template stats:', err);
+    }
   };
 
-  const handleUseTemplate = (template: Template) => {
-    toast({
-      title: "Template applied",
-      description: `We copied "${template.name}" so you can personalise it for your next send.`,
-    });
+  // Load data on mount
+  useEffect(() => {
+    loadTemplates();
+    loadStats();
+  }, []);
+
+  // Reload templates when filters change
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      loadTemplates();
+    }, 300); // Debounce search
+    
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, channelFilter, categoryFilter, favoritesOnly, pagination.page]);
+
+  // Filtered templates for display (now handled server-side)
+  const filteredTemplates = templates;
+
+  const handleCreateTemplate = async (payload: CreateTemplatePayload) => {
+    try {
+      const result = await createTemplate({
+        name: payload.name,
+        channel: payload.channel,
+        category: payload.category,
+        subjectLine: payload.subjectLine,
+        preview: payload.content.slice(0, 160),
+        body: payload.content,
+        tags: payload.tags,
+        isFavorite: false,
+      });
+      
+      await loadTemplates();
+      await loadStats();
+      
+      toast({
+        title: "Template created",
+        description: `${payload.name} is ready to use across your campaigns.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create template. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDeleteTemplate = (id: string) => {
+  const handleToggleFavorite = async (id: string) => {
+    try {
+      await toggleTemplateFavorite(id);
+      await loadTemplates();
+      await loadStats();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to toggle favorite status. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUseTemplate = async (template: Template) => {
+    try {
+      await useTemplate(template.id);
+      await loadTemplates(); // Refresh to show updated usage count
+      toast({
+        title: "Template applied",
+        description: `We copied "${template.name}" so you can personalise it for your next send.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to use template. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteTemplate = async (id: string) => {
     const template = templates.find((item) => item.id === id);
     if (!template) return;
 
@@ -718,62 +880,71 @@ export default function TemplatesPage() {
       return;
     }
 
-    setTemplates((previous) => previous.filter((item) => item.id !== id));
-    toast({
-      title: "Template deleted",
-      description: `${template.name} has been removed.`,
-    });
+    try {
+      await deleteTemplate(id);
+      await loadTemplates();
+      await loadStats();
+      toast({
+        title: "Template deleted",
+        description: `${template.name} has been removed.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete template. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDuplicateTemplate = (template: Template) => {
-    const now = new Date().toISOString();
-    const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `tmpl-${Date.now()}-copy`;
-
-    const duplicated: Template = {
-      ...template,
-      id,
-      name: `${template.name} copy`,
-      usageCount: 0,
-      isFavorite: false,
-      createdAt: now,
-      updatedAt: now,
-      lastUsed: null,
-    };
-
-    setTemplates((previous) => [duplicated, ...previous]);
-    toast({
-      title: "Template duplicated",
-      description: `${template.name} copy is ready to edit.`,
-    });
+  const handleDuplicateTemplate = async (template: Template) => {
+    try {
+      await duplicateTemplate(template.id, `${template.name} copy`);
+      await loadTemplates();
+      await loadStats();
+      toast({
+        title: "Template duplicated",
+        description: `${template.name} copy is ready to edit.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to duplicate template. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleEditTemplate = (template: Template) => {
     setEditingTemplate(template);
   };
 
-  const handleSaveEdit = (id: string, payload: CreateTemplatePayload) => {
-    const now = new Date().toISOString();
-    setTemplates((previous) =>
-      previous.map((template) =>
-        template.id === id
-          ? {
-              ...template,
-              name: payload.name,
-              channel: payload.channel,
-              category: payload.category,
-              subjectLine: payload.subjectLine,
-              preview: payload.content.slice(0, 160),
-              body: payload.content,
-              updatedAt: now,
-              tags: payload.tags,
-            }
-          : template
-      )
-    );
-    toast({
-      title: "Template updated",
-      description: `${payload.name} has been saved.`,
-    });
+  const handleSaveEdit = async (id: string, payload: CreateTemplatePayload) => {
+    try {
+      await updateTemplate(id, {
+        name: payload.name,
+        channel: payload.channel,
+        category: payload.category,
+        subjectLine: payload.subjectLine,
+        preview: payload.content.slice(0, 160),
+        body: payload.content,
+        tags: payload.tags,
+      });
+      
+      await loadTemplates();
+      await loadStats();
+      
+      toast({
+        title: "Template updated",
+        description: `${payload.name} has been saved.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update template. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -793,21 +964,32 @@ export default function TemplatesPage() {
           <Card>
             <CardContent className="p-5 space-y-1">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total templates</p>
-              <p className="text-3xl font-semibold text-gray-900 dark:text-gray-50">{stats.total}</p>
+              <p className="text-3xl font-semibold text-gray-900 dark:text-gray-50">
+                {stats ? stats.totalTemplates : '...'}
+              </p>
               <p className="text-xs text-muted-foreground">
-                {stats.favorites} favourited for quick access
+                {stats ? `${stats.favoriteTemplates} favourited for quick access` : 'Loading...'}
               </p>
             </CardContent>
           </Card>
-          {stats.byChannel.slice(0, 2).map((stat) => (
-            <Card key={stat.channel}>
-              <CardContent className="p-5 space-y-1">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{stat.label}</p>
-                <p className="text-3xl font-semibold text-gray-900 dark:text-gray-50">{stat.count}</p>
-                <p className="text-xs text-muted-foreground">Templates ready for this channel</p>
-              </CardContent>
-            </Card>
-          ))}
+          <Card>
+            <CardContent className="p-5 space-y-1">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Individual</p>
+              <p className="text-3xl font-semibold text-gray-900 dark:text-gray-50">
+                {stats ? stats.individualTemplates : '...'}
+              </p>
+              <p className="text-xs text-muted-foreground">Templates ready for this channel</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-5 space-y-1">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Promotional</p>
+              <p className="text-3xl font-semibold text-gray-900 dark:text-gray-50">
+                {stats ? stats.promotionalTemplates : '...'}
+              </p>
+              <p className="text-xs text-muted-foreground">Templates ready for this channel</p>
+            </CardContent>
+          </Card>
         </section>
 
         <section className="bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-lg shadow-sm">
@@ -862,21 +1044,46 @@ export default function TemplatesPage() {
             </div>
           </div>
           <div className="p-6">
-            {filteredTemplates.length === 0 ? (
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center space-y-3">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="text-sm text-muted-foreground">Loading templates...</p>
+                </div>
+              </div>
+            ) : error ? (
+              <Card className="border-dashed border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800">
+                <CardContent className="py-12 text-center space-y-3">
+                  <h3 className="text-lg font-semibold text-red-900 dark:text-red-100">Error loading templates</h3>
+                  <p className="text-sm text-red-700 dark:text-red-300">
+                    {error}
+                  </p>
+                  <Button variant="outline" onClick={() => loadTemplates()}>
+                    Try again
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : filteredTemplates.length === 0 ? (
               <Card className="border-dashed">
                 <CardContent className="py-12 text-center space-y-3">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">No templates match your filters</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">No templates found</h3>
                   <p className="text-sm text-muted-foreground">
-                    Try adjusting your search terms, channel, or category selections.
+                    {searchTerm || channelFilter !== 'all' || categoryFilter !== 'all' || favoritesOnly
+                      ? 'Try adjusting your search terms or filters.'
+                      : 'Get started by creating your first email template.'}
                   </p>
-                  <Button variant="outline" onClick={() => {
-                    setSearchTerm("");
-                    setChannelFilter("all");
-                    setCategoryFilter("all");
-                    setFavoritesOnly(false);
-                  }}>
-                    Reset filters
-                  </Button>
+                  <div className="space-x-2">
+                    {(searchTerm || channelFilter !== 'all' || categoryFilter !== 'all' || favoritesOnly) && (
+                      <Button variant="outline" onClick={() => {
+                        setSearchTerm("");
+                        setChannelFilter("all");
+                        setCategoryFilter("all");
+                        setFavoritesOnly(false);
+                      }}>
+                        Reset filters
+                      </Button>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             ) : (

@@ -60,12 +60,12 @@ const authInstance = betterAuth({
     additionalFields: {
       role: {
         type: "string",
-        defaultValue: "Employee",
+        defaultValue: "Owner", // New users are owners of their own tenant
         required: false,
       },
       tenantId: {
         type: "string",
-        defaultValue: "29c69b4f-3129-4aa4-a475-7bf892e5c5b9",
+        defaultValue: "2f6f5ec2-a56f-47d0-887d-c6b9c1bb56ff", // Temporary default, will be updated by signup hook
         required: false,
       },
       firstName: {
@@ -88,8 +88,69 @@ const authInstance = betterAuth({
       },
     },
   },
-  // Better Auth hooks will be implemented separately to avoid type conflicts
-  // Tenant synchronization will be handled by the registration endpoints
+  // Hooks to create tenant automatically on user signup
+  hooks: {
+    after: [
+      {
+        matcher: () => true,
+        handler: async (context: any) => {
+          // Only run on user creation (sign up)
+          if (context.type === "user.created") {
+            try {
+              const user = context.user;
+              console.log(`🔧 Creating tenant for new user: ${user.email}`);
+
+              // Create a tenant for the new user
+              const companyName = user.name ? `${user.name}'s Organization` : "My Organization";
+              
+              // Generate a unique slug
+              let baseSlug = user.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '-');
+              let slug = baseSlug;
+              let attempts = 0;
+              
+              // Check for slug conflicts and add suffix if needed
+              while (attempts < 10) {
+                const existingTenant = await db.query.tenants.findFirst({
+                  where: eq(tenants.slug, slug)
+                });
+                
+                if (!existingTenant) break;
+                
+                attempts++;
+                slug = `${baseSlug}-${attempts}`;
+              }
+
+              const [newTenant] = await db.insert(tenants).values({
+                name: companyName,
+                slug: slug,
+                isActive: true,
+                maxUsers: 10,
+              }).returning();
+
+              // Update the user with the new tenant ID
+              await db.update(betterAuthUser)
+                .set({
+                  tenantId: newTenant.id,
+                  role: 'Owner',
+                  updatedAt: new Date(),
+                })
+                .where(eq(betterAuthUser.id, user.id));
+
+              console.log(`✅ Tenant created for ${user.email}:`, {
+                tenantId: newTenant.id,
+                tenantName: newTenant.name,
+                tenantSlug: newTenant.slug,
+              });
+            } catch (error) {
+              console.error('❌ Failed to create tenant for new user:', error);
+              // Don't throw - allow signup to complete even if tenant creation fails
+              // User will be assigned to default tenant and can be manually migrated later
+            }
+          }
+        },
+      },
+    ],
+  },
 });
 
 // For Express integration, we need to extract the handler

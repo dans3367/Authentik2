@@ -13,8 +13,8 @@ export const betterAuthUser = pgTable("better_auth_user", {
   image: text("image"),
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
-  role: text("role").default('Employee').notNull(), // Keep our existing role system
-  tenantId: varchar("tenant_id").default(sql`'29c69b4f-3129-4aa4-a475-7bf892e5c5b9'`).notNull(), // Default value for multi-tenancy
+  role: text("role").default('Owner').notNull(), // New users default to Owner role
+  tenantId: varchar("tenant_id").default(sql`'2f6f5ec2-a56f-47d0-887d-c6b9c1bb56ff'`).notNull(), // Temporary default, will be updated by signup hook
   // Additional fields from users table
   firstName: text("first_name"),
   lastName: text("last_name"),
@@ -2064,7 +2064,7 @@ export const appointmentReminderRelations = relations(appointmentReminders, ({ o
   }),
 }));
 
-// Update tenant relations to include appointments
+// Update tenant relations to include appointments and templates
 export const tenantRelationsUpdated = relations(tenants, ({ many }) => ({
   users: many(betterAuthUser),
   stores: many(stores),
@@ -2088,6 +2088,7 @@ export const tenantRelationsUpdated = relations(tenants, ({ many }) => ({
   birthdaySettings: many(birthdaySettings),
   appointments: many(appointments),
   appointmentReminders: many(appointmentReminders),
+  templates: many(templates),
 }));
 
 // Appointment schemas
@@ -2147,4 +2148,96 @@ export interface AppointmentFilters {
   dateFrom?: Date;
   dateTo?: Date;
   serviceType?: string;
+}
+
+// Email templates table for reusable email content
+export const templates = pgTable("templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }), // Who created the template
+  name: text("name").notNull(),
+  channel: text("channel").notNull(), // individual, promotional, newsletter, transactional
+  category: text("category").notNull(), // welcome, retention, seasonal, update, custom
+  subjectLine: text("subject_line").notNull(),
+  preview: text("preview"), // Preview text for email clients
+  body: text("body").notNull(), // HTML or plain text content
+  usageCount: integer("usage_count").default(0),
+  lastUsed: timestamp("last_used"),
+  isFavorite: boolean("is_favorite").default(false),
+  tags: text("tags").array().default(sql`'{}'`), // Array of tags for organization
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Template relations
+export const templateRelations = relations(templates, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [templates.tenantId],
+    references: [tenants.id],
+  }),
+  user: one(betterAuthUser, {
+    fields: [templates.userId],
+    references: [betterAuthUser.id],
+  }),
+}));
+
+// Template channel and category enums
+export const templateChannels = ['individual', 'promotional', 'newsletter', 'transactional'] as const;
+export type TemplateChannel = typeof templateChannels[number];
+
+export const templateCategories = ['welcome', 'retention', 'seasonal', 'update', 'custom'] as const;
+export type TemplateCategory = typeof templateCategories[number];
+
+// Template schemas
+export const createTemplateSchema = z.object({
+  name: z.string().min(1, "Template name is required"),
+  channel: z.enum(templateChannels),
+  category: z.enum(templateCategories),
+  subjectLine: z.string().min(1, "Subject line is required"),
+  preview: z.string().optional(),
+  body: z.string().min(1, "Template content is required"),
+  tags: z.array(z.string()).default([]),
+  isFavorite: z.boolean().default(false),
+});
+
+export const updateTemplateSchema = z.object({
+  name: z.string().min(1, "Template name is required").optional(),
+  channel: z.enum(templateChannels).optional(),
+  category: z.enum(templateCategories).optional(),
+  subjectLine: z.string().min(1, "Subject line is required").optional(),
+  preview: z.string().optional(),
+  body: z.string().min(1, "Template content is required").optional(),
+  tags: z.array(z.string()).optional(),
+  isFavorite: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const insertTemplateSchema = createInsertSchema(templates).omit({
+  id: true,
+  tenantId: true,
+  userId: true,
+  usageCount: true,
+  lastUsed: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Template types
+export type Template = typeof templates.$inferSelect;
+export type InsertTemplate = z.infer<typeof insertTemplateSchema>;
+export type CreateTemplateData = z.infer<typeof createTemplateSchema>;
+export type UpdateTemplateData = z.infer<typeof updateTemplateSchema>;
+
+// Extended template types with relationships
+export interface TemplateWithDetails extends Template {
+  user: User;
+}
+
+export interface TemplateFilters {
+  search?: string;
+  channel?: TemplateChannel | 'all';
+  category?: TemplateCategory | 'all';
+  favoritesOnly?: boolean;
+  isActive?: boolean;
 }

@@ -33,6 +33,7 @@ import newsletterWorkerRoutes from "./routes/newsletterWorkerRoutes";
 import suppressionManagementRoutes from "./routes/suppressionManagementRoutes";
 import aiRoutes from "./routes/aiRoutes";
 import { birthdayWorkerRoutes } from "./routes/birthdayWorkerRoutes";
+import { templateRoutes } from "./routes/templateRoutes";
 
 // Import middleware
 import { authRateLimiter, apiRateLimiter, jwtTokenRateLimiter } from "./middleware/security";
@@ -67,6 +68,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/birthday-worker", birthdayWorkerRoutes);
   app.use("/api/ai", aiRoutes);
   app.use("/api/suppression", suppressionManagementRoutes);
+  app.use("/api/templates", templateRoutes);
 
   // Newsletter stats endpoint
   app.get("/api/newsletter-stats", authenticateToken, requireTenant, async (req: any, res) => {
@@ -385,6 +387,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: "/api/email/*",
         users: "/api/users/*",
         twoFactor: "/api/2fa/*",
+        templates: "/api/templates/* (CRUD operations with tenant filtering)",
       },
       documentation: "https://docs.zendwise.work/api",
     });
