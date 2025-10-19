@@ -35,6 +35,7 @@ import aiRoutes from "./routes/aiRoutes";
 import { birthdayWorkerRoutes } from "./routes/birthdayWorkerRoutes";
 import { templateRoutes } from "./routes/templateRoutes";
 import { signupRoutes } from "./routes/signupRoutes";
+import { tenantFixRoutes } from "./routes/tenantFixRoutes";
 
 // Import middleware
 import { authRateLimiter, apiRateLimiter, jwtTokenRateLimiter } from "./middleware/security";
@@ -53,6 +54,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // API Routes
   // Note: Auth routes handled by better-auth middleware
   app.use("/api/signup", signupRoutes); // Signup helper endpoints
+  app.use("/api/tenant-fix", tenantFixRoutes); // Admin tools to fix tenant assignments
   app.use("/api/admin", adminRoutes);
   app.use("/api/user", authRoutes); // User-facing session endpoints
   app.use("/api/forms", formsRoutes);
@@ -70,7 +72,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/birthday-worker", birthdayWorkerRoutes);
   app.use("/api/ai", aiRoutes);
   app.use("/api/suppression", suppressionManagementRoutes);
-  app.use("/api/templates", templateRoutes);
+  app.use("/api/templates", authenticateToken, requireTenant, templateRoutes);
 
   // Newsletter stats endpoint
   app.get("/api/newsletter-stats", authenticateToken, requireTenant, async (req: any, res) => {

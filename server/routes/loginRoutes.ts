@@ -7,8 +7,135 @@ import { z } from 'zod';
 import { authenticateToken } from '../middleware/auth-middleware';
 import { auth } from '../auth';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { emailService } from '../emailService';
 
 export const loginRoutes = Router();
+
+// Rate limiting for resend verification
+const resendRateLimit = new Map<string, { count: number; resetAt: number; nextAllowedAt: number }>();
+
+// Clean up expired rate limit entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [email, data] of resendRateLimit.entries()) {
+    if (data.resetAt < now) {
+      resendRateLimit.delete(email);
+    }
+  }
+}, 5 * 60 * 1000);
+
+// Resend verification email endpoint
+loginRoutes.post('/resend-verification', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ 
+        message: 'Email address is required' 
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check rate limiting
+    const now = Date.now();
+    const rateLimitData = resendRateLimit.get(normalizedEmail);
+
+    if (rateLimitData) {
+      // Check if we're still in cooldown period
+      if (now < rateLimitData.nextAllowedAt) {
+        const retryAfterMinutes = Math.ceil((rateLimitData.nextAllowedAt - now) / 60000);
+        return res.status(429).json({
+          message: `Please wait ${retryAfterMinutes} minute${retryAfterMinutes > 1 ? 's' : ''} before requesting another verification email`,
+          retryAfter: retryAfterMinutes,
+          nextAllowedAt: new Date(rateLimitData.nextAllowedAt).toISOString()
+        });
+      }
+
+      // Reset counter if past reset time
+      if (now >= rateLimitData.resetAt) {
+        resendRateLimit.delete(normalizedEmail);
+      }
+    }
+
+    console.log('📧 [Resend Verification] Request for email:', normalizedEmail);
+
+    // Find user by email
+    const user = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.email, normalizedEmail)
+    });
+
+    // Always return success to prevent email enumeration
+    // But only send email if user exists and is not verified
+    if (user) {
+      if (user.emailVerified) {
+        console.log('ℹ️ [Resend Verification] User already verified:', normalizedEmail);
+        return res.json({
+          message: 'Verification email sent successfully',
+          success: true,
+          alreadyVerified: true
+        });
+      }
+
+      // Generate new verification token (JWT)
+      const secret = process.env.BETTER_AUTH_SECRET || 'fallback-secret-key-change-in-production';
+      const verificationToken = jwt.sign(
+        { 
+          email: user.email,
+          iat: Math.floor(Date.now() / 1000)
+        },
+        secret,
+        { expiresIn: '24h' }
+      );
+
+      console.log('✅ [Resend Verification] Generated token for:', user.email);
+
+      // Send verification email
+      try {
+        await emailService.sendVerificationEmail(user.email, verificationToken, user.firstName);
+        console.log('✅ [Resend Verification] Email sent to:', user.email);
+      } catch (emailError) {
+        console.error('❌ [Resend Verification] Failed to send email:', emailError);
+        return res.status(500).json({
+          message: 'Failed to send verification email. Please try again later.',
+          success: false
+        });
+      }
+
+      // Update rate limiting - 2 minutes cooldown between requests
+      const nextAllowedAt = now + (2 * 60 * 1000); // 2 minutes
+      const resetAt = now + (60 * 60 * 1000); // 1 hour
+      const currentData = resendRateLimit.get(normalizedEmail);
+      
+      resendRateLimit.set(normalizedEmail, {
+        count: (currentData?.count || 0) + 1,
+        resetAt: currentData?.resetAt || resetAt,
+        nextAllowedAt: nextAllowedAt
+      });
+
+      return res.json({
+        message: 'Verification email sent successfully',
+        success: true,
+        nextAllowedAt: new Date(nextAllowedAt).toISOString()
+      });
+    } else {
+      console.log('⚠️ [Resend Verification] User not found:', normalizedEmail);
+      // Return success anyway to prevent email enumeration
+      return res.json({
+        message: 'Verification email sent successfully',
+        success: true
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ [Resend Verification] Error:', error);
+    res.status(500).json({ 
+      message: 'Internal server error',
+      success: false
+    });
+  }
+});
 
 // New login verification endpoint that follows the flow in the image
 loginRoutes.post('/verify-login', async (req, res) => {
@@ -666,3 +793,117 @@ export function requireTwoFactorVerification(req: any, res: any, next: any) {
 
   next();
 }
+
+// Custom email verification endpoint that creates a session automatically
+loginRoutes.get('/verify-email', async (req, res) => {
+  try {
+    const token = req.query.token as string;
+
+    if (!token) {
+      return res.status(400).json({ 
+        message: 'Verification token is required' 
+      });
+    }
+
+    console.log('📧 [Verify Email] Starting email verification for token:', token.substring(0, 20) + '...');
+
+    // Decode JWT token to get email
+    let email: string;
+    try {
+      const jwt = await import('jsonwebtoken');
+      const secret = process.env.BETTER_AUTH_SECRET || 'fallback-secret-key-change-in-production';
+      const decoded = jwt.default.verify(token, secret) as { email: string; iat: number; exp: number };
+      email = decoded.email;
+      console.log('✅ [Verify Email] JWT decoded, email:', email);
+    } catch (jwtError: any) {
+      console.error('❌ [Verify Email] JWT verification failed:', jwtError.message);
+      return res.status(400).json({ 
+        message: 'Invalid or expired verification token' 
+      });
+    }
+
+    // Find user by email
+    const user = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.email, email.toLowerCase())
+    });
+
+    if (!user) {
+      console.log('❌ [Verify Email] User not found:', email);
+      return res.status(400).json({ 
+        message: 'User not found' 
+      });
+    }
+
+    console.log('✅ [Verify Email] Found user:', user.email);
+
+    // Check if user is already verified
+    if (user.emailVerified) {
+      console.log('ℹ️ [Verify Email] User already verified:', user.email);
+      // Still create a session so they can proceed
+    } else {
+      // Update user to mark email as verified
+      await db.update(betterAuthUser)
+        .set({ 
+          emailVerified: true,
+          updatedAt: new Date()
+        })
+        .where(eq(betterAuthUser.id, user.id));
+
+      console.log('✅ [Verify Email] Email verified for user:', user.email);
+    }
+
+    // Create a Better Auth session for the user automatically
+    console.log('🔐 [Verify Email] Creating session for user:', user.email);
+    
+    // Generate a unique session ID and token
+    const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    const sessionToken = `${sessionId}_token_${Math.random().toString(36).substring(2, 15)}`;
+    const sessionExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    // Create session in database
+    const [newSession] = await db.insert(betterAuthSession)
+      .values({
+        id: sessionId,
+        userId: user.id,
+        token: sessionToken,
+        expiresAt: sessionExpiresAt,
+        ipAddress: req.ip || req.connection.remoteAddress || null,
+        userAgent: req.get('User-Agent') || null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
+      .returning();
+
+    console.log('✅ [Verify Email] Session created:', newSession.id);
+
+    // Set the session cookie
+    res.cookie('better-auth.session_token', sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: '/'
+    });
+
+    console.log('✅ [Verify Email] Session cookie set');
+
+    // Return success response with user info
+    res.json({
+      message: 'Email verified successfully',
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        emailVerified: true
+      },
+      accessToken: sessionToken // Include token for frontend compatibility
+    });
+
+  } catch (error) {
+    console.error('❌ [Verify Email] Error:', error);
+    res.status(500).json({ 
+      message: 'Internal server error during email verification' 
+    });
+  }
+});

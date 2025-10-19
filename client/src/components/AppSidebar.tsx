@@ -9,8 +9,6 @@ import {
   Users,
   Building2,
   Store,
-  Moon,
-  Sun,
   Mail,
   UserCheck,
   BarChart3,
@@ -50,8 +48,6 @@ import {
   useReduxAuth,
   useReduxLogout,
 } from "@/hooks/useReduxAuth";
-import { useUpdateTheme } from "@/hooks/useAuth";
-import { useTheme } from "@/contexts/ThemeContext";
 import { useQuery } from "@tanstack/react-query";
 import type { UserSubscriptionResponse } from "@shared/schema";
 import { useState } from "react";
@@ -97,7 +93,6 @@ export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const { user } = useReduxAuth();
   const { logout } = useReduxLogout();
-  const { theme, toggleTheme } = useTheme();
   const { t } = useTranslation();
   
   // Cast user to extended type to access custom fields
@@ -114,8 +109,6 @@ export function AppSidebar() {
   });
   
   const navigation = getNavigation(extendedUser?.role, t);
-  const updateThemeMutation = useUpdateTheme();
-  const [isThemeChanging, setIsThemeChanging] = useState(false);
   const { state, isMobile, setOpenMobile } = useSidebar();
 
   // Fetch subscription data for the user's plan
@@ -129,25 +122,6 @@ export function AppSidebar() {
     setLocation("/auth");
   };
 
-  const handleThemeToggle = async () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setIsThemeChanging(true);
-    toggleTheme();
-    
-    // Sync with backend using dedicated theme endpoint
-    if (extendedUser) {
-      try {
-        await updateThemeMutation.mutateAsync({ theme: newTheme });
-        // Allow theme sync again after mutation completes
-        setTimeout(() => setIsThemeChanging(false), 1000);
-      } catch (error) {
-        console.error('Failed to update theme:', error);
-        setIsThemeChanging(false);
-      }
-    } else {
-      setIsThemeChanging(false);
-    }
-  };
 
   const handleMobileNavClick = () => {
     if (isMobile) {
@@ -284,7 +258,7 @@ export function AppSidebar() {
               <DropdownMenuContent 
                 side="right" 
                 align="end" 
-                className="w-64 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-lg rounded-2xl p-0"
+                className="w-64 rounded-2xl p-1"
                 sideOffset={8}
               >
                 {/* User Profile Header */}
@@ -341,26 +315,9 @@ export function AppSidebar() {
 
                   <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-700" />
 
-                  <div
-                    onClick={handleThemeToggle}
-                    className="relative flex cursor-pointer select-none items-center gap-3 px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 rounded-none"
-                    role="menuitem"
-                  >
-                    {theme === 'light' ? (
-                      <>
-                        <Moon className="h-4 w-4" style={{color: "#3396D3"}} />
-                        <span className="text-sm">Dark mode</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sun className="h-4 w-4" style={{color: "#3396D3"}} />
-                        <span className="text-sm">Light mode</span>
-                      </>
-                    )}
-                  </div>
                 </div>
 
-                <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-700" />
+                <DropdownMenuSeparator />
 
                 {/* Plan Section */}
                 <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800/50">
@@ -391,7 +348,7 @@ export function AppSidebar() {
                   </div>
                 </div>
 
-                <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-700" />
+                <DropdownMenuSeparator />
 
                 {/* Logout */}
                 <div className="py-2">

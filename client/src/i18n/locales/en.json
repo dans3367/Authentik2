@@ -46,6 +46,9 @@
     "shops": "Shops",
     "users": "Users"
   },
+  "dashboard": {
+    "welcomeBack": "Welcome back, {{name}}"
+  },
   "auth": {
     "login": "Login",
     "logout": "Logout",

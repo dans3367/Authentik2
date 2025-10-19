@@ -11,17 +11,28 @@ export const companyRoutes = Router();
 // Get company information
 companyRoutes.get("/", authenticateToken, async (req: any, res) => {
   try {
+    console.log(`🏢 [GET /api/company] Fetching company for user ${req.user.email}, tenantId: ${req.user.tenantId}`);
+    
     const company = await db.query.companies.findFirst({
       where: sql`${companies.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!company) {
+      console.warn(`⚠️ [GET /api/company] No company found for tenant ${req.user.tenantId}`);
+      console.warn(`   User: ${req.user.email}`);
+      console.warn(`   This user won't see the onboarding modal!`);
       return res.status(404).json({ message: 'Company not found' });
     }
 
+    console.log(`✅ [GET /api/company] Found company:`, {
+      name: company.name,
+      setupCompleted: company.setupCompleted,
+      tenantId: company.tenantId,
+    });
+
     res.json(company);
   } catch (error) {
-    console.error('Get company error:', error);
+    console.error('❌ [GET /api/company] Error:', error);
     res.status(500).json({ message: 'Failed to get company information' });
   }
 });

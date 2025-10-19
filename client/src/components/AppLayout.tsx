@@ -4,8 +4,7 @@ import {
   useReduxAuth,
   useReduxUpdateProfile,
 } from "@/hooks/useReduxAuth";
-import { useUpdateTheme, useUpdateMenuPreference } from "@/hooks/useAuth";
-import { useTheme } from "@/contexts/ThemeContext";
+import { useUpdateMenuPreference } from "@/hooks/useAuth";
 import {
   SidebarProvider,
   SidebarInset,
@@ -23,10 +22,8 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
   const [location, setLocation] = useLocation();
   const { user, isInitialized } = useReduxAuth();
-  const { setUserTheme } = useTheme();
   const { updateProfile } = useReduxUpdateProfile();
   const updateMenuPreferenceMutation = useUpdateMenuPreference();
-  const [isThemeChanging, setIsThemeChanging] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [companyData, setCompanyData] = useState<any>(null);
   
@@ -55,47 +52,50 @@ export function AppLayout({ children }: AppLayoutProps) {
     }
   }, [isInitialized, user, user?.menuExpanded]);
 
-  // Sync theme from backend only on initial load
-  const [hasInitializedTheme, setHasInitializedTheme] = useState(false);
-  const [lastUserId, setLastUserId] = useState<string | null>(null);
-  
-  useEffect(() => {
-    // Reset initialization flag when user changes (logout/login) or when user ID changes
-    if (!user) {
-      setHasInitializedTheme(false);
-      setLastUserId(null);
-    } else if (user && (!hasInitializedTheme || user.id !== lastUserId) && !isThemeChanging) {
-      // Always set theme from backend when user logs in or changes, even if undefined
-      const backendTheme = user.theme || 'light';
-      
-      console.log(`🎨 [Theme] Syncing theme from backend: ${backendTheme} for user ${user.email}`);
-      setUserTheme(backendTheme);
-      setHasInitializedTheme(true);
-      setLastUserId(user.id);
-    }
-  }, [user, setUserTheme, hasInitializedTheme, isThemeChanging, lastUserId]);
 
   // Check if company needs onboarding
   useEffect(() => {
     const checkOnboardingStatus = async () => {
-      if (!user) return;
+      if (!user) {
+        console.log('🏢 [Onboarding] No user, skipping onboarding check');
+        return;
+      }
+
+      console.log('🏢 [Onboarding] Checking onboarding status for user:', user.email);
 
       try {
         const response = await fetch('/api/company', {
           credentials: 'include',
         });
 
+        console.log('🏢 [Onboarding] Company API response:', {
+          status: response.status,
+          ok: response.ok,
+        });
+
         if (response.ok) {
           const company = await response.json();
+          console.log('🏢 [Onboarding] Company data:', {
+            name: company?.name,
+            setupCompleted: company?.setupCompleted,
+          });
+          
           setCompanyData(company);
           
           // Show onboarding wizard if setup is not completed
           if (company && !company.setupCompleted) {
+            console.log('🎯 [Onboarding] Showing onboarding modal (setupCompleted: false)');
             setShowOnboarding(true);
+          } else {
+            console.log('✅ [Onboarding] Onboarding already completed');
           }
+        } else {
+          console.warn('⚠️ [Onboarding] Company not found (status:', response.status, ')');
+          console.warn('   This might mean the user has no company record');
+          console.warn('   Onboarding modal will NOT show');
         }
       } catch (error) {
-        console.error('Failed to check onboarding status:', error);
+        console.error('❌ [Onboarding] Failed to check onboarding status:', error);
       }
     };
 
@@ -156,7 +156,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     
     // Sync with backend
     if (user) {
-      updateMenuPreferenceMutation.mutate({ menuExpanded: open });
+      updateMenuPreferenceMutation.mutateAsync({ menuExpanded: open });
       
       // Dispatch custom event for other components/tabs
       window.dispatchEvent(

@@ -46,6 +46,9 @@
     "shops": "Tiendas",
     "users": "Usuarios"
   },
+  "dashboard": {
+    "welcomeBack": "Bienvenido de nuevo, {{name}}"
+  },
   "auth": {
     "login": "Iniciar Sesión",
     "logout": "Cerrar Sesión",

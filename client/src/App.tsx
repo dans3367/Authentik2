@@ -8,7 +8,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { AppLayout } from "@/components/AppLayout";
-import { ThemeProvider } from "@/contexts/ThemeContext";
 import { setGlobalNavigate } from "@/lib/authErrorHandler";
 import { lazy, Suspense, useEffect, useState, Component, ReactNode } from "react";
 import { useAuthErrorHandler, setGlobalAuthErrorHandler } from "@/hooks/useAuthErrorHandler";
@@ -116,33 +115,49 @@ class ErrorBoundary extends Component<
 
 // Component to handle route protection and redirection
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, user } = useReduxAuth();
+  const { isAuthenticated, user, isInitialized } = useReduxAuth();
   const [location, setLocation] = useLocation();
   
   const isEmailVerified = user ? user.emailVerified : undefined;
   
   // Handle redirects in useEffect to prevent React warnings about updating during render
   useEffect(() => {
+    // Don't redirect until auth is initialized
+    if (!isInitialized) {
+      console.log("🔒 [ProtectedRoute] Waiting for auth initialization...");
+      return;
+    }
+
+    console.log("🔒 [ProtectedRoute] Auth state:", {
+      isAuthenticated,
+      isEmailVerified,
+      location,
+      userEmail: user?.email,
+    });
+
     if (!isAuthenticated) {
       // Allow certain routes for unauthenticated users
       if (!['/auth', '/verify-email', '/update-profile'].includes(location)) {
+        console.log("🔒 [ProtectedRoute] Redirecting unauthenticated user to /auth");
         setLocation('/auth');
       }
     } else if (isAuthenticated && isEmailVerified === false) {
       // Allow certain routes for unverified users (strict false check only)
       if (!['/pending-verification', '/verify-email'].includes(location)) {
+        console.log("🔒 [ProtectedRoute] Redirecting unverified user to /pending-verification");
         setLocation('/pending-verification');
       }
     } else if (isAuthenticated && isEmailVerified === true) {
       // Redirect auth page to dashboard for verified users
       // 2FA handling is now done in the login flow itself
       if (['/auth', '/pending-verification'].includes(location)) {
+        console.log("🔒 [ProtectedRoute] Redirecting verified user to /dashboard");
         setLocation('/dashboard');
       }
     }
     // If isEmailVerified is undefined/null (loading state), don't redirect
     // This prevents premature redirects during authentication initialization
-  }, [isAuthenticated, isEmailVerified, location, setLocation]);
+  }, [isAuthenticated, isEmailVerified, location, setLocation, isInitialized, user?.email]);
   
   return <>{children}</>;
 }
@@ -270,10 +285,8 @@ function App() {
         >
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
-              <ThemeProvider>
-                <Toaster />
-                <Router />
-              </ThemeProvider>
+              <Toaster />
+              <Router />
             </TooltipProvider>
           </QueryClientProvider>
         </PersistGate>

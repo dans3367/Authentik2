@@ -53,6 +53,21 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       lastName = nameParts.slice(1).join(' ') || undefined;
     }
 
+    // Check if user has a valid tenant ID
+    const placeholderTenantIds = [
+      '00000000-0000-0000-0000-000000000000',
+    ];
+    
+    // Use default tenant as fallback for users with placeholder/missing tenant
+    // This allows them to log in, but they should be fixed via admin tools
+    let finalTenantId = userRecord.tenantId || '29c69b4f-3129-4aa4-a475-7bf892e5c5b9';
+    
+    if (!userRecord.tenantId || placeholderTenantIds.includes(userRecord.tenantId)) {
+      console.log('⚠️  [Auth] WARNING: User has placeholder tenant ID:', userRecord.tenantId, 'Email:', userRecord.email);
+      console.log('⚠️  [Auth] Using default tenant as fallback. This user should be fixed!');
+      finalTenantId = '29c69b4f-3129-4aa4-a475-7bf892e5c5b9';
+    }
+
     // Create authenticated user object using Better Auth session data
     const authUser: AuthUser = {
       id: userRecord.id,
@@ -61,7 +76,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       firstName,
       lastName,
       role: userRecord.role || 'Employee',
-      tenantId: userRecord.tenantId || '29c69b4f-3129-4aa4-a475-7bf892e5c5b9'
+      tenantId: finalTenantId
     };
 
     req.user = authUser;

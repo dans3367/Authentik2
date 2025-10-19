@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { sql, eq, and, ilike, or } from 'drizzle-orm';
+import { sql, eq, and, ilike, or, asc, desc } from 'drizzle-orm';
 import { templates, betterAuthUser } from '@shared/schema';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { sanitizeString } from '../utils/sanitization';
@@ -11,6 +11,14 @@ export const templateRoutes = Router();
 // Get all templates for the tenant with filtering and search
 templateRoutes.get("/", authenticateToken, requireTenant, async (req: any, res) => {
   try {
+    // Double-check tenant ID is present (defense in depth)
+    if (!req.user?.tenantId) {
+      console.error('❌ [Templates] Missing tenant ID in request');
+      return res.status(400).json({ message: 'Tenant ID is required' });
+    }
+
+    console.log('🔍 [Templates] Fetching templates for tenant:', req.user.tenantId, 'user:', req.user.email);
+
     const { 
       page = 1, 
       limit = 50, 
@@ -24,46 +32,53 @@ templateRoutes.get("/", authenticateToken, requireTenant, async (req: any, res) 
 
     const offset = (Number(page) - 1) * Number(limit);
 
-    // Base filter - tenant isolation is critical
-    let whereClause = sql`${templates.tenantId} = ${req.user.tenantId} AND ${templates.isActive} = true`;
+    // Build conditions for tenant isolation + filters
+    // CRITICAL: Always filter by tenant ID first
+    const conditions: any[] = [
+      eq(templates.tenantId, req.user.tenantId),
+      eq(templates.isActive, true),
+    ];
 
     // Apply search filter
     if (search) {
       const sanitizedSearch = sanitizeString(search as string);
-      whereClause = sql`${whereClause} AND (
-        ${templates.name} ILIKE ${`%${sanitizedSearch}%`} OR
-        ${templates.subjectLine} ILIKE ${`%${sanitizedSearch}%`} OR
-        ${sanitizedSearch} = ANY(${templates.tags})
-      )`;
+      const tagMatch = sql`${sanitizedSearch} = ANY(${templates.tags})`;
+      conditions.push(
+        or(
+          ilike(templates.name, `%${sanitizedSearch}%`),
+          ilike(templates.subjectLine, `%${sanitizedSearch}%`),
+          tagMatch,
+        )
+      );
     }
 
     // Apply channel filter
     if (channel && channel !== 'all') {
-      whereClause = sql`${whereClause} AND ${templates.channel} = ${channel}`;
+      conditions.push(eq(templates.channel, channel as string));
     }
 
     // Apply category filter
     if (category && category !== 'all') {
-      whereClause = sql`${whereClause} AND ${templates.category} = ${category}`;
+      conditions.push(eq(templates.category, category as string));
     }
 
     // Apply favorites filter
     if (favoritesOnly === 'true') {
-      whereClause = sql`${whereClause} AND ${templates.isFavorite} = true`;
+      conditions.push(eq(templates.isFavorite, true));
     }
 
     // Build order clause
-    const orderColumn = sortBy === 'name' ? templates.name : 
-                       sortBy === 'usageCount' ? templates.usageCount :
-                       sortBy === 'lastUsed' ? templates.lastUsed :
-                       templates.createdAt;
-    
-    const orderDirection = sortOrder === 'asc' ? sql`ASC` : sql`DESC`;
-    const orderClause = sql`${orderColumn} ${orderDirection}`;
+    const column =
+      sortBy === 'name' ? templates.name :
+      sortBy === 'usageCount' ? templates.usageCount :
+      sortBy === 'lastUsed' ? templates.lastUsed :
+      templates.createdAt;
+
+    const orderByExpr = sortOrder === 'asc' ? asc(column) : desc(column);
 
     // Fetch templates with user details
     const templatesData = await db.query.templates.findMany({
-      where: whereClause,
+      where: and(...conditions),
       with: {
         user: {
           columns: {
@@ -74,15 +89,18 @@ templateRoutes.get("/", authenticateToken, requireTenant, async (req: any, res) 
           },
         },
       },
-      orderBy: orderClause,
+      orderBy: orderByExpr,
       limit: Number(limit),
       offset,
     });
 
     // Get total count for pagination
-    const [totalCountResult] = await db.select({
-      count: sql<number>`count(*)`,
-    }).from(templates).where(whereClause);
+    const [totalCountResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(templates)
+      .where(and(...conditions));
+
+    console.log('✅ [Templates] Returning', templatesData.length, 'templates for tenant:', req.user.tenantId, 'total:', totalCountResult.count);
 
     res.json({
       templates: templatesData,
@@ -102,6 +120,14 @@ templateRoutes.get("/", authenticateToken, requireTenant, async (req: any, res) 
 // Get template statistics
 templateRoutes.get("/stats", authenticateToken, requireTenant, async (req: any, res) => {
   try {
+    // Double-check tenant ID is present (defense in depth)
+    if (!req.user?.tenantId) {
+      console.error('❌ [Templates Stats] Missing tenant ID in request');
+      return res.status(400).json({ message: 'Tenant ID is required' });
+    }
+
+    console.log('🔍 [Templates Stats] Fetching stats for tenant:', req.user.tenantId);
+
     const stats = await db.select({
       totalTemplates: sql<number>`count(*)`,
       activeTemplates: sql<number>`count(*) filter (where is_active = true)`,
@@ -113,6 +139,8 @@ templateRoutes.get("/stats", authenticateToken, requireTenant, async (req: any, 
       averageUsageCount: sql<number>`avg(usage_count)`,
     }).from(templates).where(sql`${templates.tenantId} = ${req.user.tenantId}`);
 
+    console.log('✅ [Templates Stats] Returning stats for tenant:', req.user.tenantId, 'total templates:', stats[0].totalTemplates);
+
     res.json(stats[0]);
   } catch (error) {
     console.error('Get template stats error:', error);
@@ -123,7 +151,14 @@ templateRoutes.get("/stats", authenticateToken, requireTenant, async (req: any, 
 // Get specific template by ID
 templateRoutes.get("/:id", authenticateToken, requireTenant, async (req: any, res) => {
   try {
+    // Double-check tenant ID is present (defense in depth)
+    if (!req.user?.tenantId) {
+      console.error('❌ [Template Get] Missing tenant ID in request');
+      return res.status(400).json({ message: 'Tenant ID is required' });
+    }
+
     const { id } = req.params;
+    console.log('🔍 [Template Get] Fetching template', id, 'for tenant:', req.user.tenantId);
 
     const template = await db.query.templates.findFirst({
       where: sql`${templates.id} = ${id} AND ${templates.tenantId} = ${req.user.tenantId}`,
@@ -153,6 +188,14 @@ templateRoutes.get("/:id", authenticateToken, requireTenant, async (req: any, re
 // Create new template
 templateRoutes.post("/", authenticateToken, requireTenant, async (req: any, res) => {
   try {
+    // Double-check tenant ID is present (defense in depth)
+    if (!req.user?.tenantId) {
+      console.error('❌ [Template Create] Missing tenant ID in request');
+      return res.status(400).json({ message: 'Tenant ID is required' });
+    }
+
+    console.log('🔍 [Template Create] Creating template for tenant:', req.user.tenantId);
+
     const templateData: CreateTemplateData = req.body;
 
     // Validate required fields
@@ -209,8 +252,16 @@ templateRoutes.post("/", authenticateToken, requireTenant, async (req: any, res)
 // Update template
 templateRoutes.patch("/:id", authenticateToken, requireTenant, async (req: any, res) => {
   try {
+    // Double-check tenant ID is present (defense in depth)
+    if (!req.user?.tenantId) {
+      console.error('❌ [Template Update] Missing tenant ID in request');
+      return res.status(400).json({ message: 'Tenant ID is required' });
+    }
+
     const { id } = req.params;
     const updateData: UpdateTemplateData = req.body;
+
+    console.log('🔍 [Template Update] Updating template', id, 'for tenant:', req.user.tenantId);
 
     // Check if template exists and belongs to the tenant
     const existingTemplate = await db.query.templates.findFirst({
@@ -277,6 +328,12 @@ templateRoutes.patch("/:id", authenticateToken, requireTenant, async (req: any, 
 // Toggle template favorite status
 templateRoutes.post("/:id/favorite", authenticateToken, requireTenant, async (req: any, res) => {
   try {
+    // Double-check tenant ID is present (defense in depth)
+    if (!req.user?.tenantId) {
+      console.error('❌ [Template Favorite] Missing tenant ID in request');
+      return res.status(400).json({ message: 'Tenant ID is required' });
+    }
+
     const { id } = req.params;
 
     const existingTemplate = await db.query.templates.findFirst({
@@ -305,6 +362,12 @@ templateRoutes.post("/:id/favorite", authenticateToken, requireTenant, async (re
 // Use template (increment usage count)
 templateRoutes.post("/:id/use", authenticateToken, requireTenant, async (req: any, res) => {
   try {
+    // Double-check tenant ID is present (defense in depth)
+    if (!req.user?.tenantId) {
+      console.error('❌ [Template Use] Missing tenant ID in request');
+      return res.status(400).json({ message: 'Tenant ID is required' });
+    }
+
     const { id } = req.params;
 
     const existingTemplate = await db.query.templates.findFirst({
@@ -337,6 +400,12 @@ templateRoutes.post("/:id/use", authenticateToken, requireTenant, async (req: an
 // Duplicate template
 templateRoutes.post("/:id/duplicate", authenticateToken, requireTenant, async (req: any, res) => {
   try {
+    // Double-check tenant ID is present (defense in depth)
+    if (!req.user?.tenantId) {
+      console.error('❌ [Template Duplicate] Missing tenant ID in request');
+      return res.status(400).json({ message: 'Tenant ID is required' });
+    }
+
     const { id } = req.params;
     const { name } = req.body;
 
@@ -392,7 +461,14 @@ templateRoutes.post("/:id/duplicate", authenticateToken, requireTenant, async (r
 // Delete template (soft delete by setting isActive to false)
 templateRoutes.delete("/:id", authenticateToken, requireTenant, async (req: any, res) => {
   try {
+    // Double-check tenant ID is present (defense in depth)
+    if (!req.user?.tenantId) {
+      console.error('❌ [Template Delete] Missing tenant ID in request');
+      return res.status(400).json({ message: 'Tenant ID is required' });
+    }
+
     const { id } = req.params;
+    console.log('🔍 [Template Delete] Deleting template', id, 'for tenant:', req.user.tenantId);
 
     const existingTemplate = await db.query.templates.findFirst({
       where: sql`${templates.id} = ${id} AND ${templates.tenantId} = ${req.user.tenantId}`,
@@ -417,12 +493,19 @@ templateRoutes.delete("/:id", authenticateToken, requireTenant, async (req: any,
 // Hard delete template (permanent deletion - admin only)
 templateRoutes.delete("/:id/permanent", authenticateToken, requireTenant, async (req: any, res) => {
   try {
+    // Double-check tenant ID is present (defense in depth)
+    if (!req.user?.tenantId) {
+      console.error('❌ [Template Permanent Delete] Missing tenant ID in request');
+      return res.status(400).json({ message: 'Tenant ID is required' });
+    }
+
     // Check if user has admin role
     if (req.user.role !== 'Owner' && req.user.role !== 'Administrator') {
       return res.status(403).json({ message: 'Insufficient permissions for permanent deletion' });
     }
 
     const { id } = req.params;
+    console.log('🔍 [Template Permanent Delete] Permanently deleting template', id, 'for tenant:', req.user.tenantId);
 
     const existingTemplate = await db.query.templates.findFirst({
       where: sql`${templates.id} = ${id} AND ${templates.tenantId} = ${req.user.tenantId}`,
