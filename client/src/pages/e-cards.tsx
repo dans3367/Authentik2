@@ -2699,16 +2699,16 @@ export default function ECardsPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Settings className="h-5 w-5" />
-                    E-Card Email Settings
+                    {t('ecards.settings.title')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Global Enable/Disable */}
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label className="text-base font-medium">Enable E-Card Emails</Label>
+                      <Label className="text-base font-medium">{t('ecards.settings.enableTitle')}</Label>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Automatically send e-card emails to customers
+                        {t('ecards.settings.enableDescription')}
                       </p>
                     </div>
                     <Switch
@@ -2733,20 +2733,20 @@ export default function ECardsPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <BarChart3 className="h-5 w-5" />
-                    Overview
+                    {t('ecards.settings.overview.title')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Total Customers</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">{t('ecards.settings.overview.totalCustomers')}</span>
                     <Badge variant="outline">{contacts.length}</Badge>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">With Birthdays</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">{t('ecards.settings.overview.withBirthdays')}</span>
                     <Badge variant="outline">{customersWithBirthdays.length}</Badge>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">E-Card Emails Enabled</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">{t('ecards.settings.overview.emailsEnabled')}</span>
                     <Badge variant="outline">
                       {customersWithBirthdays.filter(c => c.birthdayEmailEnabled).length}
                     </Badge>
@@ -2760,7 +2760,7 @@ export default function ECardsPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <CakeIcon className="h-5 w-5" />
-                    Upcoming Birthdays
+                    {t('ecards.settings.upcomingBirthdays.title')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -2768,7 +2768,7 @@ export default function ECardsPage() {
                     <div className="text-center py-4">
                       <CakeIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        No birthdays in the next 30 days
+                        {t('ecards.settings.upcomingBirthdays.noBirthdays')}
                       </p>
                     </div>
                   ) : (
@@ -2810,19 +2810,19 @@ export default function ECardsPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Mail className="h-5 w-5" />
-                  Test E-Cards
+                  {t('ecards.test.title')}
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                    Test Mode
+                    {t('ecards.test.testMode')}
                   </Badge>
                   <Badge variant="secondary">
-                    {users.length} Users
+                    {users.length} {t('ecards.test.users')}
                   </Badge>
                 </div>
               </div>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Send test e-cards to users individually or select multiple users for bulk sending. Test emails will be sent to the selected user's actual email address.
+                {t('ecards.test.description')}
               </p>
             </CardHeader>
             <CardContent className="p-0">
@@ -2830,13 +2830,13 @@ export default function ECardsPage() {
               {selectedUsers.length > 0 && (
                 <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-4 border-b">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{selectedUsers.length} user(s) selected</span>
+                    <span className="text-sm font-medium">{selectedUsers.length} {t('ecards.test.usersSelected')}</span>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setSelectedUsers([])}
                     >
-                      Clear Selection
+                      {t('ecards.test.clearSelection')}
                     </Button>
                   </div>
                   <div className="flex items-center gap-2">
@@ -2852,7 +2852,7 @@ export default function ECardsPage() {
                       disabled={sendTestBirthdayMutation.isPending || tokenLoading}
                     >
                       <Mail className="h-4 w-4 mr-2" />
-                      {tokenLoading ? "Refreshing..." : sendTestBirthdayMutation.isPending ? "Sending..." : "Send Test E-Cards to Selected"}
+                      {tokenLoading ? t('ecards.test.refreshing') : sendTestBirthdayMutation.isPending ? t('ecards.test.sending') : t('ecards.test.sendTestCards')}
                     </Button>
                   </div>
                 </div>
@@ -2865,8 +2865,8 @@ export default function ECardsPage() {
               ) : users.length === 0 ? (
                 <div className="text-center py-12">
                   <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">No users found</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">No users available in your tenant for testing</p>
+                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">{t('ecards.test.noUsers')}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">{t('ecards.test.noUsersDescription')}</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -2877,14 +2877,14 @@ export default function ECardsPage() {
                           <Checkbox
                             checked={isAllUsersSelected}
                             onCheckedChange={handleSelectAllUsers}
-                            aria-label="Select all users"
+                            aria-label={t('ecards.test.selectAllUsers')}
                           />
                         </TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Email Verified</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead>{t('ecards.test.name')}</TableHead>
+                        <TableHead>{t('ecards.test.email')}</TableHead>
+                        <TableHead>{t('ecards.test.role')}</TableHead>
+                        <TableHead>{t('ecards.test.emailVerified')}</TableHead>
+                        <TableHead>{t('ecards.test.actions')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -2894,7 +2894,7 @@ export default function ECardsPage() {
                             <Checkbox
                               checked={selectedUsers.includes(user.id)}
                               onCheckedChange={(checked) => handleSelectUser(user.id, checked as boolean)}
-                              aria-label={`Select ${getUserName(user)}`}
+                              aria-label={`${t('common.select')} ${getUserName(user)}`}
                             />
                           </TableCell>
                           <TableCell>
@@ -2924,7 +2924,7 @@ export default function ECardsPage() {
                               className="flex items-center gap-2"
                             >
                               <Mail className="h-4 w-4" />
-                              {tokenLoading ? "Refreshing..." : sendTestBirthdayMutation.isPending ? "Sending..." : "Send Test E-Card"}
+                              {tokenLoading ? t('ecards.test.refreshing') : sendTestBirthdayMutation.isPending ? t('ecards.test.sending') : t('ecards.test.sendTestCard')}
                             </Button>
                           </TableCell>
                         </TableRow>

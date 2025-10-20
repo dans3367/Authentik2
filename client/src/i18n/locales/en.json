@@ -426,6 +426,26 @@
       "customers": "Customers",
       "test": "Test"
     },
+    "test": {
+      "title": "Test E-Cards",
+      "testMode": "Test Mode",
+      "users": "Users",
+      "description": "Send test e-cards to users individually or select multiple users for bulk sending. Test emails will be sent to the selected user's actual email address.",
+      "usersSelected": "user(s) selected",
+      "clearSelection": "Clear Selection",
+      "sendTestCards": "Send Test E-Cards to Selected",
+      "refreshing": "Refreshing...",
+      "sending": "Sending...",
+      "noUsers": "No users found",
+      "noUsersDescription": "No users available in your tenant for testing",
+      "selectAllUsers": "Select all users",
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "emailVerified": "Email Verified",
+      "actions": "Actions",
+      "sendTestCard": "Send Test E-Card"
+    },
     "modal": {
       "addTitle": "Add Special Date",
       "editTitle": "Edit Special Date",
@@ -559,6 +579,21 @@
       "bengali": "Bengali",
       "insertPlaceholders": "Insert placeholders",
       "generateMessage": "Generate {{occasion}} message with AI"
+    },
+    "settings": {
+      "title": "E-Card Email Settings",
+      "enableTitle": "Enable E-Card Emails",
+      "enableDescription": "Automatically send e-card emails to customers",
+      "overview": {
+        "title": "Overview",
+        "totalCustomers": "Total Customers",
+        "withBirthdays": "With Birthdays",
+        "emailsEnabled": "E-Card Emails Enabled"
+      },
+      "upcomingBirthdays": {
+        "title": "Upcoming Birthdays",
+        "noBirthdays": "No birthdays in the next 30 days"
+      }
     }
   },
   "emailContacts": {

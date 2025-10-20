@@ -426,6 +426,26 @@
       "customers": "Clientes",
       "test": "Prueba"
     },
+    "test": {
+      "title": "Probar Tarjetas Electrónicas",
+      "testMode": "Modo de Prueba",
+      "users": "Usuarios",
+      "description": "Envía tarjetas electrónicas de prueba a usuarios individualmente o selecciona múltiples usuarios para envío masivo. Los correos de prueba se enviarán a la dirección de correo real del usuario seleccionado.",
+      "usersSelected": "usuario(s) seleccionado(s)",
+      "clearSelection": "Limpiar Selección",
+      "sendTestCards": "Enviar Tarjetas de Prueba a Seleccionados",
+      "refreshing": "Actualizando...",
+      "sending": "Enviando...",
+      "noUsers": "No se encontraron usuarios",
+      "noUsersDescription": "No hay usuarios disponibles en tu tenant para pruebas",
+      "selectAllUsers": "Seleccionar todos los usuarios",
+      "name": "Nombre",
+      "email": "Email",
+      "role": "Rol",
+      "emailVerified": "Email Verificado",
+      "actions": "Acciones",
+      "sendTestCard": "Enviar Tarjeta de Prueba"
+    },
     "cards": {
       "active": "Tarjetas Activas",
       "inactive": "Tarjetas Inactivas",
@@ -551,6 +571,21 @@
       "bengali": "Bengalí",
       "insertPlaceholders": "Insertar marcadores de posición",
       "generateMessage": "Generar mensaje de {{occasion}} con IA"
+    },
+    "settings": {
+      "title": "Configuración de Correos de Tarjetas Electrónicas",
+      "enableTitle": "Habilitar Correos de Tarjetas Electrónicas",
+      "enableDescription": "Enviar automáticamente correos de tarjetas electrónicas a los clientes",
+      "overview": {
+        "title": "Resumen",
+        "totalCustomers": "Total de Clientes",
+        "withBirthdays": "Con Cumpleaños",
+        "emailsEnabled": "Correos de Tarjetas Electrónicas Habilitados"
+      },
+      "upcomingBirthdays": {
+        "title": "Próximos Cumpleaños",
+        "noBirthdays": "No hay cumpleaños en los próximos 30 días"
+      }
     }
   },
   "emailContacts": {
