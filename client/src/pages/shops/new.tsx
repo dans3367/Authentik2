@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -63,6 +64,7 @@ const DEFAULT_OPERATING_HOURS = {
 };
 
 export default function NewShopPage() {
+  const { t } = useTranslation();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading: authLoading } = useReduxAuth();
@@ -158,8 +160,8 @@ export default function NewShopPage() {
     },
     onSuccess: () => {
       toast({
-        title: "Success",
-        description: "Shop created successfully",
+        title: t('common.success'),
+        description: t('shops.toasts.shopCreated'),
       });
       navigate('/shops');
     },
@@ -167,14 +169,14 @@ export default function NewShopPage() {
       // Handle shop limit errors specifically
       if (error.message && error.message.includes("Shop limit reached")) {
         toast({
-          title: "Shop Limit Reached",
+          title: t('shops.limitDialog.title'),
           description: error.message,
           variant: "destructive",
         });
       } else {
         toast({
-          title: "Error",
-          description: error.message || "Failed to create shop",
+          title: t('common.error'),
+          description: error.message || t('shops.toasts.createError'),
           variant: "destructive",
         });
       }
@@ -209,7 +211,7 @@ export default function NewShopPage() {
       <div className="p-6">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span className="ml-4">Loading...</span>
+          <span className="ml-4">{t('common.loading')}</span>
         </div>
       </div>
     );
@@ -237,8 +239,8 @@ export default function NewShopPage() {
                 <ArrowLeft className="h-4 w-4" />
               </Button>
               <div>
-                <h1 className="text-3xl font-bold tracking-tight">Add New Shop</h1>
-                <p className="text-muted-foreground">Create a new shop location</p>
+                <h1 className="text-3xl font-bold tracking-tight">{t('shops.newShop')}</h1>
+                <p className="text-muted-foreground">{t('shops.subtitle')}</p>
               </div>
             </div>
           </div>
@@ -247,17 +249,17 @@ export default function NewShopPage() {
             {/* Basic Information */}
             <Card>
               <CardHeader>
-                <CardTitle>Basic Information</CardTitle>
-                <CardDescription>General details about the shop</CardDescription>
+                <CardTitle>{t('shops.form.basicDetails')}</CardTitle>
+                <CardDescription>{t('shops.subtitle')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Shop Name *</Label>
+                    <Label htmlFor="name">{t('shops.form.name')} *</Label>
                     <Input
                       id="name"
                       {...register('name')}
-                      placeholder="Enter shop name"
+                      placeholder={t('shops.form.namePlaceholder')}
                       data-testid="input-shop-name"
                     />
                     {errors.name && (
@@ -266,13 +268,13 @@ export default function NewShopPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
+                    <Label htmlFor="category">{t('shops.form.category')}</Label>
                     <Select 
                       value={watch('category')} 
                       onValueChange={(value) => setValue('category', value)}
                     >
                       <SelectTrigger data-testid="select-category">
-                        <SelectValue placeholder="Select category" />
+                        <SelectValue placeholder={t('shops.form.categoryPlaceholder')} />
                       </SelectTrigger>
                       <SelectContent>
                         {SHOP_CATEGORIES.map(category => (
@@ -286,11 +288,11 @@ export default function NewShopPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="description">{t('shops.form.description')}</Label>
                   <Textarea
                     id="description"
                     {...register('description')}
-                    placeholder="Enter shop description"
+                    placeholder={t('shops.form.descriptionPlaceholder')}
                     rows={3}
                     data-testid="textarea-description"
                   />
@@ -298,7 +300,7 @@ export default function NewShopPage() {
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="status">Status</Label>
+                    <Label htmlFor="status">{t('shops.form.status')}</Label>
                     <Select 
                       value={watch('status')} 
                       onValueChange={(value) => setValue('status', value as any)}
@@ -307,22 +309,22 @@ export default function NewShopPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="inactive">Inactive</SelectItem>
-                        <SelectItem value="maintenance">Maintenance</SelectItem>
+                        <SelectItem value="active">{t('shops.status.active')}</SelectItem>
+                        <SelectItem value="inactive">{t('shops.status.inactive')}</SelectItem>
+                        <SelectItem value="maintenance">{t('shops.status.maintenance')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="managerId">Manager</Label>
+                    <Label htmlFor="managerId">{t('shops.form.manager')}</Label>
                     <Select 
                       value={watch('managerId') || undefined}
                       onValueChange={(value) => setValue('managerId', value)}
                       disabled={managersLoading}
                     >
                       <SelectTrigger data-testid="select-manager">
-                        <SelectValue placeholder={managersLoading ? "Loading..." : "Select manager"} />
+                        <SelectValue placeholder={managersLoading ? t('shops.loadingManagers') : t('shops.form.managerPlaceholder')} />
                       </SelectTrigger>
                       <SelectContent>
                         {managersLoading ? (
@@ -377,16 +379,16 @@ export default function NewShopPage() {
             {/* Location Information */}
             <Card>
               <CardHeader>
-                <CardTitle>Location Details</CardTitle>
-                <CardDescription>Physical location and address information</CardDescription>
+                <CardTitle>{t('shops.form.locationDetails')}</CardTitle>
+                <CardDescription>{t('shops.form.locationDetails')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="address">Street Address</Label>
+                  <Label htmlFor="address">{t('shops.form.address')}</Label>
                   <Input
                     id="address"
                     {...register('address')}
-                    placeholder="123 Main Street"
+                    placeholder={t('shops.form.addressPlaceholder')}
                     data-testid="input-address"
                   />
                   {errors.address && (
@@ -396,11 +398,11 @@ export default function NewShopPage() {
 
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="space-y-2">
-                    <Label htmlFor="city">City</Label>
+                    <Label htmlFor="city">{t('shops.form.city')}</Label>
                     <Input
                       id="city"
                       {...register('city')}
-                      placeholder="New York"
+                      placeholder={t('shops.form.cityPlaceholder')}
                       data-testid="input-city"
                     />
                     {errors.city && (
@@ -409,32 +411,32 @@ export default function NewShopPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="state">State/Province</Label>
+                    <Label htmlFor="state">{t('shops.form.state')}</Label>
                     <Input
                       id="state"
                       {...register('state')}
-                      placeholder="NY"
+                      placeholder={t('shops.form.statePlaceholder')}
                       data-testid="input-state"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="zipCode">ZIP/Postal Code</Label>
+                    <Label htmlFor="zipCode">{t('shops.form.zipCode')}</Label>
                     <Input
                       id="zipCode"
                       {...register('zipCode')}
-                      placeholder="10001"
+                      placeholder={t('shops.form.zipCodePlaceholder')}
                       data-testid="input-zip"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="country">Country</Label>
+                  <Label htmlFor="country">{t('shops.form.country')}</Label>
                   <Input
                     id="country"
                     {...register('country')}
-                    placeholder="United States"
+                    placeholder={t('shops.form.countryPlaceholder')}
                     data-testid="input-country"
                   />
                 </div>
@@ -444,17 +446,17 @@ export default function NewShopPage() {
             {/* Contact Information */}
             <Card>
               <CardHeader>
-                <CardTitle>Contact Information</CardTitle>
-                <CardDescription>How customers can reach this shop</CardDescription>
+                <CardTitle>{t('shops.form.contactInformation')}</CardTitle>
+                <CardDescription>{t('shops.form.contactInformation')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number *</Label>
+                    <Label htmlFor="phone">{t('shops.form.phone')} *</Label>
                     <Input
                       id="phone"
                       {...register('phone')}
-                      placeholder="(555) 123-4567"
+                      placeholder={t('shops.form.phonePlaceholder')}
                       data-testid="input-phone"
                     />
                     {errors.phone && (
@@ -463,12 +465,12 @@ export default function NewShopPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email Address *</Label>
+                    <Label htmlFor="email">{t('shops.form.email')} *</Label>
                     <Input
                       id="email"
                       type="email"
                       {...register('email')}
-                      placeholder="shop@example.com"
+                      placeholder={t('shops.form.emailPlaceholder')}
                       data-testid="input-email"
                     />
                     {errors.email && (
@@ -478,11 +480,11 @@ export default function NewShopPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="website">Website</Label>
+                  <Label htmlFor="website">{t('shops.form.website')}</Label>
                   <Input
                     id="website"
                     {...register('website')}
-                    placeholder="https://example.com"
+                    placeholder={t('shops.form.websitePlaceholder')}
                     data-testid="input-website"
                   />
                   {errors.website && (
@@ -495,8 +497,8 @@ export default function NewShopPage() {
             {/* Tags */}
             <Card>
               <CardHeader>
-                <CardTitle>Tags</CardTitle>
-                <CardDescription>Add tags to help categorize this shop</CardDescription>
+                <CardTitle>{t('shops.form.tags')}</CardTitle>
+                <CardDescription>{t('shops.form.tagsPlaceholder')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -504,13 +506,13 @@ export default function NewShopPage() {
                     <Input
                       value={tagInput}
                       onChange={(e) => setTagInput(e.target.value)}
-                      placeholder="Add a tag..."
+                      placeholder={t('shops.form.addTag')}
                       onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
                       data-testid="input-tag"
                     />
                     <Button type="button" onClick={handleAddTag} variant="secondary" data-testid="button-add-tag">
                       <Tag className="h-4 w-4 mr-2" />
-                      Add
+                      {t('common.add')}
                     </Button>
                   </div>
                   {tags.length > 0 && (
@@ -542,7 +544,7 @@ export default function NewShopPage() {
                   className="w-full sm:w-auto"
                   data-testid="button-cancel"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button 
                   type="submit" 
@@ -551,7 +553,7 @@ export default function NewShopPage() {
                   data-testid="button-submit"
                 >
                   <Save className="mr-2 h-4 w-4" />
-                  Create Shop
+                  {t('shops.form.createShop')}
                 </Button>
               </div>
             </div>

@@ -86,6 +86,10 @@ const authInstance = betterAuth({
         defaultValue: false,
         required: false,
       },
+      avatarUrl: {
+        type: "string",
+        required: false,
+      },
     },
   },
   // Hooks to create tenant automatically on user signup

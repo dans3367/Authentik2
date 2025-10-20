@@ -43,13 +43,10 @@ export const uploadAvatar = async (options: AvatarUploadOptions): Promise<Avatar
     // No need to manually get tokens
 
     // Upload to backend endpoint
-    const response = await fetch('/api/auth/avatar', {
+    const response = await fetch('/api/user/avatar', {
       method: 'POST',
       body: formData,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-      credentials: 'include', // Include cookies
+      credentials: 'include', // Include cookies for authentication
     })
 
     if (!response.ok) {
@@ -91,7 +88,7 @@ export const uploadAvatar = async (options: AvatarUploadOptions): Promise<Avatar
 export const deleteAvatar = async (): Promise<AvatarUploadResult> => {
   try {
     // Better Auth handles authentication via cookies
-    const response = await fetch('/api/auth/avatar', {
+    const response = await fetch('/api/user/avatar', {
       method: 'DELETE',
       credentials: 'include', // Include cookies for authentication
     })

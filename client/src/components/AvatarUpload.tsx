@@ -31,6 +31,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
   const [error, setError] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+  const [optimisticAvatarUrl, setOptimisticAvatarUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
 
@@ -89,11 +90,24 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
 
       if (result.success && result.url) {
         setPreviewUrl(null)
+        // Set optimistic avatar URL for immediate UI update
+        setOptimisticAvatarUrl(result.url)
         onAvatarUpdate?.(result.url)
         // Update Redux store
         dispatch(updateUser({ avatarUrl: result.url }))
-        // Invalidate user query to refetch latest data
+        
+        // Invalidate and refetch all auth-related queries
+        // Use resetQueries to force a complete cache reset and refetch
+        await queryClient.resetQueries({ queryKey: ["better-auth"] })
         await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] })
+        
+        // Wait a moment for the reset to complete, then refetch to ensure fresh data
+        setTimeout(async () => {
+          await queryClient.refetchQueries({ queryKey: ["better-auth"] })
+          // Clear optimistic state after cache is refreshed
+          setTimeout(() => setOptimisticAvatarUrl(null), 500)
+        }, 100)
+        
         // Clear the file input
         if (fileInputRef.current) {
           fileInputRef.current.value = ''
@@ -118,14 +132,26 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
       
       if (result.success) {
         setPreviewUrl(null)
+        // Clear optimistic avatar URL for immediate UI update
+        setOptimisticAvatarUrl('')
         if (fileInputRef.current) {
           fileInputRef.current.value = ''
         }
         onAvatarUpdate?.('')
         // Update Redux store
         dispatch(updateUser({ avatarUrl: null }))
-        // Invalidate user query to refetch latest data
+        
+        // Invalidate and refetch all auth-related queries
+        // Use resetQueries to force a complete cache reset and refetch
+        await queryClient.resetQueries({ queryKey: ["better-auth"] })
         await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] })
+        
+        // Wait a moment for the reset to complete, then refetch to ensure fresh data
+        setTimeout(async () => {
+          await queryClient.refetchQueries({ queryKey: ["better-auth"] })
+          // Clear optimistic state after cache is refreshed
+          setTimeout(() => setOptimisticAvatarUrl(null), 500)
+        }, 100)
       } else {
         setError(result.error || 'Failed to remove avatar')
       }
@@ -159,12 +185,17 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
 
   const getCurrentAvatarUrl = () => {
     if (previewUrl) return previewUrl
+    // Use optimistic avatar URL if set (for immediate UI updates)
+    if (optimisticAvatarUrl !== null) {
+      return optimisticAvatarUrl || getAvatarUrl({ email: userEmail })
+    }
     if (currentAvatarUrl) return currentAvatarUrl
     return getAvatarUrl({ email: userEmail })
   }
 
   const initials = getUserInitials(userEmail || '')
-  const hasCurrentAvatar = currentAvatarUrl && !getCurrentAvatarUrl().startsWith('data:image/svg+xml')
+  const displayAvatarUrl = optimisticAvatarUrl !== null ? optimisticAvatarUrl : currentAvatarUrl
+  const hasCurrentAvatar = displayAvatarUrl && !getCurrentAvatarUrl().startsWith('data:image/svg+xml')
 
   return (
     <div className={cn("flex flex-col items-center space-y-6", className)}>
