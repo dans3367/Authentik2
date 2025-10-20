@@ -391,6 +391,19 @@ export const contactTagAssignments = pgTable("contact_tag_assignments", {
   assignedAt: timestamp("assigned_at").defaultNow(),
 });
 
+// Segment lists for customer segmentation
+export const segmentLists = pgTable("segment_lists", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  name: text("name").notNull(),
+  description: text("description"),
+  type: text("type").notNull(), // 'all', 'selected', 'tags'
+  selectedContactIds: text("selected_contact_ids").array().default(sql`'{}'::text[]`), // Array of contact IDs for 'selected' type
+  selectedTagIds: text("selected_tag_ids").array().default(sql`'{}'::text[]`), // Array of tag IDs for 'tags' type
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Companies table for multi-tenant company information
 export const companies = pgTable("companies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -581,6 +594,7 @@ export const tenantRelations = relations(tenants, ({ many }) => ({
   contactTags: many(contactTags),
   contactListMemberships: many(contactListMemberships),
   contactTagAssignments: many(contactTagAssignments),
+  segmentLists: many(segmentLists),
   newsletters: many(newsletters),
   campaigns: many(campaigns),
   emailActivities: many(emailActivity),
@@ -1160,6 +1174,13 @@ export const contactTagAssignmentRelations = relations(contactTagAssignments, ({
   }),
 }));
 
+export const segmentListRelations = relations(segmentLists, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [segmentLists.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
 export const emailActivityRelations = relations(emailActivity, ({ one }) => ({
   tenant: one(tenants, {
     fields: [emailActivity.tenantId],
@@ -1283,6 +1304,22 @@ export type CreateContactTagData = z.infer<typeof createContactTagSchema>;
 
 export type ContactListMembership = typeof contactListMemberships.$inferSelect;
 export type ContactTagAssignment = typeof contactTagAssignments.$inferSelect;
+
+// Segment list types and schemas
+export const createSegmentListSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  description: z.string().optional(),
+  type: z.enum(['all', 'selected', 'tags']),
+  selectedContactIds: z.array(z.string()).default([]),
+  selectedTagIds: z.array(z.string()).default([]),
+});
+
+export const updateSegmentListSchema = createSegmentListSchema.partial();
+
+export type SegmentList = typeof segmentLists.$inferSelect;
+export type InsertSegmentList = typeof segmentLists.$inferInsert;
+export type CreateSegmentListData = z.infer<typeof createSegmentListSchema>;
+export type UpdateSegmentListData = z.infer<typeof updateSegmentListSchema>;
 
 // Email activity types and schemas
 export const createEmailActivitySchema = z.object({

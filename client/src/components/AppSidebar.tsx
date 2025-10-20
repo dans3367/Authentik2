@@ -19,6 +19,7 @@ import {
   Megaphone,
   Bell,
   FileText,
+  Target,
 } from "lucide-react";
 import logoUrl from "@assets/logo.png";
 import { cn } from "@/lib/utils";
@@ -77,6 +78,7 @@ const getNavigation = (userRole?: string, t?: any) => {
     { name: t?.('navigation.ecards') || "E-Cards", href: "/e-cards", icon: Mail },
     { name: t?.('navigation.reminders') || "Reminders", href: "/reminders", icon: Bell },
     { name: t?.('navigation.contacts') || "Contacts", href: "/email-contacts", icon: UserCheck },
+    { name: t?.('navigation.segmentation') || "Segmentation", href: "/segmentation", icon: Target },
     { name: t?.('navigation.analytics') || "Analytics", href: "/email-analytics", icon: BarChart3 },
     { name: t?.('navigation.shops') || "Shops", href: "/shops", icon: Store },
   ];

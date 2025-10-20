@@ -36,6 +36,7 @@ import { birthdayWorkerRoutes } from "./routes/birthdayWorkerRoutes";
 import { templateRoutes } from "./routes/templateRoutes";
 import { signupRoutes } from "./routes/signupRoutes";
 import { tenantFixRoutes } from "./routes/tenantFixRoutes";
+import { segmentListRoutes } from "./routes/segmentListRoutes";
 
 // Import middleware
 import { authRateLimiter, apiRateLimiter, jwtTokenRateLimiter } from "./middleware/security";
@@ -73,6 +74,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/ai", aiRoutes);
   app.use("/api/suppression", suppressionManagementRoutes);
   app.use("/api/templates", authenticateToken, requireTenant, templateRoutes);
+  app.use("/api", segmentListRoutes);
 
   // Newsletter stats endpoint
   app.get("/api/newsletter-stats", authenticateToken, requireTenant, async (req: any, res) => {
