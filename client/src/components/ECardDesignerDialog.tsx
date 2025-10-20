@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -98,6 +98,24 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
     return initialData?.customImage ?? false;
   });
   const [cardName, setCardName] = useState(initialData?.cardName ?? "");
+
+  // Compute a theme-based default title for AI context when explicit title is empty
+  const aiDefaultTitle = useMemo(() => {
+    const themeId = initialThemeId || 'default';
+    const defaults: Record<string, string> = {
+      'default': t('ecards.preview.defaultTitle') || 'Merry Christmas!',
+      'romantic-roses': t('ecards.preview.valentinesDay') || "Happy Valentine's Day!",
+      'sweet-hearts': t('ecards.preview.valentinesDay') || "Happy Valentine's Day!",
+      'shamrock-charm': t('ecards.preview.stPatricksDay') || "Happy St. Patrick\'s Day!",
+      'floral-delight': "Happy Mother's Day!",
+      'classic-tools': "Happy Father's Day!",
+      'stars-and-stripes': t('ecards.preview.independenceDay') || "Happy Independence Day!",
+      'pastel-eggs': t('ecards.preview.easter') || "Celebrate Easter with Joy!",
+      'midnight-sparkles': t('ecards.preview.newYearsDay') || "Happy New Year!",
+    };
+    const explicit = (title || '').trim();
+    return explicit || defaults[themeId] || '';
+  }, [initialThemeId, title, t]);
   const [sendDate, setSendDate] = useState(initialData?.sendDate ?? "");
   const [occasionType, setOccasionType] = useState(initialData?.occasionType ?? "");
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -1312,6 +1330,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                 customerInfo={customerInfo}
                 businessName={businessName}
                 occasionType={occasionType}
+                defaultTitle={aiDefaultTitle}
               />
 
               {/* Emoji counter and deliverability warning */}
@@ -1632,6 +1651,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                 customerInfo={customerInfo}
                 businessName={businessName}
                 occasionType={occasionType}
+                defaultTitle={aiDefaultTitle}
               />
 
               {/* Emoji counter and deliverability warning */}

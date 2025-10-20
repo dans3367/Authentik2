@@ -23,7 +23,7 @@ function ensureApiKey(res: any) {
 // Generate an occasion-specific greeting message using AI
 router.post("/generate-birthday-message", async (req, res) => {
   try {
-    const { customerName, businessName, occasionType } = req.body;
+    const { customerName, businessName, occasionType, defaultTitle } = req.body;
 
     if (!ensureApiKey(res)) {
       return;
@@ -31,6 +31,15 @@ router.post("/generate-birthday-message", async (req, res) => {
 
     // Determine the occasion context for the prompt
     const occasion = occasionType || "birthday";
+    
+    // Use the default title from the theme if provided, otherwise use standard greetings
+    let occasionContext = occasion;
+    if (defaultTitle) {
+      // Extract the occasion context from the default title
+      // e.g., "Happy Valentine's Day!" -> "Valentine's Day"
+      // e.g., "Merry Christmas!" -> "Christmas"
+      occasionContext = defaultTitle.replace(/^(Happy|Merry|Celebrate|Joyful)\s+/i, '').replace(/!+$/, '').trim();
+    }
     
     // Create occasion-specific greeting templates
     const occasionGreetings: { [key: string]: string } = {
@@ -49,14 +58,21 @@ router.post("/generate-birthday-message", async (req, res) => {
 
     const greeting = occasionGreetings[occasion.toLowerCase()] || `Happy ${occasion}`;
 
-    const promptText = `Create a warm and professional ${occasion} greeting card message from ${businessName || "our business"} to our customer${customerName ? ` ${customerName}` : ""}. The message should be:
-- Celebratory and appropriate for ${occasion}
+    // Build the prompt using the default title if available
+    const titleContext = defaultTitle 
+      ? `The card header reads "${defaultTitle}". Use this as the primary context for the occasion being celebrated.` 
+      : '';
+
+    const promptText = `Create a warm and professional greeting card message from ${businessName || "our business"} to our customer${customerName ? ` ${customerName}` : ""}. ${titleContext} The message should be:
+- Celebratory and appropriate for ${occasionContext}
 - Friendly and sincere, suitable for a business-to-customer relationship
 - Concise (2-3 sentences)
 - Focused on celebrating the occasion and expressing good wishes
-- Do NOT include a greeting like "Dear" or a signature—just the ${occasion} message body
+- Match the tone and theme suggested by the card title${defaultTitle ? ` "${defaultTitle}"` : ''}
+- Do NOT include a greeting like "Dear" or a signature—just the ${occasionContext} message body
 - Do NOT use phrases like "At [Company Name]" or similar company references
-- Incorporate the essence of ${occasion} in the message
+- Do NOT repeat the card title in the message body
+- Incorporate the essence of ${occasionContext} in the message
 - Format the output as a single HTML <p> tag containing all the text
 - Do not use multiple paragraph tags or add extra line breaks
 - Return only the raw HTML content without markdown code fences or backticks`;

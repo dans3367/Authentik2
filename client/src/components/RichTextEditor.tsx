@@ -33,9 +33,10 @@ interface RichTextEditorProps {
   };
   businessName?: string;
   occasionType?: string;
+  defaultTitle?: string;
 }
 
-export default function RichTextEditor({ value, onChange, placeholder = "Start typing your message...", className = "", customerInfo, businessName, occasionType }: RichTextEditorProps) {
+export default function RichTextEditor({ value, onChange, placeholder = "Start typing your message...", className = "", customerInfo, businessName, occasionType, defaultTitle }: RichTextEditorProps) {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -92,6 +93,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
         customerName: customerInfo?.firstName,
         businessName: businessName,
         occasionType: occasionType,
+        defaultTitle: defaultTitle,
       });
       
       if (result.success && result.message) {

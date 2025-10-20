@@ -4,6 +4,7 @@ interface GenerateBirthdayMessageParams {
   customerName?: string;
   businessName?: string;
   occasionType?: string;
+  defaultTitle?: string;
 }
 
 interface GenerateBirthdayMessageResponse {

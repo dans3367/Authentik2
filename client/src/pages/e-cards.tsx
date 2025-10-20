@@ -877,8 +877,24 @@ export default function ECardsPage() {
 
     // PRIORITY 3: Default empty data if no saved data found
     console.log('🆕 [Card Designer Initial Data] No saved data found, returning defaults for theme:', currentThemeId);
+    
+    // Map theme IDs to their default titles
+    const defaultTitlesByTheme: Record<string, string> = {
+      'default': t('ecards.preview.defaultTitle') || 'Merry Christmas!',
+      'romantic-roses': t('ecards.preview.valentinesDay') || "Happy Valentine's Day!",
+      'sweet-hearts': t('ecards.preview.valentinesDay') || "Happy Valentine's Day!",
+      'shamrock-charm': t('ecards.preview.stPatricksDay') || "Happy St. Patrick's Day!",
+      'floral-delight': "Happy Mother's Day!",
+      'classic-tools': "Happy Father's Day!",
+      'stars-and-stripes': t('ecards.preview.independenceDay') || "Happy Independence Day!",
+      'pastel-eggs': t('ecards.preview.easter') || "Celebrate Easter with Joy!",
+      'midnight-sparkles': t('ecards.preview.newYearsDay') || "Happy New Year!",
+    };
+    
+    const defaultTitle = defaultTitlesByTheme[currentThemeId] || '';
+    
     return {
-      title: '',
+      title: defaultTitle,
       description: '',
       message: eCardSettings?.customMessage || '',
       signature: '',
@@ -893,6 +909,7 @@ export default function ECardsPage() {
     designerThemeId,
     customCards,
     themeMetadataById,
+    t,
   ]);
 
   const handleSettingsUpdate = (field: keyof ECardSettings, value: any) => {
