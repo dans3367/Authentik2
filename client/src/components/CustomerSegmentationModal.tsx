@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Search, Tag, Users, X, Check, User, CheckCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
@@ -41,6 +41,7 @@ export function CustomerSegmentationModal({
   const [searchTerm, setSearchTerm] = useState("");
   const [tempSelectedContacts, setTempSelectedContacts] = useState<string[]>(selectedContactIds);
   const [tempSelectedTags, setTempSelectedTags] = useState<string[]>(selectedTagIds);
+  const hasAutoInitialized = useRef(false);
 
   // Fetch contacts
   const { data: contactsData, isLoading: contactsLoading } = useQuery({
@@ -83,13 +84,20 @@ export function CustomerSegmentationModal({
       setTempSelectedContacts(selectedContactIds);
       setTempSelectedTags(selectedTagIds);
       setSearchTerm("");
+      hasAutoInitialized.current = false;
     }
   }, [isOpen, recipientType, selectedContactIds, selectedTagIds]);
 
   // Auto-select all contacts when switching to "selected" tab if none are selected
   useEffect(() => {
-    if (activeTab === 'selected' && tempSelectedContacts.length === 0 && contacts.length > 0) {
+    if (
+      activeTab === 'selected' &&
+      tempSelectedContacts.length === 0 &&
+      contacts.length > 0 &&
+      !hasAutoInitialized.current
+    ) {
       setTempSelectedContacts(contacts.map(contact => contact.id));
+      hasAutoInitialized.current = true;
     }
   }, [activeTab, contacts, tempSelectedContacts.length]);
 
@@ -244,12 +252,18 @@ export function CustomerSegmentationModal({
                       {filteredContacts.map((contact) => (
                         <div
                           key={contact.id}
-                          className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-                          onClick={() => handleContactToggle(contact.id)}
+                          className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 group"
                         >
                           <Checkbox
                             checked={tempSelectedContacts.includes(contact.id)}
-                            onChange={() => {}} // Controlled by parent click
+                            onCheckedChange={(checked) => {
+                              setTempSelectedContacts((prev) =>
+                                checked
+                                  ? (prev.includes(contact.id) ? prev : [...prev, contact.id])
+                                  : prev.filter((id) => id !== contact.id)
+                              );
+                            }}
+                            className="cursor-pointer"
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">

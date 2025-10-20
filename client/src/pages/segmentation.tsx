@@ -46,14 +46,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { CustomerSegmentationModal } from "@/components/CustomerSegmentationModal";
 
@@ -425,45 +417,26 @@ export default function SegmentationPage() {
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Contacts</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredLists.map((list) => (
-                    <TableRow key={list.id}>
-                      <TableCell className="font-medium">{list.name}</TableCell>
-                      <TableCell>
-                        <Badge className={`gap-1 ${getTypeBadgeColor(list.type)}`}>
-                          {getTypeIcon(list.type)}
-                          {list.type === "all"
-                            ? "All Customers"
-                            : list.type === "selected"
-                            ? "Selected"
-                            : "Tags"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Users className="h-4 w-4 text-gray-400" />
-                          {list.contactCount}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredLists.map((list) => (
+                <Card key={list.id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      {/* Header with name and type */}
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-lg text-gray-900 dark:text-white mb-1">
+                            {list.name}
+                          </h3>
+                          <Badge className={`gap-1 ${getTypeBadgeColor(list.type)}`}>
+                            {getTypeIcon(list.type)}
+                            {list.type === "all"
+                              ? "All Customers"
+                              : list.type === "selected"
+                              ? "Selected"
+                              : "Tags"}
+                          </Badge>
                         </div>
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        {list.description || "-"}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(list.createdAt).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm">
@@ -489,11 +462,31 @@ export default function SegmentationPage() {
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      </div>
+
+                      {/* Description */}
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        {list.description ? (
+                          <p className="line-clamp-2">{list.description}</p>
+                        ) : (
+                          <p className="text-gray-400 italic">No description</p>
+                        )}
+                      </div>
+
+                      {/* Stats */}
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
+                          <Users className="h-4 w-4" />
+                          <span>{list.contactCount} contacts</span>
+                        </div>
+                        <div className="text-gray-500 dark:text-gray-500">
+                          {new Date(list.createdAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
         </CardContent>
