@@ -7,6 +7,7 @@ import { useDispatch } from 'react-redux'
 import { updateUser } from '@/store/authSlice'
 import { useQueryClient } from '@tanstack/react-query'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useSession } from '@/lib/betterAuthClient'
 
 interface AvatarUploadProps {
   currentAvatarUrl?: string | null
@@ -26,6 +27,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
   const dispatch = useDispatch()
   const queryClient = useQueryClient()
   const { t } = useLanguage()
+  const sessionQuery = useSession()
   const [isUploading, setIsUploading] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -95,6 +97,10 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
         onAvatarUpdate?.(result.url)
         // Update Redux store
         dispatch(updateUser({ avatarUrl: result.url }))
+        // Notify all avatar consumers to update immediately with cache-busting
+        if (userEmail) {
+          window.dispatchEvent(new CustomEvent('avatarUpdated', { detail: { email: userEmail, url: result.url } }))
+        }
         
         // Invalidate and refetch all auth-related queries
         // Use resetQueries to force a complete cache reset and refetch
@@ -104,6 +110,10 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
         // Wait a moment for the reset to complete, then refetch to ensure fresh data
         setTimeout(async () => {
           await queryClient.refetchQueries({ queryKey: ["better-auth"] })
+          // Also force Better Auth session refetch so all consumers update immediately
+          if (sessionQuery?.refetch) {
+            await sessionQuery.refetch()
+          }
           // Clear optimistic state after cache is refreshed
           setTimeout(() => setOptimisticAvatarUrl(null), 500)
         }, 100)
@@ -140,6 +150,10 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
         onAvatarUpdate?.('')
         // Update Redux store
         dispatch(updateUser({ avatarUrl: null }))
+        // Notify all avatar consumers to update immediately (fallback to initials)
+        if (userEmail) {
+          window.dispatchEvent(new CustomEvent('avatarUpdated', { detail: { email: userEmail, url: '' } }))
+        }
         
         // Invalidate and refetch all auth-related queries
         // Use resetQueries to force a complete cache reset and refetch
@@ -149,6 +163,10 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
         // Wait a moment for the reset to complete, then refetch to ensure fresh data
         setTimeout(async () => {
           await queryClient.refetchQueries({ queryKey: ["better-auth"] })
+          // Also force Better Auth session refetch so all consumers update immediately
+          if (sessionQuery?.refetch) {
+            await sessionQuery.refetch()
+          }
           // Clear optimistic state after cache is refreshed
           setTimeout(() => setOptimisticAvatarUrl(null), 500)
         }, 100)
