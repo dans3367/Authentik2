@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -49,9 +49,12 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ECardDesignerDialog } from "@/components/ECardDesignerDialog";
 import { PromotionSelector } from "@/components/PromotionSelector";
 import { ThemeCard } from "@/components/ThemeCard";
+
+const ECardDesignerDialog = lazy(() =>
+  import("@/components/ECardDesignerDialog").then((mod) => ({ default: mod.ECardDesignerDialog }))
+);
 
 interface ECardSettings {
   id: string;
@@ -86,7 +89,31 @@ interface CustomThemeData {
   imageScale: number;
 }
 
+interface Theme {
+  id: string;
+  legacyId?: string;
+  name: string;
+  image: string;
+  overlay: string;
+  decorations: React.ReactNode;
+}
 
+type CustomThemeStore = {
+  themes: Record<string, CustomThemeData>;
+  cardPromotions?: Record<string, string[]>;
+};
+
+// Normalize any stored JSON into a consistent store shape
+const buildThemeStore = (json: string | null | undefined): CustomThemeStore => {
+  const raw = safeJsonParse<any>(json, null);
+  if (!raw) return { themes: {} };
+  if (typeof raw === 'object' && raw && 'themes' in raw) {
+    const store = raw as CustomThemeStore;
+    return { themes: store.themes || {}, cardPromotions: store.cardPromotions };
+  }
+  // Legacy: single theme object stored directly
+  return { themes: { custom: raw as CustomThemeData } };
+};
 
 interface ContactTag {
   id: string;
@@ -190,6 +217,16 @@ const formatDateAsLocalString = (date: Date): string => {
   const d = `${date.getDate()}`.padStart(2, '0');
   return `${y}-${m}-${d}`;
 };
+
+// Simple debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(id);
+  }, [value, delay]);
+  return debounced;
+}
 
 export default function ECardsPage() {
   const { toast } = useToast();
@@ -397,6 +434,12 @@ export default function ECardsPage() {
   // State for real-time custom theme preview
   const [customThemePreview, setCustomThemePreview] = useState<CustomThemeData | null>(null);
 
+  // Stable handler to open the designer with a theme id
+  const handleOpenDesigner = useCallback((themeId: string) => {
+    setDesignerThemeId(themeId);
+    setDesignerOpen(true);
+  }, []);
+
   // State for real-time preview of all themes (including default themes with customizations)
   const [themePreviewData, setThemePreviewData] = useState<{ [key: string]: CustomThemeData }>({});
 
@@ -429,6 +472,20 @@ export default function ECardsPage() {
 
   // Card filter state for themes tab
   const [cardFilter, setCardFilter] = useState<"active" | "inactive">("active");
+
+  // O(1) lookup for disabled holidays
+  const disabledSet = useMemo(() => new Set(disabledHolidays || []), [disabledHolidays]);
+
+  // Consolidated holiday sections for rendering
+  const holidaySections = useMemo(() => (
+    [
+      { id: 'valentine', label: t('ecards.sectionLabels.valentinesDay'), themes: valentineThemes, defaultTitle: t('ecards.preview.valentinesDay') },
+      { id: 'stpatrick', label: t('ecards.sectionLabels.stPatricksDay'), themes: stPatrickThemes, defaultTitle: t('ecards.preview.stPatricksDay') },
+      { id: 'newyear', label: t('ecards.sectionLabels.newYearsDay'), themes: newYearThemes, defaultTitle: t('ecards.preview.newYearsDay') },
+      { id: 'easter', label: t('ecards.sectionLabels.easter'), themes: easterThemes, defaultTitle: t('ecards.preview.easter') },
+      { id: 'independence', label: t('ecards.sectionLabels.independenceDay'), themes: independenceThemes, defaultTitle: t('ecards.preview.independenceDay') },
+    ]
+  ), [t, valentineThemes, stPatrickThemes, newYearThemes, easterThemes, independenceThemes]);
 
   // Fetch custom cards from API with React Query
   const {
@@ -589,35 +646,40 @@ export default function ECardsPage() {
     },
   });
 
-  // Memoized parsed customThemeData to avoid repeated JSON parsing (performance optimization)
-  const parsedCustomThemeData = useMemo(() => {
-    return safeJsonParse(eCardSettings?.customThemeData, { themes: {} });
+  // Memoized parsed customThemeData to avoid repeated JSON parsing (normalized shape)
+  const parsedCustomThemeData = useMemo<CustomThemeStore>(() => {
+    return buildThemeStore(eCardSettings?.customThemeData);
   }, [eCardSettings?.customThemeData]);
 
-  // Fetch contacts from the existing email-contacts endpoint
+  // Debounced search and contacts query with derived selects
+  const debouncedSearch = useDebounce(searchQuery, 300);
   const {
     data: contactsData,
     isLoading: contactsLoading,
     refetch: refetchContacts
   } = useQuery({
-    queryKey: ['/api/email-contacts', searchQuery, statusFilter],
+    queryKey: ['/api/email-contacts', debouncedSearch, statusFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (searchQuery) params.append('search', searchQuery);
+      if (debouncedSearch) params.append('search', debouncedSearch);
       if (statusFilter !== 'all') params.append('status', statusFilter);
 
       const response = await apiRequest('GET', `/api/email-contacts?${params.toString()}`);
       return response.json();
     },
+    select: (data: any) => {
+      const contacts: Contact[] = data?.contacts ?? [];
+      const customersWithBirthdays: Contact[] = contacts.filter(c => c.birthday);
+      return { contacts, customersWithBirthdays };
+    },
+    placeholderData: (prev) => prev,
     staleTime: 10 * 60 * 1000, // Cache for 10 minutes
     refetchOnWindowFocus: false,
   });
 
-  // Extract contacts array from response data
+  // Extract contacts and derived birthdays from query select
   const contacts: Contact[] = contactsData?.contacts || [];
-
-  // Filter contacts who have birthdays for birthday-specific features
-  const customersWithBirthdays = contacts.filter(contact => contact.birthday);
+  const customersWithBirthdays: Contact[] = contactsData?.customersWithBirthdays || [];
 
   // Fetch users from the tenant
   const {
@@ -869,18 +931,14 @@ export default function ECardsPage() {
       const parsed = parsedCustomThemeData;
       console.log('✅ [Card Designer Initial Data] Using parsed customThemeData:', parsed);
 
-      let themeSpecificData = null;
+      let themeSpecificData: CustomThemeData | null = null;
 
-      // Check if it's the new structure (has themes property)
-      console.log('🔍 [Card Designer Initial Data] Loading from DB for theme:', currentThemeId, 'Available themes:', Object.keys(parsed.themes || {}));
+      // Normalized store always has themes; prefer exact themeId, then fall back to 'custom'
       if (parsed.themes && parsed.themes[currentThemeId]) {
         themeSpecificData = parsed.themes[currentThemeId];
         console.log('✅ [Card Designer Initial Data] Found theme-specific data from DB:', themeSpecificData);
-      } else if (!parsed.themes) {
-        // Old structure - assume it's for custom theme if we're loading custom
-        if (currentThemeId === 'custom') {
-          themeSpecificData = parsed;
-        }
+      } else if (currentThemeId === 'custom' && parsed.themes.custom) {
+        themeSpecificData = parsed.themes.custom;
       }
 
       if (themeSpecificData) {
@@ -1747,130 +1805,30 @@ export default function ECardsPage() {
               </div>
 
               <div>
-                {/* Valentines Row */}
-                {((cardFilter === "active" && !disabledHolidays.includes('valentine')) || 
-                  (cardFilter === "inactive" && disabledHolidays.includes('valentine'))) && (
-                <div className="mt-6">
-                  <Label className="text-sm">{t('ecards.sectionLabels.valentinesDay')}</Label>
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
-                    {valentineThemes.map((theme) => (
-                      <ThemeCard
-                        key={theme.id}
-                        theme={theme}
-                        themePreviewData={themePreviewData}
-                        parsedCustomThemeData={parsedCustomThemeData}
-                        defaultTitle={t('ecards.preview.valentinesDay')}
-                        previewLabel={t('ecards.previewLabel')}
-                        onCardClick={(themeId) => {
-                          setDesignerThemeId(themeId);
-                          setDesignerOpen(true);
-                        }}
-                        disabled={updateSettingsMutation.isPending}
-                      />
-                    ))}
-                  </div>
-                </div>
-                )}
-
-                {/* St. Patrick's Day Row */}
-                {((cardFilter === "active" && !disabledHolidays.includes('stpatrick')) || 
-                  (cardFilter === "inactive" && disabledHolidays.includes('stpatrick'))) && (
-                <div className="mt-6">
-                  <Label className="text-sm">{t('ecards.sectionLabels.stPatricksDay')}</Label>
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
-                    {stPatrickThemes.map((theme) => (
-                      <ThemeCard
-                        key={theme.id}
-                        theme={theme}
-                        themePreviewData={themePreviewData}
-                        parsedCustomThemeData={parsedCustomThemeData}
-                        defaultTitle={t('ecards.preview.stPatricksDay')}
-                        previewLabel={t('ecards.previewLabel')}
-                        onCardClick={(themeId) => {
-                          setDesignerThemeId(themeId);
-                          setDesignerOpen(true);
-                        }}
-                        disabled={updateSettingsMutation.isPending}
-                      />
-                    ))}
-                  </div>
-                </div>
-                )}
-
-                {/* New Year's Day Row */}
-                {((cardFilter === "active" && !disabledHolidays.includes('newyear')) || 
-                  (cardFilter === "inactive" && disabledHolidays.includes('newyear'))) && (
-                <div className="mt-6">
-                  <Label className="text-sm">{t('ecards.sectionLabels.newYearsDay')}</Label>
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
-                    {newYearThemes.map((theme) => (
-                      <ThemeCard
-                        key={theme.id}
-                        theme={theme}
-                        themePreviewData={themePreviewData}
-                        parsedCustomThemeData={parsedCustomThemeData}
-                        defaultTitle={t('ecards.preview.newYearsDay')}
-                        previewLabel={t('ecards.previewLabel')}
-                        onCardClick={(themeId) => {
-                          setDesignerThemeId(themeId);
-                          setDesignerOpen(true);
-                        }}
-                        disabled={updateSettingsMutation.isPending}
-                      />
-                    ))}
-                  </div>
-                </div>
-                )}
-
-                {/* Easter Row */}
-                {((cardFilter === "active" && !disabledHolidays.includes('easter')) || 
-                  (cardFilter === "inactive" && disabledHolidays.includes('easter'))) && (
-                <div className="mt-6">
-                  <Label className="text-sm">{t('ecards.sectionLabels.easter')}</Label>
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
-                    {easterThemes.map((theme) => (
-                      <ThemeCard
-                        key={theme.id}
-                        theme={theme}
-                        themePreviewData={themePreviewData}
-                        parsedCustomThemeData={parsedCustomThemeData}
-                        defaultTitle={t('ecards.preview.easter')}
-                        previewLabel={t('ecards.previewLabel')}
-                        onCardClick={(themeId) => {
-                          setDesignerThemeId(themeId);
-                          setDesignerOpen(true);
-                        }}
-                        disabled={updateSettingsMutation.isPending}
-                      />
-                    ))}
-                  </div>
-                </div>
-                )}
-
-                {/* Independence Day Row */}
-                {((cardFilter === "active" && !disabledHolidays.includes('independence')) || 
-                  (cardFilter === "inactive" && disabledHolidays.includes('independence'))) && (
-                <div className="mt-6">
-                  <Label className="text-sm">{t('ecards.sectionLabels.independenceDay')}</Label>
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
-                    {independenceThemes.map((theme) => (
-                      <ThemeCard
-                        key={theme.id}
-                        theme={theme}
-                        themePreviewData={themePreviewData}
-                        parsedCustomThemeData={parsedCustomThemeData}
-                        defaultTitle={t('ecards.preview.independenceDay')}
-                        previewLabel={t('ecards.previewLabel')}
-                        onCardClick={(themeId) => {
-                          setDesignerThemeId(themeId);
-                          setDesignerOpen(true);
-                        }}
-                        disabled={updateSettingsMutation.isPending}
-                      />
-                    ))}
-                  </div>
-                </div>
-                )}
+                {holidaySections.map((section) => {
+                  const isDisabled = disabledSet.has(section.id);
+                  const shouldShow = (cardFilter === 'active' && !isDisabled) || (cardFilter === 'inactive' && isDisabled);
+                  if (!shouldShow) return null;
+                  return (
+                    <div className="mt-6" key={section.id}>
+                      <Label className="text-sm">{section.label}</Label>
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
+                        {section.themes.map((theme) => (
+                          <ThemeCard
+                            key={theme.id}
+                            theme={theme}
+                            themePreviewData={themePreviewData}
+                            parsedCustomThemeData={parsedCustomThemeData}
+                            defaultTitle={section.defaultTitle}
+                            previewLabel={t('ecards.previewLabel')}
+                            onCardClick={handleOpenDesigner}
+                            disabled={updateSettingsMutation.isPending}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
 
                 {/* Custom Cards Section */}
                 {cardFilter === "active" && (
@@ -2110,9 +2068,10 @@ export default function ECardsPage() {
         )}
 
         {/* Card Designer */}
+        <Suspense fallback={null}>
         <ECardDesignerDialog
           open={designerOpen}
-          onOpenChange={(open) => {
+          onOpenChange={(open: boolean) => {
             setDesignerOpen(open);
             
             // When opening, refetch latest data from database
@@ -2134,7 +2093,7 @@ export default function ECardsPage() {
           onPreviewChange={handlePreviewChange}
           initialData={cardDesignerInitialData}
           themeMetadataById={themeMetadataById}
-          onSave={async (data) => {
+          onSave={async (data: any) => {
             console.log('💾 [onSave] Received data from ECardDesignerDialog:', {
               imageUrl: data.imageUrl,
               customImage: (data as any).customImage,
@@ -2428,9 +2387,10 @@ export default function ECardsPage() {
           }
           customCardToggleLoading={customCardToggleLoading}
           selectedPromotions={designerThemeId ? (cardPromotions[designerThemeId] || []) : []}
-          onPromotionsChange={designerThemeId ? (promotionIds) => handleCardPromotionsChange(designerThemeId, promotionIds) : undefined}
+          onPromotionsChange={designerThemeId ? (promotionIds: string[]) => handleCardPromotionsChange(designerThemeId, promotionIds) : undefined}
           hideDescription={false}
         />
+        </Suspense>
 
         {/* Settings Tab */}
         {activeTab === "settings" && (

@@ -25,7 +25,7 @@ interface ThemeCardProps {
   disabled?: boolean;
 }
 
-export const ThemeCard: React.FC<ThemeCardProps> = ({
+export const ThemeCard = React.memo(function ThemeCard({
   theme,
   themePreviewData,
   parsedCustomThemeData,
@@ -33,7 +33,7 @@ export const ThemeCard: React.FC<ThemeCardProps> = ({
   previewLabel,
   onCardClick,
   disabled = false,
-}) => {
+}: ThemeCardProps) {
   const themeId = theme.id;
 
   // Memoize image URL calculation
@@ -68,6 +68,7 @@ export const ThemeCard: React.FC<ThemeCardProps> = ({
     >
       <div className="relative h-40 rounded-lg overflow-hidden">
         <img
+          loading="lazy"
           src={imageUrl || theme.image}
           alt={theme.name}
           className="absolute inset-0 h-full w-full object-cover"
@@ -90,4 +91,4 @@ export const ThemeCard: React.FC<ThemeCardProps> = ({
       </div>
     </button>
   );
-};
+});
