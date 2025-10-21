@@ -106,10 +106,10 @@ emailManagementRoutes.get("/email-contacts", authenticateToken, requireTenant, a
     }).from(emailContacts).where(whereClause);
 
     // Transform the data to match frontend expectations
-    const transformedContacts = contactsData.map(contact => {
+    const transformedContacts = contactsData.map((contact: any) => {
       // Extract and transform the relationship data
-      const tags = contact.tagAssignments?.map(assignment => assignment.tag).filter(Boolean) || [];
-      const lists = contact.listMemberships?.map(membership => membership.list).filter(Boolean) || [];
+      const tags = contact.tagAssignments?.map((assignment: any) => assignment.tag).filter(Boolean) || [];
+      const lists = contact.listMemberships?.map((membership: any) => membership.list).filter(Boolean) || [];
 
       // Remove the backend-specific relationship fields and add frontend-compatible ones
       const { tagAssignments, listMemberships, ...contactData } = contact;
@@ -162,8 +162,8 @@ emailManagementRoutes.get("/email-contacts/:id", authenticateToken, requireTenan
     }
 
     // Transform the data to match frontend expectations
-    const tags = contact.tagAssignments?.map(assignment => assignment.tag).filter(Boolean) || [];
-    const lists = contact.listMemberships?.map(membership => membership.list).filter(Boolean) || [];
+    const tags = contact.tagAssignments?.map((assignment: any) => assignment.tag).filter(Boolean) || [];
+    const lists = contact.listMemberships?.map((membership: any) => membership.list).filter(Boolean) || [];
 
     const { tagAssignments, listMemberships, ...contactData } = contact;
     const transformedContact = {
@@ -269,7 +269,7 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
     const now = new Date();
 
     // Use a transaction for batch operations
-    const result = await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx: any) => {
       // Ensure the user exists in betterAuthUser table before setting addedByUserId
       let userExists = false;
       try {
@@ -748,7 +748,7 @@ emailManagementRoutes.get("/contact-tags", authenticateToken, requireTenant, asy
       orderBy: sql`${contactTags.name} ASC`,
     });
 
-    res.json(tags);
+    res.json({ tags });
   } catch (error) {
     console.error('Get contact tags error:', error);
     res.status(500).json({ message: 'Failed to get contact tags' });
@@ -769,6 +769,7 @@ emailManagementRoutes.post("/contact-tags", authenticateToken, requireTenant, as
     const sanitizedDescription = description ? sanitizeString(description) : null;
 
     const newTag = await db.insert(contactTags).values({
+      tenantId: req.user.tenantId,
       name: sanitizedName,
       color: sanitizedColor,
       description: sanitizedDescription,
@@ -934,8 +935,10 @@ emailManagementRoutes.post("/email-contacts/:contactId/tags/:tagId", authenticat
     }
 
     await db.insert(contactTagAssignments).values({
+      tenantId: req.user.tenantId,
       contactId,
       tagId,
+      assignedAt: new Date(),
     });
 
     res.json({ message: 'Tag added to contact successfully' });
@@ -976,8 +979,10 @@ emailManagementRoutes.post("/contact-tags/:tagId/contacts", authenticateToken, r
     }
 
     const relationships = contactIds.map(contactId => ({
+      tenantId: req.user.tenantId,
       contactId,
       tagId,
+      assignedAt: new Date(),
     }));
 
     await db.insert(contactTagAssignments).values(relationships);
@@ -1063,7 +1068,7 @@ emailManagementRoutes.get("/email-contacts/:contactId/activity", authenticateTok
     }).from(emailActivity).where(whereClause);
 
     // Transform activities for frontend consumption
-    const transformedActivities = activities.map(activity => ({
+    const transformedActivities = activities.map((activity: any) => ({
       id: activity.id,
       activityType: activity.activityType,
       occurredAt: activity.occurredAt,
@@ -1162,12 +1167,12 @@ emailManagementRoutes.patch("/email-contacts/birthday-email/bulk", authenticateT
 
     // Check if any contacts have unsubscribed from birthday emails when enabling
     if (enabled) {
-      const unsubscribedContacts = contacts.filter(c => c.birthdayUnsubscribedAt);
+      const unsubscribedContacts = contacts.filter((c: any) => c.birthdayUnsubscribedAt);
       if (unsubscribedContacts.length > 0) {
         return res.status(403).json({
           message: `Cannot re-enable birthday emails for ${unsubscribedContacts.length} contact(s) who have unsubscribed. These customers must opt-in again through the unsubscribe link.`,
           reason: 'unsubscribed',
-          unsubscribedContactIds: unsubscribedContacts.map(c => c.id)
+          unsubscribedContactIds: unsubscribedContacts.map((c: any) => c.id)
         });
       }
     }
@@ -1246,10 +1251,10 @@ emailManagementRoutes.get("/birthday-contacts", authenticateToken, requireTenant
     });
 
     // Transform the data to match the expected frontend format
-    const contacts = contactsData.map(contact => ({
+    const contacts = contactsData.map((contact: any) => ({
       ...contact,
-      tags: contact.tagAssignments.map(ta => ta.tag),
-      lists: contact.listMemberships.map(lm => lm.list),
+      tags: contact.tagAssignments.map((ta: any) => ta.tag),
+      lists: contact.listMemberships.map((lm: any) => lm.list),
     }));
 
     // Get total count
@@ -1784,7 +1789,7 @@ emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken,
       }
     );
 
-    if (result.success) {
+    if (typeof result === 'object' && 'success' in result && result.success) {
       res.json({
         message: 'Birthday invitation sent successfully',
         messageId: result.messageId
@@ -1950,7 +1955,7 @@ emailManagementRoutes.post("/internal/birthday-invitation", async (req: any, res
       }
     );
 
-    if (result.success) {
+    if (typeof result === 'object' && 'success' in result && result.success) {
       res.json({
         message: 'Birthday invitation sent successfully',
         messageId: result.messageId,
@@ -2443,7 +2448,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               subject: `🎉 Happy Birthday ${recipientName}!`,
               emailType: 'birthday_card',
               provider: 'resend',
-              providerMessageId: typeof result === 'string' ? result : result.messageId,
+              providerMessageId: typeof result === 'string' ? result : (result as any).messageId,
               status: 'sent',
               contactId: contact.id,
               promotionId: null,

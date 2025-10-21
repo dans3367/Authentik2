@@ -11,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import EmailActivityTimeline from "@/components/EmailActivityTimeline";
 import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
 import SendEmailModal from "@/components/SendEmailModal";
+import ManageContactTagsModal from "@/components/ManageContactTagsModal";
 import {
   ArrowLeft,
   Mail,
@@ -724,10 +725,20 @@ export default function ViewContact() {
                   </Button>
                 }
               />
-              <Button variant="outline" className="w-full justify-start">
-                <Tag className="w-4 h-4 mr-2" />
-                Manage Tags
-              </Button>
+              <ManageContactTagsModal
+                contactId={contact.id}
+                currentTagIds={contact.tags.map((t) => t.id)}
+                contactName={getFullName(contact)}
+                onUpdated={() => {
+                  queryClient.invalidateQueries({ queryKey: ['/api/email-contacts', id] });
+                }}
+                trigger={
+                  <Button variant="outline" className="w-full justify-start">
+                    <Tag className="w-4 h-4 mr-2" />
+                    Manage Tags
+                  </Button>
+                }
+              />
               <Button 
                 variant="outline" 
                 className="w-full justify-start text-red-600 hover:text-red-700"
