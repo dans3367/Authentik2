@@ -1437,6 +1437,10 @@ export interface EmailListWithCount extends EmailList {
   count: number;
 }
 
+export interface ContactTagWithCount extends ContactTag {
+  contactCount: number;
+}
+
 export interface ContactFilters {
   search?: string;
   status?: 'active' | 'unsubscribed' | 'bounced' | 'pending' | 'all';

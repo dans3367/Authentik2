@@ -746,9 +746,19 @@ emailManagementRoutes.get("/contact-tags", authenticateToken, requireTenant, asy
   try {
     const tags = await db.query.contactTags.findMany({
       orderBy: sql`${contactTags.name} ASC`,
+      with: {
+        assignments: true,
+      },
     });
 
-    res.json({ tags });
+    // Add contact count to each tag
+    const tagsWithCount = tags.map((tag: any) => ({
+      ...tag,
+      contactCount: tag.assignments?.length || 0,
+      assignments: undefined, // Remove assignments from response
+    }));
+
+    res.json({ tags: tagsWithCount });
   } catch (error) {
     console.error('Get contact tags error:', error);
     res.status(500).json({ message: 'Failed to get contact tags' });
