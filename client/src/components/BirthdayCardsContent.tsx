@@ -127,7 +127,7 @@ interface User {
   lastLogin?: string | null;
 }
 
-export default function BirthdaysPage() {
+export function BirthdayCardsContent() {
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
   const { t, currentLanguage } = useLanguage();

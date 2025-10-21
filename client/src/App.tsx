@@ -44,6 +44,7 @@ const EditEmailContactPage = lazy(() => import("@/pages/email-contacts/edit"));
 const EmailAnalyticsPage = lazy(() => import("@/pages/email-analytics"));
 const BirthdaysPage = lazy(() => import("@/pages/birthdays"));
 const ECardsPage = lazy(() => import("@/pages/e-cards"));
+const CardsPage = lazy(() => import("@/pages/cards"));
 const RemindersPage = lazy(() => import("@/pages/reminders"));
 const ConfirmAppointmentPage = lazy(() => import("@/pages/confirm-appointment"));
 const PromotionsPage = lazy(() => import("@/pages/promotions"));
@@ -244,8 +245,25 @@ function Router() {
                   <Route path="/email-contacts/edit/:id" component={EditEmailContactPage} />
                   <Route path="/email-analytics" component={EmailAnalyticsPage} />
                   <Route path="/segmentation" component={SegmentationPage} />
-                  <Route path="/birthdays" component={BirthdaysPage} />
-                  <Route path="/e-cards" component={ECardsPage} />
+                  <Route path="/cards" component={CardsPage} />
+                  <Route path="/birthdays">
+                    {() => {
+                      const [, setLocation] = useLocation();
+                      useEffect(() => {
+                        setLocation('/cards?type=birthday');
+                      }, []);
+                      return null;
+                    }}
+                  </Route>
+                  <Route path="/e-cards">
+                    {() => {
+                      const [, setLocation] = useLocation();
+                      useEffect(() => {
+                        setLocation('/cards?type=ecard');
+                      }, []);
+                      return null;
+                    }}
+                  </Route>
                   <Route path="/reminders" component={RemindersPage} />
                   <Route path="/shops" component={ShopsPage} />
                   <Route path="/shops/new" component={NewShopPage} />

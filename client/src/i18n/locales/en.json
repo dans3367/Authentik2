@@ -38,7 +38,9 @@
     "forms": "Forms",
     "emailCampaigns": "Email Campaigns",
     "emailTest": "Email Test",
+    "cards": "Cards",
     "birthdays": "Birthdays",
+    "ecards": "E-Cards",
     "reminders": "Reminders",
     "templates": "Templates",
     "contacts": "Contacts",
@@ -48,6 +50,22 @@
   },
   "dashboard": {
     "welcomeBack": "Welcome back, {{name}}"
+  },
+  "cards": {
+    "title": "Digital Card Campaigns",
+    "description": "Create and schedule personalized digital cards to arrive directly at your customers' email",
+    "hero": {
+      "celebrate": "Celebrate Their Special",
+      "dayWith": "Day With a Thoughtful",
+      "card": "Birthday e-Card!",
+      "description": "Choose your contacts and we will send them a personalized birthday greeting straight to their inbox. It only takes a few clicks to brighten someone's day!"
+    },
+    "selector": {
+      "birthday": "Birthday Cards",
+      "ecard": "E-Cards",
+      "birthdayDescription": "Manage birthday card campaigns and settings",
+      "ecardDescription": "Manage seasonal and holiday e-card campaigns"
+    }
   },
   "auth": {
     "login": "Login",

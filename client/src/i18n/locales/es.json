@@ -38,7 +38,9 @@
     "forms": "Formularios",
     "emailCampaigns": "Campañas de Email",
     "emailTest": "Prueba de Email",
+    "cards": "Tarjetas",
     "birthdays": "Cumpleaños",
+    "ecards": "Tarjetas Electrónicas",
     "reminders": "Recordatorios",
     "templates": "Plantillas",
     "contacts": "Contactos",
@@ -48,6 +50,22 @@
   },
   "dashboard": {
     "welcomeBack": "Bienvenido de nuevo, {{name}}"
+  },
+  "cards": {
+    "title": "Campañas de Tarjetas Digitales",
+    "description": "Cree y programe tarjetas digitales personalizadas para llegar directamente al correo electrónico de sus clientes",
+    "hero": {
+      "celebrate": "Celebre Su Día Especial",
+      "dayWith": "Con una Tarjeta",
+      "card": "Electrónica de Cumpleaños!",
+      "description": "Elija sus contactos y les enviaremos un saludo de cumpleaños personalizado directamente a su bandeja de entrada. ¡Solo toma unos clics alegrar el día de alguien!"
+    },
+    "selector": {
+      "birthday": "Tarjetas de Cumpleaños",
+      "ecard": "Tarjetas Electrónicas",
+      "birthdayDescription": "Gestionar campañas y configuraciones de tarjetas de cumpleaños",
+      "ecardDescription": "Gestionar campañas de tarjetas electrónicas de temporada y festivas"
+    }
   },
   "auth": {
     "login": "Iniciar Sesión",

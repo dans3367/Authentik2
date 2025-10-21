@@ -228,7 +228,7 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced;
 }
 
-export default function ECardsPage() {
+export function ECardsContent() {
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
   const { t, currentLanguage } = useLanguage();
