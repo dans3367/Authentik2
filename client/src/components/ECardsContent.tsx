@@ -1701,7 +1701,7 @@ export function ECardsContent() {
             className="flex items-center gap-2"
           >
             <Palette className="h-4 w-4" />
-            {t('ecards.tabs.themes')}
+            {t('ecards.tabs.themesButton') || 'General'}
           </Button>
           <Button
             variant={activeTab === "settings" ? "default" : "ghost"}

@@ -38,9 +38,9 @@
     "forms": "Forms",
     "emailCampaigns": "Email Campaigns",
     "emailTest": "Email Test",
-    "cards": "Cards",
+    "cards": "e-Cards",
     "birthdays": "Birthdays",
-    "ecards": "E-Cards",
+    "ecards": "Holiday Cards",
     "reminders": "Reminders",
     "templates": "Templates",
     "contacts": "Contacts",
@@ -55,14 +55,14 @@
     "title": "Digital Card Campaigns",
     "description": "Create and schedule personalized digital cards to arrive directly at your customers' email",
     "hero": {
-      "celebrate": "Celebrate Their Special",
-      "dayWith": "Day With a Thoughtful",
-      "card": "Birthday e-Card!",
-      "description": "Choose your contacts and we will send them a personalized birthday greeting straight to their inbox. It only takes a few clicks to brighten someone's day!"
+      "celebrate": "Create and Send",
+      "dayWith": "Digital Cards That Arrive",
+      "card": "Directly in Their Inbox.",
+      "description": "Choose your contacts and schedule personalized digital cards to be delivered on time. Perfect for birthdays, holidays, and special occasions!"
     },
     "selector": {
       "birthday": "Birthday Cards",
-      "ecard": "E-Cards",
+      "ecard": "Holiday Cards",
       "birthdayDescription": "Manage birthday card campaigns and settings",
       "ecardDescription": "Manage seasonal and holiday e-card campaigns"
     }
@@ -250,7 +250,8 @@
       "sendInvitation": "Send Birthday Invitation"
     },
     "tabs": {
-      "themes": "Themes",
+      "themes": "Birthday Card Themes",
+      "themesButton": "General",
       "settings": "Settings",
       "customers": "Customers",
       "promotions": "Promotions",
@@ -439,7 +440,8 @@
       "christmas": "Christmas"
     },
     "tabs": {
-      "themes": "Themes",
+      "themes": "Holiday Card Themes",
+      "themesButton": "General",
       "settings": "Settings",
       "customers": "Customers",
       "test": "Test"
@@ -473,8 +475,8 @@
       "cancel": "Cancel"
     },
     "cards": {
-      "active": "Active Cards",
-      "inactive": "Inactive Cards",
+      "active": "Active",
+      "inactive": "Inactive",
       "custom": "Custom Cards",
       "inactiveCustom": "Inactive Custom Cards",
       "createCustom": "Create Custom Card",

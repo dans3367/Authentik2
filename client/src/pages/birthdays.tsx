@@ -1197,7 +1197,7 @@ export default function BirthdaysPage() {
                   </h1>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 text-base sm:text-lg leading-relaxed max-w-full">
-                  {t('cards.hero.description') || 'Choose your contacts and we will send them a personalized birthday greeting straight to their inbox. It only takes a few clicks to brighten someone\'s day!'}
+                  {t('cards.hero.description') || 'Choose your contacts and schedule personalized digital cards to be delivered directly to their inbox. Perfect for birthdays, holidays, and special occasions!'}
                 </p>
               </div>
               <div className="justify-self-center lg:justify-self-end lg:col-span-4 mt-4 lg:mt-0">
@@ -1220,7 +1220,7 @@ export default function BirthdaysPage() {
             className="flex items-center gap-2"
           >
             <Palette className="h-4 w-4" />
-            {t('birthdays.tabs.themes')}
+            {t('birthdays.tabs.themesButton') || 'General'}
           </Button>
           <Button
             variant={activeTab === "settings" ? "default" : "ghost"}
@@ -1272,7 +1272,7 @@ export default function BirthdaysPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Palette className="h-5 w-5" />
-                Themes
+                {t('birthdays.tabs.themes') || 'Birthday Card Themes'}
               </CardTitle>
             </CardHeader>
             <CardContent>

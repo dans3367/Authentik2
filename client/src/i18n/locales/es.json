@@ -40,7 +40,7 @@
     "emailTest": "Prueba de Email",
     "cards": "Tarjetas",
     "birthdays": "Cumpleaños",
-    "ecards": "Tarjetas Electrónicas",
+    "ecards": "Tarjetas de Días Festivos",
     "reminders": "Recordatorios",
     "templates": "Plantillas",
     "contacts": "Contactos",
@@ -55,14 +55,14 @@
     "title": "Campañas de Tarjetas Digitales",
     "description": "Cree y programe tarjetas digitales personalizadas para llegar directamente al correo electrónico de sus clientes",
     "hero": {
-      "celebrate": "Celebre Su Día Especial",
-      "dayWith": "Con una Tarjeta",
-      "card": "Electrónica de Cumpleaños!",
-      "description": "Elija sus contactos y les enviaremos un saludo de cumpleaños personalizado directamente a su bandeja de entrada. ¡Solo toma unos clics alegrar el día de alguien!"
+      "celebrate": "Crea y Envía Tarjetas",
+      "dayWith": "Digitales Que Llegan",
+      "card": "a Su Bandeja de Entrada.",
+      "description": "Elija sus contactos y programe tarjetas digitales personalizadas para ser entregadas a tiempo. ¡Perfecto para cumpleaños, días festivos y ocasiones especiales!"
     },
     "selector": {
       "birthday": "Tarjetas de Cumpleaños",
-      "ecard": "Tarjetas Electrónicas",
+      "ecard": "Tarjetas de Días Festivos",
       "birthdayDescription": "Gestionar campañas y configuraciones de tarjetas de cumpleaños",
       "ecardDescription": "Gestionar campañas de tarjetas electrónicas de temporada y festivas"
     }
@@ -250,7 +250,8 @@
       "sendInvitation": "Enviar Invitación de Cumpleaños"
     },
     "tabs": {
-      "themes": "Temas",
+      "themes": "Temas de Tarjetas de Cumpleaños",
+      "themesButton": "General",
       "settings": "Configuración",
       "customers": "Clientes",
       "promotions": "Promociones",
@@ -439,7 +440,8 @@
       "christmas": "Navidad"
     },
     "tabs": {
-      "themes": "Temas",
+      "themes": "Temas de Tarjetas de Días Festivos",
+      "themesButton": "General",
       "settings": "Configuración",
       "customers": "Clientes",
       "test": "Prueba"
@@ -465,8 +467,8 @@
       "sendTestCard": "Enviar Tarjeta de Prueba"
     },
     "cards": {
-      "active": "Tarjetas Activas",
-      "inactive": "Tarjetas Inactivas",
+      "active": "Activas",
+      "inactive": "Inactivas",
       "custom": "Tarjetas Personalizadas",
       "inactiveCustom": "Tarjetas Personalizadas Inactivas",
       "createCustom": "Crear Tarjeta Personalizada",

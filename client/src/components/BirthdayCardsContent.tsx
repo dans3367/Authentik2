@@ -1220,7 +1220,7 @@ export function BirthdayCardsContent() {
             className="flex items-center gap-2"
           >
             <Palette className="h-4 w-4" />
-            {t('birthdays.tabs.themes')}
+            {t('birthdays.tabs.themesButton') || 'General'}
           </Button>
           <Button
             variant={activeTab === "settings" ? "default" : "ghost"}
@@ -1272,7 +1272,7 @@ export function BirthdayCardsContent() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Palette className="h-5 w-5" />
-                Themes
+                {t('birthdays.tabs.themes') || 'Birthday Card Themes'}
               </CardTitle>
             </CardHeader>
             <CardContent>
