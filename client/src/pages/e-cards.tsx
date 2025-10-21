@@ -51,6 +51,7 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ECardDesignerDialog } from "@/components/ECardDesignerDialog";
 import { PromotionSelector } from "@/components/PromotionSelector";
+import { ThemeCard } from "@/components/ThemeCard";
 
 interface ECardSettings {
   id: string;
@@ -158,6 +159,36 @@ const normalizeTemplateId = (value?: string | null): string => {
 
 const getLegacyTemplateId = (value: string): string | undefined => {
   return REVERSE_LEGACY_TEMPLATE_ID_MAP[value];
+};
+
+/**
+ * Safely parse JSON with fallback
+ */
+const safeJsonParse = <T,>(json: string | null | undefined, fallback: T): T => {
+  if (!json) return fallback;
+  try {
+    return JSON.parse(json) as T;
+  } catch {
+    return fallback;
+  }
+};
+
+/**
+ * Parse a birthday string (YYYY-MM-DD) as a local date to avoid timezone shifts
+ */
+const parseBirthdayAsLocalDate = (birthday: string): Date => {
+  const [year, month, day] = birthday.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
+/**
+ * Format a date as YYYY-MM-DD in local timezone
+ */
+const formatDateAsLocalString = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = `${date.getMonth() + 1}`.padStart(2, '0');
+  const d = `${date.getDate()}`.padStart(2, '0');
+  return `${y}-${m}-${d}`;
 };
 
 export default function ECardsPage() {
@@ -558,7 +589,10 @@ export default function ECardsPage() {
     },
   });
 
-
+  // Memoized parsed customThemeData to avoid repeated JSON parsing (performance optimization)
+  const parsedCustomThemeData = useMemo(() => {
+    return safeJsonParse(eCardSettings?.customThemeData, { themes: {} });
+  }, [eCardSettings?.customThemeData]);
 
   // Fetch contacts from the existing email-contacts endpoint
   const {
@@ -765,17 +799,10 @@ export default function ECardsPage() {
     setDisabledHolidays(eCardSettings?.disabledHolidays || []);
 
     // Load card-specific promotions from customThemeData
-    if (eCardSettings?.customThemeData) {
-      try {
-        const parsed = JSON.parse(eCardSettings.customThemeData);
-        if (parsed.cardPromotions) {
-          setCardPromotions(parsed.cardPromotions);
-        }
-      } catch (error) {
-        console.warn('Failed to parse card promotions from customThemeData:', error);
-      }
+    if (parsedCustomThemeData.cardPromotions) {
+      setCardPromotions(parsedCustomThemeData.cardPromotions);
     }
-  }, [eCardSettings?.promotion, eCardSettings?.splitPromotionalEmail, eCardSettings?.disabledHolidays, eCardSettings?.customThemeData]);
+  }, [eCardSettings?.promotion, eCardSettings?.splitPromotionalEmail, eCardSettings?.disabledHolidays, parsedCustomThemeData]);
 
   // Memoized initial data for ECardDesignerDialog to prevent re-render loops
   const cardDesignerInitialData = useMemo(() => {
@@ -839,39 +866,35 @@ export default function ECardsPage() {
     // PRIORITY 2: Load from database (customThemeData)
     console.log('🔍 [Card Designer Initial Data] eCardSettings.customThemeData:', eCardSettings?.customThemeData, 'Type:', typeof eCardSettings?.customThemeData);
     if (eCardSettings?.customThemeData) {
-      try {
-        const parsed = JSON.parse(eCardSettings.customThemeData);
-        console.log('✅ [Card Designer Initial Data] Parsed customThemeData:', parsed);
+      const parsed = parsedCustomThemeData;
+      console.log('✅ [Card Designer Initial Data] Using parsed customThemeData:', parsed);
 
-        let themeSpecificData = null;
+      let themeSpecificData = null;
 
-        // Check if it's the new structure (has themes property)
-        console.log('🔍 [Card Designer Initial Data] Loading from DB for theme:', currentThemeId, 'Available themes:', Object.keys(parsed.themes || {}));
-        if (parsed.themes && parsed.themes[currentThemeId]) {
-          themeSpecificData = parsed.themes[currentThemeId];
-          console.log('✅ [Card Designer Initial Data] Found theme-specific data from DB:', themeSpecificData);
-        } else if (!parsed.themes) {
-          // Old structure - assume it's for custom theme if we're loading custom
-          if (currentThemeId === 'custom') {
-            themeSpecificData = parsed;
-          }
+      // Check if it's the new structure (has themes property)
+      console.log('🔍 [Card Designer Initial Data] Loading from DB for theme:', currentThemeId, 'Available themes:', Object.keys(parsed.themes || {}));
+      if (parsed.themes && parsed.themes[currentThemeId]) {
+        themeSpecificData = parsed.themes[currentThemeId];
+        console.log('✅ [Card Designer Initial Data] Found theme-specific data from DB:', themeSpecificData);
+      } else if (!parsed.themes) {
+        // Old structure - assume it's for custom theme if we're loading custom
+        if (currentThemeId === 'custom') {
+          themeSpecificData = parsed;
         }
+      }
 
-        if (themeSpecificData) {
-          console.log('📤 [Card Designer Initial Data] Returning DB data for theme:', currentThemeId);
-          return {
-            title: themeSpecificData.title || '',
-            description: themeSpecificData.description || '',
-            message: themeSpecificData.message || eCardSettings?.customMessage || '',
-            signature: themeSpecificData.signature || '',
-            imageUrl: themeSpecificData.imageUrl || themeMetadata?.image || null,
-            customImage: Boolean(themeSpecificData.customImage && themeSpecificData.imageUrl),
-            imagePosition: themeSpecificData.imagePosition || { x: 0, y: 0 },
-            imageScale: themeSpecificData.imageScale || 1,
-          };
-        }
-      } catch (error) {
-        console.warn('⚠️ [Card Designer Initial Data] Failed to parse customThemeData:', error);
+      if (themeSpecificData) {
+        console.log('📤 [Card Designer Initial Data] Returning DB data for theme:', currentThemeId);
+        return {
+          title: themeSpecificData.title || '',
+          description: themeSpecificData.description || '',
+          message: themeSpecificData.message || eCardSettings?.customMessage || '',
+          signature: themeSpecificData.signature || '',
+          imageUrl: themeSpecificData.imageUrl || themeMetadata?.image || null,
+          customImage: Boolean(themeSpecificData.customImage && themeSpecificData.imageUrl),
+          imagePosition: themeSpecificData.imagePosition || { x: 0, y: 0 },
+          imageScale: themeSpecificData.imageScale || 1,
+        };
       }
     }
 
@@ -1031,15 +1054,8 @@ export default function ECardsPage() {
     setCardPromotions(updatedCardPromotions);
 
     if (eCardSettings) {
-      // Parse existing customThemeData or create new structure
-      let existingThemeData: Record<string, any> = {};
-      if (eCardSettings.customThemeData) {
-        try {
-          existingThemeData = JSON.parse(eCardSettings.customThemeData);
-        } catch {
-          existingThemeData = {};
-        }
-      }
+      // Use parsed data instead of parsing again
+      const existingThemeData = parsedCustomThemeData;
 
       // Update with card promotions
       const updatedThemeData = {
@@ -1368,48 +1384,43 @@ export default function ECardsPage() {
   // Initialize custom theme preview from birthday settings
   useEffect(() => {
     if (eCardSettings?.customThemeData) {
-      try {
-        const parsedData = JSON.parse(eCardSettings.customThemeData);
+      const parsedData = parsedCustomThemeData;
 
-        // Extract the custom theme data from the themes structure
-        const customThemeData = parsedData.themes?.custom;
+      // Extract the custom theme data from the themes structure
+      const customThemeData = parsedData.themes?.custom;
 
-        console.log('🎨 [Birthday Cards] Initializing custom theme preview:', {
-          hasParsedData: !!parsedData,
-          hasThemes: !!parsedData.themes,
-          hasCustomTheme: !!customThemeData,
-          customImageUrl: customThemeData?.imageUrl,
-          customImage: customThemeData?.customImage
-        });
+      console.log('🎨 [Birthday Cards] Initializing custom theme preview:', {
+        hasParsedData: !!parsedData,
+        hasThemes: !!parsedData.themes,
+        hasCustomTheme: !!customThemeData,
+        customImageUrl: customThemeData?.imageUrl,
+        customImage: customThemeData?.customImage
+      });
 
-        if (customThemeData) {
-          setCustomThemePreview(customThemeData);
+      if (customThemeData) {
+        setCustomThemePreview(customThemeData);
 
-          // Also initialize themePreviewData['custom'] so the preview shows immediately on load
-          setThemePreviewData(prev => ({
-            ...prev,
-            custom: customThemeData
-          }));
+        // Also initialize themePreviewData['custom'] so the preview shows immediately on load
+        setThemePreviewData(prev => ({
+          ...prev,
+          custom: customThemeData
+        }));
 
-          // Initialize themePreviewData for all themes in the saved data
-          const allThemes = parsedData.themes || {};
-          setThemePreviewData(prev => ({
-            ...prev,
-            ...allThemes
-          }));
+        // Initialize themePreviewData for all themes in the saved data
+        const allThemes = parsedData.themes || {};
+        setThemePreviewData(prev => ({
+          ...prev,
+          ...allThemes
+        }));
 
-          console.log('✅ [Birthday Cards] Custom theme preview initialized with imageUrl:', customThemeData.imageUrl);
-        } else {
-          setCustomThemePreview(null);
-          setThemePreviewData(prev => {
-            const newData = { ...prev };
-            delete newData.custom;
-            return newData;
-          });
-        }
-      } catch (error) {
-        console.warn('Failed to parse custom theme data:', error);
+        console.log('✅ [Birthday Cards] Custom theme preview initialized with imageUrl:', customThemeData.imageUrl);
+      } else {
         setCustomThemePreview(null);
+        setThemePreviewData(prev => {
+          const newData = { ...prev };
+          delete newData.custom;
+          return newData;
+        });
       }
     } else {
       setCustomThemePreview(null);
@@ -1420,7 +1431,7 @@ export default function ECardsPage() {
         return newData;
       });
     }
-  }, [eCardSettings?.customThemeData]);
+  }, [parsedCustomThemeData, eCardSettings?.customThemeData]);
 
   // Callback for real-time preview updates
   const handlePreviewChange = useCallback((previewData: {
@@ -1742,79 +1753,21 @@ export default function ECardsPage() {
                 <div className="mt-6">
                   <Label className="text-sm">{t('ecards.sectionLabels.valentinesDay')}</Label>
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
-                    {valentineThemes.map((theme) => {
-                      const themeId = theme.id;
-                      const isSelected = (eCardSettings?.emailTemplate === themeId) && (() => {
-                        try {
-                          if (themePreviewData[themeId]?.imageUrl) return themePreviewData[themeId]?.imageUrl === theme.image;
-                          if (eCardSettings?.customThemeData) {
-                            const parsed = JSON.parse(eCardSettings.customThemeData);
-                            const customData = parsed.themes?.[themeId];
-                            return customData?.imageUrl === theme.image;
-                          }
-                        } catch {}
-                        return false;
-                      })();
-
-                      return (
-                        <button
-                          key={theme.id}
-                          type="button"
-                          onClick={() => {
-                            setDesignerThemeId(themeId);
-                            // Don't write to localStorage when opening - let the designer load from DB
-                            // This prevents overwriting saved customizations
-                            setDesignerOpen(true);
-                          }}
-                          disabled={updateSettingsMutation.isPending}
-                          className="relative rounded-xl border border-gray-200 hover:border-gray-300 p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-                        >
-                          <div className="relative h-40 rounded-lg overflow-hidden">
-                            <img 
-                              src={(() => {
-                                try {
-                                  // Check for custom image in preview data first
-                                  if (themePreviewData[themeId]?.imageUrl) {
-                                    return themePreviewData[themeId].imageUrl;
-                                  }
-                                  // Then check in saved database data
-                                  if (eCardSettings?.customThemeData) {
-                                    const saved = JSON.parse(eCardSettings.customThemeData);
-                                    if (saved?.themes?.[themeId]?.imageUrl) {
-                                      return saved.themes[themeId].imageUrl;
-                                    }
-                                  }
-                                } catch {}
-                                // Fall back to default theme image
-                                return theme.image;
-                              })()} 
-                              alt={theme.name} 
-                              className="absolute inset-0 h-full w-full object-cover" 
-                            />
-                            <div className={`absolute inset-0 ${theme.overlay}`} />
-                            {theme.decorations}
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="text-center">
-                                <div className="font-bold text-white drop-shadow-lg text-shadow">
-                                  {/* Default to a Valentine message; if custom title saved, show it */}
-                                  {(() => {
-                                    try {
-                                      const saved = eCardSettings?.customThemeData ? JSON.parse(eCardSettings.customThemeData) : null;
-                                      const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || t('ecards.preview.valentinesDay');
-                                      return title;
-                                    } catch { return t('ecards.preview.valentinesDay'); }
-                                  })()}
-                                </div>
-                                <div className="text-xs text-white/90 drop-shadow">{theme.name} {t('ecards.previewLabel')}</div>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="mt-2">
-                            <span className="text-sm font-medium text-gray-900">{theme.name}</span>
-                          </div>
-                        </button>
-                      );
-                    })}
+                    {valentineThemes.map((theme) => (
+                      <ThemeCard
+                        key={theme.id}
+                        theme={theme}
+                        themePreviewData={themePreviewData}
+                        parsedCustomThemeData={parsedCustomThemeData}
+                        defaultTitle={t('ecards.preview.valentinesDay')}
+                        previewLabel={t('ecards.previewLabel')}
+                        onCardClick={(themeId) => {
+                          setDesignerThemeId(themeId);
+                          setDesignerOpen(true);
+                        }}
+                        disabled={updateSettingsMutation.isPending}
+                      />
+                    ))}
                   </div>
                 </div>
                 )}
@@ -1825,78 +1778,21 @@ export default function ECardsPage() {
                 <div className="mt-6">
                   <Label className="text-sm">{t('ecards.sectionLabels.stPatricksDay')}</Label>
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
-                    {stPatrickThemes.map((theme) => {
-                      const themeId = theme.id;
-                      const isSelected = (eCardSettings?.emailTemplate === themeId) && (() => {
-                        try {
-                          if (themePreviewData[themeId]?.imageUrl) return themePreviewData[themeId]?.imageUrl === theme.image;
-                          if (eCardSettings?.customThemeData) {
-                            const parsed = JSON.parse(eCardSettings.customThemeData);
-                            const customData = parsed.themes?.[themeId];
-                            return customData?.imageUrl === theme.image;
-                          }
-                        } catch {}
-                        return false;
-                      })();
-
-                      return (
-                        <button
-                          key={theme.id}
-                          type="button"
-                          onClick={() => {
-                            setDesignerThemeId(themeId);
-                            // Don't write to localStorage when opening - let the designer load from DB
-                            // This prevents overwriting saved customizations
-                            setDesignerOpen(true);
-                          }}
-                          disabled={updateSettingsMutation.isPending}
-                          className="relative rounded-xl border border-gray-200 hover:border-gray-300 p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-                        >
-                          <div className="relative h-40 rounded-lg overflow-hidden">
-                            <img 
-                              src={(() => {
-                                try {
-                                  // Check for custom image in preview data first
-                                  if (themePreviewData[themeId]?.imageUrl) {
-                                    return themePreviewData[themeId].imageUrl;
-                                  }
-                                  // Then check in saved database data
-                                  if (eCardSettings?.customThemeData) {
-                                    const saved = JSON.parse(eCardSettings.customThemeData);
-                                    if (saved?.themes?.[themeId]?.imageUrl) {
-                                      return saved.themes[themeId].imageUrl;
-                                    }
-                                  }
-                                } catch {}
-                                // Fall back to default theme image
-                                return theme.image;
-                              })()} 
-                              alt={theme.name} 
-                              className="absolute inset-0 h-full w-full object-cover" 
-                            />
-                            <div className={`absolute inset-0 ${theme.overlay}`} />
-                            {theme.decorations}
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="text-center">
-                                <div className="font-bold text-white drop-shadow-lg text-shadow">
-                                  {(() => {
-                                    try {
-                                      const saved = eCardSettings?.customThemeData ? JSON.parse(eCardSettings.customThemeData) : null;
-                                      const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || t('ecards.preview.stPatricksDay');
-                                      return title;
-                                    } catch { return t('ecards.preview.stPatricksDay'); }
-                                  })()}
-                                </div>
-                                <div className="text-xs text-white/90 drop-shadow">{theme.name} {t('ecards.previewLabel')}</div>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="mt-2">
-                            <span className="text-sm font-medium text-gray-900">{theme.name}</span>
-                          </div>
-                        </button>
-                      );
-                    })}
+                    {stPatrickThemes.map((theme) => (
+                      <ThemeCard
+                        key={theme.id}
+                        theme={theme}
+                        themePreviewData={themePreviewData}
+                        parsedCustomThemeData={parsedCustomThemeData}
+                        defaultTitle={t('ecards.preview.stPatricksDay')}
+                        previewLabel={t('ecards.previewLabel')}
+                        onCardClick={(themeId) => {
+                          setDesignerThemeId(themeId);
+                          setDesignerOpen(true);
+                        }}
+                        disabled={updateSettingsMutation.isPending}
+                      />
+                    ))}
                   </div>
                 </div>
                 )}
@@ -1907,78 +1803,21 @@ export default function ECardsPage() {
                 <div className="mt-6">
                   <Label className="text-sm">{t('ecards.sectionLabels.newYearsDay')}</Label>
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
-                    {newYearThemes.map((theme) => {
-                      const themeId = theme.id;
-                      const isSelected = (eCardSettings?.emailTemplate === themeId) && (() => {
-                        try {
-                          if (themePreviewData[themeId]?.imageUrl) return themePreviewData[themeId]?.imageUrl === theme.image;
-                          if (eCardSettings?.customThemeData) {
-                            const parsed = JSON.parse(eCardSettings.customThemeData);
-                            const customData = parsed.themes?.[themeId];
-                            return customData?.imageUrl === theme.image;
-                          }
-                        } catch {}
-                        return false;
-                      })();
-
-                      return (
-                        <button
-                          key={theme.id}
-                          type="button"
-                          onClick={() => {
-                            setDesignerThemeId(themeId);
-                            // Don't write to localStorage when opening - let the designer load from DB
-                            // This prevents overwriting saved customizations
-                            setDesignerOpen(true);
-                          }}
-                          disabled={updateSettingsMutation.isPending}
-                          className="relative rounded-xl border border-gray-200 hover:border-gray-300 p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-                        >
-                          <div className="relative h-40 rounded-lg overflow-hidden">
-                            <img 
-                              src={(() => {
-                                try {
-                                  // Check for custom image in preview data first
-                                  if (themePreviewData[themeId]?.imageUrl) {
-                                    return themePreviewData[themeId].imageUrl;
-                                  }
-                                  // Then check in saved database data
-                                  if (eCardSettings?.customThemeData) {
-                                    const saved = JSON.parse(eCardSettings.customThemeData);
-                                    if (saved?.themes?.[themeId]?.imageUrl) {
-                                      return saved.themes[themeId].imageUrl;
-                                    }
-                                  }
-                                } catch {}
-                                // Fall back to default theme image
-                                return theme.image;
-                              })()} 
-                              alt={theme.name} 
-                              className="absolute inset-0 h-full w-full object-cover" 
-                            />
-                            <div className={`absolute inset-0 ${theme.overlay}`} />
-                            {theme.decorations}
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="text-center">
-                                <div className="font-bold text-white drop-shadow-lg text-shadow">
-                                  {(() => {
-                                    try {
-                                      const saved = eCardSettings?.customThemeData ? JSON.parse(eCardSettings.customThemeData) : null;
-                                      const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || t('ecards.preview.newYearsDay');
-                                      return title;
-                                    } catch { return t('ecards.preview.newYearsDay'); }
-                                  })()}
-                                </div>
-                                <div className="text-xs text-white/90 drop-shadow">{theme.name} {t('ecards.previewLabel')}</div>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="mt-2">
-                            <span className="text-sm font-medium text-gray-900">{theme.name}</span>
-                          </div>
-                        </button>
-                      );
-                    })}
+                    {newYearThemes.map((theme) => (
+                      <ThemeCard
+                        key={theme.id}
+                        theme={theme}
+                        themePreviewData={themePreviewData}
+                        parsedCustomThemeData={parsedCustomThemeData}
+                        defaultTitle={t('ecards.preview.newYearsDay')}
+                        previewLabel={t('ecards.previewLabel')}
+                        onCardClick={(themeId) => {
+                          setDesignerThemeId(themeId);
+                          setDesignerOpen(true);
+                        }}
+                        disabled={updateSettingsMutation.isPending}
+                      />
+                    ))}
                   </div>
                 </div>
                 )}
@@ -1989,78 +1828,21 @@ export default function ECardsPage() {
                 <div className="mt-6">
                   <Label className="text-sm">{t('ecards.sectionLabels.easter')}</Label>
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
-                    {easterThemes.map((theme) => {
-                      const themeId = theme.id;
-                      const isSelected = (eCardSettings?.emailTemplate === themeId) && (() => {
-                        try {
-                          if (themePreviewData[themeId]?.imageUrl) return themePreviewData[themeId]?.imageUrl === theme.image;
-                          if (eCardSettings?.customThemeData) {
-                            const parsed = JSON.parse(eCardSettings.customThemeData);
-                            const customData = parsed.themes?.[themeId];
-                            return customData?.imageUrl === theme.image;
-                          }
-                        } catch {}
-                        return false;
-                      })();
-
-                      return (
-                        <button
-                          key={theme.id}
-                          type="button"
-                          onClick={() => {
-                            setDesignerThemeId(themeId);
-                            // Don't write to localStorage when opening - let the designer load from DB
-                            // This prevents overwriting saved customizations
-                            setDesignerOpen(true);
-                          }}
-                          disabled={updateSettingsMutation.isPending}
-                          className="relative rounded-xl border border-gray-200 hover:border-gray-300 p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-                        >
-                          <div className="relative h-40 rounded-lg overflow-hidden">
-                            <img 
-                              src={(() => {
-                                try {
-                                  // Check for custom image in preview data first
-                                  if (themePreviewData[themeId]?.imageUrl) {
-                                    return themePreviewData[themeId].imageUrl;
-                                  }
-                                  // Then check in saved database data
-                                  if (eCardSettings?.customThemeData) {
-                                    const saved = JSON.parse(eCardSettings.customThemeData);
-                                    if (saved?.themes?.[themeId]?.imageUrl) {
-                                      return saved.themes[themeId].imageUrl;
-                                    }
-                                  }
-                                } catch {}
-                                // Fall back to default theme image
-                                return theme.image;
-                              })()} 
-                              alt={theme.name} 
-                              className="absolute inset-0 h-full w-full object-cover" 
-                            />
-                            <div className={`absolute inset-0 ${theme.overlay}`} />
-                            {theme.decorations}
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="text-center">
-                                <div className="font-bold text-white drop-shadow-lg text-shadow">
-                                  {(() => {
-                                    try {
-                                      const saved = eCardSettings?.customThemeData ? JSON.parse(eCardSettings.customThemeData) : null;
-                                      const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || t('ecards.preview.easter');
-                                      return title;
-                                    } catch { return t('ecards.preview.easter'); }
-                                  })()}
-                                </div>
-                                <div className="text-xs text-white/90 drop-shadow">{theme.name} {t('ecards.previewLabel')}</div>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="mt-2">
-                            <span className="text-sm font-medium text-gray-900">{theme.name}</span>
-                          </div>
-                        </button>
-                      );
-                    })}
+                    {easterThemes.map((theme) => (
+                      <ThemeCard
+                        key={theme.id}
+                        theme={theme}
+                        themePreviewData={themePreviewData}
+                        parsedCustomThemeData={parsedCustomThemeData}
+                        defaultTitle={t('ecards.preview.easter')}
+                        previewLabel={t('ecards.previewLabel')}
+                        onCardClick={(themeId) => {
+                          setDesignerThemeId(themeId);
+                          setDesignerOpen(true);
+                        }}
+                        disabled={updateSettingsMutation.isPending}
+                      />
+                    ))}
                   </div>
                 </div>
                 )}
@@ -2071,78 +1853,21 @@ export default function ECardsPage() {
                 <div className="mt-6">
                   <Label className="text-sm">{t('ecards.sectionLabels.independenceDay')}</Label>
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
-                    {independenceThemes.map((theme) => {
-                      const themeId = theme.id;
-                      const isSelected = (eCardSettings?.emailTemplate === themeId) && (() => {
-                        try {
-                          if (themePreviewData[themeId]?.imageUrl) return themePreviewData[themeId]?.imageUrl === theme.image;
-                          if (eCardSettings?.customThemeData) {
-                            const parsed = JSON.parse(eCardSettings.customThemeData);
-                            const customData = parsed.themes?.[themeId];
-                            return customData?.imageUrl === theme.image;
-                          }
-                        } catch {}
-                        return false;
-                      })();
-
-                      return (
-                        <button
-                          key={theme.id}
-                          type="button"
-                          onClick={() => {
-                            setDesignerThemeId(themeId);
-                            // Don't write to localStorage when opening - let the designer load from DB
-                            // This prevents overwriting saved customizations
-                            setDesignerOpen(true);
-                          }}
-                          disabled={updateSettingsMutation.isPending}
-                          className="relative rounded-xl border border-gray-200 hover:border-gray-300 p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-                        >
-                          <div className="relative h-40 rounded-lg overflow-hidden">
-                            <img 
-                              src={(() => {
-                                try {
-                                  // Check for custom image in preview data first
-                                  if (themePreviewData[themeId]?.imageUrl) {
-                                    return themePreviewData[themeId].imageUrl;
-                                  }
-                                  // Then check in saved database data
-                                  if (eCardSettings?.customThemeData) {
-                                    const saved = JSON.parse(eCardSettings.customThemeData);
-                                    if (saved?.themes?.[themeId]?.imageUrl) {
-                                      return saved.themes[themeId].imageUrl;
-                                    }
-                                  }
-                                } catch {}
-                                // Fall back to default theme image
-                                return theme.image;
-                              })()} 
-                              alt={theme.name} 
-                              className="absolute inset-0 h-full w-full object-cover" 
-                            />
-                            <div className={`absolute inset-0 ${theme.overlay}`} />
-                            {theme.decorations}
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="text-center">
-                                <div className="font-bold text-white drop-shadow-lg text-shadow">
-                                  {(() => {
-                                    try {
-                                      const saved = eCardSettings?.customThemeData ? JSON.parse(eCardSettings.customThemeData) : null;
-                                      const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || t('ecards.preview.independenceDay');
-                                      return title;
-                                    } catch { return t('ecards.preview.independenceDay'); }
-                                  })()}
-                                </div>
-                                <div className="text-xs text-white/90 drop-shadow">{theme.name} {t('ecards.previewLabel')}</div>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="mt-2">
-                            <span className="text-sm font-medium text-gray-900">{theme.name}</span>
-                          </div>
-                        </button>
-                      );
-                    })}
+                    {independenceThemes.map((theme) => (
+                      <ThemeCard
+                        key={theme.id}
+                        theme={theme}
+                        themePreviewData={themePreviewData}
+                        parsedCustomThemeData={parsedCustomThemeData}
+                        defaultTitle={t('ecards.preview.independenceDay')}
+                        previewLabel={t('ecards.previewLabel')}
+                        onCardClick={(themeId) => {
+                          setDesignerThemeId(themeId);
+                          setDesignerOpen(true);
+                        }}
+                        disabled={updateSettingsMutation.isPending}
+                      />
+                    ))}
                   </div>
                 </div>
                 )}
