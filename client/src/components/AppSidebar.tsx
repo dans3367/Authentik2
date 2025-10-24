@@ -43,6 +43,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar";
 import {
@@ -67,7 +70,7 @@ interface ExtendedUser {
 }
 
 const getNavigation = (userRole?: string, t?: any) => {
-  const baseNavigation = [
+  const baseNavigation: any[] = [
     { name: t?.('navigation.dashboard') || "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: t?.('navigation.newsletter') || "Newsletter", href: "/newsletter", icon: Newspaper },
     { name: t?.('navigation.promotions') || "Promotions", href: "/promotions", icon: Megaphone },
@@ -78,14 +81,18 @@ const getNavigation = (userRole?: string, t?: any) => {
     { name: t?.('navigation.reminders') || "Reminders", href: "/reminders", icon: Bell },
     { name: t?.('navigation.contacts') || "Contacts", href: "/email-contacts", icon: UserCheck },
     { name: t?.('navigation.segmentation') || "Segmentation", href: "/segmentation", icon: Target },
-    { name: t?.('navigation.analytics') || "Analytics", href: "/email-analytics", icon: BarChart3 },
+  ];
+
+  const managementChildren: any[] = [
     { name: t?.('navigation.shops') || "Shops", href: "/shops", icon: Store },
   ];
 
-  // Add Users management for Owner, Admin and Manager roles
+  // Add Users under Management for Owner, Admin and Manager roles
   if (userRole === "Owner" || userRole === "Administrator" || userRole === "Manager") {
-    baseNavigation.push({ name: t?.('navigation.users') || "Users", href: "/users", icon: Users });
+    managementChildren.push({ name: t?.('navigation.users') || "Users", href: "/users", icon: Users });
   }
+
+  baseNavigation.push({ name: t?.('navigation.management') || "Management", href: "/management", icon: Settings, children: managementChildren });
 
   return baseNavigation;
 };
@@ -201,11 +208,49 @@ export function AppSidebar() {
           <SidebarGroupLabel className={cn("mb-4 text-left", isMobile ? "px-4 text-sm font-medium text-muted-foreground" : "px-3")}>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className={cn("w-full", isMobile ? "space-y-0.5" : "space-y-1")}>
-              {navigation.map((item) => {
-                const isActive =
-                  location === item.href ||
-                  (item.href === "/dashboard" && location === "/");
+              {navigation.map((item: any) => {
+                const hasChildren = Array.isArray(item.children) && item.children.length > 0;
+                const isActive = hasChildren
+                  ? item.children.some((c: any) => location === c.href) || location === item.href
+                  : location === item.href || (item.href === "/dashboard" && location === "/");
                 const Icon = item.icon;
+
+                if (hasChildren) {
+                  return (
+                    <SidebarMenuItem key={item.name} className="w-full flex justify-center group-data-[collapsible=icon]:justify-center">
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        className={cn(
+                          "w-full justify-start group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0",
+                          isMobile ? "px-4 py-3 mx-2 rounded-lg" : "px-3 py-2.5"
+                        )}
+                        tooltip={item.name}
+                      >
+                        <Link href={item.href} className="flex items-center gap-3 w-full group-data-[collapsible=icon]:justify-center" onClick={handleMobileNavClick}>
+                          <Icon className="h-5 w-5 flex-shrink-0" />
+                          <span className="group-data-[collapsible=icon]:hidden font-medium">{item.name}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                      <SidebarMenuSub>
+                        {item.children.map((child: any) => {
+                          const ChildIcon = child.icon;
+                          const childActive = location === child.href;
+                          return (
+                            <SidebarMenuSubItem key={child.name}>
+                              <SidebarMenuSubButton asChild isActive={childActive}>
+                                <Link href={child.href} className="flex items-center gap-2" onClick={handleMobileNavClick}>
+                                  {ChildIcon && <ChildIcon className="h-4 w-4" />}
+                                  <span>{child.name}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          );
+                        })}
+                      </SidebarMenuSub>
+                    </SidebarMenuItem>
+                  );
+                }
 
                 return (
                   <SidebarMenuItem key={item.name} className="w-full flex justify-center group-data-[collapsible=icon]:justify-center">

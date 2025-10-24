@@ -55,6 +55,7 @@ const TemplatesPage = lazy(() => import("@/pages/templates"));
 const EditEmailCampaignPage = lazy(() => import("@/pages/email-campaigns/edit"));
 const UpdateProfilePage = lazy(() => import("@/pages/update-profile"));
 const SegmentationPage = lazy(() => import("@/pages/segmentation"));
+const ManagementPage = lazy(() => import("@/pages/management"));
 
 // Loading component for Suspense fallback
 const PageLoader = () => (
@@ -271,6 +272,7 @@ function Router() {
                   <Route path="/shops/new" component={NewShopPage} />
                   <Route path="/shops/:id" component={ShopDetailsPage} />
                   <Route path="/shops/:id/edit" component={EditShopPage} />
+                  <Route path="/management" component={ManagementPage} />
                   <Route path="/forms" component={FormsPage} />
                   <Route path="/forms/add" component={FormsAddPage} />
                   <Route path="/forms/:id/edit" component={FormsEditPage} />
