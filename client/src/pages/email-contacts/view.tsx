@@ -11,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import EmailActivityTimeline from "@/components/EmailActivityTimeline";
 import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
 import SendEmailModal from "@/components/SendEmailModal";
+import ManageContactTagsModal from "@/components/ManageContactTagsModal";
 import {
   ArrowLeft,
   Mail,
@@ -27,7 +28,8 @@ import {
   UserCheck,
   Eye,
   Send,
-  TrendingUp
+  TrendingUp,
+  Clock
 } from "lucide-react";
 
 interface Contact {
@@ -375,6 +377,15 @@ export default function ViewContact() {
                 </Button>
               }
             />
+            <Button
+              variant="outline"
+              className="justify-center"
+              disabled={isSendEmailDisabled}
+              onClick={() => setLocation(`/email-compose?to=${encodeURIComponent(contact.email)}&schedule=1`)}
+            >
+              <Clock className="w-4 h-4 mr-2" />
+              Send Later
+            </Button>
             <Button 
               variant="outline"
               className="justify-center"
@@ -713,6 +724,15 @@ export default function ViewContact() {
                   </Button>
                 }
               />
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                disabled={isSendEmailDisabled}
+                onClick={() => setLocation(`/email-compose?to=${encodeURIComponent(contact.email)}&schedule=1`)}
+              >
+                <Clock className="w-4 h-4 mr-2" />
+                Send Later
+              </Button>
               <EmailActivityTimelineModal
                 contactId={contact.id}
                 contactEmail={contact.email}
@@ -724,10 +744,20 @@ export default function ViewContact() {
                   </Button>
                 }
               />
-              <Button variant="outline" className="w-full justify-start">
-                <Tag className="w-4 h-4 mr-2" />
-                Manage Tags
-              </Button>
+              <ManageContactTagsModal
+                contactId={contact.id}
+                currentTagIds={contact.tags.map((t) => t.id)}
+                contactName={getFullName(contact)}
+                onUpdated={() => {
+                  queryClient.invalidateQueries({ queryKey: ['/api/email-contacts', id] });
+                }}
+                trigger={
+                  <Button variant="outline" className="w-full justify-start">
+                    <Tag className="w-4 h-4 mr-2" />
+                    Manage Tags
+                  </Button>
+                }
+              />
               <Button 
                 variant="outline" 
                 className="w-full justify-start text-red-600 hover:text-red-700"

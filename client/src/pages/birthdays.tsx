@@ -1074,13 +1074,39 @@ export default function BirthdaysPage() {
 
   const upcomingBirthdays = customersWithBirthdays.filter(contact => {
     if (!contact.birthday) return false;
-    // Parse date as local to avoid timezone shifts
-    const [year, month, day] = contact.birthday.split('-').map(Number);
-    const birthday = new Date(year, month - 1, day);
+    // Parse the stored birthday to get month and day
+    const [, month, day] = contact.birthday.split('-').map(Number);
+    
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
-    const daysUntilBirthday = Math.ceil((birthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Create birthday date for this year
+    const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
+    thisYearBirthday.setHours(0, 0, 0, 0);
+    
+    // If birthday already passed this year, use next year
+    const nextBirthday = thisYearBirthday < today 
+      ? new Date(today.getFullYear() + 1, month - 1, day)
+      : thisYearBirthday;
+    nextBirthday.setHours(0, 0, 0, 0);
+    
+    const daysUntilBirthday = Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     return daysUntilBirthday >= 0 && daysUntilBirthday <= 30;
+  }).sort((a, b) => {
+    // Sort by days until birthday (closest first)
+    const getDaysUntil = (birthday: string) => {
+      const [, month, day] = birthday.split('-').map(Number);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
+      thisYearBirthday.setHours(0, 0, 0, 0);
+      const nextBirthday = thisYearBirthday < today 
+        ? new Date(today.getFullYear() + 1, month - 1, day)
+        : thisYearBirthday;
+      nextBirthday.setHours(0, 0, 0, 0);
+      return Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    };
+    return getDaysUntil(a.birthday!) - getDaysUntil(b.birthday!);
   }).slice(0, 5);
 
   const getContactName = (contact: Contact) => {
@@ -1154,30 +1180,30 @@ export default function BirthdaysPage() {
                       tabIndex={-1}
                       className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight break-words"
                     >
-                      {t('birthdays.hero.celebration')}
+                      {t('cards.hero.celebrate') || 'Celebrate Their Special'}
                     </h1>
                   </div>
                   <h1
                     tabIndex={-1}
                     className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight break-words"
                   >
-                    {t('birthdays.hero.dayWith')}
+                    {t('cards.hero.dayWith') || 'Day With a Thoughtful'}
                   </h1>
                   <h1
                     tabIndex={-1}
                     className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight break-words"
                   >
-                    {t('birthdays.hero.ecard')}
+                    {t('cards.hero.card') || 'Birthday e-Card!'}
                   </h1>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 text-base sm:text-lg leading-relaxed max-w-full">
-                  {t('birthdays.hero.description')}
+                  {t('cards.hero.description') || 'Choose your contacts and schedule personalized digital cards to be delivered directly to their inbox. Perfect for birthdays, holidays, and special occasions!'}
                 </p>
               </div>
               <div className="justify-self-center lg:justify-self-end lg:col-span-4 mt-4 lg:mt-0">
                 <img
                   src="/guy_present.svg"
-                  alt="Person with birthday present illustration"
+                  alt="Person with card illustration"
                   className="w-[280px] sm:w-[320px] md:w-[360px] xl:w-[420px] max-w-full h-auto"
                 />
               </div>
@@ -1194,7 +1220,7 @@ export default function BirthdaysPage() {
             className="flex items-center gap-2"
           >
             <Palette className="h-4 w-4" />
-            Themes
+            {t('birthdays.tabs.themesButton') || 'General'}
           </Button>
           <Button
             variant={activeTab === "settings" ? "default" : "ghost"}
@@ -1203,7 +1229,7 @@ export default function BirthdaysPage() {
             className="flex items-center gap-2"
           >
             <Settings className="h-4 w-4" />
-            Settings
+            {t('birthdays.tabs.settings')}
           </Button>
 
           <Button
@@ -1213,7 +1239,7 @@ export default function BirthdaysPage() {
             className="flex items-center gap-2"
           >
             <Users className="h-4 w-4" />
-            Customers
+            {t('birthdays.tabs.customers')}
             {contacts.length > 0 && (
               <Badge variant="secondary" className="ml-1">
                 {contacts.length}
@@ -1227,7 +1253,7 @@ export default function BirthdaysPage() {
             className="flex items-center gap-2"
           >
             <Gift className="h-4 w-4" />
-            Promotions
+            {t('birthdays.tabs.promotions')}
           </Button>
           <Button
             variant={activeTab === "test" ? "default" : "ghost"}
@@ -1236,7 +1262,7 @@ export default function BirthdaysPage() {
             className="flex items-center gap-2"
           >
             <Mail className="h-4 w-4" />
-            Test
+            {t('birthdays.tabs.test')}
           </Button>
         </div>
 
@@ -1246,7 +1272,7 @@ export default function BirthdaysPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Palette className="h-5 w-5" />
-                Themes
+                {t('birthdays.tabs.themes') || 'Birthday Card Themes'}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -1666,16 +1692,16 @@ export default function BirthdaysPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Settings className="h-5 w-5" />
-                    Birthday Email Settings
+                    {t('birthdays.settings.title')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Global Enable/Disable */}
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label className="text-base font-medium">Enable Birthday Emails</Label>
+                      <Label className="text-base font-medium">{t('birthdays.settings.enableBirthdayEmails')}</Label>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Automatically send birthday emails to customers
+                        {t('birthdays.settings.enableBirthdayEmailsDescription')}
                       </p>
                     </div>
                     <Switch
@@ -1700,20 +1726,20 @@ export default function BirthdaysPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <BarChart3 className="h-5 w-5" />
-                    Overview
+                    {t('birthdays.settings.overviewTitle')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Total Customers</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">{t('birthdays.settings.totalCustomers')}</span>
                     <Badge variant="outline">{contacts.length}</Badge>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">With Birthdays</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">{t('birthdays.settings.withBirthdays')}</span>
                     <Badge variant="outline">{customersWithBirthdays.length}</Badge>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Birthday Emails Enabled</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">{t('birthdays.settings.birthdayEmailsEnabled')}</span>
                     <Badge variant="outline">
                       {customersWithBirthdays.filter(c => c.birthdayEmailEnabled).length}
                     </Badge>
@@ -1727,7 +1753,7 @@ export default function BirthdaysPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <CakeIcon className="h-5 w-5" />
-                    Upcoming Birthdays
+                    {t('birthdays.settings.upcomingBirthdays')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -1735,31 +1761,53 @@ export default function BirthdaysPage() {
                     <div className="text-center py-4">
                       <CakeIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        No birthdays in the next 30 days
+                        {t('birthdays.settings.noBirthdays30Days')}
                       </p>
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {upcomingBirthdays.map((contact) => (
-                        <div key={contact.id} className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{getContactName(contact)}</p>
-                            <p className="text-xs text-gray-500">
-                              {contact.birthday && (() => {
-                                // Parse date as local to avoid timezone shifts
-                                const [year, month, day] = contact.birthday.split('-').map(Number);
-                                const localDate = new Date(year, month - 1, day);
-                                return localDate.toLocaleDateString();
-                              })()}
-                            </p>
+                      {upcomingBirthdays.map((contact) => {
+                        const getDaysUntil = (birthday: string) => {
+                          const [, month, day] = birthday.split('-').map(Number);
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
+                          thisYearBirthday.setHours(0, 0, 0, 0);
+                          const nextBirthday = thisYearBirthday < today 
+                            ? new Date(today.getFullYear() + 1, month - 1, day)
+                            : thisYearBirthday;
+                          nextBirthday.setHours(0, 0, 0, 0);
+                          return Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                        };
+                        const daysUntil = contact.birthday ? getDaysUntil(contact.birthday) : 0;
+                        
+                        return (
+                          <div 
+                            key={contact.id} 
+                            onClick={() => setLocation(`/email-contacts/view/${contact.id}`)}
+                            className="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            <div>
+                              <p className="font-medium">{getContactName(contact)}</p>
+                              <p className="text-xs text-gray-500">
+                                {contact.birthday && (() => {
+                                  // Parse date to display month/day
+                                  const [, month, day] = contact.birthday.split('-').map(Number);
+                                  const displayDate = new Date(2000, month - 1, day);
+                                  const dateStr = displayDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                                  const dayText = daysUntil === 0 ? 'Today!' : daysUntil === 1 ? 'Tomorrow' : `in ${daysUntil} days`;
+                                  return `${dateStr} • ${dayText}`;
+                                })()}
+                              </p>
+                            </div>
+                            {contact.birthdayEmailEnabled ? (
+                              <CheckCircle className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <XCircle className="h-4 w-4 text-red-500" />
+                            )}
                           </div>
-                          {contact.birthdayEmailEnabled ? (
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <XCircle className="h-4 w-4 text-red-500" />
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
@@ -2012,19 +2060,19 @@ export default function BirthdaysPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Mail className="h-5 w-5" />
-                  Test Birthday Cards
+                  {t('birthdays.test.title')}
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                    Test Mode
+                    {t('birthdays.test.testMode')}
                   </Badge>
                   <Badge variant="secondary">
-                    {users.length} Users
+                    {users.length} {t('birthdays.test.users')}
                   </Badge>
                 </div>
               </div>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Send test birthday cards to users individually or select multiple users for bulk sending. Test emails will be sent to the selected user's actual email address.
+                {t('birthdays.test.description')}
               </p>
             </CardHeader>
             <CardContent className="p-0">
@@ -2032,13 +2080,13 @@ export default function BirthdaysPage() {
               {selectedUsers.length > 0 && (
                 <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-4 border-b">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{selectedUsers.length} user(s) selected</span>
+                    <span className="text-sm font-medium">{selectedUsers.length} {t('birthdays.test.usersSelected')}</span>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setSelectedUsers([])}
                     >
-                      Clear Selection
+                      {t('birthdays.test.clearSelection')}
                     </Button>
                   </div>
                   <div className="flex items-center gap-2">
@@ -2054,7 +2102,7 @@ export default function BirthdaysPage() {
                       disabled={sendTestBirthdayMutation.isPending || tokenLoading}
                     >
                       <Mail className="h-4 w-4 mr-2" />
-                      {tokenLoading ? "Refreshing..." : sendTestBirthdayMutation.isPending ? "Sending..." : "Send Test Cards to Selected"}
+                      {tokenLoading ? t('birthdays.test.refreshing') : sendTestBirthdayMutation.isPending ? t('birthdays.test.sending') : t('birthdays.test.sendTestCards')}
                     </Button>
                   </div>
                 </div>
@@ -2067,8 +2115,8 @@ export default function BirthdaysPage() {
               ) : users.length === 0 ? (
                 <div className="text-center py-12">
                   <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">No users found</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">No users available in your tenant for testing</p>
+                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">{t('birthdays.test.noUsers')}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">{t('birthdays.test.noUsersDescription')}</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -2079,14 +2127,14 @@ export default function BirthdaysPage() {
                           <Checkbox
                             checked={isAllUsersSelected}
                             onCheckedChange={handleSelectAllUsers}
-                            aria-label="Select all users"
+                            aria-label={t('birthdays.test.selectAllUsers')}
                           />
                         </TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Email Verified</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead>{t('birthdays.test.name')}</TableHead>
+                        <TableHead>{t('birthdays.test.email')}</TableHead>
+                        <TableHead>{t('birthdays.test.role')}</TableHead>
+                        <TableHead>{t('birthdays.test.emailVerified')}</TableHead>
+                        <TableHead>{t('birthdays.test.actions')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -2126,7 +2174,7 @@ export default function BirthdaysPage() {
                               className="flex items-center gap-2"
                             >
                               <Mail className="h-4 w-4" />
-                              {tokenLoading ? "Refreshing..." : sendTestBirthdayMutation.isPending ? "Sending..." : "Send Test Card"}
+                              {tokenLoading ? t('birthdays.test.refreshing') : sendTestBirthdayMutation.isPending ? t('birthdays.test.sending') : t('birthdays.test.sendTestCard')}
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -2145,19 +2193,19 @@ export default function BirthdaysPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Gift className="h-5 w-5" />
-                Promotions
+                {t('birthdays.promotions.title')}
               </CardTitle>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Select promotions to include in birthday emails
+                {t('birthdays.promotions.description')}
               </p>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
                 {/* Promotion Selection */}
                 <div>
-                  <Label className="text-sm font-medium">Promotion (Optional)</Label>
+                  <Label className="text-sm font-medium">{t('birthdays.promotions.promotionLabel')}</Label>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                    Select a promotion to include in birthday emails. This will add promotional content to your birthday cards.
+                    {t('birthdays.promotions.promotionDescription')}
                   </p>
                   <PromotionSelector
                     selectedPromotions={selectedPromotions}
@@ -2198,10 +2246,10 @@ export default function BirthdaysPage() {
                           htmlFor="splitPromotionalEmail"
                           className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                         >
-                          Send promotion as separate email (Better Deliverability)
+                          {t('birthdays.promotions.splitEmailLabel')}
                         </label>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          When enabled, the birthday card and promotion will be sent as two separate emails to improve deliverability rates and avoid spam filters. The birthday card will be sent first, followed by the promotional email shortly after.
+                          {t('birthdays.promotions.splitEmailDescription')}
                         </p>
                       </div>
                     </div>
@@ -2211,7 +2259,7 @@ export default function BirthdaysPage() {
                 {/* Promotion Preview */}
                 {selectedPromotions.length > 0 && birthdaySettings?.promotion && (
                   <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <h4 className="text-sm font-medium mb-2">Selected Promotion Preview</h4>
+                    <h4 className="text-sm font-medium mb-2">{t('birthdays.promotions.selectedPromotionPreview')}</h4>
                     <div className="space-y-2">
                       <p className="text-sm font-medium">{birthdaySettings.promotion.title}</p>
                       {birthdaySettings.promotion.description && (
@@ -2223,12 +2271,12 @@ export default function BirthdaysPage() {
 
                 {/* Help Text */}
                 <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">How Promotions Work</h4>
+                  <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">{t('birthdays.promotions.howItWorks')}</h4>
                   <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1">
-                    <li>• Promotions are automatically included in birthday email templates</li>
-                    <li>• Only one promotion can be active at a time</li>
-                    <li>• Promotions will appear alongside your birthday message</li>
-                    <li>• You can change or remove promotions at any time</li>
+                    <li>• {t('birthdays.promotions.howItWorksList.included')}</li>
+                    <li>• {t('birthdays.promotions.howItWorksList.oneActive')}</li>
+                    <li>• {t('birthdays.promotions.howItWorksList.appears')}</li>
+                    <li>• {t('birthdays.promotions.howItWorksList.change')}</li>
                   </ul>
                 </div>
               </div>

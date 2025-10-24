@@ -38,13 +38,39 @@ export function UpcomingBirthdaysCard() {
 
   const upcomingBirthdays = customersWithBirthdays.filter(contact => {
     if (!contact.birthday) return false;
-    // Parse date as local to avoid timezone shifts
-    const [year, month, day] = contact.birthday.split('-').map(Number);
-    const birthday = new Date(year, month - 1, day);
+    // Parse the stored birthday to get month and day
+    const [, month, day] = contact.birthday.split('-').map(Number);
+    
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
-    const daysUntilBirthday = Math.ceil((birthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Create birthday date for this year
+    const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
+    thisYearBirthday.setHours(0, 0, 0, 0);
+    
+    // If birthday already passed this year, use next year
+    const nextBirthday = thisYearBirthday < today 
+      ? new Date(today.getFullYear() + 1, month - 1, day)
+      : thisYearBirthday;
+    nextBirthday.setHours(0, 0, 0, 0);
+    
+    const daysUntilBirthday = Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     return daysUntilBirthday >= 0 && daysUntilBirthday <= 30;
+  }).sort((a, b) => {
+    // Sort by days until birthday (closest first)
+    const getDaysUntil = (birthday: string) => {
+      const [, month, day] = birthday.split('-').map(Number);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
+      thisYearBirthday.setHours(0, 0, 0, 0);
+      const nextBirthday = thisYearBirthday < today 
+        ? new Date(today.getFullYear() + 1, month - 1, day)
+        : thisYearBirthday;
+      nextBirthday.setHours(0, 0, 0, 0);
+      return Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    };
+    return getDaysUntil(a.birthday!) - getDaysUntil(b.birthday!);
   }).slice(0, 5);
 
   const getContactName = (contact: Contact) => {
@@ -118,30 +144,52 @@ export function UpcomingBirthdaysCard() {
               <span>Next 30 days</span>
             </div>
             <div className="space-y-3">
-              {upcomingBirthdays.map((contact) => (
-                <div key={contact.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900 dark:text-gray-100">
-                      {getContactName(contact)}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {contact.birthday && (() => {
-                        // Parse date as local to avoid timezone shifts
-                        const [year, month, day] = contact.birthday.split('-').map(Number);
-                        const localDate = new Date(year, month - 1, day);
-                        return localDate.toLocaleDateString();
-                      })()}
-                    </p>
+              {upcomingBirthdays.map((contact) => {
+                const getDaysUntil = (birthday: string) => {
+                  const [, month, day] = birthday.split('-').map(Number);
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
+                  thisYearBirthday.setHours(0, 0, 0, 0);
+                  const nextBirthday = thisYearBirthday < today 
+                    ? new Date(today.getFullYear() + 1, month - 1, day)
+                    : thisYearBirthday;
+                  nextBirthday.setHours(0, 0, 0, 0);
+                  return Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                };
+                const daysUntil = contact.birthday ? getDaysUntil(contact.birthday) : 0;
+                
+                return (
+                  <div 
+                    key={contact.id} 
+                    onClick={() => setLocation(`/email-contacts/view/${contact.id}`)}
+                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900 dark:text-gray-100">
+                        {getContactName(contact)}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {contact.birthday && (() => {
+                          // Parse date to display month/day
+                          const [, month, day] = contact.birthday.split('-').map(Number);
+                          const displayDate = new Date(2000, month - 1, day);
+                          const dateStr = displayDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                          const dayText = daysUntil === 0 ? 'Today!' : daysUntil === 1 ? 'Tomorrow' : `in ${daysUntil} days`;
+                          return `${dateStr} • ${dayText}`;
+                        })()}
+                      </p>
+                    </div>
+                    {contact.birthdayUnsubscribedAt ? (
+                      <AlertTriangle className="h-4 w-4 text-orange-500 ml-2" title="Unsubscribed from birthday emails" />
+                    ) : contact.birthdayEmailEnabled ? (
+                      <CheckCircle className="h-4 w-4 text-green-500 ml-2" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-red-500 ml-2" />
+                    )}
                   </div>
-                  {contact.birthdayUnsubscribedAt ? (
-                    <AlertTriangle className="h-4 w-4 text-orange-500 ml-2" title="Unsubscribed from birthday emails" />
-                  ) : contact.birthdayEmailEnabled ? (
-                    <CheckCircle className="h-4 w-4 text-green-500 ml-2" />
-                  ) : (
-                    <XCircle className="h-4 w-4 text-red-500 ml-2" />
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
             <Button
               variant="outline"

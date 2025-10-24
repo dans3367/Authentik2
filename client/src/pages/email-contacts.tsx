@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -100,6 +101,7 @@ export default function EmailContacts() {
 
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   
   // Store search params in a ref to use in query function without changing dependencies
@@ -189,10 +191,10 @@ export default function EmailContacts() {
 
   const getStatusBadge = (status: Contact["status"]) => {
     const statusConfig = {
-      active: { color: "bg-green-100 text-green-700", icon: CheckCircle2, label: "Active" },
-      unsubscribed: { color: "bg-gray-100 text-gray-700", icon: XCircle, label: "Unsubscribed" },
-      bounced: { color: "bg-red-100 text-red-700", icon: AlertCircle, label: "Bounced" },
-      pending: { color: "bg-yellow-100 text-yellow-700", icon: AlertCircle, label: "Pending" },
+      active: { color: "bg-green-100 text-green-700", icon: CheckCircle2, label: t('emailContacts.statusBadges.active') },
+      unsubscribed: { color: "bg-gray-100 text-gray-700", icon: XCircle, label: t('emailContacts.statusBadges.unsubscribed') },
+      bounced: { color: "bg-red-100 text-red-700", icon: AlertCircle, label: t('emailContacts.statusBadges.bounced') },
+      pending: { color: "bg-yellow-100 text-yellow-700", icon: AlertCircle, label: t('emailContacts.statusBadges.pending') },
     };
 
     const config = statusConfig[status];
@@ -254,14 +256,14 @@ export default function EmailContacts() {
       queryClient.invalidateQueries({ queryKey: ['/api/email-contacts-stats'] });
       setSelectedContacts([]);
       toast({
-        title: "Success",
-        description: `${contactIds.length} contact${contactIds.length > 1 ? 's' : ''} deleted successfully`,
+        title: t('emailContacts.toasts.success'),
+        description: t('emailContacts.toasts.deleteSuccess', { count: contactIds.length }),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete contacts",
+        title: t('emailContacts.toasts.error'),
+        description: error.message || t('emailContacts.toasts.deleteError'),
         variant: "destructive",
       });
     },
@@ -273,8 +275,8 @@ export default function EmailContacts() {
     if (selectedContacts.length === 0) return;
 
     const confirmMessage = selectedContacts.length === 1
-      ? 'Are you sure you want to delete this contact? This action cannot be undone.'
-      : `Are you sure you want to delete ${selectedContacts.length} contacts? This action cannot be undone.`;
+      ? t('emailContacts.toasts.deleteConfirm')
+      : t('emailContacts.toasts.deleteConfirmMultiple', { count: selectedContacts.length });
 
     if (window.confirm(confirmMessage)) {
       console.log('Bulk deleting contacts:', selectedContacts);
@@ -291,7 +293,7 @@ export default function EmailContacts() {
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="flex flex-col items-center gap-4">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="text-gray-600 dark:text-gray-400">Loading contacts...</span>
+            <span className="text-gray-600 dark:text-gray-400">{t('emailContacts.loading')}</span>
           </div>
         </div>
       </div>
@@ -303,9 +305,9 @@ export default function EmailContacts() {
     return (
       <div className="p-6">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Error Loading Contacts</h1>
+          <h1 className="text-2xl font-bold mb-4">{t('emailContacts.errorLoading')}</h1>
           <p className="text-gray-600 mb-4">
-            There was an error loading your email contacts. Please try again.
+            {t('emailContacts.errorLoadingDescription')}
           </p>
           <Button 
             onClick={() => {
@@ -314,7 +316,7 @@ export default function EmailContacts() {
             }} 
             variant="outline"
           >
-            Retry
+            {t('emailContacts.retry')}
           </Button>
         </div>
       </div>
@@ -328,22 +330,18 @@ export default function EmailContacts() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">Contacts</h1>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">{t('emailContacts.title')}</h1>
             <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Manage your email subscribers and contact lists
+              {t('emailContacts.subtitle')}
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline">
-              <Upload className="w-4 h-4 mr-2" />
-              Import
-            </Button>
             <Button 
               className="bg-blue-600 hover:bg-blue-700"
               onClick={() => setLocation('/email-contacts/new')}
             >
               <UserPlus className="w-4 h-4 mr-2" />
-              Add Contact
+              {t('emailContacts.addContact')}
             </Button>
           </div>
         </div>
@@ -358,7 +356,7 @@ export default function EmailContacts() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Contacts</p>
+                <p className="text-sm font-medium text-gray-600">{t('emailContacts.stats.totalContacts')}</p>
                 <p className="text-2xl font-bold text-gray-900">{stats.totalContacts.toLocaleString()}</p>
               </div>
               <Users className="text-blue-500 w-8 h-8" />
@@ -370,7 +368,7 @@ export default function EmailContacts() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Active Subscribers</p>
+                <p className="text-sm font-medium text-gray-600">{t('emailContacts.stats.activeSubscribers')}</p>
                 <p className="text-2xl font-bold text-gray-900">{stats.activeContacts.toLocaleString()}</p>
                 <p className="text-sm text-green-600">
                   {stats.totalContacts > 0 ? Math.round((stats.activeContacts / stats.totalContacts) * 100) : 0}%
@@ -385,7 +383,7 @@ export default function EmailContacts() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Lists</p>
+                <p className="text-sm font-medium text-gray-600">{t('emailContacts.stats.lists')}</p>
                 <p className="text-2xl font-bold text-gray-900">{stats.totalLists}</p>
               </div>
               <Tag className="text-purple-500 w-8 h-8" />
@@ -397,7 +395,7 @@ export default function EmailContacts() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Avg Engagement</p>
+                <p className="text-sm font-medium text-gray-600">{t('emailContacts.stats.avgEngagement')}</p>
                 <p className="text-2xl font-bold text-gray-900">{stats.averageEngagementRate}%</p>
               </div>
               <Mail className="text-orange-500 w-8 h-8" />
@@ -412,19 +410,19 @@ export default function EmailContacts() {
       <ContactSearch
         value={searchQuery}
         onSearchChange={handleSearchChange}
-        placeholder="Search contacts..."
+        placeholder={t('emailContacts.filters.searchPlaceholder')}
       />
       <Select value={statusFilter} onValueChange={setStatusFilter}>
         <SelectTrigger className="w-[180px]">
           <Filter className="w-4 h-4 mr-2" />
-          <SelectValue placeholder="Filter by status" />
+          <SelectValue placeholder={t('emailContacts.filters.filterByStatus')} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Status</SelectItem>
-          <SelectItem value="active">Active</SelectItem>
-          <SelectItem value="unsubscribed">Unsubscribed</SelectItem>
-          <SelectItem value="bounced">Bounced</SelectItem>
-          <SelectItem value="pending">Pending</SelectItem>
+          <SelectItem value="all">{t('emailContacts.filters.allStatus')}</SelectItem>
+          <SelectItem value="active">{t('emailContacts.filters.active')}</SelectItem>
+          <SelectItem value="unsubscribed">{t('emailContacts.filters.unsubscribed')}</SelectItem>
+          <SelectItem value="bounced">{t('emailContacts.filters.bounced')}</SelectItem>
+          <SelectItem value="pending">{t('emailContacts.filters.pending')}</SelectItem>
         </SelectContent>
       </Select>
       <Button
@@ -432,7 +430,7 @@ export default function EmailContacts() {
         variant="outline"
       >
         <Download className="w-4 h-4 mr-2" />
-        Export
+        {t('emailContacts.filters.export')}
       </Button>
       </div>
 
@@ -442,16 +440,16 @@ export default function EmailContacts() {
           <CardContent className="py-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600 dark:text-gray-400">
-                {selectedContacts.length} contact{selectedContacts.length > 1 ? 's' : ''} selected
+                {selectedContacts.length} {t('emailContacts.bulkActions.selected')}
               </span>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm">
                   <Tag className="w-4 h-4 mr-2" />
-                  Add Tags
+                  {t('emailContacts.bulkActions.addTags')}
                 </Button>
                 <Button variant="outline" size="sm">
                   <Users className="w-4 h-4 mr-2" />
-                  Add to List
+                  {t('emailContacts.bulkActions.addToList')}
                 </Button>
                 <Button
                   variant="outline"
@@ -465,7 +463,7 @@ export default function EmailContacts() {
                   disabled={bulkDeleteMutation.isPending}
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
-                  {bulkDeleteMutation.isPending ? 'Deleting...' : 'Delete'}
+                  {bulkDeleteMutation.isPending ? t('emailContacts.bulkActions.deleting') : t('emailContacts.bulkActions.delete')}
                 </Button>
               </div>
             </div>
@@ -481,7 +479,7 @@ export default function EmailContacts() {
           <div className="absolute right-4 top-4 z-10">
             <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full text-sm">
               <div className="animate-spin rounded-full h-3 w-3 border border-blue-600 border-t-transparent"></div>
-              Searching...
+              {t('emailContacts.empty.searching')}
             </div>
           </div>
         )}
@@ -499,11 +497,11 @@ export default function EmailContacts() {
                       data-testid="checkbox-select-all-table"
                     />
                   </TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Tags</TableHead>
-                  <TableHead>Engagement</TableHead>
-                  <TableHead>Added</TableHead>
+                  <TableHead>{t('emailContacts.table.contact')}</TableHead>
+                  <TableHead>{t('emailContacts.table.status')}</TableHead>
+                  <TableHead>{t('emailContacts.table.tags')}</TableHead>
+                  <TableHead>{t('emailContacts.table.engagement')}</TableHead>
+                  <TableHead>{t('emailContacts.table.added')}</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -515,8 +513,8 @@ export default function EmailContacts() {
                         <Search className="h-8 w-8" />
                         <p>
                           {searchQuery ? 
-                            `No contacts found matching "${searchQuery}"` : 
-                            'No contacts found'
+                            t('emailContacts.empty.noContactsMatching', { query: searchQuery }) : 
+                            t('emailContacts.empty.noContacts')
                           }
                         </p>
                       </div>
@@ -559,7 +557,7 @@ export default function EmailContacts() {
                               }
                               {contact.id.startsWith('temp-') && (
                                 <span className="ml-2 text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-1.5 py-0.5 rounded-full">
-                                  New
+                                  {t('emailContacts.newBadge')}
                                 </span>
                               )}
                             </p>
@@ -597,10 +595,10 @@ export default function EmailContacts() {
                       <TableCell>
                         <div className="text-sm">
                           <p className="font-medium">
-                            {getEngagementRate(contact.emailsSent, contact.emailsOpened)}% open rate
+                            {getEngagementRate(contact.emailsSent, contact.emailsOpened)}% {t('emailContacts.table.openRate')}
                           </p>
                           <p className="text-gray-500">
-                            {contact.emailsOpened}/{contact.emailsSent} emails
+                            {contact.emailsOpened}/{contact.emailsSent} {t('emailContacts.table.emails')}
                           </p>
                         </div>
                       </TableCell>
@@ -609,7 +607,7 @@ export default function EmailContacts() {
                           <p>{formatDate(contact.addedDate)}</p>
                           {contact.lastActivity && (
                             <p className="text-gray-500">
-                              Active {formatDate(contact.lastActivity)}
+                              {t('emailContacts.table.active')} {formatDate(contact.lastActivity)}
                             </p>
                           )}
                         </div>
@@ -624,15 +622,15 @@ export default function EmailContacts() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => setLocation(`/email-contacts/view/${contact.id}`)}>
                               <UserCheck className="w-4 h-4 mr-2" />
-                              View Contact
+                              {t('emailContacts.actions.viewContact')}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setLocation(`/email-contacts/edit/${contact.id}`)}>
                               <Edit className="w-4 h-4 mr-2" />
-                              Edit Contact
+                              {t('emailContacts.actions.editContact')}
                             </DropdownMenuItem>
                             <DropdownMenuItem>
                               <Mail className="w-4 h-4 mr-2" />
-                              Send Email
+                              {t('emailContacts.actions.sendEmail')}
                             </DropdownMenuItem>
                             <EmailActivityTimelineModal
                               contactId={contact.id}
@@ -641,7 +639,7 @@ export default function EmailContacts() {
                               trigger={
                                 <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                                   <Calendar className="w-4 h-4 mr-2" />
-                                  View Activity Timeline
+                                  {t('emailContacts.actions.viewActivityTimeline')}
                                 </DropdownMenuItem>
                               }
                             />
@@ -666,13 +664,13 @@ export default function EmailContacts() {
                   data-testid="checkbox-select-all-cards"
                 />
                 <span className="text-sm text-gray-600 dark:text-gray-400">
-                  <span className="hidden sm:inline">Select all contacts</span>
-                  <span className="sm:hidden">Select all</span>
+                  <span className="hidden sm:inline">{t('emailContacts.selectAll.selectAllContacts')}</span>
+                  <span className="sm:hidden">{t('emailContacts.selectAll.selectAll')}</span>
                 </span>
               </div>
               {selectedContacts.length > 0 && (
                 <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                  {selectedContacts.length} selected
+                  {selectedContacts.length} {t('emailContacts.bulkActions.selected')}
                 </span>
               )}
             </div>
@@ -682,8 +680,8 @@ export default function EmailContacts() {
                 <Search className="h-8 w-8" />
                 <p>
                   {searchQuery ? 
-                    `No contacts found matching "${searchQuery}"` : 
-                    'No contacts found'
+                    t('emailContacts.empty.noContactsMatching', { query: searchQuery }) : 
+                    t('emailContacts.empty.noContacts')
                   }
                 </p>
               </div>
@@ -730,7 +728,7 @@ export default function EmailContacts() {
                               }
                               {contact.id.startsWith('temp-') && (
                                 <span className="ml-2 text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-1.5 py-0.5 rounded-full">
-                                  New
+                                  {t('emailContacts.newBadge')}
                                 </span>
                               )}
                             </p>
@@ -756,15 +754,15 @@ export default function EmailContacts() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => setLocation(`/email-contacts/view/${contact.id}`)}>
                               <UserCheck className="w-4 h-4 mr-2" />
-                              View Contact
+                              {t('emailContacts.actions.viewContact')}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setLocation(`/email-contacts/edit/${contact.id}`)}>
                               <Edit className="w-4 h-4 mr-2" />
-                              Edit Contact
+                              {t('emailContacts.actions.editContact')}
                             </DropdownMenuItem>
                             <DropdownMenuItem>
                               <Mail className="w-4 h-4 mr-2" />
-                              Send Email
+                              {t('emailContacts.actions.sendEmail')}
                             </DropdownMenuItem>
                             <EmailActivityTimelineModal
                               contactId={contact.id}
@@ -773,7 +771,7 @@ export default function EmailContacts() {
                               trigger={
                                 <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                                   <Calendar className="w-4 h-4 mr-2" />
-                                  View Activity Timeline
+                                  {t('emailContacts.actions.viewActivityTimeline')}
                                 </DropdownMenuItem>
                               }
                             />
@@ -784,13 +782,13 @@ export default function EmailContacts() {
                       {/* Status and Tags */}
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Status</span>
+                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t('emailContacts.table.status')}</span>
                           {getStatusBadge(contact.status)}
                         </div>
 
                         {contact.tags.length > 0 && (
                           <div>
-                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-2">Tags</span>
+                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-2">{t('emailContacts.table.tags')}</span>
                             <div className="flex items-center gap-1 flex-wrap">
                               {contact.tags.slice(0, 3).map((tag) => (
                                 <Badge 
@@ -814,25 +812,25 @@ export default function EmailContacts() {
 
                         {/* Engagement */}
                         <div>
-                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-2">Engagement</span>
+                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-2">{t('emailContacts.table.engagement')}</span>
                           <div className="text-sm">
                             <p className="font-medium" data-testid={`text-engagement-rate-card-${contact.id}`}>
-                              {getEngagementRate(contact.emailsSent, contact.emailsOpened)}% open rate
+                              {getEngagementRate(contact.emailsSent, contact.emailsOpened)}% {t('emailContacts.table.openRate')}
                             </p>
                             <p className="text-gray-500" data-testid={`text-email-stats-card-${contact.id}`}>
-                              {contact.emailsOpened}/{contact.emailsSent} emails
+                              {contact.emailsOpened}/{contact.emailsSent} {t('emailContacts.table.emails')}
                             </p>
                           </div>
                         </div>
 
                         {/* Added Date */}
                         <div>
-                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-2">Added</span>
+                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-2">{t('emailContacts.table.added')}</span>
                           <div className="text-sm">
                             <p data-testid={`text-added-date-card-${contact.id}`}>{formatDate(contact.addedDate)}</p>
                             {contact.lastActivity && (
                               <p className="text-gray-500" data-testid={`text-last-activity-card-${contact.id}`}>
-                                Active {formatDate(contact.lastActivity)}
+                                {t('emailContacts.table.active')} {formatDate(contact.lastActivity)}
                               </p>
                             )}
                           </div>

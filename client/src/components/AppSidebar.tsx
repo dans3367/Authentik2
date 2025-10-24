@@ -9,8 +9,6 @@ import {
   Users,
   Building2,
   Store,
-  Moon,
-  Sun,
   Mail,
   UserCheck,
   BarChart3,
@@ -21,6 +19,7 @@ import {
   Megaphone,
   Bell,
   FileText,
+  Target,
 } from "lucide-react";
 import logoUrl from "@assets/logo.png";
 import { cn } from "@/lib/utils";
@@ -44,14 +43,15 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar";
 import {
   useReduxAuth,
   useReduxLogout,
 } from "@/hooks/useReduxAuth";
-import { useUpdateTheme } from "@/hooks/useAuth";
-import { useTheme } from "@/contexts/ThemeContext";
 import { useQuery } from "@tanstack/react-query";
 import type { UserSubscriptionResponse } from "@shared/schema";
 import { useState } from "react";
@@ -70,25 +70,29 @@ interface ExtendedUser {
 }
 
 const getNavigation = (userRole?: string, t?: any) => {
-  const baseNavigation = [
+  const baseNavigation: any[] = [
     { name: t?.('navigation.dashboard') || "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: t?.('navigation.newsletter') || "Newsletter", href: "/newsletter", icon: Newspaper },
     { name: t?.('navigation.promotions') || "Promotions", href: "/promotions", icon: Megaphone },
     { name: t?.('navigation.forms') || "Forms", href: "/forms", icon: ClipboardList },
     { name: t?.('navigation.templates') || "Templates", href: "/templates", icon: FileText },
     { name: t?.('navigation.emailCampaigns') || "Email Campaigns", href: "/email-campaigns", icon: Mail },
-    { name: t?.('navigation.birthdays') || "Birthdays", href: "/birthdays", icon: Gift },
-    { name: t?.('navigation.ecards') || "E-Cards", href: "/e-cards", icon: Mail },
+    { name: t?.('navigation.cards') || "e-Cards", href: "/cards", icon: Gift },
     { name: t?.('navigation.reminders') || "Reminders", href: "/reminders", icon: Bell },
     { name: t?.('navigation.contacts') || "Contacts", href: "/email-contacts", icon: UserCheck },
-    { name: t?.('navigation.analytics') || "Analytics", href: "/email-analytics", icon: BarChart3 },
+    { name: t?.('navigation.segmentation') || "Segmentation", href: "/segmentation", icon: Target },
+  ];
+
+  const managementChildren: any[] = [
     { name: t?.('navigation.shops') || "Shops", href: "/shops", icon: Store },
   ];
 
-  // Add Users management for Owner, Admin and Manager roles
+  // Add Users under Management for Owner, Admin and Manager roles
   if (userRole === "Owner" || userRole === "Administrator" || userRole === "Manager") {
-    baseNavigation.push({ name: t?.('navigation.users') || "Users", href: "/users", icon: Users });
+    managementChildren.push({ name: t?.('navigation.users') || "Users", href: "/users", icon: Users });
   }
+
+  baseNavigation.push({ name: t?.('navigation.management') || "Management", href: "/management", icon: Settings, children: managementChildren });
 
   return baseNavigation;
 };
@@ -97,7 +101,6 @@ export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const { user } = useReduxAuth();
   const { logout } = useReduxLogout();
-  const { theme, toggleTheme } = useTheme();
   const { t } = useTranslation();
   
   // Cast user to extended type to access custom fields
@@ -114,8 +117,6 @@ export function AppSidebar() {
   });
   
   const navigation = getNavigation(extendedUser?.role, t);
-  const updateThemeMutation = useUpdateTheme();
-  const [isThemeChanging, setIsThemeChanging] = useState(false);
   const { state, isMobile, setOpenMobile } = useSidebar();
 
   // Fetch subscription data for the user's plan
@@ -129,25 +130,6 @@ export function AppSidebar() {
     setLocation("/auth");
   };
 
-  const handleThemeToggle = async () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setIsThemeChanging(true);
-    toggleTheme();
-    
-    // Sync with backend using dedicated theme endpoint
-    if (extendedUser) {
-      try {
-        await updateThemeMutation.mutateAsync({ theme: newTheme });
-        // Allow theme sync again after mutation completes
-        setTimeout(() => setIsThemeChanging(false), 1000);
-      } catch (error) {
-        console.error('Failed to update theme:', error);
-        setIsThemeChanging(false);
-      }
-    } else {
-      setIsThemeChanging(false);
-    }
-  };
 
   const handleMobileNavClick = () => {
     if (isMobile) {
@@ -226,11 +208,49 @@ export function AppSidebar() {
           <SidebarGroupLabel className={cn("mb-4 text-left", isMobile ? "px-4 text-sm font-medium text-muted-foreground" : "px-3")}>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className={cn("w-full", isMobile ? "space-y-0.5" : "space-y-1")}>
-              {navigation.map((item) => {
-                const isActive =
-                  location === item.href ||
-                  (item.href === "/dashboard" && location === "/");
+              {navigation.map((item: any) => {
+                const hasChildren = Array.isArray(item.children) && item.children.length > 0;
+                const isActive = hasChildren
+                  ? item.children.some((c: any) => location === c.href) || location === item.href
+                  : location === item.href || (item.href === "/dashboard" && location === "/");
                 const Icon = item.icon;
+
+                if (hasChildren) {
+                  return (
+                    <SidebarMenuItem key={item.name} className="w-full flex justify-center group-data-[collapsible=icon]:justify-center">
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        className={cn(
+                          "w-full justify-start group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0",
+                          isMobile ? "px-4 py-3 mx-2 rounded-lg" : "px-3 py-2.5"
+                        )}
+                        tooltip={item.name}
+                      >
+                        <Link href={item.href} className="flex items-center gap-3 w-full group-data-[collapsible=icon]:justify-center" onClick={handleMobileNavClick}>
+                          <Icon className="h-5 w-5 flex-shrink-0" />
+                          <span className="group-data-[collapsible=icon]:hidden font-medium">{item.name}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                      <SidebarMenuSub>
+                        {item.children.map((child: any) => {
+                          const ChildIcon = child.icon;
+                          const childActive = location === child.href;
+                          return (
+                            <SidebarMenuSubItem key={child.name}>
+                              <SidebarMenuSubButton asChild isActive={childActive}>
+                                <Link href={child.href} className="flex items-center gap-2" onClick={handleMobileNavClick}>
+                                  {ChildIcon && <ChildIcon className="h-4 w-4" />}
+                                  <span>{child.name}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          );
+                        })}
+                      </SidebarMenuSub>
+                    </SidebarMenuItem>
+                  );
+                }
 
                 return (
                   <SidebarMenuItem key={item.name} className="w-full flex justify-center group-data-[collapsible=icon]:justify-center">
@@ -284,7 +304,7 @@ export function AppSidebar() {
               <DropdownMenuContent 
                 side="right" 
                 align="end" 
-                className="w-64 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-lg rounded-2xl p-0"
+                className="w-64 rounded-2xl p-1"
                 sideOffset={8}
               >
                 {/* User Profile Header */}
@@ -341,26 +361,9 @@ export function AppSidebar() {
 
                   <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-700" />
 
-                  <div
-                    onClick={handleThemeToggle}
-                    className="relative flex cursor-pointer select-none items-center gap-3 px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 rounded-none"
-                    role="menuitem"
-                  >
-                    {theme === 'light' ? (
-                      <>
-                        <Moon className="h-4 w-4" style={{color: "#3396D3"}} />
-                        <span className="text-sm">Dark mode</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sun className="h-4 w-4" style={{color: "#3396D3"}} />
-                        <span className="text-sm">Light mode</span>
-                      </>
-                    )}
-                  </div>
                 </div>
 
-                <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-700" />
+                <DropdownMenuSeparator />
 
                 {/* Plan Section */}
                 <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800/50">
@@ -391,7 +394,7 @@ export function AppSidebar() {
                   </div>
                 </div>
 
-                <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-700" />
+                <DropdownMenuSeparator />
 
                 {/* Logout */}
                 <div className="py-2">

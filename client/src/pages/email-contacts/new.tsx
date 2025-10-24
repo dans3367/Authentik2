@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,17 +39,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// Schema for the form
+// Schema for the form - validation messages will be handled in the component
 const addContactSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
+  email: z.string().email(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   status: z.enum(['active', 'unsubscribed', 'bounced', 'pending']).default('active'),
   tags: z.array(z.string()).optional(),
   lists: z.array(z.string()).optional(),
-  consentGiven: z.boolean().refine(val => val === true, {
-    message: "You must acknowledge consent before adding this contact"
-  }),
+  consentGiven: z.boolean().refine(val => val === true),
   consentMethod: z.string().default('manual_add'),
 });
 
@@ -69,6 +68,7 @@ interface EmailList {
 export default function NewEmailContact() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedLists, setSelectedLists] = useState<string[]>([]);
@@ -177,15 +177,17 @@ export default function NewEmailContact() {
       queryClient.invalidateQueries({ queryKey: ['/api/email-contacts-stats'] });
 
       toast({
-        title: "Error",
-        description: err?.message || "Failed to create contact",
+        title: t('emailContacts.toasts.error'),
+        description: err?.message || t('emailContacts.newContact.toasts.createError'),
         variant: "destructive",
       });
     },
     onSuccess: (data, variables) => {
       toast({
-        title: "Success",
-        description: `Contact "${variables.firstName || variables.lastName || variables.email.split('@')[0]}" has been created and added to your list!`,
+        title: t('emailContacts.toasts.success'),
+        description: t('emailContacts.newContact.toasts.createSuccess', { 
+          name: variables.firstName || variables.lastName || variables.email.split('@')[0] 
+        }),
         duration: 3000,
       });
 
@@ -233,9 +235,9 @@ export default function NewEmailContact() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Add New Contact</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('emailContacts.newContact.title')}</h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Add a new subscriber to your email lists
+              {t('emailContacts.newContact.subtitle')}
             </p>
           </div>
         </div>
@@ -246,35 +248,13 @@ export default function NewEmailContact() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <UserPlus className="w-5 h-5" />
-              Contact Information
+              {t('emailContacts.newContact.cardTitle')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                {/* Email Field */}
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-2">
-                        <Mail className="w-4 h-4" />
-                        Email Address *
-                      </FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="contact@example.com" 
-                          {...field} 
-                          className="bg-white dark:bg-gray-800"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Name Fields */}
+                {/* Contact Information Fields */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -283,11 +263,11 @@ export default function NewEmailContact() {
                       <FormItem>
                         <FormLabel className="flex items-center gap-2">
                           <User className="w-4 h-4" />
-                          First Name
+                          {t('emailContacts.newContact.form.firstNameLabel')}
                         </FormLabel>
                         <FormControl>
                           <Input 
-                            placeholder="John" 
+                            placeholder={t('emailContacts.newContact.form.firstNamePlaceholder')} 
                             {...field} 
                             className="bg-white dark:bg-gray-800"
                           />
@@ -302,10 +282,34 @@ export default function NewEmailContact() {
                     name="lastName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Last Name</FormLabel>
+                        <FormLabel className="flex items-center gap-2">
+                          <User className="w-4 h-4" />
+                          {t('emailContacts.newContact.form.lastNameLabel')}
+                        </FormLabel>
                         <FormControl>
                           <Input 
-                            placeholder="Doe" 
+                            placeholder={t('emailContacts.newContact.form.lastNamePlaceholder')} 
+                            {...field} 
+                            className="bg-white dark:bg-gray-800"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                        <FormLabel className="flex items-center gap-2">
+                          <Mail className="w-4 h-4" />
+                          {t('emailContacts.newContact.form.emailLabel')} *
+                        </FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder={t('emailContacts.newContact.form.emailPlaceholder')} 
                             {...field} 
                             className="bg-white dark:bg-gray-800"
                           />
@@ -322,18 +326,16 @@ export default function NewEmailContact() {
                   name="status"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Status</FormLabel>
+                      <FormLabel>{t('emailContacts.newContact.form.statusLabel')}</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger className="bg-white dark:bg-gray-800">
-                            <SelectValue placeholder="Select contact status" />
+                            <SelectValue placeholder={t('emailContacts.newContact.form.statusPlaceholder')} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="pending">Pending</SelectItem>
-                          <SelectItem value="unsubscribed">Unsubscribed</SelectItem>
-                          <SelectItem value="bounced">Bounced</SelectItem>
+                          <SelectItem value="active">{t('emailContacts.filters.active')}</SelectItem>
+                          <SelectItem value="inactive">{t('emailContacts.filters.inactive')}</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -346,10 +348,10 @@ export default function NewEmailContact() {
                   <div>
                     <Label className="flex items-center gap-2 mb-3">
                       <List className="w-4 h-4" />
-                      Email Lists
+                      {t('emailContacts.newContact.form.emailListsLabel')}
                     </Label>
                     <FormDescription className="mb-3">
-                      Select which lists this contact should be added to
+                      {t('emailContacts.newContact.form.emailListsDescription')}
                     </FormDescription>
                     <div className="space-y-2">
                       {lists.map((list) => (
@@ -379,10 +381,10 @@ export default function NewEmailContact() {
                   <div>
                     <Label className="flex items-center gap-2 mb-3">
                       <Tag className="w-4 h-4" />
-                      Tags
+                      {t('emailContacts.newContact.form.tagsLabel')}
                     </Label>
                     <FormDescription className="mb-3">
-                      Add tags to organize and categorize this contact
+                      {t('emailContacts.newContact.form.tagsDescription')}
                     </FormDescription>
                     <div className="flex flex-wrap gap-2">
                       {tags.map((tag) => (
@@ -419,13 +421,10 @@ export default function NewEmailContact() {
                         </FormControl>
                         <div className="space-y-1 leading-none">
                           <FormLabel className="font-medium text-sm">
-                            Consent Acknowledgment *
+                            {t('emailContacts.newContact.form.consentLabel')} *
                           </FormLabel>
                           <FormDescription className="text-xs">
-                            I acknowledge that I have express consent from this contact to add their email address to our mailing lists. 
-                            I understand that I am legally liable for ensuring proper consent has been obtained before adding any email 
-                            address to our email marketing lists. This includes having explicit permission to send marketing communications 
-                            to this email address in compliance with applicable laws (CAN-SPAM, GDPR, etc.).
+                            {t('emailContacts.newContact.form.consentDescription')}
                           </FormDescription>
                         </div>
                         <FormMessage />
@@ -444,12 +443,12 @@ export default function NewEmailContact() {
                     {createContactMutation.isPending ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Creating...
+                        {t('emailContacts.newContact.form.creating')}
                       </>
                     ) : (
                       <>
                         <UserPlus className="w-4 h-4 mr-2" />
-                        Create Contact
+                        {t('emailContacts.newContact.form.createButton')}
                       </>
                     )}
                   </Button>
@@ -458,7 +457,7 @@ export default function NewEmailContact() {
                     variant="outline"
                     onClick={() => setLocation('/email-contacts')}
                   >
-                    Cancel
+                    {t('emailContacts.newContact.form.cancelButton')}
                   </Button>
                 </div>
               </form>

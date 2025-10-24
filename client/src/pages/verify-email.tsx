@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ export default function VerifyEmailPage() {
   const [isVerified, setIsVerified] = useState(false);
   const [error, setError] = useState("");
   const [isResending, setIsResending] = useState(false);
+  const [redirectCountdown, setRedirectCountdown] = useState(5); // 5 second countdown
 
   // Force light theme on email verification page regardless of user preference
   useEffect(() => {
@@ -63,65 +64,14 @@ export default function VerifyEmailPage() {
         if (response.ok) {
           setIsVerified(true);
           
-          const responseData = await response.json();
-          console.log("🔍 [VerifyEmail] Verification response data:", responseData);
+          console.log("🔍 [VerifyEmail] Verification response data:", data);
           
-          // Better Auth handles session management automatically
-          // If the response includes access token, the session should be established
-          if (responseData.accessToken) {
-            console.log("🔍 [VerifyEmail] Automatic login detected, Better Auth will handle session...");
-
-            // Invalidate user cache to refresh the verification status
-            console.log("🔍 [VerifyEmail] Invalidating user queries...");
-            await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-            
-            // Force a refetch of the user data
-            await queryClient.refetchQueries({ queryKey: ["/api/auth/me"] });
-            
-            // Refresh the authentication state in Redux
-            console.log("🔍 [VerifyEmail] Refreshing authentication state...");
-            await dispatch(checkAuthStatus());
-            
-            console.log("🔍 [VerifyEmail] User queries invalidated and auth state refreshed");
-            
-            toast({
-              title: "Email Verified!",
-              description: "Your account has been successfully verified and you are now logged in.",
-            });
-
-            // Wait a moment for the state to update, then redirect
-            setTimeout(() => {
-              console.log("🔍 [VerifyEmail] Redirecting to dashboard after verification");
-              setLocation("/dashboard");
-            }, 1000);
-          } else {
-            // Fallback for older verification flow
-            console.log("🔍 [VerifyEmail] Manual login required after verification");
-            
-            // Invalidate user cache to refresh the verification status
-            console.log("🔍 [VerifyEmail] Invalidating user queries...");
-            await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-            
-            // Force a refetch of the user data
-            await queryClient.refetchQueries({ queryKey: ["/api/auth/me"] });
-            
-            // Refresh the authentication state in Redux
-            console.log("🔍 [VerifyEmail] Refreshing authentication state...");
-            await dispatch(checkAuthStatus());
-            
-            console.log("🔍 [VerifyEmail] User queries invalidated and auth state refreshed");
-            
-            toast({
-              title: "Email Verified!",
-              description: "Your account has been successfully verified. You can now log in.",
-            });
-
-            // Wait a moment for the state to update, then redirect
-            setTimeout(() => {
-              console.log("🔍 [VerifyEmail] Redirecting to dashboard after verification");
-              setLocation("/dashboard");
-            }, 1000);
-          }
+          toast({
+            title: "Email Verified!",
+            description: "Your account has been successfully verified. Please log in to continue.",
+          });
+          
+          console.log("🔍 [VerifyEmail] Email verified successfully. User should now login.");
         } else {
           setError(data.message || "Failed to verify email");
         }
@@ -142,6 +92,33 @@ export default function VerifyEmailPage() {
       setLocation("/dashboard");
     }
   }, [isAuthenticated, user?.emailVerified, setLocation]);
+
+  // Function to handle redirect to login with cache refresh
+  const handleRedirectToLogin = useCallback(async () => {
+    console.log("🔄 [VerifyEmail] Clearing auth cache before redirect to login");
+    
+    // Clear auth queries to ensure fresh login
+    await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    await queryClient.invalidateQueries({ queryKey: ["better-auth"] });
+    queryClient.clear();
+    
+    // Force navigation to login page
+    console.log("🔍 [VerifyEmail] Redirecting to login page");
+    window.location.href = "/auth"; // Force full page reload with clean state
+  }, [queryClient]);
+
+  // Countdown timer for auto-redirect to login
+  useEffect(() => {
+    if (isVerified && redirectCountdown > 0) {
+      const timer = setTimeout(() => {
+        setRedirectCountdown(redirectCountdown - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (isVerified && redirectCountdown === 0) {
+      console.log("🔍 [VerifyEmail] Auto-redirecting to login");
+      handleRedirectToLogin();
+    }
+  }, [isVerified, redirectCountdown, handleRedirectToLogin]);
 
   const handleResendVerification = async () => {
     const email = prompt("Please enter your email address to resend verification:");
@@ -221,12 +198,17 @@ export default function VerifyEmailPage() {
         </CardHeader>
         <CardContent className="text-center space-y-4">
           {isVerified ? (
-            <Button
-              onClick={() => setLocation("/dashboard")}
-              className="w-full"
-            >
-              Continue to Dashboard
-            </Button>
+            <>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Redirecting to login in {redirectCountdown} second{redirectCountdown !== 1 ? 's' : ''}...
+              </p>
+              <Button
+                onClick={handleRedirectToLogin}
+                className="w-full"
+              >
+                Proceed to Login
+              </Button>
+            </>
           ) : (
             <div className="space-y-3">
               <Button

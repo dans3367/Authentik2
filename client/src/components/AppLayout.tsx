@@ -4,14 +4,14 @@ import {
   useReduxAuth,
   useReduxUpdateProfile,
 } from "@/hooks/useReduxAuth";
-import { useUpdateTheme, useUpdateMenuPreference } from "@/hooks/useAuth";
-import { useTheme } from "@/contexts/ThemeContext";
+import { useUpdateMenuPreference } from "@/hooks/useAuth";
 import {
   SidebarProvider,
   SidebarInset,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { OnboardingWizard } from "@/components/OnboardingWizard";
 
 
 
@@ -22,10 +22,10 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
   const [location, setLocation] = useLocation();
   const { user, isInitialized } = useReduxAuth();
-  const { setUserTheme } = useTheme();
   const { updateProfile } = useReduxUpdateProfile();
   const updateMenuPreferenceMutation = useUpdateMenuPreference();
-  const [isThemeChanging, setIsThemeChanging] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [companyData, setCompanyData] = useState<any>(null);
   
   // Initialize sidebar open state
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -52,25 +52,74 @@ export function AppLayout({ children }: AppLayoutProps) {
     }
   }, [isInitialized, user, user?.menuExpanded]);
 
-  // Sync theme from backend only on initial load
-  const [hasInitializedTheme, setHasInitializedTheme] = useState(false);
-  const [lastUserId, setLastUserId] = useState<string | null>(null);
-  
+
+  // Check if company needs onboarding
   useEffect(() => {
-    // Reset initialization flag when user changes (logout/login) or when user ID changes
-    if (!user) {
-      setHasInitializedTheme(false);
-      setLastUserId(null);
-    } else if (user && (!hasInitializedTheme || user.id !== lastUserId) && !isThemeChanging) {
-      // Always set theme from backend when user logs in or changes, even if undefined
-      const backendTheme = user.theme || 'light';
-      
-      console.log(`🎨 [Theme] Syncing theme from backend: ${backendTheme} for user ${user.email}`);
-      setUserTheme(backendTheme);
-      setHasInitializedTheme(true);
-      setLastUserId(user.id);
+    const checkOnboardingStatus = async () => {
+      if (!user) {
+        console.log('🏢 [Onboarding] No user, skipping onboarding check');
+        return;
+      }
+
+      console.log('🏢 [Onboarding] Checking onboarding status for user:', user.email);
+
+      try {
+        const response = await fetch('/api/company', {
+          credentials: 'include',
+        });
+
+        console.log('🏢 [Onboarding] Company API response:', {
+          status: response.status,
+          ok: response.ok,
+        });
+
+        if (response.ok) {
+          const company = await response.json();
+          console.log('🏢 [Onboarding] Company data:', {
+            name: company?.name,
+            setupCompleted: company?.setupCompleted,
+          });
+          
+          setCompanyData(company);
+          
+          // Show onboarding wizard if setup is not completed
+          if (company && !company.setupCompleted) {
+            console.log('🎯 [Onboarding] Showing onboarding modal (setupCompleted: false)');
+            setShowOnboarding(true);
+          } else {
+            console.log('✅ [Onboarding] Onboarding already completed');
+          }
+        } else {
+          console.warn('⚠️ [Onboarding] Company not found (status:', response.status, ')');
+          console.warn('   This might mean the user has no company record');
+          console.warn('   Onboarding modal will NOT show');
+        }
+      } catch (error) {
+        console.error('❌ [Onboarding] Failed to check onboarding status:', error);
+      }
+    };
+
+    checkOnboardingStatus();
+  }, [user]);
+
+  // Handle onboarding completion
+  const handleOnboardingComplete = async () => {
+    setShowOnboarding(false);
+    
+    // Refresh company data
+    try {
+      const response = await fetch('/api/company', {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const company = await response.json();
+        setCompanyData(company);
+      }
+    } catch (error) {
+      console.error('Failed to refresh company data:', error);
     }
-  }, [user, setUserTheme, hasInitializedTheme, isThemeChanging, lastUserId]);
+  };
 
   // Listen for localStorage changes from other tabs and immediate changes
   useEffect(() => {
@@ -107,7 +156,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     
     // Sync with backend
     if (user) {
-      updateMenuPreferenceMutation.mutate({ menuExpanded: open });
+      updateMenuPreferenceMutation.mutateAsync({ menuExpanded: open });
       
       // Dispatch custom event for other components/tabs
       window.dispatchEvent(
@@ -125,17 +174,25 @@ export function AppLayout({ children }: AppLayoutProps) {
   }
 
   return (
-    <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarOpenChange}>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1" />
-          <div className="flex-1" />
-        </header>
-        <div className="flex flex-1 flex-col">
-          {children}
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+    <>
+      <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarOpenChange}>
+        <AppSidebar />
+        <SidebarInset>
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+            <SidebarTrigger className="-ml-1" />
+            <div className="flex-1" />
+          </header>
+          <div className="flex flex-1 flex-col">
+            {children}
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+      
+      {/* Onboarding wizard */}
+      <OnboardingWizard 
+        open={showOnboarding} 
+        onComplete={handleOnboardingComplete}
+      />
+    </>
   );
 }

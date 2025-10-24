@@ -12,8 +12,8 @@ export const betterAuthUser = pgTable("better_auth_user", {
     image: text("image"),
     createdAt: timestamp("created_at").notNull(),
     updatedAt: timestamp("updated_at").notNull(),
-    role: text("role").default('Employee').notNull(), // Keep our existing role system
-    tenantId: varchar("tenant_id").default(sql`'29c69b4f-3129-4aa4-a475-7bf892e5c5b9'`).notNull(), // Default value for multi-tenancy
+    role: text("role").default('Owner').notNull(), // New users default to Owner role
+    tenantId: varchar("tenant_id").default(sql`'2f6f5ec2-a56f-47d0-887d-c6b9c1bb56ff'`).notNull(), // Temporary default, will be updated by signup hook
     // Additional fields from users table
     firstName: text("first_name"),
     lastName: text("last_name"),
@@ -306,6 +306,11 @@ export const companies = pgTable("companies", {
     phone: text("phone"),
     website: text("website"),
     description: text("description"),
+    // Onboarding wizard fields
+    setupCompleted: boolean("setup_completed").default(false),
+    geographicalLocation: text("geographical_location"),
+    language: text("language").default('en'), // Language for outgoing communications
+    businessDescription: text("business_description"), // AI context for platform personalization
     isActive: boolean("is_active").default(true),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
@@ -584,6 +589,7 @@ export const registerSchema = z.object({
         .regex(/[0-9]/, "Password must contain at least one number"),
     firstName: z.string().min(1, "First name is required"),
     lastName: z.string().min(1, "Last name is required"),
+    companyName: z.string().min(2, "Company name must be at least 2 characters"),
     confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",

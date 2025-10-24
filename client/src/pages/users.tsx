@@ -14,12 +14,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Users as UsersIcon, Plus, Search, Filter, Edit, Trash2, Shield, UserCheck, UserX, Calendar, Mail, MapPin, Eye, EyeOff, X } from "lucide-react";
+import { Users as UsersIcon, Plus, Search, Filter, Edit, Trash2, Shield, UserCheck, UserX, Calendar, Mail, MapPin, Eye, EyeOff, X, User as UserIcon } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createUserSchema, updateUserSchema, userRoles, nonOwnerRoles, type User, type CreateUserData, type UpdateUserData, type UserRole } from "@shared/schema";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Extended user type to include custom fields from Better Auth
 interface ExtendedUser {
@@ -41,6 +42,7 @@ interface ExtendedUser {
 }
 import { DataTable, DataTableColumnHeader, DataTableRowActions } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
+import { Link } from "wouter";
 import { Checkbox } from "@/components/ui/checkbox";
 
 interface UserStats {
@@ -73,11 +75,22 @@ function getUserInitials(firstName?: string, lastName?: string) {
   return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
 }
 
+function getRoleTranslationKey(role: string): string {
+  const roleMap: Record<string, string> = {
+    'Administrator': 'users.roles.administrator',
+    'Manager': 'users.roles.manager',
+    'Employee': 'users.roles.employee',
+    'Owner': 'users.roles.owner'
+  };
+  return roleMap[role] || role;
+}
+
 export default function UsersPage() {
   console.log("🔍 [UsersPage] Component rendered");
   const { user, isLoading: authLoading } = useReduxAuth();
   const currentUser = user as ExtendedUser | null;
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<UserRole | "">("");
@@ -95,6 +108,7 @@ export default function UsersPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [isViewMode, setIsViewMode] = useState(false);
   
   // State for tracking unsaved changes in edit dialog
   const [hasUnsavedEditChanges, setHasUnsavedEditChanges] = useState(false);
@@ -112,10 +126,10 @@ export default function UsersPage() {
                 <UsersIcon className="text-blue-600 dark:text-blue-500 w-8 h-8" />
                 <div>
                   <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-                    Users
+                    {t('users.title')}
                   </h1>
                   <p className="text-gray-600 dark:text-gray-400 mt-1">
-                    Loading user management
+                    {t('users.loadingSubtitle')}
                   </p>
                 </div>
               </div>
@@ -145,9 +159,9 @@ export default function UsersPage() {
             <CardContent className="p-8">
               <div className="text-center">
                 <Shield className="mx-auto h-12 w-12 text-red-500 dark:text-red-400 mb-4" />
-                <h2 className="mt-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Access Denied</h2>
+                <h2 className="mt-4 text-lg font-semibold text-gray-900 dark:text-gray-100">{t('users.accessDenied')}</h2>
                 <p className="mt-2 text-gray-600 dark:text-gray-300">
-                  You don't have permission to access the user management system.
+                  {t('users.accessDeniedMessage')}
                 </p>
               </div>
             </CardContent>
@@ -293,13 +307,13 @@ export default function UsersPage() {
       setIsCreateDialogOpen(false);
       createForm.reset();
       toast({
-        title: "Success",
-        description: "User created successfully",
+        title: t('toast.success'),
+        description: t('users.toasts.userCreated'),
       });
     },
     onError: (error) => {
       toast({
-        title: "Error",
+        title: t('users.toasts.error'),
         description: error.message,
         variant: "destructive",
       });
@@ -326,13 +340,13 @@ export default function UsersPage() {
       setInitialEditValues(null);
       editForm.reset();
       toast({
-        title: "Success",
-        description: "User updated successfully",
+        title: t('toast.success'),
+        description: t('users.toasts.userUpdated'),
       });
     },
     onError: (error) => {
       toast({
-        title: "Error",
+        title: t('users.toasts.error'),
         description: error.message,
         variant: "destructive",
       });
@@ -354,13 +368,13 @@ export default function UsersPage() {
       queryClient.invalidateQueries({ queryKey: ['/api/users/stats'] });
       queryClient.invalidateQueries({ queryKey: ['/api/users/limits'] });
       toast({
-        title: "Success",
-        description: "User deleted successfully",
+        title: t('toast.success'),
+        description: t('users.toasts.userDeleted'),
       });
     },
     onError: (error) => {
       toast({
-        title: "Error",
+        title: t('users.toasts.error'),
         description: error.message,
         variant: "destructive",
       });
@@ -382,13 +396,13 @@ export default function UsersPage() {
       queryClient.invalidateQueries({ queryKey: ['/api/users/stats'] });
       queryClient.invalidateQueries({ queryKey: ['/api/users/limits'] });
       toast({
-        title: "Success",
-        description: "User status updated successfully",
+        title: t('toast.success'),
+        description: t('users.toasts.statusUpdated'),
       });
     },
     onError: (error) => {
       toast({
-        title: "Error",
+        title: t('users.toasts.error'),
         description: error.message,
         variant: "destructive",
       });
@@ -399,13 +413,36 @@ export default function UsersPage() {
     createUserMutation.mutate(data);
   };
 
-  const handleEditUser = (user: User) => {
+  const handleViewUser = (user: User) => {
+    setIsViewMode(true);
     setSelectedUser(user);
     const initialValues = {
       firstName: user.firstName || "",
       lastName: user.lastName || "",
       email: user.email,
-      role: user.role === 'Owner' ? 'Administrator' : user.role as 'Administrator' | 'Manager' | 'Employee',
+      // For view mode, keep the displayed role as the user's current role where possible
+      role: (user.role === 'Owner' ? 'Administrator' : (user.role as 'Administrator' | 'Manager' | 'Employee')),
+      isActive: user.isActive ?? true,
+    };
+    editForm.reset(initialValues);
+    setInitialEditValues(initialValues);
+    setHasUnsavedEditChanges(false);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditUser = (user: User) => {
+    if (user.role === 'Owner') {
+      // View-only for Owner accounts
+      handleViewUser(user);
+      return;
+    }
+    setIsViewMode(false);
+    setSelectedUser(user);
+    const initialValues = {
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
+      email: user.email,
+      role: user.role as 'Administrator' | 'Manager' | 'Employee',
       isActive: user.isActive ?? true,
     };
     editForm.reset(initialValues);
@@ -441,6 +478,7 @@ export default function UsersPage() {
     setIsEditDialogOpen(open);
     if (!open) {
       setSelectedUser(null);
+      setIsViewMode(false);
       setHasUnsavedEditChanges(false);
       setInitialEditValues(null);
       editForm.reset();
@@ -451,6 +489,7 @@ export default function UsersPage() {
     setShowEditConfirmDialog(false);
     setIsEditDialogOpen(false);
     setSelectedUser(null);
+    setIsViewMode(false);
     setHasUnsavedEditChanges(false);
     setInitialEditValues(null);
     editForm.reset();
@@ -460,9 +499,11 @@ export default function UsersPage() {
   const columns: ColumnDef<User>[] = [
     {
       accessorKey: "user",
-      header: "USER",
+      header: t('users.table.user'),
       cell: ({ row }) => {
         const user = row.original;
+        const name = user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : t('users.table.noName');
+        const isOwnerSelf = user.role === 'Owner' && user.id === currentUser?.id;
         return (
           <div className="flex items-center space-x-3">
             <div className="relative">
@@ -474,19 +515,30 @@ export default function UsersPage() {
               </Avatar>
               <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-white"></div>
             </div>
-            <div>
-              <div className="font-medium text-gray-900">
-                {user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'No name'}
+            {isOwnerSelf ? (
+              <Link href="/profile" className="group">
+                <div>
+                  <div className="font-medium text-blue-700 group-hover:underline">
+                    {name}
+                  </div>
+                  <div className="text-sm text-blue-600/80">{user.email}</div>
+                </div>
+              </Link>
+            ) : (
+              <div>
+                <div className="font-medium text-gray-900">
+                  {name}
+                </div>
+                <div className="text-sm text-gray-500">{user.email}</div>
               </div>
-              <div className="text-sm text-gray-500">{user.email}</div>
-            </div>
+            )}
           </div>
         );
       },
     },
     {
       accessorKey: "role",
-      header: "ROLE",
+      header: t('users.table.role'),
       cell: ({ row }) => {
         const role = row.getValue("role") as string;
         const roleStyles = {
@@ -497,7 +549,7 @@ export default function UsersPage() {
         };
         return (
           <Badge variant="secondary" className={`${roleStyles[role as keyof typeof roleStyles] || 'bg-gray-100 text-gray-700'} hover:bg-opacity-80 font-normal border-0`}>
-            {role}
+            {t(getRoleTranslationKey(role))}
           </Badge>
         );
       },
@@ -507,25 +559,25 @@ export default function UsersPage() {
     },
     {
       accessorKey: "isActive",
-      header: "STATUS",
+      header: t('users.table.status'),
       cell: ({ row }) => {
         const isActive = row.getValue("isActive");
         return isActive ? (
           <div className="flex items-center space-x-1.5">
             <UserCheck className="h-4 w-4 text-green-600" />
-            <span className="text-green-600 font-medium">Active</span>
+            <span className="text-green-600 font-medium">{t('users.status.active')}</span>
           </div>
         ) : (
           <div className="flex items-center space-x-1.5">
             <UserX className="h-4 w-4 text-red-600" />
-            <span className="text-red-600 font-medium">Inactive</span>
+            <span className="text-red-600 font-medium">{t('users.status.inactive')}</span>
           </div>
         );
       },
     },
     {
       accessorKey: "location",
-      header: "LOCATION",
+      header: t('users.table.location'),
       cell: ({ row }) => {
         // For now, we'll show a dash as location is not in our schema
         return <span className="text-gray-400">—</span>;
@@ -533,13 +585,13 @@ export default function UsersPage() {
     },
     {
       accessorKey: "lastLoginAt",
-      header: "LAST LOGIN",
+      header: t('users.table.lastLogin'),
       cell: ({ row }) => {
         const lastLogin = row.getValue("lastLoginAt");
         if (!lastLogin) return (
           <div className="flex items-center space-x-1.5 text-gray-500">
             <Calendar className="h-4 w-4" />
-            <span>Never</span>
+            <span>{t('users.table.never')}</span>
           </div>
         );
         return (
@@ -552,7 +604,7 @@ export default function UsersPage() {
     },
     {
       accessorKey: "createdAt",
-      header: "JOINED",
+      header: t('users.table.joined'),
       cell: ({ row }) => {
         const createdAt = row.getValue("createdAt");
         if (!createdAt) return null;
@@ -566,10 +618,48 @@ export default function UsersPage() {
     },
     {
       id: "actions",
-      header: "ACTIONS",
+      header: t('users.table.actions'),
       cell: ({ row }) => {
         const user = row.original;
-        if (!isAdmin || user.id === currentUser.id) return null;
+        if (!isAdmin) return null;
+
+        // Current Owner: show profile link
+        if (user.id === currentUser.id && user.role === 'Owner') {
+          return (
+            <div className="flex items-center space-x-2">
+              <Link href="/profile">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                  title="Go to Profile"
+                >
+                  <UserIcon className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          );
+        }
+
+        // No actions for current non-owner
+        if (user.id === currentUser.id) return null;
+        
+        // Owner accounts (not current user) are view-only
+        if (user.role === 'Owner') {
+          return (
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
+                onClick={() => handleViewUser(user)}
+                title="View User"
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+            </div>
+          );
+        }
         
         return (
           <div className="flex items-center space-x-2">
@@ -627,10 +717,10 @@ export default function UsersPage() {
                 <UsersIcon className="text-blue-600 dark:text-blue-500 w-8 h-8" />
                 <div>
                   <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-                    Users
+                    {t('users.title')}
                   </h1>
                   <p className="text-gray-600 dark:text-gray-400 mt-1">
-                    Manage user accounts and permissions
+                    {t('users.subtitle')}
                   </p>
                 </div>
               </div>
@@ -662,10 +752,10 @@ export default function UsersPage() {
                 <UsersIcon className="text-blue-600 dark:text-blue-500 w-8 h-8" />
                 <div>
                   <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-                    Users
+                    {t('users.title')}
                   </h1>
                   <p className="text-gray-600 dark:text-gray-400 mt-1">
-                    Manage user accounts and permissions
+                    {t('users.subtitle')}
                   </p>
                 </div>
               </div>
@@ -682,14 +772,14 @@ export default function UsersPage() {
                           className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
                         >
                           <Plus className="h-4 w-4 mr-2" />
-                          Add User
+                          {t('users.addUser')}
                         </Button>
                       </DialogTrigger>
                       <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                  <DialogTitle>Create New User</DialogTitle>
+                  <DialogTitle>{t('users.createDialog.title')}</DialogTitle>
                   <DialogDescription>
-                    Add a new user to the system. The user will be automatically verified.
+                    {t('users.createDialog.description')}
                   </DialogDescription>
                 </DialogHeader>
                 <Form {...createForm}>
@@ -700,7 +790,7 @@ export default function UsersPage() {
                         name="firstName"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>First Name</FormLabel>
+                            <FormLabel>{t('users.createDialog.firstName')}</FormLabel>
                             <FormControl>
                               <Input {...field} />
                             </FormControl>
@@ -713,7 +803,7 @@ export default function UsersPage() {
                         name="lastName"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Last Name</FormLabel>
+                            <FormLabel>{t('users.createDialog.lastName')}</FormLabel>
                             <FormControl>
                               <Input {...field} />
                             </FormControl>
@@ -727,7 +817,7 @@ export default function UsersPage() {
                       name="email"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Email</FormLabel>
+                          <FormLabel>{t('users.createDialog.email')}</FormLabel>
                           <FormControl>
                             <Input type="email" {...field} />
                           </FormControl>
@@ -740,17 +830,17 @@ export default function UsersPage() {
                       name="role"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Role</FormLabel>
+                          <FormLabel>{t('users.createDialog.role')}</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select a role" />
+                                <SelectValue placeholder={t('users.createDialog.selectRole')} />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
                               {nonOwnerRoles.map((role) => (
                                 <SelectItem key={role} value={role}>
-                                  {role}
+                                  {t(getRoleTranslationKey(role))}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -764,7 +854,7 @@ export default function UsersPage() {
                       name="password"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Password</FormLabel>
+                          <FormLabel>{t('users.createDialog.password')}</FormLabel>
                           <FormControl>
                             <Input type="password" {...field} />
                           </FormControl>
@@ -777,7 +867,7 @@ export default function UsersPage() {
                       name="confirmPassword"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Confirm Password</FormLabel>
+                          <FormLabel>{t('users.createDialog.confirmPassword')}</FormLabel>
                           <FormControl>
                             <Input type="password" {...field} />
                           </FormControl>
@@ -791,9 +881,9 @@ export default function UsersPage() {
                       render={({ field }) => (
                         <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                           <div className="space-y-0.5">
-                            <FormLabel className="text-base">Email Verified</FormLabel>
+                            <FormLabel className="text-base">{t('users.createDialog.emailVerified')}</FormLabel>
                             <div className="text-sm text-muted-foreground">
-                              Mark this user's email as verified
+                              {t('users.createDialog.emailVerifiedDescription')}
                             </div>
                           </div>
                           <FormControl>
@@ -811,7 +901,7 @@ export default function UsersPage() {
                         disabled={createUserMutation.isPending}
                         className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
                       >
-                        {createUserMutation.isPending ? "Creating..." : "Create User"}
+                        {createUserMutation.isPending ? t('users.createDialog.creating') : t('users.createDialog.createUser')}
                       </Button>
                     </DialogFooter>
                   </form>
@@ -823,8 +913,11 @@ export default function UsersPage() {
                 {!limits.canAddUser && (
                   <TooltipContent>
                     <p>
-                      User limit reached ({limits.currentUsers}/{limits.maxUsers}). 
-                      Please upgrade your {limits.planName} to add more users.
+                      {t('users.userLimitReached', { 
+                        current: limits.currentUsers, 
+                        max: limits.maxUsers,
+                        plan: limits.planName 
+                      })}
                     </p>
                   </TooltipContent>
                 )}
@@ -839,12 +932,12 @@ export default function UsersPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Total Users</p>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('users.stats.totalUsers')}</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalUsers}</p>
                 </div>
                 <UsersIcon className="text-blue-500 w-8 h-8" />
               </div>
-              <p className="text-xs text-muted-foreground mt-2">Across all roles</p>
+              <p className="text-xs text-muted-foreground mt-2">{t('users.stats.acrossAllRoles')}</p>
             </CardContent>
           </Card>
           
@@ -852,13 +945,13 @@ export default function UsersPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Active Users</p>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('users.stats.activeUsers')}</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.activeUsers}</p>
                 </div>
                 <UserCheck className="text-green-500 w-8 h-8" />
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                {stats.totalUsers > 0 ? Math.round((stats.activeUsers / stats.totalUsers) * 100) : 0}% of total users
+                {stats.totalUsers > 0 ? Math.round((stats.activeUsers / stats.totalUsers) * 100) : 0}% {t('users.stats.ofTotalUsers')}
               </p>
             </CardContent>
           </Card>
@@ -867,12 +960,12 @@ export default function UsersPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Roles</p>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('users.stats.roles')}</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{Object.keys(stats.usersByRole).length}</p>
                 </div>
                 <Shield className="text-purple-500 w-8 h-8" />
               </div>
-              <p className="text-xs text-muted-foreground mt-2">Different user roles</p>
+              <p className="text-xs text-muted-foreground mt-2">{t('users.stats.differentRoles')}</p>
             </CardContent>
           </Card>
 
@@ -880,7 +973,7 @@ export default function UsersPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Plan Limits</p>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('users.stats.planLimits')}</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                     {limits.currentUsers}{limits.maxUsers ? `/${limits.maxUsers}` : ''}
                   </p>
@@ -888,7 +981,7 @@ export default function UsersPage() {
                 <UsersIcon className="text-orange-500 w-8 h-8" />
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                {limits.planName} {limits.maxUsers ? `(${limits.maxUsers - limits.currentUsers} remaining)` : '(Unlimited)'}
+                {limits.planName} {limits.maxUsers ? `(${limits.maxUsers - limits.currentUsers} ${t('users.stats.remaining')})` : `(${t('users.stats.unlimited')})`}
               </p>
             </CardContent>
           </Card>
@@ -899,7 +992,7 @@ export default function UsersPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
-              placeholder="Search users by name or email..."
+              placeholder={t('users.filters.searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 pr-10"
@@ -916,25 +1009,25 @@ export default function UsersPage() {
           </div>
           <Select value={roleFilter} onValueChange={(value) => setRoleFilter(value === "all" ? "" : value as UserRole)}>
             <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="Filter by role" />
+              <SelectValue placeholder={t('users.filters.filterByRole')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Roles</SelectItem>
+              <SelectItem value="all">{t('users.filters.allRoles')}</SelectItem>
               {userRoles.map((role) => (
                 <SelectItem key={role} value={role}>
-                  {role}
+                  {t(getRoleTranslationKey(role))}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value === "all" ? "" : value as "active" | "inactive")}>
             <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="Filter by status" />
+              <SelectValue placeholder={t('users.filters.filterByStatus')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
+              <SelectItem value="all">{t('users.filters.allStatus')}</SelectItem>
+              <SelectItem value="active">{t('users.filters.active')}</SelectItem>
+              <SelectItem value="inactive">{t('users.filters.inactive')}</SelectItem>
             </SelectContent>
           </Select>
           <div className="flex items-center space-x-2">
@@ -944,7 +1037,7 @@ export default function UsersPage() {
               onCheckedChange={setShowInactive}
             />
             <label htmlFor="show-inactive" className="text-sm font-medium">
-              Show Inactive
+              {t('users.filters.showInactive')}
             </label>
           </div>
         </div>
@@ -997,55 +1090,91 @@ export default function UsersPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <h3 className="font-medium text-gray-900 dark:text-white truncate" data-testid={`text-user-name-card-${user.id}`}>
-                              {user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'No name'}
+                              {user.role === 'Owner' && user.id === currentUser.id ? (
+                                <Link href="/profile" className="text-blue-700 hover:underline">
+                                  {user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'No name'}
+                                </Link>
+                              ) : (
+                                user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'No name'
+                              )}
                             </h3>
                             <p className="text-sm text-gray-500 dark:text-gray-400 truncate" data-testid={`text-user-email-card-${user.id}`}>
-                              {user.email}
+                              {user.role === 'Owner' && user.id === currentUser.id ? (
+                                <Link href="/profile" className="text-blue-600 hover:underline">{user.email}</Link>
+                              ) : (
+                                user.email
+                              )}
                             </p>
                           </div>
                         </div>
                         
-                        {/* Actions - only show for admins and not for current user */}
-                        {isAdmin && user.id !== currentUser.id && (
+                        {/* Actions */}
+                        {isAdmin && (
                           <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/20"
-                              onClick={() => handleEditUser(user)}
-                              data-testid={`button-edit-user-card-${user.id}`}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
+                            {user.id === currentUser.id && user.role === 'Owner' ? (
+                              <Link href="/profile">
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
-                                  data-testid={`button-delete-user-card-${user.id}`}
+                                  className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+                                  data-testid={`button-profile-owner-card-${user.id}`}
+                                  title="Go to Profile"
                                 >
-                                  <Trash2 className="h-4 w-4" />
+                                  <UserIcon className="h-4 w-4" />
                                 </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete User</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete {user.firstName} {user.lastName}? This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleDeleteUser(user.id)}
-                                    className="bg-red-600 hover:bg-red-700"
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                              </Link>
+                            ) : user.role === 'Owner' ? (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-gray-600 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-950/20"
+                                onClick={() => handleViewUser(user)}
+                                data-testid={`button-view-user-card-${user.id}`}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            ) : user.id !== currentUser.id ? (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/20"
+                                  onClick={() => handleEditUser(user)}
+                                  data-testid={`button-edit-user-card-${user.id}`}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                                      data-testid={`button-delete-user-card-${user.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete User</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete {user.firstName} {user.lastName}? This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleDeleteUser(user.id)}
+                                        className="bg-red-600 hover:bg-red-700"
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </>
+                            ) : null}
                           </div>
                         )}
                       </div>
@@ -1055,7 +1184,7 @@ export default function UsersPage() {
                         {/* Role and Status Row */}
                         <div className="flex items-center justify-between">
                           <div>
-                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Role</span>
+                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">{t('users.cardView.role')}</span>
                             <Badge 
                               variant="secondary" 
                               className={`${
@@ -1066,7 +1195,7 @@ export default function UsersPage() {
                               } hover:bg-opacity-80 font-normal border-0`}
                               data-testid={`badge-role-card-${user.id}`}
                             >
-                              {user.role}
+                              {t(getRoleTranslationKey(user.role || ''))}
                             </Badge>
                           </div>
                           <div>
@@ -1115,7 +1244,7 @@ export default function UsersPage() {
                         </div>
 
                         {/* Status Toggle for Admins */}
-                        {isAdmin && user.id !== currentUser.id && (
+                        {isAdmin && user.id !== currentUser.id && user.role !== 'Owner' && (
                           <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Account Status</span>
@@ -1141,9 +1270,9 @@ export default function UsersPage() {
         <Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogClose}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle>Edit User</DialogTitle>
+              <DialogTitle>{isViewMode ? 'View User' : 'Edit User'}</DialogTitle>
               <DialogDescription>
-                Update user information and permissions.
+                {isViewMode ? 'View user information.' : 'Update user information and permissions.'}
               </DialogDescription>
             </DialogHeader>
             <Form {...editForm}>
@@ -1156,7 +1285,7 @@ export default function UsersPage() {
                       <FormItem>
                         <FormLabel>First Name</FormLabel>
                         <FormControl>
-                          <Input {...field} />
+                          <Input {...field} disabled={isViewMode} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1169,7 +1298,7 @@ export default function UsersPage() {
                       <FormItem>
                         <FormLabel>Last Name</FormLabel>
                         <FormControl>
-                          <Input {...field} />
+                          <Input {...field} disabled={isViewMode} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1183,7 +1312,7 @@ export default function UsersPage() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input type="email" {...field} />
+                        <Input type="email" {...field} disabled={isViewMode} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1195,20 +1324,26 @@ export default function UsersPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Role</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      {isViewMode && selectedUser?.role === 'Owner' ? (
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a role" />
-                          </SelectTrigger>
+                          <Input value="Owner" disabled />
                         </FormControl>
-                        <SelectContent>
-                          {nonOwnerRoles.map((role) => (
-                            <SelectItem key={role} value={role}>
-                              {role}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      ) : (
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger disabled={isViewMode}>
+                              <SelectValue placeholder="Select a role" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {nonOwnerRoles.map((role) => (
+                              <SelectItem key={role} value={role}>
+                                {t(getRoleTranslationKey(role))}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
@@ -1228,20 +1363,23 @@ export default function UsersPage() {
                         <Switch
                           checked={field.value ?? true}
                           onCheckedChange={field.onChange}
+                          disabled={isViewMode}
                         />
                       </FormControl>
                     </FormItem>
                   )}
                 />
-                <DialogFooter>
-                  <Button 
-                    type="submit" 
-                    disabled={updateUserMutation.isPending}
-                    className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-                  >
-                    {updateUserMutation.isPending ? "Updating..." : "Update User"}
-                  </Button>
-                </DialogFooter>
+                {!isViewMode && (
+                  <DialogFooter>
+                    <Button 
+                      type="submit" 
+                      disabled={updateUserMutation.isPending}
+                      className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                    >
+                      {updateUserMutation.isPending ? "Updating..." : "Update User"}
+                    </Button>
+                  </DialogFooter>
+                )}
               </form>
             </Form>
           </DialogContent>

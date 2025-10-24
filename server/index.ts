@@ -16,6 +16,7 @@ import {
 import { auth } from "./auth";
 import { toNodeHandler } from "better-auth/node";
 import { serverLogger } from "./logger";
+import { appointmentReminderWorker } from "./workers/AppointmentReminderWorker";
 
 const app = express();
 
@@ -67,7 +68,7 @@ app.use(sanitizeMiddleware);
 // Only handle standard better-auth routes, exclude custom routes like verify-login
 app.all("/api/auth/*", (req, res, next) => {
   // Skip custom auth routes that should be handled by our custom routes
-  const customRoutes = ['verify-login', 'verify-2fa', 'check-2fa-requirement', 'verify-session-2fa', '2fa-status'];
+  const customRoutes = ['verify-login', 'verify-2fa', 'check-2fa-requirement', 'verify-session-2fa', '2fa-status', 'verify-email', 'resend-verification'];
   const path = req.path.replace('/api/auth/', '');
 
   if (customRoutes.includes(path)) {
@@ -151,6 +152,15 @@ app.use((req, res, next) => {
   }
   */
   serverLogger.info('🚫 Birthday Worker Service: DISABLED (handled by cardprocessor-go)');
+
+  // Appointment Reminder Worker - ENABLED
+  try {
+    serverLogger.info('🔔 Starting Appointment Reminder Worker...');
+    appointmentReminderWorker.start();
+    serverLogger.info('✅ Appointment Reminder Worker started');
+  } catch (error) {
+    serverLogger.error({ err: error }, 'Failed to start Appointment Reminder Worker');
+  }
 
   // Display service architecture
   serverLogger.info('🔄 Service Architecture:');

@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { useDispatch } from 'react-redux'
 import { updateUser } from '@/store/authSlice'
 import { useQueryClient } from '@tanstack/react-query'
+import { useLanguage } from '@/hooks/useLanguage'
+import { useSession } from '@/lib/betterAuthClient'
 
 interface AvatarUploadProps {
   currentAvatarUrl?: string | null
@@ -24,11 +26,14 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
 }) => {
   const dispatch = useDispatch()
   const queryClient = useQueryClient()
+  const { t } = useLanguage()
+  const sessionQuery = useSession()
   const [isUploading, setIsUploading] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+  const [optimisticAvatarUrl, setOptimisticAvatarUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
 
@@ -87,11 +92,32 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
 
       if (result.success && result.url) {
         setPreviewUrl(null)
+        // Set optimistic avatar URL for immediate UI update
+        setOptimisticAvatarUrl(result.url)
         onAvatarUpdate?.(result.url)
         // Update Redux store
         dispatch(updateUser({ avatarUrl: result.url }))
-        // Invalidate user query to refetch latest data
+        // Notify all avatar consumers to update immediately with cache-busting
+        if (userEmail) {
+          window.dispatchEvent(new CustomEvent('avatarUpdated', { detail: { email: userEmail, url: result.url } }))
+        }
+        
+        // Invalidate and refetch all auth-related queries
+        // Use resetQueries to force a complete cache reset and refetch
+        await queryClient.resetQueries({ queryKey: ["better-auth"] })
         await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] })
+        
+        // Wait a moment for the reset to complete, then refetch to ensure fresh data
+        setTimeout(async () => {
+          await queryClient.refetchQueries({ queryKey: ["better-auth"] })
+          // Also force Better Auth session refetch so all consumers update immediately
+          if (sessionQuery?.refetch) {
+            await sessionQuery.refetch()
+          }
+          // Clear optimistic state after cache is refreshed
+          setTimeout(() => setOptimisticAvatarUrl(null), 500)
+        }, 100)
+        
         // Clear the file input
         if (fileInputRef.current) {
           fileInputRef.current.value = ''
@@ -116,14 +142,34 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
       
       if (result.success) {
         setPreviewUrl(null)
+        // Clear optimistic avatar URL for immediate UI update
+        setOptimisticAvatarUrl('')
         if (fileInputRef.current) {
           fileInputRef.current.value = ''
         }
         onAvatarUpdate?.('')
         // Update Redux store
         dispatch(updateUser({ avatarUrl: null }))
-        // Invalidate user query to refetch latest data
+        // Notify all avatar consumers to update immediately (fallback to initials)
+        if (userEmail) {
+          window.dispatchEvent(new CustomEvent('avatarUpdated', { detail: { email: userEmail, url: '' } }))
+        }
+        
+        // Invalidate and refetch all auth-related queries
+        // Use resetQueries to force a complete cache reset and refetch
+        await queryClient.resetQueries({ queryKey: ["better-auth"] })
         await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] })
+        
+        // Wait a moment for the reset to complete, then refetch to ensure fresh data
+        setTimeout(async () => {
+          await queryClient.refetchQueries({ queryKey: ["better-auth"] })
+          // Also force Better Auth session refetch so all consumers update immediately
+          if (sessionQuery?.refetch) {
+            await sessionQuery.refetch()
+          }
+          // Clear optimistic state after cache is refreshed
+          setTimeout(() => setOptimisticAvatarUrl(null), 500)
+        }, 100)
       } else {
         setError(result.error || 'Failed to remove avatar')
       }
@@ -157,12 +203,17 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
 
   const getCurrentAvatarUrl = () => {
     if (previewUrl) return previewUrl
+    // Use optimistic avatar URL if set (for immediate UI updates)
+    if (optimisticAvatarUrl !== null) {
+      return optimisticAvatarUrl || getAvatarUrl({ email: userEmail })
+    }
     if (currentAvatarUrl) return currentAvatarUrl
     return getAvatarUrl({ email: userEmail })
   }
 
   const initials = getUserInitials(userEmail || '')
-  const hasCurrentAvatar = currentAvatarUrl && !getCurrentAvatarUrl().startsWith('data:image/svg+xml')
+  const displayAvatarUrl = optimisticAvatarUrl !== null ? optimisticAvatarUrl : currentAvatarUrl
+  const hasCurrentAvatar = displayAvatarUrl && !getCurrentAvatarUrl().startsWith('data:image/svg+xml')
 
   return (
     <div className={cn("flex flex-col items-center space-y-6", className)}>
@@ -218,7 +269,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
           )}>
             <Camera className={cn("text-white mb-1", iconSizes[size])} />
             <span className="text-white text-xs font-medium">
-              {isDragOver ? 'Drop here' : 'Change'}
+              {isDragOver ? t('profile.avatar.dropHere') : t('profile.avatar.change')}
             </span>
           </div>
 
@@ -258,7 +309,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
               variant="default"
             >
               <Check className="w-4 h-4 mr-2" />
-              Save Avatar
+              {t('profile.avatar.saveAvatar')}
             </Button>
             <Button
               onClick={() => {
@@ -285,7 +336,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
               ) : (
                 <ImageIcon className="w-4 h-4 mr-2" />
               )}
-              {isUploading ? 'Uploading...' : hasCurrentAvatar ? 'Change Photo' : 'Upload Photo'}
+              {isUploading ? t('profile.avatar.uploading') : hasCurrentAvatar ? t('profile.avatar.changePhoto') : t('profile.avatar.uploadPhoto')}
             </Button>
             
             {hasCurrentAvatar && !previewUrl && (
@@ -308,10 +359,10 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
         {/* Drag & Drop Hint */}
         <div className="text-center">
           <p className="text-sm text-gray-600">
-            Click or drag image to upload
+            {t('profile.avatar.clickOrDrag')}
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            JPEG, PNG or WebP • Max 5MB
+            {t('profile.avatar.fileTypes')}
           </p>
         </div>
       </div>

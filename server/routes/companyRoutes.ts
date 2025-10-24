@@ -3,7 +3,7 @@ import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { betterAuthUser, tenants, shops, stores, companies, forms, formResponses } from '@shared/schema';
 import { authenticateToken, requireRole } from '../middleware/auth-middleware';
-import { createCompanySchema, updateCompanySchema } from '@shared/schema';
+import { createCompanySchema, updateCompanySchema, completeOnboardingSchema } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 
 export const companyRoutes = Router();
@@ -11,17 +11,28 @@ export const companyRoutes = Router();
 // Get company information
 companyRoutes.get("/", authenticateToken, async (req: any, res) => {
   try {
+    console.log(`🏢 [GET /api/company] Fetching company for user ${req.user.email}, tenantId: ${req.user.tenantId}`);
+    
     const company = await db.query.companies.findFirst({
       where: sql`${companies.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!company) {
+      console.warn(`⚠️ [GET /api/company] No company found for tenant ${req.user.tenantId}`);
+      console.warn(`   User: ${req.user.email}`);
+      console.warn(`   This user won't see the onboarding modal!`);
       return res.status(404).json({ message: 'Company not found' });
     }
 
+    console.log(`✅ [GET /api/company] Found company:`, {
+      name: company.name,
+      setupCompleted: company.setupCompleted,
+      tenantId: company.tenantId,
+    });
+
     res.json(company);
   } catch (error) {
-    console.error('Get company error:', error);
+    console.error('❌ [GET /api/company] Error:', error);
     res.status(500).json({ message: 'Failed to get company information' });
   }
 });
@@ -295,5 +306,75 @@ companyRoutes.delete("/users/:userId", authenticateToken, requireRole(["Owner", 
   } catch (error) {
     console.error('Remove user error:', error);
     res.status(500).json({ message: 'Failed to remove user from company' });
+  }
+});
+
+// Complete onboarding wizard
+companyRoutes.post("/complete-onboarding", authenticateToken, async (req: any, res) => {
+  try {
+    console.log('📝 [Onboarding] Request body:', req.body);
+    console.log('👤 [Onboarding] User:', { id: req.user?.id, tenantId: req.user?.tenantId });
+
+    // Validate request body
+    let validatedData;
+    try {
+      validatedData = completeOnboardingSchema.parse(req.body);
+    } catch (validationError: any) {
+      console.error('❌ [Onboarding] Validation error:', validationError);
+      return res.status(400).json({ 
+        message: 'Validation failed', 
+        errors: validationError.errors || validationError.message 
+      });
+    }
+
+    const { geographicalLocation, language, businessDescription } = validatedData;
+
+    const company = await db.query.companies.findFirst({
+      where: sql`${companies.tenantId} = ${req.user.tenantId}`,
+    });
+
+    console.log('🏢 [Onboarding] Found company:', company ? company.id : 'none');
+
+    if (!company) {
+      return res.status(404).json({ message: 'Company not found' });
+    }
+
+    if (company.setupCompleted) {
+      return res.status(400).json({ message: 'Onboarding already completed' });
+    }
+
+    const sanitizedLocation = sanitizeString(geographicalLocation);
+    const sanitizedLanguage = sanitizeString(language);
+    const sanitizedDescription = sanitizeString(businessDescription);
+
+    console.log('💾 [Onboarding] Updating company with:', {
+      location: sanitizedLocation,
+      language: sanitizedLanguage,
+      descriptionLength: sanitizedDescription?.length
+    });
+
+    const updatedCompany = await db.update(companies)
+      .set({
+        geographicalLocation: sanitizedLocation,
+        language: sanitizedLanguage,
+        businessDescription: sanitizedDescription,
+        setupCompleted: true,
+        updatedAt: new Date(),
+      })
+      .where(sql`${companies.tenantId} = ${req.user.tenantId}`)
+      .returning();
+
+    console.log('✅ [Onboarding] Successfully updated company');
+
+    res.json({
+      message: 'Onboarding completed successfully',
+      company: updatedCompany[0],
+    });
+  } catch (error) {
+    console.error('❌ [Onboarding] Unexpected error:', error);
+    res.status(500).json({ 
+      message: 'Failed to complete onboarding',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 });

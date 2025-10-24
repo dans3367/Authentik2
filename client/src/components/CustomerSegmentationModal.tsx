@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Search, Tag, Users, X, Check, User, CheckCircle } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Search, Tag, Users, X, Check, User, CheckCircle, RefreshCw } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import type { EmailContactWithDetails, ContactTag } from "@shared/schema";
+import type { EmailContactWithDetails, ContactTagWithCount } from "@shared/schema";
 
 interface CustomerSegmentationModalProps {
   isOpen: boolean;
@@ -41,6 +41,9 @@ export function CustomerSegmentationModal({
   const [searchTerm, setSearchTerm] = useState("");
   const [tempSelectedContacts, setTempSelectedContacts] = useState<string[]>(selectedContactIds);
   const [tempSelectedTags, setTempSelectedTags] = useState<string[]>(selectedTagIds);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const hasAutoInitialized = useRef(false);
+  const queryClient = useQueryClient();
 
   // Fetch contacts
   const { data: contactsData, isLoading: contactsLoading } = useQuery({
@@ -63,7 +66,17 @@ export function CustomerSegmentationModal({
   });
 
   const contacts: EmailContactWithDetails[] = (contactsData as any)?.contacts || [];
-  const tags: ContactTag[] = (tagsData as any)?.tags || [];
+  const tags: ContactTagWithCount[] = (tagsData as any)?.tags || [];
+
+  // Refresh tags data
+  const handleRefreshTags = async () => {
+    setIsRefreshing(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: ['/api/contact-tags'] });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Filter contacts based on search
   const filteredContacts = contacts.filter(contact =>
@@ -83,13 +96,20 @@ export function CustomerSegmentationModal({
       setTempSelectedContacts(selectedContactIds);
       setTempSelectedTags(selectedTagIds);
       setSearchTerm("");
+      hasAutoInitialized.current = false;
     }
   }, [isOpen, recipientType, selectedContactIds, selectedTagIds]);
 
   // Auto-select all contacts when switching to "selected" tab if none are selected
   useEffect(() => {
-    if (activeTab === 'selected' && tempSelectedContacts.length === 0 && contacts.length > 0) {
+    if (
+      activeTab === 'selected' &&
+      tempSelectedContacts.length === 0 &&
+      contacts.length > 0 &&
+      !hasAutoInitialized.current
+    ) {
       setTempSelectedContacts(contacts.map(contact => contact.id));
+      hasAutoInitialized.current = true;
     }
   }, [activeTab, contacts, tempSelectedContacts.length]);
 
@@ -244,12 +264,18 @@ export function CustomerSegmentationModal({
                       {filteredContacts.map((contact) => (
                         <div
                           key={contact.id}
-                          className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-                          onClick={() => handleContactToggle(contact.id)}
+                          className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 group"
                         >
                           <Checkbox
                             checked={tempSelectedContacts.includes(contact.id)}
-                            onChange={() => {}} // Controlled by parent click
+                            onCheckedChange={(checked) => {
+                              setTempSelectedContacts((prev) =>
+                                checked
+                                  ? (prev.includes(contact.id) ? prev : [...prev, contact.id])
+                                  : prev.filter((id) => id !== contact.id)
+                              );
+                            }}
+                            className="cursor-pointer"
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
@@ -303,6 +329,14 @@ export function CustomerSegmentationModal({
                   </div>
                   <Button
                     variant="outline"
+                    onClick={handleRefreshTags}
+                    disabled={isRefreshing || tagsLoading}
+                    title="Refresh tag counts"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  </Button>
+                  <Button
+                    variant="outline"
                     onClick={() => setTempSelectedTags([])}
                     disabled={tempSelectedTags.length === 0}
                   >
@@ -336,12 +370,17 @@ export function CustomerSegmentationModal({
                           onClick={() => handleTagToggle(tag.id)}
                         >
                           <div
-                            className="w-3 h-3 rounded-full"
+                            className="w-3 h-3 rounded-full flex-shrink-0"
                             style={{ backgroundColor: tag.color || '#gray' }}
                           />
-                          <span className="text-sm font-medium flex-1">{tag.name}</span>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm font-medium">{tag.name}</span>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {tag.contactCount || 0} {tag.contactCount === 1 ? 'customer' : 'customers'}
+                            </div>
+                          </div>
                           {tempSelectedTags.includes(tag.id) && (
-                            <Check className="h-4 w-4 text-blue-600" />
+                            <Check className="h-4 w-4 text-blue-600 flex-shrink-0" />
                           )}
                         </div>
                       ))}

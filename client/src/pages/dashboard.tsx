@@ -3,10 +3,12 @@ import { useLocation } from "wouter";
 import { NewsletterCard } from "@/components/ui/newsletter-card";
 import { HighlightsCard } from "@/components/ui/highlights-card";
 import { UpcomingBirthdaysCard } from "@/components/ui/upcoming-birthdays-card";
+import { useTranslation } from "react-i18next";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user, isLoading } = useReduxAuth();
+  const { t } = useTranslation();
 
   if (isLoading) {
     return (
@@ -35,10 +37,10 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-                Dashboard
+                {t('navigation.dashboard')}
               </h1>
               <p className="text-gray-600 dark:text-gray-400 mt-1">
-                Welcome back, {user.name || user.email}
+                {t('dashboard.welcomeBack', { name: user.name || user.email })}
               </p>
             </div>
           </div>

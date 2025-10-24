@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { User } from 'lucide-react'
 import { getAvatarUrl, getUserInitials } from '@/lib/avatarUpload'
 import { cn } from '@/lib/utils'
@@ -33,12 +33,29 @@ export const Avatar: React.FC<AvatarProps> = ({
     lg: 'w-6 h-6'
   }
 
-  const avatarUrl = getAvatarUrl(user)
+  const [overrideUrl, setOverrideUrl] = useState<string | null>(null)
+  const [cacheBuster, setCacheBuster] = useState<number>(0)
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      const detail = e.detail || {}
+      const email = user.email
+      if (!email) return
+      if (detail.email && String(detail.email).toLowerCase() === String(email).toLowerCase()) {
+        setOverrideUrl(typeof detail.url === 'string' ? detail.url : '')
+        setCacheBuster(Date.now())
+      }
+    }
+    window.addEventListener('avatarUpdated', handler as any)
+    return () => window.removeEventListener('avatarUpdated', handler as any)
+  }, [user.email])
+
+  const baseAvatarUrl = overrideUrl !== null ? overrideUrl : getAvatarUrl(user)
   const initials = getUserInitials(user.email || '')
-  
+  const isDataUrl = baseAvatarUrl.startsWith('data:')
 
   // If it's a data URL (initials SVG), show the initials
-  if (avatarUrl.startsWith('data:image/svg+xml')) {
+  if (baseAvatarUrl.startsWith('data:image/svg+xml')) {
     return (
       <div className={cn(
         sizeClasses[size],
@@ -53,11 +70,12 @@ export const Avatar: React.FC<AvatarProps> = ({
   }
 
   // If it's a real image URL, show the image
-  if (avatarUrl && !avatarUrl.startsWith('data:')) {
+  if (baseAvatarUrl && !isDataUrl) {
+    const effectiveUrl = `${baseAvatarUrl}${baseAvatarUrl.includes('?') ? '&' : '?'}v=${cacheBuster}`
     return (
       <div className={cn(sizeClasses[size], "rounded-full overflow-hidden", className)}>
         <img
-          src={avatarUrl}
+          src={effectiveUrl}
           alt="User avatar"
           className="w-full h-full object-cover"
           onError={(e) => {

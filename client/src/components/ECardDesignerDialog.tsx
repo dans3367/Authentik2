@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 type DesignerData = {
   title: string;
@@ -65,9 +66,12 @@ interface CardDesignerDialogProps {
   hideTabs?: boolean;
   // Hide description field (for birthday cards)
   hideDescription?: boolean;
+  // Pass theme metadata from parent to ensure consistency
+  themeMetadataById?: Record<string, { image?: string | null }>;
 }
 
-export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initialData, onSave, onPreviewChange, onMakeActive, isCurrentlyActive, senderName, customerInfo, businessName, holidayId, isHolidayDisabled, onToggleHoliday, customCardActive, onToggleCustomCardActive, customCardToggleLoading = false, selectedPromotions = [], onPromotionsChange, hidePromotionsTab = false, hideTabs = false, hideDescription = false }: CardDesignerDialogProps) {
+export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initialData, onSave, onPreviewChange, onMakeActive, isCurrentlyActive, senderName, customerInfo, businessName, holidayId, isHolidayDisabled, onToggleHoliday, customCardActive, onToggleCustomCardActive, customCardToggleLoading = false, selectedPromotions = [], onPromotionsChange, hidePromotionsTab = false, hideTabs = false, hideDescription = false, themeMetadataById = {} }: CardDesignerDialogProps) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [description, setDescription] = useState(initialData?.description ?? "");
   const [message, setMessage] = useState(initialData?.message ?? "");
@@ -94,6 +98,24 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
     return initialData?.customImage ?? false;
   });
   const [cardName, setCardName] = useState(initialData?.cardName ?? "");
+
+  // Compute a theme-based default title for AI context when explicit title is empty
+  const aiDefaultTitle = useMemo(() => {
+    const themeId = initialThemeId || 'default';
+    const defaults: Record<string, string> = {
+      'default': t('ecards.preview.defaultTitle') || 'Merry Christmas!',
+      'romantic-roses': t('ecards.preview.valentinesDay') || "Happy Valentine's Day!",
+      'sweet-hearts': t('ecards.preview.valentinesDay') || "Happy Valentine's Day!",
+      'shamrock-charm': t('ecards.preview.stPatricksDay') || "Happy St. Patrick\'s Day!",
+      'floral-delight': "Happy Mother's Day!",
+      'classic-tools': "Happy Father's Day!",
+      'stars-and-stripes': t('ecards.preview.independenceDay') || "Happy Independence Day!",
+      'pastel-eggs': t('ecards.preview.easter') || "Celebrate Easter with Joy!",
+      'midnight-sparkles': t('ecards.preview.newYearsDay') || "Happy New Year!",
+    };
+    const explicit = (title || '').trim();
+    return explicit || defaults[themeId] || '';
+  }, [initialThemeId, title, t]);
   const [sendDate, setSendDate] = useState(initialData?.sendDate ?? "");
   const [occasionType, setOccasionType] = useState(initialData?.occasionType ?? "");
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -149,12 +171,8 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
     setSendDate(initialData?.sendDate ?? "");
     setOccasionType(initialData?.occasionType ?? "");
 
-    // Default theme header images (seasonal: Christmas)
-    const defaultThemeImages = {
-      'default': 'https://images.unsplash.com/photo-1478479474071-8a3014c1c15a?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-      'confetti': 'https://images.unsplash.com/photo-1512317052271-03dcd8aefb21?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-      'balloons': 'https://images.unsplash.com/photo-1454372182658-c712e4c5a1db?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'
-    };
+    // Get theme metadata from parent component - use this as the source of truth for default images
+    // This ensures the modal shows the same images as displayed in the themes grid
 
     // Determine if this should use custom image based on initialData
     const hasCustomImageData = initialData?.customImage === true && initialData?.imageUrl;
@@ -183,11 +201,18 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
       console.log('📸 Setting custom theme/card image from saved data:', initialData.imageUrl);
       setImageUrl(initialData.imageUrl);
       setCustomImage(true);
-    } else if (!isCustomTheme && initialThemeId && initialThemeId in defaultThemeImages) {
-      // Default theme with its header image
-      console.log('🎭 Setting default theme image for:', initialThemeId);
-      setImageUrl(defaultThemeImages[initialThemeId as keyof typeof defaultThemeImages]);
-      setCustomImage(false);
+    } else if (!isCustomTheme && initialThemeId) {
+      // Default theme - use image from initialData or fallback to themeMetadataById
+      const themeImage = initialData?.imageUrl || themeMetadataById[initialThemeId]?.image;
+      if (themeImage) {
+        console.log('🎭 Setting default theme image for:', initialThemeId, 'URL:', themeImage);
+        setImageUrl(themeImage);
+        setCustomImage(false);
+      } else {
+        console.log('⚠️ No theme image found for:', initialThemeId);
+        setImageUrl(null);
+        setCustomImage(false);
+      }
     } else {
       // Custom theme without custom image or unknown theme
       console.log('🎨 Custom theme without image - clearing state');
@@ -207,8 +232,8 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
     // Store initial values for change tracking
     const finalImageUrl: string | null = hasCustomImageData ? (initialData.imageUrl ?? null) :
       (isCustomTheme && initialData?.imageUrl) ? initialData.imageUrl :
-        (!isCustomTheme && initialThemeId && initialThemeId in defaultThemeImages) ?
-          defaultThemeImages[initialThemeId as keyof typeof defaultThemeImages] : null;
+        (!isCustomTheme && initialThemeId) ? 
+          (initialData?.imageUrl || themeMetadataById[initialThemeId]?.image || null) : null;
 
     const finalCustomImage: boolean = Boolean(hasCustomImageData) || (Boolean(isCustomTheme) && Boolean(initialData?.imageUrl));
 
@@ -290,12 +315,8 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
       return;
     }
 
-    // Default theme header images
-    const defaultThemeImages = {
-      'default': 'https://images.unsplash.com/photo-1588195538326-c5b1e9f80a1b?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-      'confetti': 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-      'balloons': 'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'
-    };
+    // Theme images should come from the parent component via initialData
+    // This ensures consistency between the themes grid and the designer modal
 
     console.log('🔄 [Card Designer] Theme change effect triggered:', {
       initialThemeId,
@@ -310,11 +331,14 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
         setImageUrl(null);
         setImageError(false);
       }
-    } else if (initialThemeId && initialThemeId in defaultThemeImages && !customImage) {
+    } else if (initialThemeId && !customImage) {
       // For default themes, only set if not using a custom image
-      console.log('🎭 Setting default theme image for:', initialThemeId);
-      setImageUrl(defaultThemeImages[initialThemeId as keyof typeof defaultThemeImages]);
-      setImageError(false);
+      const themeImage = initialData?.imageUrl || themeMetadataById[initialThemeId]?.image;
+      if (themeImage) {
+        console.log('🎭 Setting default theme image for:', initialThemeId, 'URL:', themeImage);
+        setImageUrl(themeImage);
+        setImageError(false);
+      }
     }
   }, [initialThemeId, open]);
 
@@ -887,15 +911,15 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
     // Validate required fields for custom cards
     if (initialThemeId && initialThemeId.startsWith('custom-')) {
       if (!cardName.trim()) {
-        alert('Please enter a card name');
+        alert(t('ecards.designer.cardNameRequired'));
         return;
       }
       if (!sendDate) {
-        alert('Please select a send date');
+        alert(t('ecards.designer.sendDateRequired'));
         return;
       }
       if (!occasionType.trim()) {
-        alert('Please enter an occasion type');
+        alert(t('ecards.designer.occasionTypeRequired'));
         return;
       }
     }
@@ -941,8 +965,8 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
           style={{ direction: 'ltr' }}
         >
           <DialogHeader className="space-y-2">
-            <DialogTitle className="text-lg sm:text-xl">Design your card</DialogTitle>
-            <DialogDescription className="text-sm sm:text-base">Customize the image, header and message.</DialogDescription>
+            <DialogTitle className="text-lg sm:text-xl">{t('ecards.designer.title')}</DialogTitle>
+            <DialogDescription className="text-sm sm:text-base">{t('ecards.designer.description')}</DialogDescription>
           </DialogHeader>
 
           {/* Card Name, Send Date, and Occasion Type - Only for custom cards */}
@@ -950,19 +974,19 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
               <div className="space-y-2">
                 <label htmlFor="cardName" className="text-sm font-medium text-gray-700">
-                  Card Name <span className="text-red-500">*</span>
+                  {t('ecards.designer.cardName')} <span className="text-red-500">*</span>
                 </label>
                 <Input
                   id="cardName"
                   value={cardName}
                   onChange={(e) => setCardName(e.target.value)}
-                  placeholder="e.g., Mother's Day Card"
+                  placeholder={t('ecards.designer.cardNamePlaceholder')}
                   className="w-full"
                 />
               </div>
               <div className="space-y-2">
                 <label htmlFor="sendDate" className="text-sm font-medium text-gray-700">
-                  Send Date <span className="text-red-500">*</span>
+                  {t('ecards.designer.sendDate')} <span className="text-red-500">*</span>
                 </label>
                 <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                   <PopoverTrigger asChild>
@@ -974,7 +998,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {sendDate ? format(new Date(sendDate + 'T00:00:00'), "MMMM d") : <span>Pick a date</span>}
+                      {sendDate ? format(new Date(sendDate + 'T00:00:00'), "MMMM d") : <span>{t('ecards.designer.pickADate')}</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -995,17 +1019,17 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                     />
                   </PopoverContent>
                 </Popover>
-                <p className="text-xs text-gray-500">The card will be sent on this date</p>
+                <p className="text-xs text-gray-500">{t('ecards.designer.sendDateHint')}</p>
               </div>
               <div className="space-y-2">
                 <label htmlFor="occasionType" className="text-sm font-medium text-gray-700">
-                  Occasion Type <span className="text-red-500">*</span>
+                  {t('ecards.designer.occasionType')} <span className="text-red-500">*</span>
                 </label>
                 <Input
                   id="occasionType"
                   value={occasionType}
                   onChange={(e) => setOccasionType(e.target.value)}
-                  placeholder="e.g., Mother's Day, Christmas"
+                  placeholder={t('ecards.designer.occasionTypePlaceholder')}
                   className="w-full"
                   list="occasion-suggestions"
                 />
@@ -1021,7 +1045,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                   <option value="Thanksgiving" />
                   <option value="Halloween" />
                 </datalist>
-                <p className="text-xs text-gray-500">Type of holiday or occasion</p>
+                <p className="text-xs text-gray-500">{t('ecards.designer.occasionTypeHint')}</p>
               </div>
             </div>
           )}
@@ -1067,7 +1091,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                 <div className="w-full h-full flex items-center justify-center text-blue-500 bg-blue-50">
                   <div className="text-center">
                     <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                    <div className="text-xs sm:text-sm">Uploading image...</div>
+                    <div className="text-xs sm:text-sm">{t('ecards.designer.uploading')}</div>
                   </div>
                 </div>
               ) : imageUrl && !imageError ? (
@@ -1107,9 +1131,9 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                 <div className="w-full h-full flex items-center justify-center text-red-400 bg-red-50">
                   <div className="text-center px-4">
                     <ImageOff className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2" />
-                    <div className="text-xs sm:text-sm">Failed to load image</div>
+                    <div className="text-xs sm:text-sm">{t('ecards.designer.imageLoadFailed')}</div>
                     <Button variant="outline" size="sm" className="mt-2 text-xs" onClick={() => setImageError(false)}>
-                      Retry
+                      {t('ecards.designer.retry')}
                     </Button>
                   </div>
                 </div>
@@ -1117,7 +1141,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                 <div className="w-full h-full flex items-center justify-center text-gray-400">
                   <div className="flex items-center gap-2 text-xs sm:text-sm">
                     <ImagePlus className="w-3 h-3 sm:w-4 sm:h-4" />
-                    Add an image
+                    {t('ecards.designer.addImage')}
                   </div>
                 </div>
               )}
@@ -1205,7 +1229,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                       htmlFor="enable-custom-card-inline"
                       className="text-sm font-medium cursor-pointer whitespace-nowrap"
                     >
-                      {customCardToggleLoading ? 'Updating...' : 'Card is active'}
+                      {customCardToggleLoading ? t('ecards.designer.updating') : t('ecards.designer.cardIsActive')}
                     </Label>
                   </div>
                 )}
@@ -1219,19 +1243,19 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                     {/* Image controls - available for all cards */}
                     <DropdownMenuItem onClick={handlePickImage} disabled={uploading}>
                       <Edit className="w-4 h-4 mr-2" />
-                      {uploading ? 'Uploading...' : 'Upload Image'}
+                      {uploading ? t('ecards.designer.uploading') : t('ecards.designer.uploadImage')}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setUnsplashOpen(true)}>
                       <Search className="w-4 h-4 mr-2" />
-                      Browse Unsplash
+                      {t('ecards.designer.browseUnsplash')}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleRemoveImage}>
                       <ImageOff className="w-4 h-4 mr-2" />
-                      Remove Image
+                      {t('ecards.designer.removeImage')}
                     </DropdownMenuItem>
                     <DropdownMenuItem className="text-red-600" onClick={handleReset}>
                       <RefreshCw className="w-4 h-4 mr-2" />
-                      Reset {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) ? 'Card' : 'Text'}
+                      {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) ? t('ecards.designer.resetCard') : t('ecards.designer.resetText')}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -1245,7 +1269,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                   ref={titleInputRef}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Add your greeting here..."
+                  placeholder={t('ecards.designer.addGreeting')}
                   className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold border-0 shadow-none px-0 pr-8 sm:pr-12 focus-visible:ring-0 text-center placeholder:text-gray-400 placeholder:font-normal h-auto min-h-[3rem] sm:min-h-[4rem] md:min-h-[5rem] lg:min-h-[6rem] py-2 sm:py-3 md:py-4 leading-tight"
                 />
                 <div className="absolute right-0 top-1/2 transform -translate-y-1/2">
@@ -1266,14 +1290,14 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="space-y-2 sm:space-y-3">
-                        <div className="text-xs sm:text-sm font-medium text-gray-700">Birthday Emojis</div>
+                        <div className="text-xs sm:text-sm font-medium text-gray-700">{t('ecards.designer.emojiMenuTitle')}</div>
                         <div className="grid grid-cols-6 sm:grid-cols-8 gap-1 sm:gap-2">
                           {birthdayEmojis.map((emoji, index) => (
                             <button
                               key={index}
                               onClick={() => insertEmoji(emoji)}
                               className="w-7 h-7 sm:w-8 sm:h-8 text-base sm:text-lg hover:bg-gray-100 rounded transition-colors flex items-center justify-center"
-                              title={`Insert ${emoji}`}
+                              title={t('ecards.designer.insertEmoji', { emoji })}
                             >
                               {emoji}
                             </button>
@@ -1291,7 +1315,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                   <Input
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Add a short description (optional)..."
+                    placeholder={t('ecards.designer.addDescription')}
                     className="text-sm sm:text-base border-0 shadow-none px-0 focus-visible:ring-0 text-center placeholder:text-gray-400"
                   />
                 </div>
@@ -1301,21 +1325,22 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
               <RichTextEditor
                 value={typeof message === 'string' ? message : ''}
                 onChange={(html) => setMessage(html)}
-                placeholder="Type your birthday message here..."
+                placeholder={t('ecards.designer.typeMessage')}
                 className="text-sm sm:text-base text-gray-800"
                 customerInfo={customerInfo}
                 businessName={businessName}
                 occasionType={occasionType}
+                defaultTitle={aiDefaultTitle}
               />
 
               {/* Emoji counter and deliverability warning */}
               <div className="mt-2">
-                <div className="text-xs text-gray-500">Emojis detected in message: {emojiCount}</div>
+                <div className="text-xs text-gray-500">{t('ecards.designer.emojisDetected', { count: emojiCount })}</div>
                 {emojiCount > 1 && (
                   <div className="mt-2 flex items-start gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 rounded p-2">
                     <AlertTriangle className="h-4 w-4 mt-0.5 text-orange-700" />
                     <span>
-                      <strong>Warning:</strong> More than one emoji could affect email delivery to inbox and place your mail under Promotions or Spam.
+                      <strong>{t('ecards.designer.warningLabel')}</strong> {t('ecards.designer.emojiWarning')}
                     </span>
                   </div>
                 )}
@@ -1325,7 +1350,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                 <Input
                   value={signature}
                   onChange={(e) => setSignature(e.target.value)}
-                  placeholder={senderName ? `From ${senderName}` : "From [Your Name]"}
+                  placeholder={senderName ? t('ecards.designer.fromName', { name: senderName }) : t('ecards.designer.fromYourName')}
                   className="w-full max-w-[180px] sm:max-w-[220px] text-right border-0 shadow-none px-0 focus-visible:ring-0 placeholder:text-gray-400"
                 />
               </div>
@@ -1353,7 +1378,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                 htmlFor="enable-holiday-card"
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
               >
-                Enable this holiday card
+                {t('ecards.designer.enableHolidayCard')}
               </Label>
             </div>
           )}
@@ -1364,12 +1389,12 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
               <TabsList className={`grid w-full ${hidePromotionsTab ? 'grid-cols-1' : 'grid-cols-2'}`}>
                 <TabsTrigger value="design" className="flex items-center gap-2">
                   <Palette className="h-4 w-4" />
-                  Design
+                  {t('ecards.designer.design')}
                 </TabsTrigger>
                 {!hidePromotionsTab && (
                   <TabsTrigger value="promotions" className="flex items-center gap-2">
                     <Gift className="h-4 w-4" />
-                    Promotions
+                    {t('ecards.designer.promotions')}
                   </TabsTrigger>
                 )}
               </TabsList>
@@ -1402,7 +1427,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                 <div className="w-full h-full flex items-center justify-center text-blue-500 bg-blue-50">
                   <div className="text-center">
                     <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                    <div className="text-xs sm:text-sm">Uploading image...</div>
+                    <div className="text-xs sm:text-sm">{t('ecards.designer.uploading')}</div>
                   </div>
                 </div>
               ) : imageUrl && !imageError ? (
@@ -1439,9 +1464,9 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                 <div className="w-full h-full flex items-center justify-center text-red-400 bg-red-50">
                   <div className="text-center px-4">
                     <ImageOff className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2" />
-                    <div className="text-xs sm:text-sm">Failed to load image</div>
+                    <div className="text-xs sm:text-sm">{t('ecards.designer.imageLoadFailed')}</div>
                     <Button variant="outline" size="sm" className="mt-2 text-xs" onClick={() => setImageError(false)}>
-                      Retry
+                      {t('ecards.designer.retry')}
                     </Button>
                   </div>
                 </div>
@@ -1449,7 +1474,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                 <div className="w-full h-full flex items-center justify-center text-gray-400">
                   <div className="flex items-center gap-2 text-xs sm:text-sm">
                     <ImagePlus className="w-3 h-3 sm:w-4 sm:h-4" />
-                    Add an image
+                    {t('ecards.designer.addImage')}
                   </div>
                 </div>
               )}
@@ -1537,7 +1562,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                       htmlFor="enable-custom-card-inline-tabs"
                       className="text-sm font-medium cursor-pointer whitespace-nowrap"
                     >
-                      {customCardToggleLoading ? 'Updating...' : 'Card is active'}
+                      {customCardToggleLoading ? t('ecards.designer.updating') : t('ecards.designer.cardIsActive')}
                     </Label>
                   </div>
                 )}
@@ -1551,19 +1576,19 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                     {/* Image controls - available for all cards */}
                     <DropdownMenuItem onClick={handlePickImage} disabled={uploading}>
                       <Edit className="w-4 h-4 mr-2" />
-                      {uploading ? 'Uploading...' : 'Upload Image'}
+                      {uploading ? t('ecards.designer.uploading') : t('ecards.designer.uploadImage')}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setUnsplashOpen(true)}>
                       <Search className="w-4 h-4 mr-2" />
-                      Browse Unsplash
+                      {t('ecards.designer.browseUnsplash')}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleRemoveImage}>
                       <ImageOff className="w-4 h-4 mr-2" />
-                      Remove Image
+                      {t('ecards.designer.removeImage')}
                     </DropdownMenuItem>
                     <DropdownMenuItem className="text-red-600" onClick={handleReset}>
                       <RefreshCw className="w-4 h-4 mr-2" />
-                      Reset {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) ? 'Card' : 'Text'}
+                      {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) ? t('ecards.designer.resetCard') : t('ecards.designer.resetText')}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -1577,7 +1602,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                   ref={titleInputRef}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Add your greeting here..."
+                  placeholder={t('ecards.designer.addGreeting')}
                   className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold border-0 shadow-none px-0 pr-8 sm:pr-12 focus-visible:ring-0 text-center placeholder:text-gray-400 placeholder:font-normal h-auto min-h-[3rem] sm:min-h-[4rem] md:min-h-[5rem] lg:min-h-[6rem] py-2 sm:py-3 md:py-4 leading-tight"
                 />
                 <div className="absolute right-0 top-1/2 transform -translate-y-1/2">
@@ -1598,14 +1623,14 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="space-y-2 sm:space-y-3">
-                        <div className="text-xs sm:text-sm font-medium text-gray-700">Birthday Emojis</div>
+                        <div className="text-xs sm:text-sm font-medium text-gray-700">{t('ecards.designer.emojiMenuTitle')}</div>
                         <div className="grid grid-cols-6 sm:grid-cols-8 gap-1 sm:gap-2">
                           {birthdayEmojis.map((emoji, index) => (
                             <button
                               key={index}
                               onClick={() => insertEmoji(emoji)}
                               className="w-7 h-7 sm:w-8 sm:h-8 text-base sm:text-lg hover:bg-gray-100 rounded transition-colors flex items-center justify-center"
-                              title={`Insert ${emoji}`}
+                              title={t('ecards.designer.insertEmoji', { emoji })}
                             >
                               {emoji}
                             </button>
@@ -1621,21 +1646,22 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
               <RichTextEditor
                 value={typeof message === 'string' ? message : ''}
                 onChange={(html) => setMessage(html)}
-                placeholder="Type your birthday message here..."
+                placeholder={t('ecards.designer.typeMessage')}
                 className="text-sm sm:text-base text-gray-800"
                 customerInfo={customerInfo}
                 businessName={businessName}
                 occasionType={occasionType}
+                defaultTitle={aiDefaultTitle}
               />
 
               {/* Emoji counter and deliverability warning */}
               <div className="mt-2">
-                <div className="text-xs text-gray-500">Emojis detected in message: {emojiCount}</div>
+                <div className="text-xs text-gray-500">{t('ecards.designer.emojisDetected', { count: emojiCount })}</div>
                 {emojiCount > 1 && (
                   <div className="mt-2 flex items-start gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 rounded p-2">
                     <AlertTriangle className="h-4 w-4 mt-0.5 text-orange-700" />
                     <span>
-                      <strong>Warning:</strong> More than one emoji could affect email delivery to inbox and place your mail under Promotions or Spam.
+                      <strong>{t('ecards.designer.warningLabel')}</strong> {t('ecards.designer.emojiWarning')}
                     </span>
                   </div>
                 )}
@@ -1645,7 +1671,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                 <Input
                   value={signature}
                   onChange={(e) => setSignature(e.target.value)}
-                  placeholder={senderName ? `From ${senderName}` : "From [Your Name]"}
+                  placeholder={senderName ? t('ecards.designer.fromName', { name: senderName }) : t('ecards.designer.fromYourName')}
                   className="w-full max-w-[180px] sm:max-w-[220px] text-right border-0 shadow-none px-0 focus-visible:ring-0 placeholder:text-gray-400"
                 />
               </div>
@@ -1673,7 +1699,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                 htmlFor="enable-holiday-card"
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
               >
-                Enable this holiday card
+                {t('ecards.designer.enableHolidayCard')}
               </Label>
             </div>
           )}
@@ -1684,12 +1710,12 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                 <TabsContent value="promotions" className="mt-4">
                   <div className="space-y-4">
                     <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                      <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">Select Promotions to Send</h4>
+                      <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">{t('ecards.designer.promotionsTabTitle')}</h4>
                       <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1">
-                        <li>• <strong>Click on a promotion</strong> to select/deselect it</li>
-                        <li>• <strong>Selected promotions</strong> will be sent with this card email</li>
-                        <li>• You can select multiple promotions per card</li>
-                        <li>• Click the <strong>eye icon</strong> to preview promotion content</li>
+                        <li dangerouslySetInnerHTML={{ __html: '• ' + t('ecards.designer.promotionsInstruction1') }} />
+                        <li dangerouslySetInnerHTML={{ __html: '• ' + t('ecards.designer.promotionsInstruction2') }} />
+                        <li>• {t('ecards.designer.promotionsInstruction3')}</li>
+                        <li dangerouslySetInnerHTML={{ __html: '• ' + t('ecards.designer.promotionsInstruction4') }} />
                       </ul>
                     </div>
                     {onPromotionsChange ? (
@@ -1701,7 +1727,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                       />
                     ) : (
                       <div className="text-sm text-gray-500 italic">
-                        Promotion management is not available for this card.
+                        {t('ecards.designer.promotionNotAvailable')}
                       </div>
                     )}
                   </div>
@@ -1743,16 +1769,16 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                     className="text-sm"
                     disabled={isCurrentlyActive}
                   >
-                    {isCurrentlyActive ? 'Currently Active' : 'Make Active'}
+                    {isCurrentlyActive ? t('ecards.designer.currentlyActive') : t('ecards.designer.makeActive')}
                   </Button>
                 )}
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={handleClose} className="text-sm">
-                  Close
+                  {t('ecards.designer.cancel')}
                 </Button>
                 <Button onClick={handleSave} className="text-sm">
-                  Save
+                  {t('ecards.designer.save')}
                 </Button>
               </div>
             </div>
@@ -1762,15 +1788,15 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
           <Dialog open={unsplashOpen} onOpenChange={setUnsplashOpen}>
             <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle className="text-lg sm:text-xl">Browse Images from Unsplash</DialogTitle>
-                <DialogDescription className="text-sm sm:text-base">Search for high-quality stock photos for your card header.</DialogDescription>
+                <DialogTitle className="text-lg sm:text-xl">{t('ecards.designer.unsplashTitle')}</DialogTitle>
+                <DialogDescription className="text-sm sm:text-base">{t('ecards.designer.unsplashDescription')}</DialogDescription>
               </DialogHeader>
 
               <div className="space-y-3 sm:space-y-4">
                 <div className="flex flex-col sm:flex-row gap-2">
                   <div className="relative">
                     <Input
-                      placeholder="Search for images..."
+                      placeholder={t('ecards.designer.searchForImages')}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && startNewSearch(searchQuery)}
@@ -1795,7 +1821,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                     className="w-full sm:w-auto text-sm"
                   >
                     <Search className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
-                    Search
+                    {t('ecards.designer.search')}
                   </Button>
                 </div>
 
@@ -1803,11 +1829,11 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                 {hasSearched && !loading && totalResults > 0 && (
                   <div className="flex items-center justify-between text-sm text-gray-600">
                     <span>
-                      Showing {unsplashImages.length} of {totalResults.toLocaleString()} results for "{searchQuery}"
+                      {t('ecards.designer.showingResults', { count: unsplashImages.length, total: totalResults.toLocaleString(), query: searchQuery })}
                     </span>
                     {currentPage < totalPages && (
                       <span className="text-xs text-gray-500">
-                        Page {currentPage} of {totalPages}
+                        {t('ecards.designer.pageOf', { current: currentPage, total: totalPages })}
                       </span>
                     )}
                   </div>
@@ -1839,7 +1865,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                         {loadingMore ? (
                           <div className="flex items-center gap-2 text-gray-600">
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
-                            <span className="text-sm">Loading more images...</span>
+                            <span className="text-sm">{t('ecards.designer.loadingMoreImages')}</span>
                           </div>
                         ) : (
                           <Button
@@ -1849,13 +1875,13 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                             disabled={loadingMore}
                           >
                             <ChevronRight className="w-4 h-4 mr-1" />
-                            Load More ({(totalPages - currentPage) > 0 ? `${Math.min(15, totalResults - unsplashImages.length)} more` : 'No more'})
+                            {t('ecards.designer.loadMore', { count: (totalPages - currentPage) > 0 ? Math.min(15, totalResults - unsplashImages.length) : t('ecards.designer.noMore') })}
                           </Button>
                         )}
 
                         {/* Progress indicator */}
                         <div className="text-xs text-gray-500">
-                          Loaded {unsplashImages.length} of {totalResults.toLocaleString()} images
+                          {t('ecards.designer.loadedImages', { count: unsplashImages.length, total: totalResults.toLocaleString() })}
                         </div>
                       </div>
                     )}
@@ -1865,12 +1891,12 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                 {!loading && unsplashImages.length === 0 && hasSearched && searchQuery && (
                   <div className="text-center py-6 sm:py-8 text-gray-500">
                     <div className="space-y-2">
-                      <p className="text-sm sm:text-base">No images found for "{searchQuery}". Try a different search term.</p>
+                      <p className="text-sm sm:text-base">{t('ecards.designer.noImagesFound', { query: searchQuery })}</p>
                       {!import.meta.env.VITE_ACCESS_KEY && (
                         <div className="text-xs sm:text-sm text-orange-600 bg-orange-50 p-3 rounded-md mx-auto max-w-md">
-                          <p className="font-medium">Unsplash API not configured</p>
-                          <p>Add VITE_ACCESS_KEY to your .env file to enable image search.</p>
-                          <p>Showing demo images instead.</p>
+                          <p className="font-medium">{t('ecards.designer.unsplashNotConfigured')}</p>
+                          <p>{t('ecards.designer.addAccessKey')}</p>
+                          <p>{t('ecards.designer.showingDemoImages')}</p>
                         </div>
                       )}
                     </div>
@@ -1882,11 +1908,8 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                     <div className="space-y-3">
                       <Search className="w-12 h-12 mx-auto text-gray-300" />
                       <div>
-                        <p className="text-sm sm:text-base font-medium">Search for beautiful images</p>
-                        <p className="text-xs sm:text-sm">Enter a search term above to find high-quality photos from Unsplash</p>
-                      </div>
-                      <div className="text-xs text-gray-400">
-                        Try searches like: "birthday party", "celebration", "cake", "balloons"
+                        <p className="text-sm sm:text-base font-medium">{t('ecards.designer.searchToStart')}</p>
+                        <p className="text-xs sm:text-sm">{t('ecards.designer.trySearching')}</p>
                       </div>
                     </div>
                   </div>

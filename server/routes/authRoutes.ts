@@ -3,6 +3,9 @@ import { db } from '../db';
 import { betterAuthSession, betterAuthUser, updateProfileSchema } from '@shared/schema';
 import { eq, and, not } from 'drizzle-orm';
 import { authenticateToken } from '../middleware/auth-middleware';
+import { avatarUpload, handleUploadError } from '../middleware/upload';
+import { uploadToR2, deleteImageFromR2, R2_CONFIG } from '../config/r2';
+import crypto from 'crypto';
 
 export const authRoutes = Router();
 
@@ -16,7 +19,7 @@ authRoutes.get("/user-sessions", authenticateToken, async (req: any, res) => {
     // Get all Better Auth sessions for this user
     const userSessions = await db.query.betterAuthSession.findMany({
       where: eq(betterAuthSession.userId, userId),
-      orderBy: (betterAuthSession, { desc }) => [desc(betterAuthSession.createdAt)],
+      orderBy: (sessions: any, { desc }: any) => [desc(sessions.createdAt)],
     });
     
     console.log(`📊 [Sessions] Found ${userSessions.length} sessions for user ${userId}`);
@@ -26,7 +29,7 @@ authRoutes.get("/user-sessions", authenticateToken, async (req: any, res) => {
     console.log('🔍 [Sessions] Current session token from cookie:', currentToken ? `${currentToken.substring(0, 8)}...` : 'None');
     
     // Format sessions for frontend (adapt Better Auth data structure)
-    const sessions = userSessions.map(session => {
+    const sessions = userSessions.map((session: any) => {
       // Parse user agent to get device info
       const userAgent = session.userAgent || '';
       const isMobile = /mobile|android|iphone|ipad/i.test(userAgent);
@@ -192,5 +195,122 @@ authRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
   } catch (error) {
     console.error('Update profile error:', error);
     res.status(500).json({ message: 'Failed to update profile' });
+  }
+});
+
+// Upload avatar
+authRoutes.post("/avatar", authenticateToken, (req: any, res) => {
+  avatarUpload(req, res, async (err) => {
+    if (err) {
+      const errorMessage = handleUploadError(err);
+      return res.status(400).json({ success: false, error: errorMessage });
+    }
+
+    try {
+      const userId = req.user.id;
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({ success: false, error: 'No file uploaded' });
+      }
+
+      // Check if R2 is configured
+      if (!R2_CONFIG.isConfigured) {
+        return res.status(503).json({ 
+          success: false, 
+          error: 'Avatar upload service is not configured' 
+        });
+      }
+
+      // Get current user to check for existing avatar
+      const currentUser = await db.query.betterAuthUser.findFirst({
+        where: eq(betterAuthUser.id, userId)
+      });
+
+      // Delete old avatar if exists
+      if (currentUser?.avatarUrl) {
+        await deleteImageFromR2(currentUser.avatarUrl).catch(err => {
+          console.warn('Failed to delete old avatar:', err);
+        });
+      }
+
+      // Generate unique filename
+      const fileExtension = file.originalname.split('.').pop();
+      const uniqueFilename = `${userId}-${crypto.randomBytes(8).toString('hex')}.${fileExtension}`;
+      const key = `avatars/${uniqueFilename}`;
+
+      // Upload to R2
+      const avatarUrl = await uploadToR2(key, file.buffer, file.mimetype);
+
+      // Update user record with new avatar URL
+      const updatedUser = await db.update(betterAuthUser)
+        .set({
+          avatarUrl,
+          updatedAt: new Date(),
+        })
+        .where(eq(betterAuthUser.id, userId))
+        .returning();
+
+      if (updatedUser.length === 0) {
+        return res.status(404).json({ success: false, error: 'User not found' });
+      }
+
+      console.log('✅ [Avatar] Successfully uploaded avatar for user:', userId);
+      res.json({
+        success: true,
+        url: avatarUrl,
+        message: 'Avatar uploaded successfully'
+      });
+    } catch (error) {
+      console.error('Avatar upload error:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to upload avatar' 
+      });
+    }
+  });
+});
+
+// Delete avatar
+authRoutes.delete("/avatar", authenticateToken, async (req: any, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Get current user to check for existing avatar
+    const currentUser = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.id, userId)
+    });
+
+    if (!currentUser) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    // Delete avatar from R2 if exists
+    if (currentUser.avatarUrl) {
+      await deleteImageFromR2(currentUser.avatarUrl).catch(err => {
+        console.warn('Failed to delete avatar from R2:', err);
+      });
+    }
+
+    // Update user record to remove avatar URL
+    const updatedUser = await db.update(betterAuthUser)
+      .set({
+        avatarUrl: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(betterAuthUser.id, userId))
+      .returning();
+
+    console.log('✅ [Avatar] Successfully deleted avatar for user:', userId);
+    res.json({
+      success: true,
+      message: 'Avatar deleted successfully'
+    });
+  } catch (error) {
+    console.error('Avatar deletion error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to delete avatar' 
+    });
   }
 });

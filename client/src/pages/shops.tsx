@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -131,6 +132,7 @@ function getStatusBadge(status: string) {
 }
 
 export default function ShopsPage() {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'maintenance'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -292,14 +294,14 @@ export default function ShopsPage() {
       // Invalidate all queries that start with '/api/shops'
       queryClient.invalidateQueries({ queryKey: ['/api/shops'] });
       toast({
-        title: "Success",
-        description: data.message || "Shop status updated successfully",
+        title: t('common.success'),
+        description: data.message || t('shops.toasts.statusUpdated'),
       });
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to update shop status",
+        title: t('common.error'),
+        description: t('shops.toasts.updateError'),
         variant: "destructive",
       });
     },
@@ -315,14 +317,14 @@ export default function ShopsPage() {
       queryClient.invalidateQueries({ queryKey: ['/api/shops'] });
       setDeleteShopId(null);
       toast({
-        title: "Success",
-        description: "Shop deleted successfully",
+        title: t('common.success'),
+        description: t('shops.toasts.shopDeleted'),
       });
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to delete shop",
+        title: t('common.error'),
+        description: t('shops.toasts.deleteError'),
         variant: "destructive",
       });
     },
@@ -332,7 +334,7 @@ export default function ShopsPage() {
   const columns: ColumnDef<ShopWithManager>[] = [
     {
       accessorKey: "shop",
-      header: "SHOP",
+      header: t('shops.table.shop').toUpperCase(),
       cell: ({ row }) => {
           const shop = row.original;
           return (
@@ -355,7 +357,7 @@ export default function ShopsPage() {
     },
     {
       accessorKey: "status",
-      header: "STATUS",
+      header: t('shops.table.status').toUpperCase(),
       cell: ({ row }) => {
         const status = row.getValue("status") as string || 'active';
         return getStatusBadge(status);
@@ -363,11 +365,11 @@ export default function ShopsPage() {
     },
     {
       accessorKey: "manager",
-      header: "MANAGER",
+      header: t('shops.table.manager').toUpperCase(),
       cell: ({ row }) => {
         const shop = row.original;
         if (!shop.manager) {
-          return <span className="text-gray-400">No manager assigned</span>;
+          return <span className="text-gray-400">{t('shops.table.noManager')}</span>;
         }
         return (
           <div className="flex items-center space-x-2">
@@ -383,7 +385,7 @@ export default function ShopsPage() {
     },
     {
       accessorKey: "location",
-      header: "LOCATION",
+      header: t('shops.table.location').toUpperCase(),
       cell: ({ row }) => {
         const shop = row.original;
         const location = [shop.city, shop.state, shop.country].filter(Boolean).join(', ');
@@ -434,7 +436,7 @@ export default function ShopsPage() {
     },
     {
       id: "actions",
-      header: "ACTIONS",
+      header: t('shops.table.actions').toUpperCase(),
       cell: ({ row }) => {
         const shop = row.original;
         
@@ -447,17 +449,17 @@ export default function ShopsPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuLabel>{t('shops.table.actions')}</DropdownMenuLabel>
               <DropdownMenuItem asChild>
                 <Link href={`/shops/${shop.id}`}>
                   <Eye className="mr-2 h-4 w-4" />
-                  View Details
+                  {t('shops.actions.viewShop')}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href={`/shops/${shop.id}/edit`}>
                   <Edit className="mr-2 h-4 w-4" />
-                  Edit Shop
+                  {t('shops.actions.editShop')}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
@@ -468,7 +470,7 @@ export default function ShopsPage() {
                 })}
               >
                 <Power className="mr-2 h-4 w-4" />
-                {shop.status === 'active' ? 'Deactivate' : 'Activate'}
+                {shop.status === 'active' ? t('shops.status.inactive') : t('shops.status.active')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -476,7 +478,7 @@ export default function ShopsPage() {
                 onClick={() => setDeleteShopId(shop.id)}
               >
                 <Trash className="mr-2 h-4 w-4" />
-                Delete
+                {t('shops.actions.deleteShop')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -532,10 +534,10 @@ export default function ShopsPage() {
                 <Store className="text-blue-600 dark:text-blue-500 w-8 h-8" />
                 <div>
                   <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-                    Shops
+                    {t('shops.title')}
                   </h1>
                   <p className="text-gray-600 dark:text-gray-400 mt-1">
-                    Manage your shop locations and details
+                    {t('shops.subtitle')}
                   </p>
                 </div>
               </div>
@@ -546,7 +548,7 @@ export default function ShopsPage() {
                 className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
               >
                 <Plus className="mr-2 h-4 w-4" />
-                Add Shop
+                {t('shops.addShop')}
               </Button>
             ) : (
               <Link href="/shops/new">
@@ -554,7 +556,7 @@ export default function ShopsPage() {
                   className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Shop
+                  {t('shops.addShop')}
                 </Button>
               </Link>
             )}
@@ -568,7 +570,7 @@ export default function ShopsPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-blue-600">Total Shops</p>
+                  <p className="text-sm font-medium text-blue-600">{t('shops.stats.totalShops')}</p>
                   <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{data.stats.totalShops}</p>
                 </div>
                 <Store className="text-blue-500 w-8 h-8" />
@@ -580,7 +582,7 @@ export default function ShopsPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-green-600">Active Shops</p>
+                  <p className="text-sm font-medium text-green-600">{t('shops.stats.activeShops')}</p>
                   <p className="text-2xl font-bold text-green-900 dark:text-green-100">{data.stats.activeShops}</p>
                 </div>
                 <CheckCircle className="text-green-500 w-8 h-8" />
@@ -596,7 +598,7 @@ export default function ShopsPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-purple-600">Categories</p>
+                  <p className="text-sm font-medium text-purple-600">{t('shops.filters.allCategories')}</p>
                   <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
                     {Object.keys(data.stats.shopsByCategory).length || 0}
                   </p>
@@ -658,7 +660,7 @@ export default function ShopsPage() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search shops..."
+            placeholder={t('shops.filters.searchPlaceholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-8"
@@ -667,22 +669,22 @@ export default function ShopsPage() {
         <div className="flex gap-2">
           <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as any)}>
             <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filter by status" />
+              <SelectValue placeholder={t('shops.filters.filterByStatus')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-              <SelectItem value="maintenance">Maintenance</SelectItem>
+              <SelectItem value="all">{t('shops.filters.allStatuses')}</SelectItem>
+              <SelectItem value="active">{t('shops.status.active')}</SelectItem>
+              <SelectItem value="inactive">{t('shops.status.inactive')}</SelectItem>
+              <SelectItem value="maintenance">{t('shops.status.maintenance')}</SelectItem>
             </SelectContent>
           </Select>
           {categories.length > 0 && (
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="All categories" />
+                <SelectValue placeholder={t('shops.filters.allCategories')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="all">{t('shops.filters.allCategories')}</SelectItem>
                 {categories.map((category) => (
                   <SelectItem key={category} value={category || 'uncategorized'}>
                     {category || 'Uncategorized'}
@@ -751,7 +753,7 @@ export default function ShopsPage() {
       ) : error ? (
         <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
           <CardContent className="py-8">
-            <p className="text-center text-gray-600 dark:text-gray-300">Failed to load shops. Please try again.</p>
+            <p className="text-center text-gray-600 dark:text-gray-300">{t('shops.toasts.fetchError')}</p>
           </CardContent>
         </Card>
       ) : (
@@ -766,17 +768,17 @@ export default function ShopsPage() {
               <CardContent className="py-8">
                 <div className="text-center">
                   <Store className="mx-auto h-12 w-12 text-blue-500 dark:text-blue-400 mb-4" />
-                  <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">No shops found</h3>
+                  <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">{t('shops.empty.noShops')}</h3>
                   <p className="text-gray-600 dark:text-gray-300 mb-4">
                     {searchTerm || statusFilter !== 'all' || categoryFilter !== 'all'
-                      ? "Try adjusting your filters" 
-                      : "Get started by adding your first shop"}
+                      ? t('shops.empty.tryAdjusting') 
+                      : t('shops.empty.noShopsDescription')}
                   </p>
                   {!searchTerm && statusFilter === 'all' && categoryFilter === 'all' && (
                     <Link href="/shops/new">
                       <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
                         <Plus className="mr-2 h-4 w-4" />
-                        Add Your First Shop
+                        {t('shops.empty.createFirstShop')}
                       </Button>
                     </Link>
                   )}
@@ -797,19 +799,18 @@ export default function ShopsPage() {
       <AlertDialog open={!!deleteShopId} onOpenChange={() => setDeleteShopId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>{t('shops.deleteDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the shop
-              and all associated data.
+              {t('shops.deleteDialog.description', { name: '' })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('shops.deleteDialog.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteShopId && deleteShopMutation.mutate(deleteShopId)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {t('shops.deleteDialog.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -821,11 +822,11 @@ export default function ShopsPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-orange-600" />
-              Shop Limit Reached
+              {t('shops.limitDialog.title')}
             </DialogTitle>
             <DialogDescription>
-              Your {data?.limits?.planName} plan allows up to {data?.limits?.maxShops} shops. 
-              Please upgrade your plan to add more shops.
+              {t('shops.limitDialog.description', { current: data?.limits?.currentShops, max: data?.limits?.maxShops, plan: data?.limits?.planName })}
+              {' '}{t('shops.limitDialog.upgradeMessage')}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex-col sm:flex-row gap-2">
@@ -834,20 +835,20 @@ export default function ShopsPage() {
               onClick={() => setShowLimitModal(false)}
               className="w-full sm:w-auto"
             >
-              Cancel
+              {t('shops.limitDialog.close')}
             </Button>
             <Button 
               onClick={() => {
                 setShowLimitModal(false);
                 // TODO: Add navigation to upgrade page when available
                 toast({
-                  title: "Upgrade Plan",
-                  description: "Contact support to upgrade your plan and add more shops.",
+                  title: t('shops.limitDialog.upgradePlan'),
+                  description: t('shops.limitDialog.upgradeMessage'),
                 });
               }}
               className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
             >
-              Upgrade Plan
+              {t('shops.limitDialog.upgradePlan')}
             </Button>
           </DialogFooter>
         </DialogContent>

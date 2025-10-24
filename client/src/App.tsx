@@ -8,7 +8,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { AppLayout } from "@/components/AppLayout";
-import { ThemeProvider } from "@/contexts/ThemeContext";
 import { setGlobalNavigate } from "@/lib/authErrorHandler";
 import { lazy, Suspense, useEffect, useState, Component, ReactNode } from "react";
 import { useAuthErrorHandler, setGlobalAuthErrorHandler } from "@/hooks/useAuthErrorHandler";
@@ -45,14 +44,18 @@ const EditEmailContactPage = lazy(() => import("@/pages/email-contacts/edit"));
 const EmailAnalyticsPage = lazy(() => import("@/pages/email-analytics"));
 const BirthdaysPage = lazy(() => import("@/pages/birthdays"));
 const ECardsPage = lazy(() => import("@/pages/e-cards"));
+const CardsPage = lazy(() => import("@/pages/cards"));
 const RemindersPage = lazy(() => import("@/pages/reminders"));
 const ConfirmAppointmentPage = lazy(() => import("@/pages/confirm-appointment"));
 const PromotionsPage = lazy(() => import("@/pages/promotions"));
+const EmailComposePage = lazy(() => import("@/pages/email-compose"));
 const CreatePromotionPage = lazy(() => import("@/pages/promotions/create"));
 const EditPromotionPage = lazy(() => import("@/pages/promotions/edit"));
 const TemplatesPage = lazy(() => import("@/pages/templates"));
 const EditEmailCampaignPage = lazy(() => import("@/pages/email-campaigns/edit"));
 const UpdateProfilePage = lazy(() => import("@/pages/update-profile"));
+const SegmentationPage = lazy(() => import("@/pages/segmentation"));
+const ManagementPage = lazy(() => import("@/pages/management"));
 
 // Loading component for Suspense fallback
 const PageLoader = () => (
@@ -116,33 +119,49 @@ class ErrorBoundary extends Component<
 
 // Component to handle route protection and redirection
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, user } = useReduxAuth();
+  const { isAuthenticated, user, isInitialized } = useReduxAuth();
   const [location, setLocation] = useLocation();
   
   const isEmailVerified = user ? user.emailVerified : undefined;
   
   // Handle redirects in useEffect to prevent React warnings about updating during render
   useEffect(() => {
+    // Don't redirect until auth is initialized
+    if (!isInitialized) {
+      console.log("🔒 [ProtectedRoute] Waiting for auth initialization...");
+      return;
+    }
+
+    console.log("🔒 [ProtectedRoute] Auth state:", {
+      isAuthenticated,
+      isEmailVerified,
+      location,
+      userEmail: user?.email,
+    });
+
     if (!isAuthenticated) {
       // Allow certain routes for unauthenticated users
       if (!['/auth', '/verify-email', '/update-profile'].includes(location)) {
+        console.log("🔒 [ProtectedRoute] Redirecting unauthenticated user to /auth");
         setLocation('/auth');
       }
     } else if (isAuthenticated && isEmailVerified === false) {
       // Allow certain routes for unverified users (strict false check only)
       if (!['/pending-verification', '/verify-email'].includes(location)) {
+        console.log("🔒 [ProtectedRoute] Redirecting unverified user to /pending-verification");
         setLocation('/pending-verification');
       }
     } else if (isAuthenticated && isEmailVerified === true) {
       // Redirect auth page to dashboard for verified users
       // 2FA handling is now done in the login flow itself
       if (['/auth', '/pending-verification'].includes(location)) {
+        console.log("🔒 [ProtectedRoute] Redirecting verified user to /dashboard");
         setLocation('/dashboard');
       }
     }
     // If isEmailVerified is undefined/null (loading state), don't redirect
     // This prevents premature redirects during authentication initialization
-  }, [isAuthenticated, isEmailVerified, location, setLocation]);
+  }, [isAuthenticated, isEmailVerified, location, setLocation, isInitialized, user?.email]);
   
   return <>{children}</>;
 }
@@ -222,18 +241,38 @@ function Router() {
                   <Route path="/email-campaigns" component={EmailCampaignsPage} />
                   <Route path="/email-campaigns/edit/:id" component={EditEmailCampaignPage} />
                   <Route path="/email-approvals" component={EmailApprovalsPage} />
+                  <Route path="/email-compose" component={EmailComposePage} />
                   <Route path="/email-contacts" component={EmailContactsPage} />
                   <Route path="/email-contacts/new" component={NewEmailContactPage} />
                   <Route path="/email-contacts/view/:id" component={ViewEmailContactPage} />
                   <Route path="/email-contacts/edit/:id" component={EditEmailContactPage} />
                   <Route path="/email-analytics" component={EmailAnalyticsPage} />
-                  <Route path="/birthdays" component={BirthdaysPage} />
-                  <Route path="/e-cards" component={ECardsPage} />
+                  <Route path="/segmentation" component={SegmentationPage} />
+                  <Route path="/cards" component={CardsPage} />
+                  <Route path="/birthdays">
+                    {() => {
+                      const [, setLocation] = useLocation();
+                      useEffect(() => {
+                        setLocation('/cards?type=birthday');
+                      }, []);
+                      return null;
+                    }}
+                  </Route>
+                  <Route path="/e-cards">
+                    {() => {
+                      const [, setLocation] = useLocation();
+                      useEffect(() => {
+                        setLocation('/cards?type=ecard');
+                      }, []);
+                      return null;
+                    }}
+                  </Route>
                   <Route path="/reminders" component={RemindersPage} />
                   <Route path="/shops" component={ShopsPage} />
                   <Route path="/shops/new" component={NewShopPage} />
                   <Route path="/shops/:id" component={ShopDetailsPage} />
                   <Route path="/shops/:id/edit" component={EditShopPage} />
+                  <Route path="/management" component={ManagementPage} />
                   <Route path="/forms" component={FormsPage} />
                   <Route path="/forms/add" component={FormsAddPage} />
                   <Route path="/forms/:id/edit" component={FormsEditPage} />
@@ -270,10 +309,8 @@ function App() {
         >
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
-              <ThemeProvider>
-                <Toaster />
-                <Router />
-              </ThemeProvider>
+              <Toaster />
+              <Router />
             </TooltipProvider>
           </QueryClientProvider>
         </PersistGate>

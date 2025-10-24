@@ -78,6 +78,20 @@ export function useRegister() {
   const mutateAsync = async (data: RegisterData) => {
     setIsPending(true);
       try {
+        // Step 1: Store company name on the server before signup
+        // This allows the auth hook to access it when creating the tenant/company
+        await fetch('/api/signup/store-company-name', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: data.email,
+            companyName: data.companyName,
+          }),
+        });
+        
+        // Step 2: Proceed with Better Auth signup
         const result = await signUp.email({
           email: data.email,
           password: data.password,

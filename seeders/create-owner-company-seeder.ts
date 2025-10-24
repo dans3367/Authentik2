@@ -43,9 +43,9 @@ interface CompanyConfig {
 }
 
 const COMPANY_CONFIG: CompanyConfig = {
-  name: "Example Corporation",
-  slug: "example-corp",
-  description: "Example Corporation - Demo company for Owner users",
+  name: "Example Demo Company",
+  slug: "example-demo",
+  description: "Example Demo Company - Demo company for Owner users",
   website: "https://example.com",
   industry: "Technology",
   maxUsers: 100
