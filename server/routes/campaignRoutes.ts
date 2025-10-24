@@ -73,8 +73,10 @@ campaignRoutes.get("/:id", authenticateToken, requireTenant, async (req: any, re
   }
 });
 
+import { requireRole } from '../middleware/auth-middleware';
+
 // Create campaign
-campaignRoutes.post("/", authenticateToken, requireTenant, async (req: any, res) => {
+campaignRoutes.post("/", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator', 'Manager']), async (req: any, res) => {
   try {
     const validatedData = createCampaignSchema.parse(req.body);
     const { name, description, type, targetAudience, budget, startDate, endDate, status } = validatedData;
@@ -105,7 +107,7 @@ campaignRoutes.post("/", authenticateToken, requireTenant, async (req: any, res)
 });
 
 // Update campaign
-campaignRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, res) => {
+campaignRoutes.put("/:id", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator', 'Manager']), async (req: any, res) => {
   try {
     const { id } = req.params;
     const validatedData = updateCampaignSchema.parse(req.body);
@@ -168,7 +170,7 @@ campaignRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, re
 });
 
 // Delete campaign
-campaignRoutes.delete("/:id", authenticateToken, requireTenant, async (req: any, res) => {
+campaignRoutes.delete("/:id", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const { id } = req.params;
 

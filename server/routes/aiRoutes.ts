@@ -1,7 +1,11 @@
 import { Router } from "express";
 import { generateText } from "ai";
 
+import { authenticateToken } from '../middleware/auth-middleware';
+
 const router = Router();
+
+router.use(authenticateToken);
 
 // AI model configuration - default google/gemini-2.0-flash
 // Other models: meta/llama-3.1-8b, google/gemini-2.0-flash-lite, xai/grok-3-mini, meta/llama-4-scout
@@ -19,9 +23,11 @@ function ensureApiKey(res: any) {
   return true;
 }
 
+import { authenticateToken } from '../middleware/auth-middleware';
+
 // POST /api/ai/generate-birthday-message
 // Generate an occasion-specific greeting message using AI
-router.post("/generate-birthday-message", async (req, res) => {
+router.post("/generate-birthday-message", authenticateToken, async (req, res) => {
   try {
     const { customerName, businessName, occasionType, defaultTitle } = req.body;
 

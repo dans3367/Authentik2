@@ -87,8 +87,10 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+import { requireRole } from '../middleware/auth-middleware';
+
 // POST /api/appointment-reminders - Create reminder
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requireRole(['Owner', 'Administrator', 'Manager']), async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
     const tenantId = user.tenantId;
@@ -142,7 +144,7 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 // POST /api/appointment-reminders/send - Send reminders for appointments
-router.post('/send', async (req: Request, res: Response) => {
+router.post('/send', requireRole(['Owner', 'Administrator', 'Manager']), async (req: Request, res: Response) => {
   try {
     const { appointmentIds, reminderType = 'email' } = req.body;
     const user = (req as any).user;
@@ -287,7 +289,7 @@ Your Team`;
 });
 
 // PUT /api/appointment-reminders/:id/status - Update reminder status
-router.put('/:id/status', async (req: Request, res: Response) => {
+router.put('/:id/status', requireRole(['Owner', 'Administrator', 'Manager']), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status, errorMessage } = req.body;

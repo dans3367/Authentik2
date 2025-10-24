@@ -73,6 +73,8 @@ devRoutes.get("/health", async (req, res) => {
   }
 });
 
+devRoutes.use(authenticateToken);
+
 // Create test managers
 devRoutes.post("/create-test-managers", async (req, res) => {
   try {

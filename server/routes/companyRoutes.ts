@@ -128,7 +128,7 @@ companyRoutes.patch("/", authenticateToken, requireRole(["Owner", "Administrator
 });
 
 // Get company statistics
-companyRoutes.get("/stats", authenticateToken, async (req: any, res) => {
+companyRoutes.get("/stats", authenticateToken, requireRole(['Owner', 'Administrator', 'Manager']), async (req: any, res) => {
   try {
     const [
       userStats,
@@ -174,7 +174,7 @@ companyRoutes.get("/stats", authenticateToken, async (req: any, res) => {
 });
 
 // Get company users
-companyRoutes.get("/users", authenticateToken, async (req: any, res) => {
+companyRoutes.get("/users", authenticateToken, requireRole(['Owner', 'Administrator', 'Manager']), async (req: any, res) => {
   try {
     const { page = 1, limit = 50, role, search } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
@@ -310,7 +310,7 @@ companyRoutes.delete("/users/:userId", authenticateToken, requireRole(["Owner", 
 });
 
 // Complete onboarding wizard
-companyRoutes.post("/complete-onboarding", authenticateToken, async (req: any, res) => {
+companyRoutes.post("/complete-onboarding", authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     console.log('📝 [Onboarding] Request body:', req.body);
     console.log('👤 [Onboarding] User:', { id: req.user?.id, tenantId: req.user?.tenantId });

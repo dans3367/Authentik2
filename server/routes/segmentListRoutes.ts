@@ -189,8 +189,10 @@ segmentListRoutes.get("/segment-lists/:id", authenticateToken, requireTenant, as
   }
 });
 
+import { requireRole } from '../middleware/auth-middleware';
+
 // Create segment list
-segmentListRoutes.post("/segment-lists", authenticateToken, requireTenant, async (req: any, res) => {
+segmentListRoutes.post("/segment-lists", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator', 'Manager']), async (req: any, res) => {
   try {
     const data: CreateSegmentListData = req.body;
 
@@ -224,7 +226,7 @@ segmentListRoutes.post("/segment-lists", authenticateToken, requireTenant, async
 });
 
 // Update segment list
-segmentListRoutes.patch("/segment-lists/:id", authenticateToken, requireTenant, async (req: any, res) => {
+segmentListRoutes.patch("/segment-lists/:id", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator', 'Manager']), async (req: any, res) => {
   try {
     const { id } = req.params;
     const data: UpdateSegmentListData = req.body;
@@ -286,7 +288,7 @@ segmentListRoutes.patch("/segment-lists/:id", authenticateToken, requireTenant, 
 });
 
 // Delete segment list
-segmentListRoutes.delete("/segment-lists/:id", authenticateToken, requireTenant, async (req: any, res) => {
+segmentListRoutes.delete("/segment-lists/:id", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const { id } = req.params;
 

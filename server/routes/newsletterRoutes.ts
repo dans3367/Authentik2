@@ -164,8 +164,10 @@ newsletterRoutes.get("/:id", authenticateToken, requireTenant, async (req: any, 
   }
 });
 
+import { requireRole } from '../middleware/auth-middleware';
+
 // Create newsletter
-newsletterRoutes.post("/", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.post("/", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator', 'Manager']), async (req: any, res) => {
   try {
     const validatedData = createNewsletterSchema.parse(req.body);
     const { title, subject, content, scheduledAt, status } = validatedData;
@@ -207,7 +209,7 @@ newsletterRoutes.post("/", authenticateToken, requireTenant, async (req: any, re
 });
 
 // Update newsletter
-newsletterRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.put("/:id", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator', 'Manager']), async (req: any, res) => {
   try {
     const { id } = req.params;
     const validatedData = updateNewsletterSchema.parse(req.body);
@@ -262,7 +264,7 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, 
 });
 
 // Delete newsletter
-newsletterRoutes.delete("/:id", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.delete("/:id", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const { id } = req.params;
 

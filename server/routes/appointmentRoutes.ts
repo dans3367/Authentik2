@@ -167,7 +167,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 });
 
 // POST /api/appointments - Create new appointment
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requireRole(['Owner', 'Administrator', 'Manager']), async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
     const tenantId = user.tenantId;
@@ -221,7 +221,7 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 // PUT /api/appointments/:id - Update appointment
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', requireRole(['Owner', 'Administrator', 'Manager']), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const user = (req as any).user;

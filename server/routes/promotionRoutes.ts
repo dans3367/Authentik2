@@ -92,8 +92,10 @@ promotionRoutes.get("/:id", authenticateToken, requireTenant, async (req: any, r
   }
 });
 
+import { requireRole } from '../middleware/auth-middleware';
+
 // Create promotion
-promotionRoutes.post("/", authenticateToken, requireTenant, async (req: any, res) => {
+promotionRoutes.post("/", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator', 'Manager']), async (req: any, res) => {
   try {
     const validatedData = createPromotionSchema.parse(req.body);
 
@@ -122,7 +124,7 @@ promotionRoutes.post("/", authenticateToken, requireTenant, async (req: any, res
 });
 
 // Update promotion
-promotionRoutes.patch("/:id", authenticateToken, requireTenant, async (req: any, res) => {
+promotionRoutes.patch("/:id", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator', 'Manager']), async (req: any, res) => {
   try {
     const { id } = req.params;
     const validatedData = updatePromotionSchema.parse(req.body);
@@ -161,7 +163,7 @@ promotionRoutes.patch("/:id", authenticateToken, requireTenant, async (req: any,
 });
 
 // Delete promotion
-promotionRoutes.delete("/:id", authenticateToken, requireTenant, async (req: any, res) => {
+promotionRoutes.delete("/:id", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const { id } = req.params;
 

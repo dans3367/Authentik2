@@ -13,7 +13,7 @@ adminRoutes.get("/sessions/stats", authenticateToken, requireRole('Administrator
       totalSessions: sql<number>`count(*)`,
       activeSessions: sql<number>`count(*) filter (where expires_at > now())`,
       expiredSessions: sql<number>`count(*) filter (where expires_at <= now())`,
-    }).from(refreshTokens);
+    }).from(refreshTokens).where(sql`${refreshTokens.tenantId} = ${req.user.tenantId}`);
 
     res.json(stats[0]);
   } catch (error) {
@@ -29,7 +29,7 @@ adminRoutes.get("/sessions", authenticateToken, requireRole('Administrator'), as
     const { page = 1, limit = 50, userId, deviceId, ipAddress } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
-    let whereClause = sql`1=1`;
+    let whereClause = sql`${refreshTokens.tenantId} = ${req.user.tenantId}`;
     const params: any[] = [];
 
     if (userId) {
@@ -93,7 +93,7 @@ adminRoutes.delete("/sessions", authenticateToken, requireRole('Administrator'),
 
     // Delete session
     const deletedSession = await db.delete(refreshTokens)
-      .where(sql`${refreshTokens.id} = ${sessionId}`)
+      .where(sql`${refreshTokens.id} = ${sessionId} AND ${refreshTokens.tenantId} = ${req.user.tenantId}`)
       .returning();
 
     if (deletedSession.length === 0) {
@@ -252,7 +252,7 @@ adminRoutes.put("/users/:userId", authenticateToken, requireRole('Administrator'
 
     // Check if user exists
     const existingUser = await db.query.betterAuthUser.findFirst({
-      where: sql`${betterAuthUser.id} = ${userId}`,
+      where: sql`${betterAuthUser.id} = ${userId} AND ${betterAuthUser.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!existingUser) {
@@ -312,7 +312,7 @@ adminRoutes.patch("/users/:userId/status", authenticateToken, requireRole('Admin
 
     // Check if user exists
     const user = await db.query.betterAuthUser.findFirst({
-      where: sql`${betterAuthUser.id} = ${userId}`,
+      where: sql`${betterAuthUser.id} = ${userId} AND ${betterAuthUser.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!user) {
@@ -366,7 +366,7 @@ adminRoutes.patch("/users/:userId/role", authenticateToken, requireRole('Adminis
 
     // Check if user exists
     const user = await db.query.betterAuthUser.findFirst({
-      where: sql`${betterAuthUser.id} = ${userId}`,
+      where: sql`${betterAuthUser.id} = ${userId} AND ${betterAuthUser.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!user) {
@@ -406,7 +406,7 @@ adminRoutes.delete("/users/:userId", authenticateToken, requireRole('Administrat
 
     // Check if user exists
     const user = await db.query.betterAuthUser.findFirst({
-      where: sql`${betterAuthUser.id} = ${userId}`,
+      where: sql`${betterAuthUser.id} = ${userId} AND ${betterAuthUser.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!user) {
@@ -444,26 +444,26 @@ adminRoutes.get("/stats", authenticateToken, requireRole('Administrator'), async
         verifiedUsers: sql<number>`count(*) filter (where email_verified = true)`,
         unverifiedUsers: sql<number>`count(*) filter (where email_verified = false)`,
         twoFactorUsers: sql<number>`count(*) filter (where two_factor_enabled = true)`,
-      }).from(betterAuthUser),
+      }).from(betterAuthUser).where(sql`${betterAuthUser.tenantId} = ${req.user.tenantId}`),
 
       // Session statistics
       db.select({
         totalSessions: sql<number>`count(*)`,
         activeSessions: sql<number>`count(*) filter (where expires_at > now())`,
         expiredSessions: sql<number>`count(*) filter (where expires_at <= now())`,
-      }).from(refreshTokens),
+      }).from(refreshTokens).where(sql`${refreshTokens.tenantId} = ${req.user.tenantId}`),
 
       // Company statistics
       db.select({
         totalCompanies: sql<number>`count(*)`,
-      }).from(companies),
+      }).from(companies).where(sql`${companies.tenantId} = ${req.user.tenantId}`),
 
       // Form statistics
       db.select({
         totalForms: sql<number>`count(*)`,
         publishedForms: sql<number>`count(*) filter (where published = true)`,
         draftForms: sql<number>`count(*) filter (where published = false)`,
-      }).from(forms),
+      }).from(forms).where(sql`${forms.tenantId} = ${req.user.tenantId}`),
     ]);
 
     res.json({
@@ -487,7 +487,7 @@ adminRoutes.get("/activity", authenticateToken, requireRole('Administrator'), as
 
     // This is a placeholder - you would need to implement an activity log table
     // For now, we'll return session activity as a proxy
-    let whereClause = sql`1=1`;
+    let whereClause = sql`${refreshTokens.tenantId} = ${req.user.tenantId}`;
 
     if (userId) {
       whereClause = sql`${whereClause} AND ${refreshTokens.userId} = ${userId}`;

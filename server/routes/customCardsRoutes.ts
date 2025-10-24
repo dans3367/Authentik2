@@ -80,8 +80,10 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
+import { requireRole } from '../middleware/auth-middleware';
+
 // POST /api/custom-cards - Create a new custom card
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requireRole(['Owner', 'Administrator', 'Manager']), async (req: Request, res: Response) => {
   try {
     const { tenantId, userId } = getTenantAndUserIds(req);
     
@@ -123,7 +125,7 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 // PUT /api/custom-cards/:id - Update a custom card
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', requireRole(['Owner', 'Administrator', 'Manager']), async (req: Request, res: Response) => {
   try {
     const { tenantId } = getTenantAndUserIds(req);
     const { id } = req.params;
@@ -187,7 +189,7 @@ router.put('/:id', async (req: Request, res: Response) => {
 });
 
 // DELETE /api/custom-cards/:id - Delete a custom card
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', requireRole(['Owner', 'Administrator']), async (req: Request, res: Response) => {
   try {
     const { tenantId } = getTenantAndUserIds(req);
     const { id } = req.params;

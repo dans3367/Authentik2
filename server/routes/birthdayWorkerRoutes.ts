@@ -4,6 +4,10 @@ import { birthdayWorkerService } from '../services/BirthdayWorkerService';
 
 const birthdayWorkerRoutes = express.Router();
 
+import { requireRole } from '../middleware/auth-middleware';
+
+birthdayWorkerRoutes.use(requireRole(['Owner', 'Administrator']));
+
 // Get birthday worker status and statistics
 birthdayWorkerRoutes.get("/status", authenticateToken, async (req: any, res) => {
   try {

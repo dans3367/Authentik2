@@ -185,8 +185,10 @@ templateRoutes.get("/:id", authenticateToken, requireTenant, async (req: any, re
   }
 });
 
+import { requireRole } from '../middleware/auth-middleware';
+
 // Create new template
-templateRoutes.post("/", authenticateToken, requireTenant, async (req: any, res) => {
+templateRoutes.post("/", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator', 'Manager']), async (req: any, res) => {
   try {
     // Double-check tenant ID is present (defense in depth)
     if (!req.user?.tenantId) {
@@ -250,7 +252,7 @@ templateRoutes.post("/", authenticateToken, requireTenant, async (req: any, res)
 });
 
 // Update template
-templateRoutes.patch("/:id", authenticateToken, requireTenant, async (req: any, res) => {
+templateRoutes.patch("/:id", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator', 'Manager']), async (req: any, res) => {
   try {
     // Double-check tenant ID is present (defense in depth)
     if (!req.user?.tenantId) {
@@ -459,7 +461,7 @@ templateRoutes.post("/:id/duplicate", authenticateToken, requireTenant, async (r
 });
 
 // Delete template (soft delete by setting isActive to false)
-templateRoutes.delete("/:id", authenticateToken, requireTenant, async (req: any, res) => {
+templateRoutes.delete("/:id", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     // Double-check tenant ID is present (defense in depth)
     if (!req.user?.tenantId) {

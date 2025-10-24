@@ -79,7 +79,7 @@ formsRoutes.get("/:id", authenticateToken, async (req: any, res) => {
 });
 
 // Create new form
-formsRoutes.post("/", authenticateToken, async (req: any, res) => {
+formsRoutes.post("/", authenticateToken, requireRole(['Owner', 'Administrator', 'Manager']), async (req: any, res) => {
   try {
     const { title, description, formData, theme } = req.body;
 
@@ -108,7 +108,7 @@ formsRoutes.post("/", authenticateToken, async (req: any, res) => {
 });
 
 // Update form
-formsRoutes.put("/:id", authenticateToken, async (req: any, res) => {
+formsRoutes.put("/:id", authenticateToken, requireRole(['Owner', 'Administrator', 'Manager']), async (req: any, res) => {
   try {
     const { id } = req.params;
     const { title, description, schema, settings, theme, published } = req.body;
@@ -163,7 +163,7 @@ formsRoutes.put("/:id", authenticateToken, async (req: any, res) => {
 });
 
 // Delete form
-formsRoutes.delete("/:id", authenticateToken, async (req: any, res) => {
+formsRoutes.delete("/:id", authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const { id } = req.params;
 
