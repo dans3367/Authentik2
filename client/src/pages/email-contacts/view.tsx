@@ -28,7 +28,8 @@ import {
   UserCheck,
   Eye,
   Send,
-  TrendingUp
+  TrendingUp,
+  Clock
 } from "lucide-react";
 
 interface Contact {
@@ -376,6 +377,15 @@ export default function ViewContact() {
                 </Button>
               }
             />
+            <Button
+              variant="outline"
+              className="justify-center"
+              disabled={isSendEmailDisabled}
+              onClick={() => setLocation(`/email-compose?to=${encodeURIComponent(contact.email)}&schedule=1`)}
+            >
+              <Clock className="w-4 h-4 mr-2" />
+              Send Later
+            </Button>
             <Button 
               variant="outline"
               className="justify-center"
@@ -714,6 +724,15 @@ export default function ViewContact() {
                   </Button>
                 }
               />
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                disabled={isSendEmailDisabled}
+                onClick={() => setLocation(`/email-compose?to=${encodeURIComponent(contact.email)}&schedule=1`)}
+              >
+                <Clock className="w-4 h-4 mr-2" />
+                Send Later
+              </Button>
               <EmailActivityTimelineModal
                 contactId={contact.id}
                 contactEmail={contact.email}

@@ -48,6 +48,7 @@ const CardsPage = lazy(() => import("@/pages/cards"));
 const RemindersPage = lazy(() => import("@/pages/reminders"));
 const ConfirmAppointmentPage = lazy(() => import("@/pages/confirm-appointment"));
 const PromotionsPage = lazy(() => import("@/pages/promotions"));
+const EmailComposePage = lazy(() => import("@/pages/email-compose"));
 const CreatePromotionPage = lazy(() => import("@/pages/promotions/create"));
 const EditPromotionPage = lazy(() => import("@/pages/promotions/edit"));
 const TemplatesPage = lazy(() => import("@/pages/templates"));
@@ -239,6 +240,7 @@ function Router() {
                   <Route path="/email-campaigns" component={EmailCampaignsPage} />
                   <Route path="/email-campaigns/edit/:id" component={EditEmailCampaignPage} />
                   <Route path="/email-approvals" component={EmailApprovalsPage} />
+                  <Route path="/email-compose" component={EmailComposePage} />
                   <Route path="/email-contacts" component={EmailContactsPage} />
                   <Route path="/email-contacts/new" component={NewEmailContactPage} />
                   <Route path="/email-contacts/view/:id" component={ViewEmailContactPage} />

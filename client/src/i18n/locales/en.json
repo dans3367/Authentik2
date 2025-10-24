@@ -96,6 +96,15 @@
       "subscription": "Subscription",
       "danger": "Danger"
     },
+    "profileTab": {
+      "title": "Personal Information",
+      "avatarHint": "Click to update your profile picture",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email Address",
+      "updating": "Updating...",
+      "saveChanges": "Save Changes"
+    },
     "personalInfo": {
       "title": "Personal Information",
       "updateAvatar": "Click to update your profile picture",
@@ -120,12 +129,19 @@
     },
     "security": {
       "title": "Change Password",
+      "tipsTitle": "Essential Personal Security Tips for Better Protection",
+      "tipsDescription": "Follow these best practices to keep your account secure.",
       "currentPassword": "Current Password",
       "newPassword": "New Password",
       "confirmNewPassword": "Confirm New Password",
       "passwordStrength": "Password strength",
       "changing": "Changing...",
-      "changePassword": "Change Password"
+      "changePassword": "Change Password",
+      "tip1": "Use a strong, unique password",
+      "tip2": "Enable two-factor authentication",
+      "tip3": "Review recent account activity",
+      "tip4": "Keep your email up to date",
+      "reviewTips": "Review all security tips"
     },
     "twoFactor": {
       "title": "Two-Factor Authentication",
@@ -138,6 +154,19 @@
       "settingUp": "Setting up...",
       "enabling": "Enabling...",
       "disabling": "Disabling..."
+    },
+    "securityTips": {
+      "title": "Security Tips",
+      "description": "Follow these best practices to keep your account secure.",
+      "strongPasswords": "Use strong, unique passwords",
+      "strongPasswordsDescription": "At least 12 characters with a mix of upper/lowercase letters, numbers, and symbols. Avoid reusing passwords across sites.",
+      "enable2FA": "Enable Two-Factor Authentication (2FA)",
+      "enable2FADescription": "Add a second verification step for logins. Store backup codes in a safe place.",
+      "bewarePhishing": "Beware of phishing",
+      "bewarePhishingDescription": "Check sender domains, avoid clicking suspicious links, and never share verification codes.",
+      "useAuthenticator": "Use an authenticator app",
+      "useAuthenticatorDescription": "Prefer app-based codes over SMS when possible for greater security.",
+      "close": "Close"
     },
     "dangerZone": {
       "title": "Danger Zone",

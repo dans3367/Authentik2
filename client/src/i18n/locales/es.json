@@ -85,68 +85,6 @@
     "signIn": "Iniciar Sesión",
     "createAccount": "Crear Cuenta"
   },
-  "profile": {
-    "title": "Configuración de Cuenta",
-    "subtitle": "Administra la información de tu cuenta y configuración de seguridad",
-    "tabs": {
-      "profile": "Perfil",
-      "preferences": "Preferencias",
-      "security": "Seguridad",
-      "twoFactor": "2FA",
-      "subscription": "Suscripción",
-      "danger": "Peligro"
-    },
-    "personalInfo": {
-      "title": "Información Personal",
-      "updateAvatar": "Haz clic para actualizar tu foto de perfil",
-      "firstName": "Nombre",
-      "lastName": "Apellido",
-      "email": "Dirección de Email",
-      "saveChanges": "Guardar Cambios",
-      "updating": "Actualizando..."
-    },
-    "preferences": {
-      "title": "Preferencias de la Aplicación",
-      "expandedMenu": {
-        "title": "Menú de Navegación Expandido",
-        "description": "Mostrar el menú de navegación expandido por defecto con etiquetas visibles"
-      },
-      "language": {
-        "title": "Idioma",
-        "description": "Elige tu idioma preferido para la interfaz",
-        "english": "Inglés",
-        "spanish": "Español"
-      }
-    },
-    "security": {
-      "title": "Cambiar Contraseña",
-      "currentPassword": "Contraseña Actual",
-      "newPassword": "Nueva Contraseña",
-      "confirmNewPassword": "Confirmar Nueva Contraseña",
-      "passwordStrength": "Fuerza de la contraseña",
-      "changing": "Cambiando...",
-      "changePassword": "Cambiar Contraseña"
-    },
-    "twoFactor": {
-      "title": "Autenticación de Dos Factores",
-      "enabled": "Habilitado",
-      "disabled": "Deshabilitado",
-      "enableDescription": "Agrega una capa extra de seguridad a tu cuenta",
-      "disableDescription": "Tu cuenta está protegida con autenticación de dos factores",
-      "setUp": "Configurar 2FA",
-      "disable": "Deshabilitar 2FA",
-      "settingUp": "Configurando...",
-      "enabling": "Habilitando...",
-      "disabling": "Deshabilitando..."
-    },
-    "dangerZone": {
-      "title": "Zona de Peligro",
-      "deleteAccount": "Eliminar Cuenta",
-      "deleteDescription": "Una vez que elimines tu cuenta, no hay vuelta atrás. Esto desactivará permanentemente tu cuenta y eliminará todos tus datos incluyendo tu perfil, configuración y toda la información asociada.",
-      "deleteConfirmation": "¿Estás absolutamente seguro de que quieres eliminar tu cuenta? Esta acción no se puede deshacer y eliminará permanentemente todos tus datos.",
-      "deleting": "Eliminando..."
-    }
-  },
   "reminders": {
     "title": "¡Nunca Vuelvas a Perder una Cita!",
     "subtitle": "Administra tus citas y envía recordatorios automáticos a tus clientes. Mantén a todos informados y reduce las ausencias con nuestro sistema inteligente de recordatorios.",

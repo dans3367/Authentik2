@@ -113,6 +113,44 @@ export default function RemindersPage() {
     notes: "",
   });
 
+  // Create scheduled reminder mutation
+  const createScheduledReminderMutation = useMutation({
+    mutationFn: async ({ appointmentId, data }: { appointmentId: string; data: { reminderType: 'email' | 'sms' | 'push'; reminderTiming: '24h' | '1h' | '30m' | 'custom'; scheduledFor: Date; content?: string } }) => {
+      const response = await apiRequest('POST', '/api/appointment-reminders', {
+        appointmentId,
+        reminderType: data.reminderType,
+        reminderTiming: data.reminderTiming,
+        scheduledFor: data.scheduledFor,
+        content: data.content,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Success', description: 'Reminder scheduled successfully' });
+      setScheduleReminderModalOpen(false);
+      setScheduleAppointmentId("");
+      refetchReminders();
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error?.message || 'Failed to schedule reminder', variant: 'destructive' });
+    }
+  });
+
+  // Schedule reminder modal state
+  const [scheduleReminderModalOpen, setScheduleReminderModalOpen] = useState(false);
+  const [scheduleAppointmentId, setScheduleAppointmentId] = useState<string>("");
+  const [scheduleData, setScheduleData] = useState<{
+    reminderType: 'email' | 'sms' | 'push';
+    reminderTiming: '24h' | '1h' | '30m' | 'custom';
+    scheduledFor: Date;
+    content: string;
+  }>({
+    reminderType: 'email',
+    reminderTiming: '24h',
+    scheduledFor: new Date(),
+    content: ''
+  });
+
   // Fetch appointments
   const { 
     data: appointmentsData,
@@ -222,6 +260,30 @@ export default function RemindersPage() {
       serviceType: "",
       notes: "",
     });
+  };
+
+  const openScheduleReminder = (appointmentId: string) => {
+    const apt = appointments.find(a => a.id === appointmentId);
+    const baseDate = apt ? new Date(apt.appointmentDate) : new Date();
+    const defaultScheduled = new Date(baseDate.getTime() - 24 * 60 * 60 * 1000); // default 24h before
+    setScheduleAppointmentId(appointmentId);
+    setScheduleData({ reminderType: 'email', reminderTiming: '24h', scheduledFor: defaultScheduled, content: '' });
+    setScheduleReminderModalOpen(true);
+  };
+
+  const computeScheduledFor = (timing: '24h' | '1h' | '30m' | 'custom'): Date => {
+    const apt = appointments.find(a => a.id === scheduleAppointmentId);
+    const baseDate = apt ? new Date(apt.appointmentDate) : new Date();
+    switch (timing) {
+      case '24h':
+        return new Date(baseDate.getTime() - 24 * 60 * 60 * 1000);
+      case '1h':
+        return new Date(baseDate.getTime() - 1 * 60 * 60 * 1000);
+      case '30m':
+        return new Date(baseDate.getTime() - 30 * 60 * 1000);
+      default:
+        return new Date();
+    }
   };
 
   const handleCreateAppointment = () => {
@@ -645,6 +707,10 @@ export default function RemindersPage() {
                                         <Send className="h-4 w-4 mr-2" />
                                         Send Reminder
                                       </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => openScheduleReminder(appointment.id)}>
+                                        <Clock className="h-4 w-4 mr-2" />
+                                        Schedule Reminder
+                                      </DropdownMenuItem>
                                       <DropdownMenuSeparator />
                                       <DropdownMenuItem className="text-red-600">
                                         <Trash2 className="h-4 w-4 mr-2" />
@@ -809,6 +875,80 @@ export default function RemindersPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Schedule Reminder Modal */}
+        <Dialog open={scheduleReminderModalOpen} onOpenChange={setScheduleReminderModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Schedule Reminder</DialogTitle>
+              <DialogDescription>
+                Choose when to send the reminder and optionally customize the message.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Reminder Type</Label>
+                <Select value={scheduleData.reminderType} onValueChange={(v) => setScheduleData(prev => ({ ...prev, reminderType: v as any }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="sms" disabled>SMS (coming soon)</SelectItem>
+                    <SelectItem value="push" disabled>Push (coming soon)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Timing</Label>
+                <Select
+                  value={scheduleData.reminderTiming}
+                  onValueChange={(v) => {
+                    const timing = v as '24h' | '1h' | '30m' | 'custom';
+                    setScheduleData(prev => ({ ...prev, reminderTiming: timing, scheduledFor: timing === 'custom' ? prev.scheduledFor : computeScheduledFor(timing) }));
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="24h">24 hours before appointment</SelectItem>
+                    <SelectItem value="1h">1 hour before appointment</SelectItem>
+                    <SelectItem value="30m">30 minutes before appointment</SelectItem>
+                    <SelectItem value="custom">Custom date & time</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {scheduleData.reminderTiming === 'custom' && (
+                <div>
+                  <Label>Custom Date & Time</Label>
+                  <Input
+                    type="datetime-local"
+                    value={new Date(scheduleData.scheduledFor).toISOString().slice(0, 16)}
+                    onChange={(e) => setScheduleData(prev => ({ ...prev, scheduledFor: new Date(e.target.value) }))}
+                  />
+                </div>
+              )}
+              <div>
+                <Label>Message (optional)</Label>
+                <Textarea
+                  placeholder="Optional custom message to include in the reminder"
+                  value={scheduleData.content}
+                  onChange={(e) => setScheduleData(prev => ({ ...prev, content: e.target.value }))}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setScheduleReminderModalOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={() => createScheduledReminderMutation.mutate({ appointmentId: scheduleAppointmentId, data: scheduleData })}
+                  disabled={createScheduledReminderMutation.isPending || !scheduleAppointmentId}
+                >
+                  {createScheduledReminderMutation.isPending ? 'Scheduling...' : 'Schedule Reminder'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Settings Tab */}
         {activeTab === "settings" && (

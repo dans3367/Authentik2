@@ -2162,7 +2162,7 @@ export const createAppointmentReminderSchema = z.object({
   appointmentId: z.string().uuid(),
   reminderType: z.enum(['email', 'sms', 'push']).default('email'),
   reminderTiming: z.enum(['24h', '1h', '30m', 'custom']).default('24h'),
-  scheduledFor: z.date(),
+  scheduledFor: z.coerce.date(),
   content: z.string().optional(),
 });
 
