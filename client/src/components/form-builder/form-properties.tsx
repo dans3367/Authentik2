@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Trash2, X, Plus, ChevronDown } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { useTranslation } from 'react-i18next';
 
 interface FormPropertiesProps {
   formTitle: string;
@@ -38,6 +39,7 @@ export function FormProperties({
   onClearForm,
   hideClearButton = false
 }: FormPropertiesProps) {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(true);
   const [availableTags, setAvailableTags] = useState<Array<{id: string, name: string, color: string}>>([]);
   const [isLoadingTags, setIsLoadingTags] = useState(false);
@@ -102,8 +104,8 @@ export function FormProperties({
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CollapsibleTrigger asChild>
           <CardHeader className="cursor-pointer hover:bg-neutral-50 transition-colors">
-            <CardTitle className="text-base flex items-center justify-between">
-              Form Properties
+<CardTitle className="text-base flex items-center justify-between">
+              {t('formBuilder.properties.title', 'Form Properties')}
               <svg 
                 className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
                 fill="none" 
@@ -120,28 +122,28 @@ export function FormProperties({
           <CardContent className="space-y-4">
             {/* Form Title */}
             <div>
-              <Label htmlFor="form-title" className="text-sm font-medium text-neutral-700 mb-2">
-                Form Title
+<Label htmlFor="form-title" className="text-sm font-medium text-neutral-700 mb-2">
+                {t('formBuilder.properties.formTitle', 'Form Title')}
               </Label>
               <Input
                 id="form-title"
                 value={formTitle}
                 onChange={(e) => onUpdateFormTitle(e.target.value)}
-                placeholder="Enter form title..."
+placeholder={t('formBuilder.properties.formTitlePlaceholder','Enter form title...')}
                 className="focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
             {/* Form Description */}
             <div>
-              <Label htmlFor="form-description" className="text-sm font-medium text-neutral-700 mb-2">
-                Form Description
+<Label htmlFor="form-description" className="text-sm font-medium text-neutral-700 mb-2">
+                {t('formBuilder.properties.formDescription', 'Form Description')}
               </Label>
               <Textarea
                 id="form-description"
                 value={description}
                 onChange={(e) => handleSettingChange('description', e.target.value)}
-                placeholder="Add a description to help users understand the form..."
+placeholder={t('formBuilder.properties.formDescriptionPlaceholder','Add a description to help users understand the form...')}
                 className="focus:ring-2 focus:ring-blue-500 min-h-[60px]"
                 rows={3}
               />
@@ -149,8 +151,8 @@ export function FormProperties({
 
             {/* Tags */}
             <div>
-              <Label className="text-sm font-medium text-neutral-700 mb-2">
-                Tags
+<Label className="text-sm font-medium text-neutral-700 mb-2">
+                {t('formBuilder.properties.tags', 'Tags')}
               </Label>
               
               {/* Assigned Tags */}
@@ -189,8 +191,8 @@ export function FormProperties({
                     disabled={isLoadingTags}
                   >
                     <span className="flex items-center gap-2">
-                      <Plus className="w-4 h-4" />
-                      Assign Tags
+<Plus className="w-4 h-4" />
+                      {t('formBuilder.properties.assignTags', 'Assign Tags')}
                     </span>
                     <ChevronDown className="w-4 h-4" />
                   </Button>
@@ -198,7 +200,7 @@ export function FormProperties({
                 <DropdownMenuContent align="start" className="w-64">
                   {availableTags.length === 0 && (
                     <div className="px-2 py-1.5 text-sm text-neutral-500">
-                      No tags available
+{t('formBuilder.properties.noTags', 'No tags available')}
                     </div>
                   )}
                   {availableTags
@@ -225,7 +227,7 @@ export function FormProperties({
 
             {/* Form Options */}
             <div className="space-y-3">
-              <h4 className="text-sm font-medium text-neutral-700">Form Options</h4>
+<h4 className="text-sm font-medium text-neutral-700">{t('formBuilder.properties.formOptions','Form Options')}</h4>
               
               <div className="flex items-center space-x-2">
                 <input
@@ -235,8 +237,8 @@ export function FormProperties({
                   onChange={(e) => handleSettingChange('compactMode', e.target.checked)}
                   className="rounded border-neutral-300 text-blue-600 focus:ring-blue-500"
                 />
-                <Label htmlFor="compact-mode" className="text-xs text-neutral-600">
-                  Compact Mode (2 fields per row)
+<Label htmlFor="compact-mode" className="text-xs text-neutral-600">
+                  {t('formBuilder.properties.compactMode','Compact Mode (2 fields per row)')}
                 </Label>
               </div>
               
@@ -248,8 +250,8 @@ export function FormProperties({
                   onChange={(e) => handleSettingChange('showFormTitle', e.target.checked)}
                   className="rounded border-neutral-300 text-blue-600 focus:ring-blue-500"
                 />
-                <Label htmlFor="show-title" className="text-xs text-neutral-600">
-                  Show form title
+<Label htmlFor="show-title" className="text-xs text-neutral-600">
+                  {t('formBuilder.properties.showFormTitle','Show form title')}
                 </Label>
               </div>
 
@@ -261,8 +263,8 @@ export function FormProperties({
                   onChange={(e) => handleSettingChange('showProgressBar', e.target.checked)}
                   className="rounded border-neutral-300 text-blue-600 focus:ring-blue-500"
                 />
-                <Label htmlFor="show-progress" className="text-xs text-neutral-600">
-                  Show progress bar
+<Label htmlFor="show-progress" className="text-xs text-neutral-600">
+                  {t('formBuilder.properties.showProgressBar','Show progress bar')}
                 </Label>
               </div>
 
@@ -273,11 +275,11 @@ export function FormProperties({
             <div className="pt-2 border-t border-neutral-200">
               <div className="text-xs text-neutral-500 space-y-1">
                 <div className="flex justify-between">
-                  <span>Fields:</span>
+<span>{t('formBuilder.properties.fields','Fields')}:</span>
                   <span className="font-medium">{elements.length}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Required:</span>
+<span>{t('formBuilder.properties.required','Required')}:</span>
                   <span className="font-medium">{elements.filter(el => el.required).length}</span>
                 </div>
               </div>
@@ -293,7 +295,7 @@ export function FormProperties({
                   className="w-full flex items-center gap-2"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Clear form
+{t('formBuilder.properties.clearForm','Clear form')}
                 </Button>
               </div>
             )}

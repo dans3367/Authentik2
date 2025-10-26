@@ -1028,5 +1028,72 @@
     "passwordTooShort": "Password must be at least 8 characters",
     "passwordsDoNotMatch": "Passwords don't match",
     "invalidFormat": "Invalid format"
+  },
+  "formBuilder": {
+    "wizard": {
+      "build": "Build",
+      "style": "Style",
+      "preview": "Preview",
+      "stepOf": "Step {{current}} of {{total}}",
+      "previous": "Previous",
+      "next": "Next",
+      "added": "added",
+      "buildHint": "Add at least one Email component to continue",
+      "styleHint": "Select a theme to continue",
+      "themeSelected": "theme selected"
+    },
+    "palette": {
+      "header": "Form Components",
+      "subheader": "Drag & drop to build your form",
+      "categories": { "basic": "Basic Inputs", "selection": "Selection" },
+      "text-input": { "label": "Text Input", "description": "Single line text field" },
+      "email-input": { "label": "Email Input", "description": "Email address field" },
+      "textarea": { "label": "Textarea", "description": "Multi-line text area" },
+      "number-input": { "label": "Number Input", "description": "Numeric field" },
+      "full-name": { "label": "Full Name", "description": "First and last name fields" },
+      "image": { "label": "Image", "description": "Square image display" },
+      "select": { "label": "Select Dropdown", "description": "Dropdown selection" },
+      "checkbox": { "label": "Checkbox", "description": "Multiple selection" },
+      "radio": { "label": "Radio Button", "description": "Single selection" },
+      "rate-scale": { "label": "Rate Scale", "description": "Rating scale 1-10" },
+      "boolean-switch": { "label": "Yes/No Switch", "description": "Toggle switch for binary choices" },
+      "datetime-picker": { "label": "Date & Time", "description": "Date, time, or datetime input" }
+    },
+    "proTipTitle": "Pro tip",
+    "proTipDesktop": "Drag components for precise placement with blue line indicators",
+    "proTipMobile": "Click to add instantly, or drag for precise placement",
+    "canvas": {
+      "autoSaved": "Auto-saved",
+      "previewFull": "Preview mode - see how your form will look to users",
+      "previewShort": "Preview mode",
+      "buildFull": "Build mode - drag or click to add",
+      "buildShort": "Build mode",
+      "buttons": {"edit": "Edit", "preview": "Preview"},
+      "heroTitle": "Build Your Perfect Form",
+      "heroSubtitleDesktop": "Start by dragging components from the sidebar, or click on any component to add it instantly.",
+      "heroSubtitleMobile": "Tap components to add them to your form.",
+      "heroBadgeTextInput": "Text Input",
+      "heroBadgeEmail": "Email",
+      "heroBadgeDropdown": "Dropdown",
+      "heroBadgeSubmit": "Submit Button",
+      "tryIt": "Try it now ↗"
+    },
+    "properties": {
+      "title": "Form Properties",
+      "formTitle": "Form Title",
+      "formTitlePlaceholder": "Enter form title...",
+      "formDescription": "Form Description",
+      "formDescriptionPlaceholder": "Add a description to help users understand the form...",
+      "tags": "Tags",
+      "assignTags": "Assign Tags",
+      "noTags": "No tags available",
+      "formOptions": "Form Options",
+      "compactMode": "Compact Mode (2 fields per row)",
+      "showFormTitle": "Show form title",
+      "showProgressBar": "Show progress bar",
+      "fields": "Fields",
+      "required": "Required",
+      "clearForm": "Clear form"
+    }
   }
 }

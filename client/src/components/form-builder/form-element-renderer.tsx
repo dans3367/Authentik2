@@ -17,6 +17,8 @@ import { BooleanSwitch } from "@/components/ui/boolean-switch";
 import { NumberInput } from "@/components/ui/number-input";
 import { FullName } from "@/components/ui/full-name";
 import { DropInsertionIndicator } from './drop-insertion-indicator';
+import { useTranslation as useLabelTranslation } from '@/hooks/use-translation';
+import { useTranslation as useI18n } from 'react-i18next';
 
 interface FormElementRendererProps {
   element: FormElement;
@@ -50,6 +52,10 @@ export function FormElementRenderer({
   showDropIndicators = false,
   elementIndex = 0,
 }: FormElementRendererProps) {
+  const { getLabel } = useLabelTranslation();
+  const { t } = useI18n();
+  const translatedLabel = getLabel({ label: element.label, labelTranslations: element.labelTranslations || {} });
+
   const handleClick = (e: React.MouseEvent) => {
     if (previewMode) return;
     e.stopPropagation();
@@ -271,8 +277,8 @@ export function FormElementRenderer({
             required={element.required}
             disabled={element.disabled || isDragging}
             readonly={element.readonly}
-            firstNamePlaceholder="First Name"
-            lastNamePlaceholder="Last Name"
+            firstNamePlaceholder={t('auth.firstName', 'First Name')}
+            lastNamePlaceholder={t('auth.lastName', 'Last Name')}
             size={element.styling?.size || 'medium'}
           />
         );
@@ -455,7 +461,7 @@ export function FormElementRenderer({
         {/* Content - no margin needed since buttons are outside */}
         <div>
           <Label className="block text-sm font-medium text-neutral-700 mb-2">
-            {element.label}
+            {translatedLabel}
             {element.required && <span className="text-red-500 ml-1">*</span>}
           </Label>
 

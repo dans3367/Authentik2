@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils';
 import * as React from 'react';
 import { HeadlessUIBooleanSwitch, HeadlessUIRadioGroup, HeadlessUICheckbox, HeadlessUIDateTimePicker, HeadlessUISelect } from './headlessui-form-components';
 import { ThemedFullName } from '@/components/ui/themed-full-name';
+import { useTranslation as useLabelTranslation } from '@/hooks/use-translation';
+import { useTranslation as useI18n } from 'react-i18next';
 
 // Extended type for preview elements that includes buttons and spacer
 type PreviewFormElement = FormElement | {
@@ -29,6 +31,10 @@ interface ThemedFormRendererProps {
 }
 
 export function ThemedFormRenderer({ element, themeStyles, onChange, onReset }: ThemedFormRendererProps) {
+  const { getLabel } = useLabelTranslation();
+  const { t } = useI18n();
+  const translatedLabel = getLabel(element as any);
+
   const renderFormControl = () => {
     const baseInputClasses = themeStyles.input;
     
@@ -156,7 +162,7 @@ export function ThemedFormRenderer({ element, themeStyles, onChange, onReset }: 
             {element.src ? (
               <img
                 src={element.src}
-                alt={element.alt || 'Form image'}
+                alt={(element as any).alt || translatedLabel || 'Form image'}
                 className="w-full h-full object-cover"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
@@ -193,7 +199,7 @@ export function ThemedFormRenderer({ element, themeStyles, onChange, onReset }: 
             type="submit"
             className={`${themeStyles.button}`}
           >
-            {element.label}
+            {translatedLabel}
           </button>
         );
 
@@ -261,8 +267,8 @@ export function ThemedFormRenderer({ element, themeStyles, onChange, onReset }: 
             required={element.required}
             disabled={(element as FormElement).disabled}
             readonly={(element as FormElement).readonly}
-            firstNamePlaceholder="First Name"
-            lastNamePlaceholder="Last Name"
+            firstNamePlaceholder={t('auth.firstName', 'First Name')}
+            lastNamePlaceholder={t('auth.lastName', 'Last Name')}
             themeStyles={themeStyles}
             onChange={(firstName, lastName) => {
               onChange?.(element.name + '_first', firstName);
@@ -286,7 +292,7 @@ export function ThemedFormRenderer({ element, themeStyles, onChange, onReset }: 
     <div className={themeStyles.field}>
       {element.type !== 'image' && (
         <label className={themeStyles.label}>
-          {element.label}
+          {translatedLabel}
           {element.required && <span className="text-red-500 ml-1">*</span>}
         </label>
       )}

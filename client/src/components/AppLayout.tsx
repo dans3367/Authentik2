@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
+import { useLanguage } from "@/hooks/useLanguage";
 
 
 
@@ -22,6 +23,8 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
   const [location, setLocation] = useLocation();
   const { user, isInitialized } = useReduxAuth();
+  // Initialize language from user preferences or localStorage across the app
+  const { currentLanguage } = useLanguage();
   const { updateProfile } = useReduxUpdateProfile();
   const updateMenuPreferenceMutation = useUpdateMenuPreference();
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -40,17 +43,22 @@ export function AppLayout({ children }: AppLayoutProps) {
     return true;
   });
 
-  // Sync sidebar state when user data loads or changes
-  useEffect(() => {
-    // Only update sidebar state after auth is initialized
-    if (isInitialized && user) {
+// Sync sidebar state when user data loads or changes
+useEffect(() => {
+  // Update document language attribute for accessibility and consistency
+  if (currentLanguage) {
+    document.documentElement.lang = currentLanguage;
+  }
+
+  // Only update sidebar state after auth is initialized
+  if (isInitialized && user) {
       // Use backend preference as source of truth
       const backendOpen = user.menuExpanded !== false;
       setSidebarOpen(backendOpen);
       // Sync localStorage with backend preference
       localStorage.setItem("menuExpanded", JSON.stringify(user.menuExpanded ?? true));
     }
-  }, [isInitialized, user, user?.menuExpanded]);
+  }, [isInitialized, user, user?.menuExpanded, currentLanguage]);
 
 
   // Check if company needs onboarding

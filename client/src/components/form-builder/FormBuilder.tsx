@@ -14,6 +14,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { Trash2, GripVertical, Type, Mail, Hash, Calendar, Check, Circle, AlignLeft, Palette, Eye, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTranslation as useLabelTranslation } from '@/hooks/use-translation';
+import { useTranslation as useI18n } from 'react-i18next';
 
 interface FormElement {
   id: string;
@@ -134,6 +136,8 @@ function SortableFormElement({ element, onUpdate, onDelete }: {
 
 function FormPreview({ elements }: { elements: FormElement[] }) {
   const [formData, setFormData] = useState<Record<string, any>>({});
+  const { getLabel } = useLabelTranslation();
+  const { t } = useI18n();
 
   const handleInputChange = (id: string, value: any) => {
     setFormData(prev => ({ ...prev, [id]: value }));
@@ -208,7 +212,9 @@ function FormPreview({ elements }: { elements: FormElement[] }) {
               checked={formData[element.id] || false}
               onCheckedChange={(checked) => handleInputChange(element.id, checked)}
             />
-            <Label htmlFor={element.id}>{element.label}</Label>
+            <Label htmlFor={element.id}>
+              {getLabel({ label: element.label, labelTranslations: (element as any).labelTranslations })}
+            </Label>
           </div>
         );
       case 'radio':
@@ -245,7 +251,7 @@ function FormPreview({ elements }: { elements: FormElement[] }) {
         <div key={element.id} className="space-y-2">
           {element.type !== 'checkbox' && (
             <Label htmlFor={element.id}>
-              {element.label}
+              {getLabel({ label: element.label, labelTranslations: (element as any).labelTranslations })}
               {element.required && <span className="text-red-500 ml-1">*</span>}
             </Label>
           )}
@@ -255,7 +261,7 @@ function FormPreview({ elements }: { elements: FormElement[] }) {
       
       {elements.length > 0 && (
         <div className="pt-4">
-          <Button className="w-full">Submit Form</Button>
+          <Button className="w-full">{t('common.submit', 'Submit')}</Button>
         </div>
       )}
     </div>
