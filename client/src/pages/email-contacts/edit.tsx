@@ -649,7 +649,7 @@ export default function EditEmailContact() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-6">
-                {contact?.tags && contact.tags.length > 0 ? (
+                {Array.isArray(contact?.tags) && contact.tags.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {contact.tags.map((tag: any) => (
                       <Badge 
@@ -682,7 +682,7 @@ export default function EditEmailContact() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-6">
-                {contact?.lists && contact.lists.length > 0 ? (
+                {Array.isArray(contact?.lists) && contact.lists.length > 0 ? (
                   <div className="space-y-2">
                     {contact.lists.map((list: any) => (
                       <div key={list.id} className="flex items-center gap-3 p-2 rounded-lg bg-slate-50/50 dark:bg-slate-800/50">

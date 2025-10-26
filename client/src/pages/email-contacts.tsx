@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ContactSearch } from "@/components/ContactSearch";
 import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
+import { AddContactDialog } from "@/components/AddContactDialog";
 import { 
   Users, 
   Plus, 
@@ -98,6 +99,7 @@ export default function EmailContacts() {
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [addContactOpen, setAddContactOpen] = useState(false);
 
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -338,13 +340,19 @@ export default function EmailContacts() {
           <div className="flex items-center gap-3">
             <Button 
               className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => setLocation('/email-contacts/new')}
+              onClick={() => setAddContactOpen(true)}
             >
               <UserPlus className="w-4 h-4 mr-2" />
               {t('emailContacts.addContact')}
             </Button>
           </div>
         </div>
+        
+        {/* Add Contact Dialog */}
+        <AddContactDialog 
+          open={addContactOpen} 
+          onOpenChange={setAddContactOpen}
+        />
 
         {/* Add minimal spacer after the header section */}
         <div className="h-3"></div>

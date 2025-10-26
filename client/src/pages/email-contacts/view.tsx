@@ -575,7 +575,7 @@ export default function ViewContact() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {contact.tags.length > 0 ? (
+                {Array.isArray(contact.tags) && contact.tags.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {contact.tags.map((tag) => (
                       <Badge 
@@ -605,7 +605,7 @@ export default function ViewContact() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {contact.lists.length > 0 ? (
+                {Array.isArray(contact.lists) && contact.lists.length > 0 ? (
                   <div className="space-y-2">
                     {contact.lists.map((list) => (
                       <div key={list.id} className="p-2 bg-gray-50 dark:bg-gray-800 rounded">
@@ -762,7 +762,7 @@ export default function ViewContact() {
               />
               <ManageContactTagsModal
                 contactId={contact.id}
-                currentTagIds={contact.tags.map((t) => t.id)}
+                currentTagIds={Array.isArray(contact.tags) ? contact.tags.map((t) => t.id) : []}
                 contactName={getFullName(contact)}
                 onUpdated={() => {
                   queryClient.invalidateQueries({ queryKey: ['/api/email-contacts', id] });

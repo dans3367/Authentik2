@@ -46,7 +46,9 @@
     "contacts": "Contacts",
     "analytics": "Analytics",
     "shops": "Shops",
-    "users": "Users"
+    "users": "Users",
+    "segmentation": "Segmentation",
+    "management": "Management"
   },
   "dashboard": {
     "welcomeBack": "Welcome back, {{name}}"
