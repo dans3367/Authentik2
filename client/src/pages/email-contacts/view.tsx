@@ -381,10 +381,18 @@ export default function ViewContact() {
               variant="outline"
               className="justify-center"
               disabled={isSendEmailDisabled}
-              onClick={() => setLocation(`/email-compose?to=${encodeURIComponent(contact.email)}&schedule=1`)}
+              onClick={() => setLocation(`/email-contacts/view/${contact.id}/schedule`)}
             >
               <Clock className="w-4 h-4 mr-2" />
               Send Later
+            </Button>
+            <Button 
+              variant="outline"
+              className="justify-center"
+              onClick={() => setLocation(`/email-contacts/view/${contact.id}/scheduled`)}
+            >
+              <Calendar className="w-4 h-4 mr-2" />
+              View Scheduled
             </Button>
             <Button 
               variant="outline"
@@ -728,10 +736,18 @@ export default function ViewContact() {
                 variant="outline" 
                 className="w-full justify-start"
                 disabled={isSendEmailDisabled}
-                onClick={() => setLocation(`/email-compose?to=${encodeURIComponent(contact.email)}&schedule=1`)}
+                onClick={() => setLocation(`/email-contacts/view/${contact.id}/schedule`)}
               >
                 <Clock className="w-4 h-4 mr-2" />
                 Send Later
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={() => setLocation(`/email-contacts/view/${contact.id}/scheduled`)}
+              >
+                <Calendar className="w-4 h-4 mr-2" />
+                View Scheduled
               </Button>
               <EmailActivityTimelineModal
                 contactId={contact.id}

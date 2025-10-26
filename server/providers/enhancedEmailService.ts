@@ -137,6 +137,38 @@ export class EnhancedEmailService {
     }
   }
 
+  // Schedule a custom email for a future time
+  async scheduleCustomEmail(
+    to: string | string[],
+    subject: string,
+    html: string,
+    scheduleAt: Date,
+    options: {
+      text?: string;
+      from?: string;
+      preferredProvider?: string;
+      headers?: Record<string, string>;
+      metadata?: Record<string, any>;
+    } = {}
+  ): Promise<string> {
+    const recipients = Array.isArray(to) ? to : [to];
+    const message: EmailMessage = {
+      to: recipients,
+      from: options.from || this.config.fromEmail,
+      subject,
+      html,
+      text: options.text,
+      headers: options.headers,
+      metadata: {
+        type: 'scheduled_custom',
+        scheduledAt: scheduleAt.toISOString(),
+        ...options.metadata,
+      },
+    };
+
+    return await this.manager.queueEmailAt(message, scheduleAt, options.preferredProvider);
+  }
+
   // Batch email sending with automatic queueing
   async sendBatchEmails(
     emails: Array<{
@@ -221,6 +253,11 @@ export class EnhancedEmailService {
 
   getEmailStatus(emailId: string) {
     return this.manager.getEmailStatus(emailId);
+  }
+
+  // Retrieve all queued emails (for admin/inspection endpoints)
+  getAllQueuedEmails() {
+    return this.manager.getAllQueuedEmails();
   }
 
   // Cleanup methods

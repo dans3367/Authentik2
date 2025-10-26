@@ -136,8 +136,12 @@ export abstract class EmailProvider {
 
 export interface EmailQueue {
   enqueue(message: EmailMessage, providerId?: string): Promise<string>;
+  enqueueAt(message: EmailMessage, runAt: Date, providerId?: string): Promise<string>;
   processQueue(): Promise<void>;
   getQueueStatus(): QueueStatus;
+  getAllEmails(): QueuedEmail[];
+  remove(emailId: string): boolean;
+  update(emailId: string, updates: { message?: Partial<EmailMessage>; nextRetryAt?: Date }): boolean;
 }
 
 export interface QueueStatus {
