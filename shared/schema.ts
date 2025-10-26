@@ -426,6 +426,7 @@ export const companies = pgTable("companies", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+
 // Forms table for DragFormMaster integration with multi-tenancy
 export const forms = pgTable("forms", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -655,6 +656,7 @@ export const companyRelations = relations(companies, ({ one }) => ({
     references: [betterAuthUser.id],
   }),
 }));
+
 
 export const formRelations = relations(forms, ({ one, many }) => ({
   tenant: one(tenants, {
@@ -1016,6 +1018,7 @@ export const updateTenantSchema = z.object({
   isActive: z.boolean(),
   maxUsers: z.number().min(1),
 });
+
 
 // Form schemas
 export const createFormSchema = z.object({

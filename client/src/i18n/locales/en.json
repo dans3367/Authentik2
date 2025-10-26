@@ -85,7 +85,8 @@
     "alreadyHaveAccount": "Already have an account?",
     "dontHaveAccount": "Don't have an account?",
     "signIn": "Sign In",
-    "createAccount": "Create Account"
+    "createAccount": "Create Account",
+    "authenticating": "Authenticating..."
   },
   "profile": {
     "title": "Account Settings",

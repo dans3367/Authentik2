@@ -81,7 +81,7 @@ formsRoutes.get("/:id", authenticateToken, async (req: any, res) => {
 // Create new form
 formsRoutes.post("/", authenticateToken, async (req: any, res) => {
   try {
-    const { title, description, formData, theme } = req.body;
+const { title, description, formData, theme } = req.body;
 
     if (!title || !formData) {
       return res.status(400).json({ message: 'Title and formData are required' });
@@ -111,7 +111,7 @@ formsRoutes.post("/", authenticateToken, async (req: any, res) => {
 formsRoutes.put("/:id", authenticateToken, async (req: any, res) => {
   try {
     const { id } = req.params;
-    const { title, description, schema, settings, theme, published } = req.body;
+const { title, description, schema, settings, theme, published } = req.body;
 
     // Check if form exists and belongs to user's company
     const existingForm = await db.query.forms.findFirst({
@@ -145,6 +145,7 @@ formsRoutes.put("/:id", authenticateToken, async (req: any, res) => {
     if (theme !== undefined) {
       updateData.theme = theme; // Already a string from client
     }
+
 
     if (published !== undefined) {
       updateData.published = published;

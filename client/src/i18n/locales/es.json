@@ -85,7 +85,8 @@
     "alreadyHaveAccount": "¿Ya tienes una cuenta?",
     "dontHaveAccount": "¿No tienes una cuenta?",
     "signIn": "Iniciar Sesión",
-    "createAccount": "Crear Cuenta"
+    "createAccount": "Crear Cuenta",
+    "authenticating": "Autenticando..."
   },
   "reminders": {
     "title": "¡Nunca Vuelvas a Perder una Cita!",

@@ -108,7 +108,8 @@ export function FormWizard({ editMode = false, formData: existingFormData }: For
           id: wizardState.selectedTheme.id,
           name: wizardState.selectedTheme.name,
           customColors: wizardState.selectedTheme.customColors || null
-        })
+        }),
+        tags: wizardState.formData.tags || []
       };
 
       console.log(`${editMode ? 'Updating' : 'Creating'} form:`, formDataToSave);
@@ -290,6 +291,7 @@ export function FormWizard({ editMode = false, formData: existingFormData }: For
             initialTitle={wizardState.formData.title}
             initialElements={wizardState.formData.elements}
             initialSettings={wizardState.formData.settings}
+            initialTags={wizardState.formData.tags}
             isEditMode={editMode}
           />
         )}

@@ -11,14 +11,15 @@ import { Button } from '@/components/ui/button';
 
 
 interface BuildStepProps {
-  onDataChange: (title: string, elements: any[], settings?: any) => void;
+  onDataChange: (title: string, elements: any[], settings?: any, tags?: string[]) => void;
   initialTitle?: string;
   initialElements?: any[];
   initialSettings?: any;
+  initialTags?: string[];
   isEditMode?: boolean;
 }
 
-export function BuildStep({ onDataChange, initialTitle, initialElements, initialSettings, isEditMode = false }: BuildStepProps) {
+export function BuildStep({ onDataChange, initialTitle, initialElements, initialSettings, initialTags, isEditMode = false }: BuildStepProps) {
   const {
     formTitle,
     elements,
@@ -35,6 +36,8 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
     resetFormData,
     formSettings,
     updateFormSettings,
+    formTags,
+    updateFormTags,
   } = useFormBuilder(initialTitle, initialElements);
 
   const [showMobileAdd, setShowMobileAdd] = useState(false);
@@ -54,7 +57,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
   const selectedElement = elements.find(el => el.id === selectedElementId) || null;
   
   // Use refs to track data and initialization
-  const lastSentData = useRef<{title: string, elements: any[], settings: any}>({ title: '', elements: [], settings: {} });
+  const lastSentData = useRef<{title: string, elements: any[], settings: any, tags: string[]}>({ title: '', elements: [], settings: {}, tags: [] });
   const hasInitialized = useRef(false);
   
   // Initialize form data from props on first mount only
@@ -73,6 +76,9 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
         updateFormSettings(key, initialSettings[key]);
       });
     }
+    if (initialTags && initialTags.length > 0) {
+      updateFormTags(initialTags);
+    }
   }, []);
 
   // Ensure change propagation even if initial data was empty
@@ -90,17 +96,18 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
         const dataChanged = formTitle !== lastSentData.current.title || 
                            elements.length !== lastSentData.current.elements.length ||
                            JSON.stringify(elements) !== JSON.stringify(lastSentData.current.elements) ||
-                           JSON.stringify(formSettings) !== JSON.stringify(lastSentData.current.settings);
+                           JSON.stringify(formSettings) !== JSON.stringify(lastSentData.current.settings) ||
+                           JSON.stringify(formTags) !== JSON.stringify(lastSentData.current.tags);
         
         if (dataChanged) {
-          onDataChange(formTitle, elements, formSettings);
-          lastSentData.current = { title: formTitle, elements: [...elements], settings: { ...formSettings } };
+          onDataChange(formTitle, elements, formSettings, formTags);
+          lastSentData.current = { title: formTitle, elements: [...elements], settings: { ...formSettings }, tags: [...formTags] };
         }
       }, 100); // 100ms debounce
       
       return () => clearTimeout(timeoutId);
     }
-  }, [formTitle, elements, formSettings, onDataChange]);
+  }, [formTitle, elements, formSettings, formTags, onDataChange]);
 
   // Drag handlers
   const handleDragStart = (event: DragStartEvent) => {
@@ -193,6 +200,8 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
             onUpdateFormTitle={updateFormTitle}
             elements={elements}
             settings={formSettings}
+            tags={formTags}
+            onUpdateTags={updateFormTags}
             onUpdateSettings={(newSettings) => {
               // Update the entire settings object
               Object.keys(newSettings).forEach(key => {

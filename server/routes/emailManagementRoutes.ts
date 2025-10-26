@@ -1196,7 +1196,6 @@ emailManagementRoutes.post("/contact-tags/:tagId/contacts", authenticateToken, r
     console.error('Bulk tag contacts error:', error);
     res.status(500).json({ message: 'Failed to tag contacts' });
   }
-  }
 });
 
 // Get contact activity
