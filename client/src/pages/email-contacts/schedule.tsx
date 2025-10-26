@@ -18,6 +18,7 @@ export default function ScheduleContactEmailPage() {
   const [content, setContent] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
+  const [isUsingTemplate, setIsUsingTemplate] = useState(false);
 
   // Load contact for context and validation
   const { data: contactResp, isLoading: contactLoading, error: contactError } = useQuery({
@@ -70,6 +71,16 @@ export default function ScheduleContactEmailPage() {
   const handleTemplateSelect = (template: { subject: string; content: string }) => {
     setSubject(template.subject);
     setContent(template.content);
+    setIsUsingTemplate(true);
+  };
+
+  const handleUseCustomMessage = () => {
+    setIsUsingTemplate(false);
+    // Clear content if switching from template
+    if (isUsingTemplate) {
+      setSubject("");
+      setContent("");
+    }
   };
 
   if (contactLoading) {
@@ -123,7 +134,14 @@ export default function ScheduleContactEmailPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
             <CardTitle>Message</CardTitle>
-            <TemplateSelector onSelect={handleTemplateSelect} channel="individual" />
+            <div className="flex gap-2">
+              {isUsingTemplate && (
+                <Button variant="outline" type="button" onClick={handleUseCustomMessage}>
+                  Use Custom Message
+                </Button>
+              )}
+              <TemplateSelector onSelect={handleTemplateSelect} channel="individual" />
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -132,11 +150,29 @@ export default function ScheduleContactEmailPage() {
             </div>
             <div>
               <Label>Subject</Label>
-              <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject..." className="mt-2" />
+              <Input 
+                value={subject} 
+                onChange={(e) => setSubject(e.target.value)} 
+                placeholder="Subject..." 
+                className="mt-2" 
+                disabled={isUsingTemplate}
+              />
             </div>
             <div>
               <Label>Content</Label>
-              <Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Write your email..." className="mt-2 min-h-[220px]" />
+              {isUsingTemplate ? (
+                <div 
+                  className="mt-2 min-h-[220px] p-3 rounded-md border border-input bg-gray-50 dark:bg-gray-900 text-sm overflow-auto"
+                  dangerouslySetInnerHTML={{ __html: content }}
+                />
+              ) : (
+                <Textarea 
+                  value={content} 
+                  onChange={(e) => setContent(e.target.value)} 
+                  placeholder="Write your email..." 
+                  className="mt-2 min-h-[220px]" 
+                />
+              )}
             </div>
           </CardContent>
         </Card>

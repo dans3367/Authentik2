@@ -9,7 +9,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import EmailActivityTimeline from "@/components/EmailActivityTimeline";
-import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
 import SendEmailModal from "@/components/SendEmailModal";
 import ManageContactTagsModal from "@/components/ManageContactTagsModal";
 import {
@@ -749,17 +748,6 @@ export default function ViewContact() {
                 <Calendar className="w-4 h-4 mr-2" />
                 View Scheduled
               </Button>
-              <EmailActivityTimelineModal
-                contactId={contact.id}
-                contactEmail={contact.email}
-                contactName={`${contact.firstName || ''} ${contact.lastName || ''}`.trim() || undefined}
-                trigger={
-                  <Button variant="outline" className="w-full justify-start">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    View Activity Timeline
-                  </Button>
-                }
-              />
               <ManageContactTagsModal
                 contactId={contact.id}
                 currentTagIds={Array.isArray(contact.tags) ? contact.tags.map((t) => t.id) : []}

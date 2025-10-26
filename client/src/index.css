@@ -342,3 +342,77 @@
 .ProseMirror *[style] {
   /* Inline styles should take precedence */
 }
+
+/* ============================================
+   FIX: TipTap Line Spacing Issue
+   ============================================ */
+
+/* 
+  Problem: TipTap adds extra margin between paragraphs causing
+  double-line spacing when pressing Enter.
+  
+  Solution: Reduce paragraph margins to create normal line spacing.
+*/
+
+/* Remove extra margins from paragraphs in TipTap editor */
+.ProseMirror p {
+  margin-top: 0;
+  margin-bottom: 0;
+  line-height: 1.25;
+}
+
+/* Add minimal spacing between separate paragraphs only when there's actual separation */
+.ProseMirror p + p {
+  margin-top: 0.25em;
+}
+
+/* Ensure headings have appropriate spacing */
+.ProseMirror h1,
+.ProseMirror h2,
+.ProseMirror h3,
+.ProseMirror h4,
+.ProseMirror h5,
+.ProseMirror h6 {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.ProseMirror h1:first-child,
+.ProseMirror h2:first-child,
+.ProseMirror h3:first-child,
+.ProseMirror h4:first-child,
+.ProseMirror h5:first-child,
+.ProseMirror h6:first-child {
+  margin-top: 0;
+}
+
+/* Fix list spacing */
+.ProseMirror ul,
+.ProseMirror ol {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  padding-left: 1.5em;
+}
+
+.ProseMirror li {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* Fix horizontal rule spacing */
+.ProseMirror hr {
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+}
+
+/* Override prose styles that might add extra spacing */
+.prose .ProseMirror p,
+.prose-sm .ProseMirror p {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.prose .ProseMirror p + p,
+.prose-sm .ProseMirror p + p {
+  margin-top: 0.5em;
+}

@@ -193,7 +193,7 @@ export function TemplateSelector({ onSelect, trigger, channel }: TemplateSelecto
                     {selectedTemplate.preview && (
                       <div>
                         <Label className="text-xs text-gray-500 dark:text-gray-400">Preview Text</Label>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{selectedTemplate.preview}</p>
+                        <div className="text-sm text-gray-600 dark:text-gray-400 mt-1" dangerouslySetInnerHTML={{ __html: selectedTemplate.preview }} />
                       </div>
                     )}
                     <div>
