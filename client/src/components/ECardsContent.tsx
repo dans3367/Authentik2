@@ -13,15 +13,11 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useSession } from "@/lib/betterAuthClient";
 import {
   Gift,
   Users,
-  Mail,
   Settings,
   Plus,
   Trash2,
@@ -143,19 +139,6 @@ interface Contact {
   birthdayEmailEnabled?: boolean; // Optional birthday email preference
   birthdayUnsubscribedAt?: Date | null; // Timestamp when unsubscribed from birthday emails
   birthdayUnsubscribeReason?: string | null; // Reason for unsubscribing from birthday emails
-}
-
-interface User {
-  id: string;
-  email: string;
-  firstName: string | null;
-  lastName: string | null;
-  role: "Owner" | "Administrator" | "Manager" | "Employee";
-  emailVerified: boolean;
-  twoFactorEnabled: boolean;
-  tenantId: string;
-  createdAt: string;
-  lastLogin?: string | null;
 }
 
 const LEGACY_TEMPLATE_ID_MAP: Record<string, string> = {
@@ -386,45 +369,18 @@ export function ECardsContent() {
     valentineThemes,
   ]);
 
-  // Use Better Auth session to get external token
-  const { data: session } = useSession();
-
-  // Query to get external service token when authenticated
-  const { data: tokenData, isLoading: tokenLoading, error: tokenError, refetch: refetchToken } = useQuery({
-    queryKey: ['/api/external-token', session?.user?.id],
-    queryFn: async () => {
-      console.log('🔑 [Token] Requesting external token for user:', session?.user?.email);
-      const response = await apiRequest('POST', '/api/external-token');
-      if (!response.ok) {
-        throw new Error(`Token request failed: ${response.status}`);
-      }
-      const data = await response.json();
-      console.log('✅ [Token] External token received, length:', data.token?.length);
-      return data;
-    },
-    enabled: !!session?.user,
-    staleTime: 10 * 60 * 1000, // Token cached for 10 minutes (5 min buffer before 15 min expiry)
-    gcTime: 15 * 60 * 1000, // Garbage collect after 15 minutes
-    retry: 3,
-    refetchOnWindowFocus: true, // Refetch on window focus to refresh expired tokens
-    refetchOnReconnect: true, // Refetch when reconnecting
-  });
-
-  const accessToken = tokenData?.token;
-
   // Initialize activeTab based on URL parameter or default to "themes"
-  const [activeTab, setActiveTab] = useState<"themes" | "settings" | "test">(() => {
+  const [activeTab, setActiveTab] = useState<"themes" | "settings">(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tab = urlParams.get('tab');
-    if (tab && ['themes', 'settings', 'test'].includes(tab)) {
-      return tab as "themes" | "settings" | "test";
+    if (tab && ['themes', 'settings'].includes(tab)) {
+      return tab as "themes" | "settings";
     }
     return "themes";
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [birthdayModalOpen, setBirthdayModalOpen] = useState(false);
   const [birthdayDraft, setBirthdayDraft] = useState<Date | undefined>(undefined);
   const [birthdayContactId, setBirthdayContactId] = useState<string | null>(null);
@@ -567,8 +523,8 @@ export function ECardsContent() {
     const handlePopState = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const tab = urlParams.get('tab');
-      if (tab && ['themes', 'settings', 'test'].includes(tab)) {
-        setActiveTab(tab as "themes" | "settings" | "test");
+      if (tab && ['themes', 'settings'].includes(tab)) {
+        setActiveTab(tab as "themes" | "settings");
       } else {
         setActiveTab("themes");
       }
@@ -680,24 +636,6 @@ export function ECardsContent() {
   // Extract contacts and derived birthdays from query select
   const contacts: Contact[] = contactsData?.contacts || [];
   const customersWithBirthdays: Contact[] = contactsData?.customersWithBirthdays || [];
-
-  // Fetch users from the tenant
-  const {
-    data: usersData,
-    isLoading: usersLoading,
-    refetch: refetchUsers
-  } = useQuery({
-    queryKey: ['/api/users'],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/users');
-      return response.json();
-    },
-    staleTime: 10 * 60 * 1000, // Cache for 10 minutes
-    refetchOnWindowFocus: false,
-  });
-
-  // Extract users array from response data
-  const users: User[] = usersData?.users || [];
 
   // Fetch user's company for business name
   const { data: company } = useQuery({
@@ -1219,61 +1157,10 @@ export function ECardsContent() {
       if (!contact) {
         throw new Error('Contact not found');
       }
-
-      // Check if we have a valid token, if not try to refresh it
-      let currentToken = accessToken;
-
-      if (!currentToken) {
-        console.log('🔄 [Birthday Invitation] No token available, attempting to refresh...');
-        try {
-          const refreshedTokenData = await refetchToken();
-          currentToken = refreshedTokenData.data?.token;
-
-          if (!currentToken) {
-            if (tokenLoading) {
-              throw new Error('Authentication token is still loading. Please wait a moment and try again.');
-            }
-            if (tokenError) {
-              throw new Error(`Authentication failed: ${tokenError.message}`);
-            }
-            throw new Error('No authentication token available. Please make sure you are logged in.');
-          }
-
-          console.log('✅ [Birthday Invitation] Token refreshed successfully');
-        } catch (refreshError) {
-          console.error('❌ [Birthday Invitation] Token refresh failed:', refreshError);
-          throw new Error('Failed to refresh authentication token. Please try again.');
-        }
-      }
-
       // Call the direct API endpoint (no longer requires temporal server)
       const response = await apiRequest('POST', `/api/birthday-invitation/${contactId}`);
 
       if (!response.ok) {
-        // If it's an authentication error, try to refresh the token and retry once
-        if (response.status === 401) {
-          console.log('🔄 [Birthday Invitation] Token appears to be expired, attempting refresh and retry...');
-
-          try {
-            const refreshedTokenData = await refetchToken();
-            const newToken = refreshedTokenData.data?.token;
-
-            if (newToken && newToken !== currentToken) {
-              console.log('✅ [Birthday Invitation] Token refreshed, retrying request...');
-
-              const retryResponse = await apiRequest('POST', `/api/birthday-invitation/${contactId}`);
-
-              if (retryResponse.ok) {
-                const retryResponseData = await retryResponse.json();
-                console.log('✅ [Birthday Invitation] Retry successful:', retryResponseData);
-                return retryResponseData;
-              }
-            }
-          } catch (retryError) {
-            console.error('❌ [Birthday Invitation] Token refresh retry failed:', retryError);
-          }
-        }
-
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to send invitation');
       }
@@ -1285,157 +1172,6 @@ export function ECardsContent() {
     },
     onError: (error: any) => {
       toast({ title: t('common.error'), description: error?.message || t('ecards.toasts.invitationError'), variant: "destructive" });
-    },
-  });
-
-  // Mutation: send test birthday card to users
-  const sendTestBirthdayMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      // Check if we have a valid token, if not try to refresh it
-      let currentToken = accessToken;
-
-      if (!currentToken) {
-        console.log('🔄 [Birthday Test] No token available, attempting to refresh...');
-        try {
-          const refreshedTokenData = await refetchToken();
-          currentToken = refreshedTokenData.data?.token;
-
-          if (!currentToken) {
-            if (tokenLoading) {
-              throw new Error('Authentication token is still loading. Please wait a moment and try again.');
-            }
-            if (tokenError) {
-              throw new Error(`Authentication failed: ${tokenError.message}`);
-            }
-            throw new Error('No authentication token available. Please make sure you are logged in.');
-          }
-
-          console.log('✅ [Birthday Test] Token refreshed successfully');
-        } catch (refreshError) {
-          console.error('❌ [Birthday Test] Token refresh failed:', refreshError);
-          throw new Error('Failed to refresh authentication token. Please try again.');
-        }
-      }
-
-      // Find the user to get additional details
-      const user = users.find(u => u.id === userId);
-      if (!user) {
-        throw new Error('User not found');
-      }
-
-      // Call the cardprocessor API directly for test birthday cards
-      const cardprocessorUrl = import.meta.env.VITE_CARDPROCESSOR_URL || 'http://localhost:5004';
-
-      // Prepare request payload
-      const requestPayload = {
-        userEmail: user.email,
-        userFirstName: user.firstName,
-        userLastName: user.lastName,
-        emailTemplate: eCardSettings?.emailTemplate || 'default',
-        customMessage: eCardSettings?.customMessage || '',
-        customThemeData: eCardSettings?.customThemeData || null,
-        senderName: eCardSettings?.senderName || '',
-        promotionId: eCardSettings?.promotionId || null,
-        splitPromotionalEmail: splitPromotionalEmail
-      };
-
-      console.log('🎂 [Birthday Test] Starting test birthday card request:', {
-        url: `${cardprocessorUrl}/api/birthday-test`,
-        userId: userId,
-        userEmail: user.email,
-        userFirstName: user.firstName,
-        userLastName: user.lastName,
-        accessTokenLength: currentToken?.length,
-        accessTokenPreview: currentToken ? `${currentToken.substring(0, 20)}...` : 'null',
-        eCardSettings: {
-          emailTemplate: eCardSettings?.emailTemplate,
-          customMessage: eCardSettings?.customMessage,
-          customThemeData: eCardSettings?.customThemeData,
-          senderName: eCardSettings?.senderName
-        },
-        requestPayload: requestPayload
-      });
-
-      const response = await fetch(`${cardprocessorUrl}/api/birthday-test`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${currentToken}`,
-        },
-        body: JSON.stringify(requestPayload),
-      });
-
-      console.log('🎂 [Birthday Test] Response received:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        headers: Object.fromEntries(response.headers.entries())
-      });
-
-      if (!response.ok) {
-        let errorData;
-        try {
-          errorData = await response.json();
-        } catch (parseError) {
-          console.error('🎂 [Birthday Test] Failed to parse error response:', parseError);
-          errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
-        }
-
-        // If it's an authentication error, try to refresh the token and retry once
-        if (response.status === 401 && errorData.error?.includes('Invalid token')) {
-          console.log('🔄 [Birthday Test] Token appears to be expired, attempting refresh and retry...');
-
-          try {
-            const refreshedTokenData = await refetchToken();
-            const newToken = refreshedTokenData.data?.token;
-
-            if (newToken && newToken !== currentToken) {
-              console.log('✅ [Birthday Test] Token refreshed, retrying request...');
-
-              const retryResponse = await fetch(`${cardprocessorUrl}/api/birthday-test`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${newToken}`,
-                },
-                body: JSON.stringify(requestPayload),
-              });
-
-              if (retryResponse.ok) {
-                const retryResponseData = await retryResponse.json();
-                console.log('✅ [Birthday Test] Retry successful:', retryResponseData);
-                return retryResponseData;
-              }
-            }
-          } catch (retryError) {
-            console.error('❌ [Birthday Test] Token refresh retry failed:', retryError);
-          }
-        }
-
-        console.error('🎂 [Birthday Test] Request failed:', {
-          status: response.status,
-          statusText: response.statusText,
-          errorData: errorData,
-          requestPayload: requestPayload,
-          url: `${cardprocessorUrl}/api/birthday-test`
-        });
-
-        throw new Error(errorData.error || `Failed to send test birthday card (${response.status})`);
-      }
-
-      const responseData = await response.json();
-      console.log('🎂 [Birthday Test] Success response:', {
-        responseData: responseData,
-        requestPayload: requestPayload
-      });
-
-      return responseData;
-    },
-    onSuccess: () => {
-      toast({ title: "Test E-Card Sent", description: "Test e-card has been sent successfully" });
-    },
-    onError: (error: any) => {
-      toast({ title: "Error", description: error?.message || "Failed to send test e-card", variant: "destructive" });
     },
   });
 
@@ -1600,28 +1336,6 @@ export function ECardsContent() {
     }
   };
 
-  const handleSendTestBirthdayCard = (userId: string) => {
-    sendTestBirthdayMutation.mutate(userId);
-  };
-
-  // User selection handlers
-  const handleSelectAllUsers = (checked: boolean) => {
-    if (checked) {
-      setSelectedUsers(users.map(user => user.id));
-    } else {
-      setSelectedUsers([]);
-    }
-  };
-
-  const handleSelectUser = (userId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedUsers(prev => [...prev, userId]);
-    } else {
-      setSelectedUsers(prev => prev.filter(id => id !== userId));
-    }
-  };
-
-
   const upcomingBirthdays = customersWithBirthdays.filter(contact => {
     if (!contact.birthday) return false;
     // Parse date as local to avoid timezone shifts
@@ -1644,17 +1358,6 @@ export function ECardsContent() {
     return contact.email;
   };
 
-  const getUserName = (user: User) => {
-    if (user.firstName && user.lastName) {
-      return `${user.firstName} ${user.lastName}`;
-    } else if (user.firstName) {
-      return user.firstName;
-    } else if (user.lastName) {
-      return user.lastName;
-    }
-    return user.email;
-  };
-
   const getStatusColor = (status: Contact['status']) => {
     switch (status) {
       case 'active': return 'bg-green-100 text-green-800';
@@ -1670,12 +1373,6 @@ export function ECardsContent() {
 
   // Check if some contacts are selected (for indeterminate state)
   const isSomeSelected = selectedContacts.length > 0 && selectedContacts.length < contacts.length;
-
-  // Check if all users are selected
-  const isAllUsersSelected = users.length > 0 && selectedUsers.length === users.length;
-
-  // Check if some users are selected (for indeterminate state)
-  const isSomeUsersSelected = selectedUsers.length > 0 && selectedUsers.length < users.length;
 
   if (settingsLoading) {
     return (
@@ -1711,15 +1408,6 @@ export function ECardsContent() {
           >
             <Settings className="h-4 w-4" />
             {t('ecards.tabs.settings')}
-          </Button>
-          <Button
-            variant={activeTab === "test" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setActiveTab("test")}
-            className="flex items-center gap-2"
-          >
-            <Mail className="h-4 w-4" />
-            {t('ecards.tabs.test')}
           </Button>
         </div>
 
@@ -2462,139 +2150,6 @@ export function ECardsContent() {
 
 
 
-        {/* Test Tab */}
-        {activeTab === "test" && (
-          <Card className="w-11/12">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Mail className="h-5 w-5" />
-                  {t('ecards.test.title')}
-                </CardTitle>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                    {t('ecards.test.testMode')}
-                  </Badge>
-                  <Badge variant="secondary">
-                    {users.length} {t('ecards.test.users')}
-                  </Badge>
-                </div>
-              </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {t('ecards.test.description')}
-              </p>
-            </CardHeader>
-            <CardContent className="p-0">
-              {/* Bulk Actions for Users */}
-              {selectedUsers.length > 0 && (
-                <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-4 border-b">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{selectedUsers.length} {t('ecards.test.usersSelected')}</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSelectedUsers([])}
-                    >
-                      {t('ecards.test.clearSelection')}
-                    </Button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => {
-                        selectedUsers.forEach(userId => {
-                          handleSendTestBirthdayCard(userId);
-                        });
-                        setSelectedUsers([]);
-                      }}
-                      disabled={sendTestBirthdayMutation.isPending || tokenLoading}
-                    >
-                      <Mail className="h-4 w-4 mr-2" />
-                      {tokenLoading ? t('ecards.test.refreshing') : sendTestBirthdayMutation.isPending ? t('ecards.test.sending') : t('ecards.test.sendTestCards')}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {usersLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
-                </div>
-              ) : users.length === 0 ? (
-                <div className="text-center py-12">
-                  <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">{t('ecards.test.noUsers')}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">{t('ecards.test.noUsersDescription')}</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-12">
-                          <Checkbox
-                            checked={isAllUsersSelected}
-                            onCheckedChange={handleSelectAllUsers}
-                            aria-label={t('ecards.test.selectAllUsers')}
-                          />
-                        </TableHead>
-                        <TableHead>{t('ecards.test.name')}</TableHead>
-                        <TableHead>{t('ecards.test.email')}</TableHead>
-                        <TableHead>{t('ecards.test.role')}</TableHead>
-                        <TableHead>{t('ecards.test.emailVerified')}</TableHead>
-                        <TableHead>{t('ecards.test.actions')}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {users.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell>
-                            <Checkbox
-                              checked={selectedUsers.includes(user.id)}
-                              onCheckedChange={(checked) => handleSelectUser(user.id, checked as boolean)}
-                              aria-label={`${t('common.select')} ${getUserName(user)}`}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">{getUserName(user)}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm">{user.email}</span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm capitalize">{user.role}</span>
-                          </TableCell>
-                          <TableCell>
-                            {user.emailVerified ? (
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <XCircle className="h-4 w-4 text-red-500" />
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleSendTestBirthdayCard(user.id)}
-                              disabled={sendTestBirthdayMutation.isPending || tokenLoading}
-                              className="flex items-center gap-2"
-                            >
-                              <Mail className="h-4 w-4" />
-                              {tokenLoading ? t('ecards.test.refreshing') : sendTestBirthdayMutation.isPending ? t('ecards.test.sending') : t('ecards.test.sendTestCard')}
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
 
         {/* Customer Details Modal */}
         <Dialog open={customerModalOpen} onOpenChange={setCustomerModalOpen}>
