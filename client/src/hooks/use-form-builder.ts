@@ -23,6 +23,8 @@ export function useFormBuilder(initialTitle?: string, initialElements?: FormElem
     showFormTitle: true,
   });
 
+  const [formTags, setFormTags] = useState<string[]>([]);
+
   const addElement = useCallback((type: FormElementType, index?: number) => {
     const newElement: FormElement = {
       id: nanoid(),
@@ -202,9 +204,14 @@ export function useFormBuilder(initialTitle?: string, initialElements?: FormElem
     }));
   }, []);
 
+  const updateFormTags = useCallback((tags: string[]) => {
+    setFormTags(tags);
+  }, []);
+
   return {
     ...state,
     formSettings,
+    formTags,
     addElement,
     addElementAtIndex,
     updateElement,
@@ -214,6 +221,7 @@ export function useFormBuilder(initialTitle?: string, initialElements?: FormElem
     updateFormTitle,
     updateSettings,
     updateFormSettings,
+    updateFormTags,
     togglePreview,
     resetFormData,
     exportForm,

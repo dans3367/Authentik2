@@ -10,7 +10,18 @@ export class EmailProviderManager {
 
   constructor() {
     this.queue = new InMemoryEmailQueue();
+    this.initializeQueue();
     this.startQueueProcessing();
+  }
+
+  // Initialize the queue by loading scheduled emails from database
+  private async initializeQueue(): Promise<void> {
+    try {
+      await this.queue.initialize();
+      console.log('[ProviderManager] Queue initialized successfully');
+    } catch (error) {
+      console.error('[ProviderManager] Failed to initialize queue:', error);
+    }
   }
 
   // Register a provider
@@ -118,6 +129,26 @@ export class EmailProviderManager {
   // Send email with queueing (for high-volume scenarios)
   async queueEmail(message: EmailMessage, preferredProviderId?: string): Promise<string> {
     return await this.queue.enqueue(message, preferredProviderId);
+  }
+
+  // Schedule email for a specific future time
+  async queueEmailAt(message: EmailMessage, runAt: Date, preferredProviderId?: string): Promise<string> {
+    return await this.queue.enqueueAt(message, runAt, preferredProviderId);
+  }
+
+  // Return snapshot of all queued emails
+  getAllQueuedEmails() {
+    return this.queue.getAllEmails();
+  }
+
+  // Remove a queued email by ID
+  removeQueuedEmail(emailId: string): boolean {
+    return this.queue.remove(emailId);
+  }
+
+  // Update a queued email message or schedule time
+  updateQueuedEmail(emailId: string, updates: { message?: Partial<EmailMessage>; nextRetryAt?: Date }): boolean {
+    return this.queue.update(emailId, updates);
   }
 
   // Attempt to send email with a specific provider

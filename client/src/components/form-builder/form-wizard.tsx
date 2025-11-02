@@ -11,6 +11,7 @@ import { useLocation } from 'wouter';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface FormWizardProps {
   editMode?: boolean;
@@ -30,8 +31,9 @@ interface FormWizardProps {
 export function FormWizard({ editMode = false, formData: existingFormData }: FormWizardProps) {
   const { isAuthenticated, isLoading: authLoading } = useReduxAuth();
   const { hasInitialized } = useAuth();
-  const [, setLocation] = useLocation();
+const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [createdFormData, setCreatedFormData] = useState<{ id: string; title: string } | null>(null);
@@ -108,7 +110,8 @@ export function FormWizard({ editMode = false, formData: existingFormData }: For
           id: wizardState.selectedTheme.id,
           name: wizardState.selectedTheme.name,
           customColors: wizardState.selectedTheme.customColors || null
-        })
+        }),
+        tags: wizardState.formData.tags || []
       };
 
       console.log(`${editMode ? 'Updating' : 'Creating'} form:`, formDataToSave);
@@ -189,11 +192,11 @@ export function FormWizard({ editMode = false, formData: existingFormData }: For
   const getStepTitle = () => {
     switch (wizardState.currentStep) {
       case 'build':
-        return 'Build Your Form';
+        return t('formBuilder.wizard.build', 'Build');
       case 'style':
-        return 'Choose Style';
+        return t('formBuilder.wizard.style', 'Style');
       case 'preview':
-        return 'Preview & Save';
+        return t('formBuilder.wizard.preview', 'Preview');
       default:
         return 'Form Builder';
     }
@@ -235,9 +238,9 @@ export function FormWizard({ editMode = false, formData: existingFormData }: For
           {/* Progress Steps */}
           <div className="hidden lg:flex items-center space-x-4">
             {[
-              { step: 1, title: 'Build', key: 'build' },
-              { step: 2, title: 'Style', key: 'style' },
-              { step: 3, title: 'Preview', key: 'preview' }
+              { step: 1, title: t('formBuilder.wizard.build', 'Build'), key: 'build' },
+              { step: 2, title: t('formBuilder.wizard.style', 'Style'), key: 'style' },
+              { step: 3, title: t('formBuilder.wizard.preview', 'Preview'), key: 'preview' }
             ].map((item, index) => (
               <div key={item.key} className="flex items-center">
                 {index > 0 && (
@@ -277,8 +280,8 @@ export function FormWizard({ editMode = false, formData: existingFormData }: For
         </div>
 
         <div className="flex items-center space-x-4">
-          <div className="text-sm text-slate-600">
-            Step {getStepNumber()} of 3
+<div className="text-sm text-slate-600">
+            {t('formBuilder.wizard.stepOf', { current: getStepNumber(), total: 3, defaultValue: `Step ${getStepNumber()} of 3` })}
           </div>
         </div>
       </header>
@@ -290,6 +293,7 @@ export function FormWizard({ editMode = false, formData: existingFormData }: For
             initialTitle={wizardState.formData.title}
             initialElements={wizardState.formData.elements}
             initialSettings={wizardState.formData.settings}
+            initialTags={wizardState.formData.tags}
             isEditMode={editMode}
           />
         )}
@@ -323,7 +327,7 @@ export function FormWizard({ editMode = false, formData: existingFormData }: For
             {wizardState.currentStep !== 'build' && (
               <Button variant="outline" onClick={previousStep} className="flex items-center space-x-2">
                 <ArrowLeft className="w-4 h-4" />
-                <span>Previous</span>
+<span>{t('formBuilder.wizard.previous', 'Previous')}</span>
               </Button>
             )}
           </div>
@@ -331,18 +335,18 @@ export function FormWizard({ editMode = false, formData: existingFormData }: For
           <div className="flex items-center space-x-3">
             {wizardState.currentStep === 'build' && (
               <div className="text-sm text-slate-600 dark:text-slate-400">
-                {canProceedToStyle ? 
-                  `${wizardState.formData.elements.length} element${wizardState.formData.elements.length !== 1 ? 's' : ''} added` :
-                  'Add at least one Email component to continue'
+{canProceedToStyle ? 
+                  `${wizardState.formData.elements.length} element${wizardState.formData.elements.length !== 1 ? 's' : ''} ${t('formBuilder.wizard.added','added')}` :
+                  t('formBuilder.wizard.buildHint', 'Add at least one Email component to continue')
                 }
               </div>
             )}
             
             {wizardState.currentStep === 'style' && (
               <div className="text-sm text-slate-600 dark:text-slate-400">
-                {canProceedToPreview ? 
-                  `${wizardState.selectedTheme?.name} theme selected` :
-                  'Select a theme to continue'
+{canProceedToPreview ? 
+                `${wizardState.selectedTheme?.name} ${t('formBuilder.wizard.themeSelected','theme selected')}` :
+                t('formBuilder.wizard.styleHint', 'Select a theme to continue')
                 }
               </div>
             )}
@@ -356,7 +360,7 @@ export function FormWizard({ editMode = false, formData: existingFormData }: For
                 }
                 className="flex items-center space-x-2"
               >
-                <span>Next</span>
+<span>{t('formBuilder.wizard.next', 'Next')}</span>
                 <ArrowRight className="w-4 h-4" />
               </Button>
             )}

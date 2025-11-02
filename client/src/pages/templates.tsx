@@ -361,9 +361,10 @@ function TemplateCard({ template, onToggleFavorite, onDuplicate, onDelete, onUse
         </div>
         <div>
           <p className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Preview</p>
-          <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-3">
-            {template.preview || 'No preview available'}
-          </p>
+          <div 
+            className="text-sm text-gray-600 dark:text-gray-300 line-clamp-3"
+            dangerouslySetInnerHTML={{ __html: template.preview || 'No preview available' }}
+          />
         </div>
         {template.tags.length > 0 && (
           <div className="flex flex-wrap gap-2">
@@ -389,9 +390,10 @@ function TemplateCard({ template, onToggleFavorite, onDuplicate, onDelete, onUse
                   Subject: {template.subjectLine}
                 </DialogDescription>
               </DialogHeader>
-              <div className="max-h-[60vh] overflow-y-auto rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-4 py-3 text-sm whitespace-pre-wrap">
-                {template.body}
-              </div>
+              <div 
+                className="max-h-[60vh] overflow-y-auto rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-4 py-3 text-sm"
+                dangerouslySetInnerHTML={{ __html: template.body }}
+              />
             </DialogContent>
           </Dialog>
           <Button

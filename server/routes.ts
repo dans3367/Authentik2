@@ -9,6 +9,7 @@ import cookieParser from "cookie-parser";
 // Note: authRoutes removed - better-auth handles authentication now
 import { adminRoutes } from "./routes/adminRoutes";
 import { formsRoutes } from "./routes/formsRoutes";
+import { formTagsRoutes } from "./routes/formTagsRoutes";
 import { subscriptionRoutes } from "./routes/subscriptionRoutes";
 import { companyRoutes } from "./routes/companyRoutes";
 import { shopsRoutes } from "./routes/shopsRoutes";
@@ -59,6 +60,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin", adminRoutes);
   app.use("/api/user", authRoutes); // User-facing session endpoints
   app.use("/api/forms", formsRoutes);
+  app.use("/api/form-tags", formTagsRoutes);
   app.use("/api/subscription", subscriptionRoutes);
   app.use("/api/company", companyRoutes);
   app.use("/api/shops", shopsRoutes);

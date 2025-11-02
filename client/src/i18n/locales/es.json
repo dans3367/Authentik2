@@ -46,7 +46,9 @@
     "contacts": "Contactos",
     "analytics": "Análisis",
     "shops": "Tiendas",
-    "users": "Usuarios"
+    "users": "Usuarios",
+    "segmentation": "Segmentación",
+    "management": "Gestión"
   },
   "dashboard": {
     "welcomeBack": "Bienvenido de nuevo, {{name}}"
@@ -83,7 +85,8 @@
     "alreadyHaveAccount": "¿Ya tienes una cuenta?",
     "dontHaveAccount": "¿No tienes una cuenta?",
     "signIn": "Iniciar Sesión",
-    "createAccount": "Crear Cuenta"
+    "createAccount": "Crear Cuenta",
+    "authenticating": "Autenticando..."
   },
   "reminders": {
     "title": "¡Nunca Vuelvas a Perder una Cita!",
@@ -1061,5 +1064,72 @@
     "passwordTooShort": "La contraseña debe tener al menos 8 caracteres",
     "passwordsDoNotMatch": "Las contraseñas no coinciden",
     "invalidFormat": "Formato inválido"
+  },
+  "formBuilder": {
+    "wizard": {
+      "build": "Construir",
+      "style": "Estilo",
+      "preview": "Vista previa",
+      "stepOf": "Paso {{current}} de {{total}}",
+      "previous": "Anterior",
+      "next": "Siguiente",
+      "added": "agregado(s)",
+      "buildHint": "Agrega al menos un componente de Email para continuar",
+      "styleHint": "Selecciona un tema para continuar",
+      "themeSelected": "tema seleccionado"
+    },
+    "palette": {
+      "header": "Componentes del Formulario",
+      "subheader": "Arrastra y suelta para construir tu formulario",
+      "categories": { "basic": "Entradas Básicas", "selection": "Selección" },
+      "text-input": { "label": "Campo de Texto", "description": "Campo de una sola línea" },
+      "email-input": { "label": "Campo de Email", "description": "Dirección de correo" },
+      "textarea": { "label": "Área de Texto", "description": "Texto de varias líneas" },
+      "number-input": { "label": "Campo Numérico", "description": "Campo numérico" },
+      "full-name": { "label": "Nombre Completo", "description": "Nombre y apellido" },
+      "image": { "label": "Imagen", "description": "Cuadro de imagen" },
+      "select": { "label": "Lista Desplegable", "description": "Selección desplegable" },
+      "checkbox": { "label": "Casilla", "description": "Selección múltiple" },
+      "radio": { "label": "Opción Única", "description": "Selección única" },
+      "rate-scale": { "label": "Escala de Calificación", "description": "Escala 1-10" },
+      "boolean-switch": { "label": "Interruptor Sí/No", "description": "Opción binaria" },
+      "datetime-picker": { "label": "Fecha y Hora", "description": "Entrada de fecha, hora o ambas" }
+    },
+    "proTipTitle": "Consejo",
+    "proTipDesktop": "Arrastra componentes para una colocación precisa con indicadores azules",
+    "proTipMobile": "Toca para agregar al instante o arrastra para colocar",
+    "canvas": {
+      "autoSaved": "Guardado automático",
+      "previewFull": "Modo de vista previa - así verá el formulario el usuario",
+      "previewShort": "Modo de vista previa",
+      "buildFull": "Modo de construcción - arrastra o haz clic para agregar",
+      "buildShort": "Modo de construcción",
+      "buttons": {"edit": "Editar", "preview": "Vista previa"},
+      "heroTitle": "Construye Tu Formulario Perfecto",
+      "heroSubtitleDesktop": "Comienza arrastrando componentes desde la barra lateral o haz clic en cualquiera para agregarlo al instante.",
+      "heroSubtitleMobile": "Toca componentes para agregarlos al formulario.",
+      "heroBadgeTextInput": "Texto",
+      "heroBadgeEmail": "Email",
+      "heroBadgeDropdown": "Desplegable",
+      "heroBadgeSubmit": "Botón Enviar",
+      "tryIt": "Pruébalo ahora ↗"
+    },
+    "properties": {
+      "title": "Propiedades del Formulario",
+      "formTitle": "Título del Formulario",
+      "formTitlePlaceholder": "Ingresa el título del formulario...",
+      "formDescription": "Descripción del Formulario",
+      "formDescriptionPlaceholder": "Agrega una descripción para ayudar a los usuarios a entender el formulario...",
+      "tags": "Etiquetas",
+      "assignTags": "Asignar Etiquetas",
+      "noTags": "No hay etiquetas disponibles",
+      "formOptions": "Opciones del Formulario",
+      "compactMode": "Modo Compacto (2 campos por fila)",
+      "showFormTitle": "Mostrar título del formulario",
+      "showProgressBar": "Mostrar barra de progreso",
+      "fields": "Campos",
+      "required": "Requeridos",
+      "clearForm": "Limpiar formulario"
+    }
   }
 }

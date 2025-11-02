@@ -9,7 +9,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import EmailActivityTimeline from "@/components/EmailActivityTimeline";
-import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
 import SendEmailModal from "@/components/SendEmailModal";
 import ManageContactTagsModal from "@/components/ManageContactTagsModal";
 import {
@@ -381,10 +380,18 @@ export default function ViewContact() {
               variant="outline"
               className="justify-center"
               disabled={isSendEmailDisabled}
-              onClick={() => setLocation(`/email-compose?to=${encodeURIComponent(contact.email)}&schedule=1`)}
+              onClick={() => setLocation(`/email-contacts/view/${contact.id}/schedule`)}
             >
               <Clock className="w-4 h-4 mr-2" />
               Send Later
+            </Button>
+            <Button 
+              variant="outline"
+              className="justify-center"
+              onClick={() => setLocation(`/email-contacts/view/${contact.id}/scheduled`)}
+            >
+              <Calendar className="w-4 h-4 mr-2" />
+              View Scheduled
             </Button>
             <Button 
               variant="outline"
@@ -567,7 +574,7 @@ export default function ViewContact() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {contact.tags.length > 0 ? (
+                {Array.isArray(contact.tags) && contact.tags.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {contact.tags.map((tag) => (
                       <Badge 
@@ -597,7 +604,7 @@ export default function ViewContact() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {contact.lists.length > 0 ? (
+                {Array.isArray(contact.lists) && contact.lists.length > 0 ? (
                   <div className="space-y-2">
                     {contact.lists.map((list) => (
                       <div key={list.id} className="p-2 bg-gray-50 dark:bg-gray-800 rounded">
@@ -728,25 +735,22 @@ export default function ViewContact() {
                 variant="outline" 
                 className="w-full justify-start"
                 disabled={isSendEmailDisabled}
-                onClick={() => setLocation(`/email-compose?to=${encodeURIComponent(contact.email)}&schedule=1`)}
+                onClick={() => setLocation(`/email-contacts/view/${contact.id}/schedule`)}
               >
                 <Clock className="w-4 h-4 mr-2" />
                 Send Later
               </Button>
-              <EmailActivityTimelineModal
-                contactId={contact.id}
-                contactEmail={contact.email}
-                contactName={`${contact.firstName || ''} ${contact.lastName || ''}`.trim() || undefined}
-                trigger={
-                  <Button variant="outline" className="w-full justify-start">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    View Activity Timeline
-                  </Button>
-                }
-              />
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={() => setLocation(`/email-contacts/view/${contact.id}/scheduled`)}
+              >
+                <Calendar className="w-4 h-4 mr-2" />
+                View Scheduled
+              </Button>
               <ManageContactTagsModal
                 contactId={contact.id}
-                currentTagIds={contact.tags.map((t) => t.id)}
+                currentTagIds={Array.isArray(contact.tags) ? contact.tags.map((t) => t.id) : []}
                 contactName={getFullName(contact)}
                 onUpdated={() => {
                   queryClient.invalidateQueries({ queryKey: ['/api/email-contacts', id] });

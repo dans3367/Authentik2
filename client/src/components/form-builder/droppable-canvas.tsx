@@ -3,6 +3,7 @@ import { FormElement, FormElementType } from '@/types/form-builder';
 import { FormElementRenderer } from './form-element-renderer';
 import { SortableFormElement } from './sortable-form-element';
 import { DropInsertionIndicator } from './drop-insertion-indicator';
+import { useTranslation } from 'react-i18next';
 // Removed DropIndicator import - using button-based movement
 
 interface DroppableCanvasProps {
@@ -41,6 +42,7 @@ export function DroppableCanvas({
   const { setNodeRef, isOver } = useDroppable({
     id: 'form-canvas',
   });
+  const { t } = useTranslation();
   const isMobile = window.innerWidth < 1024; // lg breakpoint
 
   if (previewMode) {
@@ -101,27 +103,27 @@ export function DroppableCanvas({
                 </div>
               </div>
               
-              <h3 className="text-lg md:text-xl font-bold text-slate-800 mb-2 md:mb-3">Build Your Perfect Form</h3>
-              <p className="text-sm md:text-base text-slate-600 mb-6 md:mb-8 max-w-xs md:max-w-md mx-auto leading-relaxed px-4">
-                <span className="hidden md:inline">Start by dragging components from the sidebar, or click on any component to add it instantly.</span>
-                <span className="md:hidden">Tap components to add them to your form.</span>
-              </p>
-              
-              <div className="flex flex-wrap justify-center gap-2 md:gap-3 mb-6 md:mb-8 px-4">
-                {['Text Input', 'Email', 'Dropdown', 'Submit Button'].map((component, index) => (
-                  <span 
-                    key={component}
-                    className="px-3 py-1.5 md:px-4 md:py-2 bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 text-xs md:text-sm font-medium rounded-full shadow-sm hover:shadow-md transition-shadow duration-200 animate-fade-in"
-                    style={{ animationDelay: `${index * 100}ms` }}
-                  >
-                    {component}
-                  </span>
-                ))}
-              </div>
-              
-              <div className="animate-bounce-subtle hidden md:block">
-                <div className="text-sm text-slate-500 font-medium">Try it now ↗</div>
-              </div>
+<h3 className="text-lg md:text-xl font-bold text-slate-800 mb-2 md:mb-3">{t('formBuilder.canvas.heroTitle', 'Build Your Perfect Form')}</h3>
+<p className="text-sm md:text-base text-slate-600 mb-6 md:mb-8 max-w-xs md:max-w-md mx-auto leading-relaxed px-4">
+  <span className="hidden md:inline">{t('formBuilder.canvas.heroSubtitleDesktop', 'Start by dragging components from the sidebar, or click on any component to add it instantly.')}</span>
+  <span className="md:hidden">{t('formBuilder.canvas.heroSubtitleMobile', 'Tap components to add them to your form.')}</span>
+</p>
+
+<div className="flex flex-wrap justify-center gap-2 md:gap-3 mb-6 md:mb-8 px-4">
+  {[t('formBuilder.canvas.heroBadgeTextInput','Text Input'), t('formBuilder.canvas.heroBadgeEmail','Email'), t('formBuilder.canvas.heroBadgeDropdown','Dropdown'), t('formBuilder.canvas.heroBadgeSubmit','Submit Button')].map((component, index) => (
+    <span 
+      key={`${component}-${index}`}
+      className="px-3 py-1.5 md:px-4 md:py-2 bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 text-xs md:text-sm font-medium rounded-full shadow-sm hover:shadow-md transition-shadow duration-200 animate-fade-in"
+      style={{ animationDelay: `${index * 100}ms` }}
+    >
+      {component}
+    </span>
+  ))}
+</div>
+
+<div className="animate-bounce-subtle hidden md:block">
+  <div className="text-sm text-slate-500 font-medium">{t('formBuilder.canvas.tryIt','Try it now ↗')}</div>
+</div>
             </div>
           ) : (
             <div className="space-y-0">

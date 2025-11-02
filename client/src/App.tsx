@@ -40,6 +40,8 @@ const EmailApprovalsPage = lazy(() => import("@/pages/email-approvals"));
 const EmailContactsPage = lazy(() => import("@/pages/email-contacts"));
 const NewEmailContactPage = lazy(() => import("@/pages/email-contacts/new"));
 const ViewEmailContactPage = lazy(() => import("@/pages/email-contacts/view"));
+const ScheduleEmailContactPage = lazy(() => import("@/pages/email-contacts/schedule"));
+const ScheduledTimelineContactPage = lazy(() => import("@/pages/email-contacts/scheduled"));
 const EditEmailContactPage = lazy(() => import("@/pages/email-contacts/edit"));
 const EmailAnalyticsPage = lazy(() => import("@/pages/email-analytics"));
 const BirthdaysPage = lazy(() => import("@/pages/birthdays"));
@@ -245,6 +247,8 @@ function Router() {
                   <Route path="/email-contacts" component={EmailContactsPage} />
                   <Route path="/email-contacts/new" component={NewEmailContactPage} />
                   <Route path="/email-contacts/view/:id" component={ViewEmailContactPage} />
+                  <Route path="/email-contacts/view/:id/schedule" component={ScheduleEmailContactPage} />
+                  <Route path="/email-contacts/view/:id/scheduled" component={ScheduledTimelineContactPage} />
                   <Route path="/email-contacts/edit/:id" component={EditEmailContactPage} />
                   <Route path="/email-analytics" component={EmailAnalyticsPage} />
                   <Route path="/segmentation" component={SegmentationPage} />

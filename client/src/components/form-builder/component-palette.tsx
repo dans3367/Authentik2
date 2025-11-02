@@ -1,5 +1,6 @@
 import { ComponentPaletteItem, FormElementType } from '@/types/form-builder';
 import { DraggableComponent } from './draggable-component';
+import { useTranslation } from 'react-i18next';
 
 const paletteItems: ComponentPaletteItem[] = [
   // Basic Inputs
@@ -112,6 +113,7 @@ interface ComponentPaletteProps {
 }
 
 export function ComponentPalette({ onAddElement }: ComponentPaletteProps) {
+  const { t } = useTranslation();
   const categories = ['basic', 'selection'] as const;
   const isMobile = window.innerWidth < 1024; // lg breakpoint
 
@@ -119,8 +121,8 @@ export function ComponentPalette({ onAddElement }: ComponentPaletteProps) {
     <aside className="w-80 lg:w-80 bg-gradient-to-b from-slate-50 to-white border-r border-slate-200/60 shadow-sm relative z-10 h-full flex flex-col">
       <div className="p-4 lg:p-6 flex-1 overflow-y-auto">
         <div className="mb-6">
-          <h2 className="text-lg font-bold text-slate-800 mb-1">Form Components</h2>
-          <p className="text-sm text-slate-500">Drag & drop to build your form</p>
+          <h2 className="text-lg font-bold text-slate-800 mb-1">{t('formBuilder.palette.header', 'Form Components')}</h2>
+          <p className="text-sm text-slate-500">{t('formBuilder.palette.subheader', 'Drag & drop to build your form')}</p>
         </div>
         
         {categories.map((category) => {
@@ -131,28 +133,37 @@ export function ComponentPalette({ onAddElement }: ComponentPaletteProps) {
               <div className="flex items-center mb-4">
                 <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
                 <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">
-                  {categoryLabels[category]}
+                  {t(`formBuilder.palette.categories.${category}`, categoryLabels[category])}
                 </h3>
                 <div className="flex-1 h-px bg-gradient-to-r from-slate-200 to-transparent ml-3"></div>
               </div>
               <div className="space-y-3">
-                {items.map((item) => (
-                  <DraggableComponent
-                    key={item.type}
-                    item={item}
-                    onAddElement={onAddElement}
-                    isMobile={isMobile}
-                  />
-                ))}
+                {items.map((item) => {
+                  const localizedItem = {
+                    ...item,
+                    label: t(`formBuilder.palette.${item.type}.label`, item.label),
+                    description: t(`formBuilder.palette.${item.type}.description`, item.description),
+                  } as ComponentPaletteItem;
+                  return (
+                    <DraggableComponent
+                      key={item.type}
+                      item={localizedItem}
+                      onAddElement={onAddElement}
+                      isMobile={isMobile}
+                    />
+                  );
+                })}
               </div>
             </div>
           );
         })}
         
         <div className="mt-12 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
-          <div className="text-xs text-blue-600 font-medium mb-1">💡 Pro tip</div>
+          <div className="text-xs text-blue-600 font-medium mb-1">💡 {t('formBuilder.proTipTitle', 'Pro tip')}</div>
           <div className="text-xs text-blue-700">
-            {isMobile ? 'Click to add instantly, or drag for precise placement' : 'Drag components for precise placement with blue line indicators'}
+            {isMobile 
+              ? t('formBuilder.proTipMobile', 'Click to add instantly, or drag for precise placement')
+              : t('formBuilder.proTipDesktop', 'Drag components for precise placement with blue line indicators')}
           </div>
         </div>
       </div>

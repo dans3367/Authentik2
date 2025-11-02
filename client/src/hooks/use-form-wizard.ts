@@ -492,6 +492,7 @@ interface ExistingFormData {
   description: string;
   formData: string;
   theme: string;
+  tags?: string[];
   isActive: boolean;
   responseCount: number;
   createdAt: string;
@@ -516,6 +517,7 @@ export function useFormWizard(existingForm?: ExistingFormData) {
           formData: {
             title: existingForm.title,
             elements: parsedFormData.elements || [],
+            tags: existingForm.tags || [],
             settings: {
               description: existingForm.description || '',
               showProgressBar: parsedFormData.settings?.showProgressBar || false,
@@ -543,6 +545,7 @@ export function useFormWizard(existingForm?: ExistingFormData) {
       formData: {
         title: 'Untitled Form',
         elements: [],
+        tags: [],
         settings: {
           description: '',
           showProgressBar: false,
@@ -588,13 +591,14 @@ export function useFormWizard(existingForm?: ExistingFormData) {
     });
   };
 
-  const updateFormData = (title: string, elements: FormElement[], settings?: any) => {
+  const updateFormData = (title: string, elements: FormElement[], settings?: any, tags?: string[]) => {
     setWizardState(prev => {
       const newState = {
         ...prev,
         formData: { 
           title, 
           elements,
+          tags: tags !== undefined ? tags : prev.formData.tags || [],
           settings: settings || prev.formData.settings
         }
       };
@@ -658,6 +662,7 @@ export function useFormWizard(existingForm?: ExistingFormData) {
       formData: {
         title: 'Untitled Form',
         elements: [],
+        tags: [],
         settings: {
           description: '',
           showProgressBar: false,

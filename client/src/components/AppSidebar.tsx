@@ -216,6 +216,8 @@ export function AppSidebar() {
                 const Icon = item.icon;
 
                 if (hasChildren) {
+                  // Only show submenu when sidebar is collapsed (icon mode)
+                  const showSubmenu = isCollapsed;
                   return (
                     <SidebarMenuItem key={item.name} className="w-full flex justify-center group-data-[collapsible=icon]:justify-center">
                       <SidebarMenuButton
@@ -232,22 +234,24 @@ export function AppSidebar() {
                           <span className="group-data-[collapsible=icon]:hidden font-medium">{item.name}</span>
                         </Link>
                       </SidebarMenuButton>
-                      <SidebarMenuSub>
-                        {item.children.map((child: any) => {
-                          const ChildIcon = child.icon;
-                          const childActive = location === child.href;
-                          return (
-                            <SidebarMenuSubItem key={child.name}>
-                              <SidebarMenuSubButton asChild isActive={childActive}>
-                                <Link href={child.href} className="flex items-center gap-2" onClick={handleMobileNavClick}>
-                                  {ChildIcon && <ChildIcon className="h-4 w-4" />}
-                                  <span>{child.name}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          );
-                        })}
-                      </SidebarMenuSub>
+                      {showSubmenu && (
+                        <SidebarMenuSub>
+                          {item.children.map((child: any) => {
+                            const ChildIcon = child.icon;
+                            const childActive = location === child.href;
+                            return (
+                              <SidebarMenuSubItem key={child.name}>
+                                <SidebarMenuSubButton asChild isActive={childActive}>
+                                  <Link href={child.href} className="flex items-center gap-2" onClick={handleMobileNavClick}>
+                                    {ChildIcon && <ChildIcon className="h-4 w-4" />}
+                                    <span>{child.name}</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            );
+                          })}
+                        </SidebarMenuSub>
+                      )}
                     </SidebarMenuItem>
                   );
                 }

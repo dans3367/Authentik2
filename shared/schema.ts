@@ -426,6 +426,7 @@ export const companies = pgTable("companies", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+
 // Forms table for DragFormMaster integration with multi-tenancy
 export const forms = pgTable("forms", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -580,6 +581,31 @@ export const bouncedEmails = pgTable("bounced_emails", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Scheduled emails table - persists scheduled emails across server restarts
+export const scheduledEmails = pgTable("scheduled_emails", {
+  id: varchar("id").primaryKey(), // Use the queue ID from the email queue
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  contactId: varchar("contact_id").references(() => emailContacts.id, { onDelete: 'cascade' }),
+  // Email details
+  to: text("to").notNull(), // JSON array of recipient emails
+  subject: text("subject").notNull(),
+  html: text("html"),
+  text: text("text"),
+  // Scheduling details
+  scheduledAt: timestamp("scheduled_at").notNull(), // When the email should be sent
+  status: text("status").notNull().default('pending'), // 'pending', 'processing', 'sent', 'failed', 'retrying'
+  providerId: text("provider_id"), // Email provider to use
+  // Attempt tracking
+  attemptCount: integer("attempt_count").default(0),
+  lastAttemptAt: timestamp("last_attempt_at"),
+  nextRetryAt: timestamp("next_retry_at"),
+  error: text("error"), // Last error message if failed
+  // Metadata
+  metadata: text("metadata"), // JSON metadata (contactId, recipientId, type, etc.)
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const tenantRelations = relations(tenants, ({ many }) => ({
   users: many(betterAuthUser),
@@ -630,6 +656,7 @@ export const companyRelations = relations(companies, ({ one }) => ({
     references: [betterAuthUser.id],
   }),
 }));
+
 
 export const formRelations = relations(forms, ({ one, many }) => ({
   tenant: one(tenants, {
@@ -991,6 +1018,7 @@ export const updateTenantSchema = z.object({
   isActive: z.boolean(),
   maxUsers: z.number().min(1),
 });
+
 
 // Form schemas
 export const createFormSchema = z.object({

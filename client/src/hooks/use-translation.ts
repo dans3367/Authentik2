@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useTranslation as useI18next } from 'react-i18next';
 import { getTranslatedLabel, hasTranslations, getTranslationCount, getAllTranslations } from '@/utils/translation-utils';
 
 export interface TranslationHookProps {
@@ -7,74 +8,63 @@ export interface TranslationHookProps {
 }
 
 export function useTranslation(props: TranslationHookProps = {}) {
-  const { currentLanguage = 'en', defaultLanguage = 'en' } = props;
-  const [activeLanguage, setActiveLanguage] = useState(currentLanguage);
+  const { defaultLanguage = 'en' } = props;
+  const { i18n } = useI18next();
+  const activeLanguage = (i18n.language || defaultLanguage).split('-')[0];
 
-  /**
-   * Get the translated label for a form element
-   */
+  // Get the translated label for a form element
   const getLabel = useCallback((
     element: { label: string; labelTranslations?: Record<string, string> },
     languageCode?: string
   ): string => {
-    const targetLanguage = languageCode || activeLanguage;
+    const targetLanguage = (languageCode || activeLanguage).split('-')[0];
     return getTranslatedLabel(element, targetLanguage);
   }, [activeLanguage]);
 
-  /**
-   * Check if an element has translations
-   */
+  // Check if an element has translations
   const hasElementTranslations = useCallback((
     element: { labelTranslations?: Record<string, string> }
   ): boolean => {
     return hasTranslations(element);
   }, []);
 
-  /**
-   * Get translation count for an element
-   */
+  // Get translation count for an element
   const getElementTranslationCount = useCallback((
     element: { labelTranslations?: Record<string, string> }
   ): number => {
     return getTranslationCount(element);
   }, []);
 
-  /**
-   * Get all translations for an element
-   */
+  // Get all translations for an element
   const getElementTranslations = useCallback((
     element: { label: string; labelTranslations?: Record<string, string> }
   ): Record<string, string> => {
     return getAllTranslations(element);
   }, []);
 
-  /**
-   * Switch the active language
-   */
-  const switchLanguage = useCallback((languageCode: string) => {
-    setActiveLanguage(languageCode);
-  }, []);
+  // Switch the active language via i18n
+  const switchLanguage = useCallback(async (languageCode: string) => {
+    const code = languageCode.split('-')[0];
+    if (i18n.language !== code) {
+      await i18n.changeLanguage(code);
+    }
+  }, [i18n]);
 
-  /**
-   * Reset to default language
-   */
-  const resetLanguage = useCallback(() => {
-    setActiveLanguage(defaultLanguage);
-  }, [defaultLanguage]);
+  // Reset to default language via i18n
+  const resetLanguage = useCallback(async () => {
+    if (i18n.language !== defaultLanguage) {
+      await i18n.changeLanguage(defaultLanguage);
+    }
+  }, [i18n, defaultLanguage]);
 
   return {
-    // State
     activeLanguage,
-    
-    // Actions
     getLabel,
     hasElementTranslations,
     getElementTranslationCount,
     getElementTranslations,
     switchLanguage,
     resetLanguage,
-    
-    // Utilities
-    isCurrentLanguage: (languageCode: string) => languageCode === activeLanguage,
+    isCurrentLanguage: (languageCode: string) => languageCode.split('-')[0] === activeLanguage,
   };
 } 

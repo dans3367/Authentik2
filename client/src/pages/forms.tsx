@@ -20,6 +20,7 @@ interface Form {
   description: string;
   formData: string;
   theme: string;
+  tags?: string[];
   isActive: boolean;
   responseCount: number;
   createdAt: string;
@@ -485,6 +486,25 @@ export default function Forms2() {
                       <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-2">
                         {form.description}
                       </p>
+                    )}
+                    
+                    {/* Tags */}
+                    {form.tags && form.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {form.tags.slice(0, 3).map((tagId) => (
+                          <span
+                            key={tagId}
+                            className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                          >
+                            Tag {tagId.slice(0, 8)}
+                          </span>
+                        ))}
+                        {form.tags.length > 3 && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                            +{form.tags.length - 3}
+                          </span>
+                        )}
+                      </div>
                     )}
                     
                     <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">

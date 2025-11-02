@@ -38,7 +38,11 @@ export default function ManageContactTagsModal({
   onUpdated,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState<string[]>(currentTagIds);
+  const safeCurrentTagIds = useMemo(() => 
+    Array.isArray(currentTagIds) ? currentTagIds : [], 
+    [currentTagIds]
+  );
+  const [selected, setSelected] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
   const [newTagName, setNewTagName] = useState("");
   const [newTagColor, setNewTagColor] = useState("#3B82F6");
@@ -46,20 +50,24 @@ export default function ManageContactTagsModal({
   const qc = useQueryClient();
 
   useEffect(() => {
-    if (open) setSelected(currentTagIds);
-  }, [open, currentTagIds]);
+    if (open) setSelected(safeCurrentTagIds);
+  }, [open, safeCurrentTagIds]);
 
   const { data: tagsData, isLoading: tagsLoading } = useQuery({
     queryKey: ["/api/contact-tags"],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/contact-tags");
-      const raw = await res.json();
-      return Array.isArray(raw) ? raw : raw?.tags || [];
+      return res.json();
     },
     enabled: open,
   });
 
-  const tags: ContactTag[] = tagsData || [];
+  const tags: ContactTag[] = useMemo(() => {
+    const raw: any = tagsData;
+    if (Array.isArray(raw?.tags)) return raw.tags;
+    if (Array.isArray(raw)) return raw;
+    return [];
+  }, [tagsData]);
 
   const PRESET_COLORS = [
     "#EF4444", "#EC4899", "#A855F7", "#6366F1", "#3B82F6",
@@ -75,12 +83,12 @@ export default function ManageContactTagsModal({
   };
 
   const toAdd = useMemo(
-    () => selected.filter((id) => !currentTagIds.includes(id)),
-    [selected, currentTagIds]
+    () => (selected || []).filter((id) => !safeCurrentTagIds.includes(id)),
+    [selected, safeCurrentTagIds]
   );
   const toRemove = useMemo(
-    () => currentTagIds.filter((id) => !selected.includes(id)),
-    [selected, currentTagIds]
+    () => safeCurrentTagIds.filter((id) => !(selected || []).includes(id)),
+    [selected, safeCurrentTagIds]
   );
 
   const applyMutation = useMutation({
@@ -217,7 +225,7 @@ export default function ManageContactTagsModal({
           <div className="max-h-80 overflow-auto border rounded-md">
             {tagsLoading ? (
               <div className="p-4 text-sm text-muted-foreground">Loading tags...</div>
-            ) : tags.length === 0 ? (
+            ) : !tags || tags.length === 0 ? (
               <div className="p-4 text-sm text-muted-foreground">No tags available</div>
             ) : (
               <div className="divide-y">
