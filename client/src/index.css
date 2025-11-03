@@ -1,3 +1,6 @@
+/* Puck Editor Styles */
+@import "@measured/puck/puck.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

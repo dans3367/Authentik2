@@ -339,3 +339,47 @@ export async function translateText(
     };
   }
 }
+
+interface TransformTextParams {
+  text: string;
+  prompt: string;
+}
+
+interface TransformTextResponse {
+  success: boolean;
+  text?: string;
+  error?: string;
+}
+
+/**
+ * Transform text using a custom prompt
+ * Used for generic AI transformations in Puck editor
+ */
+export async function transformText(
+  params: TransformTextParams
+): Promise<TransformTextResponse> {
+  try {
+    const response = await fetch("/api/ai/transform-text", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || "Failed to transform text");
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error: any) {
+    console.error("Error transforming text:", error);
+    return {
+      success: false,
+      error: error.message || "Failed to transform text",
+    };
+  }
+}
