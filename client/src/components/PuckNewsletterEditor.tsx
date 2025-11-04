@@ -2,6 +2,7 @@ import { Puck, type Config, type Fields } from "@measured/puck";
 import "@measured/puck/puck.css";
 import { AITextarea } from "./AITextarea";
 import { TextComponentWithAI } from "./TextComponentWithAI";
+import { TextFieldWithAIHelper } from "./TextFieldWithAIHelper";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -60,12 +61,11 @@ const config: Config = {
       fields: {
         content: {
           type: "custom",
-          label: "Text Content",
+          label: "Page Text",
           render: ({ value, onChange }) => (
-            <AITextarea
+            <TextFieldWithAIHelper
               value={value || ""}
               onChange={onChange}
-              placeholder="Enter your text content here..."
             />
           ),
         },
