@@ -1,15 +1,31 @@
-import { Puck, type Config, type Fields } from "@measured/puck";
+import { Puck, type Config, type Fields, ActionBar, usePuck } from "@measured/puck";
 import "@measured/puck/puck.css";
 import { AITextarea } from "./AITextarea";
 import { TextComponentWithAI } from "./TextComponentWithAI";
 import { TextFieldWithAIHelper } from "./TextFieldWithAIHelper";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Sparkles, Wand2, Loader2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
+  transformText,
+  expandText,
+  shortenText,
+  makeMoreFormalText,
+  makeMoreCasualText,
+} from "@/lib/aiApi";
 
 // Newsletter-focused Puck editor configuration
 const config: Config = {
@@ -391,6 +407,178 @@ export function PuckNewsletterEditor({ initialData, onChange }: PuckNewsletterEd
         config={config}
         data={data}
         onPublish={handlePublish}
+        overrides={{
+          actionBar: ({ children, label }) => {
+            const { appState, dispatch } = usePuck();
+            const [isLoading, setIsLoading] = useState(false);
+
+            // Get the currently selected component
+            const selectedItem = appState.ui.itemSelector;
+            const currentComponent = selectedItem
+              ? appState.data.content.find((item: any) => item.props.id === selectedItem.index)
+              : null;
+
+            const handleAIAction = async (action: string) => {
+              if (!currentComponent) return;
+
+              setIsLoading(true);
+
+              try {
+                let result;
+                let transformedText;
+                const content = currentComponent.props.content || "";
+
+                if (action === "generate") {
+                  // Generate new text
+                  result = await transformText({
+                    text: "",
+                    prompt: "Write a compelling newsletter text paragraph about a product or service. Make it engaging, professional, and around 2-3 sentences.",
+                  });
+                  transformedText = result.text;
+                } else {
+                  // Transform existing text
+                  if (!content || content.trim().length === 0) {
+                    toast({
+                      title: "No text to transform",
+                      description: "Please add some text first before transforming it",
+                      variant: "destructive",
+                    });
+                    setIsLoading(false);
+                    return;
+                  }
+
+                  switch (action) {
+                    case "expand":
+                      result = await expandText({ text: content });
+                      transformedText = result.expandedText;
+                      break;
+                    case "shorten":
+                      result = await shortenText({ text: content });
+                      transformedText = result.shortenedText;
+                      break;
+                    case "formal":
+                      result = await makeMoreFormalText({ text: content });
+                      transformedText = result.formalText;
+                      break;
+                    case "casual":
+                      result = await makeMoreCasualText({ text: content });
+                      transformedText = result.casualText;
+                      break;
+                    case "grammar":
+                      result = await transformText({
+                        text: content,
+                        prompt: "Fix any grammar and spelling errors in this text",
+                      });
+                      transformedText = result.text;
+                      break;
+                    case "simplify":
+                      result = await transformText({
+                        text: content,
+                        prompt: "Simplify this text to make it easier to understand",
+                      });
+                      transformedText = result.text;
+                      break;
+                    default:
+                      throw new Error("Unknown action");
+                  }
+                }
+
+                if (!result.success || !transformedText) {
+                  throw new Error(result.error || "Failed to process text");
+                }
+
+                // Update the component's content using Puck's dispatch
+                dispatch({
+                  type: "set",
+                  state: {
+                    ...appState,
+                    data: {
+                      ...appState.data,
+                      content: appState.data.content.map((item: any) =>
+                        item.props.id === currentComponent.props.id
+                          ? { ...item, props: { ...item.props, content: transformedText } }
+                          : item
+                      ),
+                    },
+                  },
+                });
+
+                toast({
+                  title: action === "generate" ? "Text generated" : "Text transformed",
+                  description:
+                    action === "generate"
+                      ? "New text has been generated successfully"
+                      : "Your text has been updated successfully",
+                });
+              } catch (error: any) {
+                console.error("AI action error:", error);
+                toast({
+                  title: "Action failed",
+                  description: error.message || "Failed to process text",
+                  variant: "destructive",
+                });
+              } finally {
+                setIsLoading(false);
+              }
+            };
+
+            const aiActions = [
+              { label: "Generate", action: "generate", icon: Sparkles },
+              { label: "Make longer", action: "expand", icon: Wand2 },
+              { label: "Make shorter", action: "shorten", icon: Wand2 },
+              { label: "More formal", action: "formal", icon: Wand2 },
+              { label: "Less formal", action: "casual", icon: Wand2 },
+              { label: "Fix grammar", action: "grammar", icon: Wand2 },
+              { label: "Simplify", action: "simplify", icon: Wand2 },
+            ];
+
+            return (
+              <ActionBar label={label}>
+                <ActionBar.Group>
+                  {children}
+                  {label === "Text" && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <div style={{ display: "inline-block" }}>
+                          <ActionBar.Action
+                            onClick={(e) => {
+                              // DropdownMenuTrigger will handle the click
+                            }}
+                            label="AI Helper"
+                          >
+                            {isLoading ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Sparkles className="h-4 w-4" />
+                            )}
+                          </ActionBar.Action>
+                        </div>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuLabel className="text-xs">AI Actions</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {aiActions.map((aiAction) => {
+                          const Icon = aiAction.icon;
+                          return (
+                            <DropdownMenuItem
+                              key={aiAction.action}
+                              onClick={() => handleAIAction(aiAction.action)}
+                              disabled={isLoading}
+                              className="cursor-pointer"
+                            >
+                              <Icon className="h-3.5 w-3.5 mr-2" />
+                              {aiAction.label}
+                            </DropdownMenuItem>
+                          );
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </ActionBar.Group>
+              </ActionBar>
+            );
+          },
+        }}
       />
       <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
