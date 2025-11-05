@@ -159,10 +159,26 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  
+  // Track whether we've initialized for the current open session
+  const hasInitializedRef = useRef(false);
 
   // Initialize state on open
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      // Reset the initialization flag when modal closes
+      hasInitializedRef.current = false;
+      return;
+    }
+    
+    // Only initialize once per open session to prevent resets during editing
+    if (hasInitializedRef.current) {
+      console.log('🔒 [Card Designer] Already initialized, skipping reset to preserve user edits');
+      return;
+    }
+    
+    console.log('🎬 [Card Designer] First initialization for this session');
+    hasInitializedRef.current = true;
     setTitle(initialData?.title ?? "");
     setDescription(initialData?.description ?? "");
     setMessage(initialData?.message ?? "");

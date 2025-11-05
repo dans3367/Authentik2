@@ -893,7 +893,23 @@ export default function ECardsPage() {
     
     // Check if creating a new custom card (designerThemeId starts with 'custom-')
     if (designerThemeId && designerThemeId.startsWith('custom-')) {
-      // New custom card - return empty data
+      // First check if data was saved to the database (e.g., after adding promotions)
+      if (eCardSettings?.customThemeData) {
+        const parsed = parsedCustomThemeData;
+        if (parsed.themes && parsed.themes[designerThemeId]) {
+          const savedData = parsed.themes[designerThemeId];
+          console.log('📥 [Card Designer Initial Data] Found saved data for new custom card:', designerThemeId, savedData);
+          return {
+            ...savedData,
+            cardName: '',
+            sendDate: '',
+            occasionType: '',
+          };
+        }
+      }
+      
+      // No saved data yet - return empty data for truly new cards
+      console.log('🆕 [Card Designer Initial Data] No saved data for new custom card, returning empty:', designerThemeId);
       return {
         title: '',
         description: '',
@@ -1115,11 +1131,29 @@ export default function ECardsPage() {
       // Use parsed data instead of parsing again
       const existingThemeData = parsedCustomThemeData;
 
-      // Update with card promotions
+      // CRITICAL FIX: Preserve unsaved card data from themePreviewData
+      // If the user is editing a card and hasn't saved it yet, we need to include
+      // that data in the themes object before saving promotions
+      const preservedThemes = { ...existingThemeData.themes };
+      
+      // If there's preview data for this theme, merge it into the themes object
+      if (themePreviewData[themeId]) {
+        preservedThemes[themeId] = themePreviewData[themeId];
+        console.log('🔒 [Promotion Change] Preserving unsaved card data for:', themeId, themePreviewData[themeId]);
+      }
+
+      // Update with card promotions and preserved theme data
       const updatedThemeData = {
         ...existingThemeData,
+        themes: preservedThemes,
         cardPromotions: updatedCardPromotions
       };
+
+      console.log('💾 [Promotion Change] Saving with preserved data:', {
+        themeId,
+        hasPreviewData: !!themePreviewData[themeId],
+        updatedThemeData
+      });
 
       updateSettingsMutation.mutate({
         ...eCardSettings,

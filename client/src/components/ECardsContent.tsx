@@ -1053,11 +1053,29 @@ export function ECardsContent() {
       // Use parsed data instead of parsing again
       const existingThemeData = parsedCustomThemeData;
 
-      // Update with card promotions
+      // CRITICAL FIX: Preserve unsaved card data from themePreviewData
+      // If the user is editing a card and hasn't saved it yet, we need to include
+      // that data in the themes object before saving promotions
+      const preservedThemes = { ...existingThemeData.themes };
+      
+      // If there's preview data for this theme, merge it into the themes object
+      if (themePreviewData[themeId]) {
+        preservedThemes[themeId] = themePreviewData[themeId];
+        console.log('🔒 [Promotion Change] Preserving unsaved card data for:', themeId, themePreviewData[themeId]);
+      }
+
+      // Update with card promotions and preserved theme data
       const updatedThemeData = {
         ...existingThemeData,
+        themes: preservedThemes,
         cardPromotions: updatedCardPromotions
       };
+
+      console.log('💾 [Promotion Change] Saving with preserved data:', {
+        themeId,
+        hasPreviewData: !!themePreviewData[themeId],
+        updatedThemeData
+      });
 
       updateSettingsMutation.mutate({
         ...eCardSettings,
