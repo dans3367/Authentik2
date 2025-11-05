@@ -11,9 +11,9 @@ export const helmetMiddleware = helmet({
     // More permissive CSP for development to allow external access
     directives: {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://rsms.me"],
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://rsms.me"],
       imgSrc: ["'self'", "data:", "https:", "http:"],
       connectSrc: [
         "'self'",
@@ -43,9 +43,9 @@ export const helmetMiddleware = helmet({
     // Production CSP with stricter rules
     directives: {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://rsms.me"],
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://rsms.me"],
       imgSrc: ["'self'", "data:", "https:"],
       connectSrc: [
         "'self'",

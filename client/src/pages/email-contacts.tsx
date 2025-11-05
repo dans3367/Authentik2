@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ContactSearch } from "@/components/ContactSearch";
 import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
 import { AddContactDialog } from "@/components/AddContactDialog";
+import ContactViewDrawer from "@/components/ContactViewDrawer";
 import { 
   Users, 
   Plus, 
@@ -100,6 +101,7 @@ export default function EmailContacts() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [addContactOpen, setAddContactOpen] = useState(false);
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
 
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -556,7 +558,7 @@ export default function EmailContacts() {
                                   ? 'text-green-700 dark:text-green-400'
                                   : 'text-gray-900 dark:text-white'
                               }`}
-                              onClick={() => !contact.id.startsWith('temp-') && setLocation(`/email-contacts/view/${contact.id}`)}
+                              onClick={() => !contact.id.startsWith('temp-') && setSelectedContactId(contact.id)}
                               data-testid={`text-contact-name-table-${contact.id}`}
                             >
                               {contact.firstName || contact.lastName
@@ -575,7 +577,7 @@ export default function EmailContacts() {
                                   ? 'text-green-600 dark:text-green-500 cursor-default'
                                   : 'text-gray-500 cursor-pointer'
                               }`}
-                              onClick={() => !contact.id.startsWith('temp-') && setLocation(`/email-contacts/view/${contact.id}`)}
+                              onClick={() => !contact.id.startsWith('temp-') && setSelectedContactId(contact.id)}
                               data-testid={`text-contact-email-table-${contact.id}`}
                             >
                               {contact.email}
@@ -628,7 +630,7 @@ export default function EmailContacts() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setLocation(`/email-contacts/view/${contact.id}`)}>
+                            <DropdownMenuItem onClick={() => setSelectedContactId(contact.id)}>
                               <UserCheck className="w-4 h-4 mr-2" />
                               {t('emailContacts.actions.viewContact')}
                             </DropdownMenuItem>
@@ -727,7 +729,7 @@ export default function EmailContacts() {
                                   ? 'text-green-700 dark:text-green-400'
                                   : 'text-gray-900 dark:text-white'
                               }`}
-                              onClick={() => !contact.id.startsWith('temp-') && setLocation(`/email-contacts/view/${contact.id}`)}
+                              onClick={() => !contact.id.startsWith('temp-') && setSelectedContactId(contact.id)}
                               data-testid={`text-contact-name-card-${contact.id}`}
                             >
                               {contact.firstName || contact.lastName
@@ -746,7 +748,7 @@ export default function EmailContacts() {
                                   ? 'text-green-600 dark:text-green-500 cursor-default'
                                   : 'text-gray-500 cursor-pointer'
                               }`}
-                              onClick={() => !contact.id.startsWith('temp-') && setLocation(`/email-contacts/view/${contact.id}`)}
+                              onClick={() => !contact.id.startsWith('temp-') && setSelectedContactId(contact.id)}
                               data-testid={`text-contact-email-card-${contact.id}`}
                             >
                               {contact.email}
@@ -760,7 +762,7 @@ export default function EmailContacts() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setLocation(`/email-contacts/view/${contact.id}`)}>
+                            <DropdownMenuItem onClick={() => setSelectedContactId(contact.id)}>
                               <UserCheck className="w-4 h-4 mr-2" />
                               {t('emailContacts.actions.viewContact')}
                             </DropdownMenuItem>
@@ -854,6 +856,13 @@ export default function EmailContacts() {
         </CardContent>
       </Card>
       </div>
+
+      {/* Contact View Drawer */}
+      <ContactViewDrawer
+        contactId={selectedContactId}
+        open={!!selectedContactId}
+        onOpenChange={(open) => !open && setSelectedContactId(null)}
+      />
     </div>
   );
 }
