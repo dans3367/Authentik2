@@ -448,23 +448,23 @@ export default function EmailContacts() {
       {selectedContacts.length > 0 && (
         <Card className="mb-4">
           <CardContent className="py-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <span className="text-sm text-gray-600 dark:text-gray-400">
                 {selectedContacts.length} {t('emailContacts.bulkActions.selected')}
               </span>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
                   <Tag className="w-4 h-4 mr-2" />
                   {t('emailContacts.bulkActions.addTags')}
                 </Button>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
                   <Users className="w-4 h-4 mr-2" />
                   {t('emailContacts.bulkActions.addToList')}
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="text-red-600"
+                  className="text-red-600 flex-1 sm:flex-none"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
