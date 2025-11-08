@@ -1,8 +1,43 @@
 import { ComponentConfig } from "@measured/puck";
 import styles from "./styles.module.css";
 import { getClassNameFactory } from "@measured/puck/lib";
-import { Button } from "@measured/puck/components/Button";
 import { Section } from "../../components/Section";
+
+// Inline Button component
+const Button = ({ 
+  children, 
+  href, 
+  variant = "primary", 
+  tabIndex 
+}: { 
+  children: React.ReactNode; 
+  href: string; 
+  variant?: "primary" | "secondary"; 
+  size?: string;
+  tabIndex?: number;
+}) => {
+  const isPrimary = variant === "primary";
+  return (
+    <a
+      href={href}
+      style={{
+        display: "inline-block",
+        padding: "12px 24px",
+        fontSize: "16px",
+        fontWeight: 600,
+        textDecoration: "none",
+        borderRadius: "6px",
+        backgroundColor: isPrimary ? "#2563eb" : "#ffffff",
+        color: isPrimary ? "#ffffff" : "#2563eb",
+        border: isPrimary ? "none" : "2px solid #2563eb",
+        cursor: "pointer",
+      }}
+      tabIndex={tabIndex}
+    >
+      {children}
+    </a>
+  );
+};
 
 const getClassName = getClassNameFactory("Hero", styles);
 

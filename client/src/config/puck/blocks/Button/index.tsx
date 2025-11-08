@@ -1,5 +1,4 @@
 import { ComponentConfig } from "@measured/puck";
-import { Button as _Button } from "@measured/puck/components/Button";
 
 export type ButtonProps = {
   label: string;
@@ -30,16 +29,27 @@ export const Button: ComponentConfig<ButtonProps> = {
     variant: "primary",
   },
   render: ({ href, variant, label, puck }) => {
+    const isPrimary = variant === "primary";
     return (
-      <div>
-        <_Button
+      <div style={{ display: "inline-block" }}>
+        <a
           href={puck.isEditing ? "#" : href}
-          variant={variant}
-          size="large"
+          style={{
+            display: "inline-block",
+            padding: "12px 24px",
+            fontSize: "16px",
+            fontWeight: 600,
+            textDecoration: "none",
+            borderRadius: "6px",
+            backgroundColor: isPrimary ? "#2563eb" : "#ffffff",
+            color: isPrimary ? "#ffffff" : "#2563eb",
+            border: isPrimary ? "none" : "2px solid #2563eb",
+            cursor: "pointer",
+          }}
           tabIndex={puck.isEditing ? -1 : undefined}
         >
           {label}
-        </_Button>
+        </a>
       </div>
     );
   },

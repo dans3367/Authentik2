@@ -1,14 +1,12 @@
 import { ComponentConfig } from "@measured/puck";
-import { Heading as _Heading } from "@measured/puck/components/Heading";
-import type { HeadingProps as _HeadingProps } from "@measured/puck/components/Heading";
 import { Section } from "../../components/Section";
 import { WithLayout, withLayout } from "../../components/Layout";
 
 export type HeadingProps = WithLayout<{
   align: "left" | "center" | "right";
   text?: string;
-  level?: _HeadingProps["rank"];
-  size: _HeadingProps["size"];
+  level?: "1" | "2" | "3" | "4" | "5" | "6";
+  size: "xxxl" | "xxl" | "xl" | "l" | "m" | "s" | "xs";
 }>;
 
 const sizeOptions = [
@@ -63,13 +61,29 @@ const HeadingInternal: ComponentConfig<HeadingProps> = {
     },
   },
   render: ({ align, text, size, level }) => {
+    const sizeMap = {
+      xxxl: "64px",
+      xxl: "48px",
+      xl: "36px",
+      l: "30px",
+      m: "24px",
+      s: "20px",
+      xs: "16px",
+    };
+    
+    const Tag = level ? (`h${level}` as any) : "h2";
+    
     return (
       <Section>
-        <_Heading size={size} rank={level as any}>
-          <span style={{ display: "block", textAlign: align, width: "100%" }}>
-            {text}
-          </span>
-        </_Heading>
+        <Tag style={{ 
+          fontSize: sizeMap[size],
+          fontWeight: 700,
+          margin: 0,
+          textAlign: align,
+          width: "100%"
+        }}>
+          {text}
+        </Tag>
       </Section>
     );
   },
