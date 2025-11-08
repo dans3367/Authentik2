@@ -1,6 +1,6 @@
 import { ComponentConfig } from "@measured/puck";
 import styles from "./styles.module.css";
-import { getClassNameFactory } from "@measured/puck/lib";
+import { getClassNameFactory } from "../../lib/get-class-name-factory";
 import { Section } from "../../components/Section";
 
 const getClassName = getClassNameFactory("Stats", styles);

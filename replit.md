@@ -32,6 +32,7 @@ The application adopts a monorepo architecture, separating client, server, and s
 -   **Subscription Management**: Interface for managing subscription plans with upgrade/downgrade options and Stripe integration.
 -   **Form Server Architecture**: Single-server architecture for the public form frontend, serving both API routes and the React frontend from a single Express server to eliminate CORS issues and simplify deployment.
 -   **Newsletter System**: Integrated CRUD interface for newsletter management with preview, statistics, and multi-tenant isolation.
+-   **Puck Visual Editor**: Integrated Puck drag-and-drop page builder for newsletter creation at `/newsletter/create`, featuring 10 customizable components (Button, Card, Grid, Flex, Hero, Heading, Text, Logos, Stats, Space), edit/preview mode toggle, and localStorage persistence.
 -   **Theme System**: Comprehensive theme support with 16 predefined themes ensuring consistent styling across all form displays.
 -   **Email Activity Timeline**: Real-time webhook integration with Resend for tracking email lifecycle events (sent, delivered, opened, clicked, bounced, failed, complained, delivery_delayed, scheduled) with comprehensive event storage and visual timeline display in contact management.
 -   **Multi-Provider Email System**: Implemented comprehensive email provider management system supporting multiple email services with advanced rate limiting (token bucket and sliding window), intelligent retry logic with exponential backoff and jitter, and provider failover for high availability.
@@ -54,3 +55,4 @@ The application adopts a monorepo architecture, separating client, server, and s
 -   **@headlessui/react**: UI components for forms.
 -   **@heroicons/react**: Icons for UI components.
 -   **Temporal**: For workflow orchestration in the Go email tracking microservice.
+-   **@measured/puck**: Visual page builder for drag-and-drop newsletter creation.

@@ -1,7 +1,7 @@
 import { ReactElement } from "react";
 import { ComponentConfig } from "@measured/puck";
 import styles from "./styles.module.css";
-import { getClassNameFactory } from "@measured/puck/lib";
+import { getClassNameFactory } from "../../lib/get-class-name-factory";
 import * as LucideIcons from "lucide-react";
 import { withLayout, WithLayout } from "../../components/Layout";
 

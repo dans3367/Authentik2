@@ -5,7 +5,7 @@ import {
   ObjectField,
 } from "@measured/puck";
 import { spacingOptions } from "../../options";
-import { getClassNameFactory } from "@measured/puck/lib";
+import { getClassNameFactory } from "../../lib/get-class-name-factory";
 import styles from "./styles.module.css";
 
 const getClassName = getClassNameFactory("Layout", styles);

@@ -1,6 +1,6 @@
 import { CSSProperties, forwardRef, ReactNode } from "react";
 import styles from "./styles.module.css";
-import { getClassNameFactory } from "@measured/puck/lib";
+import { getClassNameFactory } from "../../lib/get-class-name-factory";
 
 const getClassName = getClassNameFactory("Section", styles);
 
