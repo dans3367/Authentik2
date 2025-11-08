@@ -1,0 +1,93 @@
+.Hero {
+  position: relative;
+  width: 100%;
+}
+
+.Hero-inner {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 48px;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+
+.Hero--left .Hero-inner {
+  grid-template-columns: 1fr 1fr;
+}
+
+.Hero--center .Hero-inner {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.Hero-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.Hero-content h1 {
+  margin: 0;
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.Hero-subtitle {
+  font-size: 20px;
+  color: var(--puck-color-grey-05);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.Hero-actions {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.Hero--center .Hero-actions {
+  justify-content: center;
+}
+
+.Hero--hasImageBackground {
+  color: white;
+}
+
+.Hero--hasImageBackground .Hero-subtitle {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.Hero-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-size: cover;
+  background-position: center;
+  z-index: 0;
+}
+
+.Hero-imageOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 0;
+}
+
+@media (max-width: 768px) {
+  .Hero--left .Hero-inner {
+    grid-template-columns: 1fr;
+  }
+  
+  .Hero-content h1 {
+    font-size: 36px;
+  }
+}

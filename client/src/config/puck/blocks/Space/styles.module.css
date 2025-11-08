@@ -1,0 +1,16 @@
+.Space {
+  width: 100%;
+}
+
+.Space--vertical {
+  height: var(--size);
+}
+
+.Space--horizontal {
+  width: var(--size);
+  display: inline-block;
+}
+
+.Space:not(.Space--vertical):not(.Space--horizontal) {
+  height: var(--size);
+}

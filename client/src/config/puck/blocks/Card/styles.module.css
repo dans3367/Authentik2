@@ -1,0 +1,41 @@
+.Card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.Card-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.Card--flat {
+  background: transparent;
+}
+
+.Card--card {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+}
+
+.Card-icon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 16px;
+  color: var(--puck-color-azure-05);
+}
+
+.Card-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.Card-description {
+  font-size: 14px;
+  color: var(--puck-color-grey-05);
+  line-height: 1.6;
+}

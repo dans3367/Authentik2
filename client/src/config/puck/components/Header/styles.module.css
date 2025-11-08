@@ -1,0 +1,23 @@
+.Header {
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.Header-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.Header-logo {
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.Header-items {
+  display: flex;
+  gap: 24px;
+}

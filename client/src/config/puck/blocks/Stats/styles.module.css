@@ -1,0 +1,27 @@
+.Stats {
+  width: 100%;
+}
+
+.Stats-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 32px;
+}
+
+.Stats-item {
+  text-align: center;
+}
+
+.Stats-label {
+  font-size: 14px;
+  color: var(--puck-color-grey-05);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.Stats-value {
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--puck-color-azure-05);
+}
