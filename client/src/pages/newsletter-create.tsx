@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { ArrowLeft, Save } from "lucide-react";
-import { PuckNewsletterEditor } from "@/components/PuckNewsletterEditor";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { LazyPuckEditor } from "@/components/LazyPuckEditor";
 
 export default function NewsletterCreatePage() {
   const [, setLocation] = useLocation();
@@ -54,7 +54,7 @@ export default function NewsletterCreatePage() {
       </div>
 
       <div className="w-full">
-        <PuckNewsletterEditor
+        <LazyPuckEditor
           initialData={newsletterData}
           onChange={setNewsletterData}
         />
