@@ -16,7 +16,7 @@ import { useAuthErrorHandler, setGlobalAuthErrorHandler } from "@/hooks/useAuthE
 const AuthPage = lazy(() => import("@/pages/auth"));
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const NewsletterPage = lazy(() => import("@/pages/newsletter"));
-const NewsletterCreatePage = lazy(() => import("@/pages/newsletter-create"));
+const NewsletterCreatePage = lazy(() => import("@/pages/newsletter/create"));
 const NewsletterViewPage = lazy(() => import("@/pages/newsletter/view"));
 const ProfilePage = lazy(() => import("@/pages/profile"));
 const SessionsPage = lazy(() => import("@/pages/sessions"));
