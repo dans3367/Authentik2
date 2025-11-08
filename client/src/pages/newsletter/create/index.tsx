@@ -43,17 +43,29 @@ export default function NewsletterCreatePage() {
     desktop: "100%",
   };
 
+  const getViewportStyles = () => {
+    if (viewport === "desktop") {
+      return `
+        .Puck-frame {
+          max-width: 100% !important;
+          margin: 0 auto !important;
+        }
+      `;
+    }
+    return `
+      .Puck-frame {
+        max-width: ${viewportWidths[viewport]} !important;
+        margin: 0 auto !important;
+        box-shadow: 0 0 0 1px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.1) !important;
+      }
+    `;
+  };
+
   if (isEdit) {
     return (
-      <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-        <div style={{ 
-          position: "relative",
-          width: "100%",
-          height: "100%",
-          maxWidth: viewportWidths[viewport],
-          margin: viewport === "desktop" ? "0" : "0 auto",
-          boxShadow: viewport !== "desktop" ? "0 0 20px rgba(0,0,0,0.1)" : "none",
-        }}>
+      <>
+        <style>{getViewportStyles()}</style>
+        <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
           <Puck
             config={config}
             data={data}
@@ -144,7 +156,7 @@ export default function NewsletterCreatePage() {
             }}
           />
         </div>
-      </div>
+      </>
     );
   }
 
