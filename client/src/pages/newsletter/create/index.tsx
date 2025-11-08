@@ -46,14 +46,23 @@ export default function NewsletterCreatePage() {
   const getViewportStyles = () => {
     if (viewport === "desktop") {
       return `
-        .Puck-frame {
+        .Puck > div:last-child {
+          max-width: 100% !important;
+          margin: 0 auto !important;
+        }
+        [class*="Canvas"] > div > div {
           max-width: 100% !important;
           margin: 0 auto !important;
         }
       `;
     }
     return `
-      .Puck-frame {
+      .Puck > div:last-child {
+        max-width: ${viewportWidths[viewport]} !important;
+        margin: 0 auto !important;
+        box-shadow: 0 0 0 1px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.1) !important;
+      }
+      [class*="Canvas"] > div > div {
         max-width: ${viewportWidths[viewport]} !important;
         margin: 0 auto !important;
         box-shadow: 0 0 0 1px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.1) !important;
@@ -64,7 +73,7 @@ export default function NewsletterCreatePage() {
   if (isEdit) {
     return (
       <>
-        <style>{getViewportStyles()}</style>
+        <style key={viewport}>{getViewportStyles()}</style>
         <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
           <Puck
             config={config}
@@ -75,6 +84,25 @@ export default function NewsletterCreatePage() {
               enabled: false,
             }}
             overrides={{
+              preview: ({ children }: { children: React.ReactNode }) => (
+                <div style={{
+                  width: "100%",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "flex-start",
+                  padding: viewport !== "desktop" ? "20px" : "0",
+                  background: viewport !== "desktop" ? "#f5f5f5" : "transparent",
+                }}>
+                  <div style={{
+                    width: viewport === "desktop" ? "100%" : viewportWidths[viewport],
+                    maxWidth: viewport === "desktop" ? "100%" : viewportWidths[viewport],
+                    boxShadow: viewport !== "desktop" ? "0 0 0 1px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.1)" : "none",
+                    background: "#fff",
+                  }}>
+                    {children}
+                  </div>
+                </div>
+              ),
               headerActions: ({ children }: { children: React.ReactNode }) => (
                 <>
                   <div style={{ display: "flex", gap: "4px", marginRight: "8px" }}>
