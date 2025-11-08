@@ -3,11 +3,13 @@ import { Puck, Render } from "@measured/puck";
 import "@measured/puck/puck.css";
 import config, { initialData } from "@/config/puck";
 import { UserData } from "@/config/puck/types";
+import { Monitor, Tablet, Smartphone } from "lucide-react";
 
 export default function NewsletterCreatePage() {
   const [data, setData] = useState<UserData>(initialData);
   const [isClient, setIsClient] = useState(false);
   const [isEdit, setIsEdit] = useState(true);
+  const [viewport, setViewport] = useState<"mobile" | "tablet" | "desktop">("desktop");
 
   useEffect(() => {
     setIsClient(true);
@@ -35,41 +37,113 @@ export default function NewsletterCreatePage() {
     return null;
   }
 
+  const viewportWidths = {
+    mobile: "360px",
+    tablet: "768px",
+    desktop: "100%",
+  };
+
   if (isEdit) {
     return (
       <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-        <Puck
-          config={config}
-          data={data}
-          onPublish={handlePublish}
-          headerPath="/newsletter/create"
-          viewports={[
-            { width: 360, height: "auto", label: "Mobile", icon: "Smartphone" },
-            { width: 768, height: "auto", label: "Tablet", icon: "Tablet" },
-            { width: 1280, height: "auto", label: "Desktop", icon: "Monitor" },
-          ]}
-          overrides={{
-            headerActions: ({ children }: { children: React.ReactNode }) => (
-              <>
-                <button
-                  onClick={() => setIsEdit(false)}
-                  style={{
-                    padding: "8px 16px",
-                    marginRight: "8px",
-                    background: "#fff",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                  }}
-                  data-testid="button-preview"
-                >
-                  Preview
-                </button>
-                {children}
-              </>
-            ),
-          }}
-        />
+        <div style={{ 
+          position: "relative",
+          width: "100%",
+          height: "100%",
+          maxWidth: viewportWidths[viewport],
+          margin: viewport === "desktop" ? "0" : "0 auto",
+          boxShadow: viewport !== "desktop" ? "0 0 20px rgba(0,0,0,0.1)" : "none",
+        }}>
+          <Puck
+            config={config}
+            data={data}
+            onPublish={handlePublish}
+            headerPath="/newsletter/create"
+            iframe={{
+              enabled: false,
+            }}
+            overrides={{
+              headerActions: ({ children }: { children: React.ReactNode }) => (
+                <>
+                  <div style={{ display: "flex", gap: "4px", marginRight: "8px" }}>
+                    <button
+                      onClick={() => setViewport("mobile")}
+                      style={{
+                        padding: "8px",
+                        background: viewport === "mobile" ? "#2563eb" : "#fff",
+                        color: viewport === "mobile" ? "#fff" : "#000",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                      title="Mobile view"
+                      data-testid="viewport-mobile"
+                    >
+                      <Smartphone size={16} />
+                      <span style={{ fontSize: "12px" }}>360px</span>
+                    </button>
+                    <button
+                      onClick={() => setViewport("tablet")}
+                      style={{
+                        padding: "8px",
+                        background: viewport === "tablet" ? "#2563eb" : "#fff",
+                        color: viewport === "tablet" ? "#fff" : "#000",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                      title="Tablet view"
+                      data-testid="viewport-tablet"
+                    >
+                      <Tablet size={16} />
+                      <span style={{ fontSize: "12px" }}>768px</span>
+                    </button>
+                    <button
+                      onClick={() => setViewport("desktop")}
+                      style={{
+                        padding: "8px",
+                        background: viewport === "desktop" ? "#2563eb" : "#fff",
+                        color: viewport === "desktop" ? "#fff" : "#000",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                      title="Desktop view"
+                      data-testid="viewport-desktop"
+                    >
+                      <Monitor size={16} />
+                      <span style={{ fontSize: "12px" }}>Full</span>
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setIsEdit(false)}
+                    style={{
+                      padding: "8px 16px",
+                      marginRight: "8px",
+                      background: "#fff",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "4px",
+                      cursor: "pointer",
+                    }}
+                    data-testid="button-preview"
+                  >
+                    Preview
+                  </button>
+                  {children}
+                </>
+              ),
+            }}
+          />
+        </div>
       </div>
     );
   }
