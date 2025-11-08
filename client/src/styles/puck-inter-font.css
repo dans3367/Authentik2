@@ -1,0 +1,99 @@
+@import url("https://rsms.me/inter/inter.css");
+
+.puck-newsletter-editor {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI,
+    Helvetica Neue, sans-serif, Apple Color Emoji, Segoe UI Emoji,
+    Segoe UI Symbol;
+  height: 100vh;
+  overflow: hidden;
+}
+
+@supports (font-variation-settings: normal) {
+  .puck-newsletter-editor {
+    font-family: InterVariable, -apple-system, BlinkMacSystemFont, Segoe UI,
+      Helvetica Neue, sans-serif, Apple Color Emoji, Segoe UI Emoji,
+      Segoe UI Symbol;
+  }
+}
+
+/* Fix Puck editor scrolling and selection offset issues */
+
+/* Core layout fixes */
+.puck-newsletter-editor .puck {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.puck-newsletter-editor .puck-editor {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Canvas area - critical for scroll offset fix */
+.puck-newsletter-editor .puck-canvas,
+.puck-newsletter-editor .puck-editor__canvas {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+  background: #f9fafb;
+}
+
+/* IMPORTANT: Disable transforms and fixed positioning that cause offset */
+.puck-newsletter-editor .puck-drop-zone,
+.puck-newsletter-editor .puck-drop-zone__item,
+.puck-newsletter-editor [data-puck-drop-zone] {
+  transform: none !important;
+  position: relative !important;
+}
+
+/* Fix draggable items */
+.puck-newsletter-editor [data-rbd-draggable-id] {
+  transform: translate(0, 0) !important;
+}
+
+/* Sidebar */
+.puck-newsletter-editor .puck-editor__sidebar {
+  overflow-y: auto;
+  height: 100%;
+}
+
+/* Selection outline */
+.puck-newsletter-editor .puck-drop-zone__item--selected {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+/* Ensure clickable areas */
+.puck-newsletter-editor .puck-drop-zone__item {
+  cursor: pointer;
+  min-height: 20px;
+}
+
+/* Action bar */
+.puck-newsletter-editor .puck-action-bar {
+  position: relative;
+  z-index: 10;
+}
+
+/* Fix overlay positioning */
+.puck-newsletter-editor .puck-overlay {
+  pointer-events: none;
+}
+
+.puck-newsletter-editor .puck-overlay > * {
+  pointer-events: auto;
+}
+
+/* Disable problematic CSS that might be added by Puck */
+.puck-newsletter-editor [style*="position: fixed"] {
+  position: absolute !important;
+}
+
+/* Ensure proper stacking context */
+.puck-newsletter-editor .puck-root {
+  position: relative;
+  z-index: 0;
+}

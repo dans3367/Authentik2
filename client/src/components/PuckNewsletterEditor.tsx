@@ -1,5 +1,6 @@
 import { Puck, type Config, type Fields, ActionBar, usePuck } from "@measured/puck";
 import "@measured/puck/puck.css";
+import "../styles/puck-inter-font.css";
 import { AITextarea } from "./AITextarea";
 import { TextComponentWithAI } from "./TextComponentWithAI";
 import { TextFieldWithAIHelper } from "./TextFieldWithAIHelper";
@@ -9,7 +10,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+import { Button as UIButton } from "@/components/ui/button";
 import { Sparkles, Wand2, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
@@ -30,6 +31,147 @@ import {
 // Newsletter-focused Puck editor configuration
 const config: Config = {
   components: {
+    Hero: {
+      fields: {
+        title: { type: "text", label: "Hero Title" },
+        description: { type: "textarea", label: "Hero Description" },
+        buttons: {
+          type: "array",
+          min: 0,
+          max: 3,
+          getItemSummary: (item) => item.label || "Button",
+          arrayFields: {
+            label: { type: "text" },
+            href: { type: "text" },
+            variant: {
+              type: "select",
+              options: [
+                { label: "Primary", value: "primary" },
+                { label: "Secondary", value: "secondary" },
+              ],
+            },
+          },
+          defaultItemProps: {
+            label: "Button",
+            href: "#",
+            variant: "primary",
+          },
+        },
+        align: {
+          type: "radio",
+          options: [
+            { label: "Left", value: "left" },
+            { label: "Center", value: "center" },
+          ],
+        },
+        padding: { type: "text", label: "Padding (e.g., 64px)" },
+        imageUrl: { type: "text", label: "Image URL" },
+        imageMode: {
+          type: "radio",
+          options: [
+            { label: "Inline", value: "inline" },
+            { label: "Background", value: "background" },
+          ],
+          label: "Image Mode",
+        },
+      },
+      defaultProps: {
+        title: "Welcome to Our Newsletter",
+        description: "Stay updated with our latest news and offers",
+        align: "left",
+        padding: "64px",
+        buttons: [{ label: "Learn More", href: "#", variant: "primary" }],
+        imageMode: "inline",
+      },
+      render: ({ title, description, buttons, align, padding, imageUrl, imageMode }) => {
+        const sectionStyles: React.CSSProperties = {
+          position: "relative",
+          paddingTop: padding || "64px",
+          paddingBottom: padding || "64px",
+          paddingLeft: "24px",
+          paddingRight: "24px",
+        };
+
+        const innerStyles: React.CSSProperties = {
+          maxWidth: "1200px",
+          margin: "0 auto",
+          display: align === "center" ? "block" : "grid",
+          gridTemplateColumns: align !== "center" && imageUrl && imageMode === "inline" ? "1fr 1fr" : "1fr",
+          gap: "32px",
+          alignItems: "center",
+          textAlign: align as any,
+        };
+
+        return (
+          <div style={sectionStyles}>
+            {imageMode === "background" && imageUrl && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundImage: `url("${imageUrl}")`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  opacity: 0.3,
+                  zIndex: 0,
+                }}
+              />
+            )}
+            <div style={{ ...innerStyles, position: "relative", zIndex: 1 }}>
+              <div>
+                <h1 style={{ fontSize: "2.5rem", fontWeight: "bold", marginBottom: "16px" }}>
+                  {title}
+                </h1>
+                <p style={{ fontSize: "1.125rem", marginBottom: "24px", lineHeight: "1.6" }}>
+                  {description}
+                </p>
+                <div style={{ marginTop: "24px" }}>
+                  {buttons?.map((button, i) => {
+                    const variant = button.variant || "primary";
+                    const btnStyle: React.CSSProperties = {
+                      display: "inline-block",
+                      padding: "12px 32px",
+                      borderRadius: "8px",
+                      fontWeight: 600,
+                      textDecoration: "none",
+                      margin: "8px",
+                      transition: "all 0.2s",
+                      background: variant === "secondary" ? "#6b7280" : "#2563eb",
+                      color: "white",
+                    };
+                    return (
+                      <a
+                        key={i}
+                        href={button.href}
+                        style={btnStyle}
+                      >
+                        {button.label}
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+              {align !== "center" && imageMode === "inline" && imageUrl && (
+                <div
+                  style={{
+                    backgroundImage: `url('${imageUrl}')`,
+                    backgroundSize: "cover",
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "center",
+                    borderRadius: "24px",
+                    height: "356px",
+                    width: "100%",
+                  }}
+                />
+              )}
+            </div>
+          </div>
+        );
+      },
+    },
     Heading: {
       fields: {
         text: { type: "text", label: "Heading Text" },
@@ -321,7 +463,52 @@ export function PuckNewsletterEditor({ initialData, onChange }: PuckNewsletterEd
     for (const block of blocks) {
       const t = block?.type;
       const p = block?.props || {};
-      if (t === "Heading") {
+      if (t === "Hero") {
+        const title = p.title || "";
+        const description = p.description || "";
+        const align = p.align || "left";
+        const padding = p.padding || "64px";
+        const imageUrl = p.imageUrl || "";
+        const imageMode = p.imageMode || "inline";
+        const buttons = p.buttons || [];
+        
+        const textAlign = align === "center" ? "center" : "left";
+        let heroHtml = `<div style="position:relative; padding:${padding} 24px;">`;
+        
+        // Background image
+        if (imageMode === "background" && imageUrl) {
+          heroHtml += `<div style="position:absolute; top:0; left:0; right:0; bottom:0; background-image:url('${escapeHtml(imageUrl)}'); background-size:cover; background-position:center; opacity:0.3; z-index:0;"></div>`;
+        }
+        
+        // Content wrapper
+        const gridDisplay = align !== "center" && imageUrl && imageMode === "inline" ? "display:grid; grid-template-columns:1fr 1fr; gap:32px;" : "";
+        heroHtml += `<div style="max-width:1200px; margin:0 auto; ${gridDisplay} align-items:center; position:relative; z-index:1;">`;
+        
+        // Text content
+        heroHtml += `<div style="text-align:${textAlign};">`;
+        heroHtml += `<h1 style="font-size:2.5rem; font-weight:700; margin:0 0 16px;">${escapeHtml(title)}</h1>`;
+        heroHtml += `<p style="font-size:1.125rem; margin:0 0 24px; line-height:1.6;">${escapeHtml(description)}</p>`;
+        
+        // Buttons
+        if (buttons.length > 0) {
+          heroHtml += `<div style="margin-top:24px;">`;
+          buttons.forEach((button: any) => {
+            const btnVariant = button.variant || "primary";
+            const btnBg = btnVariant === "secondary" ? "#6b7280" : "#2563eb";
+            heroHtml += `<a href="${escapeHtml(button.href || "#")}" style="display:inline-block; padding:12px 32px; border-radius:8px; font-weight:600; text-decoration:none; margin:8px; background:${btnBg}; color:white;">${escapeHtml(button.label || "Button")}</a>`;
+          });
+          heroHtml += `</div>`;
+        }
+        heroHtml += `</div>`; // End text content
+        
+        // Inline image
+        if (align !== "center" && imageMode === "inline" && imageUrl) {
+          heroHtml += `<div style="background-image:url('${escapeHtml(imageUrl)}'); background-size:cover; background-repeat:no-repeat; background-position:center; border-radius:24px; height:356px; width:100%;"></div>`;
+        }
+        
+        heroHtml += `</div></div>`; // End content wrapper and hero container
+        parts.push(heroHtml);
+      } else if (t === "Heading") {
         const level = p.level || "h2";
         const align = p.align || "left";
         const text = p.text || "";
@@ -402,11 +589,14 @@ export function PuckNewsletterEditor({ initialData, onChange }: PuckNewsletterEd
   };
 
   return (
-    <div className="puck-newsletter-editor w-full min-h-screen">
+    <div className="puck-newsletter-editor" style={{ width: '100%', height: '100vh', position: 'relative', overflow: 'hidden' }}>
       <Puck
         config={config}
         data={data}
         onPublish={handlePublish}
+        iframe={{
+          enabled: false  // Disable iframe to avoid scroll offset issues
+        }}
         overrides={{
           actionBar: ({ children, label }) => {
             const { appState, dispatch } = usePuck();
@@ -597,8 +787,8 @@ export function PuckNewsletterEditor({ initialData, onChange }: PuckNewsletterEd
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={sending}>Cancel</Button>
-            <Button onClick={handleSendTest} disabled={sending || !testEmail.trim()}>{sending ? "Sending..." : "Send Test"}</Button>
+            <UIButton variant="outline" onClick={() => setDialogOpen(false)} disabled={sending}>Cancel</UIButton>
+            <UIButton onClick={handleSendTest} disabled={sending || !testEmail.trim()}>{sending ? "Sending..." : "Send Test"}</UIButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
