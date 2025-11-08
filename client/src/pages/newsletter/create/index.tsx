@@ -43,9 +43,11 @@ export default function NewsletterCreatePage() {
           data={data}
           onPublish={handlePublish}
           headerPath="/newsletter/create"
-          iframe={{
-            enabled: false,
-          }}
+          viewports={[
+            { width: 360, height: "auto", label: "Mobile", icon: "Smartphone" },
+            { width: 768, height: "auto", label: "Tablet", icon: "Tablet" },
+            { width: 1280, height: "auto", label: "Desktop", icon: "Monitor" },
+          ]}
           overrides={{
             headerActions: ({ children }: { children: React.ReactNode }) => (
               <>
