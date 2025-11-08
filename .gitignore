@@ -31,4 +31,4 @@ cardprocessor-go/test-build
 xxcardprocessor-go/cardprocessor
 
 # Examples
-examples/*
+#examples/*
