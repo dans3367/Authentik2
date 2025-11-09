@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import { Puck, Render } from "@measured/puck";
 import config, { initialData } from "@/config/puck";
 import { UserData } from "@/config/puck/types";
-import { Monitor, Tablet, Smartphone } from "lucide-react";
+import { Monitor, Tablet, Smartphone, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 
 export default function NewsletterCreatePage() {
   const [data, setData] = useState<UserData>(initialData);
   const [isClient, setIsClient] = useState(false);
   const [isEdit, setIsEdit] = useState(true);
   const [viewport, setViewport] = useState<"mobile" | "tablet" | "desktop">("desktop");
+  const [zoom, setZoom] = useState(100);
 
   useEffect(() => {
     setIsClient(true);
@@ -44,6 +45,18 @@ export default function NewsletterCreatePage() {
     alert("Newsletter published successfully!");
   };
 
+  const handleZoomIn = () => {
+    setZoom((prev) => Math.min(prev + 10, 100));
+  };
+
+  const handleZoomOut = () => {
+    setZoom((prev) => Math.max(prev - 10, 25));
+  };
+
+  const handleZoomReset = () => {
+    setZoom(100);
+  };
+
   if (!isClient) {
     return null;
   }
@@ -75,12 +88,16 @@ export default function NewsletterCreatePage() {
                   alignItems: "flex-start",
                   padding: viewport !== "desktop" ? "20px" : "0",
                   background: viewport !== "desktop" ? "#f5f5f5" : "transparent",
+                  overflow: "auto",
                 }}>
                   <div style={{
                     width: viewport === "desktop" ? "100%" : viewportWidths[viewport],
                     maxWidth: viewport === "desktop" ? "100%" : viewportWidths[viewport],
                     boxShadow: viewport !== "desktop" ? "0 0 0 1px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.1)" : "none",
                     background: "#fff",
+                    transform: `scale(${zoom / 100})`,
+                    transformOrigin: "top center",
+                    transition: "transform 0.2s ease-out",
                   }}>
                     {children}
                   </div>
@@ -145,6 +162,64 @@ export default function NewsletterCreatePage() {
                     >
                       <Monitor size={16} />
                       <span style={{ fontSize: "12px" }}>Full</span>
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", gap: "4px", marginRight: "8px", alignItems: "center" }}>
+                    <button
+                      onClick={handleZoomOut}
+                      disabled={zoom <= 25}
+                      style={{
+                        padding: "8px",
+                        background: "#fff",
+                        color: zoom <= 25 ? "#9ca3af" : "#000",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "4px",
+                        cursor: zoom <= 25 ? "not-allowed" : "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                      title="Zoom out"
+                      data-testid="zoom-out"
+                    >
+                      <ZoomOut size={16} />
+                    </button>
+                    <button
+                      onClick={handleZoomReset}
+                      style={{
+                        padding: "8px 12px",
+                        background: "#fff",
+                        color: "#000",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                        fontWeight: 500,
+                        minWidth: "60px",
+                      }}
+                      title="Reset zoom"
+                      data-testid="zoom-reset"
+                    >
+                      {zoom}%
+                    </button>
+                    <button
+                      onClick={handleZoomIn}
+                      disabled={zoom >= 100}
+                      style={{
+                        padding: "8px",
+                        background: "#fff",
+                        color: zoom >= 100 ? "#9ca3af" : "#000",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "4px",
+                        cursor: zoom >= 100 ? "not-allowed" : "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                      title="Zoom in"
+                      data-testid="zoom-in"
+                    >
+                      <ZoomIn size={16} />
                     </button>
                   </div>
                   <button
