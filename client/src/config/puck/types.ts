@@ -9,6 +9,7 @@ import { LogosProps } from "./blocks/Logos";
 import { StatsProps } from "./blocks/Stats";
 import { TextProps } from "./blocks/Text";
 import { SpaceProps } from "./blocks/Space";
+import { ProductGridProps } from "./blocks/ProductGrid";
 
 import { RootProps } from "./root";
 
@@ -25,6 +26,7 @@ export type Components = {
   Stats: StatsProps;
   Text: TextProps;
   Space: SpaceProps;
+  ProductGrid: ProductGridProps;
 };
 
 export type UserConfig = Config<{

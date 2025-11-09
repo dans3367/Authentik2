@@ -1,27 +1,13 @@
 .Logos {
-  width: 100%;
+  background-color: var(--puck-color-grey-02);
 }
 
 .Logos-items {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 32px;
-  align-items: center;
-}
-
-.Logos-item {
   display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.Logos-image {
-  max-width: 100%;
-  height: auto;
-  opacity: 0.6;
-  transition: opacity 0.2s;
-}
-
-.Logos-image:hover {
-  opacity: 1;
+  justify-content: space-between;
+  padding-bottom: 64px;
+  padding-top: 64px;
+  gap: 24px;
+  filter: grayscale(1) brightness(100);
+  opacity: 0.8;
 }

@@ -6,14 +6,18 @@ export function getClassNameFactory(rootClass: string, styles: Record<string, st
     }
     
     if (typeof options === 'string') {
-      return styles[options] || options;
+      // Construct the full class name key (e.g., "ProductGrid-title")
+      const fullKey = `${rootClass}-${options}`;
+      return styles[fullKey] || options;
     }
     
     const classes = [styles[rootClass] || rootClass];
     
     Object.keys(options).forEach((key) => {
       if (options[key]) {
-        const className = styles[key] || key;
+        // Construct the full class name key for modifiers
+        const fullKey = `${rootClass}--${key}`;
+        const className = styles[fullKey] || key;
         classes.push(className);
       }
     });

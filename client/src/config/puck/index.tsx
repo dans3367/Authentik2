@@ -8,6 +8,7 @@ import { Logos } from "./blocks/Logos";
 import { Stats } from "./blocks/Stats";
 import { Text } from "./blocks/Text";
 import { Space } from "./blocks/Space";
+import { ProductGrid } from "./blocks/ProductGrid";
 
 import Root from "./root";
 import { UserConfig } from "./types";
@@ -26,6 +27,10 @@ export const config: UserConfig = {
       title: "Actions",
       components: ["Button"],
     },
+    content: {
+      title: "Content",
+      components: ["ProductGrid"],
+    },
     other: {
       title: "Other",
       components: ["Card", "Hero", "Logos", "Stats"],
@@ -42,6 +47,7 @@ export const config: UserConfig = {
     Stats,
     Text,
     Space,
+    ProductGrid,
   },
 };
 

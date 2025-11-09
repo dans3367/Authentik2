@@ -40,6 +40,25 @@
   --sidebar-accent-foreground: hsl(240, 5.9%, 10%);
   --sidebar-border: hsl(220, 13%, 91%);
   --sidebar-ring: hsl(217.2, 32.6%, 17.5%);
+
+  /* Puck editor color variables (fallbacks if not provided by @measured/puck) */
+  --puck-color-grey-01: hsl(0, 0%, 10%);
+  --puck-color-grey-02: hsl(0, 0%, 20%);
+  --puck-color-grey-03: hsl(0, 0%, 30%);
+  --puck-color-grey-04: hsl(0, 0%, 45%);
+  --puck-color-grey-05: hsl(0, 0%, 60%);
+  --puck-color-grey-06: hsl(0, 0%, 75%);
+  --puck-color-grey-07: hsl(0, 0%, 85%);
+  --puck-color-grey-08: hsl(0, 0%, 92%);
+  --puck-color-grey-09: hsl(0, 0%, 96%);
+  --puck-color-grey-10: hsl(0, 0%, 98%);
+  --puck-color-grey-11: hsl(0, 0%, 99%);
+  --puck-color-grey-12: hsl(0, 0%, 100%);
+  --puck-color-azure-03: hsl(207, 90%, 40%);
+  --puck-color-azure-05: hsl(207, 90%, 54%);
+  --puck-color-azure-06: hsl(207, 90%, 65%);
+  --puck-color-azure-09: hsl(207, 90%, 90%);
+  --puck-font-size-m: 20px;
 }
 
 .dark {
@@ -88,6 +107,25 @@
   --card-dark-foreground: hsl(0, 0%, 98%);
   --card-light: hsl(210, 20%, 92%);
   --card-light-foreground: hsl(215, 25%, 12%);
+
+  /* Puck editor color variables for dark mode */
+  --puck-color-grey-01: hsl(0, 0%, 90%);
+  --puck-color-grey-02: hsl(0, 0%, 80%);
+  --puck-color-grey-03: hsl(0, 0%, 70%);
+  --puck-color-grey-04: hsl(0, 0%, 60%);
+  --puck-color-grey-05: hsl(0, 0%, 50%);
+  --puck-color-grey-06: hsl(0, 0%, 40%);
+  --puck-color-grey-07: hsl(0, 0%, 30%);
+  --puck-color-grey-08: hsl(0, 0%, 20%);
+  --puck-color-grey-09: hsl(0, 0%, 15%);
+  --puck-color-grey-10: hsl(0, 0%, 10%);
+  --puck-color-grey-11: hsl(0, 0%, 8%);
+  --puck-color-grey-12: hsl(0, 0%, 5%);
+  --puck-color-azure-03: hsl(207, 90%, 50%);
+  --puck-color-azure-05: hsl(207, 90%, 64%);
+  --puck-color-azure-06: hsl(207, 90%, 70%);
+  --puck-color-azure-09: hsl(207, 90%, 25%);
+  --puck-font-size-m: 20px;
 }
 
 @layer base {
@@ -415,4 +453,55 @@
 .prose .ProseMirror p + p,
 .prose-sm .ProseMirror p + p {
   margin-top: 0.5em;
+}
+
+/* ============================================
+   Puck Editor Styling Fixes
+   ============================================ */
+
+/* Ensure Puck editor takes full height */
+.Puck {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Ensure Puck components are visible */
+.Puck * {
+  box-sizing: border-box;
+}
+
+/* Fix potential z-index issues with Puck editor */
+.Puck [class*="Drawer"],
+.Puck [class*="Panel"],
+.Puck [class*="Sidebar"] {
+  z-index: 100;
+}
+
+/* Ensure Puck canvas is visible */
+.Puck [class*="Canvas"] {
+  background: transparent;
+  min-height: 100%;
+}
+
+/* Fix for Puck components not rendering in layout */
+.Puck [class*="DropZone"] {
+  min-height: 200px;
+}
+
+/* Ensure proper visibility for all Puck blocks */
+[data-puck-block] {
+  position: relative;
+}
+
+/* Override any TailwindCSS resets that might affect Puck */
+.Puck h1,
+.Puck h2,
+.Puck h3,
+.Puck h4,
+.Puck h5,
+.Puck h6 {
+  font-size: inherit;
+  font-weight: inherit;
+  margin: 0;
 }

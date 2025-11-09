@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Puck, Render } from "@measured/puck";
-import "@measured/puck/puck.css";
 import config, { initialData } from "@/config/puck";
 import { UserData } from "@/config/puck/types";
 import { Monitor, Tablet, Smartphone } from "lucide-react";
@@ -25,6 +24,18 @@ export default function NewsletterCreatePage() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!isClient) {
+      return;
+    }
+
+    document.body.dataset.puckViewport = viewport;
+
+    return () => {
+      delete document.body.dataset.puckViewport;
+    };
+  }, [viewport, isClient]);
+
   const handlePublish = async (data: UserData) => {
     // Save to localStorage
     localStorage.setItem("newsletter-puck-data", JSON.stringify(data));
@@ -43,37 +54,9 @@ export default function NewsletterCreatePage() {
     desktop: "100%",
   };
 
-  const getViewportStyles = () => {
-    if (viewport === "desktop") {
-      return `
-        .Puck > div:last-child {
-          max-width: 100% !important;
-          margin: 0 auto !important;
-        }
-        [class*="Canvas"] > div > div {
-          max-width: 100% !important;
-          margin: 0 auto !important;
-        }
-      `;
-    }
-    return `
-      .Puck > div:last-child {
-        max-width: ${viewportWidths[viewport]} !important;
-        margin: 0 auto !important;
-        box-shadow: 0 0 0 1px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.1) !important;
-      }
-      [class*="Canvas"] > div > div {
-        max-width: ${viewportWidths[viewport]} !important;
-        margin: 0 auto !important;
-        box-shadow: 0 0 0 1px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.1) !important;
-      }
-    `;
-  };
-
   if (isEdit) {
     return (
       <>
-        <style key={viewport}>{getViewportStyles()}</style>
         <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
           <Puck
             config={config}
