@@ -9,6 +9,15 @@ import crypto from 'crypto';
 
 export const authRoutes = Router();
 
+// Helper function to extract base token from Better Auth session cookie
+// Better Auth cookies have format: token.signature - we need just the token part
+function extractBaseToken(cookieToken: string | undefined): string | undefined {
+  if (!cookieToken) return undefined;
+  // If the token contains a dot, it has a signature suffix - extract just the base token
+  const dotIndex = cookieToken.indexOf('.');
+  return dotIndex > 0 ? cookieToken.substring(0, dotIndex) : cookieToken;
+}
+
 // Get user's own sessions
 authRoutes.get("/user-sessions", authenticateToken, async (req: any, res) => {
   try {
@@ -55,7 +64,7 @@ authRoutes.get("/user-sessions", authenticateToken, async (req: any, res) => {
         location: null, // Better Auth doesn't store location data
         // Better Auth stores the session token in the cookie, not the session ID
         // Check both token and ID for compatibility
-        isCurrent: session.token === req.cookies?.['better-auth.session_token'],
+        isCurrent: session.token === extractBaseToken(req.cookies?.['better-auth.session_token']),
         createdAt: session.createdAt.toISOString(),
         expiresAt: session.expiresAt.toISOString(),
       };
@@ -99,7 +108,7 @@ authRoutes.delete("/user-sessions", authenticateToken, async (req: any, res) => 
     console.log('🔍 [Session Delete] Current session token:', currentSessionToken ? currentSessionToken.substring(0, 8) + '...' : 'None');
     console.log('🔍 [Session Delete] Is current session?:', session.token === currentSessionToken);
 
-    if (session.token === currentSessionToken) {
+    if (session.token === extractBaseToken(currentSessionToken)) {
       console.log('❌ [Session Delete] Prevented deletion of current session');
       return res.status(400).json({ message: 'Cannot delete current session. Use logout instead.' });
     }
@@ -136,10 +145,17 @@ authRoutes.post("/logout-all", authenticateToken, async (req: any, res) => {
     }
 
     // Find current session to exclude it from deletion
+    // Extract base token from cookie (Better Auth cookies have format: token.signature)
+    const baseToken = extractBaseToken(currentSessionToken);
+    
+    if (!baseToken) {
+      return res.status(400).json({ message: 'Invalid session token format' });
+    }
+    
     const currentSession = await db.query.betterAuthSession.findFirst({
       where: and(
         eq(betterAuthSession.userId, userId),
-        eq(betterAuthSession.token, currentSessionToken)
+        eq(betterAuthSession.token, baseToken)
       ),
     });
 

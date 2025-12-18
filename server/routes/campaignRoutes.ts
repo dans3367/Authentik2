@@ -66,7 +66,7 @@ campaignRoutes.get("/:id", authenticateToken, requireTenant, async (req: any, re
       return res.status(404).json({ message: 'Campaign not found' });
     }
 
-    res.json(campaign);
+    res.json({ campaign });
   } catch (error) {
     console.error('Get campaign error:', error);
     res.status(500).json({ message: 'Failed to get campaign' });

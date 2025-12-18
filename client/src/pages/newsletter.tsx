@@ -319,9 +319,9 @@ export default function NewsletterPage() {
   // Show error state if there's an error
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:bg-gradient-to-br dark:from-slate-800 dark:via-slate-700 dark:to-slate-800">
-        <div className="container mx-auto p-6">
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-red-200/50 dark:border-red-700/30 rounded-2xl">
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <Card className="bg-white dark:bg-slate-800 border border-red-200 dark:border-red-700 shadow-sm">
             <CardContent className="p-12 text-center">
               <div className="w-20 h-20 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
                 <AlertTriangle className="h-10 w-10 text-red-600 dark:text-red-400" />
@@ -349,8 +349,8 @@ export default function NewsletterPage() {
   }
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:bg-gradient-to-br dark:from-slate-800 dark:via-slate-700 dark:to-slate-800">
-        <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
           {/* Header Skeleton */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -437,154 +437,109 @@ export default function NewsletterPage() {
   }
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:bg-gradient-to-br dark:from-slate-800 dark:via-slate-700 dark:to-slate-800">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Header */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
+              <h1 className="text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
                 Email Newsletters
               </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-1">
+              <p className="text-gray-600 dark:text-gray-400 mt-2 text-base">
                 Create and manage email campaigns to engage your subscribers
               </p>
             </div>
-            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <div className="flex items-center gap-3">
               <Button 
                 onClick={() => setLocation('/newsletter/create')} 
-                size="sm"
-                className="h-8 sm:h-9 px-3 sm:px-4  text-xs sm:text-sm"
+                size="lg"
+                className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
               >
-                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <Plus className="h-5 w-5 mr-2" />
                 Create Newsletter
               </Button>
             </div>
           </div>
         </div>
-        {/* Stats Cards - Modern Style like Dashboard */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-          {/* Total Newsletters - Yellow Card */}
-          <Card className="bg-yellow-400 dark:bg-yellow-400 border-0 rounded-2xl  transition-all duration-300 relative overflow-hidden">
+        {/* Stats Cards - Clean Modern Design */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Total Newsletters */}
+          <Card className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-black">Total Newsletters</h3>
-                  <Button size="sm" variant="ghost" className="text-black hover:bg-black/10 text-xs">
-                    More
-                  </Button>
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <Mail className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
-                <div className="space-y-2">
-                  <div className="text-4xl font-bold text-black">{stats.totalNewsletters}</div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                        <span className="text-black">Active Campaigns</span>
-                      </div>
-                      <span className="text-black font-medium">78%</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-yellow-600 rounded-full"></div>
-                        <span className="text-black">Draft Campaigns</span>
-                      </div>
-                      <span className="text-black font-medium">22%</span>
-                    </div>
-                  </div>
-                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Newsletters</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.totalNewsletters}</p>
               </div>
             </CardContent>
           </Card>
-          {/* Draft Newsletters - Dark Card */}
-          <Card className="bg-slate-800 dark:bg-slate-900 border-0 rounded-2xl  transition-all duration-300">
+
+          {/* Draft Newsletters */}
+          <Card className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-white">Draft Newsletters</h3>
-                  <div className="text-sm text-gray-400">/ {new Date().getFullYear()}</div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                  <Edit className="h-6 w-6 text-amber-600 dark:text-amber-400" />
                 </div>
-                <div className="flex items-center justify-center h-32">
-                  <div className="w-24 h-24 border-4 border-gray-600 rounded-full flex items-center justify-center relative">
-                    <div className="absolute inset-0 border-4 border-blue-500 rounded-full" style={{clipPath: 'polygon(0 0, 50% 0, 50% 100%, 0 100%)'}}></div>
-                    <Edit className="w-8 h-8 text-white" />
-                  </div>
-                </div>
-                <Button className="w-full bg-slate-700 hover:bg-slate-600 text-white border-0 rounded-2xl">
-                  <Edit className="w-4 h-4 mr-2" />
-                  View Drafts ({stats.draftNewsletters})
-                </Button>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Drafts</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.draftNewsletters}</p>
               </div>
             </CardContent>
           </Card>
-          {/* Scheduled Newsletters - Light Card */}
-          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-2xl  transition-all duration-300">
+
+          {/* Scheduled Newsletters */}
+          <Card className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-black">Scheduled</h3>
-                  <Clock className="w-5 h-5 text-black" />
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                  <Clock className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                 </div>
-                <div className="flex items-center justify-center space-x-2 py-4">
-                  <div className="flex space-x-1">
-                    <div className="w-8 h-8 bg-gray-300 rounded-lg flex items-center justify-center text-black text-sm font-medium">S</div>
-                    <div className="w-8 h-8 bg-yellow-400 rounded-lg flex items-center justify-center text-black text-sm font-medium">C</div>
-                    <div className="w-8 h-8 bg-gray-300 rounded-lg flex items-center justify-center text-black text-sm font-medium">H</div>
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-4xl font-bold text-black">{stats.scheduledNewsletters}</div>
-                  <div className="text-sm text-gray-600 flex items-center justify-center gap-1">
-                    <span className="text-green-500">+5%</span>
-                    <span>Ready to send</span>
-                  </div>
-                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Scheduled</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.scheduledNewsletters}</p>
               </div>
             </CardContent>
           </Card>
-          {/* Sent Newsletters - Light Card with Chart */}
-          <Card className="bg-gray-100 dark:bg-gray-200 border-0 rounded-2xl  transition-all duration-300">
+
+          {/* Sent Newsletters */}
+          <Card className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-black">Sent Campaigns</h3>
-                  <div className="bg-green-500 rounded-full px-3 py-1 text-xs text-white font-medium">{stats.sentNewsletters}</div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <Mail className="h-6 w-6 text-green-600 dark:text-green-400" />
                 </div>
-                <div className="h-20 flex items-end justify-center space-x-1">
-                  {[40, 60, 20, 80, 45, 90, 30, 70].map((height, index) => (
-                    <div
-                      key={index}
-                      className={`w-6 rounded-t-lg ${index === 5 ? 'bg-yellow-400' : 'bg-gray-400'}`}
-                      style={{ height: `${height}%` }}
-                    ></div>
-                  ))}
-                </div>
-                <div className="flex items-center justify-between text-xs text-gray-600">
-                  <span>Jan</span>
-                  <span>Feb</span>
-                  <span>Mar</span>
-                  <span>Apr</span>
-                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Sent</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.sentNewsletters}</p>
               </div>
             </CardContent>
           </Card>
         </div>
         {/* Newsletters List */}
         {newsletters.length === 0 ? (
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-2xl">
+          <Card className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm">
             <CardContent className="p-12 text-center">
-              <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Mail className="h-10 w-10 text-primary" />
+              <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Mail className="h-8 w-8 text-blue-600 dark:text-blue-400" />
               </div>
-              <h3 className="text-xl font-semibold mb-3">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
                 No newsletters yet
               </h3>
-              <p className="text-muted-foreground mb-8 max-w-sm mx-auto leading-relaxed">
+              <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
                 Create your first email newsletter to start engaging with your subscribers and build meaningful connections.
               </p>
               <Button 
                 onClick={() => setLocation('/newsletter/create')}
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white  transition-all duration-300 rounded-2xl"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Create Your First Newsletter
@@ -592,15 +547,15 @@ export default function NewsletterPage() {
             </CardContent>
           </Card>
         ) : filteredNewsletters.length === 0 ? (
-          <Card>
+          <Card className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm">
             <CardContent className="p-12 text-center">
-              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
-                <Search className="h-8 w-8 text-muted-foreground" />
+              <div className="w-16 h-16 bg-gray-100 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Search className="h-8 w-8 text-gray-400 dark:text-gray-500" />
               </div>
-              <h3 className="text-lg font-semibold mb-3">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                 No newsletters found
               </h3>
-              <p className="text-muted-foreground mb-6">
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
                 Try adjusting your search or filter criteria.
               </p>
               <Button 
@@ -615,7 +570,7 @@ export default function NewsletterPage() {
             </CardContent>
           </Card>
         ) : (
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 rounded-2xl">
+          <Card className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm">
             <CardContent className="p-6">
               {/* Desktop Table View */}
               <div className="hidden lg:block w-full">

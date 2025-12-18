@@ -93,8 +93,8 @@
   .ProductGrid--cols-2,
   .ProductGrid--cols-3,
   .ProductGrid--cols-4 {
-    grid-template-columns: 1fr;
-    gap: 20px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
   }
   
   .ProductGrid-item {
@@ -127,14 +127,14 @@
 }
 
 /* Editor viewport simulation: honor custom body[data-puck-viewport] attribute */
-/* Mobile: force single-column stacked cards when editor simulates mobile */
+/* Mobile: force 2-column grid when editor simulates mobile */
 body[data-puck-viewport="mobile"] .ProductGrid,
 body[data-puck-viewport="mobile"] .ProductGrid--cols-1,
 body[data-puck-viewport="mobile"] .ProductGrid--cols-2,
 body[data-puck-viewport="mobile"] .ProductGrid--cols-3,
 body[data-puck-viewport="mobile"] .ProductGrid--cols-4 {
-  grid-template-columns: 1fr;
-  gap: 20px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
 }
 
 /* Tablet: default to two columns when editor simulates tablet */

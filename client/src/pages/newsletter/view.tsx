@@ -1,6 +1,6 @@
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   ArrowLeft,
   Mail, 
@@ -68,6 +68,7 @@ export default function NewsletterViewPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [trajectoryModalOpen, setTrajectoryModalOpen] = useState(false);
   const [selectedTrajectory, setSelectedTrajectory] = useState<any>(null);
+  const tasksInitializedRef = useRef(false);
 
   // Fetch newsletter data with auto-refresh every 10 seconds for sent newsletters
   const { data: newsletterData, isLoading } = useQuery<{ newsletter: NewsletterWithUser }>({
@@ -256,10 +257,19 @@ export default function NewsletterViewPage() {
 
   const taskStatuses = taskStatusData?.taskStatuses || [];
 
-  // Initialize tasks if no task statuses exist
-  if (newsletter && taskStatuses.length === 0 && !isTaskStatusLoading && !initializeTasksMutation.isPending) {
-    initializeTasksMutation.mutate();
-  }
+  // Initialize tasks if no task statuses exist (only once per component mount)
+  useEffect(() => {
+    if (
+      newsletter &&
+      taskStatuses.length === 0 &&
+      !isTaskStatusLoading &&
+      !initializeTasksMutation.isPending &&
+      !tasksInitializedRef.current
+    ) {
+      tasksInitializedRef.current = true;
+      initializeTasksMutation.mutate();
+    }
+  }, [newsletter, taskStatuses.length, isTaskStatusLoading, initializeTasksMutation]);
 
   // Mock timeline events
   const mockTimelineEvents: TimelineEvent[] = [
