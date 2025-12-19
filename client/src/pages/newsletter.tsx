@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   Edit
 } from "lucide-react";
+import { useSetPageTitle } from "@/contexts/PageTitleContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -263,6 +264,9 @@ export default function NewsletterPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [location, setLocation] = useLocation();
+  
+  // Set page title in header
+  useSetPageTitle("Email Newsletters", "Create and manage email campaigns to engage your subscribers");
   // Fetch newsletters with fresh data on each page load
   const { data: newslettersData, isLoading, error, refetch } = useQuery({
     queryKey: ['/api/newsletters'],
@@ -439,28 +443,16 @@ export default function NewsletterPage() {
     <TooltipProvider>
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Header */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h1 className="text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
-                Email Newsletters
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-2 text-base">
-                Create and manage email campaigns to engage your subscribers
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button 
-                onClick={() => setLocation('/newsletter/create')} 
-                size="lg"
-                className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-              >
-                <Plus className="h-5 w-5 mr-2" />
-                Create Newsletter
-              </Button>
-            </div>
-          </div>
+        {/* Action Bar */}
+        <div className="flex items-center justify-end">
+          <Button 
+            onClick={() => setLocation('/newsletter/create')} 
+            size="lg"
+            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Create Newsletter
+          </Button>
         </div>
         {/* Stats Cards - Clean Modern Design */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
