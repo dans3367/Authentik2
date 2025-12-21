@@ -131,10 +131,11 @@ export default function BirthdaysPage() {
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
   const { t, currentLanguage } = useLanguage();
-  const { user: currentUser } = useAuth();
-
-  // Use Better Auth session to get external token
+  
+  // Use Better Auth session to get external token - call this before useAuth to maintain consistent hook order
   const { data: session } = useSession();
+  
+  const { user: currentUser } = useAuth();
 
   // Query to get external service token when authenticated
   const { data: tokenData, isLoading: tokenLoading, error: tokenError, refetch: refetchToken } = useQuery({

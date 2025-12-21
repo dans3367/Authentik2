@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar, Megaphone, MoreVertical, Eye, Edit, Trash2, Mail, Gift, FileText, Users, TrendingUp, Target, Settings } from 'lucide-react';
+import { Plus, Calendar, Megaphone, MoreVertical, Eye, Edit, Trash2, Mail, Gift, FileText, Users, TrendingUp, Target, Settings, LayoutDashboard } from 'lucide-react';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
+import { useSetBreadcrumbs } from '@/contexts/PageTitleContext';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 
@@ -141,6 +142,12 @@ export default function PromotionsPage() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Set breadcrumbs in header
+  useSetBreadcrumbs([
+    { label: "Dashboard", href: "/", icon: LayoutDashboard },
+    { label: "Promotions", icon: Megaphone }
+  ]);
 
   const { data: promotionsData, isLoading, error } = useQuery({
     queryKey: ['/api/promotions'],

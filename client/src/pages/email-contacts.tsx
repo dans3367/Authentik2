@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +32,8 @@ import {
   AlertCircle,
   Edit,
   Trash2,
-  UserCheck
+  UserCheck,
+  LayoutDashboard
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -107,6 +109,12 @@ export default function EmailContacts() {
   const { toast } = useToast();
   const { t } = useLanguage();
   const queryClient = useQueryClient();
+  
+  // Set breadcrumbs in header
+  useSetBreadcrumbs([
+    { label: "Dashboard", href: "/", icon: LayoutDashboard },
+    { label: "Email Contacts", icon: Users }
+  ]);
   
   // Store search params in a ref to use in query function without changing dependencies
   const searchParamsRef = useRef({

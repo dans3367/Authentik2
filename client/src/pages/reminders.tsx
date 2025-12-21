@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useTranslation } from 'react-i18next';
+import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,7 +39,9 @@ import {
   MessageSquare,
   AlertTriangle,
   MapPin,
-  Timer
+  Timer,
+  Info,
+  LayoutDashboard
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -49,6 +52,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Calendar as DateCalendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 // Types based on our schema
 interface Customer {
@@ -98,6 +102,12 @@ export default function RemindersPage() {
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<"appointments" | "reminders" | "settings">("appointments");
+  
+  // Set breadcrumbs in header
+  useSetBreadcrumbs([
+    { label: "Dashboard", href: "/", icon: LayoutDashboard },
+    { label: "Reminders & Appointments", icon: Bell }
+  ]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedAppointments, setSelectedAppointments] = useState<string[]>([]);
@@ -378,34 +388,37 @@ export default function RemindersPage() {
   return (
     <div className="min-h-screen">
       <div className="mx-auto max-w-7xl p-6 space-y-8">
-        {/* Header Card */}
-        <Card className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-          <CardContent className="p-8">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-              <div className="space-y-8 pr-6 xl:pr-12 lg:col-span-8">
-                <div className="space-y-3">
-                  <div className="flex items-baseline gap-4">
-                    <span className="text-4xl md:text-5xl">🔔</span>
-                  <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight">
-                    {t('reminders.title')}
-                  </h1>
+        {/* Page Header with Title */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Reminders & Appointments</h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
+              Schedule appointments and manage reminders to keep your customers informed
+            </p>
+          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full"
+                aria-label="Reminders info"
+              >
+                <Info className="h-5 w-5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-96">
+              <div className="space-y-2">
+                <div className="font-semibold leading-none tracking-tight">
+                  {t('reminders.title')}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {t('reminders.subtitle')}
                 </div>
               </div>
-              <p className="text-gray-600 dark:text-gray-400 text-lg leading-relaxed max-w-3xl md:max-w-4xl">
-                {t('reminders.subtitle')}
-              </p>
-              </div>
-              <div className="justify-self-center lg:justify-self-end lg:col-span-4">
-                <div className="w-[360px] xl:w-[420px] max-w-full h-auto bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl p-8 flex items-center justify-center">
-                  <div className="text-center">
-                    <Bell className="h-24 w-24 text-blue-600 mx-auto mb-4" />
-                    <p className="text-blue-800 font-semibold">Smart Reminders</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </PopoverContent>
+          </Popover>
+        </div>
 
         {/* Navigation Tabs */}
         <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg w-fit">
@@ -450,10 +463,83 @@ export default function RemindersPage() {
 
         {/* Appointments Tab */}
         {activeTab === "appointments" && (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Main Appointments Table */}
-            <div className="lg:col-span-3">
+          <div className="space-y-6">
+            {/* Overview and Upcoming Side by Side */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Overview Stats */}
               <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    Overview
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Total Appointments</span>
+                    <Badge variant="outline">{appointments.length}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Upcoming</span>
+                    <Badge variant="outline">{upcomingAppointments.length}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Confirmed</span>
+                    <Badge variant="outline">
+                      {appointments.filter(apt => apt.status === 'confirmed').length}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Reminders Sent</span>
+                    <Badge variant="outline">
+                      {appointments.filter(apt => apt.reminderSent).length}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Upcoming Appointments */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    Upcoming This Week
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {upcomingAppointments.length === 0 ? (
+                    <div className="text-center py-4">
+                      <Calendar className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600">
+                        No upcoming appointments
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {upcomingAppointments.map((appointment) => (
+                        <div key={appointment.id} className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-sm">{appointment.title}</p>
+                            <p className="text-xs text-gray-500">
+                              {getCustomerName(appointment.customer)}
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              {formatDateTime(appointment.appointmentDate)}
+                            </p>
+                          </div>
+                          <Badge className={getStatusColor(appointment.status)} variant="outline">
+                            {appointment.status}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Main Appointments Table */}
+            <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
@@ -728,81 +814,6 @@ export default function RemindersPage() {
                   )}
                 </CardContent>
               </Card>
-            </div>
-
-            {/* Sidebar */}
-            <div className="space-y-6">
-              {/* Overview Stats */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5" />
-                    Overview
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Total Appointments</span>
-                    <Badge variant="outline">{appointments.length}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Upcoming</span>
-                    <Badge variant="outline">{upcomingAppointments.length}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Confirmed</span>
-                    <Badge variant="outline">
-                      {appointments.filter(apt => apt.status === 'confirmed').length}
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Reminders Sent</span>
-                    <Badge variant="outline">
-                      {appointments.filter(apt => apt.reminderSent).length}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Upcoming Appointments */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-5 w-5" />
-                    Upcoming This Week
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {upcomingAppointments.length === 0 ? (
-                    <div className="text-center py-4">
-                      <Calendar className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-600">
-                        No upcoming appointments
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {upcomingAppointments.map((appointment) => (
-                        <div key={appointment.id} className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium text-sm">{appointment.title}</p>
-                            <p className="text-xs text-gray-500">
-                              {getCustomerName(appointment.customer)}
-                            </p>
-                            <p className="text-xs text-gray-400">
-                              {formatDateTime(appointment.appointmentDate)}
-                            </p>
-                          </div>
-                          <Badge className={getStatusColor(appointment.status)} variant="outline">
-                            {appointment.status}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
           </div>
         )}
 

@@ -3,9 +3,10 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { useLocation } from "wouter";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Gift, Snowflake } from "lucide-react";
+import { Gift, Snowflake, LayoutDashboard } from "lucide-react";
 
 // Lazy load the content components
 const BirthdayCardsContent = lazy(() => import("@/components/BirthdayCardsContent").then(mod => ({ default: mod.BirthdayCardsContent })));
@@ -22,6 +23,12 @@ const ContentLoader = () => (
 export default function CardsPage() {
   const [location, setLocation] = useLocation();
   const { t } = useLanguage();
+
+  // Set breadcrumbs in header
+  useSetBreadcrumbs([
+    { label: "Dashboard", href: "/", icon: LayoutDashboard },
+    { label: "Cards", icon: Gift }
+  ]);
 
   // Initialize cardType based on URL parameter or default to "birthday"
   const [cardType, setCardType] = useState<CardType>(() => {
@@ -65,15 +72,18 @@ export default function CardsPage() {
   };
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl space-y-6">
-      {/* Card Type Selector - Segmented Control */}
-      <Card className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="min-h-screen bg-white dark:bg-slate-800">
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
+        {/* Page Header */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
                 {t('navigation.cards') || 'e-Cards'}
               </h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                Manage your birthday and e-cards
+              </p>
             </div>
             
             {/* Segmented Control */}
@@ -108,17 +118,20 @@ export default function CardsPage() {
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Content Area - Render appropriate card content */}
-      <Suspense fallback={<ContentLoader />}>
-        {cardType === "birthday" ? (
-          <BirthdayCardsContent />
-        ) : (
-          <ECardsContent />
-        )}
-      </Suspense>
+          {/* Add minimal spacer after the header section */}
+          <div className="h-3"></div>
+        </div>
+
+        {/* Content Area - Render appropriate card content */}
+        <Suspense fallback={<ContentLoader />}>
+          {cardType === "birthday" ? (
+            <BirthdayCardsContent />
+          ) : (
+            <ECardsContent />
+          )}
+        </Suspense>
+      </div>
     </div>
   );
 }

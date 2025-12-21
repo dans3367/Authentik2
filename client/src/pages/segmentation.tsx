@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,7 @@ import {
   Target,
   Copy,
   Eye,
+  LayoutDashboard,
 } from "lucide-react";
 import {
   Dialog,
@@ -60,6 +62,12 @@ interface SegmentStats {
 }
 
 export default function SegmentationPage() {
+  // Set breadcrumbs in header
+  useSetBreadcrumbs([
+    { label: "Dashboard", href: "/", icon: LayoutDashboard },
+    { label: "Customer Segmentation", icon: Target }
+  ]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);

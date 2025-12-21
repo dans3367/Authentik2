@@ -3,12 +3,19 @@ import { useLocation } from "wouter";
 import { NewsletterCard } from "@/components/ui/newsletter-card";
 import { HighlightsCard } from "@/components/ui/highlights-card";
 import { UpcomingBirthdaysCard } from "@/components/ui/upcoming-birthdays-card";
+import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
+import { LayoutDashboard } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user, isLoading } = useReduxAuth();
   const { t } = useTranslation();
+
+  // Set breadcrumbs in header (dashboard is the root, so only show current page)
+  useSetBreadcrumbs([
+    { label: "Dashboard", icon: LayoutDashboard }
+  ]);
 
   if (isLoading) {
     return (

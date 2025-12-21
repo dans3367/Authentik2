@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { 
   Plus, 
@@ -13,9 +13,10 @@ import {
   ArrowUpDown,
   Search,
   AlertTriangle,
-  Edit
+  Edit,
+  LayoutDashboard
 } from "lucide-react";
-import { useSetPageTitle } from "@/contexts/PageTitleContext";
+import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -262,11 +263,13 @@ export default function NewsletterPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [location, setLocation] = useLocation();
   
-  // Set page title in header
-  useSetPageTitle("Email Newsletters", "Create and manage email campaigns to engage your subscribers");
+  // Set breadcrumbs in header
+  useSetBreadcrumbs([
+    { label: "Dashboard", href: "/", icon: LayoutDashboard },
+    { label: "Email Newsletters", icon: Mail }
+  ]);
   // Fetch newsletters with fresh data on each page load
   const { data: newslettersData, isLoading, error, refetch } = useQuery({
     queryKey: ['/api/newsletters'],
@@ -294,14 +297,6 @@ export default function NewsletterPage() {
     refetchOnWindowFocus: true, // Refetch when window regains focus
     retry: 2, // Retry failed requests
   });
-  // Force refresh data when component mounts or location changes
-  useEffect(() => {
-    // Invalidate cache and refetch fresh data
-    queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
-          queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
-    refetch();
-    refetchStats();
-  }, [location, refetch, refetchStats, queryClient]);
   // Process the data - newslettersData is already an array from our queryFn
   const newsletters = newslettersData || [];
   const stats = statsData || {
@@ -362,10 +357,7 @@ export default function NewsletterPage() {
                 <Skeleton className="h-9 w-64 mb-2" />
                 <Skeleton className="h-5 w-96" />
               </div>
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-9 w-20" />
-                <Skeleton className="h-9 w-32" />
-              </div>
+              <Skeleton className="h-12 w-48" />
             </div>
           </div>
           {/* Stats Cards Skeleton */}
@@ -443,8 +435,25 @@ export default function NewsletterPage() {
     <TooltipProvider>
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {/* Page Header with Title */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Newsletters</h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
+              Create and manage email newsletters to engage with your subscribers
+            </p>
+          </div>
+          <Button 
+            onClick={() => setLocation('/newsletter/create')} 
+            size="lg"
+            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Create Newsletter
+          </Button>
+        </div>
         {/* Action Bar */}
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-end hidden">
           <Button 
             onClick={() => setLocation('/newsletter/create')} 
             size="lg"

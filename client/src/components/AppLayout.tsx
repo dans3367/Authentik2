@@ -16,16 +16,49 @@ import { OnboardingWizard } from "@/components/OnboardingWizard";
 import { useLanguage } from "@/hooks/useLanguage";
 import { PageTitleProvider, usePageTitle } from "@/contexts/PageTitleContext";
 import { Button } from "@/components/ui/button";
-import { Zap, UserPlus, Bell } from "lucide-react";
+import { Zap, UserPlus, Bell, ChevronRight } from "lucide-react";
+import { Link } from "wouter";
 
-// Header component that displays the page title
+// Header component that displays breadcrumbs or page title
 function AppHeader() {
-  const { title, subtitle } = usePageTitle();
+  const { title, subtitle, breadcrumbs } = usePageTitle();
   
   return (
     <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
       <SidebarTrigger className="-ml-1" />
-      {title && (
+      {breadcrumbs.length > 0 ? (
+        <>
+          <Separator orientation="vertical" className="h-6 mx-2" />
+          <nav className="flex items-center gap-1">
+            {breadcrumbs.map((item, index) => {
+              const Icon = item.icon;
+              const isLast = index === breadcrumbs.length - 1;
+              
+              return (
+                <div key={index} className="flex items-center gap-1">
+                  {index > 0 && (
+                    <ChevronRight className="h-4 w-4 text-gray-400" />
+                  )}
+                  {item.href && !isLast ? (
+                    <Link 
+                      href={item.href}
+                      className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                    >
+                      {Icon && <Icon className="h-4 w-4" />}
+                      <span className="text-sm font-medium">{item.label}</span>
+                    </Link>
+                  ) : (
+                    <div className="flex items-center gap-1.5 text-gray-900 dark:text-white">
+                      {Icon && <Icon className="h-4 w-4" />}
+                      <span className="text-sm font-medium">{item.label}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </nav>
+        </>
+      ) : title ? (
         <>
           <Separator orientation="vertical" className="h-6 mx-2" />
           <div className="flex flex-col justify-center">
@@ -39,7 +72,7 @@ function AppHeader() {
             )}
           </div>
         </>
-      )}
+      ) : null}
       <div className="flex-1" />
       
       {/* Action Icons */}

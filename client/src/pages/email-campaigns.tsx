@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { Plus, Search, Filter, MoreVertical, Edit, Trash2, Target, TrendingUp, Calendar, DollarSign } from 'lucide-react';
+import { Plus, Search, Filter, MoreVertical, Edit, Trash2, Target, TrendingUp, Calendar, DollarSign, LayoutDashboard } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useSetBreadcrumbs } from '@/contexts/PageTitleContext';
 import { apiRequest } from '@/lib/queryClient';
 import { Skeleton } from '@/components/ui/skeleton';
 import { type Campaign } from '@shared/schema';
@@ -254,6 +255,12 @@ export default function EmailCampaignsPage() {
   const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  // Set breadcrumbs in header
+  useSetBreadcrumbs([
+    { label: "Dashboard", href: "/", icon: LayoutDashboard },
+    { label: "Email Campaigns", icon: Target }
+  ]);
   const [typeFilter, setTypeFilter] = useState('all');
 
   const { data: campaignsData, isLoading, error } = useQuery({

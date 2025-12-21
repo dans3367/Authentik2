@@ -371,6 +371,7 @@ export const contactTags = pgTable("contact_tags", {
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   name: text("name").notNull(),
   color: text("color").default('#3B82F6'),
+  description: text("description"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -2166,7 +2167,7 @@ export const createAppointmentSchema = z.object({
   customerId: z.string().uuid("Please select a valid customer"),
   title: z.string().min(1, "Appointment title is required"),
   description: z.string().optional(),
-  appointmentDate: z.date(),
+  appointmentDate: z.coerce.date(),
   duration: z.number().int().positive().default(60),
   location: z.string().optional(),
   serviceType: z.string().optional(),
@@ -2177,7 +2178,7 @@ export const createAppointmentSchema = z.object({
 export const updateAppointmentSchema = z.object({
   title: z.string().min(1, "Appointment title is required").optional(),
   description: z.string().optional(),
-  appointmentDate: z.date().optional(),
+  appointmentDate: z.coerce.date().optional(),
   duration: z.number().int().positive().optional(),
   location: z.string().optional(),
   serviceType: z.string().optional(),

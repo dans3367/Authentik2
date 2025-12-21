@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +39,7 @@ import {
   Star,
   StarOff,
   Trash2,
+  LayoutDashboard,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import RichTextEditor from "@/components/RichTextEditor";
@@ -744,6 +746,12 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
 }
 
 export default function TemplatesPage() {
+  // Set breadcrumbs in header
+  useSetBreadcrumbs([
+    { label: "Dashboard", href: "/", icon: LayoutDashboard },
+    { label: "Templates", icon: Copy }
+  ]);
+
   const [templates, setTemplates] = useState<Template[]>([]);
   const [pagination, setPagination] = useState<TemplatePagination>({ page: 1, limit: 50, total: 0, pages: 0 });
   const [stats, setStats] = useState<TemplateStats | null>(null);
@@ -817,10 +825,8 @@ export default function TemplatesPage() {
         channel: payload.channel,
         category: payload.category,
         subjectLine: payload.subjectLine,
-        preview: payload.content.slice(0, 160),
-        body: payload.content,
+        content: payload.content,
         tags: payload.tags,
-        isFavorite: false,
       });
       
       await loadTemplates();
@@ -928,8 +934,7 @@ export default function TemplatesPage() {
         channel: payload.channel,
         category: payload.category,
         subjectLine: payload.subjectLine,
-        preview: payload.content.slice(0, 160),
-        body: payload.content,
+        content: payload.content,
         tags: payload.tags,
       });
       

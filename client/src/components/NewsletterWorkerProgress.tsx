@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -67,14 +67,16 @@ export const NewsletterWorkerProgress: React.FC<NewsletterWorkerProgressProps> =
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Query for specific job status
-  const { data: jobStatus, isLoading: jobLoading, refetch: refetchJob } = useQuery<JobProgress>({
+  const { data: jobStatus, isLoading: jobLoading, refetch: refetchJob } = useQuery<JobProgress | null>({
     queryKey: ['newsletter-job-status', jobId],
     queryFn: async () => {
       if (!jobId) return null;
       const response = await apiRequest('GET', `/api/newsletter-worker/jobs/${jobId}/status`);
-      return response.job;
+      const data = await response.json();
+      return data.job ?? null;
     },
     enabled: !!jobId,
+    staleTime: refreshInterval,
     refetchInterval: autoRefresh && jobId ? refreshInterval : false,
     refetchIntervalInBackground: true,
   });
@@ -84,22 +86,35 @@ export const NewsletterWorkerProgress: React.FC<NewsletterWorkerProgressProps> =
     queryKey: ['newsletter-all-jobs'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/newsletter-worker/jobs');
-      return response.jobs;
+      const data = await response.json();
+      return data.jobs ?? {};
     },
     enabled: !jobId || showWorkerStats,
-    refetchInterval: autoRefresh ? refreshInterval : false,
+    staleTime: refreshInterval, // Prevent duplicate fetches within refresh interval
+    refetchInterval: (data) => {
+      if (!autoRefresh) return false;
+      // Only keep polling while there is at least one active job.
+      // When there are no jobs (or only completed/failed/cancelled jobs), stop polling.
+      const hasActiveJobs = !!data && Object.values(data).some((job) => job.status === 'pending' || job.status === 'processing');
+      return hasActiveJobs ? refreshInterval : false;
+    },
     refetchIntervalInBackground: true,
   });
+
+  const hasActiveJobs = !!allJobs && Object.values(allJobs).some((job) => job.status === 'pending' || job.status === 'processing');
 
   // Query for worker stats
   const { data: workerStats } = useQuery<WorkerStats>({
     queryKey: ['newsletter-worker-stats'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/newsletter-worker/workers/stats');
-      return response.stats;
+      const data = await response.json();
+      // Ensure we never return undefined (React Query requirement)
+      return data.stats ?? { totalWorkers: 0, activeWorkers: 0, totalActiveJobs: 0, totalQueuedJobs: 0, totalJobs: 0, isHealthy: false };
     },
     enabled: showWorkerStats,
-    refetchInterval: autoRefresh ? refreshInterval * 2 : false, // Slower refresh for stats
+    staleTime: refreshInterval * 2, // Prevent duplicate fetches within refresh interval
+    refetchInterval: autoRefresh && (jobId || hasActiveJobs) ? refreshInterval * 2 : false, // Only poll stats while jobs are active
   });
 
   // Cancel job mutation
