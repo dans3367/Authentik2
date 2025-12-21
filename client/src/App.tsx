@@ -54,6 +54,7 @@ const EmailComposePage = lazy(() => import("@/pages/email-compose"));
 const CreatePromotionPage = lazy(() => import("@/pages/promotions/create"));
 const EditPromotionPage = lazy(() => import("@/pages/promotions/edit"));
 const TemplatesPage = lazy(() => import("@/pages/templates"));
+const CreateTemplatePage = lazy(() => import("@/pages/templates/create"));
 const EditEmailCampaignPage = lazy(() => import("@/pages/email-campaigns/edit"));
 const UpdateProfilePage = lazy(() => import("@/pages/update-profile"));
 const SegmentationPage = lazy(() => import("@/pages/segmentation"));
@@ -237,6 +238,7 @@ function Router() {
                   <Route path="/promotions" component={PromotionsPage} />
                   <Route path="/promotions/create" component={CreatePromotionPage} />
                   <Route path="/promotions/:id/edit" component={EditPromotionPage} />
+                  <Route path="/templates/create" component={CreateTemplatePage} />
                   <Route path="/templates" component={TemplatesPage} />
                   <Route path="/company" component={CompanyPage} />
                   <Route path="/campaigns/create" component={CreateCampaignPage} />

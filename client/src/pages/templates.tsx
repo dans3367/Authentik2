@@ -1,4 +1,5 @@
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +15,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -413,163 +413,6 @@ function TemplateCard({ template, onToggleFavorite, onDuplicate, onDelete, onUse
   );
 }
 
-interface CreateTemplateDialogProps {
-  onCreate: (payload: CreateTemplatePayload) => void;
-}
-
-function CreateTemplateDialog({ onCreate }: CreateTemplateDialogProps) {
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [channel, setChannel] = useState<TemplateChannel>("individual");
-  const [category, setCategory] = useState<TemplateCategory>("welcome");
-  const [subjectLine, setSubjectLine] = useState("");
-  const [content, setContent] = useState("");
-  const [tagInput, setTagInput] = useState("");
-
-  const resetForm = () => {
-    setName("");
-    setChannel("individual");
-    setCategory("welcome");
-    setSubjectLine("");
-    setContent("");
-    setTagInput("");
-  };
-
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!name.trim() || !subjectLine.trim() || !hasContent(content)) {
-      return;
-    }
-
-    const tags = tagInput
-      .split(",")
-      .map((tag) => tag.trim())
-      .filter(Boolean);
-
-    onCreate({
-      name: name.trim(),
-      channel,
-      category,
-      subjectLine: subjectLine.trim(),
-      content: content.trim(),
-      tags,
-    });
-
-    resetForm();
-    setOpen(false);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="bg-blue-600 hover:bg-blue-700">
-          <Plus className="mr-2 h-4 w-4" />
-          Create template
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[650px] max-h-[85vh] overflow-y-auto">
-        <form onSubmit={handleSubmit} className="space-y-6 pb-2">
-          <DialogHeader>
-            <DialogTitle>Create template</DialogTitle>
-            <DialogDescription>
-              Build a reusable template for individual outreach, promotional campaigns, or transactional emails.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="template-name">Template name</Label>
-              <Input
-                id="template-name"
-                placeholder="e.g. New customer welcome"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                required
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="template-channel">Channel</Label>
-              <Select value={channel} onValueChange={(value: TemplateChannel) => setChannel(value)}>
-                <SelectTrigger id="template-channel">
-                  <SelectValue placeholder="Select channel" />
-                </SelectTrigger>
-                <SelectContent>
-                  {channelOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{option.label}</span>
-                        <span className="text-xs text-muted-foreground">{option.description}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="template-category">Category</Label>
-              <Select value={category} onValueChange={(value: TemplateCategory) => setCategory(value)}>
-                <SelectTrigger id="template-category">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categoryOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="template-subject">Subject line</Label>
-              <Input
-                id="template-subject"
-                placeholder="e.g. Welcome to {{company_name}}"
-                value={subjectLine}
-                onChange={(event) => setSubjectLine(event.target.value)}
-                required
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="template-content">Content</Label>
-              <RichTextEditor
-                value={content}
-                onChange={setContent}
-                placeholder="Write your email content or paste HTML"
-                className="min-h-[200px]"
-              />
-              <p className="text-xs text-muted-foreground">
-                {"Use liquid-style variables such as {{first_name}} or {{order_number}} to personalise your message."}
-              </p>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="template-tags">Tags</Label>
-              <Input
-                id="template-tags"
-                placeholder="Comma separated e.g. onboarding, v1"
-                value={tagInput}
-                onChange={(event) => setTagInput(event.target.value)}
-              />
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2 justify-end">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit">Save template</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 interface EditTemplateDialogProps {
   template: Template | null;
@@ -763,6 +606,7 @@ export default function TemplatesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const [location, setLocation] = useLocation();
 
   // Load templates and stats on component mount and when filters change
   const loadTemplates = async () => {
@@ -800,11 +644,14 @@ export default function TemplatesPage() {
     }
   };
 
-  // Load data on mount
+  // Load data on mount and when location changes (e.g., returning from create page)
   useEffect(() => {
-    loadTemplates();
-    loadStats();
-  }, []);
+    // Only reload if we're on the templates page (not a subpage)
+    if (location === '/templates') {
+      loadTemplates();
+      loadStats();
+    }
+  }, [location]);
 
   // Reload templates when filters change
   useEffect(() => {
@@ -818,32 +665,6 @@ export default function TemplatesPage() {
   // Filtered templates for display (now handled server-side)
   const filteredTemplates = templates;
 
-  const handleCreateTemplate = async (payload: CreateTemplatePayload) => {
-    try {
-      const result = await createTemplate({
-        name: payload.name,
-        channel: payload.channel,
-        category: payload.category,
-        subjectLine: payload.subjectLine,
-        content: payload.content,
-        tags: payload.tags,
-      });
-      
-      await loadTemplates();
-      await loadStats();
-      
-      toast({
-        title: "Template created",
-        description: `${payload.name} is ready to use across your campaigns.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to create template. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
 
   const handleToggleFavorite = async (id: string) => {
     try {
@@ -964,7 +785,13 @@ export default function TemplatesPage() {
               Create reusable content for one-to-one emails, promotional campaigns, newsletters, and system notifications.
             </p>
           </div>
-          <CreateTemplateDialog onCreate={handleCreateTemplate} />
+          <Button 
+            className="bg-blue-600 hover:bg-blue-700"
+            onClick={() => setLocation('/templates/create')}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Create template
+          </Button>
         </header>
 
         <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
