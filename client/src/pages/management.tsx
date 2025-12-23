@@ -5,6 +5,7 @@ import { LayoutDashboard, Settings } from "lucide-react";
 import UsersPage from "@/pages/users";
 import ShopsPage from "@/pages/shops";
 import ManagementTags from "@/pages/management-tags";
+import ManagementEmailDesign from "@/pages/management-email-design";
 
 export default function ManagementPage() {
   // Set breadcrumbs in header
@@ -20,7 +21,7 @@ export default function ManagementPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Management</h1>
             <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Manage users, shops, and tags to organize your business operations
+              Manage users, shops, tags, and email designs to organize your business operations
             </p>
           </div>
         </div>
@@ -29,6 +30,7 @@ export default function ManagementPage() {
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="shops">Shops</TabsTrigger>
             <TabsTrigger value="tags">Tags</TabsTrigger>
+            <TabsTrigger value="email-design">Email Design</TabsTrigger>
           </TabsList>
           <div className="mt-6">
             <TabsContent value="users">
@@ -39,6 +41,9 @@ export default function ManagementPage() {
             </TabsContent>
             <TabsContent value="tags">
               <ManagementTags />
+            </TabsContent>
+            <TabsContent value="email-design">
+              <ManagementEmailDesign />
             </TabsContent>
           </div>
         </Tabs>
