@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { DndContext, DragEndEvent, MouseSensor, TouchSensor, useSensor, useSensors, DragOverlay, DragStartEvent, closestCenter } from '@dnd-kit/core';
+import { DndContext, DragEndEvent, MouseSensor, TouchSensor, useSensor, useSensors, DragOverlay, DragStartEvent, pointerWithin, rectIntersection, CollisionDetection } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { useFormBuilder } from '@/hooks/use-form-builder';
 import { ComponentPalette } from '@/components/form-builder/component-palette';
@@ -48,12 +48,44 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
 
   // Configure drag and drop sensors with better desktop support
   const mouseSensor = useSensor(MouseSensor, {
-    activationConstraint: { distance: 8 }
+    activationConstraint: { distance: 5 }
   });
   const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: { delay: 150, tolerance: 8 }
+    activationConstraint: { delay: 100, tolerance: 5 }
   });
   const sensors = useSensors(mouseSensor, touchSensor);
+
+  // Custom collision detection that prioritizes insertion points
+  const customCollisionDetection: CollisionDetection = (args) => {
+    // First check for pointer within collisions (most precise)
+    const pointerCollisions = pointerWithin(args);
+    
+    // Prioritize insertion points when dragging new components
+    if (pointerCollisions.length > 0) {
+      const insertionPoint = pointerCollisions.find(
+        collision => collision.data?.droppableContainer?.data?.current?.isInsertionPoint
+      );
+      if (insertionPoint) {
+        return [insertionPoint];
+      }
+    }
+    
+    // Fall back to rect intersection for broader detection
+    const rectCollisions = rectIntersection(args);
+    
+    // Again prioritize insertion points
+    if (rectCollisions.length > 0) {
+      const insertionPoint = rectCollisions.find(
+        collision => collision.data?.droppableContainer?.data?.current?.isInsertionPoint
+      );
+      if (insertionPoint) {
+        return [insertionPoint];
+      }
+    }
+    
+    // Return pointer collisions if any, otherwise rect collisions
+    return pointerCollisions.length > 0 ? pointerCollisions : rectCollisions;
+  };
 
   const selectedElement = elements.find(el => el.id === selectedElementId) || null;
   
@@ -131,12 +163,24 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
       
       // Check if dropping on an insertion point
       if (over.data.current?.isInsertionPoint) {
-        const { elementId, position } = over.data.current;
-        const targetIndex = elements.findIndex(el => el.id === elementId);
+        const { elementId, position, insertIndex } = over.data.current;
         
+        // Handle special drop zones (insert-first and insert-end)
+        if (over.id === 'insert-first') {
+          addElementAtIndex(type, 0);
+          return;
+        }
+        
+        if (over.id === 'insert-end') {
+          addElement(type);
+          return;
+        }
+        
+        // Handle insertion between elements
+        const targetIndex = elements.findIndex(el => el.id === elementId);
         if (targetIndex !== -1) {
-          const insertIndex = position === 'top' ? targetIndex : targetIndex + 1;
-          addElementAtIndex(type, insertIndex);
+          const idx = position === 'top' ? targetIndex : targetIndex + 1;
+          addElementAtIndex(type, idx);
           return;
         }
       }
@@ -175,13 +219,13 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={customCollisionDetection}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
       <div className="flex relative">
         {/* Left Sidebar - Component Palette */}
-        <div className="hidden lg:block flex-none relative z-20">
+        <div className="hidden lg:block flex-none relative z-20 sticky top-0 self-start max-h-screen overflow-y-auto">
           <ComponentPalette onAddElement={handleAddElement} />
         </div>
         
@@ -205,7 +249,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
         </div>
         
         {/* Right Sidebar - Form Properties & Element Properties */}
-        <div className="hidden lg:block flex-none relative z-20 flex flex-col">
+        <div className="hidden lg:block flex-none relative z-20 flex flex-col sticky top-0 self-start max-h-screen overflow-y-auto">
           {/* Form Properties - Always visible */}
           <FormProperties
             formTitle={formTitle}

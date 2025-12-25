@@ -5,7 +5,50 @@ import { FormElementRenderer } from './form-element-renderer';
 import { SortableFormElement } from './sortable-form-element';
 import { DropInsertionIndicator } from './drop-insertion-indicator';
 import { useTranslation } from 'react-i18next';
-// Removed DropIndicator import - using button-based movement
+
+// End drop zone component for adding elements at the end of the list
+function EndDropZone({ elementCount }: { elementCount: number }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: 'insert-end',
+    data: {
+      elementId: 'end',
+      position: 'bottom',
+      isInsertionPoint: true,
+      insertIndex: elementCount,
+    },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`relative transition-all duration-200 mt-2 ${
+        isOver ? 'h-20' : 'h-12'
+      }`}
+    >
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div
+          className={`w-full h-1 rounded-full transition-all duration-200 ${
+            isOver 
+              ? 'bg-blue-500 shadow-lg shadow-blue-500/50' 
+              : 'bg-slate-200/50'
+          }`}
+        />
+      </div>
+      {isOver && (
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center shadow-lg">
+          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+          </svg>
+        </div>
+      )}
+      {!isOver && (
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xs text-slate-400 whitespace-nowrap">
+          Drop here to add at end
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface DroppableCanvasProps {
   elements: FormElement[];
@@ -129,13 +172,23 @@ export function DroppableCanvas({
           ) : (
             <SortableContext items={elements.map(el => el.id)} strategy={verticalListSortingStrategy}>
               <div className="space-y-0 pl-8">
+                {/* First element drop zone */}
+                {isDragging && elements.length > 0 && (
+                  <DropInsertionIndicator
+                    id="insert-first"
+                    position="top"
+                    elementId={elements[0].id}
+                    isVisible={true}
+                  />
+                )}
+                
                 {elements.map((element, index) => {
                   const isMovingElement = showMoveIndicators && moveFromIndex === index;
                   const showMoveIndicatorAbove = showMoveIndicators && moveDirection === 'up' && moveFromIndex === index + 1;
                   const showMoveIndicatorBelow = showMoveIndicators && moveDirection === 'down' && moveFromIndex === index - 1;
                   
                   return (
-                    <div key={element.id} className="relative">
+                    <div key={element.id} className="relative group">
                       {/* Move indicator above */}
                       {showMoveIndicatorAbove && (
                         <div className="h-6 flex items-center justify-center mb-2">
@@ -158,7 +211,7 @@ export function DroppableCanvas({
                           onUpdate={onUpdateElement}
                           onMobileEdit={onMobileEdit}
                           isGlobalDragging={isDragging}
-                          showDropIndicators={!isMobile && draggedType !== null}
+                          showDropIndicators={!isMobile && isDragging}
                           elementIndex={index}
                         />
                       </div>
@@ -173,6 +226,11 @@ export function DroppableCanvas({
                     </div>
                   );
                 })}
+                
+                {/* End of list drop zone - always visible when dragging */}
+                {isDragging && elements.length > 0 && (
+                  <EndDropZone elementCount={elements.length} />
+                )}
               </div>
             </SortableContext>
           )}

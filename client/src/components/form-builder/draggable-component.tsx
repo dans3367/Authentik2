@@ -42,9 +42,9 @@ export function DraggableComponent({ item, onAddElement, isMobile = false }: Dra
 
   const style = transform ? {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-    opacity: isDragging ? 0.6 : 1,
-    scale: isDragging ? 1.05 : 1,
+    opacity: isDragging ? 0.8 : 1,
     zIndex: isDragging ? 1000 : 1,
+    cursor: isDragging ? 'grabbing' : 'grab',
   } : undefined;
 
   const IconComponent = iconMap[item.type] || Type;
