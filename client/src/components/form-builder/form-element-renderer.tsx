@@ -29,10 +29,6 @@ interface FormElementRendererProps {
   previewMode: boolean;
   onMobileEdit?: (id: string) => void;
   isDragging?: boolean;
-  onMoveUp?: (id: string) => void;
-  onMoveDown?: (id: string) => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
   showDropIndicators?: boolean;
   elementIndex?: number;
 }
@@ -45,10 +41,6 @@ export function FormElementRenderer({
   previewMode,
   onMobileEdit,
   isDragging = false,
-  onMoveUp,
-  onMoveDown,
-  canMoveUp = true,
-  canMoveDown = true,
   showDropIndicators = false,
   elementIndex = 0,
 }: FormElementRendererProps) {
@@ -95,7 +87,6 @@ export function FormElementRenderer({
       case "number-input":
         return (
           <NumberInput
-            variant={element.numberVariant || "number"}
             placeholder={element.placeholder}
             required={element.required}
             disabled={element.disabled || isDragging}
@@ -234,13 +225,9 @@ export function FormElementRenderer({
       case "rate-scale":
         return (
           <RateScale
-            name={element.name}
-            required={element.required}
-            disabled={element.disabled || isDragging}
             min={element.validation?.min || 1}
             max={element.validation?.max || 10}
-            variant={element.rateVariant || "numbers"}
-            showNumbers={element.rateVariant === "numbers" || !element.rateVariant}
+            disabled={element.disabled || isDragging}
             className="justify-center"
           />
         );
@@ -248,11 +235,7 @@ export function FormElementRenderer({
       case "boolean-switch":
         return (
           <BooleanSwitch
-            name={element.name}
-            required={element.required}
             disabled={element.disabled || isDragging}
-            variant={element.booleanVariant || "yes-no"}
-            showLabels={true}
             className="justify-center"
           />
         );
@@ -371,45 +354,15 @@ export function FormElementRenderer({
             </div>
           )}
 
-          {/* Vertical control panel - up, settings, down */}
+          {/* Mobile settings button only */}
           {isSelected && (
-            <div className="absolute -right-4 top-1/2 -translate-y-1/2 flex flex-col gap-1 transition-opacity duration-200 z-10">
-              {/* Move Up Button */}
-              {onMoveUp && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMoveUp(element.id);
-                  }}
-                  disabled={!canMoveUp}
-                  className={`w-8 h-8 lg:w-9 lg:h-9 rounded-full shadow-lg flex items-center justify-center transition-all ${
-                    canMoveUp
-                      ? "bg-blue-500 hover:bg-blue-600 text-white shadow-blue-200"
-                      : "bg-slate-300 text-slate-500 cursor-not-allowed"
-                  }`}
-                  title="Move up"
-                >
-                  <svg
-                    className="w-3 h-3 lg:w-4 lg:h-4"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </button>
-              )}
-
-              {/* Settings Button - Mobile only */}
+            <div className="lg:hidden absolute -right-4 top-1/2 -translate-y-1/2 transition-opacity duration-200 z-10">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   onMobileEdit?.(element.id);
                 }}
-                className="lg:hidden w-8 h-8 rounded-full shadow-lg flex items-center justify-center transition-all bg-slate-500 hover:bg-slate-600 text-white shadow-slate-200"
+                className="w-8 h-8 rounded-full shadow-lg flex items-center justify-center transition-all bg-slate-500 hover:bg-slate-600 text-white shadow-slate-200"
                 title="Edit properties"
               >
                 <svg
@@ -424,35 +377,6 @@ export function FormElementRenderer({
                   />
                 </svg>
               </button>
-
-              {/* Move Down Button */}
-              {onMoveDown && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMoveDown(element.id);
-                  }}
-                  disabled={!canMoveDown}
-                  className={`w-8 h-8 lg:w-9 lg:h-9 rounded-full shadow-lg flex items-center justify-center transition-all ${
-                    canMoveDown
-                      ? "bg-blue-500 hover:bg-blue-600 text-white shadow-blue-200"
-                      : "bg-slate-300 text-slate-500 cursor-not-allowed"
-                  }`}
-                  title="Move down"
-                >
-                  <svg
-                    className="w-3 h-3 lg:w-4 lg:h-4"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </button>
-              )}
             </div>
           )}
         </>

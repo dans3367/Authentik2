@@ -1,4 +1,5 @@
 import { useDroppable } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { FormElement, FormElementType } from '@/types/form-builder';
 import { FormElementRenderer } from './form-element-renderer';
 import { SortableFormElement } from './sortable-form-element';
@@ -126,9 +127,8 @@ export function DroppableCanvas({
 </div>
             </div>
           ) : (
-            <div className="space-y-0">
-                {/* Removed drop zone - using button-based movement */}
-                
+            <SortableContext items={elements.map(el => el.id)} strategy={verticalListSortingStrategy}>
+              <div className="space-y-0 pl-8">
                 {elements.map((element, index) => {
                   const isMovingElement = showMoveIndicators && moveFromIndex === index;
                   const showMoveIndicatorAbove = showMoveIndicators && moveDirection === 'up' && moveFromIndex === index + 1;
@@ -158,20 +158,6 @@ export function DroppableCanvas({
                           onUpdate={onUpdateElement}
                           onMobileEdit={onMobileEdit}
                           isGlobalDragging={isDragging}
-                          onMoveUp={onMoveElement ? (id) => {
-                            const elementIndex = elements.findIndex(el => el.id === id);
-                            if (elementIndex > 0) {
-                              onMoveElement(elementIndex, elementIndex - 1);
-                            }
-                          } : undefined}
-                          onMoveDown={onMoveElement ? (id) => {
-                            const elementIndex = elements.findIndex(el => el.id === id);
-                            if (elementIndex < elements.length - 1) {
-                              onMoveElement(elementIndex, elementIndex + 1);
-                            }
-                          } : undefined}
-                          canMoveUp={index > 0}
-                          canMoveDown={index < elements.length - 1}
                           showDropIndicators={!isMobile && draggedType !== null}
                           elementIndex={index}
                         />
@@ -184,13 +170,11 @@ export function DroppableCanvas({
                         </div>
                       )}
                       
-                      {/* Removed drop zones - using button-based movement */}
                     </div>
                   );
                 })}
-                
-                {/* Removed drop zone - using button-based movement */}
               </div>
+            </SortableContext>
           )}
         </div>
         

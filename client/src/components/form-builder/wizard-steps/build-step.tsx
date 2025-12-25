@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { DndContext, DragEndEvent, MouseSensor, TouchSensor, useSensor, useSensors, DragOverlay, DragStartEvent } from '@dnd-kit/core';
+import { DndContext, DragEndEvent, MouseSensor, TouchSensor, useSensor, useSensors, DragOverlay, DragStartEvent, closestCenter } from '@dnd-kit/core';
+import { arrayMove } from '@dnd-kit/sortable';
 import { useFormBuilder } from '@/hooks/use-form-builder';
 import { ComponentPalette } from '@/components/form-builder/component-palette';
 import { FormCanvas } from '@/components/form-builder/form-canvas';
@@ -144,6 +145,16 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
       if (over.id === 'form-canvas') {
         addElement(type);
       }
+    } else {
+      // Handle reordering existing elements
+      if (active.id !== over.id) {
+        const oldIndex = elements.findIndex(el => el.id === active.id);
+        const newIndex = elements.findIndex(el => el.id === over.id);
+        
+        if (oldIndex !== -1 && newIndex !== -1) {
+          moveElement(oldIndex, newIndex);
+        }
+      }
     }
   };
 
@@ -164,6 +175,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
   return (
     <DndContext
       sensors={sensors}
+      collisionDetection={closestCenter}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
