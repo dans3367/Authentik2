@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { DndContext, DragEndEvent, MouseSensor, TouchSensor, useSensor, useSensors, DragOverlay, DragStartEvent, pointerWithin, rectIntersection, CollisionDetection } from '@dnd-kit/core';
+import { DndContext, DragEndEvent, MouseSensor, TouchSensor, useSensor, useSensors, DragOverlay, DragStartEvent, pointerWithin, rectIntersection, closestCenter, CollisionDetection } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { useFormBuilder } from '@/hooks/use-form-builder';
 import { ComponentPalette } from '@/components/form-builder/component-palette';
@@ -55,36 +55,57 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
   });
   const sensors = useSensors(mouseSensor, touchSensor);
 
-  // Custom collision detection that prioritizes insertion points
+  // Custom collision detection that allows vertical-only dragging
   const customCollisionDetection: CollisionDetection = (args) => {
-    // First check for pointer within collisions (most precise)
+    const { droppableContainers, pointerCoordinates } = args;
+    
+    if (!pointerCoordinates) {
+      return closestCenter(args);
+    }
+    
+    // Filter to only insertion points
+    const insertionPoints = droppableContainers.filter(
+      (container) => container.data.current?.isInsertionPoint
+    );
+    
+    // If we have insertion points, find the closest one by Y position
+    if (insertionPoints.length > 0) {
+      let closestInsertionPoint: typeof insertionPoints[0] | null = null;
+      let closestDistance = Infinity;
+      
+      for (const container of insertionPoints) {
+        if (!container.rect.current) continue;
+        
+        const rect = container.rect.current;
+        const centerY = rect.top + rect.height / 2;
+        const distanceY = Math.abs(pointerCoordinates.y - centerY);
+        
+        // Use Y distance primarily for insertion points
+        if (distanceY < closestDistance) {
+          closestDistance = distanceY;
+          closestInsertionPoint = container;
+        }
+      }
+      
+      if (closestInsertionPoint && closestDistance < 100) {
+        return [{ id: closestInsertionPoint.id, data: { droppableContainer: closestInsertionPoint } }];
+      }
+    }
+    
+    // Fall back to pointer within for precise detection
     const pointerCollisions = pointerWithin(args);
-    
-    // Prioritize insertion points when dragging new components
     if (pointerCollisions.length > 0) {
-      const insertionPoint = pointerCollisions.find(
-        collision => collision.data?.droppableContainer?.data?.current?.isInsertionPoint
-      );
-      if (insertionPoint) {
-        return [insertionPoint];
-      }
+      return pointerCollisions;
     }
     
-    // Fall back to rect intersection for broader detection
+    // Fall back to rect intersection
     const rectCollisions = rectIntersection(args);
-    
-    // Again prioritize insertion points
     if (rectCollisions.length > 0) {
-      const insertionPoint = rectCollisions.find(
-        collision => collision.data?.droppableContainer?.data?.current?.isInsertionPoint
-      );
-      if (insertionPoint) {
-        return [insertionPoint];
-      }
+      return rectCollisions;
     }
     
-    // Return pointer collisions if any, otherwise rect collisions
-    return pointerCollisions.length > 0 ? pointerCollisions : rectCollisions;
+    // Final fallback to closest center
+    return closestCenter(args);
   };
 
   const selectedElement = elements.find(el => el.id === selectedElementId) || null;

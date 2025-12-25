@@ -17,7 +17,7 @@ export interface FormElement {
   rateVariant?: 'numbers' | 'faces' | 'stars'; // for rate-scale components
   booleanVariant?: 'yes-no' | 'true-false' | 'on-off'; // for boolean-switch components
   dateTimeVariant?: 'date-only' | 'time-only' | 'datetime'; // for datetime-picker components
-  numberVariant?: 'number' | 'phone' | 'currency'; // for number-input components
+  numberVariant?: 'number' | 'phone' | 'country-phone' | 'currency'; // for number-input components
 }
 
 export interface ValidationRules {

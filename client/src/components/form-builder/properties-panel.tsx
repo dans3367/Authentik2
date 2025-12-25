@@ -310,6 +310,7 @@ export function PropertiesPanel({
                       <SelectContent>
                         <SelectItem value="number">Number (Default)</SelectItem>
                         <SelectItem value="phone">Phone Number</SelectItem>
+                        <SelectItem value="country-phone">International Phone</SelectItem>
                         <SelectItem value="currency">Currency ($)</SelectItem>
                       </SelectContent>
                     </Select>

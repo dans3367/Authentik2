@@ -87,6 +87,7 @@ export function FormElementRenderer({
       case "number-input":
         return (
           <NumberInput
+            variant={element.numberVariant || "number"}
             placeholder={element.placeholder}
             required={element.required}
             disabled={element.disabled || isDragging}
