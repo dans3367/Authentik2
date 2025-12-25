@@ -105,8 +105,8 @@ export default function RemindersPage() {
   
   // Set breadcrumbs in header
   useSetBreadcrumbs([
-    { label: "Dashboard", href: "/", icon: LayoutDashboard },
-    { label: "Reminders & Appointments", icon: Bell }
+    { label: t('navigation.dashboard'), href: "/", icon: LayoutDashboard },
+    { label: t('reminders.pageTitle'), icon: Bell }
   ]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -136,13 +136,13 @@ export default function RemindersPage() {
       return response.json();
     },
     onSuccess: () => {
-      toast({ title: 'Success', description: 'Reminder scheduled successfully' });
+      toast({ title: t('reminders.toasts.success'), description: t('reminders.toasts.reminderScheduled') });
       setScheduleReminderModalOpen(false);
       setScheduleAppointmentId("");
       refetchReminders();
     },
     onError: (error: any) => {
-      toast({ title: 'Error', description: error?.message || 'Failed to schedule reminder', variant: 'destructive' });
+      toast({ title: t('reminders.toasts.error'), description: error?.message || t('reminders.toasts.reminderScheduleError'), variant: 'destructive' });
     }
   });
 
@@ -216,8 +216,8 @@ export default function RemindersPage() {
     },
     onSuccess: () => {
       toast({
-        title: "Success",
-        description: "Appointment created successfully",
+        title: t('reminders.toasts.success'),
+        description: t('reminders.toasts.appointmentCreated'),
       });
       refetchAppointments();
       setNewAppointmentModalOpen(false);
@@ -225,8 +225,8 @@ export default function RemindersPage() {
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error?.message || "Failed to create appointment",
+        title: t('reminders.toasts.error'),
+        description: error?.message || t('reminders.toasts.appointmentCreateError'),
         variant: "destructive",
       });
     },
@@ -243,8 +243,8 @@ export default function RemindersPage() {
     },
     onSuccess: (_, variables) => {
       toast({
-        title: "Success",
-        description: `Reminders sent for ${variables.appointmentIds.length} appointment(s)`,
+        title: t('reminders.toasts.success'),
+        description: t('reminders.toasts.remindersSent', { count: variables.appointmentIds.length }),
       });
       refetchAppointments();
       refetchReminders();
@@ -252,8 +252,8 @@ export default function RemindersPage() {
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error?.message || "Failed to send reminders",
+        title: t('reminders.toasts.error'),
+        description: error?.message || t('reminders.toasts.remindersSendError'),
         variant: "destructive",
       });
     },
@@ -299,8 +299,8 @@ export default function RemindersPage() {
   const handleCreateAppointment = () => {
     if (!newAppointmentData.customerId || !newAppointmentData.title) {
       toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields",
+        title: t('reminders.toasts.validationError'),
+        description: t('reminders.toasts.fillRequired'),
         variant: "destructive",
       });
       return;
@@ -312,8 +312,8 @@ export default function RemindersPage() {
   const handleSendReminders = () => {
     if (selectedAppointments.length === 0) {
       toast({
-        title: "No Selection",
-        description: "Please select appointments to send reminders for",
+        title: t('reminders.toasts.noSelection'),
+        description: t('reminders.toasts.selectAppointments'),
         variant: "destructive",
       });
       return;
@@ -391,9 +391,9 @@ export default function RemindersPage() {
         {/* Page Header with Title */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Reminders & Appointments</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{t('reminders.pageTitle')}</h1>
             <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Schedule appointments and manage reminders to keep your customers informed
+              {t('reminders.pageSubtitle')}
             </p>
           </div>
           <Popover>
@@ -429,7 +429,7 @@ export default function RemindersPage() {
             className="flex items-center gap-2"
           >
             <Calendar className="h-4 w-4" />
-            Appointments
+            {t('reminders.tabs.appointments')}
             {appointments.length > 0 && (
               <Badge variant="secondary" className="ml-1">
                 {appointments.length}
@@ -443,7 +443,7 @@ export default function RemindersPage() {
             className="flex items-center gap-2"
           >
             <Bell className="h-4 w-4" />
-            Reminders
+            {t('reminders.tabs.reminders')}
             {reminders.length > 0 && (
               <Badge variant="secondary" className="ml-1">
                 {reminders.length}
@@ -457,7 +457,7 @@ export default function RemindersPage() {
             className="flex items-center gap-2"
           >
             <Settings className="h-4 w-4" />
-            Settings
+            {t('reminders.tabs.settings')}
           </Button>
         </div>
 
@@ -471,26 +471,26 @@ export default function RemindersPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <BarChart3 className="h-5 w-5" />
-                    Overview
+                    {t('reminders.overview.title')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Total Appointments</span>
+                    <span className="text-sm text-gray-600">{t('reminders.overview.total')}</span>
                     <Badge variant="outline">{appointments.length}</Badge>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Upcoming</span>
+                    <span className="text-sm text-gray-600">{t('reminders.overview.upcoming')}</span>
                     <Badge variant="outline">{upcomingAppointments.length}</Badge>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Confirmed</span>
+                    <span className="text-sm text-gray-600">{t('reminders.overview.confirmed')}</span>
                     <Badge variant="outline">
                       {appointments.filter(apt => apt.status === 'confirmed').length}
                     </Badge>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Reminders Sent</span>
+                    <span className="text-sm text-gray-600">{t('reminders.overview.remindersSent')}</span>
                     <Badge variant="outline">
                       {appointments.filter(apt => apt.reminderSent).length}
                     </Badge>
@@ -503,7 +503,7 @@ export default function RemindersPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Clock className="h-5 w-5" />
-                    Upcoming This Week
+                    {t('reminders.overview.upcomingThisWeek')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -511,7 +511,7 @@ export default function RemindersPage() {
                     <div className="text-center py-4">
                       <Calendar className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                       <p className="text-sm text-gray-600">
-                        No upcoming appointments
+                        {t('reminders.appointments.noUpcoming')}
                       </p>
                     </div>
                   ) : (
@@ -544,28 +544,28 @@ export default function RemindersPage() {
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
                       <Calendar className="h-5 w-5" />
-                      Appointments
+                      {t('reminders.tabs.appointments')}
                     </CardTitle>
                     <Dialog open={newAppointmentModalOpen} onOpenChange={setNewAppointmentModalOpen}>
                       <DialogTrigger asChild>
                         <Button>
                           <CalendarPlus className="h-4 w-4 mr-2" />
-                          New Appointment
+                          {t('reminders.appointments.newAppointment')}
                         </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-md">
                         <DialogHeader>
-                          <DialogTitle>Create New Appointment</DialogTitle>
+                          <DialogTitle>{t('reminders.appointments.createAppointment')}</DialogTitle>
                           <DialogDescription>
-                            Schedule a new appointment with a customer.
+                            {t('reminders.appointments.scheduleDescription')}
                           </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
                           <div>
-                            <Label>Customer</Label>
+                            <Label>{t('reminders.appointments.customer')}</Label>
                             <Select value={newAppointmentData.customerId} onValueChange={(value) => setNewAppointmentData(prev => ({...prev, customerId: value}))}>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select a customer" />
+                                <SelectValue placeholder={t('reminders.appointments.selectCustomer')} />
                               </SelectTrigger>
                               <SelectContent>
                                 {customers.map((customer) => (
@@ -578,16 +578,16 @@ export default function RemindersPage() {
                           </div>
                           
                           <div>
-                            <Label>Title</Label>
+                            <Label>{t('reminders.appointments.title')}</Label>
                             <Input 
                               value={newAppointmentData.title}
                               onChange={(e) => setNewAppointmentData(prev => ({...prev, title: e.target.value}))}
-                              placeholder="Appointment title"
+                              placeholder={t('reminders.appointments.titlePlaceholder')}
                             />
                           </div>
 
                           <div>
-                            <Label>Date & Time</Label>
+                            <Label>{t('reminders.appointments.dateTime')}</Label>
                             <Input 
                               type="datetime-local"
                               value={newAppointmentData.appointmentDate.toISOString().slice(0, 16)}
@@ -596,7 +596,7 @@ export default function RemindersPage() {
                           </div>
 
                           <div>
-                            <Label>Duration (minutes)</Label>
+                            <Label>{t('reminders.appointments.duration')}</Label>
                             <Input 
                               type="number"
                               value={newAppointmentData.duration}
@@ -607,23 +607,23 @@ export default function RemindersPage() {
                           </div>
 
                           <div>
-                            <Label>Location</Label>
+                            <Label>{t('reminders.appointments.location')}</Label>
                             <Input 
                               value={newAppointmentData.location}
                               onChange={(e) => setNewAppointmentData(prev => ({...prev, location: e.target.value}))}
-                              placeholder="Meeting location"
+                              placeholder={t('reminders.appointments.locationPlaceholder')}
                             />
                           </div>
 
                           <div className="flex justify-end gap-2">
                             <Button variant="outline" onClick={() => setNewAppointmentModalOpen(false)}>
-                              Cancel
+                              {t('reminders.appointments.cancel')}
                             </Button>
                             <Button 
                               onClick={handleCreateAppointment}
                               disabled={createAppointmentMutation.isPending}
                             >
-                              Create Appointment
+                              {t('reminders.appointments.createAppointment')}
                             </Button>
                           </div>
                         </div>
@@ -637,7 +637,7 @@ export default function RemindersPage() {
                     <div className="relative flex-1 max-w-sm">
                       <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
-                        placeholder="Search appointments..."
+                        placeholder={t('reminders.appointments.searchPlaceholder')}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="pl-10"
@@ -648,12 +648,12 @@ export default function RemindersPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="scheduled">Scheduled</SelectItem>
-                        <SelectItem value="confirmed">Confirmed</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="no_show">No Show</SelectItem>
+                        <SelectItem value="all">{t('reminders.appointments.allStatuses')}</SelectItem>
+                        <SelectItem value="scheduled">{t('reminders.appointments.scheduled')}</SelectItem>
+                        <SelectItem value="confirmed">{t('reminders.appointments.confirmed')}</SelectItem>
+                        <SelectItem value="cancelled">{t('reminders.appointments.cancelled')}</SelectItem>
+                        <SelectItem value="completed">{t('reminders.appointments.completed')}</SelectItem>
+                        <SelectItem value="no_show">{t('reminders.appointments.noShow')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -662,13 +662,13 @@ export default function RemindersPage() {
                   {selectedAppointments.length > 0 && (
                     <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-4 border-b">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{selectedAppointments.length} selected</span>
+                        <span className="text-sm font-medium">{selectedAppointments.length} {t('reminders.appointments.selected')}</span>
                         <Button 
                           variant="outline" 
                           size="sm" 
                           onClick={() => setSelectedAppointments([])}
                         >
-                          Clear Selection
+                          {t('reminders.appointments.clearSelection')}
                         </Button>
                       </div>
                       <div className="flex items-center gap-2">
@@ -679,7 +679,7 @@ export default function RemindersPage() {
                           disabled={sendReminderMutation.isPending}
                         >
                           <Send className="h-4 w-4 mr-2" />
-                          Send Reminders
+                          {t('reminders.appointments.sendReminders')}
                         </Button>
                       </div>
                     </div>
@@ -692,11 +692,11 @@ export default function RemindersPage() {
                   ) : appointments.length === 0 ? (
                     <div className="text-center py-12">
                       <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                      <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">No appointments found</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">Create your first appointment to get started</p>
+                      <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">{t('reminders.appointments.noAppointments')}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">{t('reminders.appointments.createFirst')}</p>
                       <Button onClick={() => setNewAppointmentModalOpen(true)}>
                         <CalendarPlus className="h-4 w-4 mr-2" />
-                        Create Appointment
+                        {t('reminders.appointments.createAppointment')}
                       </Button>
                     </div>
                   ) : (
@@ -711,12 +711,12 @@ export default function RemindersPage() {
                                 aria-label="Select all appointments"
                               />
                             </TableHead>
-                            <TableHead>Customer</TableHead>
-                            <TableHead>Appointment</TableHead>
-                            <TableHead>Date & Time</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Reminder</TableHead>
-                            <TableHead>Actions</TableHead>
+                            <TableHead>{t('reminders.table.customer')}</TableHead>
+                            <TableHead>{t('reminders.table.appointment')}</TableHead>
+                            <TableHead>{t('reminders.table.dateTime')}</TableHead>
+                            <TableHead>{t('reminders.table.status')}</TableHead>
+                            <TableHead>{t('reminders.table.reminder')}</TableHead>
+                            <TableHead>{t('reminders.table.actions')}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -750,7 +750,7 @@ export default function RemindersPage() {
                                   <p className="font-medium">{formatDateTime(appointment.appointmentDate)}</p>
                                   <p className="text-sm text-gray-500 flex items-center gap-1">
                                     <Timer className="h-3 w-3" />
-                                    {appointment.duration} minutes
+                                    {appointment.duration} {t('reminders.appointments.minutes')}
                                   </p>
                                 </div>
                               </TableCell>
@@ -764,12 +764,12 @@ export default function RemindersPage() {
                                   {appointment.reminderSent ? (
                                     <div className="flex items-center gap-1 text-green-600">
                                       <CheckCircle className="h-4 w-4" />
-                                      <span className="text-sm">Sent</span>
+                                      <span className="text-sm">{t('reminders.reminderHistory.sent')}</span>
                                     </div>
                                   ) : (
                                     <div className="flex items-center gap-1 text-gray-400">
                                       <Clock className="h-4 w-4" />
-                                      <span className="text-sm">Pending</span>
+                                      <span className="text-sm">{t('reminders.reminderHistory.pending')}</span>
                                     </div>
                                   )}
                                 </div>
@@ -791,16 +791,16 @@ export default function RemindersPage() {
                                     <DropdownMenuContent>
                                       <DropdownMenuItem onClick={() => sendReminderMutation.mutate({ appointmentIds: [appointment.id] })}>
                                         <Send className="h-4 w-4 mr-2" />
-                                        Send Reminder
+                                        {t('reminders.actions.sendReminder')}
                                       </DropdownMenuItem>
                                       <DropdownMenuItem onClick={() => openScheduleReminder(appointment.id)}>
                                         <Clock className="h-4 w-4 mr-2" />
-                                        Schedule Reminder
+                                        {t('reminders.actions.scheduleReminder')}
                                       </DropdownMenuItem>
                                       <DropdownMenuSeparator />
                                       <DropdownMenuItem className="text-red-600">
                                         <Trash2 className="h-4 w-4 mr-2" />
-                                        Cancel Appointment
+                                        {t('reminders.actions.cancelAppointment')}
                                       </DropdownMenuItem>
                                     </DropdownMenuContent>
                                   </DropdownMenu>
@@ -823,7 +823,7 @@ export default function RemindersPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Bell className="h-5 w-5" />
-                Reminder History
+                {t('reminders.reminderHistory.title')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -834,20 +834,20 @@ export default function RemindersPage() {
               ) : reminders.length === 0 ? (
                 <div className="text-center py-12">
                   <Bell className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-lg text-gray-600 mb-2">No reminders sent yet</p>
-                  <p className="text-sm text-gray-500 mb-6">Create appointments and send reminders to see them here</p>
+                  <p className="text-lg text-gray-600 mb-2">{t('reminders.reminderHistory.noReminders')}</p>
+                  <p className="text-sm text-gray-500 mb-6">{t('reminders.reminderHistory.noRemindersDescription')}</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Appointment</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Timing</TableHead>
-                        <TableHead>Scheduled For</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Sent At</TableHead>
+                        <TableHead>{t('reminders.reminderHistory.appointment')}</TableHead>
+                        <TableHead>{t('reminders.reminderHistory.type')}</TableHead>
+                        <TableHead>{t('reminders.reminderHistory.timing')}</TableHead>
+                        <TableHead>{t('reminders.reminderHistory.scheduledFor')}</TableHead>
+                        <TableHead>{t('reminders.reminderHistory.status')}</TableHead>
+                        <TableHead>{t('reminders.reminderHistory.sentAt')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -891,27 +891,27 @@ export default function RemindersPage() {
         <Dialog open={scheduleReminderModalOpen} onOpenChange={setScheduleReminderModalOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Schedule Reminder</DialogTitle>
+              <DialogTitle>{t('reminders.scheduleReminder.title')}</DialogTitle>
               <DialogDescription>
-                Choose when to send the reminder and optionally customize the message.
+                {t('reminders.scheduleReminder.description')}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label>Reminder Type</Label>
+                <Label>{t('reminders.scheduleReminder.reminderType')}</Label>
                 <Select value={scheduleData.reminderType} onValueChange={(v) => setScheduleData(prev => ({ ...prev, reminderType: v as any }))}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="email">Email</SelectItem>
-                    <SelectItem value="sms" disabled>SMS (coming soon)</SelectItem>
-                    <SelectItem value="push" disabled>Push (coming soon)</SelectItem>
+                    <SelectItem value="email">{t('reminders.scheduleReminder.email')}</SelectItem>
+                    <SelectItem value="sms" disabled>{t('reminders.scheduleReminder.sms')}</SelectItem>
+                    <SelectItem value="push" disabled>{t('reminders.scheduleReminder.push')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label>Timing</Label>
+                <Label>{t('reminders.scheduleReminder.timing')}</Label>
                 <Select
                   value={scheduleData.reminderTiming}
                   onValueChange={(v) => {
@@ -923,16 +923,16 @@ export default function RemindersPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="24h">24 hours before appointment</SelectItem>
-                    <SelectItem value="1h">1 hour before appointment</SelectItem>
-                    <SelectItem value="30m">30 minutes before appointment</SelectItem>
-                    <SelectItem value="custom">Custom date & time</SelectItem>
+                    <SelectItem value="24h">{t('reminders.scheduleReminder.24hBefore')}</SelectItem>
+                    <SelectItem value="1h">{t('reminders.scheduleReminder.1hBefore')}</SelectItem>
+                    <SelectItem value="30m">{t('reminders.scheduleReminder.30mBefore')}</SelectItem>
+                    <SelectItem value="custom">{t('reminders.scheduleReminder.customDateTime')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               {scheduleData.reminderTiming === 'custom' && (
                 <div>
-                  <Label>Custom Date & Time</Label>
+                  <Label>{t('reminders.scheduleReminder.customDateTimeLabel')}</Label>
                   <Input
                     type="datetime-local"
                     value={new Date(scheduleData.scheduledFor).toISOString().slice(0, 16)}
@@ -941,20 +941,20 @@ export default function RemindersPage() {
                 </div>
               )}
               <div>
-                <Label>Message (optional)</Label>
+                <Label>{t('reminders.scheduleReminder.message')}</Label>
                 <Textarea
-                  placeholder="Optional custom message to include in the reminder"
+                  placeholder={t('reminders.scheduleReminder.messagePlaceholder')}
                   value={scheduleData.content}
                   onChange={(e) => setScheduleData(prev => ({ ...prev, content: e.target.value }))}
                 />
               </div>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setScheduleReminderModalOpen(false)}>Cancel</Button>
+                <Button variant="outline" onClick={() => setScheduleReminderModalOpen(false)}>{t('reminders.scheduleReminder.cancel')}</Button>
                 <Button
                   onClick={() => createScheduledReminderMutation.mutate({ appointmentId: scheduleAppointmentId, data: scheduleData })}
                   disabled={createScheduledReminderMutation.isPending || !scheduleAppointmentId}
                 >
-                  {createScheduledReminderMutation.isPending ? 'Scheduling...' : 'Schedule Reminder'}
+                  {createScheduledReminderMutation.isPending ? t('reminders.scheduleReminder.scheduling') : t('reminders.scheduleReminder.schedule')}
                 </Button>
               </div>
             </div>
@@ -967,16 +967,16 @@ export default function RemindersPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Settings className="h-5 w-5" />
-                Reminder Settings
+                {t('reminders.settings.title')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label className="text-base font-medium">Enable Automatic Reminders</Label>
+                    <Label className="text-base font-medium">{t('reminders.settings.enableAutomatic')}</Label>
                     <p className="text-sm text-gray-600">
-                      Automatically send reminders based on appointment timing
+                      {t('reminders.settings.enableAutomaticDescription')}
                     </p>
                   </div>
                   <Switch />
@@ -985,33 +985,33 @@ export default function RemindersPage() {
                 <Separator />
 
                 <div className="space-y-4">
-                  <Label className="text-base font-medium">Default Reminder Settings</Label>
+                  <Label className="text-base font-medium">{t('reminders.settings.defaultSettings')}</Label>
                   
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-sm">Send reminder</Label>
+                      <Label className="text-sm">{t('reminders.settings.sendReminder')}</Label>
                       <Select defaultValue="24h">
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="24h">24 hours before</SelectItem>
-                          <SelectItem value="1h">1 hour before</SelectItem>
-                          <SelectItem value="30m">30 minutes before</SelectItem>
+                          <SelectItem value="24h">{t('reminders.settings.24hBefore')}</SelectItem>
+                          <SelectItem value="1h">{t('reminders.settings.1hBefore')}</SelectItem>
+                          <SelectItem value="30m">{t('reminders.settings.30mBefore')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div>
-                      <Label className="text-sm">Reminder method</Label>
+                      <Label className="text-sm">{t('reminders.settings.reminderMethod')}</Label>
                       <Select defaultValue="email">
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="email">Email</SelectItem>
-                          <SelectItem value="sms">SMS</SelectItem>
-                          <SelectItem value="both">Both</SelectItem>
+                          <SelectItem value="email">{t('reminders.settings.email')}</SelectItem>
+                          <SelectItem value="sms">{t('reminders.settings.sms')}</SelectItem>
+                          <SelectItem value="both">{t('reminders.settings.both')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1021,13 +1021,13 @@ export default function RemindersPage() {
                 <Separator />
 
                 <div className="space-y-4">
-                  <Label className="text-base font-medium">Email Template</Label>
+                  <Label className="text-base font-medium">{t('reminders.settings.emailTemplate')}</Label>
                   <Textarea 
-                    placeholder="Hi {customer_name}, this is a reminder about your appointment on {appointment_date} at {appointment_time}. Please confirm by replying to this email."
+                    placeholder={t('reminders.settings.emailTemplatePlaceholder')}
                     rows={4}
                   />
                   <p className="text-xs text-gray-500">
-                    Available variables: {'{customer_name}'}, {'{appointment_date}'}, {'{appointment_time}'}, {'{appointment_title}'}, {'{location}'}
+                    {t('reminders.settings.availableVariables')}
                   </p>
                 </div>
               </div>

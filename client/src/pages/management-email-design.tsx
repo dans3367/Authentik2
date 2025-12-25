@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -64,6 +65,7 @@ const mockMasterDesign: MasterEmailDesign = {
 };
 
 export default function ManagementEmailDesign() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
@@ -111,9 +113,9 @@ export default function ManagementEmailDesign() {
     onSuccess: async () => {
       setIsEditing(false);
       await qc.invalidateQueries({ queryKey: ["/api/master-email-design"] });
-      toast({ title: "Master email design updated successfully" });
+      toast({ title: t('management.emailDesign.toasts.updated') });
     },
-    onError: (e: any) => toast({ title: "Error", description: e?.message || "Failed to update email design", variant: "destructive" }),
+    onError: (e: any) => toast({ title: t('management.emailDesign.toasts.error'), description: e?.message || t('management.emailDesign.toasts.updateError'), variant: "destructive" }),
   });
 
   const handleSave = () => {
@@ -167,24 +169,24 @@ export default function ManagementEmailDesign() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-medium">Master Email Design</h2>
+          <h2 className="text-lg font-medium">{t('management.emailDesign.title')}</h2>
           <p className="text-sm text-muted-foreground">
-            Configure your universal email look and feel that will be applied to all emails
+            {t('management.emailDesign.subtitle')}
           </p>
         </div>
         <div className="flex gap-2">
           {!isEditing ? (
             <Button size="sm" onClick={() => setIsEditing(true)}>
-              <Edit className="h-4 w-4 mr-1" /> Edit Design
+              <Edit className="h-4 w-4 mr-1" /> {t('management.emailDesign.editDesign')}
             </Button>
           ) : (
             <>
               <Button size="sm" variant="outline" onClick={handleCancel}>
-                Cancel
+                {t('management.emailDesign.cancel')}
               </Button>
               <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending}>
                 <Save className="h-4 w-4 mr-1" />
-                {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                {updateMutation.isPending ? t('management.emailDesign.saving') : t('management.emailDesign.saveChanges')}
               </Button>
             </>
           )}
@@ -195,33 +197,33 @@ export default function ManagementEmailDesign() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Brand Information</CardTitle>
+              <CardTitle className="text-base">{t('management.emailDesign.brandInfo.title')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="companyName">Company Name</Label>
+                <Label htmlFor="companyName">{t('management.emailDesign.brandInfo.companyName')}</Label>
                 <Input
                   id="companyName"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                   disabled={!isEditing}
-                  placeholder="Your Company Name"
+                  placeholder={t('management.emailDesign.brandInfo.companyNamePlaceholder')}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="logoUrl">Logo URL</Label>
+                <Label htmlFor="logoUrl">{t('management.emailDesign.brandInfo.logoUrl')}</Label>
                 <Input
                   id="logoUrl"
                   value={logoUrl}
                   onChange={(e) => setLogoUrl(e.target.value)}
                   disabled={!isEditing}
-                  placeholder="https://example.com/logo.png"
+                  placeholder={t('management.emailDesign.brandInfo.logoUrlPlaceholder')}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="fontFamily">Font Family</Label>
+                <Label htmlFor="fontFamily">{t('management.emailDesign.brandInfo.fontFamily')}</Label>
                 <select
                   id="fontFamily"
                   value={fontFamily}
@@ -241,11 +243,11 @@ export default function ManagementEmailDesign() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Color Scheme</CardTitle>
+              <CardTitle className="text-base">{t('management.emailDesign.colorScheme.title')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Primary Color</Label>
+                <Label>{t('management.emailDesign.colorScheme.primaryColor')}</Label>
                 <div className="flex items-center gap-3">
                   <div
                     className="w-12 h-12 rounded-lg border-2 border-gray-200"
@@ -268,7 +270,7 @@ export default function ManagementEmailDesign() {
               </div>
 
               <div className="space-y-2">
-                <Label>Secondary Color</Label>
+                <Label>{t('management.emailDesign.colorScheme.secondaryColor')}</Label>
                 <div className="flex items-center gap-3">
                   <div
                     className="w-12 h-12 rounded-lg border-2 border-gray-200"
@@ -291,7 +293,7 @@ export default function ManagementEmailDesign() {
               </div>
 
               <div className="space-y-2">
-                <Label>Accent Color</Label>
+                <Label>{t('management.emailDesign.colorScheme.accentColor')}</Label>
                 <div className="flex items-center gap-3">
                   <div
                     className="w-12 h-12 rounded-lg border-2 border-gray-200"
@@ -317,28 +319,28 @@ export default function ManagementEmailDesign() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Email Content</CardTitle>
+              <CardTitle className="text-base">{t('management.emailDesign.emailContent.title')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="headerText">Header Text (Optional)</Label>
+                <Label htmlFor="headerText">{t('management.emailDesign.emailContent.headerText')}</Label>
                 <Input
                   id="headerText"
                   value={headerText}
                   onChange={(e) => setHeaderText(e.target.value)}
                   disabled={!isEditing}
-                  placeholder="e.g., Welcome to our newsletter"
+                  placeholder={t('management.emailDesign.emailContent.headerTextPlaceholder')}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="footerText">Footer Text</Label>
+                <Label htmlFor="footerText">{t('management.emailDesign.emailContent.footerText')}</Label>
                 <Textarea
                   id="footerText"
                   value={footerText}
                   onChange={(e) => setFooterText(e.target.value)}
                   disabled={!isEditing}
-                  placeholder="© 2025 Your Company. All rights reserved."
+                  placeholder={t('management.emailDesign.emailContent.footerTextPlaceholder')}
                   rows={3}
                 />
               </div>
@@ -347,50 +349,50 @@ export default function ManagementEmailDesign() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Social Media Links (Optional)</CardTitle>
+              <CardTitle className="text-base">{t('management.emailDesign.socialMedia.title')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="facebook">Facebook URL</Label>
+                <Label htmlFor="facebook">{t('management.emailDesign.socialMedia.facebookUrl')}</Label>
                 <Input
                   id="facebook"
                   value={facebookUrl}
                   onChange={(e) => setFacebookUrl(e.target.value)}
                   disabled={!isEditing}
-                  placeholder="https://facebook.com/yourpage"
+                  placeholder={t('management.emailDesign.socialMedia.facebookPlaceholder')}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="twitter">Twitter URL</Label>
+                <Label htmlFor="twitter">{t('management.emailDesign.socialMedia.twitterUrl')}</Label>
                 <Input
                   id="twitter"
                   value={twitterUrl}
                   onChange={(e) => setTwitterUrl(e.target.value)}
                   disabled={!isEditing}
-                  placeholder="https://twitter.com/yourhandle"
+                  placeholder={t('management.emailDesign.socialMedia.twitterPlaceholder')}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="instagram">Instagram URL</Label>
+                <Label htmlFor="instagram">{t('management.emailDesign.socialMedia.instagramUrl')}</Label>
                 <Input
                   id="instagram"
                   value={instagramUrl}
                   onChange={(e) => setInstagramUrl(e.target.value)}
                   disabled={!isEditing}
-                  placeholder="https://instagram.com/yourhandle"
+                  placeholder={t('management.emailDesign.socialMedia.instagramPlaceholder')}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="linkedin">LinkedIn URL</Label>
+                <Label htmlFor="linkedin">{t('management.emailDesign.socialMedia.linkedinUrl')}</Label>
                 <Input
                   id="linkedin"
                   value={linkedinUrl}
                   onChange={(e) => setLinkedinUrl(e.target.value)}
                   disabled={!isEditing}
-                  placeholder="https://linkedin.com/company/yourcompany"
+                  placeholder={t('management.emailDesign.socialMedia.linkedinPlaceholder')}
                 />
               </div>
             </CardContent>
@@ -402,7 +404,7 @@ export default function ManagementEmailDesign() {
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
                 <Eye className="w-4 h-4" />
-                Live Preview
+                {t('management.emailDesign.preview.title')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -436,9 +438,9 @@ export default function ManagementEmailDesign() {
                     className="p-4 rounded-lg mb-4"
                     style={{ backgroundColor: secondaryColor, color: "white" }}
                   >
-                    <h2 className="text-lg font-semibold mb-2">Sample Email Content</h2>
+                    <h2 className="text-lg font-semibold mb-2">{t('management.emailDesign.preview.sampleContent')}</h2>
                     <p className="text-sm opacity-90">
-                      This is how your email content will appear with your chosen design.
+                      {t('management.emailDesign.preview.sampleDescription')}
                     </p>
                   </div>
 
@@ -446,7 +448,7 @@ export default function ManagementEmailDesign() {
                     className="w-full py-3 px-6 rounded-lg font-medium text-white"
                     style={{ backgroundColor: accentColor }}
                   >
-                    Call to Action Button
+                    {t('management.emailDesign.preview.ctaButton')}
                   </button>
                 </div>
 
@@ -488,11 +490,11 @@ export default function ManagementEmailDesign() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Design Information</CardTitle>
+              <CardTitle className="text-base">{t('management.emailDesign.designInfo.title')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Last Updated:</span>
+                <span className="text-muted-foreground">{t('management.emailDesign.designInfo.lastUpdated')}</span>
                 <span className="font-medium">
                   {masterDesign?.updatedAt
                     ? new Date(masterDesign.updatedAt).toLocaleDateString("en-US", {
@@ -502,13 +504,12 @@ export default function ManagementEmailDesign() {
                         hour: "2-digit",
                         minute: "2-digit",
                       })
-                    : "Never"}
+                    : t('management.emailDesign.designInfo.never')}
                 </span>
               </div>
               <div className="pt-3 border-t">
                 <p className="text-sm text-muted-foreground">
-                  This master design will be automatically applied to all your email communications,
-                  ensuring consistent branding across newsletters, promotions, and transactional emails.
+                  {t('management.emailDesign.designInfo.description')}
                 </p>
               </div>
             </CardContent>

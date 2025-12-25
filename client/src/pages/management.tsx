@@ -2,16 +2,19 @@ import React from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { LayoutDashboard, Settings } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import UsersPage from "@/pages/users";
 import ShopsPage from "@/pages/shops";
 import ManagementTags from "@/pages/management-tags";
 import ManagementEmailDesign from "@/pages/management-email-design";
 
 export default function ManagementPage() {
+  const { t } = useTranslation();
+
   // Set breadcrumbs in header
   useSetBreadcrumbs([
-    { label: "Dashboard", href: "/", icon: LayoutDashboard },
-    { label: "Management", icon: Settings }
+    { label: t('navigation.dashboard'), href: "/", icon: LayoutDashboard },
+    { label: t('management.title'), icon: Settings }
   ]);
 
   return (
@@ -19,18 +22,18 @@ export default function ManagementPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Management</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{t('management.title')}</h1>
             <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Manage users, shops, tags, and email designs to organize your business operations
+              {t('management.subtitle')}
             </p>
           </div>
         </div>
         <Tabs defaultValue="users" className="w-full">
           <TabsList>
-            <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="shops">Shops</TabsTrigger>
-            <TabsTrigger value="tags">Tags</TabsTrigger>
-            <TabsTrigger value="email-design">Email Design</TabsTrigger>
+            <TabsTrigger value="users">{t('management.tabs.users')}</TabsTrigger>
+            <TabsTrigger value="shops">{t('management.tabs.shops')}</TabsTrigger>
+            <TabsTrigger value="tags">{t('management.tabs.tags')}</TabsTrigger>
+            <TabsTrigger value="email-design">{t('management.tabs.emailDesign')}</TabsTrigger>
           </TabsList>
           <div className="mt-6">
             <TabsContent value="users">

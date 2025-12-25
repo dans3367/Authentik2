@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,12 +32,27 @@ const channelOptions = [
   { value: "transactional", label: "Transactional", description: "Receipts, confirmations, and notifications" },
 ];
 
+const getChannelOptions = (t: any) => [
+  { value: "individual", label: t('templatesPage.channels.individual'), description: t('templatesPage.channels.individualDesc') },
+  { value: "promotional", label: t('templatesPage.channels.promotional'), description: t('templatesPage.channels.promotionalDesc') },
+  { value: "newsletter", label: t('templatesPage.channels.newsletter'), description: t('templatesPage.channels.newsletterDesc') },
+  { value: "transactional", label: t('templatesPage.channels.transactional'), description: t('templatesPage.channels.transactionalDesc') },
+];
+
 const categoryOptions = [
   { value: "welcome", label: "Welcome & Onboarding" },
   { value: "retention", label: "Retention & Engagement" },
   { value: "seasonal", label: "Seasonal & Events" },
   { value: "update", label: "Product Updates" },
   { value: "custom", label: "Custom" },
+];
+
+const getCategoryOptions = (t: any) => [
+  { value: "welcome", label: t('templatesPage.categories.welcome') },
+  { value: "retention", label: t('templatesPage.categories.retention') },
+  { value: "seasonal", label: t('templatesPage.categories.seasonal') },
+  { value: "update", label: t('templatesPage.categories.update') },
+  { value: "custom", label: t('templatesPage.categories.custom') },
 ];
 
 const themeOptions = [
@@ -208,15 +224,21 @@ const createTemplate = async (templateData: CreateTemplatePayload) => {
 };
 
 export default function CreateTemplatePage() {
+  const { t } = useTranslation();
+  
   useSetBreadcrumbs([
-    { label: "Dashboard", href: "/", icon: LayoutDashboard },
-    { label: "Templates", href: "/templates", icon: Copy },
-    { label: "Create Template" }
+    { label: t('navigation.dashboard'), href: "/", icon: LayoutDashboard },
+    { label: t('templatesPage.title'), href: "/templates", icon: Copy },
+    { label: t('templatesPage.createTemplatePage.title') }
   ]);
 
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Get localized options
+  const localizedChannelOptions = getChannelOptions(t);
+  const localizedCategoryOptions = getCategoryOptions(t);
 
   const [name, setName] = useState("");
   const [channel, setChannel] = useState<TemplateChannel>("individual");
@@ -234,8 +256,8 @@ export default function CreateTemplatePage() {
 
     if (!name.trim() || !subjectLine.trim() || !hasContent(content)) {
       toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields.",
+        title: t('templatesPage.createTemplatePage.validation.error'),
+        description: t('templatesPage.createTemplatePage.validation.fillRequired'),
         variant: "destructive",
       });
       return;
@@ -255,15 +277,15 @@ export default function CreateTemplatePage() {
       });
 
       toast({
-        title: "Template created",
-        description: `${name} is ready to use across your campaigns.`,
+        title: t('templatesPage.createTemplatePage.toasts.templateCreated'),
+        description: t('templatesPage.createTemplatePage.toasts.templateCreatedDesc', { name }),
       });
 
       setLocation('/templates');
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to create template. Please try again.",
+        title: t('templatesPage.createTemplatePage.toasts.error'),
+        description: t('templatesPage.createTemplatePage.toasts.createError'),
         variant: "destructive",
       });
     } finally {
@@ -276,9 +298,9 @@ export default function CreateTemplatePage() {
       <div className="max-w-7xl mx-auto p-6 space-y-8">
         <header className="flex flex-col gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-50">Create Template</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-50">{t('templatesPage.createTemplatePage.title')}</h1>
             <p className="text-gray-600 dark:text-gray-300">
-              Build a reusable template for individual outreach, promotional campaigns, newsletters, and system notifications.
+              {t('templatesPage.createTemplatePage.subtitle')}
             </p>
           </div>
         </header>
@@ -287,16 +309,16 @@ export default function CreateTemplatePage() {
 
           <Card className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm">
             <CardHeader>
-              <CardTitle>Template Details</CardTitle>
+              <CardTitle>{t('templatesPage.createTemplatePage.templateDetails')}</CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="template-name">Template name *</Label>
+                  <Label htmlFor="template-name">{t('templatesPage.createTemplatePage.templateName')}</Label>
                   <Input
                     id="template-name"
-                    placeholder="e.g. New customer welcome"
+                    placeholder={t('templatesPage.createTemplatePage.templateNamePlaceholder')}
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     required
@@ -304,13 +326,13 @@ export default function CreateTemplatePage() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="template-channel">Channel *</Label>
+                  <Label htmlFor="template-channel">{t('templatesPage.createTemplatePage.channel')}</Label>
                   <Select value={channel} onValueChange={(value: TemplateChannel) => setChannel(value)}>
                     <SelectTrigger id="template-channel">
-                      <SelectValue placeholder="Select channel" />
+                      <SelectValue placeholder={t('templatesPage.createTemplatePage.selectChannel')} />
                     </SelectTrigger>
                     <SelectContent>
-                      {channelOptions.map((option) => (
+                      {localizedChannelOptions.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           <div className="flex flex-col">
                             <span className="font-medium">{option.label}</span>
@@ -323,13 +345,13 @@ export default function CreateTemplatePage() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="template-category">Category *</Label>
+                  <Label htmlFor="template-category">{t('templatesPage.createTemplatePage.category')}</Label>
                   <Select value={category} onValueChange={(value: TemplateCategory) => setCategory(value)}>
                     <SelectTrigger id="template-category">
-                      <SelectValue placeholder="Select category" />
+                      <SelectValue placeholder={t('templatesPage.createTemplatePage.selectCategory')} />
                     </SelectTrigger>
                     <SelectContent>
-                      {categoryOptions.map((option) => (
+                      {localizedCategoryOptions.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
                         </SelectItem>
@@ -339,10 +361,10 @@ export default function CreateTemplatePage() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="template-subject">Subject line *</Label>
+                  <Label htmlFor="template-subject">{t('templatesPage.createTemplatePage.subjectLine')}</Label>
                   <Input
                     id="template-subject"
-                    placeholder="e.g. Welcome to {{company_name}}"
+                    placeholder={t('templatesPage.createTemplatePage.subjectLinePlaceholder')}
                     value={subjectLine}
                     onChange={(event) => setSubjectLine(event.target.value)}
                     required
@@ -350,22 +372,22 @@ export default function CreateTemplatePage() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="template-content">Content *</Label>
+                  <Label htmlFor="template-content">{t('templatesPage.createTemplatePage.content')}</Label>
                   <RichTextEditor
                     value={content}
                     onChange={setContent}
-                    placeholder="Write your email content or paste HTML"
+                    placeholder={t('templatesPage.createTemplatePage.contentPlaceholder')}
                     className="min-h-[300px]"
                   />
                   <p className="text-xs text-muted-foreground">
-                    {"Use liquid-style variables such as {{first_name}} or {{order_number}} to personalise your message."}
+                    {t('templatesPage.createTemplatePage.contentHelp')}
                   </p>
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="template-theme">Email Theme</Label>
+                  <Label htmlFor="template-theme">{t('templatesPage.createTemplatePage.emailTheme')}</Label>
                   <p className="text-sm text-muted-foreground mb-3">
-                    Choose a design template that will wrap your content for email compatibility
+                    {t('templatesPage.createTemplatePage.emailThemeDescription')}
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {themeOptions.map((option) => (
@@ -411,7 +433,7 @@ export default function CreateTemplatePage() {
                           className="mt-2 w-full gap-2 text-xs"
                         >
                           <Eye className="h-3 w-3" />
-                          Preview
+                          {t('templatesPage.createTemplatePage.preview')}
                         </Button>
                       </button>
                     ))}
@@ -419,11 +441,11 @@ export default function CreateTemplatePage() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="template-tags">Tags</Label>
+                  <Label htmlFor="template-tags">{t('templatesPage.createTemplatePage.tags')}</Label>
                   <div className="space-y-2">
                     <div className="flex flex-wrap gap-2 min-h-[40px] p-2 border rounded-md bg-background">
                       {tags.length === 0 && (
-                        <span className="text-sm text-muted-foreground">No tags added yet</span>
+                        <span className="text-sm text-muted-foreground">{t('templatesPage.createTemplatePage.noTagsAdded')}</span>
                       )}
                       {tags.map((tag, index) => (
                         <Badge
@@ -445,7 +467,7 @@ export default function CreateTemplatePage() {
                     <div className="flex gap-2">
                       <Input
                         id="template-tags"
-                        placeholder="Add a tag (e.g. onboarding, v1)"
+                        placeholder={t('templatesPage.createTemplatePage.addTagPlaceholder')}
                         value={tagInput}
                         onChange={(event) => setTagInput(event.target.value)}
                         onKeyDown={(event) => {
@@ -471,11 +493,11 @@ export default function CreateTemplatePage() {
                         }}
                         disabled={!tagInput.trim()}
                       >
-                        Add
+                        {t('common.add')}
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Press Enter or click Add to create a tag. Click the X to remove.
+                      {t('templatesPage.createTemplatePage.addTagHelp')}
                     </p>
                   </div>
                 </div>
@@ -488,10 +510,10 @@ export default function CreateTemplatePage() {
                     onClick={() => setLocation('/templates')}
                     disabled={isSubmitting}
                   >
-                    Cancel
+                    {t('templatesPage.createTemplatePage.cancel')}
                   </Button>
                   <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? "Creating..." : "Create template"}
+                    {isSubmitting ? t('templatesPage.createTemplatePage.creating') : t('templatesPage.createTemplatePage.createTemplate')}
                   </Button>
                 </div>
               </form>
@@ -504,7 +526,7 @@ export default function CreateTemplatePage() {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {themeOptions.find(t => t.value === previewTheme)?.label} Theme Preview
+              {t('templatesPage.createTemplatePage.themePreview', { theme: themeOptions.find(t => t.value === previewTheme)?.label })}
             </DialogTitle>
             <DialogDescription>
               {themeOptions.find(t => t.value === previewTheme)?.description}
@@ -523,19 +545,19 @@ export default function CreateTemplatePage() {
                 variant="outline"
                 onClick={() => setPreviewOpen(false)}
               >
-                Close
+                {t('common.close')}
               </Button>
               <Button
                 onClick={() => {
                   setTheme(previewTheme);
                   setPreviewOpen(false);
                   toast({
-                    title: "Theme selected",
-                    description: `${themeOptions.find(t => t.value === previewTheme)?.label} theme has been applied.`,
+                    title: t('templatesPage.createTemplatePage.themeSelected'),
+                    description: t('templatesPage.createTemplatePage.themeSelectedDesc', { theme: themeOptions.find(t => t.value === previewTheme)?.label }),
                   });
                 }}
               >
-                Use This Theme
+                {t('templatesPage.createTemplatePage.useThisTheme')}
               </Button>
             </div>
           </div>
