@@ -16,12 +16,72 @@ import { OnboardingWizard } from "@/components/OnboardingWizard";
 import { useLanguage } from "@/hooks/useLanguage";
 import { PageTitleProvider, usePageTitle } from "@/contexts/PageTitleContext";
 import { Button } from "@/components/ui/button";
-import { Zap, UserPlus, Bell, ChevronRight } from "lucide-react";
+import { Zap, UserPlus, Bell, ChevronRight, X } from "lucide-react";
 import { Link } from "wouter";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Header component that displays breadcrumbs or page title
 function AppHeader() {
   const { title, subtitle, breadcrumbs } = usePageTitle();
+  const [location, setLocation] = useLocation();
+  const [showExitDialog, setShowExitDialog] = useState(false);
+  
+  // Check if we're on newsletter create/edit pages or forms edit pages
+  const hideHeader = location === '/newsletter/create' || 
+                    location.startsWith('/newsletter/edit/') || 
+                    location.startsWith('/forms/');
+  
+  // Return null to completely hide header on newsletter create/edit pages
+  if (hideHeader) {
+    return (
+      <>
+        {/* Minimal header with exit button */}
+        <header className="flex h-16 shrink-0 items-center justify-end gap-2 border-b px-4 bg-white dark:bg-gray-900">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowExitDialog(true)}
+            className="h-9 w-9 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            title="Exit to Forms"
+          >
+            <X className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+          </Button>
+        </header>
+        
+        {/* Exit Confirmation Dialog */}
+        <AlertDialog open={showExitDialog} onOpenChange={setShowExitDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Exit Editor?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to exit? Any unsaved changes will be lost.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  setShowExitDialog(false);
+                  setLocation('/forms');
+                }}
+              >
+                Exit
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
+    );
+  }
   
   return (
     <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">

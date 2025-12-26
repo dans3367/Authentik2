@@ -505,7 +505,17 @@ export function PreviewStep({
       >
         <div 
           className={`${themeStyles.container} ${selectedTheme.id === 'glassmorphism' ? 'glassmorphism-override' : ''} ${selectedTheme.customColors ? 'custom-theme-wrapper' : ''}`}
-          style={selectedTheme.customColors ? formStyle : {}}
+          style={selectedTheme.customColors ? {
+            ...formStyle,
+            borderRadius: selectedTheme.customColors.borderRadius === 'none' ? '0px' :
+                         selectedTheme.customColors.borderRadius === 'small' ? '0.375rem' :
+                         selectedTheme.customColors.borderRadius === 'large' ? '1rem' :
+                         selectedTheme.customColors.borderRadius === 'full' ? '1.5rem' : '0.75rem',
+            boxShadow: selectedTheme.customColors.containerShadow === 'none' ? 'none' :
+                      selectedTheme.customColors.containerShadow === 'small' ? '0 1px 2px 0 rgb(0 0 0 / 0.05)' :
+                      selectedTheme.customColors.containerShadow === 'large' ? '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' :
+                      '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
+          } : {}}
         >
           {formSettings.showFormTitle !== false && (
             <>

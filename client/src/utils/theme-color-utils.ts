@@ -21,110 +21,234 @@ export function extractThemeColors(theme: FormTheme): CustomColors {
   let background = '#FFFFFF'; // Default white background
   let header = '#1F2937'; // Default header color
   let font: 'sans' | 'serif' | 'mono' = 'sans'; // Default font
+  // New default values
+  let label = '#374151'; // Default label color
+  let inputBackground = '#FFFFFF'; // Default input background
+  let inputBorder = '#D1D5DB'; // Default input border
+  let inputText = '#1F2937'; // Default input text
+  let borderRadius: 'none' | 'small' | 'medium' | 'large' | 'full' = 'medium';
+  let containerShadow: 'none' | 'small' | 'medium' | 'large' = 'medium';
+  let progressBar = '#3B82F6'; // Default progress bar color
 
   // Extract colors based on theme ID patterns
   switch (theme.id) {
     case 'minimal':
-      text = '#1F2937'; // Dark gray
-      header = '#111827'; // Darker gray for headers
-      button = '#1F2937'; // Dark gray for minimal
+      text = '#1F2937';
+      header = '#111827';
+      button = '#1F2937';
       background = '#FFFFFF';
       font = 'sans';
+      label = '#374151';
+      inputBackground = '#F9FAFB';
+      inputBorder = '#D1D5DB';
+      inputText = '#1F2937';
+      borderRadius = 'medium';
+      containerShadow = 'large';
+      progressBar = '#3B82F6';
       break;
     case 'modern':
-      text = '#374151'; // Gray
-      header = '#8B5CF6'; // Purple for headers
-      button = '#8B5CF6'; // Purple for modern
+      text = '#374151';
+      header = '#8B5CF6';
+      button = '#8B5CF6';
       background = '#F8FAFC';
       font = 'sans';
+      label = '#1F2937';
+      inputBackground = '#FFFFFF';
+      inputBorder = '#E5E7EB';
+      inputText = '#1F2937';
+      borderRadius = 'large';
+      containerShadow = 'large';
+      progressBar = '#8B5CF6';
       break;
     case 'professional':
-      text = '#1F2937'; // Dark gray
-      header = '#2563EB'; // Blue for headers
-      button = '#2563EB'; // Blue for professional
+      text = '#1F2937';
+      header = '#2563EB';
+      button = '#2563EB';
       background = '#FFFFFF';
       font = 'sans';
+      label = '#374151';
+      inputBackground = '#FFFFFF';
+      inputBorder = '#D1D5DB';
+      inputText = '#1F2937';
+      borderRadius = 'small';
+      containerShadow = 'small';
+      progressBar = '#2563EB';
       break;
     case 'playful':
-      text = '#7C3AED'; // Purple
-      header = '#EC4899'; // Pink for headers
-      button = '#EC4899'; // Pink for playful
+      text = '#7C3AED';
+      header = '#EC4899';
+      button = '#EC4899';
       background = '#FDF2F8';
       font = 'sans';
+      label = '#7C3AED';
+      inputBackground = '#FDF2F8';
+      inputBorder = '#F9A8D4';
+      inputText = '#7C3AED';
+      borderRadius = 'full';
+      containerShadow = 'large';
+      progressBar = '#EC4899';
       break;
     case 'elegant':
-      text = '#1F2937'; // Dark gray
-      header = '#4F46E5'; // Indigo for headers
-      button = '#4F46E5'; // Indigo for elegant
+      text = '#1F2937';
+      header = '#4F46E5';
+      button = '#4F46E5';
       background = '#FFFFFF';
       font = 'serif';
+      label = '#6B7280';
+      inputBackground = '#FFFFFF';
+      inputBorder = '#E5E7EB';
+      inputText = '#1F2937';
+      borderRadius = 'medium';
+      containerShadow = 'large';
+      progressBar = '#4F46E5';
       break;
     case 'neon':
-      text = '#00D9FF'; // Neon cyan
-      header = '#00FF88'; // Neon green for headers
-      button = '#00FF88'; // Neon green
+      text = '#00D9FF';
+      header = '#00FF88';
+      button = '#00FF88';
       background = '#0A0A0A';
       font = 'mono';
+      label = '#00D9FF';
+      inputBackground = '#111111';
+      inputBorder = '#00D9FF';
+      inputText = '#00D9FF';
+      borderRadius = 'small';
+      containerShadow = 'none';
+      progressBar = '#00FF88';
       break;
     case 'nature':
-      text = '#047857'; // Dark emerald
-      header = '#059669'; // Emerald for headers
-      button = '#059669'; // Emerald green
+      text = '#047857';
+      header = '#059669';
+      button = '#059669';
       background = '#F0FDF4';
       font = 'sans';
+      label = '#047857';
+      inputBackground = '#FFFFFF';
+      inputBorder = '#86EFAC';
+      inputText = '#047857';
+      borderRadius = 'full';
+      containerShadow = 'medium';
+      progressBar = '#059669';
       break;
     case 'luxury':
-      text = '#FCD34D'; // Gold/yellow
-      header = '#F59E0B'; // Amber for headers
-      button = '#D97706'; // Amber/gold
+      text = '#FCD34D';
+      header = '#F59E0B';
+      button = '#D97706';
       background = '#0F0A02';
       font = 'serif';
+      label = '#FCD34D';
+      inputBackground = '#1C1917';
+      inputBorder = '#D97706';
+      inputText = '#FCD34D';
+      borderRadius = 'medium';
+      containerShadow = 'large';
+      progressBar = '#D97706';
       break;
     case 'retro':
-      text = '#DC2626'; // Red
-      header = '#F97316'; // Orange for headers
-      button = '#F97316'; // Orange
+      text = '#DC2626';
+      header = '#F97316';
+      button = '#F97316';
       background = '#FFF7ED';
       font = 'mono';
+      label = '#DC2626';
+      inputBackground = '#FFFBEB';
+      inputBorder = '#F97316';
+      inputText = '#DC2626';
+      borderRadius = 'none';
+      containerShadow = 'none';
+      progressBar = '#F97316';
       break;
     case 'cosmic':
-      text = '#E9D5FF'; // Light purple
-      header = '#A855F7'; // Bright purple for headers
-      button = '#8B5CF6'; // Purple
+      text = '#E9D5FF';
+      header = '#A855F7';
+      button = '#8B5CF6';
       background = '#0F0F23';
       font = 'sans';
+      label = '#E9D5FF';
+      inputBackground = '#1E1B4B';
+      inputBorder = '#8B5CF6';
+      inputText = '#E9D5FF';
+      borderRadius = 'medium';
+      containerShadow = 'large';
+      progressBar = '#8B5CF6';
       break;
     case 'brutalist':
-      text = '#000000'; // Black
-      header = '#000000'; // Black for headers
-      button = '#000000'; // Black
+      text = '#000000';
+      header = '#000000';
+      button = '#000000';
       background = '#FFFFFF';
       font = 'mono';
+      label = '#000000';
+      inputBackground = '#FFFFFF';
+      inputBorder = '#000000';
+      inputText = '#000000';
+      borderRadius = 'none';
+      containerShadow = 'none';
+      progressBar = '#000000';
       break;
     case 'pastel-dream':
-      text = '#BE185D'; // Pink
-      header = '#EC4899'; // Bright pink for headers
-      button = '#EC4899'; // Pink
+      text = '#BE185D';
+      header = '#EC4899';
+      button = '#EC4899';
       background = '#FDF2F8';
       font = 'sans';
+      label = '#BE185D';
+      inputBackground = '#FFFFFF';
+      inputBorder = '#F9A8D4';
+      inputText = '#BE185D';
+      borderRadius = 'full';
+      containerShadow = 'medium';
+      progressBar = '#EC4899';
       break;
     case 'neo-modern':
-      text = '#10B981'; // Green
-      header = '#00FF41'; // Matrix green for headers
-      button = '#00FF41'; // Matrix green
+      text = '#10B981';
+      header = '#00FF41';
+      button = '#00FF41';
       background = '#0A0A0A';
       font = 'mono';
+      label = '#10B981';
+      inputBackground = '#111111';
+      inputBorder = '#10B981';
+      inputText = '#10B981';
+      borderRadius = 'small';
+      containerShadow = 'none';
+      progressBar = '#00FF41';
       break;
     case 'modern-bold':
-      text = '#1F2937'; // Dark gray
-      header = '#F97316'; // Orange for headers
-      button = '#F97316'; // Orange
+      text = '#1F2937';
+      header = '#F97316';
+      button = '#F97316';
       background = '#FFFFFF';
       font = 'sans';
+      label = '#1F2937';
+      inputBackground = '#FFFFFF';
+      inputBorder = '#F97316';
+      inputText = '#1F2937';
+      borderRadius = 'large';
+      containerShadow = 'large';
+      progressBar = '#F97316';
+      break;
+    case 'glassmorphism':
+      text = '#FFFFFF';
+      header = '#FFFFFF';
+      button = '#FFFFFF';
+      background = '#1E293B';
+      font = 'sans';
+      label = '#E2E8F0';
+      inputBackground = 'rgba(255,255,255,0.15)';
+      inputBorder = 'rgba(255,255,255,0.3)';
+      inputText = '#FFFFFF';
+      borderRadius = 'full';
+      containerShadow = 'large';
+      progressBar = '#FFFFFF';
       break;
   }
 
-  return { text, button, background, header, font };
+  return { 
+    text, button, background, header, font,
+    label, inputBackground, inputBorder, inputText,
+    borderRadius, containerShadow, progressBar
+  };
 }
 
 // Helper function to lighten a color

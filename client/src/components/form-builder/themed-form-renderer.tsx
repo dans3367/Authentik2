@@ -220,15 +220,12 @@ export function ThemedFormRenderer({ element, themeStyles, onChange, onReset }: 
       case 'rate-scale':
         return (
           <RateScale
-            name={element.name}
-            required={element.required}
             disabled={(element as FormElement).disabled}
             min={(element as FormElement).validation?.min || 1}
             max={(element as FormElement).validation?.max || 10}
             variant={(element as FormElement).rateVariant || "numbers"}
-            showNumbers={(element as FormElement).rateVariant === "numbers" || !(element as FormElement).rateVariant}
             className="justify-center"
-            onValueChange={(value) => onChange?.(element.name, value)}
+            onChange={(value) => onChange?.(element.name, value)}
           />
         );
 

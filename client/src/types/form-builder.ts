@@ -89,6 +89,16 @@ export interface CustomColors {
   buttonGradient?: string;
   header: string;
   headerGradient?: string;
+  // New appearance options
+  label?: string;
+  labelGradient?: string;
+  inputBackground?: string;
+  inputBorder?: string;
+  inputText?: string;
+  borderRadius?: 'none' | 'small' | 'medium' | 'large' | 'full';
+  containerShadow?: 'none' | 'small' | 'medium' | 'large';
+  progressBar?: string;
+  progressBarGradient?: string;
 }
 
 export interface FormTheme {

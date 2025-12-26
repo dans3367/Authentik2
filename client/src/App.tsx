@@ -17,6 +17,7 @@ const AuthPage = lazy(() => import("@/pages/auth"));
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const NewsletterPage = lazy(() => import("@/pages/newsletter"));
 const NewsletterCreatePage = lazy(() => import("@/pages/newsletter/create"));
+const NewsletterEditPage = lazy(() => import("@/pages/newsletter/edit"));
 const NewsletterViewPage = lazy(() => import("@/pages/newsletter/view"));
 const ProfilePage = lazy(() => import("@/pages/profile"));
 const SessionsPage = lazy(() => import("@/pages/sessions"));
@@ -234,6 +235,7 @@ function Router() {
                   <Route path="/newsletter" component={NewsletterPage} />
                   <Route path="/newsletters" component={NewsletterPage} />
                   <Route path="/newsletter/create" component={NewsletterCreatePage} />
+                  <Route path="/newsletter/edit/:id" component={NewsletterEditPage} />
                   <Route path="/newsletters/:id" component={NewsletterViewPage} />
                   <Route path="/promotions" component={PromotionsPage} />
                   <Route path="/promotions/create" component={CreatePromotionPage} />

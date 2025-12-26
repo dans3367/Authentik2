@@ -55,6 +55,13 @@ export function PropertiesPanel({
     onUpdateElement(selectedElement.id, { validation });
   };
 
+  const handleRateScaleValidationUpdate = (field: keyof ValidationRules, value: any) => {
+    // Clamp values to 1-10 range for rate scale
+    const clampedValue = Math.max(1, Math.min(10, parseInt(value) || 1));
+    const validation = { ...selectedElement.validation, [field]: clampedValue };
+    onUpdateElement(selectedElement.id, { validation });
+  };
+
   const handleStylingUpdate = (field: keyof ElementStyling, value: any) => {
     const currentStyling = selectedElement.styling || { width: 'full', size: 'medium' };
     const styling = { ...currentStyling, [field]: value };
@@ -262,279 +269,283 @@ export function PropertiesPanel({
         )}
 
         {/* Validation Rules */}
-        <div className="mb-8">
-            <h3 className="text-sm font-medium text-neutral-700 mb-4">Validation Rules</h3>
-            <div className="space-y-3">
-              <label className="flex items-center">
-                <Checkbox
-                  checked={selectedElement.required}
-                  onCheckedChange={(checked) => handleUpdate('required', checked)}
-                />
-                <span className="ml-2 text-sm text-neutral-700">Required field</span>
-              </label>
-              
-              {(selectedElement.type === 'text-input' || selectedElement.type === 'textarea') && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs font-medium text-neutral-600 mb-1">Min Length</Label>
-                    <Input
-                      type="number"
-                      value={selectedElement.validation?.minLength || ''}
-                      onChange={(e) => handleValidationUpdate('minLength', parseInt(e.target.value) || undefined)}
-                      className="text-sm"
-                    />
+        {selectedElement.type !== 'image' && (
+          <div className="mb-8">
+              <h3 className="text-sm font-medium text-neutral-700 mb-4">Validation Rules</h3>
+              <div className="space-y-3">
+                <label className="flex items-center">
+                  <Checkbox
+                    checked={selectedElement.required}
+                    onCheckedChange={(checked) => handleUpdate('required', checked)}
+                  />
+                  <span className="ml-2 text-sm text-neutral-700">Required field</span>
+                </label>
+                
+                {(selectedElement.type === 'text-input' || selectedElement.type === 'textarea') && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs font-medium text-neutral-600 mb-1">Min Length</Label>
+                      <Input
+                        type="number"
+                        value={selectedElement.validation?.minLength || ''}
+                        onChange={(e) => handleValidationUpdate('minLength', parseInt(e.target.value) || undefined)}
+                        className="text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-neutral-600 mb-1">Max Length</Label>
+                      <Input
+                        type="number"
+                        value={selectedElement.validation?.maxLength || ''}
+                        onChange={(e) => handleValidationUpdate('maxLength', parseInt(e.target.value) || undefined)}
+                        className="text-sm"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <Label className="text-xs font-medium text-neutral-600 mb-1">Max Length</Label>
-                    <Input
-                      type="number"
-                      value={selectedElement.validation?.maxLength || ''}
-                      onChange={(e) => handleValidationUpdate('maxLength', parseInt(e.target.value) || undefined)}
-                      className="text-sm"
-                    />
-                  </div>
-                </div>
-              )}
+                )}
 
-              {selectedElement.type === 'number-input' && (
-                <>
-                  <div>
-                    <Label className="text-xs font-medium text-neutral-600 mb-1">Input Type</Label>
-                    <Select 
-                      value={selectedElement.numberVariant || 'number'}
-                      onValueChange={(value) => handleUpdate('numberVariant', value)}
-                    >
-                      <SelectTrigger className="text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="number">Number (Default)</SelectItem>
-                        <SelectItem value="phone">Phone Number</SelectItem>
-                        <SelectItem value="country-phone">International Phone</SelectItem>
-                        <SelectItem value="currency">Currency ($)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {selectedElement.numberVariant === 'number' && (
+                {selectedElement.type === 'number-input' && (
+                  <>
+                    <div>
+                      <Label className="text-xs font-medium text-neutral-600 mb-1">Input Type</Label>
+                      <Select 
+                        value={selectedElement.numberVariant || 'number'}
+                        onValueChange={(value) => handleUpdate('numberVariant', value)}
+                      >
+                        <SelectTrigger className="text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="number">Number (Default)</SelectItem>
+                          <SelectItem value="phone">Phone Number</SelectItem>
+                          <SelectItem value="country-phone">International Phone</SelectItem>
+                          <SelectItem value="currency">Currency ($)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {selectedElement.numberVariant === 'number' && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs font-medium text-neutral-600 mb-1">Min Value</Label>
+                          <Input
+                            type="number"
+                            value={selectedElement.validation?.min || ''}
+                            onChange={(e) => handleValidationUpdate('min', parseInt(e.target.value) || undefined)}
+                            className="text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs font-medium text-neutral-600 mb-1">Max Value</Label>
+                          <Input
+                            type="number"
+                            value={selectedElement.validation?.max || ''}
+                            onChange={(e) => handleValidationUpdate('max', parseInt(e.target.value) || undefined)}
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {selectedElement.type === 'rate-scale' && (
+                  <>
+                    <div>
+                      <Label className="text-xs font-medium text-neutral-600 mb-1">Display Style</Label>
+                      <Select 
+                        value={selectedElement.rateVariant || 'numbers'}
+                        onValueChange={(value) => handleUpdate('rateVariant', value)}
+                      >
+                        <SelectTrigger className="text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="numbers">Numbers (1, 2, 3...)</SelectItem>
+                          <SelectItem value="stars">Stars (⭐⭐⭐...)</SelectItem>
+                          <SelectItem value="faces">Happy Faces (😢😐😊...)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <Label className="text-xs font-medium text-neutral-600 mb-1">Min Value</Label>
+                        <Label className="text-xs font-medium text-neutral-600 mb-1">Min Rating</Label>
                         <Input
                           type="number"
-                          value={selectedElement.validation?.min || ''}
-                          onChange={(e) => handleValidationUpdate('min', parseInt(e.target.value) || undefined)}
+                          value={selectedElement.validation?.min || 1}
+                          onChange={(e) => handleRateScaleValidationUpdate('min', parseInt(e.target.value) || 1)}
                           className="text-sm"
+                          min="1"
+                          max="10"
                         />
                       </div>
                       <div>
-                        <Label className="text-xs font-medium text-neutral-600 mb-1">Max Value</Label>
+                        <Label className="text-xs font-medium text-neutral-600 mb-1">Max Rating</Label>
                         <Input
                           type="number"
-                          value={selectedElement.validation?.max || ''}
-                          onChange={(e) => handleValidationUpdate('max', parseInt(e.target.value) || undefined)}
+                          value={selectedElement.validation?.max || 10}
+                          onChange={(e) => handleRateScaleValidationUpdate('max', parseInt(e.target.value) || 10)}
                           className="text-sm"
+                          min="1"
+                          max="10"
                         />
                       </div>
                     </div>
-                  )}
-                </>
-              )}
+                  </>
+                )}
 
-              {selectedElement.type === 'rate-scale' && (
-                <>
+                {selectedElement.type === 'boolean-switch' && (
                   <div>
                     <Label className="text-xs font-medium text-neutral-600 mb-1">Display Style</Label>
                     <Select 
-                      value={selectedElement.rateVariant || 'numbers'}
-                      onValueChange={(value) => handleUpdate('rateVariant', value)}
+                      value={selectedElement.booleanVariant || 'yes-no'}
+                      onValueChange={(value) => handleUpdate('booleanVariant', value)}
                     >
                       <SelectTrigger className="text-sm">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="numbers">Numbers (1, 2, 3...)</SelectItem>
-                        <SelectItem value="stars">Stars (⭐⭐⭐...)</SelectItem>
-                        <SelectItem value="faces">Happy Faces (😢😐😊...)</SelectItem>
+                        <SelectItem value="yes-no">Yes / No</SelectItem>
+                        <SelectItem value="true-false">True / False</SelectItem>
+                        <SelectItem value="on-off">On / Off</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-xs font-medium text-neutral-600 mb-1">Min Rating</Label>
-                      <Input
-                        type="number"
-                        value={selectedElement.validation?.min || 1}
-                        onChange={(e) => handleValidationUpdate('min', parseInt(e.target.value) || 1)}
-                        className="text-sm"
-                        min="1"
-                        max="10"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs font-medium text-neutral-600 mb-1">Max Rating</Label>
-                      <Input
-                        type="number"
-                        value={selectedElement.validation?.max || 10}
-                        onChange={(e) => handleValidationUpdate('max', parseInt(e.target.value) || 10)}
-                        className="text-sm"
-                        min="1"
-                        max="10"
-                      />
-                    </div>
+                )}
+
+                {selectedElement.type === 'datetime-picker' && (
+                  <div>
+                    <Label className="text-xs font-medium text-neutral-600 mb-1">Input Type</Label>
+                    <Listbox 
+                      value={selectedElement.dateTimeVariant || 'date-only'}
+                      onChange={(value) => {
+                        console.log('DateTime variant changing to:', value);
+                        handleUpdate('dateTimeVariant', value);
+                      }}
+                    >
+                      <div className="relative">
+                        <Listbox.Button className="relative w-full cursor-default rounded-lg bg-white py-2 pl-3 pr-10 text-left shadow-sm border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+                          <span className="block truncate">
+                            {selectedElement.dateTimeVariant === 'date-only' || !selectedElement.dateTimeVariant ? '📅 Date Only' :
+                             selectedElement.dateTimeVariant === 'time-only' ? '🕐 Time Only' :
+                             '📅🕐 Date & Time'}
+                          </span>
+                          <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                            <ChevronUpDownIcon
+                              className="h-4 w-4 text-gray-400"
+                              aria-hidden="true"
+                            />
+                          </span>
+                        </Listbox.Button>
+                        <Transition
+                          as={Fragment}
+                          leave="transition ease-in duration-100"
+                          leaveFrom="opacity-100"
+                          leaveTo="opacity-0"
+                        >
+                          <Listbox.Options className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                            <Listbox.Option
+                              value="date-only"
+                              className={({ active }) =>
+                                `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                                  active ? 'bg-blue-100 text-blue-900' : 'text-gray-900'
+                                }`
+                              }
+                            >
+                              {({ selected }) => (
+                                <>
+                                  <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
+                                    📅 Date Only
+                                  </span>
+                                  {selected ? (
+                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-blue-600">
+                                      <CheckIcon className="h-4 w-4" aria-hidden="true" />
+                                    </span>
+                                  ) : null}
+                                </>
+                              )}
+                            </Listbox.Option>
+                            <Listbox.Option
+                              value="time-only"
+                              className={({ active }) =>
+                                `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                                  active ? 'bg-blue-100 text-blue-900' : 'text-gray-900'
+                                }`
+                              }
+                            >
+                              {({ selected }) => (
+                                <>
+                                  <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
+                                    🕐 Time Only
+                                  </span>
+                                  {selected ? (
+                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-blue-600">
+                                      <CheckIcon className="h-4 w-4" aria-hidden="true" />
+                                    </span>
+                                  ) : null}
+                                </>
+                              )}
+                            </Listbox.Option>
+                            <Listbox.Option
+                              value="datetime"
+                              className={({ active }) =>
+                                `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                                  active ? 'bg-blue-100 text-blue-900' : 'text-gray-900'
+                                }`
+                              }
+                            >
+                              {({ selected }) => (
+                                <>
+                                  <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
+                                    📅🕐 Date & Time
+                                  </span>
+                                  {selected ? (
+                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-blue-600">
+                                      <CheckIcon className="h-4 w-4" aria-hidden="true" />
+                                    </span>
+                                  ) : null}
+                                </>
+                              )}
+                            </Listbox.Option>
+                          </Listbox.Options>
+                        </Transition>
+                      </div>
+                    </Listbox>
+                    <p className="text-xs text-neutral-500 mt-1">
+                      {(selectedElement.dateTimeVariant === 'date-only' || !selectedElement.dateTimeVariant) && 'Users will select a date only'}
+                      {selectedElement.dateTimeVariant === 'time-only' && 'Users will select a time only'}
+                      {selectedElement.dateTimeVariant === 'datetime' && 'Users will select both date and time'}
+                    </p>
                   </div>
-                </>
-              )}
-
-              {selectedElement.type === 'boolean-switch' && (
-                <div>
-                  <Label className="text-xs font-medium text-neutral-600 mb-1">Display Style</Label>
-                  <Select 
-                    value={selectedElement.booleanVariant || 'yes-no'}
-                    onValueChange={(value) => handleUpdate('booleanVariant', value)}
-                  >
-                    <SelectTrigger className="text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="yes-no">Yes / No</SelectItem>
-                      <SelectItem value="true-false">True / False</SelectItem>
-                      <SelectItem value="on-off">On / Off</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {selectedElement.type === 'datetime-picker' && (
-                <div>
-                  <Label className="text-xs font-medium text-neutral-600 mb-1">Input Type</Label>
-                  <Listbox 
-                    value={selectedElement.dateTimeVariant || 'date-only'}
-                    onChange={(value) => {
-                      console.log('DateTime variant changing to:', value);
-                      handleUpdate('dateTimeVariant', value);
-                    }}
-                  >
-                    <div className="relative">
-                      <Listbox.Button className="relative w-full cursor-default rounded-lg bg-white py-2 pl-3 pr-10 text-left shadow-sm border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
-                        <span className="block truncate">
-                          {selectedElement.dateTimeVariant === 'date-only' || !selectedElement.dateTimeVariant ? '📅 Date Only' :
-                           selectedElement.dateTimeVariant === 'time-only' ? '🕐 Time Only' :
-                           '📅🕐 Date & Time'}
-                        </span>
-                        <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                          <ChevronUpDownIcon
-                            className="h-4 w-4 text-gray-400"
-                            aria-hidden="true"
-                          />
-                        </span>
-                      </Listbox.Button>
-                      <Transition
-                        as={Fragment}
-                        leave="transition ease-in duration-100"
-                        leaveFrom="opacity-100"
-                        leaveTo="opacity-0"
-                      >
-                        <Listbox.Options className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                          <Listbox.Option
-                            value="date-only"
-                            className={({ active }) =>
-                              `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                                active ? 'bg-blue-100 text-blue-900' : 'text-gray-900'
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <>
-                                <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
-                                  📅 Date Only
-                                </span>
-                                {selected ? (
-                                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-blue-600">
-                                    <CheckIcon className="h-4 w-4" aria-hidden="true" />
-                                  </span>
-                                ) : null}
-                              </>
-                            )}
-                          </Listbox.Option>
-                          <Listbox.Option
-                            value="time-only"
-                            className={({ active }) =>
-                              `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                                active ? 'bg-blue-100 text-blue-900' : 'text-gray-900'
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <>
-                                <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
-                                  🕐 Time Only
-                                </span>
-                                {selected ? (
-                                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-blue-600">
-                                    <CheckIcon className="h-4 w-4" aria-hidden="true" />
-                                  </span>
-                                ) : null}
-                              </>
-                            )}
-                          </Listbox.Option>
-                          <Listbox.Option
-                            value="datetime"
-                            className={({ active }) =>
-                              `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                                active ? 'bg-blue-100 text-blue-900' : 'text-gray-900'
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <>
-                                <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
-                                  📅🕐 Date & Time
-                                </span>
-                                {selected ? (
-                                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-blue-600">
-                                    <CheckIcon className="h-4 w-4" aria-hidden="true" />
-                                  </span>
-                                ) : null}
-                              </>
-                            )}
-                          </Listbox.Option>
-                        </Listbox.Options>
-                      </Transition>
-                    </div>
-                  </Listbox>
-                  <p className="text-xs text-neutral-500 mt-1">
-                    {(selectedElement.dateTimeVariant === 'date-only' || !selectedElement.dateTimeVariant) && 'Users will select a date only'}
-                    {selectedElement.dateTimeVariant === 'time-only' && 'Users will select a time only'}
-                    {selectedElement.dateTimeVariant === 'datetime' && 'Users will select both date and time'}
-                  </p>
-                </div>
-              )}
-            </div>
-        </div>
+                )}
+              </div>
+          </div>
+        )}
 
         
 
         {/* Advanced Settings */}
-        <div className="mb-8">
-          <h3 className="text-sm font-medium text-neutral-700 mb-4">Advanced</h3>
-          <div className="space-y-3">
-            <label className="flex items-center">
-              <Checkbox
-                checked={selectedElement.disabled || false}
-                onCheckedChange={(checked) => handleUpdate('disabled', checked)}
-              />
-              <span className="ml-2 text-sm text-neutral-700">Disabled</span>
-            </label>
-            
-            <label className="flex items-center">
-              <Checkbox
-                checked={selectedElement.readonly || false}
-                onCheckedChange={(checked) => handleUpdate('readonly', checked)}
-              />
-              <span className="ml-2 text-sm text-neutral-700">Read only</span>
-            </label>
+        {selectedElement.type !== 'image' && (
+          <div className="mb-8">
+            <h3 className="text-sm font-medium text-neutral-700 mb-4">Advanced</h3>
+            <div className="space-y-3">
+              <label className="flex items-center">
+                <Checkbox
+                  checked={selectedElement.disabled || false}
+                  onCheckedChange={(checked) => handleUpdate('disabled', checked)}
+                />
+                <span className="ml-2 text-sm text-neutral-700">Disabled</span>
+              </label>
+              
+              <label className="flex items-center">
+                <Checkbox
+                  checked={selectedElement.readonly || false}
+                  onCheckedChange={(checked) => handleUpdate('readonly', checked)}
+                />
+                <span className="ml-2 text-sm text-neutral-700">Read only</span>
+              </label>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Actions */}
         <div className="pt-6 border-t border-neutral-200">
