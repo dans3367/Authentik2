@@ -193,6 +193,38 @@ export function ThemedFormRenderer({ element, themeStyles, onChange, onReset }: 
           <div className="h-[35px]" />
         );
 
+      case 'label':
+        const labelSizeClasses = {
+          'h1': 'text-3xl font-bold',
+          'h2': 'text-2xl font-bold',
+          'h3': 'text-xl font-semibold',
+          'h4': 'text-lg font-semibold',
+          'body': 'text-base',
+          'small': 'text-sm',
+        };
+        const sizeClass = labelSizeClasses[(element as FormElement).labelSize || 'body'];
+        const textColor = (element as FormElement).labelTextColor || 'inherit';
+        const subtextColor = (element as FormElement).labelSubtextColor || 'inherit';
+        
+        return (
+          <div className="w-full">
+            <div 
+              className={sizeClass}
+              style={{ color: textColor }}
+            >
+              {translatedLabel}
+            </div>
+            {(element as FormElement).labelSubtext && (
+              <div 
+                className="mt-1 text-sm"
+                style={{ color: subtextColor }}
+              >
+                {(element as FormElement).labelSubtext}
+              </div>
+            )}
+          </div>
+        );
+
       case 'submit-button':
         return (
           <button
@@ -280,7 +312,7 @@ export function ThemedFormRenderer({ element, themeStyles, onChange, onReset }: 
   };
 
   // Handle special types separately since they don't need labels
-  if (element.type === 'submit-button' || element.type === 'reset-button' || element.type === 'spacer') {
+  if (element.type === 'submit-button' || element.type === 'reset-button' || element.type === 'spacer' || element.type === 'label') {
     return renderFormControl();
   }
 

@@ -268,6 +268,38 @@ export function FormElementRenderer({
           />
         );
 
+      case "label":
+        const labelSizeClasses = {
+          'h1': 'text-3xl font-bold',
+          'h2': 'text-2xl font-bold',
+          'h3': 'text-xl font-semibold',
+          'h4': 'text-lg font-semibold',
+          'body': 'text-base',
+          'small': 'text-sm',
+        };
+        const sizeClass = labelSizeClasses[element.labelSize || 'body'];
+        const textColor = element.labelTextColor || 'inherit';
+        const subtextColor = element.labelSubtextColor || 'inherit';
+        
+        return (
+          <div className="w-full">
+            <div 
+              className={sizeClass}
+              style={{ color: textColor }}
+            >
+              {translatedLabel}
+            </div>
+            {element.labelSubtext && (
+              <div 
+                className="mt-1 text-sm"
+                style={{ color: subtextColor }}
+              >
+                {element.labelSubtext}
+              </div>
+            )}
+          </div>
+        );
+
       default:
         return <div>Unknown element type</div>;
     }
@@ -386,14 +418,16 @@ export function FormElementRenderer({
 
         {/* Content - no margin needed since buttons are outside */}
         <div>
-          <Label className="block text-sm font-medium text-neutral-700 mb-2">
-            {translatedLabel}
-            {element.required && <span className="text-red-500 ml-1">*</span>}
-          </Label>
+          {element.type !== 'label' && (
+            <Label className="block text-sm font-medium text-neutral-700 mb-2">
+              {translatedLabel}
+              {element.required && <span className="text-red-500 ml-1">*</span>}
+            </Label>
+          )}
 
           {renderFormControl()}
 
-          {element.helpText && (
+          {element.type !== 'label' && element.helpText && (
             <div className="text-xs text-neutral-500 mt-1">
               {element.helpText}
             </div>

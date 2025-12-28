@@ -187,6 +187,107 @@ export function PropertiesPanel({
             </div>
           </div>
 
+          {/* Label/Text-specific properties */}
+          {selectedElement.type === 'label' && (
+            <>
+              <div>
+                <Label htmlFor="labelSize" className="text-sm font-medium text-neutral-700 mb-2">
+                  Text Size
+                </Label>
+                <Select 
+                  value={selectedElement.labelSize || 'body'}
+                  onValueChange={(value) => handleUpdate('labelSize', value)}
+                >
+                  <SelectTrigger className="text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="h1">Heading 1 (Largest)</SelectItem>
+                    <SelectItem value="h2">Heading 2</SelectItem>
+                    <SelectItem value="h3">Heading 3</SelectItem>
+                    <SelectItem value="h4">Heading 4</SelectItem>
+                    <SelectItem value="body">Body Text</SelectItem>
+                    <SelectItem value="small">Small Text</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="labelSubtext" className="text-sm font-medium text-neutral-700 mb-2">
+                  Subtext
+                </Label>
+                <Textarea
+                  id="labelSubtext"
+                  value={selectedElement.labelSubtext || ''}
+                  onChange={(e) => handleUpdate('labelSubtext', e.target.value)}
+                  placeholder="Optional subtext below the main text..."
+                  className="focus:ring-2 focus:ring-blue-500"
+                  rows={2}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="labelTextColor" className="text-sm font-medium text-neutral-700 mb-2">
+                  Text Color
+                </Label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    id="labelTextColor"
+                    type="color"
+                    value={selectedElement.labelTextColor || '#000000'}
+                    onChange={(e) => handleUpdate('labelTextColor', e.target.value)}
+                    className="w-12 h-10 p-1 cursor-pointer"
+                  />
+                  <Input
+                    type="text"
+                    value={selectedElement.labelTextColor || '#000000'}
+                    onChange={(e) => handleUpdate('labelTextColor', e.target.value)}
+                    placeholder="#000000"
+                    className="flex-1 focus:ring-2 focus:ring-blue-500"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleUpdate('labelTextColor', undefined)}
+                    className="text-xs"
+                  >
+                    Reset
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="labelSubtextColor" className="text-sm font-medium text-neutral-700 mb-2">
+                  Subtext Color
+                </Label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    id="labelSubtextColor"
+                    type="color"
+                    value={selectedElement.labelSubtextColor || '#6b7280'}
+                    onChange={(e) => handleUpdate('labelSubtextColor', e.target.value)}
+                    className="w-12 h-10 p-1 cursor-pointer"
+                  />
+                  <Input
+                    type="text"
+                    value={selectedElement.labelSubtextColor || '#6b7280'}
+                    onChange={(e) => handleUpdate('labelSubtextColor', e.target.value)}
+                    placeholder="#6b7280"
+                    className="flex-1 focus:ring-2 focus:ring-blue-500"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleUpdate('labelSubtextColor', undefined)}
+                    className="text-xs"
+                  >
+                    Reset
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+
           {/* Image-specific properties */}
           {selectedElement.type === 'image' && (
             <>
@@ -269,7 +370,7 @@ export function PropertiesPanel({
         )}
 
         {/* Validation Rules */}
-        {selectedElement.type !== 'image' && (
+        {selectedElement.type !== 'image' && selectedElement.type !== 'label' && (
           <div className="mb-8">
               <h3 className="text-sm font-medium text-neutral-700 mb-4">Validation Rules</h3>
               <div className="space-y-3">
@@ -524,7 +625,7 @@ export function PropertiesPanel({
         
 
         {/* Advanced Settings */}
-        {selectedElement.type !== 'image' && (
+        {selectedElement.type !== 'image' && selectedElement.type !== 'label' && (
           <div className="mb-8">
             <h3 className="text-sm font-medium text-neutral-700 mb-4">Advanced</h3>
             <div className="space-y-3">

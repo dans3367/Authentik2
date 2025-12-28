@@ -18,6 +18,11 @@ export interface FormElement {
   booleanVariant?: 'yes-no' | 'true-false' | 'on-off'; // for boolean-switch components
   dateTimeVariant?: 'date-only' | 'time-only' | 'datetime'; // for datetime-picker components
   numberVariant?: 'number' | 'phone' | 'country-phone' | 'currency'; // for number-input components
+  // Label/text display component properties
+  labelSize?: 'h1' | 'h2' | 'h3' | 'h4' | 'body' | 'small'; // for label components
+  labelSubtext?: string; // subtext displayed below the main label text
+  labelTextColor?: string; // custom text color for label
+  labelSubtextColor?: string; // custom color for subtext
 }
 
 export interface ValidationRules {
@@ -52,7 +57,8 @@ export type FormElementType =
   | 'rate-scale'
   | 'boolean-switch'
   | 'datetime-picker'
-  | 'full-name';
+  | 'full-name'
+  | 'label';
 
 export interface ComponentPaletteItem {
   type: FormElementType;

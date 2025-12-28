@@ -45,6 +45,8 @@ export function useFormBuilder(initialTitle?: string, initialElements?: FormElem
       booleanVariant: type === 'boolean-switch' ? 'yes-no' : undefined,
       dateTimeVariant: type === 'datetime-picker' ? 'date-only' : undefined,
       numberVariant: type === 'number-input' ? 'number' : undefined,
+      labelSize: type === 'label' ? 'body' : undefined,
+      labelSubtext: type === 'label' ? '' : undefined,
     };
 
     setState(prev => {
@@ -178,6 +180,7 @@ export function useFormBuilder(initialTitle?: string, initialElements?: FormElem
       ...(type === 'rate-scale' && { rateVariant: 'numbers' }),
       ...(type === 'boolean-switch' && { booleanVariant: 'yes-no' }),
       ...(type === 'datetime-picker' && { dateTimeVariant: 'date-only' }),
+      ...(type === 'label' && { labelSize: 'body', labelSubtext: '', labelTextColor: undefined, labelSubtextColor: undefined }),
     };
 
     if (index !== undefined && index >= 0 && index <= state.elements.length) {
@@ -229,7 +232,7 @@ export function useFormBuilder(initialTitle?: string, initialElements?: FormElem
 }
 
 function getDefaultLabel(type: FormElementType): string {
-  const labels = {
+  const labels: Record<FormElementType, string> = {
     'text-input': 'Text Field',
     'email-input': 'Email Address',
     'number-input': 'Number',
@@ -242,12 +245,13 @@ function getDefaultLabel(type: FormElementType): string {
     'boolean-switch': 'Yes or No?',
     'datetime-picker': 'Select Date',
     'full-name': 'Full Name',
-  } as const;
+    'label': 'Section Title',
+  };
   return labels[type];
 }
 
 function getDefaultPlaceholder(type: FormElementType): string {
-  const placeholders = {
+  const placeholders: Record<FormElementType, string> = {
     'text-input': 'Enter text...',
     'email-input': 'you@example.com',
     'number-input': 'Enter number...',
@@ -260,7 +264,8 @@ function getDefaultPlaceholder(type: FormElementType): string {
     'boolean-switch': '',
     'datetime-picker': 'Select date...',
     'full-name': 'Enter your full name',
-  } as const;
+    'label': '',
+  };
   return placeholders[type];
 }
 
