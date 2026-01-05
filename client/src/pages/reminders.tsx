@@ -89,7 +89,8 @@ interface AppointmentReminder {
   id: string;
   appointmentId: string;
   reminderType: 'email' | 'sms' | 'push';
-  reminderTiming: '24h' | '1h' | '30m' | 'custom';
+  reminderTiming: '5m' | '30m' | '1h' | '5h' | '10h' | 'custom';
+  customMinutesBefore?: number;
   scheduledFor: Date;
   sentAt?: Date;
   status: 'pending' | 'sent' | 'failed' | 'cancelled';
@@ -112,6 +113,8 @@ export default function RemindersPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedAppointments, setSelectedAppointments] = useState<string[]>([]);
   const [newAppointmentModalOpen, setNewAppointmentModalOpen] = useState(false);
+  const [editAppointmentModalOpen, setEditAppointmentModalOpen] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [newAppointmentData, setNewAppointmentData] = useState({
     customerId: "",
     title: "",
@@ -125,11 +128,12 @@ export default function RemindersPage() {
 
   // Create scheduled reminder mutation
   const createScheduledReminderMutation = useMutation({
-    mutationFn: async ({ appointmentId, data }: { appointmentId: string; data: { reminderType: 'email' | 'sms' | 'push'; reminderTiming: '24h' | '1h' | '30m' | 'custom'; scheduledFor: Date; content?: string } }) => {
+    mutationFn: async ({ appointmentId, data }: { appointmentId: string; data: { reminderType: 'email' | 'sms' | 'push'; reminderTiming: '5m' | '30m' | '1h' | '5h' | '10h' | 'custom'; customMinutesBefore?: number; scheduledFor: Date; content?: string } }) => {
       const response = await apiRequest('POST', '/api/appointment-reminders', {
         appointmentId,
         reminderType: data.reminderType,
         reminderTiming: data.reminderTiming,
+        customMinutesBefore: data.customMinutesBefore,
         scheduledFor: data.scheduledFor,
         content: data.content,
       });
@@ -151,15 +155,20 @@ export default function RemindersPage() {
   const [scheduleAppointmentId, setScheduleAppointmentId] = useState<string>("");
   const [scheduleData, setScheduleData] = useState<{
     reminderType: 'email' | 'sms' | 'push';
-    reminderTiming: '24h' | '1h' | '30m' | 'custom';
+    reminderTiming: '5m' | '30m' | '1h' | '5h' | '10h' | 'custom';
+    customMinutesBefore?: number;
     scheduledFor: Date;
     content: string;
   }>({
     reminderType: 'email',
-    reminderTiming: '24h',
+    reminderTiming: '1h',
     scheduledFor: new Date(),
     content: ''
   });
+
+  // Cancel appointment confirmation state
+  const [cancelAppointmentId, setCancelAppointmentId] = useState<string>("");
+  const [cancelConfirmModalOpen, setCancelConfirmModalOpen] = useState(false);
 
   // Fetch appointments
   const { 
@@ -207,6 +216,30 @@ export default function RemindersPage() {
   const appointments: Appointment[] = appointmentsData?.appointments || [];
   const customers: Customer[] = customersData?.contacts || [];
   const reminders: AppointmentReminder[] = remindersData?.reminders || [];
+
+  // Update appointment mutation
+  const updateAppointmentMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Appointment> }) => {
+      const response = await apiRequest('PATCH', `/api/appointments/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: t('reminders.toasts.success'),
+        description: t('reminders.toasts.appointmentUpdated'),
+      });
+      refetchAppointments();
+      setEditAppointmentModalOpen(false);
+      setEditingAppointment(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: t('reminders.toasts.error'),
+        description: error?.message || t('reminders.toasts.appointmentUpdateError'),
+        variant: "destructive",
+      });
+    },
+  });
 
   // Create appointment mutation
   const createAppointmentMutation = useMutation({
@@ -259,6 +292,30 @@ export default function RemindersPage() {
     },
   });
 
+  // Cancel appointment mutation
+  const cancelAppointmentMutation = useMutation({
+    mutationFn: async (appointmentId: string) => {
+      const response = await apiRequest('DELETE', `/api/appointments/${appointmentId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: t('reminders.toasts.success'),
+        description: t('reminders.toasts.appointmentCancelled'),
+      });
+      refetchAppointments();
+      refetchReminders();
+      setSelectedAppointments(prev => prev.filter(id => id !== cancelAppointmentId));
+    },
+    onError: (error: any) => {
+      toast({
+        title: t('reminders.toasts.error'),
+        description: error?.message || t('reminders.toasts.appointmentCancelError'),
+        variant: "destructive",
+      });
+    },
+  });
+
   const resetNewAppointmentData = () => {
     setNewAppointmentData({
       customerId: "",
@@ -275,25 +332,57 @@ export default function RemindersPage() {
   const openScheduleReminder = (appointmentId: string) => {
     const apt = appointments.find(a => a.id === appointmentId);
     const baseDate = apt ? new Date(apt.appointmentDate) : new Date();
-    const defaultScheduled = new Date(baseDate.getTime() - 24 * 60 * 60 * 1000); // default 24h before
+    const defaultScheduled = new Date(baseDate.getTime() - 1 * 60 * 60 * 1000); // default 1h before
     setScheduleAppointmentId(appointmentId);
-    setScheduleData({ reminderType: 'email', reminderTiming: '24h', scheduledFor: defaultScheduled, content: '' });
+    setScheduleData({ reminderType: 'email', reminderTiming: '1h', scheduledFor: defaultScheduled, content: '' });
     setScheduleReminderModalOpen(true);
   };
 
-  const computeScheduledFor = (timing: '24h' | '1h' | '30m' | 'custom'): Date => {
+  const computeScheduledFor = (timing: '5m' | '30m' | '1h' | '5h' | '10h' | 'custom', customMinutesBefore?: number): Date => {
     const apt = appointments.find(a => a.id === scheduleAppointmentId);
     const baseDate = apt ? new Date(apt.appointmentDate) : new Date();
     switch (timing) {
-      case '24h':
-        return new Date(baseDate.getTime() - 24 * 60 * 60 * 1000);
-      case '1h':
-        return new Date(baseDate.getTime() - 1 * 60 * 60 * 1000);
+      case '5m':
+        return new Date(baseDate.getTime() - 5 * 60 * 1000);
       case '30m':
         return new Date(baseDate.getTime() - 30 * 60 * 1000);
+      case '1h':
+        return new Date(baseDate.getTime() - 1 * 60 * 60 * 1000);
+      case '5h':
+        return new Date(baseDate.getTime() - 5 * 60 * 60 * 1000);
+      case '10h':
+        return new Date(baseDate.getTime() - 10 * 60 * 60 * 1000);
+      case 'custom':
+        if (customMinutesBefore) {
+          return new Date(baseDate.getTime() - customMinutesBefore * 60 * 1000);
+        }
+        return new Date(baseDate.getTime() - 1 * 60 * 60 * 1000); // Default to 1h for custom if no minutes specified
       default:
-        return new Date();
+        return new Date(baseDate.getTime() - 1 * 60 * 60 * 1000); // Default to 1h
     }
+  };
+
+  const handleEditAppointment = (appointment: Appointment) => {
+    setEditingAppointment(appointment);
+    setEditAppointmentModalOpen(true);
+  };
+
+  const handleUpdateAppointment = () => {
+    if (!editingAppointment) return;
+    
+    updateAppointmentMutation.mutate({
+      id: editingAppointment.id,
+      data: {
+        title: editingAppointment.title,
+        description: editingAppointment.description,
+        appointmentDate: editingAppointment.appointmentDate,
+        duration: editingAppointment.duration,
+        location: editingAppointment.location,
+        serviceType: editingAppointment.serviceType,
+        status: editingAppointment.status,
+        notes: editingAppointment.notes,
+      },
+    });
   };
 
   const handleCreateAppointment = () => {
@@ -320,6 +409,19 @@ export default function RemindersPage() {
     }
 
     sendReminderMutation.mutate({ appointmentIds: selectedAppointments });
+  };
+
+  const handleCancelAppointment = (appointmentId: string) => {
+    setCancelAppointmentId(appointmentId);
+    setCancelConfirmModalOpen(true);
+  };
+
+  const confirmCancelAppointment = () => {
+    if (!cancelAppointmentId) return;
+    
+    cancelAppointmentMutation.mutate(cancelAppointmentId);
+    setCancelConfirmModalOpen(false);
+    setCancelAppointmentId("");
   };
 
   const handleSelectAll = (checked: boolean) => {
@@ -776,7 +878,7 @@ export default function RemindersPage() {
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1">
-                                  <Button variant="ghost" size="sm">
+                                  <Button variant="ghost" size="sm" onClick={() => handleEditAppointment(appointment)}>
                                     <Edit className="h-4 w-4" />
                                   </Button>
                                   <Button variant="ghost" size="sm">
@@ -798,7 +900,7 @@ export default function RemindersPage() {
                                         {t('reminders.actions.scheduleReminder')}
                                       </DropdownMenuItem>
                                       <DropdownMenuSeparator />
-                                      <DropdownMenuItem className="text-red-600">
+                                      <DropdownMenuItem className="text-red-600" onClick={() => handleCancelAppointment(appointment.id)}>
                                         <Trash2 className="h-4 w-4 mr-2" />
                                         {t('reminders.actions.cancelAppointment')}
                                       </DropdownMenuItem>
@@ -915,29 +1017,51 @@ export default function RemindersPage() {
                 <Select
                   value={scheduleData.reminderTiming}
                   onValueChange={(v) => {
-                    const timing = v as '24h' | '1h' | '30m' | 'custom';
-                    setScheduleData(prev => ({ ...prev, reminderTiming: timing, scheduledFor: timing === 'custom' ? prev.scheduledFor : computeScheduledFor(timing) }));
+                    const timing = v as '5m' | '30m' | '1h' | '5h' | '10h' | 'custom';
+                    setScheduleData(prev => ({ 
+                      ...prev, 
+                      reminderTiming: timing, 
+                      customMinutesBefore: timing === 'custom' ? prev.customMinutesBefore : undefined,
+                      scheduledFor: timing === 'custom' ? prev.scheduledFor : computeScheduledFor(timing) 
+                    }));
                   }}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="24h">{t('reminders.scheduleReminder.24hBefore')}</SelectItem>
-                    <SelectItem value="1h">{t('reminders.scheduleReminder.1hBefore')}</SelectItem>
+                    <SelectItem value="5m">{t('reminders.scheduleReminder.5mBefore')}</SelectItem>
                     <SelectItem value="30m">{t('reminders.scheduleReminder.30mBefore')}</SelectItem>
-                    <SelectItem value="custom">{t('reminders.scheduleReminder.customDateTime')}</SelectItem>
+                    <SelectItem value="1h">{t('reminders.scheduleReminder.1hBefore')}</SelectItem>
+                    <SelectItem value="5h">{t('reminders.scheduleReminder.5hBefore')}</SelectItem>
+                    <SelectItem value="10h">{t('reminders.scheduleReminder.10hBefore')}</SelectItem>
+                    <SelectItem value="custom">{t('reminders.scheduleReminder.customTime')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               {scheduleData.reminderTiming === 'custom' && (
                 <div>
-                  <Label>{t('reminders.scheduleReminder.customDateTimeLabel')}</Label>
+                  <Label>{t('reminders.scheduleReminder.customMinutesLabel')}</Label>
                   <Input
-                    type="datetime-local"
-                    value={new Date(scheduleData.scheduledFor).toISOString().slice(0, 16)}
-                    onChange={(e) => setScheduleData(prev => ({ ...prev, scheduledFor: new Date(e.target.value) }))}
+                    type="number"
+                    min="1"
+                    max="10080"
+                    placeholder={t('reminders.scheduleReminder.customMinutesPlaceholder')}
+                    value={scheduleData.customMinutesBefore || ''}
+                    onChange={(e) => {
+                      const minutes = parseInt(e.target.value);
+                      if (!isNaN(minutes) && minutes > 0 && minutes <= 10080) {
+                        setScheduleData(prev => ({ 
+                          ...prev, 
+                          customMinutesBefore: minutes,
+                          scheduledFor: computeScheduledFor('custom', minutes)
+                        }));
+                      }
+                    }}
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {t('reminders.scheduleReminder.customMinutesHelp')}
+                  </p>
                 </div>
               )}
               <div>
@@ -955,6 +1079,138 @@ export default function RemindersPage() {
                   disabled={createScheduledReminderMutation.isPending || !scheduleAppointmentId}
                 >
                   {createScheduledReminderMutation.isPending ? t('reminders.scheduleReminder.scheduling') : t('reminders.scheduleReminder.schedule')}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Appointment Modal */}
+        <Dialog open={editAppointmentModalOpen} onOpenChange={setEditAppointmentModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{t('reminders.appointments.editAppointment')}</DialogTitle>
+              <DialogDescription>
+                {t('reminders.appointments.editDescription')}
+              </DialogDescription>
+            </DialogHeader>
+            {editingAppointment && (
+              <div className="space-y-4">
+                <div>
+                  <Label>{t('reminders.appointments.title')}</Label>
+                  <Input 
+                    value={editingAppointment.title}
+                    onChange={(e) => setEditingAppointment(prev => prev ? {...prev, title: e.target.value} : null)}
+                    placeholder={t('reminders.appointments.titlePlaceholder')}
+                  />
+                </div>
+
+                <div>
+                  <Label>{t('reminders.appointments.dateTime')}</Label>
+                  <Input 
+                    type="datetime-local"
+                    value={new Date(editingAppointment.appointmentDate).toISOString().slice(0, 16)}
+                    onChange={(e) => setEditingAppointment(prev => prev ? {...prev, appointmentDate: new Date(e.target.value)} : null)}
+                  />
+                </div>
+
+                <div>
+                  <Label>{t('reminders.appointments.duration')}</Label>
+                  <Input 
+                    type="number"
+                    value={editingAppointment.duration}
+                    onChange={(e) => setEditingAppointment(prev => prev ? {...prev, duration: parseInt(e.target.value)} : null)}
+                    min="15"
+                    step="15"
+                  />
+                </div>
+
+                <div>
+                  <Label>{t('reminders.appointments.location')}</Label>
+                  <Input 
+                    value={editingAppointment.location || ''}
+                    onChange={(e) => setEditingAppointment(prev => prev ? {...prev, location: e.target.value} : null)}
+                    placeholder={t('reminders.appointments.locationPlaceholder')}
+                  />
+                </div>
+
+                <div>
+                  <Label>{t('reminders.appointments.status')}</Label>
+                  <Select 
+                    value={editingAppointment.status} 
+                    onValueChange={(value) => setEditingAppointment(prev => prev ? {...prev, status: value as Appointment['status']} : null)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="scheduled">{t('reminders.appointments.scheduled')}</SelectItem>
+                      <SelectItem value="confirmed">{t('reminders.appointments.confirmed')}</SelectItem>
+                      <SelectItem value="cancelled">{t('reminders.appointments.cancelled')}</SelectItem>
+                      <SelectItem value="completed">{t('reminders.appointments.completed')}</SelectItem>
+                      <SelectItem value="no_show">{t('reminders.appointments.noShow')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>{t('reminders.appointments.notes')}</Label>
+                  <Textarea 
+                    value={editingAppointment.notes || ''}
+                    onChange={(e) => setEditingAppointment(prev => prev ? {...prev, notes: e.target.value} : null)}
+                    placeholder={t('reminders.appointments.notesPlaceholder')}
+                    rows={3}
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setEditAppointmentModalOpen(false)}>
+                    {t('reminders.appointments.cancel')}
+                  </Button>
+                  <Button 
+                    onClick={handleUpdateAppointment}
+                    disabled={updateAppointmentMutation.isPending}
+                  >
+                    {updateAppointmentMutation.isPending ? t('reminders.appointments.saving') : t('reminders.appointments.saveChanges')}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Cancel Appointment Confirmation Modal */}
+        <Dialog open={cancelConfirmModalOpen} onOpenChange={setCancelConfirmModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600">
+                <AlertTriangle className="h-5 w-5" />
+                {t('reminders.cancelConfirm.title')}
+              </DialogTitle>
+              <DialogDescription>
+                {t('reminders.cancelConfirm.description')}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                <p className="font-medium">{appointments.find(apt => apt.id === cancelAppointmentId)?.title}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {getCustomerName(appointments.find(apt => apt.id === cancelAppointmentId)?.customer)}
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-500">
+                  {cancelAppointmentId && formatDateTime(appointments.find(apt => apt.id === cancelAppointmentId)?.appointmentDate || new Date())}
+                </p>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setCancelConfirmModalOpen(false)}>
+                  {t('reminders.cancelConfirm.keep')}
+                </Button>
+                <Button 
+                  variant="destructive"
+                  onClick={confirmCancelAppointment}
+                  disabled={cancelAppointmentMutation.isPending}
+                >
+                  {cancelAppointmentMutation.isPending ? t('reminders.cancelConfirm.cancelling') : t('reminders.cancelConfirm.confirmCancel')}
                 </Button>
               </div>
             </div>

@@ -125,7 +125,13 @@
       "noUpcoming": "No hay citas próximas",
       "minutes": "minutos",
       "cancel": "Cancelar",
-      "scheduleDescription": "Programa una nueva cita con un cliente."
+      "scheduleDescription": "Programa una nueva cita con un cliente.",
+      "editAppointment": "Editar Cita",
+      "editDescription": "Edita los detalles de la cita y actualiza la información.",
+      "notes": "Notas",
+      "notesPlaceholder": "Notas adicionales sobre la cita",
+      "saveChanges": "Guardar Cambios",
+      "saving": "Guardando..."
     },
     "overview": {
       "title": "Resumen",
@@ -196,12 +202,23 @@
       "noSelection": "Sin Selección",
       "appointmentCreated": "Cita creada exitosamente",
       "appointmentCreateError": "Error al crear la cita",
+      "appointmentUpdated": "Cita actualizada exitosamente",
+      "appointmentUpdateError": "Error al actualizar la cita",
+      "appointmentCancelled": "Cita cancelada exitosamente",
+      "appointmentCancelError": "Error al cancelar la cita",
       "reminderScheduled": "Recordatorio programado exitosamente",
       "reminderScheduleError": "Error al programar el recordatorio",
       "remindersSent": "Recordatorios enviados para {{count}} cita(s)",
       "remindersSendError": "Error al enviar recordatorios",
       "fillRequired": "Por favor completa todos los campos requeridos",
       "selectAppointments": "Por favor selecciona citas para enviar recordatorios"
+    },
+    "cancelConfirm": {
+      "title": "Cancelar Cita",
+      "description": "¿Estás seguro de que quieres cancelar esta cita? Esta acción no se puede deshacer.",
+      "keep": "Mantener Cita",
+      "confirmCancel": "Cancelar Cita",
+      "cancelling": "Cancelando..."
     },
     "table": {
       "customer": "Cliente",

@@ -2092,7 +2092,8 @@ export const appointmentReminders = pgTable("appointment_reminders", {
   appointmentId: varchar("appointment_id").notNull().references(() => appointments.id, { onDelete: 'cascade' }),
   customerId: varchar("customer_id").notNull().references(() => emailContacts.id, { onDelete: 'cascade' }),
   reminderType: text("reminder_type").notNull(), // 'email', 'sms', 'push'
-  reminderTiming: text("reminder_timing").notNull(), // '24h', '1h', '30m', 'custom'
+  reminderTiming: text("reminder_timing").notNull(), // '5m', '30m', '1h', '5h', '10h', 'custom'
+  customMinutesBefore: integer("custom_minutes_before"), // Custom minutes before appointment when reminder should be sent
   scheduledFor: timestamp("scheduled_for").notNull(),
   sentAt: timestamp("sent_at"),
   status: text("status").notNull().default('pending'), // pending, sent, failed, cancelled
@@ -2190,7 +2191,8 @@ export const updateAppointmentSchema = z.object({
 export const createAppointmentReminderSchema = z.object({
   appointmentId: z.string().uuid(),
   reminderType: z.enum(['email', 'sms', 'push']).default('email'),
-  reminderTiming: z.enum(['24h', '1h', '30m', 'custom']).default('24h'),
+  reminderTiming: z.enum(['5m', '30m', '1h', '5h', '10h', 'custom']).default('1h'),
+  customMinutesBefore: z.number().min(1).max(10080).optional(), // Up to 1 week before
   scheduledFor: z.coerce.date(),
   content: z.string().optional(),
 });

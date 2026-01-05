@@ -54,6 +54,7 @@ router.get('/', async (req: Request, res: Response) => {
         status: appointmentReminders.status,
         content: appointmentReminders.content,
         errorMessage: appointmentReminders.errorMessage,
+        customMinutesBefore: appointmentReminders.customMinutesBefore,
         metadata: appointmentReminders.metadata,
         createdAt: appointmentReminders.createdAt,
         updatedAt: appointmentReminders.updatedAt,
@@ -116,13 +117,24 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     // Create reminder
+    const reminderData: any = {
+      tenantId,
+      customerId: appointment[0].customerId,
+      appointmentId: validatedData.appointmentId,
+      reminderType: validatedData.reminderType,
+      reminderTiming: validatedData.reminderTiming,
+      scheduledFor: validatedData.scheduledFor,
+      content: validatedData.content,
+    };
+
+    // Only add customMinutesBefore if it's provided (to handle cases where migration hasn't been applied yet)
+    if (validatedData.customMinutesBefore !== undefined) {
+      reminderData.customMinutesBefore = validatedData.customMinutesBefore;
+    }
+
     const newReminder = await db
       .insert(appointmentReminders)
-      .values({
-        tenantId,
-        customerId: appointment[0].customerId,
-        ...validatedData,
-      })
+      .values(reminderData)
       .returning();
 
     res.status(201).json({ 
@@ -221,9 +233,32 @@ If you need to reschedule or have any questions, please contact us.
 Best regards,
 Your Team`;
 
-        // Calculate when to send the reminder (24 hours before by default)
+        // Calculate when to send the reminder based on reminder timing
         const appointmentTime = new Date(appointment.appointmentDate);
-        const reminderTime = new Date(appointmentTime.getTime() - (24 * 60 * 60 * 1000)); // 24 hours before
+        let reminderTime: Date;
+        
+        // Default to 1 hour before if no specific timing provided
+        const reminderTiming: '5m' | '30m' | '1h' | '5h' | '10h' = '1h'; // This could be made configurable
+        
+        switch (reminderTiming) {
+          case '5m':
+            reminderTime = new Date(appointmentTime.getTime() - (5 * 60 * 1000));
+            break;
+          case '30m':
+            reminderTime = new Date(appointmentTime.getTime() - (30 * 60 * 1000));
+            break;
+          case '1h':
+            reminderTime = new Date(appointmentTime.getTime() - (1 * 60 * 60 * 1000));
+            break;
+          case '5h':
+            reminderTime = new Date(appointmentTime.getTime() - (5 * 60 * 60 * 1000));
+            break;
+          case '10h':
+            reminderTime = new Date(appointmentTime.getTime() - (10 * 60 * 60 * 1000));
+            break;
+          default:
+            reminderTime = new Date(appointmentTime.getTime() - (1 * 60 * 60 * 1000)); // Default to 1 hour
+        }
 
         // Create reminder record
         const newReminder = await db
@@ -233,7 +268,7 @@ Your Team`;
             appointmentId: appointment.id,
             customerId: appointment.customerId,
             reminderType: reminderType as 'email' | 'sms' | 'push',
-            reminderTiming: '24h',
+            reminderTiming: reminderTiming,
             scheduledFor: reminderTime,
             status: 'sent', // Mark as sent immediately for now
             content,
