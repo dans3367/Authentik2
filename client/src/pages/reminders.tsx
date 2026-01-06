@@ -113,7 +113,9 @@ export default function RemindersPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedAppointments, setSelectedAppointments] = useState<string[]>([]);
   const [newAppointmentModalOpen, setNewAppointmentModalOpen] = useState(false);
+  const [newAppointmentReminderModalOpen, setNewAppointmentReminderModalOpen] = useState(false);
   const [editAppointmentModalOpen, setEditAppointmentModalOpen] = useState(false);
+  const [editAppointmentReminderModalOpen, setEditAppointmentReminderModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [newAppointmentData, setNewAppointmentData] = useState({
     customerId: "",
@@ -162,7 +164,9 @@ export default function RemindersPage() {
   // Delete/cancel reminder mutation
   const deleteReminderMutation = useMutation({
     mutationFn: async (reminderId: string) => {
-      const response = await apiRequest('DELETE', `/api/appointment-reminders/${reminderId}`);
+      const response = await apiRequest('PUT', `/api/appointment-reminders/${reminderId}/status`, {
+        status: 'cancelled',
+      });
       return response.json();
     },
     onSuccess: () => {
@@ -452,21 +456,23 @@ export default function RemindersPage() {
 
   const handleEditAppointment = (appointment: Appointment) => {
     setEditingAppointment(appointment);
-    setEditAppointmentErrors({});
-    
-    // Check if there's an existing reminder for this appointment
+    setEditAppointmentModalOpen(true);
+
+    // Check for existing reminder
     const existingReminder = reminders.find(r => r.appointmentId === appointment.id && r.status === 'pending');
     
     if (existingReminder) {
       setEditAppointmentReminderEnabled(true);
+      setEditAppointmentReminderModalOpen(false);
       setEditAppointmentReminderData({
         reminderType: existingReminder.reminderType,
         reminderTiming: existingReminder.reminderTiming,
-        customMinutesBefore: existingReminder.customMinutesBefore,
+        customMinutesBefore: existingReminder.customMinutesBefore || undefined,
         content: existingReminder.content || '',
       });
     } else {
       setEditAppointmentReminderEnabled(false);
+      setEditAppointmentReminderModalOpen(false);
       setEditAppointmentReminderData({
         reminderType: 'email',
         reminderTiming: '1h',
@@ -474,8 +480,8 @@ export default function RemindersPage() {
         content: '',
       });
     }
-    
-    setEditAppointmentModalOpen(true);
+
+    setEditAppointmentErrors({});
   };
 
   const handleUpdateAppointment = () => {
@@ -919,109 +925,155 @@ export default function RemindersPage() {
                               className="focus-visible:ring-0"
                             />
                           </div>
-
-                          <Separator />
-
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <Label htmlFor="new-reminder-enabled">{t('reminders.scheduleReminder.title')}</Label>
-                              <Switch
-                                id="new-reminder-enabled"
-                                checked={newAppointmentReminderEnabled}
-                                onCheckedChange={setNewAppointmentReminderEnabled}
-                                className="focus-visible:ring-0"
-                              />
-                            </div>
-
-                            {newAppointmentReminderEnabled && (
-                              <div className="space-y-3 pl-4 border-l-2 border-gray-200">
-                                <div>
-                                  <Label>{t('reminders.scheduleReminder.reminderType')}</Label>
-                                  <Select 
-                                    value={newAppointmentReminderData.reminderType} 
-                                    onValueChange={(value: 'email' | 'sms' | 'push') => setNewAppointmentReminderData(prev => ({...prev, reminderType: value}))}
-                                  >
-                                    <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="email">{t('reminders.scheduleReminder.email')}</SelectItem>
-                                      <SelectItem value="sms" disabled>{t('reminders.scheduleReminder.sms')}</SelectItem>
-                                      <SelectItem value="push" disabled>{t('reminders.scheduleReminder.push')}</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-
-                                <div>
-                                  <Label>{t('reminders.scheduleReminder.timing')}</Label>
-                                  <Select 
-                                    value={newAppointmentReminderData.reminderTiming} 
-                                    onValueChange={(value: '5m' | '30m' | '1h' | '5h' | '10h' | 'custom') => setNewAppointmentReminderData(prev => ({...prev, reminderTiming: value}))}
-                                  >
-                                    <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="5m">{t('reminders.scheduleReminder.5mBefore')}</SelectItem>
-                                      <SelectItem value="30m">{t('reminders.scheduleReminder.30mBefore')}</SelectItem>
-                                      <SelectItem value="1h">{t('reminders.scheduleReminder.1hBefore')}</SelectItem>
-                                      <SelectItem value="5h">{t('reminders.scheduleReminder.5hBefore')}</SelectItem>
-                                      <SelectItem value="10h">{t('reminders.scheduleReminder.10hBefore')}</SelectItem>
-                                      <SelectItem value="custom">{t('reminders.scheduleReminder.customTime')}</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-
-                                {newAppointmentReminderData.reminderTiming === 'custom' && (
-                                  <div>
-                                    <Label className={newAppointmentErrors.customMinutesBefore ? "text-red-500" : ""}>
-                                      {t('reminders.scheduleReminder.customMinutesLabel')} <span className="text-red-500">*</span>
-                                    </Label>
-                                    <Input
-                                      type="number"
-                                      min="1"
-                                      max="10080"
-                                      placeholder={t('reminders.scheduleReminder.customMinutesPlaceholder')}
-                                      value={newAppointmentReminderData.customMinutesBefore || ''}
-                                      onChange={(e) => {
-                                        setNewAppointmentReminderData(prev => ({
-                                          ...prev,
-                                          customMinutesBefore: e.target.value ? parseInt(e.target.value) : undefined
-                                        }));
-                                        setNewAppointmentErrors(prev => ({...prev, customMinutesBefore: false}));
-                                      }}
-                                      className={`focus-visible:ring-0 ${newAppointmentErrors.customMinutesBefore ? 'border-red-500' : ''}`}
-                                    />
-                                    <p className="text-xs text-gray-500 mt-1">{t('reminders.scheduleReminder.customMinutesHelp')}</p>
-                                  </div>
-                                )}
-
-                                <div>
-                                  <Label>{t('reminders.scheduleReminder.message')}</Label>
-                                  <Textarea
-                                    placeholder={t('reminders.scheduleReminder.messagePlaceholder')}
-                                    value={newAppointmentReminderData.content}
-                                    onChange={(e) => setNewAppointmentReminderData(prev => ({...prev, content: e.target.value}))}
-                                    rows={3}
-                                    className="focus-visible:ring-0"
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
                         </div>
                         
-                        <div className="flex justify-end gap-2 pt-4 border-t">
-                          <Button variant="outline" onClick={() => setNewAppointmentModalOpen(false)}>
-                            {t('reminders.appointments.cancel')}
-                          </Button>
-                          <Button 
-                            onClick={handleCreateAppointment}
-                            disabled={createAppointmentMutation.isPending}
-                          >
-                            {t('reminders.appointments.createAppointment')}
-                          </Button>
+                        <div className="flex items-center justify-between gap-2 pt-4 border-t">
+                          <div className="flex items-center gap-3">
+                            <Label htmlFor="new-reminder-enabled" className="cursor-pointer">
+                              {t('reminders.scheduleReminder.title')}
+                            </Label>
+                            <Switch
+                              id="new-reminder-enabled"
+                              checked={newAppointmentReminderEnabled}
+                              onCheckedChange={(checked) => {
+                                setNewAppointmentReminderEnabled(checked);
+                                if (checked) {
+                                  setNewAppointmentReminderModalOpen(true);
+                                } else {
+                                  setNewAppointmentReminderModalOpen(false);
+                                  setNewAppointmentErrors(prev => ({ ...prev, customMinutesBefore: false }));
+                                }
+                              }}
+                              className="focus-visible:ring-0"
+                            />
+                            {newAppointmentReminderEnabled && (
+                              <button
+                                type="button"
+                                onClick={() => setNewAppointmentReminderModalOpen(true)}
+                                className="text-sm underline text-muted-foreground hover:text-foreground"
+                              >
+                                {t('common.modify')}
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => {
+                              setNewAppointmentModalOpen(false);
+                              setNewAppointmentReminderModalOpen(false);
+                            }}>
+                              {t('reminders.appointments.cancel')}
+                            </Button>
+                            <Button 
+                              onClick={handleCreateAppointment}
+                              disabled={createAppointmentMutation.isPending}
+                            >
+                              {t('reminders.appointments.createAppointment')}
+                            </Button>
+                          </div>
                         </div>
+
+                        <Dialog open={newAppointmentReminderModalOpen} onOpenChange={(open) => {
+                          setNewAppointmentReminderModalOpen(open);
+                          if (!open) {
+                            setNewAppointmentReminderEnabled(false);
+                          }
+                        }}>
+                          <DialogContent className="max-w-lg">
+                            <DialogHeader>
+                              <DialogTitle>{t('reminders.scheduleReminder.title')}</DialogTitle>
+                              <DialogDescription>
+                                {t('reminders.appointments.scheduleDescription')}
+                              </DialogDescription>
+                            </DialogHeader>
+
+                            <div className="space-y-4">
+                              <div>
+                                <Label>{t('reminders.scheduleReminder.reminderType')}</Label>
+                                <Select 
+                                  value={newAppointmentReminderData.reminderType} 
+                                  onValueChange={(value: 'email' | 'sms' | 'push') => setNewAppointmentReminderData(prev => ({...prev, reminderType: value}))}
+                                >
+                                  <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="email">{t('reminders.scheduleReminder.email')}</SelectItem>
+                                    <SelectItem value="sms" disabled>{t('reminders.scheduleReminder.sms')}</SelectItem>
+                                    <SelectItem value="push" disabled>{t('reminders.scheduleReminder.push')}</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div>
+                                <Label>{t('reminders.scheduleReminder.timing')}</Label>
+                                <Select 
+                                  value={newAppointmentReminderData.reminderTiming} 
+                                  onValueChange={(value: '5m' | '30m' | '1h' | '5h' | '10h' | 'custom') => setNewAppointmentReminderData(prev => ({...prev, reminderTiming: value}))}
+                                >
+                                  <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="5m">{t('reminders.scheduleReminder.5mBefore')}</SelectItem>
+                                    <SelectItem value="30m">{t('reminders.scheduleReminder.30mBefore')}</SelectItem>
+                                    <SelectItem value="1h">{t('reminders.scheduleReminder.1hBefore')}</SelectItem>
+                                    <SelectItem value="5h">{t('reminders.scheduleReminder.5hBefore')}</SelectItem>
+                                    <SelectItem value="10h">{t('reminders.scheduleReminder.10hBefore')}</SelectItem>
+                                    <SelectItem value="custom">{t('reminders.scheduleReminder.customTime')}</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              {newAppointmentReminderData.reminderTiming === 'custom' && (
+                                <div>
+                                  <Label className={newAppointmentErrors.customMinutesBefore ? "text-red-500" : ""}>
+                                    {t('reminders.scheduleReminder.customMinutesLabel')} <span className="text-red-500">*</span>
+                                  </Label>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    max="10080"
+                                    placeholder={t('reminders.scheduleReminder.customMinutesPlaceholder')}
+                                    value={newAppointmentReminderData.customMinutesBefore || ''}
+                                    onChange={(e) => {
+                                      setNewAppointmentReminderData(prev => ({
+                                        ...prev,
+                                        customMinutesBefore: e.target.value ? parseInt(e.target.value) : undefined
+                                      }));
+                                      setNewAppointmentErrors(prev => ({...prev, customMinutesBefore: false}));
+                                    }}
+                                    className={`focus-visible:ring-0 ${newAppointmentErrors.customMinutesBefore ? 'border-red-500' : ''}`}
+                                  />
+                                  <p className="text-xs text-gray-500 mt-1">{t('reminders.scheduleReminder.customMinutesHelp')}</p>
+                                </div>
+                              )}
+
+                              <div>
+                                <Label>{t('reminders.scheduleReminder.message')}</Label>
+                                <Textarea
+                                  placeholder={t('reminders.scheduleReminder.messagePlaceholder')}
+                                  value={newAppointmentReminderData.content}
+                                  onChange={(e) => setNewAppointmentReminderData(prev => ({...prev, content: e.target.value}))}
+                                  rows={4}
+                                  className="focus-visible:ring-0"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-4">
+                              <Button variant="outline" onClick={() => {
+                                setNewAppointmentReminderModalOpen(false);
+                                setNewAppointmentReminderEnabled(false);
+                              }}>
+                                {t('reminders.appointments.cancel')}
+                              </Button>
+                              <Button onClick={() => setNewAppointmentReminderModalOpen(false)}>
+                                {t('common.save')}
+                              </Button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
                       </DialogContent>
                     </Dialog>
                   </div>
@@ -1466,109 +1518,155 @@ export default function RemindersPage() {
                         className="focus-visible:ring-0"
                       />
                     </div>
+                </div>
+                
+                <div className="flex items-center justify-between gap-2 pt-4 border-t">
+                  <div className="flex items-center gap-3">
+                    <Label htmlFor="edit-reminder-enabled" className="cursor-pointer">
+                      {t('reminders.scheduleReminder.title')}
+                    </Label>
+                    <Switch
+                      id="edit-reminder-enabled"
+                      checked={editAppointmentReminderEnabled}
+                      onCheckedChange={(checked) => {
+                        setEditAppointmentReminderEnabled(checked);
+                        if (checked) {
+                          setEditAppointmentReminderModalOpen(true);
+                        } else {
+                          setEditAppointmentReminderModalOpen(false);
+                          setEditAppointmentErrors(prev => ({ ...prev, customMinutesBefore: false }));
+                        }
+                      }}
+                      className="focus-visible:ring-0"
+                    />
+                    {editAppointmentReminderEnabled && (
+                      <button
+                        type="button"
+                        onClick={() => setEditAppointmentReminderModalOpen(true)}
+                        className="text-sm underline text-muted-foreground hover:text-foreground"
+                      >
+                        {t('common.modify')}
+                      </button>
+                    )}
+                  </div>
 
-                    <Separator />
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => {
+                      setEditAppointmentModalOpen(false);
+                      setEditAppointmentReminderModalOpen(false);
+                    }}>
+                      {t('reminders.appointments.cancel')}
+                    </Button>
+                    <Button 
+                      onClick={handleUpdateAppointment}
+                      disabled={updateAppointmentMutation.isPending}
+                    >
+                      {updateAppointmentMutation.isPending ? t('reminders.appointments.saving') : t('reminders.appointments.saveChanges')}
+                    </Button>
+                  </div>
+                </div>
 
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="edit-reminder-enabled">{t('reminders.scheduleReminder.title')}</Label>
-                        <Switch
-                          id="edit-reminder-enabled"
-                          checked={editAppointmentReminderEnabled}
-                          onCheckedChange={setEditAppointmentReminderEnabled}
+                <Dialog open={editAppointmentReminderModalOpen} onOpenChange={(open) => {
+                  setEditAppointmentReminderModalOpen(open);
+                  if (!open) {
+                    setEditAppointmentReminderEnabled(false);
+                  }
+                }}>
+                  <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>{t('reminders.scheduleReminder.title')}</DialogTitle>
+                      <DialogDescription>
+                        {t('reminders.appointments.editDescription')}
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                      <div>
+                        <Label>{t('reminders.scheduleReminder.reminderType')}</Label>
+                        <Select 
+                          value={editAppointmentReminderData.reminderType} 
+                          onValueChange={(value: 'email' | 'sms' | 'push') => setEditAppointmentReminderData(prev => ({...prev, reminderType: value}))}
+                        >
+                          <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="email">{t('reminders.scheduleReminder.email')}</SelectItem>
+                            <SelectItem value="sms" disabled>{t('reminders.scheduleReminder.sms')}</SelectItem>
+                            <SelectItem value="push" disabled>{t('reminders.scheduleReminder.push')}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label>{t('reminders.scheduleReminder.timing')}</Label>
+                        <Select 
+                          value={editAppointmentReminderData.reminderTiming} 
+                          onValueChange={(value: '5m' | '30m' | '1h' | '5h' | '10h' | 'custom') => setEditAppointmentReminderData(prev => ({...prev, reminderTiming: value}))}
+                        >
+                          <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="5m">{t('reminders.scheduleReminder.5mBefore')}</SelectItem>
+                            <SelectItem value="30m">{t('reminders.scheduleReminder.30mBefore')}</SelectItem>
+                            <SelectItem value="1h">{t('reminders.scheduleReminder.1hBefore')}</SelectItem>
+                            <SelectItem value="5h">{t('reminders.scheduleReminder.5hBefore')}</SelectItem>
+                            <SelectItem value="10h">{t('reminders.scheduleReminder.10hBefore')}</SelectItem>
+                            <SelectItem value="custom">{t('reminders.scheduleReminder.customTime')}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {editAppointmentReminderData.reminderTiming === 'custom' && (
+                        <div>
+                          <Label className={editAppointmentErrors.customMinutesBefore ? "text-red-500" : ""}>
+                            {t('reminders.scheduleReminder.customMinutesLabel')} <span className="text-red-500">*</span>
+                          </Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max="10080"
+                            placeholder={t('reminders.scheduleReminder.customMinutesPlaceholder')}
+                            value={editAppointmentReminderData.customMinutesBefore || ''}
+                            onChange={(e) => {
+                              setEditAppointmentReminderData(prev => ({
+                                ...prev,
+                                customMinutesBefore: e.target.value ? parseInt(e.target.value) : undefined
+                              }));
+                              setEditAppointmentErrors(prev => ({...prev, customMinutesBefore: false}));
+                            }}
+                            className={`focus-visible:ring-0 ${editAppointmentErrors.customMinutesBefore ? 'border-red-500' : ''}`}
+                          />
+                          <p className="text-xs text-gray-500 mt-1">{t('reminders.scheduleReminder.customMinutesHelp')}</p>
+                        </div>
+                      )}
+
+                      <div>
+                        <Label>{t('reminders.scheduleReminder.message')}</Label>
+                        <Textarea
+                          placeholder={t('reminders.scheduleReminder.messagePlaceholder')}
+                          value={editAppointmentReminderData.content}
+                          onChange={(e) => setEditAppointmentReminderData(prev => ({...prev, content: e.target.value}))}
+                          rows={4}
                           className="focus-visible:ring-0"
                         />
                       </div>
-
-                      {editAppointmentReminderEnabled && (
-                        <div className="space-y-3 pl-4 border-l-2 border-gray-200">
-                          <div>
-                            <Label>{t('reminders.scheduleReminder.reminderType')}</Label>
-                            <Select 
-                              value={editAppointmentReminderData.reminderType} 
-                              onValueChange={(value: 'email' | 'sms' | 'push') => setEditAppointmentReminderData(prev => ({...prev, reminderType: value}))}
-                            >
-                              <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="email">{t('reminders.scheduleReminder.email')}</SelectItem>
-                                <SelectItem value="sms" disabled>{t('reminders.scheduleReminder.sms')}</SelectItem>
-                                <SelectItem value="push" disabled>{t('reminders.scheduleReminder.push')}</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div>
-                            <Label>{t('reminders.scheduleReminder.timing')}</Label>
-                            <Select 
-                              value={editAppointmentReminderData.reminderTiming} 
-                              onValueChange={(value: '5m' | '30m' | '1h' | '5h' | '10h' | 'custom') => setEditAppointmentReminderData(prev => ({...prev, reminderTiming: value}))}
-                            >
-                              <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="5m">{t('reminders.scheduleReminder.5mBefore')}</SelectItem>
-                                <SelectItem value="30m">{t('reminders.scheduleReminder.30mBefore')}</SelectItem>
-                                <SelectItem value="1h">{t('reminders.scheduleReminder.1hBefore')}</SelectItem>
-                                <SelectItem value="5h">{t('reminders.scheduleReminder.5hBefore')}</SelectItem>
-                                <SelectItem value="10h">{t('reminders.scheduleReminder.10hBefore')}</SelectItem>
-                                <SelectItem value="custom">{t('reminders.scheduleReminder.customTime')}</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          {editAppointmentReminderData.reminderTiming === 'custom' && (
-                            <div>
-                              <Label className={editAppointmentErrors.customMinutesBefore ? "text-red-500" : ""}>
-                                {t('reminders.scheduleReminder.customMinutesLabel')} <span className="text-red-500">*</span>
-                              </Label>
-                              <Input
-                                type="number"
-                                min="1"
-                                max="10080"
-                                placeholder={t('reminders.scheduleReminder.customMinutesPlaceholder')}
-                                value={editAppointmentReminderData.customMinutesBefore || ''}
-                                onChange={(e) => {
-                                  setEditAppointmentReminderData(prev => ({
-                                    ...prev,
-                                    customMinutesBefore: e.target.value ? parseInt(e.target.value) : undefined
-                                  }));
-                                  setEditAppointmentErrors(prev => ({...prev, customMinutesBefore: false}));
-                                }}
-                                className={`focus-visible:ring-0 ${editAppointmentErrors.customMinutesBefore ? 'border-red-500' : ''}`}
-                              />
-                              <p className="text-xs text-gray-500 mt-1">{t('reminders.scheduleReminder.customMinutesHelp')}</p>
-                            </div>
-                          )}
-
-                          <div>
-                            <Label>{t('reminders.scheduleReminder.message')}</Label>
-                            <Textarea
-                              placeholder={t('reminders.scheduleReminder.messagePlaceholder')}
-                              value={editAppointmentReminderData.content}
-                              onChange={(e) => setEditAppointmentReminderData(prev => ({...prev, content: e.target.value}))}
-                              rows={3}
-                              className="focus-visible:ring-0"
-                            />
-                          </div>
-                        </div>
-                      )}
                     </div>
-                </div>
-                
-                <div className="flex justify-end gap-2 pt-4 border-t">
-                  <Button variant="outline" onClick={() => setEditAppointmentModalOpen(false)}>
-                    {t('reminders.appointments.cancel')}
-                  </Button>
-                  <Button 
-                    onClick={handleUpdateAppointment}
-                    disabled={updateAppointmentMutation.isPending}
-                  >
-                    {updateAppointmentMutation.isPending ? t('reminders.appointments.saving') : t('reminders.appointments.saveChanges')}
-                  </Button>
-                </div>
+
+                    <div className="flex justify-end gap-2 pt-4">
+                      <Button variant="outline" onClick={() => {
+                        setEditAppointmentReminderModalOpen(false);
+                        setEditAppointmentReminderEnabled(false);
+                      }}>
+                        {t('reminders.appointments.cancel')}
+                      </Button>
+                      <Button onClick={() => setEditAppointmentReminderModalOpen(false)}>
+                        {t('common.save')}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </>
             )}
           </DialogContent>
