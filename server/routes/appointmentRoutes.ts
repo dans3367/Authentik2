@@ -220,7 +220,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-// PUT /api/appointments/:id - Update appointment
+// PUT /api/appointments/:id - Update appointment (full update)
 router.put('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -265,6 +265,61 @@ router.put('/:id', async (req: Request, res: Response) => {
         details: error.errors 
       });
     }
+    console.error('Failed to update appointment:', error);
+    res.status(500).json({ error: 'Failed to update appointment' });
+  }
+});
+
+// PATCH /api/appointments/:id - Partial update appointment
+router.patch('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const user = (req as any).user;
+    const tenantId = user.tenantId;
+
+    // For PATCH, we accept partial updates but need to convert date strings
+    const updateData: any = { ...req.body };
+    
+    // Convert date strings to Date objects if present
+    if (updateData.appointmentDate) {
+      updateData.appointmentDate = new Date(updateData.appointmentDate);
+    }
+    if (updateData.reminderSentAt) {
+      updateData.reminderSentAt = new Date(updateData.reminderSentAt);
+    }
+    if (updateData.confirmationReceivedAt) {
+      updateData.confirmationReceivedAt = new Date(updateData.confirmationReceivedAt);
+    }
+
+    // Check if appointment exists and belongs to tenant
+    const existingAppointment = await db
+      .select()
+      .from(appointments)
+      .where(and(
+        eq(appointments.id, id),
+        eq(appointments.tenantId, tenantId)
+      ))
+      .limit(1);
+
+    if (existingAppointment.length === 0) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+
+    // Update appointment with partial data
+    const updatedAppointment = await db
+      .update(appointments)
+      .set({
+        ...updateData,
+        updatedAt: new Date(),
+      })
+      .where(eq(appointments.id, id))
+      .returning();
+
+    res.json({ 
+      appointment: updatedAppointment[0],
+      message: 'Appointment updated successfully' 
+    });
+  } catch (error) {
     console.error('Failed to update appointment:', error);
     res.status(500).json({ error: 'Failed to update appointment' });
   }
