@@ -51,6 +51,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Calendar as DateCalendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
@@ -117,6 +118,8 @@ export default function RemindersPage() {
   const [editAppointmentModalOpen, setEditAppointmentModalOpen] = useState(false);
   const [editAppointmentReminderModalOpen, setEditAppointmentReminderModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
+  const [viewAppointmentPanelOpen, setViewAppointmentPanelOpen] = useState(false);
+  const [viewingAppointment, setViewingAppointment] = useState<Appointment | null>(null);
   const [newAppointmentData, setNewAppointmentData] = useState({
     customerId: "",
     title: "",
@@ -469,6 +472,11 @@ export default function RemindersPage() {
       default:
         return new Date(baseDate.getTime() - 1 * 60 * 60 * 1000); // Default to 1h
     }
+  };
+
+  const handleViewAppointment = (appointment: Appointment) => {
+    setViewingAppointment(appointment);
+    setViewAppointmentPanelOpen(true);
   };
 
   const handleEditAppointment = (appointment: Appointment) => {
@@ -1248,7 +1256,7 @@ export default function RemindersPage() {
                                   <Button variant="ghost" size="sm" onClick={() => handleEditAppointment(appointment)}>
                                     <Edit className="h-4 w-4" />
                                   </Button>
-                                  <Button variant="ghost" size="sm">
+                                  <Button variant="ghost" size="sm" onClick={() => handleViewAppointment(appointment)}>
                                     <Eye className="h-4 w-4" />
                                   </Button>
                                   <DropdownMenu>
@@ -1726,6 +1734,220 @@ export default function RemindersPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* View Appointment Side Panel */}
+        <Sheet open={viewAppointmentPanelOpen} onOpenChange={setViewAppointmentPanelOpen}>
+          <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+            {viewingAppointment && (
+              <>
+                <SheetHeader>
+                  <SheetTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5" />
+                    {t('reminders.appointments.title')} Details
+                  </SheetTitle>
+                  <SheetDescription>
+                    View complete appointment information
+                  </SheetDescription>
+                </SheetHeader>
+
+                <div className="space-y-6 mt-6">
+                  {/* Customer Information */}
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Customer Information
+                    </h3>
+                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Name</p>
+                        <p className="font-medium">{getCustomerName(viewingAppointment.customer)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Email</p>
+                        <p className="text-sm">{viewingAppointment.customer?.email || 'N/A'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Appointment Details */}
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Appointment Details
+                    </h3>
+                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-3">
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Title</p>
+                        <p className="font-medium">{viewingAppointment.title}</p>
+                      </div>
+                      {viewingAppointment.description && (
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Description</p>
+                          <p className="text-sm">{viewingAppointment.description}</p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Date & Time</p>
+                        <p className="text-sm font-medium">{formatDateTime(viewingAppointment.appointmentDate)}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Duration</p>
+                          <p className="text-sm flex items-center gap-1">
+                            <Timer className="h-3 w-3" />
+                            {viewingAppointment.duration} {t('reminders.appointments.minutes')}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Status</p>
+                          <Badge className={getStatusColor(viewingAppointment.status)}>
+                            {viewingAppointment.status.replace('_', ' ')}
+                          </Badge>
+                        </div>
+                      </div>
+                      {viewingAppointment.location && (
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Location</p>
+                          <p className="text-sm flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {viewingAppointment.location}
+                          </p>
+                        </div>
+                      )}
+                      {viewingAppointment.serviceType && (
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Service Type</p>
+                          <p className="text-sm">{viewingAppointment.serviceType}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Reminder Status */}
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                      <Bell className="h-4 w-4" />
+                      Reminder Status
+                    </h3>
+                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Reminder Sent</p>
+                        {viewingAppointment.reminderSent ? (
+                          <div className="flex items-center gap-1 text-green-600">
+                            <CheckCircle className="h-4 w-4" />
+                            <span className="text-sm font-medium">Yes</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 text-gray-400">
+                            <XCircle className="h-4 w-4" />
+                            <span className="text-sm">No</span>
+                          </div>
+                        )}
+                      </div>
+                      {viewingAppointment.reminderSentAt && (
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Sent At</p>
+                          <p className="text-sm">{formatDateTime(viewingAppointment.reminderSentAt)}</p>
+                        </div>
+                      )}
+                      {reminders.some(r => r.appointmentId === viewingAppointment.id && r.status === 'pending') && (
+                        <div className="flex items-center gap-2 text-blue-600 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+                          <Clock className="h-4 w-4" />
+                          <span className="text-sm">Reminder scheduled</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Confirmation Status */}
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4" />
+                      Confirmation Status
+                    </h3>
+                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Confirmed</p>
+                        {viewingAppointment.confirmationReceived ? (
+                          <div className="flex items-center gap-1 text-green-600">
+                            <CheckCircle className="h-4 w-4" />
+                            <span className="text-sm font-medium">Yes</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 text-gray-400">
+                            <XCircle className="h-4 w-4" />
+                            <span className="text-sm">No</span>
+                          </div>
+                        )}
+                      </div>
+                      {viewingAppointment.confirmationReceivedAt && (
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Confirmed At</p>
+                          <p className="text-sm">{formatDateTime(viewingAppointment.confirmationReceivedAt)}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  {viewingAppointment.notes && (
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4" />
+                        Notes
+                      </h3>
+                      <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                        <p className="text-sm whitespace-pre-wrap">{viewingAppointment.notes}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Metadata */}
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                      <Info className="h-4 w-4" />
+                      Metadata
+                    </h3>
+                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 dark:text-gray-400">Created</span>
+                        <span>{formatDateTime(viewingAppointment.createdAt)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 dark:text-gray-400">Last Updated</span>
+                        <span>{formatDateTime(viewingAppointment.updatedAt)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 dark:text-gray-400">Appointment ID</span>
+                        <span className="font-mono text-[10px]">{viewingAppointment.id}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-4 border-t">
+                    <Button 
+                      className="flex-1" 
+                      onClick={() => {
+                        setViewAppointmentPanelOpen(false);
+                        handleEditAppointment(viewingAppointment);
+                      }}
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Appointment
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => setViewAppointmentPanelOpen(false)}
+                    >
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </SheetContent>
+        </Sheet>
 
         {/* Settings Tab */}
         {activeTab === "settings" && (
