@@ -1412,21 +1412,18 @@ export const createEmailEventSchema = z.object({
 
 export const insertEmailSendSchema = createInsertSchema(emailSends).omit({
   id: true,
-  tenantId: true,
   createdAt: true,
   updatedAt: true,
 });
 
 export const insertEmailContentSchema = createInsertSchema(emailContent).omit({
   id: true,
-  tenantId: true,
   createdAt: true,
   updatedAt: true,
 });
 
 export const insertEmailEventSchema = createInsertSchema(emailEvents).omit({
   id: true,
-  tenantId: true,
   createdAt: true,
 });
 

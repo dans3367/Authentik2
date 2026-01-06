@@ -274,11 +274,28 @@ export default function RemindersPage() {
       const response = await apiRequest('PATCH', `/api/appointments/${id}`, data);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       toast({
         title: t('reminders.toasts.success'),
         description: t('reminders.toasts.appointmentUpdated'),
       });
+
+      if (data?.appointment) {
+        queryClient.setQueryData(
+          ['/api/appointments', searchQuery, statusFilter],
+          (old: { appointments: Appointment[] } | undefined) => {
+            if (!old?.appointments) return old;
+            return {
+              ...old,
+              appointments: old.appointments.map((apt) =>
+                apt.id === data.appointment.id ? { ...apt, ...data.appointment } : apt
+              ),
+            };
+          }
+        );
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
       refetchAppointments();
       setEditAppointmentModalOpen(false);
       setEditingAppointment(null);
@@ -506,7 +523,7 @@ export default function RemindersPage() {
     setEditAppointmentErrors({});
     
     // Set status to 'scheduled' if reminder is enabled
-    const appointmentStatus = editAppointmentReminderEnabled ? 'scheduled' : editingAppointment.status;
+    const appointmentStatus = editingAppointment.status;
     
     updateAppointmentMutation.mutate({
       id: editingAppointment.id,
