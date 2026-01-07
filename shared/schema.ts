@@ -2078,6 +2078,8 @@ export const appointments = pgTable("appointments", {
   confirmationReceivedAt: timestamp("confirmation_received_at"),
   confirmationToken: text("confirmation_token"), // Unique token for confirmation links
   reminderSettings: text("reminder_settings"), // JSON: when to send reminders
+  isArchived: boolean("is_archived").default(false), // Whether the appointment is archived
+  archivedAt: timestamp("archived_at"), // When the appointment was archived
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

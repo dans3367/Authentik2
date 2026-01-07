@@ -43,7 +43,9 @@ import {
   Info,
   LayoutDashboard,
   StickyNote,
-  Loader2
+  Loader2,
+  Archive,
+  ArchiveRestore
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -83,6 +85,8 @@ interface Appointment {
   confirmationReceivedAt?: Date;
   confirmationToken?: string;
   reminderSettings?: string;
+  isArchived?: boolean;
+  archivedAt?: Date;
   customer?: Customer;
   createdAt: Date;
   updatedAt: Date;
@@ -129,9 +133,14 @@ export default function RemindersPage() {
   ]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [showArchived, setShowArchived] = useState(false);
   const [selectedAppointments, setSelectedAppointments] = useState<string[]>([]);
   const [newAppointmentModalOpen, setNewAppointmentModalOpen] = useState(false);
   const [newAppointmentReminderModalOpen, setNewAppointmentReminderModalOpen] = useState(false);
+
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+  }, [showArchived]);
   const [editAppointmentModalOpen, setEditAppointmentModalOpen] = useState(false);
   const [editAppointmentReminderModalOpen, setEditAppointmentReminderModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
@@ -247,17 +256,22 @@ export default function RemindersPage() {
   const [cancelAppointmentId, setCancelAppointmentId] = useState<string>("");
   const [cancelConfirmModalOpen, setCancelConfirmModalOpen] = useState(false);
 
+  // Archive appointment confirmation state
+  const [archiveAppointmentId, setArchiveAppointmentId] = useState<string>("");
+  const [archiveConfirmModalOpen, setArchiveConfirmModalOpen] = useState(false);
+
   // Fetch appointments
   const { 
     data: appointmentsData,
     isLoading: appointmentsLoading,
     refetch: refetchAppointments 
   } = useQuery<{appointments: Appointment[]}>({
-    queryKey: ['/api/appointments', searchQuery, statusFilter],
+    queryKey: ['/api/appointments', searchQuery, statusFilter, showArchived],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
       if (statusFilter !== 'all') params.append('status', statusFilter);
+      if (showArchived) params.append('archived', 'true');
       
       const response = await apiRequest('GET', `/api/appointments?${params.toString()}`);
       return response.json();
@@ -511,6 +525,53 @@ export default function RemindersPage() {
     },
   });
 
+  // Archive appointment mutation
+  const archiveAppointmentMutation = useMutation({
+    mutationFn: async (appointmentId: string) => {
+      const response = await apiRequest('POST', `/api/appointments/${appointmentId}/archive`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: t('reminders.toasts.success'),
+        description: 'Appointment archived successfully',
+      });
+      refetchAppointments();
+      setSelectedAppointments(prev => prev.filter(id => id !== archiveAppointmentId));
+      setArchiveConfirmModalOpen(false);
+      setArchiveAppointmentId("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: t('reminders.toasts.error'),
+        description: error?.message || 'Failed to archive appointment',
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Unarchive appointment mutation
+  const unarchiveAppointmentMutation = useMutation({
+    mutationFn: async (appointmentId: string) => {
+      const response = await apiRequest('POST', `/api/appointments/${appointmentId}/unarchive`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: t('reminders.toasts.success'),
+        description: 'Appointment restored successfully',
+      });
+      refetchAppointments();
+    },
+    onError: (error: any) => {
+      toast({
+        title: t('reminders.toasts.error'),
+        description: error?.message || 'Failed to restore appointment',
+        variant: "destructive",
+      });
+    },
+  });
+
   const resetNewAppointmentData = () => {
     setNewAppointmentData({
       customerId: "",
@@ -734,6 +795,21 @@ export default function RemindersPage() {
     cancelAppointmentMutation.mutate(cancelAppointmentId);
     setCancelConfirmModalOpen(false);
     setCancelAppointmentId("");
+  };
+
+  const handleArchiveAppointment = (appointmentId: string) => {
+    setArchiveAppointmentId(appointmentId);
+    setArchiveConfirmModalOpen(true);
+  };
+
+  const confirmArchiveAppointment = () => {
+    if (!archiveAppointmentId) return;
+    
+    archiveAppointmentMutation.mutate(archiveAppointmentId);
+  };
+
+  const handleUnarchiveAppointment = (appointmentId: string) => {
+    unarchiveAppointmentMutation.mutate(appointmentId);
   };
 
   const handleSelectAll = (checked: boolean) => {
@@ -1229,6 +1305,17 @@ export default function RemindersPage() {
                         <SelectItem value="no_show">{t('reminders.appointments.noShow')}</SelectItem>
                       </SelectContent>
                     </Select>
+                    <Button
+                      variant={showArchived ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setShowArchived(prev => !prev);
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <Archive className="h-4 w-4" />
+                      {showArchived ? 'Viewing Archived' : 'View Archived'}
+                    </Button>
                   </div>
 
                   {/* Bulk Actions */}
@@ -1367,19 +1454,39 @@ export default function RemindersPage() {
                                       </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent>
-                                      <DropdownMenuItem onClick={() => sendReminderMutation.mutate({ appointmentIds: [appointment.id] })}>
-                                        <Send className="h-4 w-4 mr-2" />
-                                        {t('reminders.actions.sendReminder')}
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem onClick={() => openScheduleReminder(appointment.id)}>
-                                        <Clock className="h-4 w-4 mr-2" />
-                                        {t('reminders.actions.scheduleReminder')}
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem className="text-red-600" onClick={() => handleCancelAppointment(appointment.id)}>
-                                        <Trash2 className="h-4 w-4 mr-2" />
-                                        {t('reminders.actions.cancelAppointment')}
-                                      </DropdownMenuItem>
+                                      {!showArchived && (
+                                        <>
+                                          <DropdownMenuItem onClick={() => sendReminderMutation.mutate({ appointmentIds: [appointment.id] })}>
+                                            <Send className="h-4 w-4 mr-2" />
+                                            {t('reminders.actions.sendReminder')}
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => openScheduleReminder(appointment.id)}>
+                                            <Clock className="h-4 w-4 mr-2" />
+                                            {t('reminders.actions.scheduleReminder')}
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem onClick={() => handleArchiveAppointment(appointment.id)}>
+                                            <Archive className="h-4 w-4 mr-2" />
+                                            Archive
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem className="text-red-600" onClick={() => handleCancelAppointment(appointment.id)}>
+                                            <Trash2 className="h-4 w-4 mr-2" />
+                                            {t('reminders.actions.cancelAppointment')}
+                                          </DropdownMenuItem>
+                                        </>
+                                      )}
+                                      {showArchived && (
+                                        <>
+                                          <DropdownMenuItem onClick={() => handleUnarchiveAppointment(appointment.id)}>
+                                            <ArchiveRestore className="h-4 w-4 mr-2" />
+                                            Restore
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem className="text-red-600" onClick={() => handleCancelAppointment(appointment.id)}>
+                                            <Trash2 className="h-4 w-4 mr-2" />
+                                            Delete Permanently
+                                          </DropdownMenuItem>
+                                        </>
+                                      )}
                                     </DropdownMenuContent>
                                   </DropdownMenu>
                                 </div>
@@ -1830,6 +1937,46 @@ export default function RemindersPage() {
                   disabled={cancelAppointmentMutation.isPending}
                 >
                   {cancelAppointmentMutation.isPending ? t('reminders.cancelConfirm.cancelling') : t('reminders.cancelConfirm.confirmCancel')}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Archive Appointment Confirmation Modal */}
+        <Dialog open={archiveConfirmModalOpen} onOpenChange={setArchiveConfirmModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Archive className="h-5 w-5" />
+                Archive Appointment
+              </DialogTitle>
+              <DialogDescription>
+                This appointment will be moved to the archive. You can restore it later if needed.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                <p className="font-medium">{appointments.find(apt => apt.id === archiveAppointmentId)?.title}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {getCustomerName(appointments.find(apt => apt.id === archiveAppointmentId)?.customer)}
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-500">
+                  {archiveAppointmentId && formatDateTime(appointments.find(apt => apt.id === archiveAppointmentId)?.appointmentDate || new Date())}
+                </p>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => {
+                  setArchiveConfirmModalOpen(false);
+                  setArchiveAppointmentId("");
+                }}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={confirmArchiveAppointment}
+                  disabled={archiveAppointmentMutation.isPending}
+                >
+                  {archiveAppointmentMutation.isPending ? 'Archiving...' : 'Archive'}
                 </Button>
               </div>
             </div>

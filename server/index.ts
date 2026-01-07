@@ -20,6 +20,9 @@ import { appointmentReminderWorker } from "./workers/AppointmentReminderWorker";
 
 const app = express();
 
+// Disable ETag generation to avoid 304 responses for API JSON
+app.set('etag', false);
+
 // Trust proxy for Replit environment - trust only the first proxy
 app.set('trust proxy', 1);
 
