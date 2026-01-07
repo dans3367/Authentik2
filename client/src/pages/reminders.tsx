@@ -280,6 +280,18 @@ export default function RemindersPage() {
     refetchOnWindowFocus: false,
   });
 
+  // Fetch upcoming appointments (always non-archived for the sidebar)
+  const { data: upcomingAppointmentsData } = useQuery<{appointments: Appointment[]}>({
+    queryKey: ['/api/appointments/upcoming'],
+    queryFn: async () => {
+      // Always fetch non-archived appointments for upcoming section
+      const response = await apiRequest('GET', '/api/appointments');
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
   // Fetch customers for appointment creation
   const { data: customersData } = useQuery<{contacts: Customer[]}>({
     queryKey: ['/api/email-contacts'],
@@ -305,6 +317,7 @@ export default function RemindersPage() {
   });
 
   const appointments: Appointment[] = appointmentsData?.appointments || [];
+  const upcomingAppointmentsForSidebar: Appointment[] = upcomingAppointmentsData?.appointments || [];
   const customers: Customer[] = customersData?.contacts || [];
   const reminders: AppointmentReminder[] = remindersData?.reminders || [];
 
@@ -867,8 +880,8 @@ export default function RemindersPage() {
   // Check if some appointments are selected (for indeterminate state)
   const isSomeSelected = selectedAppointments.length > 0 && selectedAppointments.length < appointments.length;
 
-  // Get upcoming appointments (next 7 days)
-  const upcomingAppointments = appointments.filter(apt => {
+  // Get upcoming appointments (next 7 days) - always use non-archived data
+  const upcomingAppointments = upcomingAppointmentsForSidebar.filter(apt => {
     const appointmentDate = new Date(apt.appointmentDate);
     const now = new Date();
     const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
