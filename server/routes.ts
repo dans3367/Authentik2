@@ -30,6 +30,7 @@ import { promotionRoutes } from "./routes/promotionRoutes";
 import customCardsRoutes from "./routes/customCardsRoutes";
 import appointmentRoutes from "./routes/appointmentRoutes";
 import appointmentRemindersRoutes from "./routes/appointmentRemindersRoutes";
+import appointmentNotesRoutes from "./routes/appointmentNotesRoutes";
 import newsletterWorkerRoutes from "./routes/newsletterWorkerRoutes";
 import suppressionManagementRoutes from "./routes/suppressionManagementRoutes";
 import aiRoutes from "./routes/aiRoutes";
@@ -71,6 +72,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/custom-cards", customCardsRoutes);
   app.use("/api/appointments", appointmentRoutes);
   app.use("/api/appointment-reminders", appointmentRemindersRoutes);
+  app.use("/api/appointment-notes", appointmentNotesRoutes);
   app.use("/api/newsletter-worker", newsletterWorkerRoutes);
   app.use("/api/birthday-worker", birthdayWorkerRoutes);
   app.use("/api/ai", aiRoutes);

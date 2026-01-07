@@ -2082,6 +2082,17 @@ export const appointments = pgTable("appointments", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Appointment notes table for storing multiple notes per appointment
+export const appointmentNotes = pgTable("appointment_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  appointmentId: varchar("appointment_id").notNull().references(() => appointments.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }), // Who created the note
+  content: text("content").notNull(), // Multiline text content
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Appointment reminders table for tracking reminder history
 export const appointmentReminders = pgTable("appointment_reminders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -2116,6 +2127,23 @@ export const appointmentRelations = relations(appointments, ({ one, many }) => (
     references: [betterAuthUser.id],
   }),
   reminders: many(appointmentReminders),
+  notes: many(appointmentNotes),
+}));
+
+// Appointment notes relations
+export const appointmentNoteRelations = relations(appointmentNotes, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [appointmentNotes.tenantId],
+    references: [tenants.id],
+  }),
+  appointment: one(appointments, {
+    fields: [appointmentNotes.appointmentId],
+    references: [appointments.id],
+  }),
+  user: one(betterAuthUser, {
+    fields: [appointmentNotes.userId],
+    references: [betterAuthUser.id],
+  }),
 }));
 
 export const appointmentReminderRelations = relations(appointmentReminders, ({ one }) => ({
@@ -2204,11 +2232,28 @@ export type AppointmentReminder = typeof appointmentReminders.$inferSelect;
 export type InsertAppointmentReminder = typeof appointmentReminders.$inferInsert;
 export type CreateAppointmentReminderData = z.infer<typeof createAppointmentReminderSchema>;
 
+// Appointment note schemas
+export const createAppointmentNoteSchema = z.object({
+  appointmentId: z.string().uuid("Valid appointment ID is required"),
+  content: z.string().min(1, "Note content is required"),
+});
+
+export const updateAppointmentNoteSchema = z.object({
+  content: z.string().min(1, "Note content is required"),
+});
+
+// Appointment note types
+export type AppointmentNote = typeof appointmentNotes.$inferSelect;
+export type InsertAppointmentNote = typeof appointmentNotes.$inferInsert;
+export type CreateAppointmentNoteData = z.infer<typeof createAppointmentNoteSchema>;
+export type UpdateAppointmentNoteData = z.infer<typeof updateAppointmentNoteSchema>;
+
 // Extended appointment types with relationships
 export interface AppointmentWithDetails extends Appointment {
   customer: EmailContact;
   user: User;
   reminders?: AppointmentReminder[];
+  appointmentNotes?: AppointmentNote[];
 }
 
 export interface AppointmentFilters {

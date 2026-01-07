@@ -41,7 +41,9 @@ import {
   MapPin,
   Timer,
   Info,
-  LayoutDashboard
+  LayoutDashboard,
+  StickyNote,
+  Loader2
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -97,6 +99,21 @@ interface AppointmentReminder {
   status: 'pending' | 'sent' | 'failed' | 'cancelled';
   content?: string;
   errorMessage?: string;
+}
+
+interface AppointmentNote {
+  id: string;
+  appointmentId: string;
+  userId: string;
+  content: string;
+  createdAt: Date;
+  updatedAt: Date;
+  user?: {
+    id: string;
+    name: string;
+    firstName?: string;
+    lastName?: string;
+  };
 }
 
 export default function RemindersPage() {
@@ -163,6 +180,12 @@ export default function RemindersPage() {
   const [editAppointmentErrors, setEditAppointmentErrors] = useState<{
     customMinutesBefore?: boolean;
   }>({});
+
+  // Appointment notes state
+  const [appointmentNotes, setAppointmentNotes] = useState<AppointmentNote[]>([]);
+  const [newNoteContent, setNewNoteContent] = useState("");
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingNoteContent, setEditingNoteContent] = useState("");
 
   // Delete/cancel reminder mutation
   const deleteReminderMutation = useMutation({
@@ -270,6 +293,75 @@ export default function RemindersPage() {
   const appointments: Appointment[] = appointmentsData?.appointments || [];
   const customers: Customer[] = customersData?.contacts || [];
   const reminders: AppointmentReminder[] = remindersData?.reminders || [];
+
+  // Fetch appointment notes when viewing an appointment
+  const { 
+    data: notesData,
+    isLoading: notesLoading,
+    refetch: refetchNotes 
+  } = useQuery<{notes: AppointmentNote[]}>({
+    queryKey: ['/api/appointment-notes', viewingAppointment?.id],
+    queryFn: async () => {
+      if (!viewingAppointment?.id) return { notes: [] };
+      const response = await apiRequest('GET', `/api/appointment-notes/${viewingAppointment.id}`);
+      return response.json();
+    },
+    enabled: !!viewingAppointment?.id,
+    staleTime: 1 * 60 * 1000,
+  });
+
+  // Create note mutation
+  const createNoteMutation = useMutation({
+    mutationFn: async ({ appointmentId, content }: { appointmentId: string; content: string }) => {
+      const response = await apiRequest('POST', '/api/appointment-notes', {
+        appointmentId,
+        content,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: t('reminders.toasts.success'), description: 'Note added successfully' });
+      setNewNoteContent("");
+      refetchNotes();
+    },
+    onError: (error: any) => {
+      toast({ title: t('reminders.toasts.error'), description: error?.message || 'Failed to add note', variant: 'destructive' });
+    }
+  });
+
+  // Update note mutation
+  const updateNoteMutation = useMutation({
+    mutationFn: async ({ noteId, content }: { noteId: string; content: string }) => {
+      const response = await apiRequest('PATCH', `/api/appointment-notes/${noteId}`, {
+        content,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: t('reminders.toasts.success'), description: 'Note updated successfully' });
+      setEditingNoteId(null);
+      setEditingNoteContent("");
+      refetchNotes();
+    },
+    onError: (error: any) => {
+      toast({ title: t('reminders.toasts.error'), description: error?.message || 'Failed to update note', variant: 'destructive' });
+    }
+  });
+
+  // Delete note mutation
+  const deleteNoteMutation = useMutation({
+    mutationFn: async (noteId: string) => {
+      const response = await apiRequest('DELETE', `/api/appointment-notes/${noteId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: t('reminders.toasts.success'), description: 'Note deleted successfully' });
+      refetchNotes();
+    },
+    onError: (error: any) => {
+      toast({ title: t('reminders.toasts.error'), description: error?.message || 'Failed to delete note', variant: 'destructive' });
+    }
+  });
 
   // Update appointment mutation
   const updateAppointmentMutation = useMutation({
@@ -839,9 +931,18 @@ export default function RemindersPage() {
                   ) : (
                     <div className="space-y-3">
                       {upcomingAppointments.map((appointment) => (
-                        <div key={appointment.id} className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium text-sm">{appointment.title}</p>
+                        <div
+                          key={appointment.id}
+                          className="flex w-full items-center justify-between rounded-lg px-2 py-1"
+                        >
+                          <div className="text-left space-y-0.5">
+                            <button
+                              type="button"
+                              onClick={() => handleViewAppointment(appointment)}
+                              className="text-sm font-medium text-left hover:underline focus:outline-none focus:ring-2 focus:ring-primary/50 rounded"
+                            >
+                              {appointment.title}
+                            </button>
                             <p className="text-xs text-gray-500">
                               {getCustomerName(appointment.customer)}
                             </p>
@@ -1889,18 +1990,169 @@ export default function RemindersPage() {
                     </div>
                   </div>
 
-                  {/* Notes */}
+                  {/* Legacy Notes (single field) */}
                   {viewingAppointment.notes && (
                     <div className="space-y-3">
                       <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                         <MessageSquare className="h-4 w-4" />
-                        Notes
+                        Quick Notes
                       </h3>
                       <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
                         <p className="text-sm whitespace-pre-wrap">{viewingAppointment.notes}</p>
                       </div>
                     </div>
                   )}
+
+                  {/* Appointment Notes (multiple entries) */}
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                      <StickyNote className="h-4 w-4" />
+                      Appointment Notes
+                      {notesData?.notes && notesData.notes.length > 0 && (
+                        <Badge variant="secondary" className="ml-1 text-xs">
+                          {notesData.notes.length}
+                        </Badge>
+                      )}
+                    </h3>
+                    
+                    {/* Add new note form */}
+                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-3">
+                      <Textarea
+                        placeholder="Add a new note..."
+                        value={newNoteContent}
+                        onChange={(e) => setNewNoteContent(e.target.value)}
+                        rows={3}
+                        className="resize-none focus-visible:ring-0"
+                      />
+                      <div className="flex justify-end">
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            if (newNoteContent.trim() && viewingAppointment?.id) {
+                              createNoteMutation.mutate({
+                                appointmentId: viewingAppointment.id,
+                                content: newNoteContent.trim(),
+                              });
+                            }
+                          }}
+                          disabled={!newNoteContent.trim() || createNoteMutation.isPending}
+                        >
+                          {createNoteMutation.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Adding...
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add Note
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Notes list */}
+                    {notesLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                      </div>
+                    ) : notesData?.notes && notesData.notes.length > 0 ? (
+                      <div className="space-y-3">
+                        {notesData.notes.map((note) => (
+                          <div key={note.id} className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
+                            {editingNoteId === note.id ? (
+                              <>
+                                <Textarea
+                                  value={editingNoteContent}
+                                  onChange={(e) => setEditingNoteContent(e.target.value)}
+                                  rows={3}
+                                  className="resize-none focus-visible:ring-0"
+                                  autoFocus
+                                />
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setEditingNoteId(null);
+                                      setEditingNoteContent("");
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => {
+                                      if (editingNoteContent.trim()) {
+                                        updateNoteMutation.mutate({
+                                          noteId: note.id,
+                                          content: editingNoteContent.trim(),
+                                        });
+                                      }
+                                    }}
+                                    disabled={!editingNoteContent.trim() || updateNoteMutation.isPending}
+                                  >
+                                    {updateNoteMutation.isPending ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      'Save'
+                                    )}
+                                  </Button>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                                <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                                    <span>
+                                      {note.user?.firstName && note.user?.lastName 
+                                        ? `${note.user.firstName} ${note.user.lastName}`
+                                        : note.user?.name || 'Unknown'}
+                                    </span>
+                                    <span className="mx-1">•</span>
+                                    <span>{new Date(note.createdAt).toLocaleDateString('en-US', { 
+                                      month: 'short', 
+                                      day: 'numeric',
+                                      hour: 'numeric',
+                                      minute: '2-digit'
+                                    })}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 w-7 p-0"
+                                      onClick={() => {
+                                        setEditingNoteId(note.id);
+                                        setEditingNoteContent(note.content);
+                                      }}
+                                    >
+                                      <Edit className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                      onClick={() => deleteNoteMutation.mutate(note.id)}
+                                      disabled={deleteNoteMutation.isPending}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">
+                        No notes yet. Add your first note above.
+                      </div>
+                    )}
+                  </div>
 
                   {/* Metadata */}
                   <div className="space-y-3">
