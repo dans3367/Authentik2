@@ -318,242 +318,201 @@ export default function NewsletterPage() {
   // Show error state if there's an error
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Card className="bg-white dark:bg-slate-800 border border-red-200 dark:border-red-700 shadow-sm">
-            <CardContent className="p-12 text-center">
-              <div className="w-20 h-20 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <AlertTriangle className="h-10 w-10 text-red-600 dark:text-red-400" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2 text-red-800 dark:text-red-300">
-                Error Loading Newsletters
-              </h3>
-              <p className="text-red-600 dark:text-red-400 mb-4">
-                {error instanceof Error ? error.message : 'Failed to load newsletter data'}
-              </p>
-              <Button 
-                onClick={() => {
-                  refetch();
-                  refetchStats();
-                }}
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
-                Try Again
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+      <div className="container mx-auto p-4 lg:p-6">
+        <Card className="w-full max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle className="text-red-600">Error</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-600 mb-4">
+              {error instanceof Error ? error.message : 'Failed to load newsletter data'}
+            </p>
+            <Button 
+              onClick={() => {
+                refetch();
+                refetchStats();
+              }}
+            >
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-          {/* Header Skeleton */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Skeleton className="h-9 w-64 mb-2" />
-                <Skeleton className="h-5 w-96" />
-              </div>
-              <Skeleton className="h-12 w-48" />
-            </div>
+      <div className="container mx-auto p-4 lg:p-6 space-y-6 lg:space-y-8">
+        {/* Header Skeleton */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <Skeleton className="h-8 w-48 mb-2" />
+            <Skeleton className="h-5 w-72" />
           </div>
-          {/* Stats Cards Skeleton */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="rounded-2xl">
-                <CardContent className="p-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Skeleton className="h-6 w-32" />
-                      <Skeleton className="h-8 w-12" />
-                    </div>
-                    <Skeleton className="h-12 w-16" />
-                    <div className="space-y-2">
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-3/4" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          {/* Secondary Cards Skeleton */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {Array.from({ length: 2 }).map((_, i) => (
-              <Card key={i} className="rounded-2xl">
-                <CardContent className="p-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Skeleton className="h-6 w-40" />
-                      <Skeleton className="h-8 w-16" />
-                    </div>
-                    <Skeleton className="h-12 w-20" />
-                    <Skeleton className="h-20 w-full" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          {/* Newsletter List Skeleton */}
-          <Card className="rounded-2xl">
-            <CardContent className="p-6">
-              <div className="space-y-6">
-                {/* Table header */}
-                <div className="flex items-center justify-between">
-                  <Skeleton className="h-10 w-64" />
-                  <Skeleton className="h-8 w-24" />
-                </div>
-                {/* Table rows */}
-                <div className="space-y-4">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="flex items-center justify-between p-4 border border-gray-100 dark:border-gray-700 rounded-lg">
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-5 w-48" />
-                        <Skeleton className="h-4 w-64" />
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <Skeleton className="h-6 w-16" />
-                        <Skeleton className="h-8 w-8 rounded-full" />
-                        <Skeleton className="h-4 w-12" />
-                        <Skeleton className="h-4 w-20" />
-                        <Skeleton className="h-8 w-8" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <Skeleton className="h-10 w-40" />
         </div>
+        {/* Stats Cards Skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6 lg:mb-8">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div className="h-4 w-[100px] bg-gray-200 rounded animate-pulse" />
+                <div className="h-4 w-4 bg-gray-200 rounded animate-pulse" />
+              </CardHeader>
+              <CardContent>
+                <div className="h-8 w-[60px] bg-gray-200 rounded animate-pulse mb-2" />
+                <div className="h-3 w-[120px] bg-gray-200 rounded animate-pulse" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        {/* Newsletter List Skeleton */}
+        <Card>
+          <CardHeader>
+            <div className="h-5 w-32 bg-gray-200 rounded animate-pulse" />
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Card key={i} className="animate-pulse">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <div className="h-5 w-1/3 bg-gray-200 rounded" />
+                      <div className="h-8 w-8 bg-gray-200 rounded" />
+                    </div>
+                    <div className="mt-2 h-4 w-1/4 bg-gray-200 rounded" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-3 w-3/4 bg-gray-200 rounded mb-2" />
+                    <div className="h-3 w-2/3 bg-gray-200 rounded" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Page Header with Title */}
-        <div className="flex items-center justify-between">
+      <div className="container mx-auto p-4 lg:p-6 space-y-6 lg:space-y-8">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Newsletters</h1>
+            <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
+              Newsletters
+            </h1>
             <p className="text-gray-600 dark:text-gray-400 mt-1">
               Create and manage email newsletters to engage with your subscribers
             </p>
           </div>
-          <Button 
-            onClick={() => setLocation('/newsletter/create')} 
-            size="lg"
-            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-          >
-            <Plus className="h-5 w-5 mr-2" />
+          <Button onClick={() => setLocation('/newsletter/create')}>
+            <Plus className="h-4 w-4 mr-2" />
             Create Newsletter
           </Button>
         </div>
-        {/* Action Bar */}
-        <div className="flex items-center justify-end hidden">
-          <Button 
-            onClick={() => setLocation('/newsletter/create')} 
-            size="lg"
-            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            Create Newsletter
-          </Button>
-        </div>
-        {/* Stats Cards - Clean Modern Design */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6 lg:mb-8">
           {/* Total Newsletters */}
-          <Card className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <Mail className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Total Newsletters
+              </CardTitle>
+              <Mail className="h-4 w-4 text-gray-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                {stats.totalNewsletters}
               </div>
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Newsletters</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.totalNewsletters}</p>
-              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                All newsletter campaigns
+              </p>
             </CardContent>
           </Card>
 
           {/* Draft Newsletters */}
-          <Card className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                  <Edit className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-                </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Drafts
+              </CardTitle>
+              <Edit className="h-4 w-4 text-gray-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                {stats.draftNewsletters}
               </div>
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Drafts</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.draftNewsletters}</p>
-              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                In progress
+              </p>
             </CardContent>
           </Card>
 
           {/* Scheduled Newsletters */}
-          <Card className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                  <Clock className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Scheduled
+              </CardTitle>
+              <Clock className="h-4 w-4 text-gray-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                {stats.scheduledNewsletters}
               </div>
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Scheduled</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.scheduledNewsletters}</p>
-              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Pending delivery
+              </p>
             </CardContent>
           </Card>
 
           {/* Sent Newsletters */}
-          <Card className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <Mail className="h-6 w-6 text-green-600 dark:text-green-400" />
-                </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Sent
+              </CardTitle>
+              <Mail className="h-4 w-4 text-gray-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                {stats.sentNewsletters}
               </div>
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Sent</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.sentNewsletters}</p>
-              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Delivered campaigns
+              </p>
             </CardContent>
           </Card>
         </div>
         {/* Newsletters List */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              All Newsletters
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
         {newsletters.length === 0 ? (
-          <Card className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm">
-            <CardContent className="p-12 text-center">
-              <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Mail className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            <div className="text-center py-12">
+              <Mail className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                 No newsletters yet
               </h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
-                Create your first email newsletter to start engaging with your subscribers and build meaningful connections.
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                Create your first email newsletter to start engaging with your subscribers.
               </p>
-              <Button 
-                onClick={() => setLocation('/newsletter/create')}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
+              <Button onClick={() => setLocation('/newsletter/create')}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Your First Newsletter
               </Button>
-            </CardContent>
-          </Card>
+            </div>
         ) : filteredNewsletters.length === 0 ? (
-          <Card className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm">
-            <CardContent className="p-12 text-center">
-              <div className="w-16 h-16 bg-gray-100 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Search className="h-8 w-8 text-gray-400 dark:text-gray-500" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            <div className="text-center py-12">
+              <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                 No newsletters found
               </h3>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
@@ -568,11 +527,9 @@ export default function NewsletterPage() {
               >
                 Clear filters
               </Button>
-            </CardContent>
-          </Card>
+            </div>
         ) : (
-          <Card className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm">
-            <CardContent className="p-6">
+          <>
               {/* Desktop Table View */}
               <div className="hidden lg:block w-full">
                 <DataTable
@@ -732,9 +689,10 @@ export default function NewsletterPage() {
                   </div>
                 )}
               </div>
-            </CardContent>
-          </Card>
+          </>
         )}
+          </CardContent>
+        </Card>
 
         {/* Newsletter Worker Progress - Only show if there are active jobs */}
         <div className="space-y-6">
@@ -744,10 +702,7 @@ export default function NewsletterPage() {
             refreshInterval={3000}
           />
         </div>
-
-        {/* Delete Confirmation Dialog */}
       </div>
-    </div>
     </TooltipProvider>
   );
 }

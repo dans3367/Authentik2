@@ -683,6 +683,34 @@ export default function RemindersPage() {
     if (editAppointmentReminderEnabled && editAppointmentReminderData.reminderTiming === 'custom' && !editAppointmentReminderData.customMinutesBefore) {
       errors.customMinutesBefore = true;
     }
+
+    if (editAppointmentReminderEnabled) {
+      const appointmentDate = new Date(editingAppointment.appointmentDate);
+      let scheduledFor: Date;
+      
+      if (editAppointmentReminderData.reminderTiming === 'custom' && editAppointmentReminderData.customMinutesBefore) {
+        scheduledFor = new Date(appointmentDate.getTime() - editAppointmentReminderData.customMinutesBefore * 60 * 1000);
+      } else {
+        const timingMap: Record<string, number> = {
+          '5m': 5,
+          '30m': 30,
+          '1h': 60,
+          '5h': 300,
+          '10h': 600,
+        };
+        const minutes = timingMap[editAppointmentReminderData.reminderTiming] || 60;
+        scheduledFor = new Date(appointmentDate.getTime() - minutes * 60 * 1000);
+      }
+      
+      if (scheduledFor < new Date()) {
+        toast({
+          title: t('reminders.toasts.validationError'),
+          description: "Reminder time cannot be in the past",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     
     if (Object.keys(errors).length > 0) {
       setEditAppointmentErrors(errors);
@@ -768,6 +796,34 @@ export default function RemindersPage() {
     }
     if (newAppointmentReminderEnabled && newAppointmentReminderData.reminderTiming === 'custom' && !newAppointmentReminderData.customMinutesBefore) {
       errors.customMinutesBefore = true;
+    }
+
+    if (newAppointmentReminderEnabled) {
+      const appointmentDate = new Date(newAppointmentData.appointmentDate);
+      let scheduledFor: Date;
+      
+      if (newAppointmentReminderData.reminderTiming === 'custom' && newAppointmentReminderData.customMinutesBefore) {
+        scheduledFor = new Date(appointmentDate.getTime() - newAppointmentReminderData.customMinutesBefore * 60 * 1000);
+      } else {
+        const timingMap: Record<string, number> = {
+          '5m': 5,
+          '30m': 30,
+          '1h': 60,
+          '5h': 300,
+          '10h': 600,
+        };
+        const minutes = timingMap[newAppointmentReminderData.reminderTiming] || 60;
+        scheduledFor = new Date(appointmentDate.getTime() - minutes * 60 * 1000);
+      }
+      
+      if (scheduledFor < new Date()) {
+        toast({
+          title: t('reminders.toasts.validationError'),
+          description: "Reminder time cannot be in the past",
+          variant: "destructive",
+        });
+        return;
+      }
     }
     
     if (Object.keys(errors).length > 0) {
@@ -1018,28 +1074,25 @@ export default function RemindersPage() {
                       </p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-1">
                       {upcomingAppointments.map((appointment) => (
                         <div
                           key={appointment.id}
-                          className="flex w-full items-center justify-between rounded-lg px-2 py-1"
+                          className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 hover:bg-muted/50 transition-colors"
                         >
-                          <div className="text-left space-y-0.5">
+                          <div className="text-left min-w-0 flex-1 mr-3">
                             <button
                               type="button"
                               onClick={() => handleViewAppointment(appointment)}
-                              className="text-sm font-medium text-left hover:underline focus:outline-none focus:ring-2 focus:ring-primary/50 rounded"
+                              className="text-sm font-medium text-left hover:underline focus:outline-none focus:ring-2 focus:ring-primary/50 rounded block w-full truncate"
                             >
                               {appointment.title}
                             </button>
-                            <p className="text-xs text-gray-500">
-                              {getCustomerName(appointment.customer)}
-                            </p>
-                            <p className="text-xs text-gray-400">
-                              {formatDateTime(appointment.appointmentDate)}
+                            <p className="text-xs text-muted-foreground truncate">
+                              {getCustomerName(appointment.customer)} • {formatDateTime(appointment.appointmentDate)}
                             </p>
                           </div>
-                          <Badge className={getStatusColor(appointment.status)} variant="outline">
+                          <Badge className={`${getStatusColor(appointment.status)} text-[10px] px-1.5 py-0 h-5 whitespace-nowrap`} variant="outline">
                             {appointment.status}
                           </Badge>
                         </div>
@@ -1671,7 +1724,17 @@ export default function RemindersPage() {
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setScheduleReminderModalOpen(false)}>{t('reminders.scheduleReminder.cancel')}</Button>
                 <Button
-                  onClick={() => createScheduledReminderMutation.mutate({ appointmentId: scheduleAppointmentId, data: scheduleData })}
+                  onClick={() => {
+                    if (scheduleData.scheduledFor < new Date()) {
+                      toast({
+                        title: t('reminders.toasts.validationError'),
+                        description: "Reminder time cannot be in the past",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    createScheduledReminderMutation.mutate({ appointmentId: scheduleAppointmentId, data: scheduleData });
+                  }}
                   disabled={createScheduledReminderMutation.isPending || !scheduleAppointmentId}
                 >
                   {createScheduledReminderMutation.isPending ? t('reminders.scheduleReminder.scheduling') : t('reminders.scheduleReminder.schedule')}

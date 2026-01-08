@@ -309,64 +309,34 @@ export default function SegmentationPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="container mx-auto p-4 lg:p-6 space-y-6 lg:space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Target className="h-8 w-8 text-indigo-600" />
+          <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
             {t('segmentation.title')}
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             {t('segmentation.subtitle')}
           </p>
         </div>
-        <Button onClick={handleCreate} className="gap-2">
-          <Plus className="h-4 w-4" />
+        <Button onClick={handleCreate}>
+          <Plus className="h-4 w-4 mr-2" />
           {t('segmentation.createSegment')}
         </Button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('segmentation.stats.totalSegments')}</CardTitle>
-            <List className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalLists}</div>
-            <p className="text-xs text-muted-foreground">{t('segmentation.stats.activeSegmentLists')}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('segmentation.stats.totalContacts')}</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalContacts}</div>
-            <p className="text-xs text-muted-foreground">{t('segmentation.stats.acrossAllSegments')}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('segmentation.stats.avgSegmentSize')}</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{Math.round(stats.averageListSize)}</div>
-            <p className="text-xs text-muted-foreground">{t('segmentation.stats.contactsPerSegment')}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters and Search */}
+      {/* Segments List */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="h-5 w-5" />
+            {t('segmentation.list.title')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Filters and Search */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
@@ -388,15 +358,8 @@ export default function SegmentationPage() {
               </SelectContent>
             </Select>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Segments Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('segmentation.list.title')}</CardTitle>
-        </CardHeader>
-        <CardContent>
+          {/* Segments Content */}
           {listsLoading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -420,7 +383,7 @@ export default function SegmentationPage() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
               {filteredLists.map((list) => (
                 <Card key={list.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
