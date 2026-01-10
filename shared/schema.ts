@@ -2218,7 +2218,7 @@ export const updateAppointmentSchema = z.object({
 export const createAppointmentReminderSchema = z.object({
   appointmentId: z.string().uuid(),
   reminderType: z.enum(['email', 'sms', 'push']).default('email'),
-  reminderTiming: z.enum(['5m', '30m', '1h', '5h', '10h', 'custom']).default('1h'),
+  reminderTiming: z.enum(['now', '5m', '30m', '1h', '5h', '10h', 'custom']).default('1h'),
   customMinutesBefore: z.number().min(1).max(10080).optional(), // Up to 1 week before
   scheduledFor: z.coerce.date(),
   content: z.string().optional(),

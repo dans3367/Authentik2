@@ -254,6 +254,7 @@
       "sms": "SMS (coming soon)",
       "push": "Push (coming soon)",
       "timing": "Timing",
+      "sendNow": "Send immediately",
       "5mBefore": "5 minutes before appointment",
       "30mBefore": "30 minutes before appointment",
       "1hBefore": "1 hour before appointment",

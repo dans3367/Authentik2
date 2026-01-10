@@ -163,6 +163,7 @@
       "sms": "SMS (próximamente)",
       "push": "Push (próximamente)",
       "timing": "Momento",
+      "sendNow": "Enviar inmediatamente",
       "24hBefore": "24 horas antes de la cita",
       "1hBefore": "1 hora antes de la cita",
       "30mBefore": "30 minutos antes de la cita",

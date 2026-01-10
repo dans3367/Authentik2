@@ -1408,8 +1408,9 @@ export const updateAppointmentSchema = z.object({
 export const createAppointmentReminderSchema = z.object({
     appointmentId: z.string().uuid(),
     reminderType: z.enum(['email', 'sms', 'push']).default('email'),
-    reminderTiming: z.enum(['24h', '1h', '30m', 'custom']).default('24h'),
-    scheduledFor: z.date(),
+    reminderTiming: z.enum(['now', '5m', '30m', '1h', '5h', '10h', 'custom']).default('1h'),
+    customMinutesBefore: z.number().min(1).max(10080).optional(),
+    scheduledFor: z.coerce.date(),
     content: z.string().optional(),
 });
 //# sourceMappingURL=schema.js.map

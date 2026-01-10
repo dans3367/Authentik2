@@ -165,7 +165,7 @@ export default function RemindersPage() {
   const [newAppointmentReminderEnabled, setNewAppointmentReminderEnabled] = useState(false);
   const [newAppointmentReminderData, setNewAppointmentReminderData] = useState<{
     reminderType: 'email' | 'sms' | 'push';
-    reminderTiming: '5m' | '30m' | '1h' | '5h' | '10h' | 'custom';
+    reminderTiming: 'now' | '5m' | '30m' | '1h' | '5h' | '10h' | 'custom';
     customMinutesBefore?: number;
     content?: string;
   }>({
@@ -177,7 +177,7 @@ export default function RemindersPage() {
   const [editAppointmentReminderEnabled, setEditAppointmentReminderEnabled] = useState(false);
   const [editAppointmentReminderData, setEditAppointmentReminderData] = useState<{
     reminderType: 'email' | 'sms' | 'push';
-    reminderTiming: '5m' | '30m' | '1h' | '5h' | '10h' | 'custom';
+    reminderTiming: 'now' | '5m' | '30m' | '1h' | '5h' | '10h' | 'custom';
     customMinutesBefore?: number;
     content?: string;
   }>({
@@ -214,7 +214,7 @@ export default function RemindersPage() {
 
   // Create scheduled reminder mutation
   const createScheduledReminderMutation = useMutation({
-    mutationFn: async ({ appointmentId, data }: { appointmentId: string; data: { reminderType: 'email' | 'sms' | 'push'; reminderTiming: '5m' | '30m' | '1h' | '5h' | '10h' | 'custom'; customMinutesBefore?: number; scheduledFor: Date; content?: string } }) => {
+    mutationFn: async ({ appointmentId, data }: { appointmentId: string; data: { reminderType: 'email' | 'sms' | 'push'; reminderTiming: 'now' | '5m' | '30m' | '1h' | '5h' | '10h' | 'custom'; customMinutesBefore?: number; scheduledFor: Date; content?: string } }) => {
       const response = await apiRequest('POST', '/api/appointment-reminders', {
         appointmentId,
         reminderType: data.reminderType,
@@ -449,7 +449,9 @@ export default function RemindersPage() {
         const appointmentDate = new Date(data.appointment.appointmentDate);
         let scheduledFor: Date;
         
-        if (newAppointmentReminderData.reminderTiming === 'custom' && newAppointmentReminderData.customMinutesBefore) {
+        if (newAppointmentReminderData.reminderTiming === 'now') {
+          scheduledFor = new Date();
+        } else if (newAppointmentReminderData.reminderTiming === 'custom' && newAppointmentReminderData.customMinutesBefore) {
           scheduledFor = new Date(appointmentDate.getTime() - newAppointmentReminderData.customMinutesBefore * 60 * 1000);
         } else {
           const timingMap: Record<string, number> = {
@@ -798,7 +800,7 @@ export default function RemindersPage() {
       errors.customMinutesBefore = true;
     }
 
-    if (newAppointmentReminderEnabled) {
+    if (newAppointmentReminderEnabled && newAppointmentReminderData.reminderTiming !== 'now') {
       const appointmentDate = new Date(newAppointmentData.appointmentDate);
       let scheduledFor: Date;
       
@@ -1277,12 +1279,13 @@ export default function RemindersPage() {
                                 <Label>{t('reminders.scheduleReminder.timing')}</Label>
                                 <Select 
                                   value={newAppointmentReminderData.reminderTiming} 
-                                  onValueChange={(value: '5m' | '30m' | '1h' | '5h' | '10h' | 'custom') => setNewAppointmentReminderData(prev => ({...prev, reminderTiming: value}))}
+                                  onValueChange={(value: 'now' | '5m' | '30m' | '1h' | '5h' | '10h' | 'custom') => setNewAppointmentReminderData(prev => ({...prev, reminderTiming: value}))}
                                 >
                                   <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
+                                    <SelectItem value="now">{t('reminders.scheduleReminder.sendNow')}</SelectItem>
                                     <SelectItem value="5m">{t('reminders.scheduleReminder.5mBefore')}</SelectItem>
                                     <SelectItem value="30m">{t('reminders.scheduleReminder.30mBefore')}</SelectItem>
                                     <SelectItem value="1h">{t('reminders.scheduleReminder.1hBefore')}</SelectItem>

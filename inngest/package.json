@@ -1,0 +1,26 @@
+{
+  "name": "inngest-email-server",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Inngest-based email processing server with Resend integration",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "build": "tsc",
+    "inngest:dev": "npx inngest-cli@latest dev"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.1",
+    "express": "^4.21.2",
+    "inngest": "^3.27.0",
+    "resend": "^4.7.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.16.11",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3"
+  }
+}
