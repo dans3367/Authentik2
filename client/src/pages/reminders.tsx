@@ -45,7 +45,8 @@ import {
   StickyNote,
   Loader2,
   Archive,
-  ArchiveRestore
+  ArchiveRestore,
+  RefreshCw
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -58,6 +59,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Calendar as DateCalendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Types based on our schema
 interface Customer {
@@ -146,6 +148,7 @@ export default function RemindersPage() {
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [viewAppointmentPanelOpen, setViewAppointmentPanelOpen] = useState(false);
   const [viewingAppointment, setViewingAppointment] = useState<Appointment | null>(null);
+  const [viewAppointmentTab, setViewAppointmentTab] = useState<"details" | "notes">("details");
   const [newAppointmentData, setNewAppointmentData] = useState({
     customerId: "",
     title: "",
@@ -230,6 +233,9 @@ export default function RemindersPage() {
       setScheduleReminderModalOpen(false);
       setScheduleAppointmentId("");
       refetchReminders();
+      // Invalidate appointments queries to refresh the list with updated reminder status
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] });
     },
     onError: (error: any) => {
       toast({ title: t('reminders.toasts.error'), description: error?.message || t('reminders.toasts.reminderScheduleError'), variant: 'destructive' });
@@ -442,7 +448,21 @@ export default function RemindersPage() {
         title: t('reminders.toasts.success'),
         description: t('reminders.toasts.appointmentCreated'),
       });
-      refetchAppointments();
+      
+      // Invalidate all appointment queries to ensure fresh data
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] });
+      
+      // Schedule delayed refreshes to ensure data is fully synced
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] });
+      }, 5000);
+      
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] });
+      }, 15000);
       
       // Schedule reminder if enabled
       if (newAppointmentReminderEnabled && data.appointment) {
@@ -525,7 +545,7 @@ export default function RemindersPage() {
     onSuccess: () => {
       toast({
         title: t('reminders.toasts.success'),
-        description: t('reminders.toasts.appointmentCancelled'),
+        description: 'Appointment deleted successfully',
       });
       refetchAppointments();
       refetchReminders();
@@ -534,7 +554,7 @@ export default function RemindersPage() {
     onError: (error: any) => {
       toast({
         title: t('reminders.toasts.error'),
-        description: error?.message || t('reminders.toasts.appointmentCancelError'),
+        description: error?.message || 'Failed to delete appointment',
         variant: "destructive",
       });
     },
@@ -645,6 +665,7 @@ export default function RemindersPage() {
   const handleViewAppointment = (appointment: Appointment) => {
     setViewingAppointment(appointment);
     setViewAppointmentPanelOpen(true);
+    setViewAppointmentTab("details");
   };
 
   const handleEditAppointment = (appointment: Appointment) => {
@@ -932,6 +953,16 @@ export default function RemindersPage() {
     }).format(new Date(date));
   };
 
+  const toLocalDateTimeString = (date: Date) => {
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
   // Check if all appointments are selected
   const isAllSelected = appointments.length > 0 && selectedAppointments.length === appointments.length;
   
@@ -1113,13 +1144,26 @@ export default function RemindersPage() {
                       <Calendar className="h-5 w-5" />
                       {t('reminders.tabs.appointments')}
                     </CardTitle>
-                    <Dialog open={newAppointmentModalOpen} onOpenChange={setNewAppointmentModalOpen}>
-                      <DialogTrigger asChild>
-                        <Button>
-                          <CalendarPlus className="h-4 w-4 mr-2" />
-                          {t('reminders.appointments.newAppointment')}
-                        </Button>
-                      </DialogTrigger>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => {
+                          queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+                          queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] });
+                          toast({ title: t('reminders.toasts.success'), description: 'Appointments refreshed' });
+                        }}
+                        title="Refresh appointments"
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                      <Dialog open={newAppointmentModalOpen} onOpenChange={setNewAppointmentModalOpen}>
+                        <DialogTrigger asChild>
+                          <Button>
+                            <CalendarPlus className="h-4 w-4 mr-2" />
+                            {t('reminders.appointments.newAppointment')}
+                          </Button>
+                        </DialogTrigger>
                       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
                         <DialogHeader>
                           <DialogTitle>{t('reminders.appointments.createAppointment')}</DialogTitle>
@@ -1168,7 +1212,7 @@ export default function RemindersPage() {
                             <Label>{t('reminders.appointments.dateTime')}</Label>
                             <Input 
                               type="datetime-local"
-                              value={newAppointmentData.appointmentDate.toISOString().slice(0, 16)}
+                              value={toLocalDateTimeString(newAppointmentData.appointmentDate)}
                               onChange={(e) => setNewAppointmentData(prev => ({...prev, appointmentDate: new Date(e.target.value)}))}
                               className="focus-visible:ring-0"
                             />
@@ -1347,6 +1391,7 @@ export default function RemindersPage() {
                         </Dialog>
                       </DialogContent>
                     </Dialog>
+                  </div>
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -1540,7 +1585,7 @@ export default function RemindersPage() {
                                           </DropdownMenuItem>
                                           <DropdownMenuItem className="text-red-600" onClick={() => handleCancelAppointment(appointment.id)}>
                                             <Trash2 className="h-4 w-4 mr-2" />
-                                            {t('reminders.actions.cancelAppointment')}
+                                            Delete
                                           </DropdownMenuItem>
                                         </>
                                       )}
@@ -1773,7 +1818,7 @@ export default function RemindersPage() {
                       <Label>{t('reminders.appointments.dateTime')}</Label>
                       <Input 
                         type="datetime-local"
-                        value={new Date(editingAppointment.appointmentDate).toISOString().slice(0, 16)}
+                        value={toLocalDateTimeString(new Date(editingAppointment.appointmentDate))}
                         onChange={(e) => setEditingAppointment(prev => prev ? {...prev, appointmentDate: new Date(e.target.value)} : null)}
                         className="focus-visible:ring-0"
                       />
@@ -1984,16 +2029,16 @@ export default function RemindersPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Cancel Appointment Confirmation Modal */}
+        {/* Delete Appointment Confirmation Modal */}
         <Dialog open={cancelConfirmModalOpen} onOpenChange={setCancelConfirmModalOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-red-600">
                 <AlertTriangle className="h-5 w-5" />
-                {t('reminders.cancelConfirm.title')}
+                Delete Appointment
               </DialogTitle>
               <DialogDescription>
-                {t('reminders.cancelConfirm.description')}
+                Are you sure you want to delete this appointment? This action cannot be undone.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -2008,14 +2053,14 @@ export default function RemindersPage() {
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setCancelConfirmModalOpen(false)}>
-                  {t('reminders.cancelConfirm.keep')}
+                  Cancel
                 </Button>
                 <Button 
                   variant="destructive"
                   onClick={confirmCancelAppointment}
                   disabled={cancelAppointmentMutation.isPending}
                 >
-                  {cancelAppointmentMutation.isPending ? t('reminders.cancelConfirm.cancelling') : t('reminders.cancelConfirm.confirmCancel')}
+                  {cancelAppointmentMutation.isPending ? 'Deleting...' : 'Delete'}
                 </Button>
               </div>
             </div>
@@ -2070,14 +2115,27 @@ export default function RemindersPage() {
                 <SheetHeader>
                   <SheetTitle className="flex items-center gap-2">
                     <Calendar className="h-5 w-5" />
-                    {t('reminders.appointments.title')} Details
+                    Appointment Details
                   </SheetTitle>
                   <SheetDescription>
                     View complete appointment information
                   </SheetDescription>
                 </SheetHeader>
 
-                <div className="space-y-6 mt-6">
+                <Tabs value={viewAppointmentTab} onValueChange={(value) => setViewAppointmentTab(value as "details" | "notes")} className="mt-6">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="details">Details</TabsTrigger>
+                    <TabsTrigger value="notes">
+                      Notes
+                      {notesData?.notes && notesData.notes.length > 0 && (
+                        <Badge variant="secondary" className="ml-2 text-xs">
+                          {notesData.notes.length}
+                        </Badge>
+                      )}
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="details" className="space-y-6 mt-6">
                   {/* Customer Information */}
                   <div className="space-y-3">
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
@@ -2216,6 +2274,30 @@ export default function RemindersPage() {
                     </div>
                   </div>
 
+                  {/* Metadata */}
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                      <Info className="h-4 w-4" />
+                      Metadata
+                    </h3>
+                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 dark:text-gray-400">Created</span>
+                        <span>{formatDateTime(viewingAppointment.createdAt)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 dark:text-gray-400">Last Updated</span>
+                        <span>{formatDateTime(viewingAppointment.updatedAt)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 dark:text-gray-400">Appointment ID</span>
+                        <span className="font-mono text-[10px]">{viewingAppointment.id}</span>
+                      </div>
+                    </div>
+                  </div>
+                  </TabsContent>
+
+                  <TabsContent value="notes" className="space-y-6 mt-6">
                   {/* Legacy Notes (single field) */}
                   {viewingAppointment.notes && (
                     <div className="space-y-3">
@@ -2379,30 +2461,11 @@ export default function RemindersPage() {
                       </div>
                     )}
                   </div>
+                  </TabsContent>
+                </Tabs>
 
-                  {/* Metadata */}
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                      <Info className="h-4 w-4" />
-                      Metadata
-                    </h3>
-                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500 dark:text-gray-400">Created</span>
-                        <span>{formatDateTime(viewingAppointment.createdAt)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500 dark:text-gray-400">Last Updated</span>
-                        <span>{formatDateTime(viewingAppointment.updatedAt)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500 dark:text-gray-400">Appointment ID</span>
-                        <span className="font-mono text-[10px]">{viewingAppointment.id}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
+                {/* Actions */}
+                <div className="mt-6">
                   <div className="flex gap-2 pt-4 border-t">
                     <Button 
                       className="flex-1" 

@@ -14,7 +14,70 @@ const INNGEST_URL = process.env.INNGEST_URL || 'http://localhost:3006';
 
 const router = Router();
 
-// Apply authentication to all routes
+// Internal endpoint for Inngest to update reminder status (no auth required)
+router.put('/internal/:id/status', async (req: Request, res: Response) => {
+  console.log('📧 [Internal Status] Received request:', {
+    id: req.params.id,
+    headers: req.headers['x-internal-service'],
+    body: req.body,
+  });
+  
+  try {
+    // Verify internal service header
+    const internalHeader = req.headers['x-internal-service'];
+    const internalService = Array.isArray(internalHeader)
+      ? internalHeader[0]
+      : internalHeader;
+    
+    console.log('📧 [Internal Status] Header check:', { internalHeader, internalService });
+    
+    if ((internalService || '').toString().toLowerCase() !== 'inngest') {
+      console.log('📧 [Internal Status] Rejecting - invalid header');
+      return res.status(403).json({ error: 'Forbidden', reason: 'missing_or_invalid_internal_header' });
+    }
+
+    const { id } = req.params;
+    const { status, errorMessage } = req.body;
+
+    if (!['pending', 'sent', 'failed', 'cancelled'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    // Verify reminder exists
+    const existingReminder = await db
+      .select()
+      .from(appointmentReminders)
+      .where(eq(appointmentReminders.id, id))
+      .limit(1);
+
+    if (existingReminder.length === 0) {
+      return res.status(404).json({ error: 'Reminder not found' });
+    }
+
+    // Update reminder status
+    const updatedReminder = await db
+      .update(appointmentReminders)
+      .set({
+        status,
+        errorMessage: status === 'failed' ? errorMessage : null,
+        sentAt: status === 'sent' ? new Date() : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(appointmentReminders.id, id))
+      .returning();
+
+    console.log(`📧 [Internal] Reminder ${id} status updated to: ${status}`);
+    res.json({ 
+      reminder: updatedReminder[0],
+      message: 'Reminder status updated successfully' 
+    });
+  } catch (error) {
+    console.error('Failed to update reminder status (internal):', error);
+    res.status(500).json({ error: 'Failed to update reminder status' });
+  }
+});
+
+// Apply authentication to all routes below this point
 router.use(authenticateToken);
 
 // GET /api/appointment-reminders - List reminders
@@ -161,6 +224,7 @@ router.post('/', async (req: Request, res: Response) => {
           : 'Valued Customer';
 
         const inngestPayload = {
+          reminderId: newReminder[0].id,
           appointmentId: appointment.id,
           customerId: appointment.customerId,
           customerEmail: appointment.customer.email,
@@ -198,11 +262,13 @@ router.post('/', async (req: Request, res: Response) => {
             .where(eq(appointmentReminders.id, newReminder[0].id));
         } else {
           // Update reminder status to sent on success
-          await db
+          const updatedReminder = await db
             .update(appointmentReminders)
             .set({ status: 'sent', sentAt: new Date(), updatedAt: new Date() })
-            .where(eq(appointmentReminders.id, newReminder[0].id));
+            .where(eq(appointmentReminders.id, newReminder[0].id))
+            .returning();
           console.log(`📧 Immediate reminder sent for appointment ${appointment.id} to ${appointment.customer.email}`);
+          console.log(`📧 [Debug] Updated reminder status:`, updatedReminder[0]?.status);
         }
       } catch (inngestError) {
         console.error('Error calling Inngest for immediate reminder:', inngestError);
@@ -406,22 +472,35 @@ router.put('/:id/status', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status, errorMessage } = req.body;
-    const user = (req as any).user;
-    const tenantId = user.tenantId;
-
+    
+    // Check for internal service call (from Inngest)
+    const isInternalService = req.headers['x-internal-service'] === 'inngest';
+    
     if (!['pending', 'sent', 'failed', 'cancelled'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
 
-    // Check if reminder exists and belongs to tenant
-    const existingReminder = await db
-      .select()
-      .from(appointmentReminders)
-      .where(and(
-        eq(appointmentReminders.id, id),
-        eq(appointmentReminders.tenantId, tenantId)
-      ))
-      .limit(1);
+    // For internal service calls, just verify the reminder exists
+    // For user calls, verify tenant ownership
+    let existingReminder;
+    if (isInternalService) {
+      existingReminder = await db
+        .select()
+        .from(appointmentReminders)
+        .where(eq(appointmentReminders.id, id))
+        .limit(1);
+    } else {
+      const user = (req as any).user;
+      const tenantId = user.tenantId;
+      existingReminder = await db
+        .select()
+        .from(appointmentReminders)
+        .where(and(
+          eq(appointmentReminders.id, id),
+          eq(appointmentReminders.tenantId, tenantId)
+        ))
+        .limit(1);
+    }
 
     if (existingReminder.length === 0) {
       return res.status(404).json({ error: 'Reminder not found' });

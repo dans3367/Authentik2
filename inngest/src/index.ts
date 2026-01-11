@@ -131,7 +131,7 @@ app.post("/api/schedule-newsletter", async (req, res) => {
 // API endpoint to send appointment reminder
 app.post("/api/send-reminder", async (req, res) => {
   try {
-    const { appointmentId, customerId, customerEmail, customerName, appointmentTitle, appointmentDate, appointmentTime, location, reminderType, content, tenantId, from, replyTo } = req.body;
+    const { reminderId, appointmentId, customerId, customerEmail, customerName, appointmentTitle, appointmentDate, appointmentTime, location, reminderType, content, tenantId, from, replyTo } = req.body;
 
     if (!appointmentId || !customerEmail || !customerName || !appointmentTitle || !appointmentDate || !appointmentTime || !tenantId) {
       res.status(400).json({ error: "Missing required fields" });
@@ -140,7 +140,7 @@ app.post("/api/send-reminder", async (req, res) => {
 
     await inngest.send({
       name: "reminder/send",
-      data: { appointmentId, customerId, customerEmail, customerName, appointmentTitle, appointmentDate, appointmentTime, location, reminderType: reminderType || "email", content, tenantId, from, replyTo },
+      data: { reminderId, appointmentId, customerId, customerEmail, customerName, appointmentTitle, appointmentDate, appointmentTime, location, reminderType: reminderType || "email", content, tenantId, from, replyTo },
     });
 
     res.json({ success: true, message: "Reminder queued for sending" });

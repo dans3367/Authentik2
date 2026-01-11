@@ -28,6 +28,12 @@ type EmailContact struct {
 	ConsentIPAddress           *string    `json:"consentIpAddress" db:"consent_ip_address"`
 	ConsentUserAgent           *string    `json:"consentUserAgent" db:"consent_user_agent"`
 	AddedByUserID              *string    `json:"addedByUserId" db:"added_by_user_id"`
+	Address                    *string    `json:"address" db:"address"`
+	City                       *string    `json:"city" db:"city"`
+	State                      *string    `json:"state" db:"state"`
+	ZipCode                    *string    `json:"zipCode" db:"zip_code"`
+	Country                    *string    `json:"country" db:"country"`
+	PhoneNumber                *string    `json:"phoneNumber" db:"phone_number"`
 	CreatedAt                  time.Time  `json:"createdAt" db:"created_at"`
 	UpdatedAt                  time.Time  `json:"updatedAt" db:"updated_at"`
 }

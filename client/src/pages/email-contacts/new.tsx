@@ -49,6 +49,12 @@ const addContactSchema = z.object({
   lists: z.array(z.string()).optional(),
   consentGiven: z.boolean().refine(val => val === true),
   consentMethod: z.string().default('manual_add'),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zipCode: z.string().optional(),
+  country: z.string().optional(),
+  phoneNumber: z.string().optional(),
 });
 
 type AddContactForm = z.infer<typeof addContactSchema>;
@@ -84,6 +90,12 @@ export default function NewEmailContact() {
       lists: [],
       consentGiven: false,
       consentMethod: "manual_add",
+      address: "",
+      city: "",
+      state: "",
+      zipCode: "",
+      country: "",
+      phoneNumber: "",
     },
   });
 
@@ -320,7 +332,124 @@ export default function NewEmailContact() {
                   />
                 </div>
 
-                {/* Status Field */}
+                {/* Address Fields */}
+                <div className="space-y-4 border-t pt-6">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">Address Information (Optional)</h3>
+                  
+                  <FormField
+                    control={form.control}
+                    name="address"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Street Address</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="123 Main St" 
+                            {...field} 
+                            className="bg-white dark:bg-gray-800"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="city"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>City</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="New York" 
+                              {...field} 
+                              className="bg-white dark:bg-gray-800"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="state"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>State/Province</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="NY" 
+                              {...field} 
+                              className="bg-white dark:bg-gray-800"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="zipCode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Zip/Postal Code</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="10001" 
+                              {...field} 
+                              className="bg-white dark:bg-gray-800"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="country"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Country</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="United States" 
+                              {...field} 
+                              className="bg-white dark:bg-gray-800"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="phoneNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone Number</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="+1 (555) 123-4567" 
+                            {...field} 
+                            className="bg-white dark:bg-gray-800"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Status Field */
                 <FormField
                   control={form.control}
                   name="status"

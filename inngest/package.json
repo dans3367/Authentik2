@@ -11,9 +11,13 @@
     "inngest:dev": "npx inngest-cli@latest dev"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.0.2",
+    "@types/pg": "^8.16.0",
     "dotenv": "^17.2.1",
+    "drizzle-orm": "^0.45.1",
     "express": "^4.21.2",
     "inngest": "^3.27.0",
+    "pg": "^8.16.3",
     "resend": "^4.7.0",
     "zod": "^3.24.2"
   },

@@ -364,7 +364,7 @@ emailManagementRoutes.get("/email-contacts/:id/stats", authenticateToken, requir
 // Create email contact with batch operations
 emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, async (req: any, res) => {
   try {
-    const { email, firstName, lastName, tags, lists, status, consentGiven, consentMethod, consentIpAddress, consentUserAgent } = req.body;
+    const { email, firstName, lastName, tags, lists, status, consentGiven, consentMethod, consentIpAddress, consentUserAgent, address, city, state, zipCode, country, phoneNumber } = req.body;
 
     if (!email) {
       return res.status(400).json({ message: 'Email is required' });
@@ -373,6 +373,12 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
     const sanitizedEmail = sanitizeEmail(email);
     const sanitizedFirstName = firstName ? sanitizeString(firstName) : null;
     const sanitizedLastName = lastName ? sanitizeString(lastName) : null;
+    const sanitizedAddress = address ? sanitizeString(address) : null;
+    const sanitizedCity = city ? sanitizeString(city) : null;
+    const sanitizedState = state ? sanitizeString(state) : null;
+    const sanitizedZipCode = zipCode ? sanitizeString(zipCode) : null;
+    const sanitizedCountry = country ? sanitizeString(country) : null;
+    const sanitizedPhoneNumber = phoneNumber ? sanitizeString(phoneNumber) : null;
 
     // Check if contact already exists
     const existingContact = await db.query.emailContacts.findFirst({
@@ -435,6 +441,12 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
         consentIpAddress: consentIpAddress || null,
         consentUserAgent: consentUserAgent || null,
         addedByUserId: userExists ? req.user.id : null,
+        address: sanitizedAddress,
+        city: sanitizedCity,
+        state: sanitizedState,
+        zipCode: sanitizedZipCode,
+        country: sanitizedCountry,
+        phoneNumber: sanitizedPhoneNumber,
         createdAt: now,
         updatedAt: now,
       }).returning();
@@ -477,7 +489,7 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
 emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
-    const { email, firstName, lastName, status, birthday } = req.body;
+    const { email, firstName, lastName, status, birthday, address, city, state, zipCode, country, phoneNumber } = req.body;
 
     const contact = await db.query.emailContacts.findFirst({
       where: sql`${emailContacts.id} = ${id}`,
@@ -526,6 +538,32 @@ emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenan
         return res.status(400).json({ message: 'Birthday must be in YYYY-MM-DD format' });
       }
       updateData.birthday = birthday || null;
+    }
+
+    // Optional address fields
+    if (address !== undefined) {
+      updateData.address = address ? sanitizeString(address) : null;
+    }
+
+    if (city !== undefined) {
+      updateData.city = city ? sanitizeString(city) : null;
+    }
+
+    if (state !== undefined) {
+      updateData.state = state ? sanitizeString(state) : null;
+    }
+
+    if (zipCode !== undefined) {
+      updateData.zipCode = zipCode ? sanitizeString(zipCode) : null;
+    }
+
+    if (country !== undefined) {
+      updateData.country = country ? sanitizeString(country) : null;
+    }
+
+    // Optional phone number
+    if (phoneNumber !== undefined) {
+      updateData.phoneNumber = phoneNumber ? sanitizeString(phoneNumber) : null;
     }
 
     const updatedContact = await db.update(emailContacts)

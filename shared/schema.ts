@@ -353,6 +353,14 @@ export const emailContacts = pgTable("email_contacts", {
   consentIpAddress: text("consent_ip_address"),
   consentUserAgent: text("consent_user_agent"),
   addedByUserId: varchar("added_by_user_id").references(() => betterAuthUser.id),
+  // Address fields
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  country: text("country"),
+  // Contact fields
+  phoneNumber: text("phone_number"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1294,6 +1302,14 @@ export const createEmailContactSchema = z.object({
     message: "You must acknowledge consent before adding this contact"
   }),
   consentMethod: z.string().default('manual_add'),
+  // Address fields
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zipCode: z.string().optional(),
+  country: z.string().optional(),
+  // Contact fields
+  phoneNumber: z.string().optional(),
 });
 
 export const updateEmailContactSchema = z.object({
@@ -1305,6 +1321,14 @@ export const updateEmailContactSchema = z.object({
   lastActivity: z.date().optional(),
   birthday: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Birthday must be in YYYY-MM-DD format").optional(),
   birthdayEmailEnabled: z.boolean().optional(),
+  // Address fields
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zipCode: z.string().optional(),
+  country: z.string().optional(),
+  // Contact fields
+  phoneNumber: z.string().optional(),
 });
 
 export const createEmailListSchema = z.object({

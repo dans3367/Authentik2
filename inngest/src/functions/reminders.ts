@@ -1,8 +1,11 @@
 import { inngest } from "../client";
 import { sendEmail } from "../email";
 import { z } from "zod";
+import { db } from "../db";
+import { sql } from "drizzle-orm";
 
 const reminderEventSchema = z.object({
+  reminderId: z.string().optional(),
   appointmentId: z.string(),
   customerId: z.string(),
   customerEmail: z.string(),
@@ -16,6 +19,7 @@ const reminderEventSchema = z.object({
   tenantId: z.string(),
   from: z.string().optional(),
   replyTo: z.string().optional(),
+  databaseUrl: z.string().optional(),
 });
 
 const scheduledReminderEventSchema = reminderEventSchema.extend({
@@ -62,12 +66,52 @@ export const sendReminderFunction = inngest.createFunction(
       throw new Error(`Failed to send reminder: ${result.error}`);
     }
 
+    // Update reminder status to 'sent' in database using direct PostgreSQL connection
+    const statusUpdate = await step.run("update-reminder-status", async () => {
+      if (!data.reminderId) {
+        return { updated: false, reason: "missing_reminderId" as const };
+      }
+
+      try {
+        console.log(`📧 [Inngest] Attempting to update reminder ${data.reminderId} and appointment ${data.appointmentId}`);
+        
+        // Update reminder status
+        const reminderResult = await db.execute(sql`
+          UPDATE appointment_reminders 
+          SET status = 'sent', 
+              sent_at = NOW(), 
+              updated_at = NOW()
+          WHERE id = ${data.reminderId}
+          RETURNING id, status, sent_at
+        `);
+        console.log(`📧 [Inngest] Reminder update result:`, reminderResult);
+        
+        // Also update the appointment's reminder_sent_at timestamp
+        const appointmentResult = await db.execute(sql`
+          UPDATE appointments 
+          SET reminder_sent = true,
+              reminder_sent_at = NOW()
+          WHERE id = ${data.appointmentId}
+          RETURNING id, reminder_sent, reminder_sent_at
+        `);
+        console.log(`📧 [Inngest] Appointment update result:`, appointmentResult);
+        
+        console.log(`📧 [Inngest] Reminder ${data.reminderId} status updated to 'sent' via direct DB`);
+        return { updated: true, reminderResult, appointmentResult };
+      } catch (err) {
+        console.error("Failed to update reminder status in database:", err);
+        return { updated: false, reason: "db_error" as const, error: String(err) };
+      }
+    });
+
     return {
       emailId: result.id,
+      reminderId: data.reminderId,
       appointmentId: data.appointmentId,
       customerId: data.customerId,
       customerEmail: data.customerEmail,
       sentAt: new Date().toISOString(),
+      statusUpdate,
     };
   }
 );
@@ -204,6 +248,10 @@ function generateReminderEmailHtml(data: z.infer<typeof reminderEventSchema>): s
       </div>`
     : "";
 
+  const baseUrl = process.env.API_URL || 'http://localhost:3000';
+  const confirmUrl = `${baseUrl}/api/appointments/${data.appointmentId}/confirm`;
+  const declineUrl = `${baseUrl}/api/appointments/${data.appointmentId}/decline`;
+
   return `
 <!DOCTYPE html>
 <html>
@@ -229,6 +277,20 @@ function generateReminderEmailHtml(data: z.infer<typeof reminderEventSchema>): s
     </div>
     
     ${customMessageSection}
+    
+    <div style="margin: 30px 0; text-align: center;">
+      <p style="margin: 0 0 15px 0; font-size: 16px; font-weight: 600; color: #1f2937;">Will you be attending?</p>
+      <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto;">
+        <tr>
+          <td style="padding: 0 8px;">
+            <a href="${confirmUrl}" style="display: inline-block; padding: 12px 32px; background-color: #10b981; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">Confirm</a>
+          </td>
+          <td style="padding: 0 8px;">
+            <a href="${declineUrl}" style="display: inline-block; padding: 12px 32px; background-color: #ef4444; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">Not attending</a>
+          </td>
+        </tr>
+      </table>
+    </div>
     
     <p style="margin: 20px 0 0 0; color: #6b7280; font-size: 14px;">
       If you need to reschedule or cancel, please contact us as soon as possible.

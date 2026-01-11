@@ -53,6 +53,12 @@ interface Contact {
   consentMethod?: string | null;
   consentIpAddress?: string | null;
   addedByUserId?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zipCode?: string | null;
+  country?: string | null;
+  phoneNumber?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -351,6 +357,62 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                     <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Email Address</label>
                     <p className="text-gray-900 dark:text-white font-mono text-sm break-all">{contact.email}</p>
                   </div>
+                  
+                  {/* Address Information */}
+                  {(contact.address || contact.city || contact.state || contact.zipCode || contact.country || contact.phoneNumber) && (
+                    <>
+                      <Separator />
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Address & Contact</h4>
+                        
+                        {contact.address && (
+                          <div>
+                            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Street Address</label>
+                            <p className="text-gray-900 dark:text-white">{contact.address}</p>
+                          </div>
+                        )}
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          {contact.city && (
+                            <div>
+                              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">City</label>
+                              <p className="text-gray-900 dark:text-white">{contact.city}</p>
+                            </div>
+                          )}
+                          
+                          {contact.state && (
+                            <div>
+                              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">State/Province</label>
+                              <p className="text-gray-900 dark:text-white">{contact.state}</p>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          {contact.zipCode && (
+                            <div>
+                              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Zip/Postal Code</label>
+                              <p className="text-gray-900 dark:text-white">{contact.zipCode}</p>
+                            </div>
+                          )}
+                          
+                          {contact.country && (
+                            <div>
+                              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Country</label>
+                              <p className="text-gray-900 dark:text-white">{contact.country}</p>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {contact.phoneNumber && (
+                          <div>
+                            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Phone Number</label>
+                            <p className="text-gray-900 dark:text-white font-mono text-sm">{contact.phoneNumber}</p>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
 
