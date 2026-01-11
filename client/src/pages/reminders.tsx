@@ -137,6 +137,7 @@ export default function RemindersPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [showArchived, setShowArchived] = useState(false);
   const [selectedAppointments, setSelectedAppointments] = useState<string[]>([]);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const [newAppointmentModalOpen, setNewAppointmentModalOpen] = useState(false);
   const [newAppointmentReminderModalOpen, setNewAppointmentReminderModalOpen] = useState(false);
 
@@ -198,6 +199,10 @@ export default function RemindersPage() {
   const [newNoteContent, setNewNoteContent] = useState("");
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteContent, setEditingNoteContent] = useState("");
+
+  // Pagination state for reminders table
+  const [remindersPage, setRemindersPage] = useState(1);
+  const [remindersPageSize] = useState(10);
 
   // Delete/cancel reminder mutation
   const deleteReminderMutation = useMutation({
@@ -326,6 +331,13 @@ export default function RemindersPage() {
   const upcomingAppointmentsForSidebar: Appointment[] = upcomingAppointmentsData?.appointments || [];
   const customers: Customer[] = customersData?.contacts || [];
   const reminders: AppointmentReminder[] = remindersData?.reminders || [];
+
+  // Pagination calculations for reminders
+  const remindersTotal = reminders.length;
+  const remindersTotalPages = Math.ceil(remindersTotal / remindersPageSize);
+  const remindersStartIndex = (remindersPage - 1) * remindersPageSize;
+  const remindersEndIndex = remindersStartIndex + remindersPageSize;
+  const paginatedReminders = reminders.slice(remindersStartIndex, remindersEndIndex);
 
   // Fetch appointment notes when viewing an appointment
   const { 
@@ -1151,12 +1163,18 @@ export default function RemindersPage() {
                         onClick={() => {
                           queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
                           queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] });
+                          setLastRefreshedAt(new Date());
                           toast({ title: t('reminders.toasts.success'), description: 'Appointments refreshed' });
                         }}
                         title="Refresh appointments"
                       >
                         <RefreshCw className="h-4 w-4" />
                       </Button>
+                      {lastRefreshedAt && (
+                        <span className="text-sm text-muted-foreground">
+                          Last refreshed: {lastRefreshedAt.toLocaleTimeString()}
+                        </span>
+                      )}
                       <Dialog open={newAppointmentModalOpen} onOpenChange={setNewAppointmentModalOpen}>
                         <DialogTrigger asChild>
                           <Button>
@@ -1637,20 +1655,21 @@ export default function RemindersPage() {
                   <p className="text-sm text-gray-500 mb-6">{t('reminders.reminderHistory.noRemindersDescription')}</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t('reminders.reminderHistory.appointment')}</TableHead>
-                        <TableHead>{t('reminders.reminderHistory.type')}</TableHead>
-                        <TableHead>{t('reminders.reminderHistory.timing')}</TableHead>
-                        <TableHead>{t('reminders.reminderHistory.scheduledFor')}</TableHead>
-                        <TableHead>{t('reminders.reminderHistory.status')}</TableHead>
-                        <TableHead>{t('reminders.reminderHistory.sentAt')}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {reminders.map((reminder) => (
+                <div className="space-y-4">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{t('reminders.reminderHistory.appointment')}</TableHead>
+                          <TableHead>{t('reminders.reminderHistory.type')}</TableHead>
+                          <TableHead>{t('reminders.reminderHistory.timing')}</TableHead>
+                          <TableHead>{t('reminders.reminderHistory.scheduledFor')}</TableHead>
+                          <TableHead>{t('reminders.reminderHistory.status')}</TableHead>
+                          <TableHead>{t('reminders.reminderHistory.sentAt')}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedReminders.map((reminder) => (
                         <TableRow key={reminder.id}>
                           <TableCell>
                             <div>
@@ -1681,6 +1700,47 @@ export default function RemindersPage() {
                     </TableBody>
                   </Table>
                 </div>
+
+                {/* Pagination Controls */}
+                {remindersTotalPages > 1 && (
+                  <div className="flex items-center justify-between px-2">
+                    <div className="text-sm text-gray-600">
+                      Showing {remindersStartIndex + 1} to {Math.min(remindersEndIndex, remindersTotal)} of {remindersTotal} reminders
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setRemindersPage(prev => Math.max(1, prev - 1))}
+                        disabled={remindersPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: remindersTotalPages }, (_, i) => i + 1).map((page) => (
+                          <Button
+                            key={page}
+                            variant={remindersPage === page ? "default" : "outline"}
+                            size="sm"
+                            className="w-8 h-8 p-0"
+                            onClick={() => setRemindersPage(page)}
+                          >
+                            {page}
+                          </Button>
+                        ))}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setRemindersPage(prev => Math.min(remindersTotalPages, prev + 1))}
+                        disabled={remindersPage === remindersTotalPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
               )}
             </CardContent>
           </Card>

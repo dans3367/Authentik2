@@ -109,7 +109,7 @@ export class AppointmentReminderWorker extends EventEmitter {
 
         const subject = `Reminder: ${a?.title || 'Appointment'}`;
         
-        const baseUrl = process.env.API_URL || 'http://localhost:3000';
+        const baseUrl = process.env.API_URL || 'http://localhost:5002';
         const confirmUrl = `${baseUrl}/api/appointments/${a?.id}/confirm`;
         const declineUrl = `${baseUrl}/api/appointments/${a?.id}/decline`;
         

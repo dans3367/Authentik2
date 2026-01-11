@@ -248,7 +248,7 @@ function generateReminderEmailHtml(data: z.infer<typeof reminderEventSchema>): s
       </div>`
     : "";
 
-  const baseUrl = process.env.API_URL || 'http://localhost:3000';
+  const baseUrl = process.env.API_URL || 'http://localhost:5002';
   const confirmUrl = `${baseUrl}/api/appointments/${data.appointmentId}/confirm`;
   const declineUrl = `${baseUrl}/api/appointments/${data.appointmentId}/decline`;
 
