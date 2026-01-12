@@ -271,6 +271,9 @@ export default function RemindersPage() {
   const [archiveAppointmentId, setArchiveAppointmentId] = useState<string>("");
   const [archiveConfirmModalOpen, setArchiveConfirmModalOpen] = useState(false);
 
+  // Past date confirmation state
+  const [pastDateConfirmModalOpen, setPastDateConfirmModalOpen] = useState(false);
+
   // Fetch appointments
   const { 
     data: appointmentsData,
@@ -619,6 +622,32 @@ export default function RemindersPage() {
     },
   });
 
+  // Confirm appointment mutation
+  const confirmAppointmentMutation = useMutation({
+    mutationFn: async (appointmentId: string) => {
+      const response = await apiRequest('PATCH', `/api/appointments/${appointmentId}`, {
+        status: 'confirmed',
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: t('reminders.toasts.success'),
+        description: 'Appointment confirmed successfully',
+      });
+      refetchAppointments();
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t('reminders.toasts.error'),
+        description: error?.message || 'Failed to confirm appointment',
+        variant: "destructive",
+      });
+    },
+  });
+
   const resetNewAppointmentData = () => {
     setNewAppointmentData({
       customerId: "",
@@ -872,6 +901,20 @@ export default function RemindersPage() {
     }
     
     setNewAppointmentErrors({});
+    
+    // Check if appointment date is in the past
+    const appointmentDate = new Date(newAppointmentData.appointmentDate);
+    const now = new Date();
+    if (appointmentDate < now) {
+      setPastDateConfirmModalOpen(true);
+      return;
+    }
+    
+    createAppointmentMutation.mutate(newAppointmentData);
+  };
+
+  const confirmPastDateAppointment = () => {
+    setPastDateConfirmModalOpen(false);
     createAppointmentMutation.mutate(newAppointmentData);
   };
 
@@ -1588,6 +1631,11 @@ export default function RemindersPage() {
                                     <DropdownMenuContent>
                                       {!showArchived && (
                                         <>
+                                          <DropdownMenuItem onClick={() => confirmAppointmentMutation.mutate(appointment.id)}>
+                                            <CheckCircle className="h-4 w-4 mr-2" />
+                                            Confirm Appointment
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSeparator />
                                           <DropdownMenuItem onClick={() => sendReminderMutation.mutate({ appointmentIds: [appointment.id] })}>
                                             <Send className="h-4 w-4 mr-2" />
                                             {t('reminders.actions.sendReminder')}
@@ -2167,6 +2215,44 @@ export default function RemindersPage() {
           </DialogContent>
         </Dialog>
 
+        {/* Past Date Confirmation Modal */}
+        <Dialog open={pastDateConfirmModalOpen} onOpenChange={setPastDateConfirmModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-amber-600">
+                <AlertTriangle className="h-5 w-5" />
+                Past Date Warning
+              </DialogTitle>
+              <DialogDescription>
+                You are scheduling an appointment for a date in the past. Are you sure you want to continue?
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
+                <p className="font-medium">{newAppointmentData.title || 'Untitled Appointment'}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Scheduled for: {formatDateTime(newAppointmentData.appointmentDate)}
+                </p>
+                <p className="text-sm text-amber-700 dark:text-amber-400 mt-2 flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  This date is in the past
+                </p>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setPastDateConfirmModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={confirmPastDateAppointment}
+                  disabled={createAppointmentMutation.isPending}
+                >
+                  {createAppointmentMutation.isPending ? 'Creating...' : 'Create Anyway'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* View Appointment Side Panel */}
         <Sheet open={viewAppointmentPanelOpen} onOpenChange={setViewAppointmentPanelOpen}>
           <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
@@ -2175,18 +2261,18 @@ export default function RemindersPage() {
                 <SheetHeader>
                   <SheetTitle className="flex items-center gap-2">
                     <Calendar className="h-5 w-5" />
-                    Appointment Details
+                    {t('reminders.details.title')}
                   </SheetTitle>
                   <SheetDescription>
-                    View complete appointment information
+                    {t('reminders.details.viewDescription')}
                   </SheetDescription>
                 </SheetHeader>
 
                 <Tabs value={viewAppointmentTab} onValueChange={(value) => setViewAppointmentTab(value as "details" | "notes")} className="mt-6">
                   <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="details">Details</TabsTrigger>
+                    <TabsTrigger value="details">{t('reminders.details.tabs.details')}</TabsTrigger>
                     <TabsTrigger value="notes">
-                      Notes
+                      {t('reminders.details.tabs.notes')}
                       {notesData?.notes && notesData.notes.length > 0 && (
                         <Badge variant="secondary" className="ml-2 text-xs">
                           {notesData.notes.length}
@@ -2200,15 +2286,15 @@ export default function RemindersPage() {
                   <div className="space-y-3">
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                       <Users className="h-4 w-4" />
-                      Customer Information
+                      {t('reminders.details.customerInfo')}
                     </h3>
                     <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
                       <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Name</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.name')}</p>
                         <p className="font-medium">{getCustomerName(viewingAppointment.customer)}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Email</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.email')}</p>
                         <p className="text-sm">{viewingAppointment.customer?.email || 'N/A'}</p>
                       </div>
                     </div>
@@ -2218,33 +2304,33 @@ export default function RemindersPage() {
                   <div className="space-y-3">
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                       <Calendar className="h-4 w-4" />
-                      Appointment Details
+                      {t('reminders.details.appointmentDetails')}
                     </h3>
                     <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-3">
                       <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Title</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.appointments.title')}</p>
                         <p className="font-medium">{viewingAppointment.title}</p>
                       </div>
                       {viewingAppointment.description && (
                         <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Description</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.descriptionLabel')}</p>
                           <p className="text-sm">{viewingAppointment.description}</p>
                         </div>
                       )}
                       <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Date & Time</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.appointments.dateTime')}</p>
                         <p className="text-sm font-medium">{formatDateTime(viewingAppointment.appointmentDate)}</p>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Duration</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.appointments.duration')}</p>
                           <p className="text-sm flex items-center gap-1">
                             <Timer className="h-3 w-3" />
                             {viewingAppointment.duration} {t('reminders.appointments.minutes')}
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Status</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.appointments.status')}</p>
                           <Badge className={getStatusColor(viewingAppointment.status)}>
                             {viewingAppointment.status.replace('_', ' ')}
                           </Badge>
@@ -2252,7 +2338,7 @@ export default function RemindersPage() {
                       </div>
                       {viewingAppointment.location && (
                         <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Location</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.appointments.location')}</p>
                           <p className="text-sm flex items-center gap-1">
                             <MapPin className="h-3 w-3" />
                             {viewingAppointment.location}
@@ -2261,7 +2347,7 @@ export default function RemindersPage() {
                       )}
                       {viewingAppointment.serviceType && (
                         <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Service Type</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.serviceType')}</p>
                           <p className="text-sm">{viewingAppointment.serviceType}</p>
                         </div>
                       )}
@@ -2272,33 +2358,33 @@ export default function RemindersPage() {
                   <div className="space-y-3">
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                       <Bell className="h-4 w-4" />
-                      Reminder Status
+                      {t('reminders.details.reminderStatus')}
                     </h3>
                     <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
                       <div className="flex items-center justify-between">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Reminder Sent</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.reminderSent')}</p>
                         {viewingAppointment.reminderSent ? (
                           <div className="flex items-center gap-1 text-green-600">
                             <CheckCircle className="h-4 w-4" />
-                            <span className="text-sm font-medium">Yes</span>
+                            <span className="text-sm font-medium">{t('common.yes')}</span>
                           </div>
                         ) : (
                           <div className="flex items-center gap-1 text-gray-400">
                             <XCircle className="h-4 w-4" />
-                            <span className="text-sm">No</span>
+                            <span className="text-sm">{t('common.no')}</span>
                           </div>
                         )}
                       </div>
                       {viewingAppointment.reminderSentAt && (
                         <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Sent At</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.sentAt')}</p>
                           <p className="text-sm">{formatDateTime(viewingAppointment.reminderSentAt)}</p>
                         </div>
                       )}
                       {reminders.some(r => r.appointmentId === viewingAppointment.id && r.status === 'pending') && (
                         <div className="flex items-center gap-2 text-blue-600 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
                           <Clock className="h-4 w-4" />
-                          <span className="text-sm">Reminder scheduled</span>
+                          <span className="text-sm">{t('reminders.details.reminderScheduled')}</span>
                         </div>
                       )}
                     </div>
@@ -2308,26 +2394,26 @@ export default function RemindersPage() {
                   <div className="space-y-3">
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                       <CheckCircle className="h-4 w-4" />
-                      Confirmation Status
+                      {t('reminders.details.confirmationStatus')}
                     </h3>
                     <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
                       <div className="flex items-center justify-between">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Confirmed</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.confirmed')}</p>
                         {viewingAppointment.confirmationReceived ? (
                           <div className="flex items-center gap-1 text-green-600">
                             <CheckCircle className="h-4 w-4" />
-                            <span className="text-sm font-medium">Yes</span>
+                            <span className="text-sm font-medium">{t('common.yes')}</span>
                           </div>
                         ) : (
                           <div className="flex items-center gap-1 text-gray-400">
                             <XCircle className="h-4 w-4" />
-                            <span className="text-sm">No</span>
+                            <span className="text-sm">{t('common.no')}</span>
                           </div>
                         )}
                       </div>
                       {viewingAppointment.confirmationReceivedAt && (
                         <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Confirmed At</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.confirmedAt')}</p>
                           <p className="text-sm">{formatDateTime(viewingAppointment.confirmationReceivedAt)}</p>
                         </div>
                       )}
@@ -2338,19 +2424,19 @@ export default function RemindersPage() {
                   <div className="space-y-3">
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                       <Info className="h-4 w-4" />
-                      Metadata
+                      {t('reminders.details.metadata')}
                     </h3>
                     <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2 text-xs">
                       <div className="flex justify-between">
-                        <span className="text-gray-500 dark:text-gray-400">Created</span>
+                        <span className="text-gray-500 dark:text-gray-400">{t('reminders.details.created')}</span>
                         <span>{formatDateTime(viewingAppointment.createdAt)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-500 dark:text-gray-400">Last Updated</span>
+                        <span className="text-gray-500 dark:text-gray-400">{t('reminders.details.lastUpdated')}</span>
                         <span>{formatDateTime(viewingAppointment.updatedAt)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-500 dark:text-gray-400">Appointment ID</span>
+                        <span className="text-gray-500 dark:text-gray-400">{t('reminders.details.appointmentId')}</span>
                         <span className="font-mono text-[10px]">{viewingAppointment.id}</span>
                       </div>
                     </div>
@@ -2363,7 +2449,7 @@ export default function RemindersPage() {
                     <div className="space-y-3">
                       <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                         <MessageSquare className="h-4 w-4" />
-                        Quick Notes
+                        {t('reminders.details.quickNotes')}
                       </h3>
                       <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
                         <p className="text-sm whitespace-pre-wrap">{viewingAppointment.notes}</p>
@@ -2375,7 +2461,7 @@ export default function RemindersPage() {
                   <div className="space-y-3">
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                       <StickyNote className="h-4 w-4" />
-                      Appointment Notes
+                      {t('reminders.details.appointmentNotes')}
                       {notesData?.notes && notesData.notes.length > 0 && (
                         <Badge variant="secondary" className="ml-1 text-xs">
                           {notesData.notes.length}
@@ -2386,7 +2472,7 @@ export default function RemindersPage() {
                     {/* Add new note form */}
                     <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-3">
                       <Textarea
-                        placeholder="Add a new note..."
+                        placeholder={t('reminders.details.addNotePlaceholder')}
                         value={newNoteContent}
                         onChange={(e) => setNewNoteContent(e.target.value)}
                         rows={3}
@@ -2408,12 +2494,12 @@ export default function RemindersPage() {
                           {createNoteMutation.isPending ? (
                             <>
                               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Adding...
+                              {t('reminders.details.adding')}
                             </>
                           ) : (
                             <>
                               <Plus className="h-4 w-4 mr-2" />
-                              Add Note
+                              {t('reminders.details.addNote')}
                             </>
                           )}
                         </Button>
@@ -2517,7 +2603,7 @@ export default function RemindersPage() {
                       </div>
                     ) : (
                       <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">
-                        No notes yet. Add your first note above.
+                        {t('reminders.details.noNotes')}
                       </div>
                     )}
                   </div>
@@ -2535,13 +2621,13 @@ export default function RemindersPage() {
                       }}
                     >
                       <Edit className="h-4 w-4 mr-2" />
-                      Edit Appointment
+                      {t('reminders.details.editAppointment')}
                     </Button>
                     <Button 
                       variant="outline"
                       onClick={() => setViewAppointmentPanelOpen(false)}
                     >
-                      Close
+                      {t('reminders.details.close')}
                     </Button>
                   </div>
                 </div>

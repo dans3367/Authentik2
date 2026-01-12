@@ -324,6 +324,39 @@
       "status": "Status",
       "reminder": "Reminder",
       "actions": "Actions"
+    },
+    "details": {
+      "title": "Appointment Details",
+      "viewDescription": "View complete appointment information",
+      "tabs": {
+        "details": "Details",
+        "notes": "Notes"
+      },
+      "customerInfo": "Customer Information",
+      "name": "Name",
+      "email": "Email",
+      "appointmentDetails": "Appointment Details",
+      "descriptionLabel": "Description",
+      "serviceType": "Service Type",
+      "reminderStatus": "Reminder Status",
+      "reminderSent": "Reminder Sent",
+      "sentAt": "Sent At",
+      "reminderScheduled": "Reminder scheduled",
+      "confirmationStatus": "Confirmation Status",
+      "confirmed": "Confirmed",
+      "confirmedAt": "Confirmed At",
+      "metadata": "Metadata",
+      "created": "Created",
+      "lastUpdated": "Last Updated",
+      "appointmentId": "Appointment ID",
+      "quickNotes": "Quick Notes",
+      "appointmentNotes": "Appointment Notes",
+      "addNote": "Add Note",
+      "addNotePlaceholder": "Add a new note...",
+      "adding": "Adding...",
+      "noNotes": "No notes yet. Add your first note above.",
+      "editAppointment": "Edit Appointment",
+      "close": "Close"
     }
   },
   "birthdays": {

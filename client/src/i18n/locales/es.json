@@ -229,6 +229,39 @@
       "status": "Estado",
       "reminder": "Recordatorio",
       "actions": "Acciones"
+    },
+    "details": {
+      "title": "Detalles de la Cita",
+      "viewDescription": "Ver información completa de la cita",
+      "tabs": {
+        "details": "Detalles",
+        "notes": "Notas"
+      },
+      "customerInfo": "Información del Cliente",
+      "name": "Nombre",
+      "email": "Correo Electrónico",
+      "appointmentDetails": "Detalles de la Cita",
+      "descriptionLabel": "Descripción",
+      "serviceType": "Tipo de Servicio",
+      "reminderStatus": "Estado del Recordatorio",
+      "reminderSent": "Recordatorio Enviado",
+      "sentAt": "Enviado El",
+      "reminderScheduled": "Recordatorio programado",
+      "confirmationStatus": "Estado de Confirmación",
+      "confirmed": "Confirmado",
+      "confirmedAt": "Confirmado El",
+      "metadata": "Metadatos",
+      "created": "Creado",
+      "lastUpdated": "Última Actualización",
+      "appointmentId": "ID de Cita",
+      "quickNotes": "Notas Rápidas",
+      "appointmentNotes": "Notas de la Cita",
+      "addNote": "Agregar Nota",
+      "addNotePlaceholder": "Agregar una nueva nota...",
+      "adding": "Agregando...",
+      "noNotes": "Aún no hay notas. Agrega tu primera nota arriba.",
+      "editAppointment": "Editar Cita",
+      "close": "Cerrar"
     }
   },
   "birthdays": {
