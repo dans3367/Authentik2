@@ -116,11 +116,16 @@
       "createFirst": "Crea tu primera cita para comenzar",
       "searchPlaceholder": "Buscar citas...",
       "allStatuses": "Todos los Estados",
-      "scheduled": "Programada",
-      "confirmed": "Confirmada",
-      "cancelled": "Cancelada",
-      "completed": "Completada",
-      "noShow": "No Asistió",
+      "scheduled": "Programado",
+      "confirmed": "Confirmado",
+      "cancelled": "Cancelado",
+      "completed": "Completado",
+      "noShow": "No Se Presentó",
+      "dateRange": "Rango de Fechas:",
+      "fromDate": "Desde Fecha",
+      "toDate": "Hasta Fecha",
+      "filterByDate": "Filtrar por Fecha",
+      "clearDates": "Limpiar Fechas",
       "selected": "seleccionados",
       "clearSelection": "Limpiar Selección",
       "noUpcoming": "No hay citas próximas",
@@ -153,7 +158,8 @@
       "status": "Estado",
       "sentAt": "Enviado El",
       "sent": "Enviado",
-      "pending": "Pendiente"
+      "pending": "Pendiente",
+      "notSet": "No Establecido"
     },
     "scheduleReminder": {
       "title": "Programar Recordatorio",
@@ -709,7 +715,14 @@
       "totalContacts": "Total de Contactos",
       "activeSubscribers": "Suscriptores Activos",
       "lists": "Listas",
-      "avgEngagement": "Compromiso Promedio"
+      "avgEngagement": "Compromiso Promedio",
+      "allContacts": "Todos los contactos",
+      "ofTotal": "del total",
+      "emailLists": "Listas de correo",
+      "openRate": "Tasa de apertura"
+    },
+    "list": {
+      "title": "Lista de Contactos"
     },
     "filters": {
       "searchPlaceholder": "Buscar contactos...",

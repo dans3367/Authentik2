@@ -212,6 +212,11 @@
       "cancelled": "Cancelled",
       "completed": "Completed",
       "noShow": "No Show",
+      "dateRange": "Date Range:",
+      "fromDate": "From Date",
+      "toDate": "To Date",
+      "filterByDate": "Filter by Date",
+      "clearDates": "Clear Dates",
       "selected": "selected",
       "clearSelection": "Clear Selection",
       "noUpcoming": "No upcoming appointments",
@@ -244,7 +249,8 @@
       "status": "Status",
       "sentAt": "Sent At",
       "sent": "Sent",
-      "pending": "Pending"
+      "pending": "Pending",
+      "notSet": "Not Set"
     },
     "scheduleReminder": {
       "title": "Schedule Reminder",
@@ -812,7 +818,14 @@
       "totalContacts": "Total Contacts",
       "activeSubscribers": "Active Subscribers",
       "lists": "Lists",
-      "avgEngagement": "Avg Engagement"
+      "avgEngagement": "Avg Engagement",
+      "allContacts": "All contacts",
+      "ofTotal": "of total",
+      "emailLists": "Email lists",
+      "openRate": "Open rate"
+    },
+    "list": {
+      "title": "Contacts List"
     },
     "filters": {
       "searchPlaceholder": "Search contacts...",

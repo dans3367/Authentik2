@@ -134,12 +134,24 @@ export default function RemindersPage() {
     { label: t('reminders.pageTitle'), icon: Bell }
   ]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showArchived, setShowArchived] = useState(false);
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [selectedAppointments, setSelectedAppointments] = useState<string[]>([]);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const [newAppointmentModalOpen, setNewAppointmentModalOpen] = useState(false);
   const [newAppointmentReminderModalOpen, setNewAppointmentReminderModalOpen] = useState(false);
+
+  // Debounce search query to avoid jittery API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300); // 300ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
@@ -280,12 +292,14 @@ export default function RemindersPage() {
     isLoading: appointmentsLoading,
     refetch: refetchAppointments 
   } = useQuery<{appointments: Appointment[]}>({
-    queryKey: ['/api/appointments', searchQuery, statusFilter, showArchived],
+    queryKey: ['/api/appointments', debouncedSearchQuery, statusFilter, showArchived, dateFrom, dateTo],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (searchQuery) params.append('search', searchQuery);
+      if (debouncedSearchQuery) params.append('search', debouncedSearchQuery);
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (showArchived) params.append('archived', 'true');
+      if (dateFrom) params.append('dateFrom', dateFrom.toISOString());
+      if (dateTo) params.append('dateTo', dateTo.toISOString());
       
       const response = await apiRequest('GET', `/api/appointments?${params.toString()}`);
       return response.json();
@@ -1480,6 +1494,60 @@ export default function RemindersPage() {
                         <SelectItem value="no_show">{t('reminders.appointments.noShow')}</SelectItem>
                       </SelectContent>
                     </Select>
+                    
+                    {/* Date Range Filter */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={`flex items-center gap-2 ${(dateFrom || dateTo) ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                        >
+                          <Calendar className="h-4 w-4" />
+                          {(dateFrom || dateTo) ? (
+                            <span className="text-sm">
+                              {dateFrom ? dateFrom.toLocaleDateString() : '...'} - {dateTo ? dateTo.toLocaleDateString() : '...'}
+                            </span>
+                          ) : (
+                            <span className="text-sm">{t('reminders.appointments.filterByDate')}</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-4" align="start">
+                        <div className="space-y-4">
+                          <div>
+                            <Label className="text-sm font-medium mb-2 block">{t('reminders.appointments.fromDate')}</Label>
+                            <DateCalendar
+                              selected={dateFrom}
+                              onSelect={setDateFrom}
+                            />
+                          </div>
+                          <Separator />
+                          <div>
+                            <Label className="text-sm font-medium mb-2 block">{t('reminders.appointments.toDate')}</Label>
+                            <DateCalendar
+                              selected={dateTo}
+                              onSelect={setDateTo}
+                            />
+                          </div>
+                          {(dateFrom || dateTo) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setDateFrom(undefined);
+                                setDateTo(undefined);
+                              }}
+                              className="w-full"
+                            >
+                              <XCircle className="h-4 w-4 mr-2" />
+                              {t('reminders.appointments.clearDates')}
+                            </Button>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    
                     <Button
                       variant={showArchived ? "default" : "outline"}
                       size="sm"
@@ -1609,7 +1677,7 @@ export default function RemindersPage() {
                                   ) : (
                                     <div className="flex items-center gap-1 text-gray-400">
                                       <Clock className="h-4 w-4" />
-                                      <span className="text-sm">{t('reminders.reminderHistory.pending')}</span>
+                                      <span className="text-sm">{t('reminders.reminderHistory.notSet')}</span>
                                     </div>
                                   )}
                                 </div>

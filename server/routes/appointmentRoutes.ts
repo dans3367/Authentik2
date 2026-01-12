@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { and, eq, desc, asc, like, gte, lte, isNull, isNotNull } from 'drizzle-orm';
+import { and, eq, desc, asc, like, gte, lte, isNull, isNotNull, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db';
 import { 
@@ -87,10 +87,6 @@ router.get('/', async (req: Request, res: Response) => {
       conditions.push(eq(appointments.isArchived, false));
     }
 
-    if (search) {
-      conditions.push(like(appointments.title, `%${search}%`));
-    }
-
     if (status && status !== 'all') {
       conditions.push(eq(appointments.status, status as string));
     }
@@ -112,7 +108,7 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     // Fetch appointments with customer details
-    const appointmentsList = await db
+    let query = db
       .select({
         id: appointments.id,
         customerId: appointments.customerId,
@@ -143,9 +139,29 @@ router.get('/', async (req: Request, res: Response) => {
         }
       })
       .from(appointments)
-      .leftJoin(emailContacts, eq(appointments.customerId, emailContacts.id))
-      .where(and(...conditions))
-      .orderBy(desc(appointments.appointmentDate));
+      .leftJoin(emailContacts, eq(appointments.customerId, emailContacts.id));
+
+    // Apply search filter across multiple fields
+    if (search) {
+      const searchPattern = `%${search}%`;
+      query = query.where(
+        and(
+          ...conditions,
+          or(
+            like(appointments.title, searchPattern),
+            like(appointments.description, searchPattern),
+            like(appointments.location, searchPattern),
+            like(emailContacts.firstName, searchPattern),
+            like(emailContacts.lastName, searchPattern),
+            like(emailContacts.email, searchPattern)
+          )
+        )
+      );
+    } else {
+      query = query.where(and(...conditions));
+    }
+
+    const appointmentsList = await query.orderBy(desc(appointments.appointmentDate));
 
     res.json({ 
       appointments: appointmentsList,
