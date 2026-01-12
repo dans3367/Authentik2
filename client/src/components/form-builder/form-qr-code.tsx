@@ -15,8 +15,21 @@ export function FormQRCode({ formId, formTitle }: FormQRCodeProps) {
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement | null>(null);
   
-  // Use the form server URL - defaults to localhost:3004 if not configured
-  const formServerUrl = import.meta.env.VITE_FORMS_URL || 'http://localhost:3004';
+  // Use the form server URL - dynamically determine based on access method
+  const getFormServerUrl = () => {
+    if (import.meta.env.VITE_FORMS_URL) {
+      return import.meta.env.VITE_FORMS_URL;
+    }
+    if (typeof window !== 'undefined') {
+      const { hostname, protocol } = window.location;
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return 'http://localhost:3004';
+      }
+      return `${protocol}//${hostname}:3004`;
+    }
+    return 'http://localhost:3004';
+  };
+  const formServerUrl = getFormServerUrl();
   const formUrl = `${formServerUrl}/form/${formId}`;
 
   useEffect(() => {

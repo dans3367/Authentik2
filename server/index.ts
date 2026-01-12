@@ -34,8 +34,20 @@ app.use((req, res, next) => {
   const origin = req.headers.origin;
   let allowedOrigin = process.env.CORS_ORIGIN || '*';
   
-  // Allow localhost and 127.0.0.1 on any port to support browser previews
-  if (origin && (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:'))) {
+  // Allow localhost, 127.0.0.1, and any IP address on the local network
+  if (origin && (
+    origin.startsWith('http://localhost:') || 
+    origin.startsWith('http://127.0.0.1:') ||
+    origin.startsWith('http://192.168.') ||
+    origin.startsWith('http://10.') ||
+    origin.startsWith('http://172.') ||
+    // Also allow HTTPS versions
+    origin.startsWith('https://localhost:') || 
+    origin.startsWith('https://127.0.0.1:') ||
+    origin.startsWith('https://192.168.') ||
+    origin.startsWith('https://10.') ||
+    origin.startsWith('https://172.')
+  )) {
     allowedOrigin = origin;
   }
   

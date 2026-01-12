@@ -1091,7 +1091,20 @@ export default function ECardsPage() {
       }
 
       // Call the cardprocessor API directly for test birthday cards
-      const cardprocessorUrl = import.meta.env.VITE_CARDPROCESSOR_URL || 'http://localhost:5004';
+      const getCardprocessorUrl = () => {
+        if (import.meta.env.VITE_CARDPROCESSOR_URL) {
+          return import.meta.env.VITE_CARDPROCESSOR_URL;
+        }
+        if (typeof window !== 'undefined') {
+          const { hostname, protocol } = window.location;
+          if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return 'http://localhost:5004';
+          }
+          return `${protocol}//${hostname}:5004`;
+        }
+        return 'http://localhost:5004';
+      };
+      const cardprocessorUrl = getCardprocessorUrl();
 
       // Prepare request payload
       const requestPayload = {

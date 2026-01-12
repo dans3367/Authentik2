@@ -35,10 +35,10 @@ const authInstance = betterAuth({
     // Configure social providers as needed
     // Example: google, github, etc.
   },
-  baseURL: process.env.BASE_URL || `http://localhost:${process.env.PORT || "5000"}`,
+  baseURL: process.env.BASE_URL || `http://localhost:${process.env.PORT || "5002"}`,
   secret: process.env.BETTER_AUTH_SECRET || "fallback-secret-key-change-in-production",
   trustedOrigins: [
-    `http://localhost:${process.env.PORT || "5000"}`,
+    `http://localhost:${process.env.PORT || "5002"}`,
     "http://localhost:5173",
     "http://127.0.0.1:35145", // Browser preview URL
     "https://weby.zendwise.work",
@@ -49,12 +49,44 @@ const authInstance = betterAuth({
     "https://webx.zendwise.work",
     "https://2850dacc-d7a0-40e0-a90b-43f06888d139-00-18hp2u206zmhk.kirk.replit.dev",
     "https://057ace97-08a0-4add-bf8a-36081a149b23-00-2keem4p96xbcw.janeway.replit.dev",
-    process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : ""
+    process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "",
+    // Allow any IP address on local networks
+    ...(() => {
+      const origins = [];
+      const port = process.env.PORT || "5002";
+      // Support common private IP ranges
+      for (let i = 1; i <= 254; i++) {
+        origins.push(`http://192.168.${i}:${port}`);
+        origins.push(`https://192.168.${i}:${port}`);
+      }
+      for (let i = 0; i <= 255; i++) {
+        origins.push(`http://10.0.${i}:${port}`);
+        origins.push(`https://10.0.${i}:${port}`);
+      }
+      return origins;
+    })()
   ].filter(Boolean),
   // Add session callback to include custom user fields
   session: {
     updateAge: 24 * 60 * 60, // 24 hours
     expiresIn: 60 * 60 * 24 * 7, // 7 days
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60, // 5 minutes
+    },
+  },
+  // Cookie configuration for cross-origin/IP access
+  advanced: {
+    cookiePrefix: "better-auth",
+    crossSubDomainCookies: {
+      enabled: false, // Disable for IP access
+    },
+    defaultCookieAttributes: {
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      path: "/",
+    },
   },
   user: {
     additionalFields: {
@@ -95,20 +127,24 @@ const authInstance = betterAuth({
   // Hooks to create tenant automatically on user signup
   hooks: {
     after: async (ctx: any) => {
+      // Declare variables outside try block for accessibility in catch
+      let userRecord: any = null;
+      let email = '';
+      
       try {
         // Only run after sign-up endpoints
         const path = ctx?.path || "";
         if (!path.includes("sign-up")) return {};
 
         // Determine user email
-        const email = ctx?.body?.email || ctx?.context?.returned?.user?.email;
+        email = ctx?.body?.email || ctx?.context?.returned?.user?.email;
         if (!email) {
           console.log('⚠️  [Signup Hook] No email found in context');
           return {};
         }
 
         // Fetch the created user
-        const userRecord = await db.query.betterAuthUser.findFirst({
+        userRecord = await db.query.betterAuthUser.findFirst({
           where: eq(betterAuthUser.email, email.toLowerCase())
         });
         
@@ -219,7 +255,7 @@ const authInstance = betterAuth({
           return {};
       } catch (error) {
         console.error('❌ ❌ ❌ [Signup Hook] CRITICAL ERROR - Failed to create tenant for new user:', error);
-        console.error('❌ [Signup Hook] User email:', email);
+        console.error('❌ [Signup Hook] User email:', userRecord?.email || email || 'unknown');
         console.error('❌ [Signup Hook] Error details:', error);
         // Don't throw - allow signup to complete even if tenant creation fails
         // User will be assigned to default tenant and can be manually migrated later
