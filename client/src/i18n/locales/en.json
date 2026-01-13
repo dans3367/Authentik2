@@ -42,7 +42,7 @@
     "cards": "e-Cards",
     "birthdays": "Birthdays",
     "ecards": "Holiday Cards",
-    "reminders": "Reminders",
+    "reminders": "Appointments",
     "templates": "Templates",
     "contacts": "Contacts",
     "analytics": "Analytics",
@@ -181,10 +181,10 @@
     }
   },
   "reminders": {
-    "pageTitle": "Reminders & Appointments",
-    "pageSubtitle": "Schedule appointments and manage reminders to keep your customers informed",
-    "title": "Never Miss an Appointment Again!",
-    "subtitle": "Manage your appointments and send automated reminders to your customers. Keep everyone informed and reduce no-shows with our smart reminder system.",
+    "pageTitle": "Appointments",
+    "pageSubtitle": "Schedule and manage appointments with your customers",
+    "title": "Manage Your Appointments",
+    "subtitle": "Schedule appointments and keep your customers informed. Reduce no-shows with automated appointment confirmations.",
     "tabs": {
       "appointments": "Appointments",
       "reminders": "Reminders", 

@@ -42,7 +42,7 @@
     "cards": "Tarjetas",
     "birthdays": "Cumpleaños",
     "ecards": "Tarjetas de Días Festivos",
-    "reminders": "Recordatorios",
+    "reminders": "Citas",
     "templates": "Plantillas",
     "contacts": "Contactos",
     "analytics": "Análisis",
@@ -90,10 +90,10 @@
     "authenticating": "Autenticando..."
   },
   "reminders": {
-    "pageTitle": "Recordatorios y Citas",
-    "pageSubtitle": "Programa citas y administra recordatorios para mantener informados a tus clientes",
-    "title": "¡Nunca Vuelvas a Perder una Cita!",
-    "subtitle": "Administra tus citas y envía recordatorios automáticos a tus clientes. Mantén a todos informados y reduce las ausencias con nuestro sistema inteligente de recordatorios.",
+    "pageTitle": "Citas",
+    "pageSubtitle": "Programa y administra citas con tus clientes",
+    "title": "Administra Tus Citas",
+    "subtitle": "Programa citas y mantén informados a tus clientes. Reduce las ausencias con confirmaciones automáticas de citas.",
     "tabs": {
       "appointments": "Citas",
       "reminders": "Recordatorios",

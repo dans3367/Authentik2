@@ -126,7 +126,7 @@ export default function RemindersPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<"appointments" | "reminders" | "settings">("appointments");
+  const [activeTab, setActiveTab] = useState<"appointments" | "settings">("appointments");
   
   // Set breadcrumbs in header
   useSetBreadcrumbs([
@@ -1098,20 +1098,6 @@ export default function RemindersPage() {
             )}
           </Button>
           <Button
-            variant={activeTab === "reminders" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setActiveTab("reminders")}
-            className="flex items-center gap-2"
-          >
-            <Bell className="h-4 w-4" />
-            {t('reminders.tabs.reminders')}
-            {reminders.length > 0 && (
-              <Badge variant="secondary" className="ml-1">
-                {reminders.length}
-              </Badge>
-            )}
-          </Button>
-          <Button
             variant={activeTab === "settings" ? "default" : "ghost"}
             size="sm"
             onClick={() => setActiveTab("settings")}
@@ -1522,22 +1508,24 @@ export default function RemindersPage() {
                           )}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-4" align="start" sideOffset={5} avoidCollisions={true}>
-                        <div className="flex flex-col md:flex-row gap-4">
-                          <div className="flex flex-col gap-2">
-                            <Label className="text-sm font-medium">{t('reminders.appointments.fromDate')}</Label>
+                      <PopoverContent className="w-auto p-3" align="start" sideOffset={5} avoidCollisions={true}>
+                        <div className="flex flex-col md:flex-row gap-3">
+                          <div className="flex flex-col gap-1">
+                            <Label className="text-xs font-medium">{t('reminders.appointments.fromDate')}</Label>
                             <DateCalendar
                               selected={dateFrom}
                               onSelect={setDateFrom}
+                              className="text-sm [&_table]:w-full [&_td]:p-0 [&_th]:p-0 [&_button]:h-7 [&_button]:w-7 [&_button]:text-xs"
                             />
                           </div>
                           <Separator className="hidden md:block md:h-auto md:w-px" orientation="vertical" />
                           <Separator className="md:hidden" />
-                          <div className="flex flex-col gap-2">
-                            <Label className="text-sm font-medium">{t('reminders.appointments.toDate')}</Label>
+                          <div className="flex flex-col gap-1">
+                            <Label className="text-xs font-medium">{t('reminders.appointments.toDate')}</Label>
                             <DateCalendar
                               selected={dateTo}
                               onSelect={setDateTo}
+                              className="text-sm [&_table]:w-full [&_td]:p-0 [&_th]:p-0 [&_button]:h-7 [&_button]:w-7 [&_button]:text-xs"
                             />
                           </div>
                         </div>
@@ -1616,100 +1604,230 @@ export default function RemindersPage() {
                         </Button>
                       </div>
                     ) : (
-                      <div className="overflow-x-auto">
-                        <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-12">
-                              <Checkbox
-                                checked={isAllSelected}
-                                onCheckedChange={handleSelectAll}
-                                aria-label="Select all appointments"
-                              />
-                            </TableHead>
-                            <TableHead>{t('reminders.table.customer')}</TableHead>
-                            <TableHead>{t('reminders.table.appointment')}</TableHead>
-                            <TableHead>{t('reminders.table.dateTime')}</TableHead>
-                            <TableHead>{t('reminders.table.status')}</TableHead>
-                            <TableHead>{t('reminders.table.reminder')}</TableHead>
-                            <TableHead>{t('reminders.table.actions')}</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {appointments.map((appointment) => (
-                            <TableRow key={appointment.id}>
-                              <TableCell>
+                      <>
+                        {/* Desktop Table View - hidden on mobile/tablet */}
+                        <div className="hidden lg:block overflow-x-auto">
+                          <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-12">
                                 <Checkbox
-                                  checked={selectedAppointments.includes(appointment.id)}
-                                  onCheckedChange={(checked) => handleSelectAppointment(appointment.id, checked as boolean)}
+                                  checked={isAllSelected}
+                                  onCheckedChange={handleSelectAll}
+                                  aria-label="Select all appointments"
                                 />
-                              </TableCell>
-                              <TableCell>
-                                <div>
-                                  <p className="font-medium">{getCustomerName(appointment.customer)}</p>
-                                  <p className="text-sm text-gray-500">{appointment.customer?.email}</p>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <div>
-                                  <p className="font-medium">{appointment.title}</p>
-                                  {appointment.location && (
+                              </TableHead>
+                              <TableHead>{t('reminders.table.customer')}</TableHead>
+                              <TableHead>{t('reminders.table.appointment')}</TableHead>
+                              <TableHead>{t('reminders.table.dateTime')}</TableHead>
+                              <TableHead>{t('reminders.table.status')}</TableHead>
+                              <TableHead>{t('reminders.table.reminder')}</TableHead>
+                              <TableHead>{t('reminders.table.actions')}</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {appointments.map((appointment) => (
+                              <TableRow key={appointment.id}>
+                                <TableCell>
+                                  <Checkbox
+                                    checked={selectedAppointments.includes(appointment.id)}
+                                    onCheckedChange={(checked) => handleSelectAppointment(appointment.id, checked as boolean)}
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <div>
+                                    <p className="font-medium">{getCustomerName(appointment.customer)}</p>
+                                    <p className="text-sm text-gray-500">{appointment.customer?.email}</p>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div>
+                                    <p className="font-medium">{appointment.title}</p>
+                                    {appointment.location && (
+                                      <p className="text-sm text-gray-500 flex items-center gap-1">
+                                        <MapPin className="h-3 w-3" />
+                                        {appointment.location}
+                                      </p>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div>
+                                    <p className="font-medium">{formatDateTime(appointment.appointmentDate)}</p>
                                     <p className="text-sm text-gray-500 flex items-center gap-1">
-                                      <MapPin className="h-3 w-3" />
-                                      {appointment.location}
+                                      <Timer className="h-3 w-3" />
+                                      {appointment.duration} {t('reminders.appointments.minutes')}
                                     </p>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge className={getStatusColor(appointment.status)}>
+                                    {appointment.status.replace('_', ' ')}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    {appointment.reminderSent ? (
+                                      <div className="flex items-center gap-1 text-green-600">
+                                        <CheckCircle className="h-4 w-4" />
+                                        <span className="text-sm">{t('reminders.reminderHistory.sent')}</span>
+                                      </div>
+                                    ) : reminders.some(r => r.appointmentId === appointment.id && r.status === 'pending') ? (
+                                      <div className="flex items-center gap-1 text-blue-600">
+                                        <Clock className="h-4 w-4" />
+                                        <span className="text-sm">Scheduled</span>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-1 text-gray-400">
+                                        <Clock className="h-4 w-4" />
+                                        <span className="text-sm">{t('reminders.reminderHistory.notSet')}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-1">
+                                    <Button variant="ghost" size="sm" onClick={() => handleEditAppointment(appointment)}>
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="sm" onClick={() => handleViewAppointment(appointment)}>
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="sm">
+                                          <MoreVertical className="h-4 w-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent>
+                                        {!showArchived && (
+                                          <>
+                                            <DropdownMenuItem onClick={() => confirmAppointmentMutation.mutate(appointment.id)}>
+                                              <CheckCircle className="h-4 w-4 mr-2" />
+                                              Confirm Appointment
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={() => sendReminderMutation.mutate({ appointmentIds: [appointment.id] })}>
+                                              <Send className="h-4 w-4 mr-2" />
+                                              {t('reminders.actions.sendReminder')}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => openScheduleReminder(appointment.id)}>
+                                              <Clock className="h-4 w-4 mr-2" />
+                                              {t('reminders.actions.scheduleReminder')}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={() => handleArchiveAppointment(appointment.id)}>
+                                              <Archive className="h-4 w-4 mr-2" />
+                                              Archive
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem className="text-red-600" onClick={() => handleCancelAppointment(appointment.id)}>
+                                              <Trash2 className="h-4 w-4 mr-2" />
+                                              Delete
+                                            </DropdownMenuItem>
+                                          </>
+                                        )}
+                                        {showArchived && (
+                                          <>
+                                            <DropdownMenuItem onClick={() => handleUnarchiveAppointment(appointment.id)}>
+                                              <ArchiveRestore className="h-4 w-4 mr-2" />
+                                              Restore
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem className="text-red-600" onClick={() => handleCancelAppointment(appointment.id)}>
+                                              <Trash2 className="h-4 w-4 mr-2" />
+                                              Delete Permanently
+                                            </DropdownMenuItem>
+                                          </>
+                                        )}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+
+                      {/* Mobile/Tablet Card View - visible only on mobile/tablet */}
+                      <div className="lg:hidden space-y-4">
+                        {appointments.map((appointment) => (
+                          <Card key={appointment.id} className="overflow-hidden">
+                            <CardContent className="p-4">
+                              <div className="space-y-3">
+                                {/* Header with checkbox and status */}
+                                <div className="flex items-start justify-between">
+                                  <div className="flex items-start gap-3">
+                                    <Checkbox
+                                      checked={selectedAppointments.includes(appointment.id)}
+                                      onCheckedChange={(checked) => handleSelectAppointment(appointment.id, checked as boolean)}
+                                      className="mt-1"
+                                    />
+                                    <div className="flex-1">
+                                      <h3 className="font-semibold text-base">{appointment.title}</h3>
+                                      <p className="text-sm text-gray-600 dark:text-gray-400">{getCustomerName(appointment.customer)}</p>
+                                      <p className="text-xs text-gray-500 dark:text-gray-500">{appointment.customer?.email}</p>
+                                    </div>
+                                  </div>
+                                  <Badge className={getStatusColor(appointment.status)}>
+                                    {appointment.status.replace('_', ' ')}
+                                  </Badge>
+                                </div>
+
+                                {/* Appointment details */}
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                                    <Calendar className="h-4 w-4 text-gray-500" />
+                                    <span>{formatDateTime(appointment.appointmentDate)}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                                    <Timer className="h-4 w-4 text-gray-500" />
+                                    <span>{appointment.duration} {t('reminders.appointments.minutes')}</span>
+                                  </div>
+                                  {appointment.location && (
+                                    <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                                      <MapPin className="h-4 w-4 text-gray-500" />
+                                      <span>{appointment.location}</span>
+                                    </div>
                                   )}
+                                  
+                                  {/* Reminder status */}
+                                  <div className="flex items-center gap-2">
+                                    {appointment.reminderSent ? (
+                                      <div className="flex items-center gap-1 text-green-600">
+                                        <CheckCircle className="h-4 w-4" />
+                                        <span className="text-sm">{t('reminders.reminderHistory.sent')}</span>
+                                      </div>
+                                    ) : reminders.some(r => r.appointmentId === appointment.id && r.status === 'pending') ? (
+                                      <div className="flex items-center gap-1 text-blue-600">
+                                        <Clock className="h-4 w-4" />
+                                        <span className="text-sm">Scheduled</span>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-1 text-gray-400">
+                                        <Clock className="h-4 w-4" />
+                                        <span className="text-sm">{t('reminders.reminderHistory.notSet')}</span>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              </TableCell>
-                              <TableCell>
-                                <div>
-                                  <p className="font-medium">{formatDateTime(appointment.appointmentDate)}</p>
-                                  <p className="text-sm text-gray-500 flex items-center gap-1">
-                                    <Timer className="h-3 w-3" />
-                                    {appointment.duration} {t('reminders.appointments.minutes')}
-                                  </p>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Badge className={getStatusColor(appointment.status)}>
-                                  {appointment.status.replace('_', ' ')}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  {appointment.reminderSent ? (
-                                    <div className="flex items-center gap-1 text-green-600">
-                                      <CheckCircle className="h-4 w-4" />
-                                      <span className="text-sm">{t('reminders.reminderHistory.sent')}</span>
-                                    </div>
-                                  ) : reminders.some(r => r.appointmentId === appointment.id && r.status === 'pending') ? (
-                                    <div className="flex items-center gap-1 text-blue-600">
-                                      <Clock className="h-4 w-4" />
-                                      <span className="text-sm">Scheduled</span>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center gap-1 text-gray-400">
-                                      <Clock className="h-4 w-4" />
-                                      <span className="text-sm">{t('reminders.reminderHistory.notSet')}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-1">
-                                  <Button variant="ghost" size="sm" onClick={() => handleEditAppointment(appointment)}>
-                                    <Edit className="h-4 w-4" />
+
+                                {/* Actions */}
+                                <div className="flex items-center gap-2 pt-2 border-t">
+                                  <Button variant="outline" size="sm" onClick={() => handleEditAppointment(appointment)} className="flex-1">
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Edit
                                   </Button>
-                                  <Button variant="ghost" size="sm" onClick={() => handleViewAppointment(appointment)}>
-                                    <Eye className="h-4 w-4" />
+                                  <Button variant="outline" size="sm" onClick={() => handleViewAppointment(appointment)} className="flex-1">
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View
                                   </Button>
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="sm">
+                                      <Button variant="outline" size="sm">
                                         <MoreVertical className="h-4 w-4" />
                                       </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent>
+                                    <DropdownMenuContent align="end">
                                       {!showArchived && (
                                         <>
                                           <DropdownMenuItem onClick={() => confirmAppointmentMutation.mutate(appointment.id)}>
@@ -1751,12 +1869,12 @@ export default function RemindersPage() {
                                     </DropdownMenuContent>
                                   </DropdownMenu>
                                 </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </>
                     )}
                   </div>
                 </CardContent>
@@ -1764,117 +1882,6 @@ export default function RemindersPage() {
           </div>
         )}
 
-        {/* Reminders Tab */}
-        {activeTab === "reminders" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
-                {t('reminders.reminderHistory.title')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {remindersLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
-                </div>
-              ) : reminders.length === 0 ? (
-                <div className="text-center py-12">
-                  <Bell className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-lg text-gray-600 mb-2">{t('reminders.reminderHistory.noReminders')}</p>
-                  <p className="text-sm text-gray-500 mb-6">{t('reminders.reminderHistory.noRemindersDescription')}</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>{t('reminders.reminderHistory.appointment')}</TableHead>
-                          <TableHead>{t('reminders.reminderHistory.type')}</TableHead>
-                          <TableHead>{t('reminders.reminderHistory.timing')}</TableHead>
-                          <TableHead>{t('reminders.reminderHistory.scheduledFor')}</TableHead>
-                          <TableHead>{t('reminders.reminderHistory.status')}</TableHead>
-                          <TableHead>{t('reminders.reminderHistory.sentAt')}</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {paginatedReminders.map((reminder) => (
-                        <TableRow key={reminder.id}>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">Appointment #{reminder.appointmentId.slice(-8)}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">
-                              {reminder.reminderType}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{reminder.reminderTiming}</TableCell>
-                          <TableCell>{formatDateTime(reminder.scheduledFor)}</TableCell>
-                          <TableCell>
-                            <Badge className={
-                              reminder.status === 'sent' ? 'bg-green-100 text-green-800' :
-                              reminder.status === 'failed' ? 'bg-red-100 text-red-800' :
-                              'bg-yellow-100 text-yellow-800'
-                            }>
-                              {reminder.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {reminder.sentAt ? formatDateTime(reminder.sentAt) : '-'}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                {/* Pagination Controls */}
-                {remindersTotalPages > 1 && (
-                  <div className="flex items-center justify-between px-2">
-                    <div className="text-sm text-gray-600">
-                      Showing {remindersStartIndex + 1} to {Math.min(remindersEndIndex, remindersTotal)} of {remindersTotal} reminders
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setRemindersPage(prev => Math.max(1, prev - 1))}
-                        disabled={remindersPage === 1}
-                      >
-                        Previous
-                      </Button>
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: remindersTotalPages }, (_, i) => i + 1).map((page) => (
-                          <Button
-                            key={page}
-                            variant={remindersPage === page ? "default" : "outline"}
-                            size="sm"
-                            className="w-8 h-8 p-0"
-                            onClick={() => setRemindersPage(page)}
-                          >
-                            {page}
-                          </Button>
-                        ))}
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setRemindersPage(prev => Math.min(remindersTotalPages, prev + 1))}
-                        disabled={remindersPage === remindersTotalPages}
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
 
         {/* Schedule Reminder Modal */}
         <Dialog open={scheduleReminderModalOpen} onOpenChange={setScheduleReminderModalOpen}>
