@@ -1478,8 +1478,17 @@ export default function RemindersPage() {
                         placeholder={t('reminders.appointments.searchPlaceholder')}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10"
+                        className="pl-10 pr-10"
                       />
+                      {searchQuery && (
+                        <button
+                          onClick={() => setSearchQuery("")}
+                          className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                          aria-label="Clear search"
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
                       <SelectTrigger className="w-48">
@@ -1513,24 +1522,27 @@ export default function RemindersPage() {
                           )}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-4" align="start">
-                        <div className="space-y-4">
-                          <div>
-                            <Label className="text-sm font-medium mb-2 block">{t('reminders.appointments.fromDate')}</Label>
+                      <PopoverContent className="w-auto p-4" align="start" sideOffset={5} avoidCollisions={true}>
+                        <div className="flex flex-col md:flex-row gap-4">
+                          <div className="flex flex-col gap-2">
+                            <Label className="text-sm font-medium">{t('reminders.appointments.fromDate')}</Label>
                             <DateCalendar
                               selected={dateFrom}
                               onSelect={setDateFrom}
                             />
                           </div>
-                          <Separator />
-                          <div>
-                            <Label className="text-sm font-medium mb-2 block">{t('reminders.appointments.toDate')}</Label>
+                          <Separator className="hidden md:block md:h-auto md:w-px" orientation="vertical" />
+                          <Separator className="md:hidden" />
+                          <div className="flex flex-col gap-2">
+                            <Label className="text-sm font-medium">{t('reminders.appointments.toDate')}</Label>
                             <DateCalendar
                               selected={dateTo}
                               onSelect={setDateTo}
                             />
                           </div>
-                          {(dateFrom || dateTo) && (
+                        </div>
+                        {(dateFrom || dateTo) && (
+                          <div className="mt-4 pt-4 border-t">
                             <Button
                               variant="outline"
                               size="sm"
@@ -1543,8 +1555,8 @@ export default function RemindersPage() {
                               <XCircle className="h-4 w-4 mr-2" />
                               {t('reminders.appointments.clearDates')}
                             </Button>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </PopoverContent>
                     </Popover>
                     
@@ -1588,23 +1600,24 @@ export default function RemindersPage() {
                     </div>
                   )}
 
-                  {appointmentsLoading ? (
-                    <div className="flex items-center justify-center py-12">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
-                    </div>
-                  ) : appointments.length === 0 ? (
-                    <div className="text-center py-12">
-                      <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                      <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">{t('reminders.appointments.noAppointments')}</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">{t('reminders.appointments.createFirst')}</p>
-                      <Button onClick={() => setNewAppointmentModalOpen(true)}>
-                        <CalendarPlus className="h-4 w-4 mr-2" />
-                        {t('reminders.appointments.createAppointment')}
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <Table>
+                  <div className="min-h-[400px]">
+                    {appointmentsLoading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
+                      </div>
+                    ) : appointments.length === 0 ? (
+                      <div className="text-center py-12">
+                        <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                        <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">{t('reminders.appointments.noAppointments')}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">{t('reminders.appointments.createFirst')}</p>
+                        <Button onClick={() => setNewAppointmentModalOpen(true)}>
+                          <CalendarPlus className="h-4 w-4 mr-2" />
+                          {t('reminders.appointments.createAppointment')}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <Table>
                         <TableHeader>
                           <TableRow>
                             <TableHead className="w-12">
@@ -1744,7 +1757,8 @@ export default function RemindersPage() {
                         </TableBody>
                       </Table>
                     </div>
-                  )}
+                    )}
+                  </div>
                 </CardContent>
               </Card>
           </div>
