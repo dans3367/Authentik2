@@ -1032,6 +1032,27 @@ export default function RemindersPage() {
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
+  const toLocalDateString = (date: Date) => {
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const toLocalTimeString = (date: Date) => {
+    const d = new Date(date);
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
+  const mergeDateAndTime = (current: Date, nextDate?: string, nextTime?: string) => {
+    const datePart = nextDate ?? toLocalDateString(current);
+    const timePart = nextTime ?? toLocalTimeString(current);
+    return new Date(`${datePart}T${timePart}`);
+  };
+
   // Check if all appointments are selected
   const isAllSelected = appointments.length > 0 && selectedAppointments.length === appointments.length;
   
@@ -1271,12 +1292,26 @@ export default function RemindersPage() {
 
                           <div>
                             <Label>{t('reminders.appointments.dateTime')}</Label>
-                            <Input 
-                              type="datetime-local"
-                              value={toLocalDateTimeString(newAppointmentData.appointmentDate)}
-                              onChange={(e) => setNewAppointmentData(prev => ({...prev, appointmentDate: new Date(e.target.value)}))}
-                              className="focus-visible:ring-0"
-                            />
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                              <Input 
+                                type="date"
+                                value={toLocalDateString(newAppointmentData.appointmentDate)}
+                                onChange={(e) => setNewAppointmentData(prev => ({
+                                  ...prev,
+                                  appointmentDate: mergeDateAndTime(prev.appointmentDate, e.target.value, undefined)
+                                }))}
+                                className="focus-visible:ring-0"
+                              />
+                              <Input 
+                                type="time"
+                                value={toLocalTimeString(newAppointmentData.appointmentDate)}
+                                onChange={(e) => setNewAppointmentData(prev => ({
+                                  ...prev,
+                                  appointmentDate: mergeDateAndTime(prev.appointmentDate, undefined, e.target.value)
+                                }))}
+                                className="focus-visible:ring-0"
+                              />
+                            </div>
                           </div>
 
                           <div>
@@ -2013,12 +2048,26 @@ export default function RemindersPage() {
 
                     <div>
                       <Label>{t('reminders.appointments.dateTime')}</Label>
-                      <Input 
-                        type="datetime-local"
-                        value={toLocalDateTimeString(new Date(editingAppointment.appointmentDate))}
-                        onChange={(e) => setEditingAppointment(prev => prev ? {...prev, appointmentDate: new Date(e.target.value)} : null)}
-                        className="focus-visible:ring-0"
-                      />
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <Input 
+                          type="date"
+                          value={toLocalDateString(new Date(editingAppointment.appointmentDate))}
+                          onChange={(e) => setEditingAppointment(prev => prev ? {
+                            ...prev,
+                            appointmentDate: mergeDateAndTime(new Date(prev.appointmentDate), e.target.value, undefined)
+                          } : null)}
+                          className="focus-visible:ring-0"
+                        />
+                        <Input 
+                          type="time"
+                          value={toLocalTimeString(new Date(editingAppointment.appointmentDate))}
+                          onChange={(e) => setEditingAppointment(prev => prev ? {
+                            ...prev,
+                            appointmentDate: mergeDateAndTime(new Date(prev.appointmentDate), undefined, e.target.value)
+                          } : null)}
+                          className="focus-visible:ring-0"
+                        />
+                      </div>
                     </div>
 
                     <div>
