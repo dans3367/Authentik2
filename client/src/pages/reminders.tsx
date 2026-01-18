@@ -1662,8 +1662,12 @@ export default function RemindersPage() {
                           </TableHeader>
                           <TableBody>
                             {appointments.map((appointment) => (
-                              <TableRow key={appointment.id}>
-                                <TableCell>
+                              <TableRow
+                                key={appointment.id}
+                                onClick={() => handleViewAppointment(appointment)}
+                                className="cursor-pointer"
+                              >
+                                <TableCell onClick={(event) => event.stopPropagation()}>
                                   <Checkbox
                                     checked={selectedAppointments.includes(appointment.id)}
                                     onCheckedChange={(checked) => handleSelectAppointment(appointment.id, checked as boolean)}
@@ -1722,15 +1726,33 @@ export default function RemindersPage() {
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex items-center gap-1">
-                                    <Button variant="ghost" size="sm" onClick={() => handleEditAppointment(appointment)}>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        handleEditAppointment(appointment);
+                                      }}
+                                    >
                                       <Edit className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => handleViewAppointment(appointment)}>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        handleViewAppointment(appointment);
+                                      }}
+                                    >
                                       <Eye className="h-4 w-4" />
                                     </Button>
                                     <DropdownMenu>
                                       <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="sm">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={(event) => event.stopPropagation()}
+                                        >
                                           <MoreVertical className="h-4 w-4" />
                                         </Button>
                                       </DropdownMenuTrigger>
@@ -1786,17 +1808,23 @@ export default function RemindersPage() {
                       {/* Mobile/Tablet Card View - visible only on mobile/tablet */}
                       <div className="lg:hidden space-y-4">
                         {appointments.map((appointment) => (
-                          <Card key={appointment.id} className="overflow-hidden">
+                          <Card
+                            key={appointment.id}
+                            className="overflow-hidden cursor-pointer"
+                            onClick={() => handleViewAppointment(appointment)}
+                          >
                             <CardContent className="p-4">
                               <div className="space-y-3">
                                 {/* Header with checkbox and status */}
                                 <div className="flex items-start justify-between">
                                   <div className="flex items-start gap-3">
-                                    <Checkbox
-                                      checked={selectedAppointments.includes(appointment.id)}
-                                      onCheckedChange={(checked) => handleSelectAppointment(appointment.id, checked as boolean)}
-                                      className="mt-1"
-                                    />
+                                    <div onClick={(event) => event.stopPropagation()}>
+                                      <Checkbox
+                                        checked={selectedAppointments.includes(appointment.id)}
+                                        onCheckedChange={(checked) => handleSelectAppointment(appointment.id, checked as boolean)}
+                                        className="mt-1"
+                                      />
+                                    </div>
                                     <div className="flex-1">
                                       <h3 className="font-semibold text-base">{appointment.title}</h3>
                                       <p className="text-sm text-gray-600 dark:text-gray-400">{getCustomerName(appointment.customer)}</p>
@@ -1848,17 +1876,37 @@ export default function RemindersPage() {
 
                                 {/* Actions */}
                                 <div className="flex items-center gap-2 pt-2 border-t">
-                                  <Button variant="outline" size="sm" onClick={() => handleEditAppointment(appointment)} className="flex-1">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      handleEditAppointment(appointment);
+                                    }}
+                                    className="flex-1"
+                                  >
                                     <Edit className="h-4 w-4 mr-2" />
                                     Edit
                                   </Button>
-                                  <Button variant="outline" size="sm" onClick={() => handleViewAppointment(appointment)} className="flex-1">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      handleViewAppointment(appointment);
+                                    }}
+                                    className="flex-1"
+                                  >
                                     <Eye className="h-4 w-4 mr-2" />
                                     View
                                   </Button>
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                      <Button variant="outline" size="sm">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={(event) => event.stopPropagation()}
+                                      >
                                         <MoreVertical className="h-4 w-4" />
                                       </Button>
                                     </DropdownMenuTrigger>
@@ -2419,7 +2467,7 @@ export default function RemindersPage() {
                     </TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="details" className="space-y-6 mt-6">
+                  <TabsContent value="details" className="space-y-6 mt-6 focus-visible:outline-none focus-visible:ring-0">
                   {/* Customer Information */}
                   <div className="space-y-3">
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
@@ -2581,7 +2629,7 @@ export default function RemindersPage() {
                   </div>
                   </TabsContent>
 
-                  <TabsContent value="notes" className="space-y-6 mt-6">
+                  <TabsContent value="notes" className="space-y-6 mt-6 focus-visible:outline-none focus-visible:ring-0">
                   {/* Legacy Notes (single field) */}
                   {viewingAppointment.notes && (
                     <div className="space-y-3">
