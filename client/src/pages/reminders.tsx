@@ -297,6 +297,7 @@ export default function RemindersPage() {
   const { 
     data: appointmentsData,
     isLoading: appointmentsLoading,
+    isFetching: appointmentsFetching,
     refetch: refetchAppointments 
   } = useQuery<{appointments: Appointment[]}>({
     queryKey: ['/api/appointments', debouncedSearchQuery, statusFilter, showArchived, dateFrom, dateTo],
@@ -316,7 +317,7 @@ export default function RemindersPage() {
   });
 
   // Fetch upcoming appointments (always non-archived for the sidebar)
-  const { data: upcomingAppointmentsData } = useQuery<{appointments: Appointment[]}>({
+  const { data: upcomingAppointmentsData, refetch: refetchUpcomingAppointments } = useQuery<{appointments: Appointment[]}>({
     queryKey: ['/api/appointments/upcoming'],
     queryFn: async () => {
       // Always fetch non-archived appointments for upcoming section
@@ -1236,15 +1237,23 @@ export default function RemindersPage() {
                       <Button
                         variant="outline"
                         size="icon"
-                        onClick={() => {
-                          queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-                          queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] });
+                        disabled={appointmentsFetching}
+                        onClick={async () => {
+                          // Invalidate first to mark as stale, then refetch to force network request
+                          await queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+                          await queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] });
+                          await queryClient.invalidateQueries({ queryKey: ['/api/appointment-reminders'] });
+                          await Promise.all([
+                            refetchAppointments(),
+                            refetchUpcomingAppointments(),
+                            refetchReminders()
+                          ]);
                           setLastRefreshedAt(new Date());
                           toast({ title: t('reminders.toasts.success'), description: 'Appointments refreshed' });
                         }}
                         title="Refresh appointments"
                       >
-                        <RefreshCw className="h-4 w-4" />
+                        <RefreshCw className={`h-4 w-4 ${appointmentsFetching ? 'animate-spin' : ''}`} />
                       </Button>
                       {lastRefreshedAt && (
                         <span className="text-sm text-muted-foreground">
@@ -1685,7 +1694,12 @@ export default function RemindersPage() {
                     ) : (
                       <>
                         {/* Desktop Table View - hidden on mobile/tablet */}
-                        <div className="hidden lg:block overflow-x-auto">
+                        <div className="hidden lg:block overflow-x-auto relative">
+                          {appointmentsFetching && (
+                            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center">
+                              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                            </div>
+                          )}
                           <Table>
                           <TableHeader>
                             <TableRow>
@@ -1750,22 +1764,35 @@ export default function RemindersPage() {
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex items-center gap-2">
-                                    {appointment.reminderSent ? (
-                                      <div className="flex items-center gap-1 text-green-600">
-                                        <CheckCircle className="h-4 w-4" />
-                                        <span className="text-sm">{t('reminders.reminderHistory.sent')}</span>
-                                      </div>
-                                    ) : reminders.some(r => r.appointmentId === appointment.id && r.status === 'pending') ? (
-                                      <div className="flex items-center gap-1 text-blue-600">
-                                        <Clock className="h-4 w-4" />
-                                        <span className="text-sm">Scheduled</span>
-                                      </div>
-                                    ) : (
-                                      <div className="flex items-center gap-1 text-gray-400">
-                                        <Clock className="h-4 w-4" />
-                                        <span className="text-sm">{t('reminders.reminderHistory.notSet')}</span>
-                                      </div>
-                                    )}
+                                    {(() => {
+                                      // Check reminder records for this appointment
+                                      const appointmentReminders = reminders.filter(r => r.appointmentId === appointment.id);
+                                      const hasSentReminder = appointmentReminders.some(r => r.status === 'sent') || appointment.reminderSent;
+                                      const hasPendingReminder = appointmentReminders.some(r => r.status === 'pending');
+                                      
+                                      if (hasSentReminder) {
+                                        return (
+                                          <div className="flex items-center gap-1 text-green-600">
+                                            <CheckCircle className="h-4 w-4" />
+                                            <span className="text-sm">{t('reminders.reminderHistory.sent')}</span>
+                                          </div>
+                                        );
+                                      } else if (hasPendingReminder) {
+                                        return (
+                                          <div className="flex items-center gap-1 text-blue-600">
+                                            <Clock className="h-4 w-4" />
+                                            <span className="text-sm">Scheduled</span>
+                                          </div>
+                                        );
+                                      } else {
+                                        return (
+                                          <div className="flex items-center gap-1 text-gray-400">
+                                            <Clock className="h-4 w-4" />
+                                            <span className="text-sm">{t('reminders.reminderHistory.notSet')}</span>
+                                          </div>
+                                        );
+                                      }
+                                    })()}
                                   </div>
                                 </TableCell>
                                 <TableCell>
@@ -1850,7 +1877,12 @@ export default function RemindersPage() {
                       </div>
 
                       {/* Mobile/Tablet Card View - visible only on mobile/tablet */}
-                      <div className="lg:hidden space-y-4">
+                      <div className="lg:hidden space-y-4 relative">
+                        {appointmentsFetching && (
+                          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center min-h-[200px]">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                          </div>
+                        )}
                         {appointments.map((appointment) => (
                           <Card
                             key={appointment.id}
@@ -1899,22 +1931,34 @@ export default function RemindersPage() {
                                   
                                   {/* Reminder status */}
                                   <div className="flex items-center gap-2">
-                                    {appointment.reminderSent ? (
-                                      <div className="flex items-center gap-1 text-green-600">
-                                        <CheckCircle className="h-4 w-4" />
-                                        <span className="text-sm">{t('reminders.reminderHistory.sent')}</span>
-                                      </div>
-                                    ) : reminders.some(r => r.appointmentId === appointment.id && r.status === 'pending') ? (
-                                      <div className="flex items-center gap-1 text-blue-600">
-                                        <Clock className="h-4 w-4" />
-                                        <span className="text-sm">Scheduled</span>
-                                      </div>
-                                    ) : (
-                                      <div className="flex items-center gap-1 text-gray-400">
-                                        <Clock className="h-4 w-4" />
-                                        <span className="text-sm">{t('reminders.reminderHistory.notSet')}</span>
-                                      </div>
-                                    )}
+                                    {(() => {
+                                      const appointmentReminders = reminders.filter(r => r.appointmentId === appointment.id);
+                                      const hasSentReminder = appointmentReminders.some(r => r.status === 'sent') || appointment.reminderSent;
+                                      const hasPendingReminder = appointmentReminders.some(r => r.status === 'pending');
+                                      
+                                      if (hasSentReminder) {
+                                        return (
+                                          <div className="flex items-center gap-1 text-green-600">
+                                            <CheckCircle className="h-4 w-4" />
+                                            <span className="text-sm">{t('reminders.reminderHistory.sent')}</span>
+                                          </div>
+                                        );
+                                      } else if (hasPendingReminder) {
+                                        return (
+                                          <div className="flex items-center gap-1 text-blue-600">
+                                            <Clock className="h-4 w-4" />
+                                            <span className="text-sm">Scheduled</span>
+                                          </div>
+                                        );
+                                      } else {
+                                        return (
+                                          <div className="flex items-center gap-1 text-gray-400">
+                                            <Clock className="h-4 w-4" />
+                                            <span className="text-sm">{t('reminders.reminderHistory.notSet')}</span>
+                                          </div>
+                                        );
+                                      }
+                                    })()}
                                   </div>
                                 </div>
 
@@ -2621,9 +2665,30 @@ export default function RemindersPage() {
                         </div>
                         <div>
                           <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.appointments.status')}</p>
-                          <Badge className={getStatusColor(viewingAppointment.status)}>
-                            {viewingAppointment.status.replace('_', ' ')}
-                          </Badge>
+                          <Select
+                            value={viewingAppointment.status}
+                            onValueChange={(value: Appointment['status']) => {
+                              updateAppointmentMutation.mutate(
+                                { id: viewingAppointment.id, data: { status: value } },
+                                {
+                                  onSuccess: () => {
+                                    setViewingAppointment(prev => prev ? { ...prev, status: value } : null);
+                                  }
+                                }
+                              );
+                            }}
+                          >
+                            <SelectTrigger className="h-7 w-[130px] text-xs focus-visible:ring-0 focus:ring-0">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="scheduled">{t('reminders.appointments.scheduled')}</SelectItem>
+                              <SelectItem value="confirmed">{t('reminders.appointments.confirmed')}</SelectItem>
+                              <SelectItem value="completed">{t('reminders.appointments.completed')}</SelectItem>
+                              <SelectItem value="cancelled">{t('reminders.appointments.cancelled')}</SelectItem>
+                              <SelectItem value="no_show">{t('reminders.appointments.noShow')}</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
                       {viewingAppointment.location && (
@@ -2650,33 +2715,88 @@ export default function RemindersPage() {
                       <Bell className="h-4 w-4" />
                       {t('reminders.details.reminderStatus')}
                     </h3>
-                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.reminderSent')}</p>
-                        {viewingAppointment.reminderSent ? (
-                          <div className="flex items-center gap-1 text-green-600">
-                            <CheckCircle className="h-4 w-4" />
-                            <span className="text-sm font-medium">{t('common.yes')}</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1 text-gray-400">
-                            <XCircle className="h-4 w-4" />
-                            <span className="text-sm">{t('common.no')}</span>
-                          </div>
-                        )}
-                      </div>
-                      {viewingAppointment.reminderSentAt && (
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.sentAt')}</p>
-                          <p className="text-sm">{formatDateTime(viewingAppointment.reminderSentAt)}</p>
-                        </div>
-                      )}
-                      {reminders.some(r => r.appointmentId === viewingAppointment.id && r.status === 'pending') && (
-                        <div className="flex items-center gap-2 text-blue-600 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
-                          <Clock className="h-4 w-4" />
-                          <span className="text-sm">{t('reminders.details.reminderScheduled')}</span>
-                        </div>
-                      )}
+                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-3">
+                      {(() => {
+                        const appointmentReminders = reminders.filter(r => r.appointmentId === viewingAppointment.id);
+                        const sentReminders = appointmentReminders.filter(r => r.status === 'sent');
+                        const pendingReminders = appointmentReminders.filter(r => r.status === 'pending');
+                        const hasSentReminder = sentReminders.length > 0 || viewingAppointment.reminderSent;
+                        
+                        return (
+                          <>
+                            {/* Overall Status */}
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.reminderSent')}</p>
+                              {hasSentReminder ? (
+                                <div className="flex items-center gap-1 text-green-600">
+                                  <CheckCircle className="h-4 w-4" />
+                                  <span className="text-sm font-medium">{t('common.yes')}</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1 text-gray-400">
+                                  <XCircle className="h-4 w-4" />
+                                  <span className="text-sm">{t('common.no')}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Sent Reminders Details */}
+                            {sentReminders.length > 0 && (
+                              <div className="border-t pt-3 space-y-2">
+                                <p className="text-xs font-medium text-green-600">Sent Reminders ({sentReminders.length})</p>
+                                {sentReminders.map((reminder) => (
+                                  <div key={reminder.id} className="bg-green-50 dark:bg-green-900/20 p-2 rounded text-sm space-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs text-gray-500 capitalize">{reminder.reminderType}</span>
+                                      <span className="text-xs text-gray-500">{reminder.reminderTiming === 'custom' ? `${reminder.customMinutesBefore}m before` : reminder.reminderTiming}</span>
+                                    </div>
+                                    {reminder.sentAt && (
+                                      <div className="flex items-center gap-1 text-green-700 dark:text-green-400">
+                                        <CheckCircle className="h-3 w-3" />
+                                        <span className="text-xs">Sent: {formatDateTime(reminder.sentAt)}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Legacy sent at (if no reminder records but appointment shows sent) */}
+                            {sentReminders.length === 0 && viewingAppointment.reminderSentAt && (
+                              <div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.sentAt')}</p>
+                                <p className="text-sm">{formatDateTime(viewingAppointment.reminderSentAt)}</p>
+                              </div>
+                            )}
+
+                            {/* Scheduled/Pending Reminders Details */}
+                            {pendingReminders.length > 0 && (
+                              <div className="border-t pt-3 space-y-2">
+                                <p className="text-xs font-medium text-blue-600">Scheduled Reminders ({pendingReminders.length})</p>
+                                {pendingReminders.map((reminder) => (
+                                  <div key={reminder.id} className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded text-sm space-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs text-gray-500 capitalize">{reminder.reminderType}</span>
+                                      <span className="text-xs text-gray-500">{reminder.reminderTiming === 'custom' ? `${reminder.customMinutesBefore}m before` : reminder.reminderTiming}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1 text-blue-700 dark:text-blue-400">
+                                      <Clock className="h-3 w-3" />
+                                      <span className="text-xs">Scheduled for: {formatDateTime(reminder.scheduledFor)}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* No reminders message */}
+                            {appointmentReminders.length === 0 && !viewingAppointment.reminderSent && (
+                              <div className="text-center py-2 text-gray-400 text-sm">
+                                No reminders configured
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
 

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { and, eq, desc, asc, like, gte, lte, isNull, isNotNull, or } from 'drizzle-orm';
+import { and, eq, desc, asc, like, ilike, gte, lte, isNull, isNotNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db';
 import { 
@@ -141,19 +141,22 @@ router.get('/', async (req: Request, res: Response) => {
       .from(appointments)
       .leftJoin(emailContacts, eq(appointments.customerId, emailContacts.id));
 
-    // Apply search filter across multiple fields
+    // Apply search filter across multiple fields (case-insensitive)
     if (search) {
       const searchPattern = `%${search}%`;
       query = query.where(
         and(
           ...conditions,
           or(
-            like(appointments.title, searchPattern),
-            like(appointments.description, searchPattern),
-            like(appointments.location, searchPattern),
-            like(emailContacts.firstName, searchPattern),
-            like(emailContacts.lastName, searchPattern),
-            like(emailContacts.email, searchPattern)
+            ilike(appointments.title, searchPattern),
+            ilike(appointments.description, searchPattern),
+            ilike(appointments.location, searchPattern),
+            ilike(emailContacts.firstName, searchPattern),
+            ilike(emailContacts.lastName, searchPattern),
+            ilike(emailContacts.email, searchPattern),
+            // Also search combined full name (first + last and last + first)
+            sql`LOWER(CONCAT(${emailContacts.firstName}, ' ', ${emailContacts.lastName})) LIKE LOWER(${searchPattern})`,
+            sql`LOWER(CONCAT(${emailContacts.lastName}, ' ', ${emailContacts.firstName})) LIKE LOWER(${searchPattern})`
           )
         )
       );
