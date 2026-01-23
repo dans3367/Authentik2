@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CalendarClock, ChevronRight, Calendar } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { CalendarClock, ChevronRight, Calendar, Clock, MapPin, User, Mail, Timer, X } from "lucide-react";
 import { useLocation } from "wouter";
 
 interface AppointmentCustomer {
@@ -16,13 +18,20 @@ interface AppointmentCustomer {
 interface Appointment {
   id: string;
   title: string;
+  description?: string;
   appointmentDate: Date;
+  duration?: number;
+  location?: string;
   status: "scheduled" | "confirmed" | "cancelled" | "completed" | "no_show";
   customer?: AppointmentCustomer;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export function UpcomingAppointmentsCard() {
   const [, setLocation] = useLocation();
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const { data: appointmentsData, isLoading } = useQuery<{ appointments: Appointment[] }>({
     queryKey: ["/api/appointments/upcoming-dashboard"],
@@ -85,6 +94,23 @@ export function UpcomingAppointmentsCard() {
       minute: "2-digit",
       hour12: true,
     }).format(new Date(date));
+  };
+
+  const formatFullDateTime = (date: Date) => {
+    return new Intl.DateTimeFormat("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).format(new Date(date));
+  };
+
+  const handleViewAppointment = (appointment: Appointment) => {
+    setSelectedAppointment(appointment);
+    setDetailsOpen(true);
   };
 
   if (isLoading) {
@@ -150,7 +176,8 @@ export function UpcomingAppointmentsCard() {
               {upcomingAppointments.map((appointment) => (
                 <div
                   key={appointment.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  onClick={() => handleViewAppointment(appointment)}
                 >
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-900 dark:text-gray-100 truncate">
@@ -180,6 +207,122 @@ export function UpcomingAppointmentsCard() {
           </div>
         )}
       </CardContent>
+
+      {/* Appointment Details Sheet */}
+      <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          {selectedAppointment && (
+            <>
+              <SheetHeader>
+                <SheetTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Appointment Details
+                </SheetTitle>
+                <SheetDescription>
+                  View appointment information
+                </SheetDescription>
+              </SheetHeader>
+
+              <div className="mt-6 space-y-6">
+                {/* Customer Information */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Customer
+                  </h3>
+                  <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Name</p>
+                      <p className="font-medium">{getCustomerName(selectedAppointment.customer)}</p>
+                    </div>
+                    {selectedAppointment.customer?.email && (
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Email</p>
+                        <p className="text-sm flex items-center gap-1">
+                          <Mail className="h-3 w-3" />
+                          {selectedAppointment.customer.email}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Appointment Details */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Details
+                  </h3>
+                  <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-3">
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Title</p>
+                      <p className="font-medium">{selectedAppointment.title}</p>
+                    </div>
+                    {selectedAppointment.description && (
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Description</p>
+                        <p className="text-sm">{selectedAppointment.description}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Date & Time</p>
+                      <p className="text-sm font-medium flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {formatFullDateTime(selectedAppointment.appointmentDate)}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {selectedAppointment.duration && (
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Duration</p>
+                          <p className="text-sm flex items-center gap-1">
+                            <Timer className="h-3 w-3" />
+                            {selectedAppointment.duration} min
+                          </p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Status</p>
+                        <Badge className={getStatusColor(selectedAppointment.status)}>
+                          {selectedAppointment.status.replace('_', ' ')}
+                        </Badge>
+                      </div>
+                    </div>
+                    {selectedAppointment.location && (
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Location</p>
+                        <p className="text-sm flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {selectedAppointment.location}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-4 border-t">
+                  <Button 
+                    className="flex-1" 
+                    onClick={() => {
+                      setDetailsOpen(false);
+                      setLocation("/reminders");
+                    }}
+                  >
+                    View Full Details
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => setDetailsOpen(false)}
+                  >
+                    Close
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </Card>
   );
 }

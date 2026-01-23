@@ -2129,6 +2129,8 @@ export const appointmentReminders = pgTable("appointment_reminders", {
   reminderTiming: text("reminder_timing").notNull(), // '5m', '30m', '1h', '5h', '10h', 'custom'
   customMinutesBefore: integer("custom_minutes_before"), // Custom minutes before appointment when reminder should be sent
   scheduledFor: timestamp("scheduled_for").notNull(),
+  timezone: text("timezone").default('America/Chicago'), // Timezone for the reminder (IANA timezone identifier)
+  inngestEventId: text("inngest_event_id"), // Inngest event ID for tracking/cancellation
   sentAt: timestamp("sent_at"),
   status: text("status").notNull().default('pending'), // pending, sent, failed, cancelled
   content: text("content"), // The reminder message content
@@ -2245,6 +2247,7 @@ export const createAppointmentReminderSchema = z.object({
   reminderTiming: z.enum(['now', '5m', '30m', '1h', '5h', '10h', 'custom']).default('1h'),
   customMinutesBefore: z.number().min(1).max(10080).optional(), // Up to 1 week before
   scheduledFor: z.coerce.date(),
+  timezone: z.string().default('America/Chicago'), // IANA timezone identifier
   content: z.string().optional(),
 });
 

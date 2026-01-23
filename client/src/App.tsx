@@ -61,6 +61,23 @@ const UpdateProfilePage = lazy(() => import("@/pages/update-profile"));
 const SegmentationPage = lazy(() => import("@/pages/segmentation"));
 const ManagementPage = lazy(() => import("@/pages/management"));
 
+// Redirect components for legacy routes
+function BirthdaysRedirect() {
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    setLocation('/cards?type=birthday');
+  }, [setLocation]);
+  return null;
+}
+
+function ECardsRedirect() {
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    setLocation('/cards?type=ecard');
+  }, [setLocation]);
+  return null;
+}
+
 // Loading component for Suspense fallback
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -257,24 +274,8 @@ function Router() {
                   <Route path="/email-analytics" component={EmailAnalyticsPage} />
                   <Route path="/segmentation" component={SegmentationPage} />
                   <Route path="/cards" component={CardsPage} />
-                  <Route path="/birthdays">
-                    {() => {
-                      const [, setLocation] = useLocation();
-                      useEffect(() => {
-                        setLocation('/cards?type=birthday');
-                      }, []);
-                      return null;
-                    }}
-                  </Route>
-                  <Route path="/e-cards">
-                    {() => {
-                      const [, setLocation] = useLocation();
-                      useEffect(() => {
-                        setLocation('/cards?type=ecard');
-                      }, []);
-                      return null;
-                    }}
-                  </Route>
+                  <Route path="/birthdays" component={BirthdaysRedirect} />
+                  <Route path="/e-cards" component={ECardsRedirect} />
                   <Route path="/reminders" component={RemindersPage} />
                   <Route path="/shops" component={ShopsPage} />
                   <Route path="/shops/new" component={NewShopPage} />

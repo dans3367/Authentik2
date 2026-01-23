@@ -200,6 +200,7 @@ router.post('/', async (req: Request, res: Response) => {
       reminderType: validatedData.reminderType,
       reminderTiming: validatedData.reminderTiming,
       scheduledFor: validatedData.scheduledFor,
+      timezone: validatedData.timezone || 'America/Chicago',
       content: validatedData.content,
       status: isSendNow ? 'sent' : 'pending',
       sentAt: isSendNow ? new Date() : null,
@@ -215,63 +216,100 @@ router.post('/', async (req: Request, res: Response) => {
       .values(reminderData)
       .returning();
 
-    // If timing is 'now', send the reminder immediately via Inngest
-    if (isSendNow && appointment.customer?.email) {
+    // Prepare common Inngest payload data
+    const appointmentDate = new Date(appointment.appointmentDate);
+    const customerName = appointment.customer?.firstName 
+      ? `${appointment.customer.firstName} ${appointment.customer.lastName || ''}`.trim()
+      : 'Valued Customer';
+
+    const inngestPayload = {
+      reminderId: newReminder[0].id,
+      appointmentId: appointment.id,
+      customerId: appointment.customerId,
+      customerEmail: appointment.customer?.email,
+      customerName,
+      appointmentTitle: appointment.title,
+      appointmentDate: appointmentDate.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        timeZone: validatedData.timezone || 'America/Chicago',
+      }),
+      appointmentTime: appointmentDate.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: validatedData.timezone || 'America/Chicago',
+      }),
+      location: appointment.location || undefined,
+      reminderType: validatedData.reminderType,
+      content: validatedData.content || undefined,
+      tenantId,
+      timezone: validatedData.timezone || 'America/Chicago',
+    };
+
+    // Send to Inngest - either immediately or scheduled
+    if (appointment.customer?.email) {
       try {
-        const appointmentDate = new Date(appointment.appointmentDate);
-        const customerName = appointment.customer.firstName 
-          ? `${appointment.customer.firstName} ${appointment.customer.lastName || ''}`.trim()
-          : 'Valued Customer';
+        let inngestEndpoint: string;
+        let inngestBody: any;
 
-        const inngestPayload = {
-          reminderId: newReminder[0].id,
-          appointmentId: appointment.id,
-          customerId: appointment.customerId,
-          customerEmail: appointment.customer.email,
-          customerName,
-          appointmentTitle: appointment.title,
-          appointmentDate: appointmentDate.toLocaleDateString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          }),
-          appointmentTime: appointmentDate.toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true,
-          }),
-          location: appointment.location || undefined,
-          reminderType: validatedData.reminderType,
-          content: validatedData.content || undefined,
-          tenantId,
-        };
+        if (isSendNow) {
+          // Send immediately
+          inngestEndpoint = `${INNGEST_URL}/api/send-reminder`;
+          inngestBody = inngestPayload;
+        } else {
+          // Schedule for later - use the schedule-reminder endpoint
+          inngestEndpoint = `${INNGEST_URL}/api/schedule-reminder`;
+          inngestBody = {
+            ...inngestPayload,
+            scheduledFor: validatedData.scheduledFor.toISOString(),
+          };
+        }
 
-        const response = await fetch(`${INNGEST_URL}/api/send-reminder`, {
+        console.log(`📅 [Inngest] Sending to ${inngestEndpoint}:`, JSON.stringify(inngestBody, null, 2));
+
+        const response = await fetch(inngestEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(inngestPayload),
+          body: JSON.stringify(inngestBody),
         });
+        
+        console.log(`📅 [Inngest] Response status: ${response.status}`);
 
         if (!response.ok) {
-          console.error('Failed to send immediate reminder via Inngest:', await response.text());
+          const errorText = await response.text();
+          console.error(`Failed to ${isSendNow ? 'send' : 'schedule'} reminder via Inngest:`, errorText);
           // Update reminder status to failed
           await db
             .update(appointmentReminders)
-            .set({ status: 'failed', errorMessage: 'Failed to send via Inngest', updatedAt: new Date() })
+            .set({ status: 'failed', errorMessage: `Failed to ${isSendNow ? 'send' : 'schedule'} via Inngest`, updatedAt: new Date() })
             .where(eq(appointmentReminders.id, newReminder[0].id));
         } else {
-          // Update reminder status to sent on success
-          const updatedReminder = await db
-            .update(appointmentReminders)
-            .set({ status: 'sent', sentAt: new Date(), updatedAt: new Date() })
-            .where(eq(appointmentReminders.id, newReminder[0].id))
-            .returning();
-          console.log(`📧 Immediate reminder sent for appointment ${appointment.id} to ${appointment.customer.email}`);
-          console.log(`📧 [Debug] Updated reminder status:`, updatedReminder[0]?.status);
+          const responseData = await response.json();
+          
+          if (isSendNow) {
+            // Update reminder status to sent on success
+            await db
+              .update(appointmentReminders)
+              .set({ status: 'sent', sentAt: new Date(), updatedAt: new Date() })
+              .where(eq(appointmentReminders.id, newReminder[0].id));
+            console.log(`📧 Immediate reminder sent for appointment ${appointment.id} to ${appointment.customer.email}`);
+          } else {
+            // Store the Inngest event ID for potential cancellation later
+            await db
+              .update(appointmentReminders)
+              .set({ 
+                inngestEventId: responseData.eventId || null,
+                updatedAt: new Date() 
+              })
+              .where(eq(appointmentReminders.id, newReminder[0].id));
+            console.log(`📅 Scheduled reminder for appointment ${appointment.id} at ${validatedData.scheduledFor.toISOString()} (${validatedData.timezone || 'America/Chicago'})`);
+          }
         }
       } catch (inngestError) {
-        console.error('Error calling Inngest for immediate reminder:', inngestError);
+        console.error('Error calling Inngest for reminder:', inngestError);
         // Update reminder status to failed
         await db
           .update(appointmentReminders)

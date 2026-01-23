@@ -183,11 +183,13 @@ export default function RemindersPage() {
     reminderType: 'email' | 'sms' | 'push';
     reminderTiming: 'now' | '5m' | '30m' | '1h' | '5h' | '10h' | 'custom';
     customMinutesBefore?: number;
+    timezone: string;
     content?: string;
   }>({
     reminderType: 'email',
     reminderTiming: '1h',
     customMinutesBefore: undefined,
+    timezone: 'America/Chicago',
     content: '',
   });
   const [editAppointmentReminderEnabled, setEditAppointmentReminderEnabled] = useState(false);
@@ -195,11 +197,13 @@ export default function RemindersPage() {
     reminderType: 'email' | 'sms' | 'push';
     reminderTiming: 'now' | '5m' | '30m' | '1h' | '5h' | '10h' | 'custom';
     customMinutesBefore?: number;
+    timezone: string;
     content?: string;
   }>({
     reminderType: 'email',
     reminderTiming: '1h',
     customMinutesBefore: undefined,
+    timezone: 'America/Chicago',
     content: '',
   });
   const [editAppointmentErrors, setEditAppointmentErrors] = useState<{
@@ -234,13 +238,14 @@ export default function RemindersPage() {
 
   // Create scheduled reminder mutation
   const createScheduledReminderMutation = useMutation({
-    mutationFn: async ({ appointmentId, data }: { appointmentId: string; data: { reminderType: 'email' | 'sms' | 'push'; reminderTiming: 'now' | '5m' | '30m' | '1h' | '5h' | '10h' | 'custom'; customMinutesBefore?: number; scheduledFor: Date; content?: string } }) => {
+    mutationFn: async ({ appointmentId, data }: { appointmentId: string; data: { reminderType: 'email' | 'sms' | 'push'; reminderTiming: 'now' | '5m' | '30m' | '1h' | '5h' | '10h' | 'custom'; customMinutesBefore?: number; scheduledFor: Date; timezone?: string; content?: string } }) => {
       const response = await apiRequest('POST', '/api/appointment-reminders', {
         appointmentId,
         reminderType: data.reminderType,
         reminderTiming: data.reminderTiming,
         customMinutesBefore: data.customMinutesBefore,
         scheduledFor: data.scheduledFor,
+        timezone: data.timezone || 'America/Chicago',
         content: data.content,
       });
       return response.json();
@@ -267,11 +272,13 @@ export default function RemindersPage() {
     reminderTiming: '5m' | '30m' | '1h' | '5h' | '10h' | 'custom';
     customMinutesBefore?: number;
     scheduledFor: Date;
+    timezone: string;
     content: string;
   }>({
     reminderType: 'email',
     reminderTiming: '1h',
     scheduledFor: new Date(),
+    timezone: 'America/Chicago',
     content: ''
   });
 
@@ -521,6 +528,7 @@ export default function RemindersPage() {
             reminderTiming: newAppointmentReminderData.reminderTiming,
             customMinutesBefore: newAppointmentReminderData.customMinutesBefore,
             scheduledFor,
+            timezone: newAppointmentReminderData.timezone,
             content: newAppointmentReminderData.content,
           },
         });
@@ -680,6 +688,7 @@ export default function RemindersPage() {
       reminderType: 'email',
       reminderTiming: '1h',
       customMinutesBefore: undefined,
+      timezone: 'America/Chicago',
       content: '',
     });
   };
@@ -689,7 +698,7 @@ export default function RemindersPage() {
     const baseDate = apt ? new Date(apt.appointmentDate) : new Date();
     const defaultScheduled = new Date(baseDate.getTime() - 1 * 60 * 60 * 1000); // default 1h before
     setScheduleAppointmentId(appointmentId);
-    setScheduleData({ reminderType: 'email', reminderTiming: '1h', scheduledFor: defaultScheduled, content: '' });
+    setScheduleData({ reminderType: 'email', reminderTiming: '1h', scheduledFor: defaultScheduled, timezone: 'America/Chicago', content: '' });
     setScheduleReminderModalOpen(true);
   };
 
@@ -737,6 +746,7 @@ export default function RemindersPage() {
         reminderType: existingReminder.reminderType,
         reminderTiming: existingReminder.reminderTiming,
         customMinutesBefore: existingReminder.customMinutesBefore || undefined,
+        timezone: (existingReminder as any).timezone || 'America/Chicago',
         content: existingReminder.content || '',
       });
     } else {
@@ -746,6 +756,7 @@ export default function RemindersPage() {
         reminderType: 'email',
         reminderTiming: '1h',
         customMinutesBefore: undefined,
+        timezone: 'America/Chicago',
         content: '',
       });
     }
@@ -854,6 +865,7 @@ export default function RemindersPage() {
           reminderTiming: editAppointmentReminderData.reminderTiming,
           customMinutesBefore: editAppointmentReminderData.customMinutesBefore,
           scheduledFor,
+          timezone: editAppointmentReminderData.timezone,
           content: editAppointmentReminderData.content,
         },
       });
@@ -1461,6 +1473,38 @@ export default function RemindersPage() {
                               )}
 
                               <div>
+                                <Label>Timezone</Label>
+                                <Select 
+                                  value={newAppointmentReminderData.timezone} 
+                                  onValueChange={(value) => setNewAppointmentReminderData(prev => ({...prev, timezone: value}))}
+                                >
+                                  <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
+                                    <SelectValue placeholder="Select timezone" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="America/New_York">Eastern Time (ET)</SelectItem>
+                                    <SelectItem value="America/Chicago">Central Time (CT)</SelectItem>
+                                    <SelectItem value="America/Denver">Mountain Time (MT)</SelectItem>
+                                    <SelectItem value="America/Los_Angeles">Pacific Time (PT)</SelectItem>
+                                    <SelectItem value="America/Anchorage">Alaska Time (AKT)</SelectItem>
+                                    <SelectItem value="Pacific/Honolulu">Hawaii Time (HT)</SelectItem>
+                                    <SelectItem value="America/Phoenix">Arizona (MST)</SelectItem>
+                                    <SelectItem value="UTC">UTC</SelectItem>
+                                    <SelectItem value="Europe/London">London (GMT/BST)</SelectItem>
+                                    <SelectItem value="Europe/Paris">Paris (CET/CEST)</SelectItem>
+                                    <SelectItem value="Europe/Berlin">Berlin (CET/CEST)</SelectItem>
+                                    <SelectItem value="Asia/Tokyo">Tokyo (JST)</SelectItem>
+                                    <SelectItem value="Asia/Shanghai">Shanghai (CST)</SelectItem>
+                                    <SelectItem value="Asia/Kolkata">India (IST)</SelectItem>
+                                    <SelectItem value="Australia/Sydney">Sydney (AEST/AEDT)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  The reminder will be sent at the scheduled time in this timezone
+                                </p>
+                              </div>
+
+                              <div>
                                 <Label>{t('reminders.scheduleReminder.message')}</Label>
                                 <Textarea
                                   placeholder={t('reminders.scheduleReminder.messagePlaceholder')}
@@ -2042,6 +2086,34 @@ export default function RemindersPage() {
                 </div>
               )}
               <div>
+                <Label>Timezone</Label>
+                <Select value={scheduleData.timezone} onValueChange={(v) => setScheduleData(prev => ({ ...prev, timezone: v }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select timezone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="America/New_York">Eastern Time (ET)</SelectItem>
+                    <SelectItem value="America/Chicago">Central Time (CT)</SelectItem>
+                    <SelectItem value="America/Denver">Mountain Time (MT)</SelectItem>
+                    <SelectItem value="America/Los_Angeles">Pacific Time (PT)</SelectItem>
+                    <SelectItem value="America/Anchorage">Alaska Time (AKT)</SelectItem>
+                    <SelectItem value="Pacific/Honolulu">Hawaii Time (HT)</SelectItem>
+                    <SelectItem value="America/Phoenix">Arizona (MST)</SelectItem>
+                    <SelectItem value="UTC">UTC</SelectItem>
+                    <SelectItem value="Europe/London">London (GMT/BST)</SelectItem>
+                    <SelectItem value="Europe/Paris">Paris (CET/CEST)</SelectItem>
+                    <SelectItem value="Europe/Berlin">Berlin (CET/CEST)</SelectItem>
+                    <SelectItem value="Asia/Tokyo">Tokyo (JST)</SelectItem>
+                    <SelectItem value="Asia/Shanghai">Shanghai (CST)</SelectItem>
+                    <SelectItem value="Asia/Kolkata">India (IST)</SelectItem>
+                    <SelectItem value="Australia/Sydney">Sydney (AEST/AEDT)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500 mt-1">
+                  The reminder will be sent at the scheduled time in this timezone
+                </p>
+              </div>
+              <div>
                 <Label>{t('reminders.scheduleReminder.message')}</Label>
                 <Textarea
                   placeholder={t('reminders.scheduleReminder.messagePlaceholder')}
@@ -2292,6 +2364,38 @@ export default function RemindersPage() {
                           <p className="text-xs text-gray-500 mt-1">{t('reminders.scheduleReminder.customMinutesHelp')}</p>
                         </div>
                       )}
+
+                      <div>
+                        <Label>Timezone</Label>
+                        <Select 
+                          value={editAppointmentReminderData.timezone} 
+                          onValueChange={(value) => setEditAppointmentReminderData(prev => ({...prev, timezone: value}))}
+                        >
+                          <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
+                            <SelectValue placeholder="Select timezone" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="America/New_York">Eastern Time (ET)</SelectItem>
+                            <SelectItem value="America/Chicago">Central Time (CT)</SelectItem>
+                            <SelectItem value="America/Denver">Mountain Time (MT)</SelectItem>
+                            <SelectItem value="America/Los_Angeles">Pacific Time (PT)</SelectItem>
+                            <SelectItem value="America/Anchorage">Alaska Time (AKT)</SelectItem>
+                            <SelectItem value="Pacific/Honolulu">Hawaii Time (HT)</SelectItem>
+                            <SelectItem value="America/Phoenix">Arizona (MST)</SelectItem>
+                            <SelectItem value="UTC">UTC</SelectItem>
+                            <SelectItem value="Europe/London">London (GMT/BST)</SelectItem>
+                            <SelectItem value="Europe/Paris">Paris (CET/CEST)</SelectItem>
+                            <SelectItem value="Europe/Berlin">Berlin (CET/CEST)</SelectItem>
+                            <SelectItem value="Asia/Tokyo">Tokyo (JST)</SelectItem>
+                            <SelectItem value="Asia/Shanghai">Shanghai (CST)</SelectItem>
+                            <SelectItem value="Asia/Kolkata">India (IST)</SelectItem>
+                            <SelectItem value="Australia/Sydney">Sydney (AEST/AEDT)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-gray-500 mt-1">
+                          The reminder will be sent at the scheduled time in this timezone
+                        </p>
+                      </div>
 
                       <div>
                         <Label>{t('reminders.scheduleReminder.message')}</Label>
