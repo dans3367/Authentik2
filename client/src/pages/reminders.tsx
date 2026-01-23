@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { useTranslation } from 'react-i18next';
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,7 +47,10 @@ import {
   Loader2,
   Archive,
   ArchiveRestore,
-  RefreshCw
+  RefreshCw,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -140,7 +144,11 @@ export default function RemindersPage() {
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [selectedAppointments, setSelectedAppointments] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+  const [sortColumn, setSortColumn] = useState<'customer' | 'title' | 'date' | 'status'>('date');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [newAppointmentModalOpen, setNewAppointmentModalOpen] = useState(false);
   const [newAppointmentReminderModalOpen, setNewAppointmentReminderModalOpen] = useState(false);
 
@@ -152,6 +160,11 @@ export default function RemindersPage() {
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchQuery, statusFilter, showArchived, dateFrom, dateTo]);
 
   useEffect(() => {
     queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
@@ -352,8 +365,43 @@ export default function RemindersPage() {
     refetchOnWindowFocus: false,
   });
 
-  const appointments: Appointment[] = appointmentsData?.appointments || [];
+  const allAppointments: Appointment[] = appointmentsData?.appointments || [];
   const upcomingAppointmentsForSidebar: Appointment[] = upcomingAppointmentsData?.appointments || [];
+  
+  // Helper to get customer name for sorting
+  const getCustomerNameForSort = (customer: Customer | undefined): string => {
+    if (!customer) return '';
+    return `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customer.email;
+  };
+
+  // Sort appointments
+  const sortedAppointments = [...allAppointments].sort((a, b) => {
+    let comparison = 0;
+    switch (sortColumn) {
+      case 'customer':
+        const nameA = getCustomerNameForSort(a.customer);
+        const nameB = getCustomerNameForSort(b.customer);
+        comparison = nameA.localeCompare(nameB);
+        break;
+      case 'title':
+        comparison = (a.title || '').localeCompare(b.title || '');
+        break;
+      case 'date':
+        comparison = new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime();
+        break;
+      case 'status':
+        comparison = (a.status || '').localeCompare(b.status || '');
+        break;
+    }
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
+
+  // Pagination calculations
+  const totalAppointments = sortedAppointments.length;
+  const totalPages = Math.ceil(totalAppointments / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const appointments = sortedAppointments.slice(startIndex, endIndex);
   const customers: Customer[] = customersData?.contacts || [];
   const reminders: AppointmentReminder[] = remindersData?.reminders || [];
 
@@ -363,6 +411,27 @@ export default function RemindersPage() {
   const remindersStartIndex = (remindersPage - 1) * remindersPageSize;
   const remindersEndIndex = remindersStartIndex + remindersPageSize;
   const paginatedReminders = reminders.slice(remindersStartIndex, remindersEndIndex);
+
+  // Handle column sort click
+  const handleSort = (column: 'customer' | 'title' | 'date' | 'status') => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+    setCurrentPage(1);
+  };
+
+  // Render sort icon for column header
+  const SortIcon = ({ column }: { column: 'customer' | 'title' | 'date' | 'status' }) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="h-4 w-4 ml-1" />
+      : <ArrowDown className="h-4 w-4 ml-1" />;
+  };
 
   // Fetch appointment notes when viewing an appointment
   const { 
@@ -988,7 +1057,7 @@ export default function RemindersPage() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedAppointments(appointments.map(apt => apt.id));
+      setSelectedAppointments(allAppointments.map(apt => apt.id));
     } else {
       setSelectedAppointments([]);
     }
@@ -1067,10 +1136,10 @@ export default function RemindersPage() {
   };
 
   // Check if all appointments are selected
-  const isAllSelected = appointments.length > 0 && selectedAppointments.length === appointments.length;
+  const isAllSelected = allAppointments.length > 0 && selectedAppointments.length === allAppointments.length;
   
   // Check if some appointments are selected (for indeterminate state)
-  const isSomeSelected = selectedAppointments.length > 0 && selectedAppointments.length < appointments.length;
+  const isSomeSelected = selectedAppointments.length > 0 && selectedAppointments.length < allAppointments.length;
 
   // Get upcoming appointments (next 7 days) - always use non-archived data
   const upcomingAppointments = upcomingAppointmentsForSidebar.filter(apt => {
@@ -1125,9 +1194,9 @@ export default function RemindersPage() {
           >
             <Calendar className="h-4 w-4" />
             {t('reminders.tabs.appointments')}
-            {appointments.length > 0 && (
+            {allAppointments.length > 0 && (
               <Badge variant="secondary" className="ml-1">
-                {appointments.length}
+                {allAppointments.length}
               </Badge>
             )}
           </Button>
@@ -1158,7 +1227,7 @@ export default function RemindersPage() {
                 <CardContent className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">{t('reminders.overview.total')}</span>
-                    <Badge variant="outline">{appointments.length}</Badge>
+                    <Badge variant="outline">{allAppointments.length}</Badge>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">{t('reminders.overview.upcoming')}</span>
@@ -1167,13 +1236,13 @@ export default function RemindersPage() {
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">{t('reminders.overview.confirmed')}</span>
                     <Badge variant="outline">
-                      {appointments.filter(apt => apt.status === 'confirmed').length}
+                      {allAppointments.filter(apt => apt.status === 'confirmed').length}
                     </Badge>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">{t('reminders.overview.remindersSent')}</span>
                     <Badge variant="outline">
-                      {appointments.filter(apt => apt.reminderSent).length}
+                      {allAppointments.filter(apt => apt.reminderSent).length}
                     </Badge>
                   </div>
                 </CardContent>
@@ -1694,12 +1763,7 @@ export default function RemindersPage() {
                     ) : (
                       <>
                         {/* Desktop Table View - hidden on mobile/tablet */}
-                        <div className="hidden lg:block overflow-x-auto relative">
-                          {appointmentsFetching && (
-                            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center">
-                              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                            </div>
-                          )}
+                        <div className="hidden lg:block overflow-x-auto">
                           <Table>
                           <TableHeader>
                             <TableRow>
@@ -1710,16 +1774,77 @@ export default function RemindersPage() {
                                   aria-label="Select all appointments"
                                 />
                               </TableHead>
-                              <TableHead>{t('reminders.table.customer')}</TableHead>
-                              <TableHead>{t('reminders.table.appointment')}</TableHead>
-                              <TableHead>{t('reminders.table.dateTime')}</TableHead>
-                              <TableHead>{t('reminders.table.status')}</TableHead>
+                              <TableHead 
+                                className="cursor-pointer hover:bg-muted/50 select-none"
+                                onClick={() => handleSort('customer')}
+                              >
+                                <div className="flex items-center">
+                                  {t('reminders.table.customer')}
+                                  <SortIcon column="customer" />
+                                </div>
+                              </TableHead>
+                              <TableHead 
+                                className="cursor-pointer hover:bg-muted/50 select-none"
+                                onClick={() => handleSort('title')}
+                              >
+                                <div className="flex items-center">
+                                  {t('reminders.table.appointment')}
+                                  <SortIcon column="title" />
+                                </div>
+                              </TableHead>
+                              <TableHead 
+                                className="cursor-pointer hover:bg-muted/50 select-none"
+                                onClick={() => handleSort('date')}
+                              >
+                                <div className="flex items-center">
+                                  {t('reminders.table.dateTime')}
+                                  <SortIcon column="date" />
+                                </div>
+                              </TableHead>
+                              <TableHead 
+                                className="cursor-pointer hover:bg-muted/50 select-none"
+                                onClick={() => handleSort('status')}
+                              >
+                                <div className="flex items-center">
+                                  {t('reminders.table.status')}
+                                  <SortIcon column="status" />
+                                </div>
+                              </TableHead>
                               <TableHead>{t('reminders.table.reminder')}</TableHead>
                               <TableHead>{t('reminders.table.actions')}</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {appointments.map((appointment) => (
+                            {(appointmentsFetching || searchQuery !== debouncedSearchQuery) ? (
+                              // Skeleton loading rows
+                              Array.from({ length: 5 }).map((_, index) => (
+                                <TableRow key={`skeleton-${index}`}>
+                                  <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                                  <TableCell>
+                                    <div className="space-y-2">
+                                      <Skeleton className="h-4 w-32" />
+                                      <Skeleton className="h-3 w-40" />
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="space-y-2">
+                                      <Skeleton className="h-4 w-28" />
+                                      <Skeleton className="h-3 w-24" />
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="space-y-2">
+                                      <Skeleton className="h-4 w-36" />
+                                      <Skeleton className="h-3 w-20" />
+                                    </div>
+                                  </TableCell>
+                                  <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                                  <TableCell><Skeleton className="h-8 w-24" /></TableCell>
+                                </TableRow>
+                              ))
+                            ) : (
+                              appointments.map((appointment) => (
                               <TableRow
                                 key={appointment.id}
                                 onClick={() => handleViewAppointment(appointment)}
@@ -1871,19 +1996,51 @@ export default function RemindersPage() {
                                   </div>
                                 </TableCell>
                               </TableRow>
-                            ))}
+                            ))
+                            )}
                           </TableBody>
                         </Table>
                       </div>
 
                       {/* Mobile/Tablet Card View - visible only on mobile/tablet */}
-                      <div className="lg:hidden space-y-4 relative">
-                        {appointmentsFetching && (
-                          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center min-h-[200px]">
-                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                          </div>
-                        )}
-                        {appointments.map((appointment) => (
+                      <div className="lg:hidden space-y-4">
+                        {(appointmentsFetching || searchQuery !== debouncedSearchQuery) ? (
+                          // Skeleton loading cards
+                          Array.from({ length: 3 }).map((_, index) => (
+                            <Card key={`skeleton-card-${index}`} className="overflow-hidden">
+                              <CardContent className="p-4">
+                                <div className="space-y-3">
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex items-start gap-3">
+                                      <Skeleton className="h-4 w-4 mt-1" />
+                                      <div className="space-y-2">
+                                        <Skeleton className="h-5 w-40" />
+                                        <Skeleton className="h-4 w-32" />
+                                        <Skeleton className="h-3 w-44" />
+                                      </div>
+                                    </div>
+                                    <Skeleton className="h-6 w-20 rounded-full" />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                      <Skeleton className="h-4 w-4" />
+                                      <Skeleton className="h-4 w-36" />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <Skeleton className="h-4 w-4" />
+                                      <Skeleton className="h-4 w-24" />
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between pt-2">
+                                    <Skeleton className="h-4 w-20" />
+                                    <Skeleton className="h-8 w-8 rounded" />
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))
+                        ) : (
+                          appointments.map((appointment) => (
                           <Card
                             key={appointment.id}
                             className="overflow-hidden cursor-pointer"
@@ -2043,11 +2200,77 @@ export default function RemindersPage() {
                               </div>
                             </CardContent>
                           </Card>
-                        ))}
+                        ))
+                        )}
                       </div>
                     </>
                     )}
+
                   </div>
+
+                  {/* Pagination Controls */}
+                  {allAppointments.length > 0 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 border-t">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>Showing {startIndex + 1}-{Math.min(endIndex, totalAppointments)} of {totalAppointments}</span>
+                        <span className="hidden sm:inline">•</span>
+                        <div className="flex items-center gap-2">
+                          <span className="hidden sm:inline">Rows per page:</span>
+                          <Select value={pageSize.toString()} onValueChange={(value) => {
+                            setPageSize(Number(value));
+                            setCurrentPage(1);
+                          }}>
+                            <SelectTrigger className="w-[70px] h-8 focus-visible:ring-0">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="10">10</SelectItem>
+                              <SelectItem value="25">25</SelectItem>
+                              <SelectItem value="50">50</SelectItem>
+                              <SelectItem value="100">100</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(1)}
+                          disabled={currentPage === 1}
+                        >
+                          First
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-sm px-2">
+                          Page {currentPage} of {totalPages}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          disabled={currentPage === totalPages}
+                        >
+                          Next
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(totalPages)}
+                          disabled={currentPage === totalPages}
+                        >
+                          Last
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
           </div>
