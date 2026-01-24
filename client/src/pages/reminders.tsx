@@ -146,9 +146,13 @@ export default function RemindersPage() {
   const [selectedAppointments, setSelectedAppointments] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [pastCurrentPage, setPastCurrentPage] = useState(1);
+  const [pastPageSize, setPastPageSize] = useState(10);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const [sortColumn, setSortColumn] = useState<'customer' | 'title' | 'date' | 'status'>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [pastSortColumn, setPastSortColumn] = useState<'customer' | 'title' | 'date' | 'status'>('date');
+  const [pastSortDirection, setPastSortDirection] = useState<'asc' | 'desc'>('desc');
   const [newAppointmentModalOpen, setNewAppointmentModalOpen] = useState(false);
   const [newAppointmentReminderModalOpen, setNewAppointmentReminderModalOpen] = useState(false);
 
@@ -374,8 +378,13 @@ export default function RemindersPage() {
     return `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customer.email;
   };
 
-  // Sort appointments
-  const sortedAppointments = [...allAppointments].sort((a, b) => {
+  // Split appointments into upcoming and past based on current time
+  const now = new Date();
+  const upcomingAppointmentsAll = allAppointments.filter(a => new Date(a.appointmentDate) >= now);
+  const pastAppointmentsAll = allAppointments.filter(a => new Date(a.appointmentDate) < now);
+
+  // Sort upcoming appointments
+  const sortedUpcomingAppointments = [...upcomingAppointmentsAll].sort((a, b) => {
     let comparison = 0;
     switch (sortColumn) {
       case 'customer':
@@ -396,12 +405,41 @@ export default function RemindersPage() {
     return sortDirection === 'asc' ? comparison : -comparison;
   });
 
-  // Pagination calculations
-  const totalAppointments = sortedAppointments.length;
+  // Sort past appointments
+  const sortedPastAppointments = [...pastAppointmentsAll].sort((a, b) => {
+    let comparison = 0;
+    switch (pastSortColumn) {
+      case 'customer':
+        const nameA = getCustomerNameForSort(a.customer);
+        const nameB = getCustomerNameForSort(b.customer);
+        comparison = nameA.localeCompare(nameB);
+        break;
+      case 'title':
+        comparison = (a.title || '').localeCompare(b.title || '');
+        break;
+      case 'date':
+        comparison = new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime();
+        break;
+      case 'status':
+        comparison = (a.status || '').localeCompare(b.status || '');
+        break;
+    }
+    return pastSortDirection === 'asc' ? comparison : -comparison;
+  });
+
+  // Pagination calculations for upcoming appointments
+  const totalAppointments = sortedUpcomingAppointments.length;
   const totalPages = Math.ceil(totalAppointments / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
-  const appointments = sortedAppointments.slice(startIndex, endIndex);
+  const appointments = sortedUpcomingAppointments.slice(startIndex, endIndex);
+
+  // Pagination calculations for past appointments
+  const totalPastAppointments = sortedPastAppointments.length;
+  const totalPastPages = Math.ceil(totalPastAppointments / pastPageSize);
+  const pastStartIndex = (pastCurrentPage - 1) * pastPageSize;
+  const pastEndIndex = pastStartIndex + pastPageSize;
+  const pastAppointments = sortedPastAppointments.slice(pastStartIndex, pastEndIndex);
   const customers: Customer[] = customersData?.contacts || [];
   const reminders: AppointmentReminder[] = remindersData?.reminders || [];
 
@@ -412,7 +450,7 @@ export default function RemindersPage() {
   const remindersEndIndex = remindersStartIndex + remindersPageSize;
   const paginatedReminders = reminders.slice(remindersStartIndex, remindersEndIndex);
 
-  // Handle column sort click
+  // Handle column sort click for upcoming appointments
   const handleSort = (column: 'customer' | 'title' | 'date' | 'status') => {
     if (sortColumn === column) {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -423,12 +461,33 @@ export default function RemindersPage() {
     setCurrentPage(1);
   };
 
-  // Render sort icon for column header
+  // Handle column sort click for past appointments
+  const handlePastSort = (column: 'customer' | 'title' | 'date' | 'status') => {
+    if (pastSortColumn === column) {
+      setPastSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setPastSortColumn(column);
+      setPastSortDirection('asc');
+    }
+    setPastCurrentPage(1);
+  };
+
+  // Render sort icon for upcoming appointments column header
   const SortIcon = ({ column }: { column: 'customer' | 'title' | 'date' | 'status' }) => {
     if (sortColumn !== column) {
       return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
     }
     return sortDirection === 'asc' 
+      ? <ArrowUp className="h-4 w-4 ml-1" />
+      : <ArrowDown className="h-4 w-4 ml-1" />;
+  };
+
+  // Render sort icon for past appointments column header
+  const PastSortIcon = ({ column }: { column: 'customer' | 'title' | 'date' | 'status' }) => {
+    if (pastSortColumn !== column) {
+      return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
+    }
+    return pastSortDirection === 'asc' 
       ? <ArrowUp className="h-4 w-4 ml-1" />
       : <ArrowDown className="h-4 w-4 ml-1" />;
   };
@@ -1294,13 +1353,13 @@ export default function RemindersPage() {
               </Card>
             </div>
 
-            {/* Main Appointments Table */}
+            {/* Upcoming Appointments Table */}
             <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
                       <Calendar className="h-5 w-5" />
-                      {t('reminders.tabs.appointments')}
+                      Upcoming Appointments
                     </CardTitle>
                     <div className="flex items-center gap-2">
                       <Button
@@ -1308,14 +1367,11 @@ export default function RemindersPage() {
                         size="icon"
                         disabled={appointmentsFetching}
                         onClick={async () => {
-                          // Invalidate first to mark as stale, then refetch to force network request
-                          await queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-                          await queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] });
-                          await queryClient.invalidateQueries({ queryKey: ['/api/appointment-reminders'] });
+                          // Invalidate queries to trigger refetch
                           await Promise.all([
-                            refetchAppointments(),
-                            refetchUpcomingAppointments(),
-                            refetchReminders()
+                            queryClient.invalidateQueries({ queryKey: ['/api/appointments'] }),
+                            queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] }),
+                            queryClient.invalidateQueries({ queryKey: ['/api/appointment-reminders'] })
                           ]);
                           setLastRefreshedAt(new Date());
                           toast({ title: t('reminders.toasts.success'), description: 'Appointments refreshed' });
@@ -1745,7 +1801,7 @@ export default function RemindersPage() {
                     </div>
                   )}
 
-                  <div className="min-h-[400px]">
+                  <div>
                     {appointmentsLoading ? (
                       <div className="flex items-center justify-center py-12">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
@@ -2265,6 +2321,242 @@ export default function RemindersPage() {
                           size="sm"
                           onClick={() => setCurrentPage(totalPages)}
                           disabled={currentPage === totalPages}
+                        >
+                          Last
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Past Appointments Table */}
+              <Card className="mt-6">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <Clock className="h-5 w-5" />
+                      Past Appointments
+                    </CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="min-h-[200px]">
+                    {appointmentsLoading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
+                      </div>
+                    ) : pastAppointments.length === 0 ? (
+                      <div className="text-center py-12">
+                        <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-600 dark:text-gray-400">No past appointments</p>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Desktop Table View */}
+                        <div className="hidden lg:block overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead 
+                                  className="cursor-pointer hover:bg-muted/50 select-none"
+                                  onClick={() => handlePastSort('customer')}
+                                >
+                                  <div className="flex items-center">
+                                    {t('reminders.table.customer')}
+                                    <PastSortIcon column="customer" />
+                                  </div>
+                                </TableHead>
+                                <TableHead 
+                                  className="cursor-pointer hover:bg-muted/50 select-none"
+                                  onClick={() => handlePastSort('title')}
+                                >
+                                  <div className="flex items-center">
+                                    {t('reminders.table.appointment')}
+                                    <PastSortIcon column="title" />
+                                  </div>
+                                </TableHead>
+                                <TableHead 
+                                  className="cursor-pointer hover:bg-muted/50 select-none"
+                                  onClick={() => handlePastSort('date')}
+                                >
+                                  <div className="flex items-center">
+                                    {t('reminders.table.dateTime')}
+                                    <PastSortIcon column="date" />
+                                  </div>
+                                </TableHead>
+                                <TableHead 
+                                  className="cursor-pointer hover:bg-muted/50 select-none"
+                                  onClick={() => handlePastSort('status')}
+                                >
+                                  <div className="flex items-center">
+                                    {t('reminders.table.status')}
+                                    <PastSortIcon column="status" />
+                                  </div>
+                                </TableHead>
+                                <TableHead>{t('reminders.table.actions')}</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {pastAppointments.map((appointment) => (
+                                <TableRow
+                                  key={appointment.id}
+                                  onClick={() => handleViewAppointment(appointment)}
+                                  className="cursor-pointer"
+                                >
+                                  <TableCell>
+                                    <div>
+                                      <p className="font-medium">{getCustomerName(appointment.customer)}</p>
+                                      <p className="text-sm text-gray-500">{appointment.customer?.email}</p>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div>
+                                      <p className="font-medium">{appointment.title}</p>
+                                      {appointment.location && (
+                                        <p className="text-sm text-gray-500 flex items-center gap-1">
+                                          <MapPin className="h-3 w-3" />
+                                          {appointment.location}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div>
+                                      <p className="font-medium">{formatDateTime(appointment.appointmentDate)}</p>
+                                      <p className="text-sm text-gray-500 flex items-center gap-1">
+                                        <Timer className="h-3 w-3" />
+                                        {appointment.duration} {t('reminders.appointments.minutes')}
+                                      </p>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge className={getStatusColor(appointment.status)}>
+                                      {appointment.status.replace('_', ' ')}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          handleViewAppointment(appointment);
+                                        }}
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+
+                        {/* Mobile/Tablet Card View */}
+                        <div className="lg:hidden space-y-4 p-4">
+                          {pastAppointments.map((appointment) => (
+                            <Card
+                              key={appointment.id}
+                              className="overflow-hidden cursor-pointer"
+                              onClick={() => handleViewAppointment(appointment)}
+                            >
+                              <CardContent className="p-4">
+                                <div className="space-y-3">
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                      <h3 className="font-semibold text-base">{appointment.title}</h3>
+                                      <p className="text-sm text-gray-600 dark:text-gray-400">{getCustomerName(appointment.customer)}</p>
+                                      <p className="text-xs text-gray-500 dark:text-gray-500">{appointment.customer?.email}</p>
+                                    </div>
+                                    <Badge className={getStatusColor(appointment.status)}>
+                                      {appointment.status.replace('_', ' ')}
+                                    </Badge>
+                                  </div>
+                                  <div className="space-y-2 text-sm">
+                                    <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                                      <Calendar className="h-4 w-4 text-gray-500" />
+                                      <span>{formatDateTime(appointment.appointmentDate)}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                                      <Timer className="h-4 w-4 text-gray-500" />
+                                      <span>{appointment.duration} {t('reminders.appointments.minutes')}</span>
+                                    </div>
+                                    {appointment.location && (
+                                      <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                                        <MapPin className="h-4 w-4 text-gray-500" />
+                                        <span>{appointment.location}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Pagination Controls for Past Appointments */}
+                  {pastAppointmentsAll.length > 0 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 border-t">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>Showing {pastStartIndex + 1}-{Math.min(pastEndIndex, totalPastAppointments)} of {totalPastAppointments}</span>
+                        <span className="hidden sm:inline">•</span>
+                        <div className="flex items-center gap-2">
+                          <span className="hidden sm:inline">Rows per page:</span>
+                          <Select value={pastPageSize.toString()} onValueChange={(value) => {
+                            setPastPageSize(Number(value));
+                            setPastCurrentPage(1);
+                          }}>
+                            <SelectTrigger className="w-[70px] h-8 focus-visible:ring-0">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="10">10</SelectItem>
+                              <SelectItem value="25">25</SelectItem>
+                              <SelectItem value="50">50</SelectItem>
+                              <SelectItem value="100">100</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPastCurrentPage(1)}
+                          disabled={pastCurrentPage === 1}
+                        >
+                          First
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPastCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={pastCurrentPage === 1}
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-sm px-2">
+                          Page {pastCurrentPage} of {totalPastPages}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPastCurrentPage(prev => Math.min(totalPastPages, prev + 1))}
+                          disabled={pastCurrentPage === totalPastPages}
+                        >
+                          Next
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPastCurrentPage(totalPastPages)}
+                          disabled={pastCurrentPage === totalPastPages}
                         >
                           Last
                         </Button>
