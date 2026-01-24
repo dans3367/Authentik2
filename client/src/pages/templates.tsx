@@ -1,9 +1,12 @@
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +16,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -38,6 +40,7 @@ import {
   Star,
   StarOff,
   Trash2,
+  LayoutDashboard,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import RichTextEditor from "@/components/RichTextEditor";
@@ -291,6 +294,7 @@ function getChannelBadgeClasses(channel: TemplateChannel) {
 }
 
 function TemplateCard({ template, onToggleFavorite, onDuplicate, onDelete, onUse, onEdit }: TemplateCardProps) {
+  const { t } = useTranslation();
   const [previewOpen, setPreviewOpen] = useState(false);
 
   return (
@@ -308,9 +312,9 @@ function TemplateCard({ template, onToggleFavorite, onDuplicate, onDelete, onUse
               <Badge variant="outline" className="capitalize">
                 {template.category.replace("_", " ")}
               </Badge>
-              <span>Used {template.usageCount}×</span>
+              <span>{t('templatesPage.card.used', { count: template.usageCount })}</span>
               {template.lastUsed && (
-                <span>Last sent {new Date(template.lastUsed).toLocaleDateString()}</span>
+                <span>{t('templatesPage.card.lastSent', { date: new Date(template.lastUsed).toLocaleDateString() })}</span>
               )}
             </div>
           </div>
@@ -326,7 +330,7 @@ function TemplateCard({ template, onToggleFavorite, onDuplicate, onDelete, onUse
               ) : (
                 <StarOff className="h-5 w-5 text-gray-400" />
               )}
-              <span className="sr-only">Toggle favorite</span>
+              <span className="sr-only">{t('templatesPage.actions.toggleFavorite')}</span>
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -336,16 +340,16 @@ function TemplateCard({ template, onToggleFavorite, onDuplicate, onDelete, onUse
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => onEdit(template)}>Edit</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setPreviewOpen(true)}>Preview</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onDuplicate(template)}>Duplicate</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onEdit(template)}>{t('templatesPage.actions.edit')}</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setPreviewOpen(true)}>{t('templatesPage.actions.preview')}</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onDuplicate(template)}>{t('templatesPage.actions.duplicate')}</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-red-600"
                   onClick={() => onDelete(template.id)}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                  {t('templatesPage.actions.delete')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -354,16 +358,16 @@ function TemplateCard({ template, onToggleFavorite, onDuplicate, onDelete, onUse
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Subject line</p>
+          <p className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{t('templatesPage.card.subjectLine')}</p>
           <p className="text-sm font-mono bg-gray-50 dark:bg-gray-800 rounded-md px-3 py-2 text-gray-800 dark:text-gray-100 break-words">
             {template.subjectLine}
           </p>
         </div>
         <div>
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Preview</p>
+          <p className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{t('templatesPage.card.preview')}</p>
           <div 
             className="text-sm text-gray-600 dark:text-gray-300 line-clamp-3"
-            dangerouslySetInnerHTML={{ __html: template.preview || 'No preview available' }}
+            dangerouslySetInnerHTML={{ __html: template.preview || t('templatesPage.card.noPreview') }}
           />
         </div>
         {template.tags.length > 0 && (
@@ -380,14 +384,14 @@ function TemplateCard({ template, onToggleFavorite, onDuplicate, onDelete, onUse
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" className="flex-1">
                 <Eye className="mr-2 h-4 w-4" />
-                Preview
+                {t('templatesPage.card.preview')}
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-hidden">
               <DialogHeader>
                 <DialogTitle>{template.name}</DialogTitle>
                 <DialogDescription>
-                  Subject: {template.subjectLine}
+                  {t('templatesPage.subject')}: {template.subjectLine}
                 </DialogDescription>
               </DialogHeader>
               <div 
@@ -403,7 +407,7 @@ function TemplateCard({ template, onToggleFavorite, onDuplicate, onDelete, onUse
             onClick={() => onUse(template)}
           >
             <Copy className="mr-2 h-4 w-4" />
-            Use template
+            {t('templatesPage.card.useTemplate')}
           </Button>
         </div>
       </CardContent>
@@ -411,163 +415,6 @@ function TemplateCard({ template, onToggleFavorite, onDuplicate, onDelete, onUse
   );
 }
 
-interface CreateTemplateDialogProps {
-  onCreate: (payload: CreateTemplatePayload) => void;
-}
-
-function CreateTemplateDialog({ onCreate }: CreateTemplateDialogProps) {
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [channel, setChannel] = useState<TemplateChannel>("individual");
-  const [category, setCategory] = useState<TemplateCategory>("welcome");
-  const [subjectLine, setSubjectLine] = useState("");
-  const [content, setContent] = useState("");
-  const [tagInput, setTagInput] = useState("");
-
-  const resetForm = () => {
-    setName("");
-    setChannel("individual");
-    setCategory("welcome");
-    setSubjectLine("");
-    setContent("");
-    setTagInput("");
-  };
-
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!name.trim() || !subjectLine.trim() || !hasContent(content)) {
-      return;
-    }
-
-    const tags = tagInput
-      .split(",")
-      .map((tag) => tag.trim())
-      .filter(Boolean);
-
-    onCreate({
-      name: name.trim(),
-      channel,
-      category,
-      subjectLine: subjectLine.trim(),
-      content: content.trim(),
-      tags,
-    });
-
-    resetForm();
-    setOpen(false);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="bg-blue-600 hover:bg-blue-700">
-          <Plus className="mr-2 h-4 w-4" />
-          Create template
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[650px] max-h-[85vh] overflow-y-auto">
-        <form onSubmit={handleSubmit} className="space-y-6 pb-2">
-          <DialogHeader>
-            <DialogTitle>Create template</DialogTitle>
-            <DialogDescription>
-              Build a reusable template for individual outreach, promotional campaigns, or transactional emails.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="template-name">Template name</Label>
-              <Input
-                id="template-name"
-                placeholder="e.g. New customer welcome"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                required
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="template-channel">Channel</Label>
-              <Select value={channel} onValueChange={(value: TemplateChannel) => setChannel(value)}>
-                <SelectTrigger id="template-channel">
-                  <SelectValue placeholder="Select channel" />
-                </SelectTrigger>
-                <SelectContent>
-                  {channelOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{option.label}</span>
-                        <span className="text-xs text-muted-foreground">{option.description}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="template-category">Category</Label>
-              <Select value={category} onValueChange={(value: TemplateCategory) => setCategory(value)}>
-                <SelectTrigger id="template-category">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categoryOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="template-subject">Subject line</Label>
-              <Input
-                id="template-subject"
-                placeholder="e.g. Welcome to {{company_name}}"
-                value={subjectLine}
-                onChange={(event) => setSubjectLine(event.target.value)}
-                required
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="template-content">Content</Label>
-              <RichTextEditor
-                value={content}
-                onChange={setContent}
-                placeholder="Write your email content or paste HTML"
-                className="min-h-[200px]"
-              />
-              <p className="text-xs text-muted-foreground">
-                {"Use liquid-style variables such as {{first_name}} or {{order_number}} to personalise your message."}
-              </p>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="template-tags">Tags</Label>
-              <Input
-                id="template-tags"
-                placeholder="Comma separated e.g. onboarding, v1"
-                value={tagInput}
-                onChange={(event) => setTagInput(event.target.value)}
-              />
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2 justify-end">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit">Save template</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 interface EditTemplateDialogProps {
   template: Template | null;
@@ -576,6 +423,7 @@ interface EditTemplateDialogProps {
 }
 
 function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [channel, setChannel] = useState<TemplateChannel>("individual");
@@ -643,18 +491,18 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
       <DialogContent className="sm:max-w-[650px] max-h-[85vh] overflow-y-auto">
         <form onSubmit={handleSubmit} className="space-y-6 pb-2">
           <DialogHeader>
-            <DialogTitle>Edit template</DialogTitle>
+            <DialogTitle>{t('templatesPage.editDialog.title')}</DialogTitle>
             <DialogDescription>
-              Update your template content, channel, or category.
+              {t('templatesPage.editDialog.description')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="edit-template-name">Template name</Label>
+              <Label htmlFor="edit-template-name">{t('templatesPage.editDialog.templateName')}</Label>
               <Input
                 id="edit-template-name"
-                placeholder="e.g. New customer welcome"
+                placeholder={t('templatesPage.editDialog.templateNamePlaceholder')}
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 required
@@ -662,10 +510,10 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="edit-template-channel">Channel</Label>
+              <Label htmlFor="edit-template-channel">{t('templatesPage.editDialog.channel')}</Label>
               <Select value={channel} onValueChange={(value: TemplateChannel) => setChannel(value)}>
                 <SelectTrigger id="edit-template-channel">
-                  <SelectValue placeholder="Select channel" />
+                  <SelectValue placeholder={t('templatesPage.editDialog.selectChannel')} />
                 </SelectTrigger>
                 <SelectContent>
                   {channelOptions.map((option) => (
@@ -681,10 +529,10 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="edit-template-category">Category</Label>
+              <Label htmlFor="edit-template-category">{t('templatesPage.editDialog.category')}</Label>
               <Select value={category} onValueChange={(value: TemplateCategory) => setCategory(value)}>
                 <SelectTrigger id="edit-template-category">
-                  <SelectValue placeholder="Select category" />
+                  <SelectValue placeholder={t('templatesPage.editDialog.selectCategory')} />
                 </SelectTrigger>
                 <SelectContent>
                   {categoryOptions.map((option) => (
@@ -697,10 +545,10 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="edit-template-subject">Subject line</Label>
+              <Label htmlFor="edit-template-subject">{t('templatesPage.editDialog.subjectLine')}</Label>
               <Input
                 id="edit-template-subject"
-                placeholder="e.g. Welcome to {{company_name}}"
+                placeholder={t('templatesPage.editDialog.subjectLinePlaceholder')}
                 value={subjectLine}
                 onChange={(event) => setSubjectLine(event.target.value)}
                 required
@@ -708,23 +556,23 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="edit-template-content">Content</Label>
+              <Label htmlFor="edit-template-content">{t('templatesPage.editDialog.content')}</Label>
               <RichTextEditor
                 value={content}
                 onChange={setContent}
-                placeholder="Write your email content or paste HTML"
+                placeholder={t('templatesPage.editDialog.contentPlaceholder')}
                 className="min-h-[200px]"
               />
               <p className="text-xs text-muted-foreground">
-                {"Use liquid-style variables such as {{first_name}} or {{order_number}} to personalise your message."}
+                {t('templatesPage.editDialog.contentHelp')}
               </p>
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="edit-template-tags">Tags</Label>
+              <Label htmlFor="edit-template-tags">{t('templatesPage.editDialog.tags')}</Label>
               <Input
                 id="edit-template-tags"
-                placeholder="Comma separated e.g. onboarding, v1"
+                placeholder={t('templatesPage.editDialog.tagsPlaceholder')}
                 value={tagInput}
                 onChange={(event) => setTagInput(event.target.value)}
               />
@@ -733,9 +581,9 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
 
           <DialogFooter className="gap-2 justify-end">
             <Button type="button" variant="outline" onClick={handleCancel}>
-              Cancel
+              {t('templatesPage.editDialog.cancel')}
             </Button>
-            <Button type="submit">Save changes</Button>
+            <Button type="submit">{t('templatesPage.editDialog.saveChanges')}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -744,6 +592,14 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
 }
 
 export default function TemplatesPage() {
+  const { t } = useTranslation();
+
+  // Set breadcrumbs in header
+  useSetBreadcrumbs([
+    { label: t('navigation.dashboard'), href: "/", icon: LayoutDashboard },
+    { label: t('templatesPage.title'), icon: Copy }
+  ]);
+
   const [templates, setTemplates] = useState<Template[]>([]);
   const [pagination, setPagination] = useState<TemplatePagination>({ page: 1, limit: 50, total: 0, pages: 0 });
   const [stats, setStats] = useState<TemplateStats | null>(null);
@@ -755,6 +611,7 @@ export default function TemplatesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const [location, setLocation] = useLocation();
 
   // Load templates and stats on component mount and when filters change
   const loadTemplates = async () => {
@@ -774,8 +631,8 @@ export default function TemplatesPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load templates');
       toast({
-        title: "Error",
-        description: "Failed to load templates. Please try again.",
+        title: t('templatesPage.toasts.error'),
+        description: t('templatesPage.toasts.loadError'),
         variant: "destructive",
       });
     } finally {
@@ -792,11 +649,14 @@ export default function TemplatesPage() {
     }
   };
 
-  // Load data on mount
+  // Load data on mount and when location changes (e.g., returning from create page)
   useEffect(() => {
-    loadTemplates();
-    loadStats();
-  }, []);
+    // Only reload if we're on the templates page (not a subpage)
+    if (location === '/templates') {
+      loadTemplates();
+      loadStats();
+    }
+  }, [location]);
 
   // Reload templates when filters change
   useEffect(() => {
@@ -810,34 +670,6 @@ export default function TemplatesPage() {
   // Filtered templates for display (now handled server-side)
   const filteredTemplates = templates;
 
-  const handleCreateTemplate = async (payload: CreateTemplatePayload) => {
-    try {
-      const result = await createTemplate({
-        name: payload.name,
-        channel: payload.channel,
-        category: payload.category,
-        subjectLine: payload.subjectLine,
-        preview: payload.content.slice(0, 160),
-        body: payload.content,
-        tags: payload.tags,
-        isFavorite: false,
-      });
-      
-      await loadTemplates();
-      await loadStats();
-      
-      toast({
-        title: "Template created",
-        description: `${payload.name} is ready to use across your campaigns.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to create template. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
 
   const handleToggleFavorite = async (id: string) => {
     try {
@@ -846,8 +678,8 @@ export default function TemplatesPage() {
       await loadStats();
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to toggle favorite status. Please try again.",
+        title: t('templatesPage.toasts.error'),
+        description: t('templatesPage.toasts.favoriteError'),
         variant: "destructive",
       });
     }
@@ -858,13 +690,13 @@ export default function TemplatesPage() {
       await useTemplate(template.id);
       await loadTemplates(); // Refresh to show updated usage count
       toast({
-        title: "Template applied",
-        description: `We copied "${template.name}" so you can personalise it for your next send.`,
+        title: t('templatesPage.toasts.templateApplied'),
+        description: t('templatesPage.toasts.templateAppliedDesc', { name: template.name }),
       });
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to use template. Please try again.",
+        title: t('templatesPage.toasts.error'),
+        description: t('templatesPage.toasts.useError'),
         variant: "destructive",
       });
     }
@@ -887,13 +719,13 @@ export default function TemplatesPage() {
       await loadTemplates();
       await loadStats();
       toast({
-        title: "Template deleted",
-        description: `${template.name} has been removed.`,
+        title: t('templatesPage.toasts.templateDeleted'),
+        description: t('templatesPage.toasts.templateDeletedDesc', { name: template.name }),
       });
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to delete template. Please try again.",
+        title: t('templatesPage.toasts.error'),
+        description: t('templatesPage.toasts.deleteError'),
         variant: "destructive",
       });
     }
@@ -905,13 +737,13 @@ export default function TemplatesPage() {
       await loadTemplates();
       await loadStats();
       toast({
-        title: "Template duplicated",
-        description: `${template.name} copy is ready to edit.`,
+        title: t('templatesPage.toasts.templateDuplicated'),
+        description: t('templatesPage.toasts.templateDuplicatedDesc', { name: template.name }),
       });
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to duplicate template. Please try again.",
+        title: t('templatesPage.toasts.error'),
+        description: t('templatesPage.toasts.duplicateError'),
         variant: "destructive",
       });
     }
@@ -928,8 +760,7 @@ export default function TemplatesPage() {
         channel: payload.channel,
         category: payload.category,
         subjectLine: payload.subjectLine,
-        preview: payload.content.slice(0, 160),
-        body: payload.content,
+        content: payload.content,
         tags: payload.tags,
       });
       
@@ -937,13 +768,13 @@ export default function TemplatesPage() {
       await loadStats();
       
       toast({
-        title: "Template updated",
-        description: `${payload.name} has been saved.`,
+        title: t('templatesPage.toasts.templateUpdated'),
+        description: t('templatesPage.toasts.templateUpdatedDesc', { name: payload.name }),
       });
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to update template. Please try again.",
+        title: t('templatesPage.toasts.error'),
+        description: t('templatesPage.toasts.updateError'),
         variant: "destructive",
       });
     }
@@ -954,42 +785,48 @@ export default function TemplatesPage() {
       <div className="max-w-7xl mx-auto p-6 space-y-8">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-50">Templates</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-50">{t('templatesPage.title')}</h1>
             <p className="text-gray-600 dark:text-gray-300">
-              Create reusable content for one-to-one emails, promotional campaigns, newsletters, and system notifications.
+              {t('templatesPage.subtitle')}
             </p>
           </div>
-          <CreateTemplateDialog onCreate={handleCreateTemplate} />
+          <Button 
+            className="bg-blue-600 hover:bg-blue-700"
+            onClick={() => setLocation('/templates/create')}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            {t('templatesPage.createTemplate')}
+          </Button>
         </header>
 
         <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardContent className="p-5 space-y-1">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total templates</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('templatesPage.stats.totalTemplates')}</p>
               <p className="text-3xl font-semibold text-gray-900 dark:text-gray-50">
                 {stats ? stats.totalTemplates : '...'}
               </p>
               <p className="text-xs text-muted-foreground">
-                {stats ? `${stats.favoriteTemplates} favourited for quick access` : 'Loading...'}
+                {stats ? t('templatesPage.stats.favorited', { count: stats.favoriteTemplates }) : t('templatesPage.stats.loading')}
               </p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-5 space-y-1">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Individual</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('templatesPage.stats.individual')}</p>
               <p className="text-3xl font-semibold text-gray-900 dark:text-gray-50">
                 {stats ? stats.individualTemplates : '...'}
               </p>
-              <p className="text-xs text-muted-foreground">Templates ready for this channel</p>
+              <p className="text-xs text-muted-foreground">{t('templatesPage.stats.templatesReady')}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-5 space-y-1">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Promotional</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('templatesPage.stats.promotional')}</p>
               <p className="text-3xl font-semibold text-gray-900 dark:text-gray-50">
                 {stats ? stats.promotionalTemplates : '...'}
               </p>
-              <p className="text-xs text-muted-foreground">Templates ready for this channel</p>
+              <p className="text-xs text-muted-foreground">{t('templatesPage.stats.templatesReady')}</p>
             </CardContent>
           </Card>
         </section>
@@ -1000,7 +837,7 @@ export default function TemplatesPage() {
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Search by name, subject line, or tag"
+                  placeholder={t('templatesPage.filters.searchPlaceholder')}
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                   className="pl-9"
@@ -1013,7 +850,7 @@ export default function TemplatesPage() {
                     <SelectValue placeholder="Channel" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All channels</SelectItem>
+                    <SelectItem value="all">{t('templatesPage.filters.allChannels')}</SelectItem>
                     {channelOptions.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
@@ -1026,7 +863,7 @@ export default function TemplatesPage() {
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All categories</SelectItem>
+                    <SelectItem value="all">{t('templatesPage.filters.allCategories')}</SelectItem>
                     {categoryOptions.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
@@ -1040,7 +877,7 @@ export default function TemplatesPage() {
                   onClick={() => setFavoritesOnly((previous) => !previous)}
                 >
                   {favoritesOnly ? <Star className="mr-2 h-4 w-4" /> : <StarOff className="mr-2 h-4 w-4" />}
-                  Favorites
+                  {t('templatesPage.filters.favorites')}
                 </Button>
               </div>
             </div>
@@ -1050,29 +887,29 @@ export default function TemplatesPage() {
               <div className="flex items-center justify-center py-12">
                 <div className="text-center space-y-3">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="text-sm text-muted-foreground">Loading templates...</p>
+                  <p className="text-sm text-muted-foreground">{t('templatesPage.loading.text')}</p>
                 </div>
               </div>
             ) : error ? (
               <Card className="border-dashed border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800">
                 <CardContent className="py-12 text-center space-y-3">
-                  <h3 className="text-lg font-semibold text-red-900 dark:text-red-100">Error loading templates</h3>
+                  <h3 className="text-lg font-semibold text-red-900 dark:text-red-100">{t('templatesPage.error.title')}</h3>
                   <p className="text-sm text-red-700 dark:text-red-300">
                     {error}
                   </p>
                   <Button variant="outline" onClick={() => loadTemplates()}>
-                    Try again
+                    {t('templatesPage.error.tryAgain')}
                   </Button>
                 </CardContent>
               </Card>
             ) : filteredTemplates.length === 0 ? (
               <Card className="border-dashed">
                 <CardContent className="py-12 text-center space-y-3">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">No templates found</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('templatesPage.empty.noTemplates')}</h3>
                   <p className="text-sm text-muted-foreground">
                     {searchTerm || channelFilter !== 'all' || categoryFilter !== 'all' || favoritesOnly
-                      ? 'Try adjusting your search terms or filters.'
-                      : 'Get started by creating your first email template.'}
+                      ? t('templatesPage.empty.adjustFilters')
+                      : t('templatesPage.empty.getStarted')}
                   </p>
                   <div className="space-x-2">
                     {(searchTerm || channelFilter !== 'all' || categoryFilter !== 'all' || favoritesOnly) && (
@@ -1082,7 +919,7 @@ export default function TemplatesPage() {
                         setCategoryFilter("all");
                         setFavoritesOnly(false);
                       }}>
-                        Reset filters
+                        {t('templatesPage.empty.resetFilters')}
                       </Button>
                     )}
                   </div>

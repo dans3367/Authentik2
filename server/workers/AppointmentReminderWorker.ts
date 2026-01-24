@@ -108,16 +108,59 @@ export class AppointmentReminderWorker extends EventEmitter {
         const apptTime = a?.appointmentDate ? new Date(a.appointmentDate).toLocaleString('en-US', { hour12: true }) : '';
 
         const subject = `Reminder: ${a?.title || 'Appointment'}`;
+        
+        const baseUrl = process.env.API_URL || 'http://localhost:5002';
+        const confirmUrl = `${baseUrl}/api/appointments/${a?.id}/confirm`;
+        const declineUrl = `${baseUrl}/api/appointments/${a?.id}/decline`;
+        
         const html = r.content || `
-          <div>
-            <p>Hi ${customerName},</p>
-            <p>This is a reminder about your upcoming appointment.</p>
-            ${a?.title ? `<p><strong>Title:</strong> ${a.title}</p>` : ''}
-            ${apptTime ? `<p><strong>When:</strong> ${apptTime}</p>` : ''}
-            ${a?.location ? `<p><strong>Location:</strong> ${a.location}</p>` : ''}
-            ${a?.duration ? `<p><strong>Duration:</strong> ${a.duration} minutes</p>` : ''}
-            <p>If you need to reschedule, please let us know.</p>
-          </div>
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+              <h1 style="color: white; margin: 0; font-size: 24px;">Appointment Reminder</h1>
+            </div>
+            
+            <div style="background-color: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+              <p style="margin: 0 0 20px 0;">Hi ${customerName},</p>
+              
+              <p style="margin: 0 0 20px 0;">This is a friendly reminder about your upcoming appointment:</p>
+              
+              <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                ${a?.title ? `<h2 style="margin: 0 0 15px 0; color: #1f2937; font-size: 18px;">${a.title}</h2>` : ''}
+                ${apptTime ? `<p style="margin: 0 0 10px 0;"><strong>When:</strong> ${apptTime}</p>` : ''}
+                ${a?.location ? `<p style="margin: 0 0 10px 0;"><strong>Location:</strong> ${a.location}</p>` : ''}
+                ${a?.duration ? `<p style="margin: 0 0 10px 0;"><strong>Duration:</strong> ${a.duration} minutes</p>` : ''}
+              </div>
+              
+              <div style="margin: 30px 0; text-align: center;">
+                <p style="margin: 0 0 15px 0; font-size: 16px; font-weight: 600; color: #1f2937;">Will you be attending?</p>
+                <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto;">
+                  <tr>
+                    <td style="padding: 0 8px;">
+                      <a href="${confirmUrl}" style="display: inline-block; padding: 12px 32px; background-color: #10b981; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">Confirm</a>
+                    </td>
+                    <td style="padding: 0 8px;">
+                      <a href="${declineUrl}" style="display: inline-block; padding: 12px 32px; background-color: #ef4444; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">Not attending</a>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+              
+              <p style="margin: 20px 0 0 0; color: #6b7280; font-size: 14px;">
+                If you need to reschedule or cancel, please contact us as soon as possible.
+              </p>
+            </div>
+            
+            <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
+              <p style="margin: 0;">This is an automated reminder. Please do not reply to this email.</p>
+            </div>
+          </body>
+          </html>
         `;
 
         try {

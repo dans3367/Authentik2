@@ -10,9 +10,165 @@ import {
   SidebarInset,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { Separator } from "@/components/ui/separator";
 import { AppSidebar } from "@/components/AppSidebar";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
 import { useLanguage } from "@/hooks/useLanguage";
+import { PageTitleProvider, usePageTitle } from "@/contexts/PageTitleContext";
+import { Button } from "@/components/ui/button";
+import { Zap, UserPlus, Bell, ChevronRight, X } from "lucide-react";
+import { Link } from "wouter";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+// Header component that displays breadcrumbs or page title
+function AppHeader() {
+  const { title, subtitle, breadcrumbs } = usePageTitle();
+  const [location, setLocation] = useLocation();
+  const [showExitDialog, setShowExitDialog] = useState(false);
+  
+  // Check if we're on newsletter create/edit pages or forms edit pages
+  const hideHeader = location === '/newsletter/create' || 
+                    location.startsWith('/newsletter/edit/') || 
+                    location.startsWith('/forms/');
+  
+  // Return null to completely hide header on newsletter create/edit pages
+  if (hideHeader) {
+    return (
+      <>
+        {/* Minimal header with exit button */}
+        <header className="flex h-16 shrink-0 items-center justify-end gap-2 border-b px-4 bg-white dark:bg-gray-900">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowExitDialog(true)}
+            className="h-9 w-9 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            title="Exit to Forms"
+          >
+            <X className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+          </Button>
+        </header>
+        
+        {/* Exit Confirmation Dialog */}
+        <AlertDialog open={showExitDialog} onOpenChange={setShowExitDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Exit Editor?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to exit? Any unsaved changes will be lost.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  setShowExitDialog(false);
+                  setLocation('/forms');
+                }}
+              >
+                Exit
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
+    );
+  }
+  
+  return (
+    <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+      <SidebarTrigger className="-ml-1" />
+      {breadcrumbs.length > 0 ? (
+        <>
+          <Separator orientation="vertical" className="h-6 mx-2" />
+          <nav className="flex items-center gap-1">
+            {breadcrumbs.map((item, index) => {
+              const Icon = item.icon;
+              const isLast = index === breadcrumbs.length - 1;
+              
+              return (
+                <div key={index} className="flex items-center gap-1">
+                  {index > 0 && (
+                    <ChevronRight className="h-4 w-4 text-gray-400" />
+                  )}
+                  {item.href && !isLast ? (
+                    <Link 
+                      href={item.href}
+                      className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                    >
+                      {Icon && <Icon className="h-4 w-4" />}
+                      <span className="text-sm font-medium">{item.label}</span>
+                    </Link>
+                  ) : (
+                    <div className="flex items-center gap-1.5 text-gray-900 dark:text-white">
+                      {Icon && <Icon className="h-4 w-4" />}
+                      <span className="text-sm font-medium">{item.label}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </nav>
+        </>
+      ) : title ? (
+        <>
+          <Separator orientation="vertical" className="h-6 mx-2" />
+          <div className="flex flex-col justify-center">
+            <h1 className="text-lg font-semibold text-gray-900 dark:text-white leading-tight">
+              {title}
+            </h1>
+            {subtitle && (
+              <p className="text-sm text-gray-500 dark:text-gray-400 leading-tight">
+                {subtitle}
+              </p>
+            )}
+          </div>
+        </>
+      ) : null}
+      <div className="flex-1" />
+      
+      {/* Action Icons */}
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          title="Quick Actions"
+        >
+          <Zap className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+        </Button>
+        
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          title="Invite Users"
+        >
+          <UserPlus className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+        </Button>
+        
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
+          title="Notifications"
+        >
+          <Bell className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+          {/* Optional notification badge */}
+          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-gray-900" />
+        </Button>
+      </div>
+    </header>
+  );
+}
 
 
 
@@ -182,14 +338,11 @@ useEffect(() => {
   }
 
   return (
-    <>
+    <PageTitleProvider>
       <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarOpenChange}>
         <AppSidebar />
         <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-            <SidebarTrigger className="-ml-1" />
-            <div className="flex-1" />
-          </header>
+          <AppHeader />
           <div className="flex flex-1 flex-col">
             {children}
           </div>
@@ -201,6 +354,6 @@ useEffect(() => {
         open={showOnboarding} 
         onComplete={handleOnboardingComplete}
       />
-    </>
+    </PageTitleProvider>
   );
 }

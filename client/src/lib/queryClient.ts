@@ -28,8 +28,31 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  // Use relative URLs for same-domain requests or environment variable for different domains
-  const baseURL = import.meta.env.VITE_BETTER_AUTH_URL || "";
+  // Determine the base URL dynamically based on access method
+  const getApiBaseURL = () => {
+    // Use environment variable if set
+    if (import.meta.env.VITE_BETTER_AUTH_URL) {
+      return import.meta.env.VITE_BETTER_AUTH_URL;
+    }
+    
+    // In browser, determine based on current location
+    if (typeof window !== 'undefined') {
+      const { hostname, protocol } = window.location;
+      
+      // If accessing via localhost, use relative URLs (Vite proxy handles it)
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return '';
+      }
+      
+      // If accessing via IP address, point directly to the API server port
+      const apiPort = import.meta.env.VITE_API_PORT || '5002';
+      return `${protocol}//${hostname}:${apiPort}`;
+    }
+    
+    return '';
+  };
+  
+  const baseURL = getApiBaseURL();
   const fullUrl = url.startsWith('http') ? url : baseURL ? `${baseURL}${url}` : url;
   
   try {

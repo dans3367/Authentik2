@@ -101,6 +101,14 @@ const paletteItems: ComponentPaletteItem[] = [
     color: 'bg-gradient-to-br from-blue-100 to-sky-200 text-blue-700',
     category: 'basic',
   },
+  {
+    type: 'label',
+    label: 'Label / Text',
+    description: 'Add headings or text to your form',
+    icon: 'fas fa-heading',
+    color: 'bg-gradient-to-br from-slate-100 to-gray-200 text-slate-700',
+    category: 'basic',
+  },
 ];
 
 const categoryLabels = {

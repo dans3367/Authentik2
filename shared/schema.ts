@@ -353,6 +353,14 @@ export const emailContacts = pgTable("email_contacts", {
   consentIpAddress: text("consent_ip_address"),
   consentUserAgent: text("consent_user_agent"),
   addedByUserId: varchar("added_by_user_id").references(() => betterAuthUser.id),
+  // Address fields
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  country: text("country"),
+  // Contact fields
+  phoneNumber: text("phone_number"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -371,6 +379,7 @@ export const contactTags = pgTable("contact_tags", {
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   name: text("name").notNull(),
   color: text("color").default('#3B82F6'),
+  description: text("description"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1293,6 +1302,14 @@ export const createEmailContactSchema = z.object({
     message: "You must acknowledge consent before adding this contact"
   }),
   consentMethod: z.string().default('manual_add'),
+  // Address fields
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zipCode: z.string().optional(),
+  country: z.string().optional(),
+  // Contact fields
+  phoneNumber: z.string().optional(),
 });
 
 export const updateEmailContactSchema = z.object({
@@ -1304,6 +1321,14 @@ export const updateEmailContactSchema = z.object({
   lastActivity: z.date().optional(),
   birthday: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Birthday must be in YYYY-MM-DD format").optional(),
   birthdayEmailEnabled: z.boolean().optional(),
+  // Address fields
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zipCode: z.string().optional(),
+  country: z.string().optional(),
+  // Contact fields
+  phoneNumber: z.string().optional(),
 });
 
 export const createEmailListSchema = z.object({
@@ -1411,21 +1436,18 @@ export const createEmailEventSchema = z.object({
 
 export const insertEmailSendSchema = createInsertSchema(emailSends).omit({
   id: true,
-  tenantId: true,
   createdAt: true,
   updatedAt: true,
 });
 
 export const insertEmailContentSchema = createInsertSchema(emailContent).omit({
   id: true,
-  tenantId: true,
   createdAt: true,
   updatedAt: true,
 });
 
 export const insertEmailEventSchema = createInsertSchema(emailEvents).omit({
   id: true,
-  tenantId: true,
   createdAt: true,
 });
 
@@ -2080,6 +2102,19 @@ export const appointments = pgTable("appointments", {
   confirmationReceivedAt: timestamp("confirmation_received_at"),
   confirmationToken: text("confirmation_token"), // Unique token for confirmation links
   reminderSettings: text("reminder_settings"), // JSON: when to send reminders
+  isArchived: boolean("is_archived").default(false), // Whether the appointment is archived
+  archivedAt: timestamp("archived_at"), // When the appointment was archived
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Appointment notes table for storing multiple notes per appointment
+export const appointmentNotes = pgTable("appointment_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  appointmentId: varchar("appointment_id").notNull().references(() => appointments.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }), // Who created the note
+  content: text("content").notNull(), // Multiline text content
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -2091,8 +2126,11 @@ export const appointmentReminders = pgTable("appointment_reminders", {
   appointmentId: varchar("appointment_id").notNull().references(() => appointments.id, { onDelete: 'cascade' }),
   customerId: varchar("customer_id").notNull().references(() => emailContacts.id, { onDelete: 'cascade' }),
   reminderType: text("reminder_type").notNull(), // 'email', 'sms', 'push'
-  reminderTiming: text("reminder_timing").notNull(), // '24h', '1h', '30m', 'custom'
+  reminderTiming: text("reminder_timing").notNull(), // '5m', '30m', '1h', '5h', '10h', 'custom'
+  customMinutesBefore: integer("custom_minutes_before"), // Custom minutes before appointment when reminder should be sent
   scheduledFor: timestamp("scheduled_for").notNull(),
+  timezone: text("timezone").default('America/Chicago'), // Timezone for the reminder (IANA timezone identifier)
+  inngestEventId: text("inngest_event_id"), // Inngest event ID for tracking/cancellation
   sentAt: timestamp("sent_at"),
   status: text("status").notNull().default('pending'), // pending, sent, failed, cancelled
   content: text("content"), // The reminder message content
@@ -2117,6 +2155,23 @@ export const appointmentRelations = relations(appointments, ({ one, many }) => (
     references: [betterAuthUser.id],
   }),
   reminders: many(appointmentReminders),
+  notes: many(appointmentNotes),
+}));
+
+// Appointment notes relations
+export const appointmentNoteRelations = relations(appointmentNotes, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [appointmentNotes.tenantId],
+    references: [tenants.id],
+  }),
+  appointment: one(appointments, {
+    fields: [appointmentNotes.appointmentId],
+    references: [appointments.id],
+  }),
+  user: one(betterAuthUser, {
+    fields: [appointmentNotes.userId],
+    references: [betterAuthUser.id],
+  }),
 }));
 
 export const appointmentReminderRelations = relations(appointmentReminders, ({ one }) => ({
@@ -2159,14 +2214,75 @@ export const tenantRelationsUpdated = relations(tenants, ({ many }) => ({
   appointments: many(appointments),
   appointmentReminders: many(appointmentReminders),
   templates: many(templates),
+  inngestEvents: many(inngestEvents),
 }));
+
+// Inngest Events tracking table for recording all events sent to Inngest
+export const inngestEvents = pgTable("inngest_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }),
+  
+  // Event identification
+  eventName: text("event_name").notNull(), // e.g., 'email/send', 'reminder/send'
+  eventId: text("event_id"), // Inngest's returned event ID
+  idempotencyKey: text("idempotency_key").unique(), // Prevent duplicate sends
+  
+  // Event payload
+  eventData: text("event_data").notNull(), // JSON payload
+  
+  // Status tracking
+  status: text("status").notNull().default('pending'), // pending, sent, processing, completed, failed, cancelled
+  
+  // Retry tracking
+  retryCount: integer("retry_count").default(0),
+  maxRetries: integer("max_retries").default(3),
+  lastRetryAt: timestamp("last_retry_at"),
+  nextRetryAt: timestamp("next_retry_at"),
+  
+  // Scheduling
+  scheduledFor: timestamp("scheduled_for"),
+  
+  // Result tracking
+  result: text("result"), // JSON result from Inngest
+  errorMessage: text("error_message"),
+  
+  // Related records
+  relatedType: text("related_type"), // 'appointment_reminder', 'newsletter', 'email'
+  relatedId: varchar("related_id"),
+  
+  // Timestamps
+  sentAt: timestamp("sent_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Inngest events relations
+export const inngestEventRelations = relations(inngestEvents, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [inngestEvents.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+// Inngest event status enum
+export const inngestEventStatuses = ['pending', 'sent', 'processing', 'completed', 'failed', 'cancelled'] as const;
+export type InngestEventStatus = typeof inngestEventStatuses[number];
+
+// Inngest event related types
+export const inngestEventRelatedTypes = ['appointment_reminder', 'newsletter', 'email', 'bulk_email', 'scheduled_email'] as const;
+export type InngestEventRelatedType = typeof inngestEventRelatedTypes[number];
+
+// Inngest event types
+export type InngestEvent = typeof inngestEvents.$inferSelect;
+export type InsertInngestEvent = typeof inngestEvents.$inferInsert;
 
 // Appointment schemas
 export const createAppointmentSchema = z.object({
   customerId: z.string().uuid("Please select a valid customer"),
   title: z.string().min(1, "Appointment title is required"),
   description: z.string().optional(),
-  appointmentDate: z.date(),
+  appointmentDate: z.coerce.date(),
   duration: z.number().int().positive().default(60),
   location: z.string().optional(),
   serviceType: z.string().optional(),
@@ -2177,7 +2293,7 @@ export const createAppointmentSchema = z.object({
 export const updateAppointmentSchema = z.object({
   title: z.string().min(1, "Appointment title is required").optional(),
   description: z.string().optional(),
-  appointmentDate: z.date().optional(),
+  appointmentDate: z.coerce.date().optional(),
   duration: z.number().int().positive().optional(),
   location: z.string().optional(),
   serviceType: z.string().optional(),
@@ -2189,8 +2305,10 @@ export const updateAppointmentSchema = z.object({
 export const createAppointmentReminderSchema = z.object({
   appointmentId: z.string().uuid(),
   reminderType: z.enum(['email', 'sms', 'push']).default('email'),
-  reminderTiming: z.enum(['24h', '1h', '30m', 'custom']).default('24h'),
+  reminderTiming: z.enum(['now', '5m', '30m', '1h', '5h', '10h', 'custom']).default('1h'),
+  customMinutesBefore: z.number().min(1).max(10080).optional(), // Up to 1 week before
   scheduledFor: z.coerce.date(),
+  timezone: z.string().default('America/Chicago'), // IANA timezone identifier
   content: z.string().optional(),
 });
 
@@ -2204,11 +2322,28 @@ export type AppointmentReminder = typeof appointmentReminders.$inferSelect;
 export type InsertAppointmentReminder = typeof appointmentReminders.$inferInsert;
 export type CreateAppointmentReminderData = z.infer<typeof createAppointmentReminderSchema>;
 
+// Appointment note schemas
+export const createAppointmentNoteSchema = z.object({
+  appointmentId: z.string().uuid("Valid appointment ID is required"),
+  content: z.string().min(1, "Note content is required"),
+});
+
+export const updateAppointmentNoteSchema = z.object({
+  content: z.string().min(1, "Note content is required"),
+});
+
+// Appointment note types
+export type AppointmentNote = typeof appointmentNotes.$inferSelect;
+export type InsertAppointmentNote = typeof appointmentNotes.$inferInsert;
+export type CreateAppointmentNoteData = z.infer<typeof createAppointmentNoteSchema>;
+export type UpdateAppointmentNoteData = z.infer<typeof updateAppointmentNoteSchema>;
+
 // Extended appointment types with relationships
 export interface AppointmentWithDetails extends Appointment {
   customer: EmailContact;
   user: User;
   reminders?: AppointmentReminder[];
+  appointmentNotes?: AppointmentNote[];
 }
 
 export interface AppointmentFilters {

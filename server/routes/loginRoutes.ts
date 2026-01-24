@@ -220,9 +220,11 @@ loginRoutes.post('/verify-login', async (req, res) => {
       res.cookie('better-auth.session_token', authSessionToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days (Better Auth default)
-        path: '/'
+        path: '/',
+        // Allow cookies to be sent from any origin in development
+        ...(process.env.NODE_ENV !== 'production' && { domain: undefined })
       });
 
       return res.json({

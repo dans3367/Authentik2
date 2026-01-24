@@ -10,9 +10,74 @@ import {
 } from '@shared/schema';
 import { authenticateToken } from '../middleware/auth-middleware';
 
+const INNGEST_URL = process.env.INNGEST_URL || 'http://localhost:3006';
+
 const router = Router();
 
-// Apply authentication to all routes
+// Internal endpoint for Inngest to update reminder status (no auth required)
+router.put('/internal/:id/status', async (req: Request, res: Response) => {
+  console.log('📧 [Internal Status] Received request:', {
+    id: req.params.id,
+    headers: req.headers['x-internal-service'],
+    body: req.body,
+  });
+  
+  try {
+    // Verify internal service header
+    const internalHeader = req.headers['x-internal-service'];
+    const internalService = Array.isArray(internalHeader)
+      ? internalHeader[0]
+      : internalHeader;
+    
+    console.log('📧 [Internal Status] Header check:', { internalHeader, internalService });
+    
+    if ((internalService || '').toString().toLowerCase() !== 'inngest') {
+      console.log('📧 [Internal Status] Rejecting - invalid header');
+      return res.status(403).json({ error: 'Forbidden', reason: 'missing_or_invalid_internal_header' });
+    }
+
+    const { id } = req.params;
+    const { status, errorMessage } = req.body;
+
+    if (!['pending', 'sent', 'failed', 'cancelled'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    // Verify reminder exists
+    const existingReminder = await db
+      .select()
+      .from(appointmentReminders)
+      .where(eq(appointmentReminders.id, id))
+      .limit(1);
+
+    if (existingReminder.length === 0) {
+      return res.status(404).json({ error: 'Reminder not found' });
+    }
+
+    // Update reminder status
+    const updatedReminder = await db
+      .update(appointmentReminders)
+      .set({
+        status,
+        errorMessage: status === 'failed' ? errorMessage : null,
+        sentAt: status === 'sent' ? new Date() : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(appointmentReminders.id, id))
+      .returning();
+
+    console.log(`📧 [Internal] Reminder ${id} status updated to: ${status}`);
+    res.json({ 
+      reminder: updatedReminder[0],
+      message: 'Reminder status updated successfully' 
+    });
+  } catch (error) {
+    console.error('Failed to update reminder status (internal):', error);
+    res.status(500).json({ error: 'Failed to update reminder status' });
+  }
+});
+
+// Apply authentication to all routes below this point
 router.use(authenticateToken);
 
 // GET /api/appointment-reminders - List reminders
@@ -54,6 +119,7 @@ router.get('/', async (req: Request, res: Response) => {
         status: appointmentReminders.status,
         content: appointmentReminders.content,
         errorMessage: appointmentReminders.errorMessage,
+        customMinutesBefore: appointmentReminders.customMinutesBefore,
         metadata: appointmentReminders.metadata,
         createdAt: appointmentReminders.createdAt,
         updatedAt: appointmentReminders.updatedAt,
@@ -96,38 +162,168 @@ router.post('/', async (req: Request, res: Response) => {
     // Validate request body
     const validatedData = createAppointmentReminderSchema.parse(req.body);
 
-    // Verify appointment belongs to this tenant
-    const appointment = await db
+    // Verify appointment belongs to this tenant and get customer details
+    const appointmentWithCustomer = await db
       .select({
         id: appointments.id,
         customerId: appointments.customerId,
         title: appointments.title,
         appointmentDate: appointments.appointmentDate,
+        location: appointments.location,
+        customer: {
+          id: emailContacts.id,
+          email: emailContacts.email,
+          firstName: emailContacts.firstName,
+          lastName: emailContacts.lastName,
+        }
       })
       .from(appointments)
+      .leftJoin(emailContacts, eq(appointments.customerId, emailContacts.id))
       .where(and(
         eq(appointments.id, validatedData.appointmentId),
         eq(appointments.tenantId, tenantId)
       ))
       .limit(1);
 
-    if (appointment.length === 0) {
+    if (appointmentWithCustomer.length === 0) {
       return res.status(400).json({ error: 'Appointment not found or does not belong to your organization' });
     }
 
+    const appointment = appointmentWithCustomer[0];
+    const isSendNow = validatedData.reminderTiming === 'now';
+
     // Create reminder
+    const reminderData: any = {
+      tenantId,
+      customerId: appointment.customerId,
+      appointmentId: validatedData.appointmentId,
+      reminderType: validatedData.reminderType,
+      reminderTiming: validatedData.reminderTiming,
+      scheduledFor: validatedData.scheduledFor,
+      timezone: validatedData.timezone || 'America/Chicago',
+      content: validatedData.content,
+      status: isSendNow ? 'sent' : 'pending',
+      sentAt: isSendNow ? new Date() : null,
+    };
+
+    // Only add customMinutesBefore if it's provided (to handle cases where migration hasn't been applied yet)
+    if (validatedData.customMinutesBefore !== undefined) {
+      reminderData.customMinutesBefore = validatedData.customMinutesBefore;
+    }
+
     const newReminder = await db
       .insert(appointmentReminders)
-      .values({
-        tenantId,
-        customerId: appointment[0].customerId,
-        ...validatedData,
-      })
+      .values(reminderData)
       .returning();
+
+    // Prepare common Inngest payload data
+    const appointmentDate = new Date(appointment.appointmentDate);
+    const customerName = appointment.customer?.firstName 
+      ? `${appointment.customer.firstName} ${appointment.customer.lastName || ''}`.trim()
+      : 'Valued Customer';
+
+    const inngestPayload = {
+      reminderId: newReminder[0].id,
+      appointmentId: appointment.id,
+      customerId: appointment.customerId,
+      customerEmail: appointment.customer?.email,
+      customerName,
+      appointmentTitle: appointment.title,
+      appointmentDate: appointmentDate.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        timeZone: validatedData.timezone || 'America/Chicago',
+      }),
+      appointmentTime: appointmentDate.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: validatedData.timezone || 'America/Chicago',
+      }),
+      location: appointment.location || undefined,
+      reminderType: validatedData.reminderType,
+      content: validatedData.content || undefined,
+      tenantId,
+      timezone: validatedData.timezone || 'America/Chicago',
+    };
+
+    // Send to Inngest - either immediately or scheduled
+    if (appointment.customer?.email) {
+      try {
+        let inngestEndpoint: string;
+        let inngestBody: any;
+
+        if (isSendNow) {
+          // Send immediately
+          inngestEndpoint = `${INNGEST_URL}/api/send-reminder`;
+          inngestBody = inngestPayload;
+        } else {
+          // Schedule for later - use the schedule-reminder endpoint
+          inngestEndpoint = `${INNGEST_URL}/api/schedule-reminder`;
+          inngestBody = {
+            ...inngestPayload,
+            scheduledFor: validatedData.scheduledFor.toISOString(),
+          };
+        }
+
+        console.log(`📅 [Inngest] Sending to ${inngestEndpoint}:`, JSON.stringify(inngestBody, null, 2));
+
+        const response = await fetch(inngestEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(inngestBody),
+        });
+        
+        console.log(`📅 [Inngest] Response status: ${response.status}`);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Failed to ${isSendNow ? 'send' : 'schedule'} reminder via Inngest:`, errorText);
+          // Update reminder status to failed
+          await db
+            .update(appointmentReminders)
+            .set({ status: 'failed', errorMessage: `Failed to ${isSendNow ? 'send' : 'schedule'} via Inngest`, updatedAt: new Date() })
+            .where(eq(appointmentReminders.id, newReminder[0].id));
+        } else {
+          const responseData = await response.json();
+          
+          if (isSendNow) {
+            // Update reminder status to sent on success
+            await db
+              .update(appointmentReminders)
+              .set({ status: 'sent', sentAt: new Date(), updatedAt: new Date() })
+              .where(eq(appointmentReminders.id, newReminder[0].id));
+            console.log(`📧 Immediate reminder sent for appointment ${appointment.id} to ${appointment.customer.email}`);
+          } else {
+            // Store the Inngest event ID for potential cancellation later
+            await db
+              .update(appointmentReminders)
+              .set({ 
+                inngestEventId: responseData.eventId || null,
+                updatedAt: new Date() 
+              })
+              .where(eq(appointmentReminders.id, newReminder[0].id));
+            console.log(`📅 Scheduled reminder for appointment ${appointment.id} at ${validatedData.scheduledFor.toISOString()} (${validatedData.timezone || 'America/Chicago'})`);
+          }
+        }
+      } catch (inngestError) {
+        console.error('Error calling Inngest for reminder:', inngestError);
+        // Update reminder status to failed
+        await db
+          .update(appointmentReminders)
+          .set({ 
+            status: 'failed', 
+            errorMessage: inngestError instanceof Error ? inngestError.message : 'Unknown error' 
+          })
+          .where(eq(appointmentReminders.id, newReminder[0].id));
+      }
+    }
 
     res.status(201).json({ 
       reminder: newReminder[0],
-      message: 'Reminder created successfully' 
+      message: isSendNow ? 'Reminder sent immediately' : 'Reminder scheduled successfully' 
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -221,9 +417,32 @@ If you need to reschedule or have any questions, please contact us.
 Best regards,
 Your Team`;
 
-        // Calculate when to send the reminder (24 hours before by default)
+        // Calculate when to send the reminder based on reminder timing
         const appointmentTime = new Date(appointment.appointmentDate);
-        const reminderTime = new Date(appointmentTime.getTime() - (24 * 60 * 60 * 1000)); // 24 hours before
+        let reminderTime: Date;
+        
+        // Default to 1 hour before if no specific timing provided
+        const reminderTiming: '5m' | '30m' | '1h' | '5h' | '10h' = '1h'; // This could be made configurable
+        
+        switch (reminderTiming) {
+          case '5m':
+            reminderTime = new Date(appointmentTime.getTime() - (5 * 60 * 1000));
+            break;
+          case '30m':
+            reminderTime = new Date(appointmentTime.getTime() - (30 * 60 * 1000));
+            break;
+          case '1h':
+            reminderTime = new Date(appointmentTime.getTime() - (1 * 60 * 60 * 1000));
+            break;
+          case '5h':
+            reminderTime = new Date(appointmentTime.getTime() - (5 * 60 * 60 * 1000));
+            break;
+          case '10h':
+            reminderTime = new Date(appointmentTime.getTime() - (10 * 60 * 60 * 1000));
+            break;
+          default:
+            reminderTime = new Date(appointmentTime.getTime() - (1 * 60 * 60 * 1000)); // Default to 1 hour
+        }
 
         // Create reminder record
         const newReminder = await db
@@ -233,7 +452,7 @@ Your Team`;
             appointmentId: appointment.id,
             customerId: appointment.customerId,
             reminderType: reminderType as 'email' | 'sms' | 'push',
-            reminderTiming: '24h',
+            reminderTiming: reminderTiming,
             scheduledFor: reminderTime,
             status: 'sent', // Mark as sent immediately for now
             content,
@@ -291,22 +510,35 @@ router.put('/:id/status', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status, errorMessage } = req.body;
-    const user = (req as any).user;
-    const tenantId = user.tenantId;
-
+    
+    // Check for internal service call (from Inngest)
+    const isInternalService = req.headers['x-internal-service'] === 'inngest';
+    
     if (!['pending', 'sent', 'failed', 'cancelled'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
 
-    // Check if reminder exists and belongs to tenant
-    const existingReminder = await db
-      .select()
-      .from(appointmentReminders)
-      .where(and(
-        eq(appointmentReminders.id, id),
-        eq(appointmentReminders.tenantId, tenantId)
-      ))
-      .limit(1);
+    // For internal service calls, just verify the reminder exists
+    // For user calls, verify tenant ownership
+    let existingReminder;
+    if (isInternalService) {
+      existingReminder = await db
+        .select()
+        .from(appointmentReminders)
+        .where(eq(appointmentReminders.id, id))
+        .limit(1);
+    } else {
+      const user = (req as any).user;
+      const tenantId = user.tenantId;
+      existingReminder = await db
+        .select()
+        .from(appointmentReminders)
+        .where(and(
+          eq(appointmentReminders.id, id),
+          eq(appointmentReminders.tenantId, tenantId)
+        ))
+        .limit(1);
+    }
 
     if (existingReminder.length === 0) {
       return res.status(404).json({ error: 'Reminder not found' });

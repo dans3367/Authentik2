@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -49,14 +49,10 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { CardDesignerDialog } from "@/components/CardDesignerDialog";
 import { PromotionSelector } from "@/components/PromotionSelector";
-import { ThemeCard } from "@/components/ThemeCard";
 
-const ECardDesignerDialog = lazy(() =>
-  import("@/components/ECardDesignerDialog").then((mod) => ({ default: mod.ECardDesignerDialog }))
-);
-
-interface ECardSettings {
+interface BirthdaySettings {
   id: string;
   enabled: boolean;
   emailTemplate: string;
@@ -89,31 +85,7 @@ interface CustomThemeData {
   imageScale: number;
 }
 
-interface Theme {
-  id: string;
-  legacyId?: string;
-  name: string;
-  image: string;
-  overlay: string;
-  decorations: React.ReactNode;
-}
 
-type CustomThemeStore = {
-  themes: Record<string, CustomThemeData>;
-  cardPromotions?: Record<string, string[]>;
-};
-
-// Normalize any stored JSON into a consistent store shape
-const buildThemeStore = (json: string | null | undefined): CustomThemeStore => {
-  const raw = safeJsonParse<any>(json, null);
-  if (!raw) return { themes: {} };
-  if (typeof raw === 'object' && raw && 'themes' in raw) {
-    const store = raw as CustomThemeStore;
-    return { themes: store.themes || {}, cardPromotions: store.cardPromotions };
-  }
-  // Legacy: single theme object stored directly
-  return { themes: { custom: raw as CustomThemeData } };
-};
 
 interface ContactTag {
   id: string;
@@ -187,46 +159,6 @@ const normalizeTemplateId = (value?: string | null): string => {
 const getLegacyTemplateId = (value: string): string | undefined => {
   return REVERSE_LEGACY_TEMPLATE_ID_MAP[value];
 };
-
-/**
- * Safely parse JSON with fallback
- */
-const safeJsonParse = <T,>(json: string | null | undefined, fallback: T): T => {
-  if (!json) return fallback;
-  try {
-    return JSON.parse(json) as T;
-  } catch {
-    return fallback;
-  }
-};
-
-/**
- * Parse a birthday string (YYYY-MM-DD) as a local date to avoid timezone shifts
- */
-const parseBirthdayAsLocalDate = (birthday: string): Date => {
-  const [year, month, day] = birthday.split('-').map(Number);
-  return new Date(year, month - 1, day);
-};
-
-/**
- * Format a date as YYYY-MM-DD in local timezone
- */
-const formatDateAsLocalString = (date: Date): string => {
-  const y = date.getFullYear();
-  const m = `${date.getMonth() + 1}`.padStart(2, '0');
-  const d = `${date.getDate()}`.padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
-
-// Simple debounce hook
-function useDebounce<T>(value: T, delay: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const id = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(id);
-  }, [value, delay]);
-  return debounced;
-}
 
 export default function ECardsPage() {
   const { toast } = useToast();
@@ -355,37 +287,6 @@ export default function ECardsPage() {
     },
   ]), [t]);
 
-  const themeMetadataById = useMemo(() => {
-    const map: Record<string, { image?: string | null }> = {};
-    const registerThemes = (themes: Array<{ id: string; image?: string | null }>) => {
-      themes.forEach((theme) => {
-        map[theme.id] = {
-          image: theme.image ?? null,
-        };
-      });
-    };
-
-    registerThemes(christmasThemes);
-    registerThemes(stPatrickThemes);
-    registerThemes(mothersThemes);
-    registerThemes(fathersThemes);
-    registerThemes(independenceThemes);
-    registerThemes(easterThemes);
-    registerThemes(newYearThemes);
-    registerThemes(valentineThemes);
-
-    return map;
-  }, [
-    christmasThemes,
-    stPatrickThemes,
-    mothersThemes,
-    fathersThemes,
-    independenceThemes,
-    easterThemes,
-    newYearThemes,
-    valentineThemes,
-  ]);
-
   // Use Better Auth session to get external token
   const { data: session } = useSession();
 
@@ -413,11 +314,11 @@ export default function ECardsPage() {
   const accessToken = tokenData?.token;
 
   // Initialize activeTab based on URL parameter or default to "themes"
-  const [activeTab, setActiveTab] = useState<"themes" | "settings" | "test">(() => {
+  const [activeTab, setActiveTab] = useState<"themes" | "settings" | "customers" | "test">(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tab = urlParams.get('tab');
-    if (tab && ['themes', 'settings', 'test'].includes(tab)) {
-      return tab as "themes" | "settings" | "test";
+    if (tab && ['themes', 'settings', 'customers', 'test'].includes(tab)) {
+      return tab as "themes" | "settings" | "customers" | "test";
     }
     return "themes";
   });
@@ -430,15 +331,10 @@ export default function ECardsPage() {
   const [birthdayContactId, setBirthdayContactId] = useState<string | null>(null);
   const [designerOpen, setDesignerOpen] = useState(false);
   const [designerThemeId, setDesignerThemeId] = useState<string | null>(null);
+  const [description, setDescription] = useState<string>("");
 
   // State for real-time custom theme preview
   const [customThemePreview, setCustomThemePreview] = useState<CustomThemeData | null>(null);
-
-  // Stable handler to open the designer with a theme id
-  const handleOpenDesigner = useCallback((themeId: string) => {
-    setDesignerThemeId(themeId);
-    setDesignerOpen(true);
-  }, []);
 
   // State for real-time preview of all themes (including default themes with customizations)
   const [themePreviewData, setThemePreviewData] = useState<{ [key: string]: CustomThemeData }>({});
@@ -453,9 +349,6 @@ export default function ECardsPage() {
   // State for disabled holidays
   const [disabledHolidays, setDisabledHolidays] = useState<string[]>([]);
 
-  // State for custom card toggle loading
-  const [customCardToggleLoading, setCustomCardToggleLoading] = useState(false);
-
   // Customer modal state
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Contact | null>(null);
@@ -466,95 +359,38 @@ export default function ECardsPage() {
     active: boolean;
     name: string;
     sendDate: string; // ISO date string (YYYY-MM-DD)
-    occasionType?: string; // Type of occasion/holiday
     data: CustomThemeData;
   }>>([]);
 
   // Card filter state for themes tab
   const [cardFilter, setCardFilter] = useState<"active" | "inactive">("active");
 
-  // O(1) lookup for disabled holidays
-  const disabledSet = useMemo(() => new Set(disabledHolidays || []), [disabledHolidays]);
-
-  // Consolidated holiday sections for rendering
-  const holidaySections = useMemo(() => (
-    [
-      { id: 'valentine', label: t('ecards.sectionLabels.valentinesDay'), themes: valentineThemes, defaultTitle: t('ecards.preview.valentinesDay') },
-      { id: 'stpatrick', label: t('ecards.sectionLabels.stPatricksDay'), themes: stPatrickThemes, defaultTitle: t('ecards.preview.stPatricksDay') },
-      { id: 'newyear', label: t('ecards.sectionLabels.newYearsDay'), themes: newYearThemes, defaultTitle: t('ecards.preview.newYearsDay') },
-      { id: 'easter', label: t('ecards.sectionLabels.easter'), themes: easterThemes, defaultTitle: t('ecards.preview.easter') },
-      { id: 'independence', label: t('ecards.sectionLabels.independenceDay'), themes: independenceThemes, defaultTitle: t('ecards.preview.independenceDay') },
-    ]
-  ), [t, valentineThemes, stPatrickThemes, newYearThemes, easterThemes, independenceThemes]);
-
-  // Fetch custom cards from API with React Query
-  const {
-    data: customCardsData,
-    isLoading: customCardsLoading,
-    refetch: refetchCustomCards
-  } = useQuery({
-    queryKey: ['/api/custom-cards'],
-    queryFn: async () => {
-      try {
-        const response = await fetch('/api/custom-cards');
-        if (!response.ok) {
-          throw new Error('Failed to fetch custom cards');
-        }
-        return await response.json();
-      } catch (error) {
-        console.warn('Failed to fetch custom cards:', error);
-        return [];
-      }
-    },
-  });
-
-  // Update local state when data is fetched
+  // Load custom cards from localStorage on mount
   useEffect(() => {
-    if (customCardsData) {
-      // Transform API data to match local state format
-      const transformed = customCardsData.map((card: any) => {
-        try {
-          const parsedData = JSON.parse(card.cardData);
-          console.log('📦 [Custom Card API] Parsed card data:', {
-            id: card.id,
-            name: card.name,
-            hasImageUrl: !!parsedData.imageUrl,
-            imageUrl: parsedData.imageUrl,
-            customImage: parsedData.customImage,
-            parsedData
-          });
-          return {
-            id: card.id,
-            active: card.active ?? true,
-            name: card.name,
-            sendDate: card.sendDate,
-            occasionType: card.occasionType,
-            data: parsedData,
-          };
-        } catch (error) {
-          console.error('Error parsing card data:', error);
-          // Return card with empty data if parsing fails
-          return {
-            id: card.id,
-            active: card.active ?? true,
-            name: card.name,
-            sendDate: card.sendDate,
-            occasionType: card.occasionType,
-            data: {
-              title: '',
-              message: '',
-              signature: '',
-              imageUrl: null,
-              customImage: false,
-              imagePosition: { x: 0, y: 0 },
-              imageScale: 1,
-            },
-          };
-        }
-      });
-      setCustomCards(transformed);
+    try {
+      const saved = localStorage.getItem('customEcards');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Migrate old cards without active property
+        const migrated = parsed.map((card: any) => ({
+          ...card,
+          active: card.active ?? true
+        }));
+        setCustomCards(migrated);
+      }
+    } catch (error) {
+      console.warn('Failed to load custom cards:', error);
     }
-  }, [customCardsData]);
+  }, []);
+
+  // Persist custom cards to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('customEcards', JSON.stringify(customCards));
+    } catch (error) {
+      console.warn('Failed to save custom cards:', error);
+    }
+  }, [customCards]);
 
   // Reset modal state when location changes (prevents frozen modal on navigation back)
   useEffect(() => {
@@ -567,8 +403,8 @@ export default function ECardsPage() {
     const handlePopState = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const tab = urlParams.get('tab');
-      if (tab && ['themes', 'settings', 'test'].includes(tab)) {
-        setActiveTab(tab as "themes" | "settings" | "test");
+      if (tab && ['themes', 'settings', 'customers', 'test'].includes(tab)) {
+        setActiveTab(tab as "themes" | "settings" | "customers" | "test");
       } else {
         setActiveTab("themes");
       }
@@ -605,14 +441,14 @@ export default function ECardsPage() {
 
   // Fetch birthday settings
   const {
-    data: eCardSettings,
+    data: birthdaySettings,
     isLoading: settingsLoading,
     refetch: refetchSettings
-  } = useQuery<ECardSettings>({
-    queryKey: ['/api/e-card-settings'],
+  } = useQuery<BirthdaySettings>({
+    queryKey: ['/api/birthday-settings'],
     queryFn: async () => {
       try {
-        const response = await fetch('/api/e-card-settings');
+        const response = await fetch('/api/birthday-settings');
         if (!response.ok) throw new Error('Failed to fetch settings');
         const data = await response.json();
         console.log('📥 [Birthday Settings] Fetched settings:', data);
@@ -646,40 +482,32 @@ export default function ECardsPage() {
     },
   });
 
-  // Memoized parsed customThemeData to avoid repeated JSON parsing (normalized shape)
-  const parsedCustomThemeData = useMemo<CustomThemeStore>(() => {
-    return buildThemeStore(eCardSettings?.customThemeData);
-  }, [eCardSettings?.customThemeData]);
 
-  // Debounced search and contacts query with derived selects
-  const debouncedSearch = useDebounce(searchQuery, 300);
+
+  // Fetch contacts from the existing email-contacts endpoint
   const {
     data: contactsData,
     isLoading: contactsLoading,
     refetch: refetchContacts
   } = useQuery({
-    queryKey: ['/api/email-contacts', debouncedSearch, statusFilter],
+    queryKey: ['/api/email-contacts', searchQuery, statusFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (debouncedSearch) params.append('search', debouncedSearch);
+      if (searchQuery) params.append('search', searchQuery);
       if (statusFilter !== 'all') params.append('status', statusFilter);
 
       const response = await apiRequest('GET', `/api/email-contacts?${params.toString()}`);
       return response.json();
     },
-    select: (data: any) => {
-      const contacts: Contact[] = data?.contacts ?? [];
-      const customersWithBirthdays: Contact[] = contacts.filter(c => c.birthday);
-      return { contacts, customersWithBirthdays };
-    },
-    placeholderData: (prev) => prev,
     staleTime: 10 * 60 * 1000, // Cache for 10 minutes
     refetchOnWindowFocus: false,
   });
 
-  // Extract contacts and derived birthdays from query select
+  // Extract contacts array from response data
   const contacts: Contact[] = contactsData?.contacts || [];
-  const customersWithBirthdays: Contact[] = contactsData?.customersWithBirthdays || [];
+
+  // Filter contacts who have birthdays for birthday-specific features
+  const customersWithBirthdays = contacts.filter(contact => contact.birthday);
 
   // Fetch users from the tenant
   const {
@@ -712,9 +540,9 @@ export default function ECardsPage() {
 
   // Update birthday settings
   const updateSettingsMutation = useMutation({
-    mutationFn: async (settings: Partial<ECardSettings>) => {
+    mutationFn: async (settings: Partial<BirthdaySettings>) => {
       console.log('📤 [Birthday Settings] Sending update:', settings);
-      const response = await fetch('/api/e-card-settings', {
+      const response = await fetch('/api/birthday-settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings),
@@ -731,27 +559,26 @@ export default function ECardsPage() {
     },
     onSuccess: (updatedSettings) => {
       console.log('✅ [Birthday Settings] Update success, updating cache with:', updatedSettings);
-      console.log('📌 [Birthday Settings] customThemeData value:', updatedSettings?.customThemeData);
-      console.log('📌 [Birthday Settings] customThemeData type:', typeof updatedSettings?.customThemeData);
+      console.log('📌 [Birthday Settings] New emailTemplate should be:', updatedSettings?.emailTemplate);
       
       toast({
         title: "Success",
-        description: "E-card settings updated successfully",
+        description: "Birthday settings updated successfully",
       });
       
-      // Update the query cache immediately with the server response (same as /birthdays)
-      queryClient.setQueryData(['/api/e-card-settings'], updatedSettings);
+      // Update the query cache immediately with the server response (now returns settings directly)
+      queryClient.setQueryData(['/api/birthday-settings'], updatedSettings);
       console.log('💾 [Birthday Settings] Cache updated');
       
       // Force a re-render by invalidating the query
-      queryClient.invalidateQueries({ queryKey: ['/api/e-card-settings'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/birthday-settings'] });
       console.log('🔄 [Birthday Settings] Query invalidated, will refetch');
     },
     onError: (error: any) => {
       console.error('🎨 [Birthday Cards] Update settings error:', error);
 
       // Try to extract error message from response
-      let errorMessage = "Failed to update e-card settings";
+      let errorMessage = "Failed to update birthday settings";
       if (error?.message) {
         errorMessage = error.message;
       } else if (error?.response?.data?.message) {
@@ -776,7 +603,7 @@ export default function ECardsPage() {
     onSuccess: () => {
       toast({
         title: "Success",
-        description: "E-card email preference updated",
+        description: "Birthday email preference updated",
       });
       refetchContacts();
     },
@@ -800,26 +627,26 @@ export default function ECardsPage() {
       setSelectedContacts([]);
       const summary = data.summary || { successful: 0, failed: 0, total: contactIds.length };
       toast({
-        title: t('ecards.cardsSent') || "E-Cards Sent",
-        description: `Successfully sent ${summary.successful} of ${summary.total} e-cards${summary.failed > 0 ? ` (${summary.failed} failed)` : ''}`,
+        title: t('ecards.cardsSent') || "Birthday Cards Sent",
+        description: `Successfully sent ${summary.successful} of ${summary.total} birthday cards${summary.failed > 0 ? ` (${summary.failed} failed)` : ''}`,
       });
     },
     onError: (error: any) => {
       toast({
         title: t('common.error') || "Error",
-        description: error.message || "Failed to send e-cards",
+        description: error.message || "Failed to send birthday cards",
         variant: "destructive",
       });
     },
   });
 
-  // Handle send e-card
+  // Handle send birthday card
   const handleSendBirthdayCard = () => {
     if (selectedContacts.length === 0) return;
 
     const confirmMessage = selectedContacts.length === 1
-      ? 'Are you sure you want to send an e-card to this customer?'
-      : `Are you sure you want to send e-cards to ${selectedContacts.length} customers?`;
+      ? 'Are you sure you want to send a birthday card to this customer?'
+      : `Are you sure you want to send birthday cards to ${selectedContacts.length} customers?`;
 
     if (window.confirm(confirmMessage)) {
       sendBirthdayCardMutation.mutate(selectedContacts);
@@ -836,7 +663,7 @@ export default function ECardsPage() {
     onSuccess: (_, variables) => {
       toast({
         title: "Success",
-        description: `E-card email preferences updated for ${variables.contactIds.length} customer(s)`,
+        description: `Birthday email preferences updated for ${variables.contactIds.length} customer(s)`,
       });
       refetchContacts();
       setSelectedContacts([]);
@@ -852,47 +679,35 @@ export default function ECardsPage() {
 
   // Initialize selected promotions when birthday settings are loaded
   useEffect(() => {
-    if (eCardSettings?.promotion) {
-      setSelectedPromotions([eCardSettings.promotion.id]);
+    if (birthdaySettings?.promotion) {
+      setSelectedPromotions([birthdaySettings.promotion.id]);
     } else {
       setSelectedPromotions([]);
     }
-    setSplitPromotionalEmail(eCardSettings?.splitPromotionalEmail || false);
-    setDisabledHolidays(eCardSettings?.disabledHolidays || []);
+    setSplitPromotionalEmail(birthdaySettings?.splitPromotionalEmail || false);
+    setDisabledHolidays(birthdaySettings?.disabledHolidays || []);
 
     // Load card-specific promotions from customThemeData
-    if (parsedCustomThemeData.cardPromotions) {
-      setCardPromotions(parsedCustomThemeData.cardPromotions);
+    if (birthdaySettings?.customThemeData) {
+      try {
+        const parsed = JSON.parse(birthdaySettings.customThemeData);
+        if (parsed.cardPromotions) {
+          setCardPromotions(parsed.cardPromotions);
+        }
+      } catch (error) {
+        console.warn('Failed to parse card promotions from customThemeData:', error);
+      }
     }
-  }, [eCardSettings?.promotion, eCardSettings?.splitPromotionalEmail, eCardSettings?.disabledHolidays, parsedCustomThemeData]);
+  }, [birthdaySettings?.promotion, birthdaySettings?.splitPromotionalEmail, birthdaySettings?.disabledHolidays, birthdaySettings?.customThemeData]);
 
-  // Memoized initial data for ECardDesignerDialog to prevent re-render loops
+  // Memoized initial data for CardDesignerDialog to prevent re-render loops
   const cardDesignerInitialData = useMemo(() => {
-    // Check if we're editing a custom card by looking for it in customCards array
-    const existingCard = designerThemeId ? customCards.find(c => c.id === designerThemeId) : null;
-    
-    if (existingCard) {
-      // Editing an existing custom card
-      const hasImage = Boolean(existingCard.data.imageUrl);
-      console.log('🔍 [Edit Custom Card] Loading data for:', existingCard.id, {
-        name: existingCard.name,
-        hasImageUrl: hasImage,
-        imageUrl: existingCard.data.imageUrl,
-        originalCustomImage: existingCard.data.customImage,
-        willSetCustomImage: hasImage ? true : (existingCard.data.customImage || false),
-        fullData: existingCard.data
-      });
-      return {
-        ...existingCard.data,
-        customImage: hasImage ? true : (existingCard.data.customImage || false),
-        cardName: existingCard.name,
-        sendDate: existingCard.sendDate,
-        occasionType: existingCard.occasionType || '',
-      };
-    }
-    
-    // Check if creating a new custom card (designerThemeId starts with 'custom-')
+    // Check if we're editing a custom card
     if (designerThemeId && designerThemeId.startsWith('custom-')) {
+      const existingCard = customCards.find(c => c.id === designerThemeId);
+      if (existingCard) {
+        return existingCard.data;
+      }
       // New custom card - return empty data
       return {
         title: '',
@@ -903,108 +718,87 @@ export default function ECardsPage() {
         customImage: false,
         imagePosition: { x: 0, y: 0 },
         imageScale: 1,
-        cardName: '',
-        sendDate: '',
-        occasionType: '',
       };
     }
 
     // Resolve current theme id once and use it for namespaced draft keys
     const currentThemeId = designerThemeId || 'default';
-    const themeMetadata = themeMetadataById[currentThemeId];
 
-    // PRIORITY 1: Load from localStorage draft first (for most recent changes)
+    // PRIORITY 1: Load from database first (customThemeData)
+    if (birthdaySettings?.customThemeData) {
+      try {
+        const parsed = JSON.parse(birthdaySettings.customThemeData);
+
+        let themeSpecificData = null;
+
+        // Check if it's the new structure (has themes property)
+        console.log('🔍 [Card Designer Initial Data] Loading from DB for theme:', currentThemeId, 'Available themes:', Object.keys(parsed.themes || {}));
+        if (parsed.themes && parsed.themes[currentThemeId]) {
+          themeSpecificData = parsed.themes[currentThemeId];
+          console.log('✅ [Card Designer Initial Data] Found theme-specific data from DB:', themeSpecificData);
+        } else if (!parsed.themes) {
+          // Old structure - assume it's for custom theme if we're loading custom
+          if (currentThemeId === 'custom') {
+            themeSpecificData = parsed;
+          }
+        }
+
+        if (themeSpecificData) {
+          console.log('📤 [Card Designer Initial Data] Returning DB data for theme:', currentThemeId);
+          return {
+            title: themeSpecificData.title || '',
+            description: themeSpecificData.description || '',
+            message: themeSpecificData.message || birthdaySettings?.customMessage || '',
+            signature: themeSpecificData.signature || '',
+            imageUrl: themeSpecificData.imageUrl || null,
+            customImage: Boolean(themeSpecificData.customImage && themeSpecificData.imageUrl),
+            imagePosition: themeSpecificData.imagePosition || { x: 0, y: 0 },
+            imageScale: themeSpecificData.imageScale || 1,
+          };
+        }
+      } catch (error) {
+        console.warn('⚠️ [Card Designer Initial Data] Failed to parse customThemeData:', error);
+        // Fall through to localStorage fallback
+      }
+    }
+
+    // PRIORITY 2: Fallback to localStorage draft (for unsaved changes)
     try {
-      const raw = localStorage.getItem(`eCardDesignerDraft:${currentThemeId}`);
+      const raw = localStorage.getItem(`birthdayCardDesignerDraft:${currentThemeId}`);
       if (raw) {
-        console.log('📥 [Card Designer Initial Data] Using localStorage draft for theme:', currentThemeId);
-        const draftData = JSON.parse(raw);
-        return draftData;
+        console.log('📥 [Card Designer Initial Data] No DB data found, using localStorage draft for theme:', currentThemeId);
+        return JSON.parse(raw);
       }
     } catch (error) {
       console.warn('⚠️ [Card Designer Initial Data] Failed to parse localStorage draft:', error);
     }
 
-    // PRIORITY 2: Load from database (customThemeData)
-    console.log('🔍 [Card Designer Initial Data] eCardSettings.customThemeData:', eCardSettings?.customThemeData, 'Type:', typeof eCardSettings?.customThemeData);
-    if (eCardSettings?.customThemeData) {
-      const parsed = parsedCustomThemeData;
-      console.log('✅ [Card Designer Initial Data] Using parsed customThemeData:', parsed);
-
-      let themeSpecificData: CustomThemeData | null = null;
-
-      // Normalized store always has themes; prefer exact themeId, then fall back to 'custom'
-      if (parsed.themes && parsed.themes[currentThemeId]) {
-        themeSpecificData = parsed.themes[currentThemeId];
-        console.log('✅ [Card Designer Initial Data] Found theme-specific data from DB:', themeSpecificData);
-      } else if (currentThemeId === 'custom' && parsed.themes.custom) {
-        themeSpecificData = parsed.themes.custom;
-      }
-
-      if (themeSpecificData) {
-        console.log('📤 [Card Designer Initial Data] Returning DB data for theme:', currentThemeId);
-        return {
-          title: themeSpecificData.title || '',
-          description: themeSpecificData.description || '',
-          message: themeSpecificData.message || eCardSettings?.customMessage || '',
-          signature: themeSpecificData.signature || '',
-          imageUrl: themeSpecificData.imageUrl || themeMetadata?.image || null,
-          customImage: Boolean(themeSpecificData.customImage && themeSpecificData.imageUrl),
-          imagePosition: themeSpecificData.imagePosition || { x: 0, y: 0 },
-          imageScale: themeSpecificData.imageScale || 1,
-        };
-      }
-    }
-
     // PRIORITY 3: Default empty data if no saved data found
     console.log('🆕 [Card Designer Initial Data] No saved data found, returning defaults for theme:', currentThemeId);
-    
-    // Map theme IDs to their default titles
-    const defaultTitlesByTheme: Record<string, string> = {
-      'default': t('ecards.preview.defaultTitle') || 'Merry Christmas!',
-      'romantic-roses': t('ecards.preview.valentinesDay') || "Happy Valentine's Day!",
-      'sweet-hearts': t('ecards.preview.valentinesDay') || "Happy Valentine's Day!",
-      'shamrock-charm': t('ecards.preview.stPatricksDay') || "Happy St. Patrick's Day!",
-      'floral-delight': "Happy Mother's Day!",
-      'classic-tools': "Happy Father's Day!",
-      'stars-and-stripes': t('ecards.preview.independenceDay') || "Happy Independence Day!",
-      'pastel-eggs': t('ecards.preview.easter') || "Celebrate Easter with Joy!",
-      'midnight-sparkles': t('ecards.preview.newYearsDay') || "Happy New Year!",
-    };
-    
-    const defaultTitle = defaultTitlesByTheme[currentThemeId] || '';
-    
     return {
-      title: defaultTitle,
+      title: '',
       description: '',
-      message: eCardSettings?.customMessage || '',
+      message: birthdaySettings?.customMessage || '',
       signature: '',
-      imageUrl: themeMetadata?.image ?? null,
+      imageUrl: null, // Let CardDesignerDialog load the default theme image
       customImage: false, // This is key - tells the dialog it's NOT a custom image
       imagePosition: { x: 0, y: 0 },
       imageScale: 1,
     };
-  }, [
-    eCardSettings?.customThemeData,
-    eCardSettings?.customMessage,
-    designerThemeId,
-    customCards,
-    themeMetadataById,
-    t,
-  ]);
+  }, [birthdaySettings?.customThemeData, birthdaySettings?.customMessage, designerThemeId, customCards]);
 
-  const handleSettingsUpdate = (field: keyof ECardSettings, value: any) => {
-    if (eCardSettings) {
+  const handleSettingsUpdate = (field: keyof BirthdaySettings, value: any) => {
+    if (birthdaySettings) {
       updateSettingsMutation.mutate({
-        ...eCardSettings,
+        ...birthdaySettings,
         [field]: value,
       });
     }
   };
 
   const handleToggleGlobalEnabled = () => {
-    if (eCardSettings) {
-      handleSettingsUpdate('enabled', !eCardSettings.enabled);
+    if (birthdaySettings) {
+      handleSettingsUpdate('enabled', !birthdaySettings.enabled);
     }
   };
 
@@ -1022,9 +816,9 @@ export default function ECardsPage() {
 
   // Handler for toggling holiday disabled state
   const handleToggleHoliday = (holidayId: string) => {
-    if (eCardSettings) {
+    if (birthdaySettings) {
       // Get the parent holiday ID if this is a theme variant
-      const parentHolidayId = getParentHolidayId(holidayId) || holidayId;
+      const parentHolidayId = getParentHolidayId(holidayId);
       const currentDisabled = disabledHolidays || [];
       const newDisabled = currentDisabled.includes(parentHolidayId)
         ? currentDisabled.filter(id => id !== parentHolidayId)
@@ -1033,70 +827,36 @@ export default function ECardsPage() {
       setDisabledHolidays(newDisabled);
       
       updateSettingsMutation.mutate({
-        ...eCardSettings,
+        ...birthdaySettings,
         disabledHolidays: newDisabled,
       });
     }
   };
 
   // Handler for toggling custom card active state
-  const handleToggleCustomCardActive = async () => {
-    const isCustomCard = designerThemeId && (
-      designerThemeId.startsWith('custom-') || 
-      customCards.some(c => c.id === designerThemeId)
-    );
-    
-    if (isCustomCard) {
-      const card = customCards.find(c => c.id === designerThemeId);
-      if (!card) return;
-
-      setCustomCardToggleLoading(true);
-      try {
-        const response = await fetch(`/api/custom-cards/${designerThemeId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            active: !card.active,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to update card status');
-        }
-
-        // Invalidate and refetch custom cards to update the list with fresh data
-        await queryClient.invalidateQueries({ queryKey: ['/api/custom-cards'] });
-
-        toast({
-          title: "Card Updated",
-          description: `Card is now ${!card.active ? 'active' : 'inactive'}.`,
-        });
-      } catch (error) {
-        console.error('Error toggling custom card active state:', error);
-        toast({
-          title: "Update Failed",
-          description: "Failed to update card status. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setCustomCardToggleLoading(false);
-      }
+  const handleToggleCustomCardActive = () => {
+    if (designerThemeId && designerThemeId.startsWith('custom-')) {
+      setCustomCards(prev => prev.map(card => 
+        card.id === designerThemeId 
+          ? { ...card, active: !card.active }
+          : card
+      ));
     }
   };
 
   // Handler for promotion selection changes (legacy)
   const handlePromotionsChange = (promotionIds: string[]) => {
     setSelectedPromotions(promotionIds);
-    if (eCardSettings) {
+    if (birthdaySettings) {
       const promotionId = promotionIds.length > 0 ? promotionIds[0] : null;
       updateSettingsMutation.mutate({
-        id: eCardSettings.id,
-        enabled: eCardSettings.enabled,
-        emailTemplate: eCardSettings.emailTemplate || 'default',
-        segmentFilter: eCardSettings.segmentFilter || 'all',
-        customMessage: eCardSettings.customMessage || '',
-        senderName: eCardSettings.senderName || '',
-        customThemeData: eCardSettings.customThemeData,
+        id: birthdaySettings.id,
+        enabled: birthdaySettings.enabled,
+        emailTemplate: birthdaySettings.emailTemplate || 'default',
+        segmentFilter: birthdaySettings.segmentFilter || 'all',
+        customMessage: birthdaySettings.customMessage || '',
+        senderName: birthdaySettings.senderName || '',
+        customThemeData: birthdaySettings.customThemeData,
         promotionId: promotionId,
         splitPromotionalEmail: splitPromotionalEmail,
       });
@@ -1111,9 +871,16 @@ export default function ECardsPage() {
     };
     setCardPromotions(updatedCardPromotions);
 
-    if (eCardSettings) {
-      // Use parsed data instead of parsing again
-      const existingThemeData = parsedCustomThemeData;
+    if (birthdaySettings) {
+      // Parse existing customThemeData or create new structure
+      let existingThemeData: Record<string, any> = {};
+      if (birthdaySettings.customThemeData) {
+        try {
+          existingThemeData = JSON.parse(birthdaySettings.customThemeData);
+        } catch {
+          existingThemeData = {};
+        }
+      }
 
       // Update with card promotions
       const updatedThemeData = {
@@ -1122,7 +889,7 @@ export default function ECardsPage() {
       };
 
       updateSettingsMutation.mutate({
-        ...eCardSettings,
+        ...birthdaySettings,
         customThemeData: JSON.stringify(updatedThemeData),
       });
     }
@@ -1275,7 +1042,7 @@ export default function ECardsPage() {
         }
 
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send invitation');
+        throw new Error(errorData.error || 'Failed to send birthday invitation');
       }
 
       return response.json();
@@ -1324,18 +1091,31 @@ export default function ECardsPage() {
       }
 
       // Call the cardprocessor API directly for test birthday cards
-      const cardprocessorUrl = import.meta.env.VITE_CARDPROCESSOR_URL || 'http://localhost:5004';
+      const getCardprocessorUrl = () => {
+        if (import.meta.env.VITE_CARDPROCESSOR_URL) {
+          return import.meta.env.VITE_CARDPROCESSOR_URL;
+        }
+        if (typeof window !== 'undefined') {
+          const { hostname, protocol } = window.location;
+          if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return 'http://localhost:5004';
+          }
+          return `${protocol}//${hostname}:5004`;
+        }
+        return 'http://localhost:5004';
+      };
+      const cardprocessorUrl = getCardprocessorUrl();
 
       // Prepare request payload
       const requestPayload = {
         userEmail: user.email,
         userFirstName: user.firstName,
         userLastName: user.lastName,
-        emailTemplate: eCardSettings?.emailTemplate || 'default',
-        customMessage: eCardSettings?.customMessage || '',
-        customThemeData: eCardSettings?.customThemeData || null,
-        senderName: eCardSettings?.senderName || '',
-        promotionId: eCardSettings?.promotionId || null,
+        emailTemplate: birthdaySettings?.emailTemplate || 'default',
+        customMessage: birthdaySettings?.customMessage || '',
+        customThemeData: birthdaySettings?.customThemeData || null,
+        senderName: birthdaySettings?.senderName || '',
+        promotionId: birthdaySettings?.promotionId || null,
         splitPromotionalEmail: splitPromotionalEmail
       };
 
@@ -1347,11 +1127,11 @@ export default function ECardsPage() {
         userLastName: user.lastName,
         accessTokenLength: currentToken?.length,
         accessTokenPreview: currentToken ? `${currentToken.substring(0, 20)}...` : 'null',
-        eCardSettings: {
-          emailTemplate: eCardSettings?.emailTemplate,
-          customMessage: eCardSettings?.customMessage,
-          customThemeData: eCardSettings?.customThemeData,
-          senderName: eCardSettings?.senderName
+        birthdaySettings: {
+          emailTemplate: birthdaySettings?.emailTemplate,
+          customMessage: birthdaySettings?.customMessage,
+          customThemeData: birthdaySettings?.customThemeData,
+          senderName: birthdaySettings?.senderName
         },
         requestPayload: requestPayload
       });
@@ -1432,53 +1212,58 @@ export default function ECardsPage() {
       return responseData;
     },
     onSuccess: () => {
-      toast({ title: "Test E-Card Sent", description: "Test e-card has been sent successfully" });
+      toast({ title: "Test Birthday Card Sent", description: "Test birthday card has been sent successfully" });
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error?.message || "Failed to send test e-card", variant: "destructive" });
+      toast({ title: "Error", description: error?.message || "Failed to send test birthday card", variant: "destructive" });
     },
   });
 
   // Initialize custom theme preview from birthday settings
   useEffect(() => {
-    if (eCardSettings?.customThemeData) {
-      const parsedData = parsedCustomThemeData;
+    if (birthdaySettings?.customThemeData) {
+      try {
+        const parsedData = JSON.parse(birthdaySettings.customThemeData);
 
-      // Extract the custom theme data from the themes structure
-      const customThemeData = parsedData.themes?.custom;
+        // Extract the custom theme data from the themes structure
+        const customThemeData = parsedData.themes?.custom;
 
-      console.log('🎨 [Birthday Cards] Initializing custom theme preview:', {
-        hasParsedData: !!parsedData,
-        hasThemes: !!parsedData.themes,
-        hasCustomTheme: !!customThemeData,
-        customImageUrl: customThemeData?.imageUrl,
-        customImage: customThemeData?.customImage
-      });
-
-      if (customThemeData) {
-        setCustomThemePreview(customThemeData);
-
-        // Also initialize themePreviewData['custom'] so the preview shows immediately on load
-        setThemePreviewData(prev => ({
-          ...prev,
-          custom: customThemeData
-        }));
-
-        // Initialize themePreviewData for all themes in the saved data
-        const allThemes = parsedData.themes || {};
-        setThemePreviewData(prev => ({
-          ...prev,
-          ...allThemes
-        }));
-
-        console.log('✅ [Birthday Cards] Custom theme preview initialized with imageUrl:', customThemeData.imageUrl);
-      } else {
-        setCustomThemePreview(null);
-        setThemePreviewData(prev => {
-          const newData = { ...prev };
-          delete newData.custom;
-          return newData;
+        console.log('🎨 [Birthday Cards] Initializing custom theme preview:', {
+          hasParsedData: !!parsedData,
+          hasThemes: !!parsedData.themes,
+          hasCustomTheme: !!customThemeData,
+          customImageUrl: customThemeData?.imageUrl,
+          customImage: customThemeData?.customImage
         });
+
+        if (customThemeData) {
+          setCustomThemePreview(customThemeData);
+
+          // Also initialize themePreviewData['custom'] so the preview shows immediately on load
+          setThemePreviewData(prev => ({
+            ...prev,
+            custom: customThemeData
+          }));
+
+          // Initialize themePreviewData for all themes in the saved data
+          const allThemes = parsedData.themes || {};
+          setThemePreviewData(prev => ({
+            ...prev,
+            ...allThemes
+          }));
+
+          console.log('✅ [Birthday Cards] Custom theme preview initialized with imageUrl:', customThemeData.imageUrl);
+        } else {
+          setCustomThemePreview(null);
+          setThemePreviewData(prev => {
+            const newData = { ...prev };
+            delete newData.custom;
+            return newData;
+          });
+        }
+      } catch (error) {
+        console.warn('Failed to parse custom theme data:', error);
+        setCustomThemePreview(null);
       }
     } else {
       setCustomThemePreview(null);
@@ -1489,7 +1274,7 @@ export default function ECardsPage() {
         return newData;
       });
     }
-  }, [parsedCustomThemeData, eCardSettings?.customThemeData]);
+  }, [birthdaySettings?.customThemeData]);
 
   // Callback for real-time preview updates
   const handlePreviewChange = useCallback((previewData: {
@@ -1566,7 +1351,7 @@ export default function ECardsPage() {
     if (selectedContacts.length === 0) {
       toast({
         title: "No Selection",
-        description: "Please select customers first",
+        description: "Please select customers without birthdays first",
         variant: "destructive",
       });
       return;
@@ -1581,15 +1366,15 @@ export default function ECardsPage() {
     if (contactsWithoutBirthdays.length === 0) {
       toast({
         title: "No Eligible Customers",
-        description: "All selected customers already have dates set",
+        description: "All selected customers already have birthdays set",
         variant: "destructive",
       });
       return;
     }
 
     const confirmMessage = contactsWithoutBirthdays.length === 1
-      ? 'Are you sure you want to send a date request email to 1 customer?'
-      : `Are you sure you want to send date request emails to ${contactsWithoutBirthdays.length} customers?`;
+      ? 'Are you sure you want to send a birthday request email to 1 customer?'
+      : `Are you sure you want to send birthday request emails to ${contactsWithoutBirthdays.length} customers?`;
 
     if (window.confirm(confirmMessage)) {
       // Send invitations sequentially
@@ -1692,6 +1477,49 @@ export default function ECardsPage() {
   return (
     <div key={currentLanguage} className="min-h-screen overflow-x-hidden">
       <div className="mx-auto max-w-7xl p-4 sm:p-6 space-y-6 sm:space-y-8">
+        {/* Greeting Header Card */}
+        <Card className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <CardContent className="p-4 sm:p-6 lg:p-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
+              <div className="space-y-4 sm:space-y-6 lg:space-y-8 pr-0 sm:pr-4 lg:pr-6 xl:pr-12 lg:col-span-8">
+                <div className="birthday-header space-y-2 sm:space-y-3">
+                  <div className="flex items-baseline gap-2 sm:gap-4 flex-wrap">
+                    <span className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl">🎉</span>
+                    <h1
+                      tabIndex={-1}
+                      className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight break-words"
+                    >
+                      {t('ecards.hero.celebration')}
+                    </h1>
+                  </div>
+                  <h1
+                    tabIndex={-1}
+                    className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight break-words"
+                  >
+                    {t('ecards.hero.dayWith')}
+                  </h1>
+                  <h1
+                    tabIndex={-1}
+                    className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight break-words"
+                  >
+                    {t('ecards.hero.ecard')}
+                  </h1>
+                </div>
+                <p className="text-gray-600 dark:text-gray-400 text-base sm:text-lg leading-relaxed max-w-full">
+                  {t('ecards.hero.description')}
+                </p>
+              </div>
+              <div className="justify-self-center lg:justify-self-end lg:col-span-4 mt-4 lg:mt-0">
+                <img
+                  src="/guy_present.svg"
+                  alt="Person with birthday present illustration"
+                  className="w-[280px] sm:w-[320px] md:w-[360px] xl:w-[420px] max-w-full h-auto"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Navigation Tabs */}
         <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg w-fit">
           <Button
@@ -1701,7 +1529,7 @@ export default function ECardsPage() {
             className="flex items-center gap-2"
           >
             <Palette className="h-4 w-4" />
-            {t('ecards.tabs.themesButton') || 'General'}
+            {t('ecards.tabs.themes')}
           </Button>
           <Button
             variant={activeTab === "settings" ? "default" : "ghost"}
@@ -1711,6 +1539,21 @@ export default function ECardsPage() {
           >
             <Settings className="h-4 w-4" />
             {t('ecards.tabs.settings')}
+          </Button>
+
+          <Button
+            variant={activeTab === "customers" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setActiveTab("customers")}
+            className="flex items-center gap-2"
+          >
+            <Users className="h-4 w-4" />
+            {t('ecards.tabs.customers')}
+            {contacts.length > 0 && (
+              <Badge variant="secondary" className="ml-1">
+                {contacts.length}
+              </Badge>
+            )}
           </Button>
           <Button
             variant={activeTab === "test" ? "default" : "ghost"}
@@ -1762,30 +1605,466 @@ export default function ECardsPage() {
               </div>
 
               <div>
-                {holidaySections.map((section) => {
-                  const isDisabled = disabledSet.has(section.id);
-                  const shouldShow = (cardFilter === 'active' && !isDisabled) || (cardFilter === 'inactive' && isDisabled);
-                  if (!shouldShow) return null;
-                  return (
-                    <div className="mt-6" key={section.id}>
-                      <Label className="text-sm">{section.label}</Label>
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
-                        {section.themes.map((theme) => (
-                          <ThemeCard
-                            key={theme.id}
-                            theme={theme}
-                            themePreviewData={themePreviewData}
-                            parsedCustomThemeData={parsedCustomThemeData}
-                            defaultTitle={section.defaultTitle}
-                            previewLabel={t('ecards.previewLabel')}
-                            onCardClick={handleOpenDesigner}
-                            disabled={updateSettingsMutation.isPending}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
+                {/* Valentines Row */}
+                {((cardFilter === "active" && !disabledHolidays.includes('valentine')) || 
+                  (cardFilter === "inactive" && disabledHolidays.includes('valentine'))) && (
+                <div className="mt-6">
+                  <Label className="text-sm">{t('ecards.sectionLabels.valentinesDay')}</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
+                    {valentineThemes.map((theme) => {
+                      const themeId = theme.id;
+                      const isSelected = (birthdaySettings?.emailTemplate === themeId) && (() => {
+                        try {
+                          if (themePreviewData[themeId]?.imageUrl) return themePreviewData[themeId]?.imageUrl === theme.image;
+                          if (birthdaySettings?.customThemeData) {
+                            const parsed = JSON.parse(birthdaySettings.customThemeData);
+                            const customData = parsed.themes?.[themeId];
+                            return customData?.imageUrl === theme.image;
+                          }
+                        } catch {}
+                        return false;
+                      })();
+
+                      return (
+                        <button
+                          key={theme.id}
+                          type="button"
+                          onClick={() => {
+                            setDesignerThemeId(themeId);
+                            const draft = {
+                              title: '',
+                              message: birthdaySettings?.customMessage || '',
+                              signature: '',
+                              imageUrl: theme.image,
+                              themeId: themeId,
+                              customImage: true,
+                            };
+                            try {
+                              localStorage.setItem(`birthdayCardDesignerDraft:${themeId}`, JSON.stringify(draft));
+                            } catch {}
+                            setThemePreviewData(prev => ({
+                              ...prev,
+                              [themeId]: {
+                                title: '',
+                                message: birthdaySettings?.customMessage || '',
+                                signature: '',
+                                imageUrl: theme.image,
+                                customImage: true,
+                                imagePosition: { x: 0, y: 0 },
+                                imageScale: 1,
+                              }
+                            }));
+                            setCustomThemePreview({
+                              title: '',
+                              message: birthdaySettings?.customMessage || '',
+                              signature: '',
+                              imageUrl: theme.image,
+                              customImage: true,
+                              imagePosition: { x: 0, y: 0 },
+                              imageScale: 1,
+                            });
+                            setDesignerOpen(true);
+                          }}
+                          disabled={updateSettingsMutation.isPending}
+                          className="relative rounded-xl border border-gray-200 hover:border-gray-300 p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                        >
+                          <div className="relative h-40 rounded-lg overflow-hidden">
+                            <img src={theme.image} alt={theme.name} className="absolute inset-0 h-full w-full object-cover" />
+                            <div className={`absolute inset-0 ${theme.overlay}`} />
+                            {theme.decorations}
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="text-center">
+                                <div className="font-bold text-white drop-shadow-lg text-shadow">
+                                  {/* Default to a Valentine message; if custom title saved, show it */}
+                                  {(() => {
+                                    try {
+                                      const saved = birthdaySettings?.customThemeData ? JSON.parse(birthdaySettings.customThemeData) : null;
+                                      const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || t('ecards.preview.valentinesDay');
+                                      return title;
+                                    } catch { return t('ecards.preview.valentinesDay'); }
+                                  })()}
+                                </div>
+                                <div className="text-xs text-white/90 drop-shadow">{theme.name} {t('ecards.previewLabel')}</div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-2">
+                            <span className="text-sm font-medium text-gray-900">{theme.name}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                )}
+
+                {/* St. Patrick's Day Row */}
+                {((cardFilter === "active" && !disabledHolidays.includes('stpatrick')) || 
+                  (cardFilter === "inactive" && disabledHolidays.includes('stpatrick'))) && (
+                <div className="mt-6">
+                  <Label className="text-sm">{t('ecards.sectionLabels.stPatricksDay')}</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
+                    {stPatrickThemes.map((theme) => {
+                      const themeId = theme.id;
+                      const isSelected = (birthdaySettings?.emailTemplate === themeId) && (() => {
+                        try {
+                          if (themePreviewData[themeId]?.imageUrl) return themePreviewData[themeId]?.imageUrl === theme.image;
+                          if (birthdaySettings?.customThemeData) {
+                            const parsed = JSON.parse(birthdaySettings.customThemeData);
+                            const customData = parsed.themes?.[themeId];
+                            return customData?.imageUrl === theme.image;
+                          }
+                        } catch {}
+                        return false;
+                      })();
+
+                      return (
+                        <button
+                          key={theme.id}
+                          type="button"
+                          onClick={() => {
+                            setDesignerThemeId(themeId);
+                            const draft = {
+                              title: '',
+                              message: birthdaySettings?.customMessage || '',
+                              signature: '',
+                              imageUrl: theme.image,
+                              themeId: themeId,
+                              customImage: true,
+                            };
+                            try {
+                              localStorage.setItem(`birthdayCardDesignerDraft:${themeId}`, JSON.stringify(draft));
+                            } catch {}
+                            setThemePreviewData(prev => ({
+                              ...prev,
+                              [themeId]: {
+                                title: '',
+                                message: birthdaySettings?.customMessage || '',
+                                signature: '',
+                                imageUrl: theme.image,
+                                customImage: true,
+                                imagePosition: { x: 0, y: 0 },
+                                imageScale: 1,
+                              }
+                            }));
+                            setCustomThemePreview({
+                              title: '',
+                              message: birthdaySettings?.customMessage || '',
+                              signature: '',
+                              imageUrl: theme.image,
+                              customImage: true,
+                              imagePosition: { x: 0, y: 0 },
+                              imageScale: 1,
+                            });
+                            setDesignerOpen(true);
+                          }}
+                          disabled={updateSettingsMutation.isPending}
+                          className="relative rounded-xl border border-gray-200 hover:border-gray-300 p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                        >
+                          <div className="relative h-40 rounded-lg overflow-hidden">
+                            <img src={theme.image} alt={theme.name} className="absolute inset-0 h-full w-full object-cover" />
+                            <div className={`absolute inset-0 ${theme.overlay}`} />
+                            {theme.decorations}
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="text-center">
+                                <div className="font-bold text-white drop-shadow-lg text-shadow">
+                                  {(() => {
+                                    try {
+                                      const saved = birthdaySettings?.customThemeData ? JSON.parse(birthdaySettings.customThemeData) : null;
+                                      const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || t('ecards.preview.stPatricksDay');
+                                      return title;
+                                    } catch { return t('ecards.preview.stPatricksDay'); }
+                                  })()}
+                                </div>
+                                <div className="text-xs text-white/90 drop-shadow">{theme.name} {t('ecards.previewLabel')}</div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-2">
+                            <span className="text-sm font-medium text-gray-900">{theme.name}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                )}
+
+                {/* New Year's Day Row */}
+                {((cardFilter === "active" && !disabledHolidays.includes('newyear')) || 
+                  (cardFilter === "inactive" && disabledHolidays.includes('newyear'))) && (
+                <div className="mt-6">
+                  <Label className="text-sm">{t('ecards.sectionLabels.newYearsDay')}</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
+                    {newYearThemes.map((theme) => {
+                      const themeId = theme.id;
+                      const isSelected = (birthdaySettings?.emailTemplate === themeId) && (() => {
+                        try {
+                          if (themePreviewData[themeId]?.imageUrl) return themePreviewData[themeId]?.imageUrl === theme.image;
+                          if (birthdaySettings?.customThemeData) {
+                            const parsed = JSON.parse(birthdaySettings.customThemeData);
+                            const customData = parsed.themes?.[themeId];
+                            return customData?.imageUrl === theme.image;
+                          }
+                        } catch {}
+                        return false;
+                      })();
+
+                      return (
+                        <button
+                          key={theme.id}
+                          type="button"
+                          onClick={() => {
+                            setDesignerThemeId(themeId);
+                            const draft = {
+                              title: '',
+                              message: birthdaySettings?.customMessage || '',
+                              signature: '',
+                              imageUrl: theme.image,
+                              themeId: themeId,
+                              customImage: true,
+                            };
+                            try {
+                              localStorage.setItem(`birthdayCardDesignerDraft:${themeId}`, JSON.stringify(draft));
+                            } catch {}
+                            setThemePreviewData(prev => ({
+                              ...prev,
+                              [themeId]: {
+                                title: '',
+                                message: birthdaySettings?.customMessage || '',
+                                signature: '',
+                                imageUrl: theme.image,
+                                customImage: true,
+                                imagePosition: { x: 0, y: 0 },
+                                imageScale: 1,
+                              }
+                            }));
+                            setCustomThemePreview({
+                              title: '',
+                              message: birthdaySettings?.customMessage || '',
+                              signature: '',
+                              imageUrl: theme.image,
+                              customImage: true,
+                              imagePosition: { x: 0, y: 0 },
+                              imageScale: 1,
+                            });
+                            setDesignerOpen(true);
+                          }}
+                          disabled={updateSettingsMutation.isPending}
+                          className="relative rounded-xl border border-gray-200 hover:border-gray-300 p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                        >
+                          <div className="relative h-40 rounded-lg overflow-hidden">
+                            <img src={theme.image} alt={theme.name} className="absolute inset-0 h-full w-full object-cover" />
+                            <div className={`absolute inset-0 ${theme.overlay}`} />
+                            {theme.decorations}
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="text-center">
+                                <div className="font-bold text-white drop-shadow-lg text-shadow">
+                                  {(() => {
+                                    try {
+                                      const saved = birthdaySettings?.customThemeData ? JSON.parse(birthdaySettings.customThemeData) : null;
+                                      const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || t('ecards.preview.newYearsDay');
+                                      return title;
+                                    } catch { return t('ecards.preview.newYearsDay'); }
+                                  })()}
+                                </div>
+                                <div className="text-xs text-white/90 drop-shadow">{theme.name} {t('ecards.previewLabel')}</div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-2">
+                            <span className="text-sm font-medium text-gray-900">{theme.name}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                )}
+
+                {/* Easter Row */}
+                {((cardFilter === "active" && !disabledHolidays.includes('easter')) || 
+                  (cardFilter === "inactive" && disabledHolidays.includes('easter'))) && (
+                <div className="mt-6">
+                  <Label className="text-sm">{t('ecards.sectionLabels.easter')}</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
+                    {easterThemes.map((theme) => {
+                      const themeId = theme.id;
+                      const isSelected = (birthdaySettings?.emailTemplate === themeId) && (() => {
+                        try {
+                          if (themePreviewData[themeId]?.imageUrl) return themePreviewData[themeId]?.imageUrl === theme.image;
+                          if (birthdaySettings?.customThemeData) {
+                            const parsed = JSON.parse(birthdaySettings.customThemeData);
+                            const customData = parsed.themes?.[themeId];
+                            return customData?.imageUrl === theme.image;
+                          }
+                        } catch {}
+                        return false;
+                      })();
+
+                      return (
+                        <button
+                          key={theme.id}
+                          type="button"
+                          onClick={() => {
+                            setDesignerThemeId(themeId);
+                            const draft = {
+                              title: '',
+                              message: birthdaySettings?.customMessage || '',
+                              signature: '',
+                              imageUrl: theme.image,
+                              themeId: themeId,
+                              customImage: true,
+                            };
+                            try {
+                              localStorage.setItem(`birthdayCardDesignerDraft:${themeId}`, JSON.stringify(draft));
+                            } catch {}
+                            setThemePreviewData(prev => ({
+                              ...prev,
+                              [themeId]: {
+                                title: '',
+                                message: birthdaySettings?.customMessage || '',
+                                signature: '',
+                                imageUrl: theme.image,
+                                customImage: true,
+                                imagePosition: { x: 0, y: 0 },
+                                imageScale: 1,
+                              }
+                            }));
+                            setCustomThemePreview({
+                              title: '',
+                              message: birthdaySettings?.customMessage || '',
+                              signature: '',
+                              imageUrl: theme.image,
+                              customImage: true,
+                              imagePosition: { x: 0, y: 0 },
+                              imageScale: 1,
+                            });
+                            setDesignerOpen(true);
+                          }}
+                          disabled={updateSettingsMutation.isPending}
+                          className="relative rounded-xl border border-gray-200 hover:border-gray-300 p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                        >
+                          <div className="relative h-40 rounded-lg overflow-hidden">
+                            <img src={theme.image} alt={theme.name} className="absolute inset-0 h-full w-full object-cover" />
+                            <div className={`absolute inset-0 ${theme.overlay}`} />
+                            {theme.decorations}
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="text-center">
+                                <div className="font-bold text-white drop-shadow-lg text-shadow">
+                                  {(() => {
+                                    try {
+                                      const saved = birthdaySettings?.customThemeData ? JSON.parse(birthdaySettings.customThemeData) : null;
+                                      const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || t('ecards.preview.easter');
+                                      return title;
+                                    } catch { return t('ecards.preview.easter'); }
+                                  })()}
+                                </div>
+                                <div className="text-xs text-white/90 drop-shadow">{theme.name} {t('ecards.previewLabel')}</div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-2">
+                            <span className="text-sm font-medium text-gray-900">{theme.name}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                )}
+
+                {/* Independence Day Row */}
+                {((cardFilter === "active" && !disabledHolidays.includes('independence')) || 
+                  (cardFilter === "inactive" && disabledHolidays.includes('independence'))) && (
+                <div className="mt-6">
+                  <Label className="text-sm">{t('ecards.sectionLabels.independenceDay')}</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
+                    {independenceThemes.map((theme) => {
+                      const themeId = theme.id;
+                      const isSelected = (birthdaySettings?.emailTemplate === themeId) && (() => {
+                        try {
+                          if (themePreviewData[themeId]?.imageUrl) return themePreviewData[themeId]?.imageUrl === theme.image;
+                          if (birthdaySettings?.customThemeData) {
+                            const parsed = JSON.parse(birthdaySettings.customThemeData);
+                            const customData = parsed.themes?.[themeId];
+                            return customData?.imageUrl === theme.image;
+                          }
+                        } catch {}
+                        return false;
+                      })();
+
+                      return (
+                        <button
+                          key={theme.id}
+                          type="button"
+                          onClick={() => {
+                            setDesignerThemeId(themeId);
+                            const draft = {
+                              title: '',
+                              message: birthdaySettings?.customMessage || '',
+                              signature: '',
+                              imageUrl: theme.image,
+                              themeId: themeId,
+                              customImage: true,
+                            };
+                            try {
+                              localStorage.setItem(`birthdayCardDesignerDraft:${themeId}`, JSON.stringify(draft));
+                            } catch {}
+                            setThemePreviewData(prev => ({
+                              ...prev,
+                              [themeId]: {
+                                title: '',
+                                message: birthdaySettings?.customMessage || '',
+                                signature: '',
+                                imageUrl: theme.image,
+                                customImage: true,
+                                imagePosition: { x: 0, y: 0 },
+                                imageScale: 1,
+                              }
+                            }));
+                            setCustomThemePreview({
+                              title: '',
+                              message: birthdaySettings?.customMessage || '',
+                              signature: '',
+                              imageUrl: theme.image,
+                              customImage: true,
+                              imagePosition: { x: 0, y: 0 },
+                              imageScale: 1,
+                            });
+                            setDesignerOpen(true);
+                          }}
+                          disabled={updateSettingsMutation.isPending}
+                          className="relative rounded-xl border border-gray-200 hover:border-gray-300 p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                        >
+                          <div className="relative h-40 rounded-lg overflow-hidden">
+                            <img src={theme.image} alt={theme.name} className="absolute inset-0 h-full w-full object-cover" />
+                            <div className={`absolute inset-0 ${theme.overlay}`} />
+                            {theme.decorations}
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="text-center">
+                                <div className="font-bold text-white drop-shadow-lg text-shadow">
+                                  {(() => {
+                                    try {
+                                      const saved = birthdaySettings?.customThemeData ? JSON.parse(birthdaySettings.customThemeData) : null;
+                                      const title = (themePreviewData[themeId]?.title) || (saved?.themes?.[themeId]?.title) || t('ecards.preview.independenceDay');
+                                      return title;
+                                    } catch { return t('ecards.preview.independenceDay'); }
+                                  })()}
+                                </div>
+                                <div className="text-xs text-white/90 drop-shadow">{theme.name} {t('ecards.previewLabel')}</div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-2">
+                            <span className="text-sm font-medium text-gray-900">{theme.name}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                )}
 
                 {/* Custom Cards Section */}
                 {cardFilter === "active" && (
@@ -1825,9 +2104,8 @@ export default function ECardsPage() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                      {customCards.filter(c => c.active !== false).map((card) => {
-                        console.log('🖼️ Rendering custom card:', { id: card.id, name: card.name, imageUrl: card.data.imageUrl, hasImageUrl: !!card.data.imageUrl });
-                        const isSelected = eCardSettings?.emailTemplate === card.id;
+                      {customCards.map((card) => {
+                        const isSelected = birthdaySettings?.emailTemplate === card.id;
                         return (
                           <div
                             key={card.id}
@@ -1835,46 +2113,31 @@ export default function ECardsPage() {
                           >
                             <div className="relative h-40 rounded-lg overflow-hidden bg-gray-100">
                               {card.data.imageUrl ? (
-                                <>
-                                  <img
-                                    src={card.data.imageUrl}
-                                    alt={card.name}
-                                    className="absolute inset-0 h-full w-full object-cover z-0"
-                                    onError={(e) => {
-                                      console.error('🖼️ Image failed to load:', card.data.imageUrl, e);
-                                      // Hide the failed image
-                                      (e.target as HTMLImageElement).style.display = 'none';
-                                    }}
-                                    onLoad={() => {
-                                      console.log('🖼️ Image loaded successfully:', card.data.imageUrl);
-                                    }}
-                                  />
-                                  <div className="absolute inset-0 bg-black/20 z-10" />
-                                  <div className="absolute inset-0 flex items-center justify-center z-20">
-                                    <div className="text-center px-2">
-                                      <div className="font-bold text-white drop-shadow-lg text-shadow line-clamp-2">
-                                        {card.data.title || card.name}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </>
+                                <img
+                                  src={card.data.imageUrl}
+                                  alt={card.name}
+                                  className="absolute inset-0 h-full w-full object-cover"
+                                />
                               ) : (
                                 <div className="absolute inset-0 flex items-center justify-center">
                                   <Palette className="h-12 w-12 text-gray-400" />
                                 </div>
                               )}
+                              <div className="absolute inset-0 bg-black/20" />
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="text-center px-2">
+                                  <div className="font-bold text-white drop-shadow-lg text-shadow line-clamp-2">
+                                    {card.data.title || card.name}
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                             <div className="mt-2 space-y-1">
                               <div>
                                 <span className="text-sm font-medium text-gray-900 truncate">{card.name}</span>
                               </div>
-                              {card.occasionType && (
-                                <div className="text-xs text-gray-600 font-medium">
-                                  🎉 {card.occasionType}
-                                </div>
-                              )}
                               <div className="text-xs text-gray-500">
-                                📅 {t('ecards.cards.sendsOn')} {new Date(card.sendDate).toLocaleDateString()}
+                                📅 Sends on: {new Date(card.sendDate).toLocaleDateString()}
                               </div>
                             </div>
                             <div className="mt-2 space-y-2">
@@ -1889,37 +2152,18 @@ export default function ECardsPage() {
                                   }}
                                 >
                                   <Edit className="h-3 w-3 mr-1" />
-                                  {t('common.edit')}
+                                  Edit
                                 </Button>
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={async () => {
+                                  onClick={() => {
                                     if (confirm(`Delete "${card.name}"? This cannot be undone.`)) {
-                                      try {
-                                        const response = await fetch(`/api/custom-cards/${card.id}`, {
-                                          method: 'DELETE',
-                                        });
-
-                                        if (!response.ok) {
-                                          throw new Error('Failed to delete card');
-                                        }
-
-                                        // Refetch custom cards to update the list
-                                        await refetchCustomCards();
-
-                                        toast({
-                                          title: "Card Deleted",
-                                          description: `"${card.name}" has been deleted.`,
-                                        });
-                                      } catch (error) {
-                                        console.error('Error deleting custom card:', error);
-                                        toast({
-                                          title: "Delete Failed",
-                                          description: "Failed to delete card. Please try again.",
-                                          variant: "destructive",
-                                        });
-                                      }
+                                      setCustomCards(prev => prev.filter(c => c.id !== card.id));
+                                      toast({
+                                        title: "Card Deleted",
+                                        description: `"${card.name}" has been deleted.`,
+                                      });
                                     }
                                   }}
                                 >
@@ -1954,47 +2198,32 @@ export default function ECardsPage() {
                           >
                             <div className="relative h-40 rounded-lg overflow-hidden bg-gray-100">
                               {card.data.imageUrl ? (
-                                <>
-                                  <img
-                                    src={card.data.imageUrl}
-                                    alt={card.name}
-                                    className="absolute inset-0 h-full w-full object-cover z-0"
-                                    onError={(e) => {
-                                      console.error('🖼️ Inactive card image failed to load:', card.data.imageUrl, e);
-                                      // Hide the failed image
-                                      (e.target as HTMLImageElement).style.display = 'none';
-                                    }}
-                                    onLoad={() => {
-                                      console.log('🖼️ Inactive card image loaded successfully:', card.data.imageUrl);
-                                    }}
-                                  />
-                                  <div className="absolute inset-0 bg-black/20 z-10" />
-                                  <div className="absolute inset-0 flex items-center justify-center z-20">
-                                    <div className="text-center px-2">
-                                      <div className="font-bold text-white drop-shadow-lg text-shadow line-clamp-2">
-                                        {card.data.title || card.name}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </>
+                                <img
+                                  src={card.data.imageUrl}
+                                  alt={card.name}
+                                  className="absolute inset-0 h-full w-full object-cover"
+                                />
                               ) : (
                                 <div className="absolute inset-0 flex items-center justify-center">
                                   <Palette className="h-12 w-12 text-gray-400" />
                                 </div>
                               )}
+                              <div className="absolute inset-0 bg-black/20" />
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="text-center px-2">
+                                  <div className="font-bold text-white drop-shadow-lg text-shadow line-clamp-2">
+                                    {card.data.title || card.name}
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                             <div className="mt-2 space-y-1">
                               <div className="flex items-center justify-between">
                                 <span className="text-sm font-medium text-gray-900 truncate">{card.name}</span>
                                 <span className="text-xs font-semibold text-gray-500">Inactive</span>
                               </div>
-                              {card.occasionType && (
-                                <div className="text-xs text-gray-600 font-medium">
-                                  🎉 {card.occasionType}
-                                </div>
-                              )}
                               <div className="text-xs text-gray-500">
-                                📅 {t('ecards.cards.sendsOn')} {new Date(card.sendDate).toLocaleDateString()}
+                                📅 Sends on: {new Date(card.sendDate).toLocaleDateString()}
                               </div>
                             </div>
                             <div className="mt-2">
@@ -2008,7 +2237,7 @@ export default function ECardsPage() {
                                 }}
                               >
                                 <Edit className="h-3 w-3 mr-1" />
-                                {t('common.edit')}
+                                Edit
                               </Button>
                             </div>
                           </div>
@@ -2025,10 +2254,9 @@ export default function ECardsPage() {
         )}
 
         {/* Card Designer */}
-        <Suspense fallback={null}>
-        <ECardDesignerDialog
+        <CardDesignerDialog
           open={designerOpen}
-          onOpenChange={(open: boolean) => {
+          onOpenChange={(open) => {
             setDesignerOpen(open);
             
             // When opening, refetch latest data from database
@@ -2049,23 +2277,15 @@ export default function ECardsPage() {
           initialThemeId={designerThemeId || undefined}
           onPreviewChange={handlePreviewChange}
           initialData={cardDesignerInitialData}
-          themeMetadataById={themeMetadataById}
-          onSave={async (data: any) => {
-            console.log('💾 [onSave] Received data from ECardDesignerDialog:', {
-              imageUrl: data.imageUrl,
-              customImage: (data as any).customImage,
-              title: data.title,
-              hasImageUrl: !!data.imageUrl
-            });
-
+          onSave={(data) => {
             try {
-              localStorage.setItem(`eCardDesignerDraft:${data.themeId || designerThemeId || 'default'}`, JSON.stringify({ title: data.title, description: data.description, message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId, customImage: (data as any).customImage }));
+              localStorage.setItem(`birthdayCardDesignerDraft:${data.themeId || designerThemeId || 'default'}`, JSON.stringify({ title: data.title, description: (data as any).description || '', message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId, customImage: (data as any).customImage }));
             } catch { }
 
             // Create theme data for preview updates
             const themeData: CustomThemeData = {
               title: data.title,
-              description: data.description,
+              description: (data as any).description || '',
               message: data.message,
               signature: data.signature || '',
               imageUrl: data.imageUrl || null,
@@ -2074,106 +2294,43 @@ export default function ECardsPage() {
               imageScale: (data as any).imageScale || 1,
             };
 
-            console.log('💾 [onSave] Created themeData:', {
-              imageUrl: themeData.imageUrl,
-              customImage: themeData.customImage,
-              hasImageUrl: !!themeData.imageUrl,
-              title: themeData.title,
-              message: themeData.message,
-              signature: themeData.signature,
-              description: themeData.description
-            });
-
-            // Check if this is a custom card - either starts with 'custom-' or is found in customCards array
-            const isCustomCard = designerThemeId && (
-              designerThemeId.startsWith('custom-') || 
-              customCards.some(c => c.id === designerThemeId)
-            );
-
-            if (isCustomCard) {
+            // Check if this is a custom card
+            if (designerThemeId && designerThemeId.startsWith('custom-')) {
               const existingCard = customCards.find(c => c.id === designerThemeId);
               const cardName = (data as any).cardName || existingCard?.name || '';
               const sendDate = (data as any).sendDate || existingCard?.sendDate || '';
-              const occasionType = (data as any).occasionType || existingCard?.occasionType || '';
 
-              console.log('💾 [Custom Card Save] Preparing to save custom card:', {
-                designerThemeId,
-                cardName,
-                sendDate,
-                occasionType,
-                themeDataTitle: themeData.title,
-                themeDataMessage: themeData.message,
-                themeDataSignature: themeData.signature,
-                dataReceived: data
-              });
-
-              // Validation is now handled in ECardDesignerDialog
-              if (!cardName || !sendDate || !occasionType) {
+              // Validation is now handled in CardDesignerDialog
+              if (!cardName || !sendDate) {
                 toast({
                   title: "Save Failed",
-                  description: "Card name, send date, and occasion type are required.",
+                  description: "Card name and send date are required.",
                   variant: "destructive",
                 });
                 return;
               }
 
-              // Save or update the custom card via API
-              try {
-                const existing = customCards.find(c => c.id === designerThemeId);
-                const cardPayload = {
-                  name: cardName,
-                  sendDate,
-                  occasionType,
-                  active: existing?.active ?? true,
-                  cardData: JSON.stringify(themeData),
-                  promotionIds: [], // TODO: Add promotion support
-                };
-
-                console.log('💾 [Custom Card Save] Payload being sent to API:', {
-                  ...cardPayload,
-                  cardDataParsed: JSON.parse(cardPayload.cardData)
-                });
-
-                let response;
+              // Save or update the custom card
+              setCustomCards(prev => {
+                const existing = prev.find(c => c.id === designerThemeId);
                 if (existing) {
                   // Update existing card
-                  response = await fetch(`/api/custom-cards/${designerThemeId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(cardPayload),
-                  });
+                  return prev.map(c => c.id === designerThemeId 
+                    ? { ...c, name: cardName, sendDate, data: themeData } 
+                    : c);
                 } else {
-                  // Create new card
-                  response = await fetch('/api/custom-cards', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(cardPayload),
-                  });
+                  // Add new card
+                  return [...prev, { id: designerThemeId, name: cardName, sendDate, data: themeData }];
                 }
+              });
 
-                if (!response.ok) {
-                  throw new Error('Failed to save custom card');
-                }
+              toast({
+                title: existingCard ? "Card Updated" : "Card Created",
+                description: `"${cardName}" will be sent on ${new Date(sendDate).toLocaleDateString()}.`,
+              });
 
-                // Invalidate and refetch custom cards to update the list with fresh data
-                await queryClient.invalidateQueries({ queryKey: ['/api/custom-cards'] });
-
-                toast({
-                  title: existing ? "Card Updated" : "Card Created",
-                  description: `"${cardName}" (${occasionType}) will be sent on ${new Date(sendDate).toLocaleDateString()}.`,
-                });
-
-                setDesignerOpen(false);
-                return;
-              } catch (error) {
-                console.error('Error saving custom card:', error);
-                toast({
-                  title: "Save Failed",
-                  description: "Failed to save custom card. Please try again.",
-                  variant: "destructive",
-                });
-                return;
-              }
+              setDesignerOpen(false);
+              return;
             }
 
             // Update preview state immediately for instant visual feedback
@@ -2184,12 +2341,12 @@ export default function ECardsPage() {
 
             // Parse existing customThemeData or create new structure
             // IMPORTANT: Get the latest birthday settings from the cache, not from closure
-            const latestECardSettings = queryClient.getQueryData<ECardSettings>(['/api/e-card-settings']) || eCardSettings;
-            console.log('🔄 [Card Save] Using latest settings from cache. Has themes:', !!latestECardSettings?.customThemeData);
+            const latestBirthdaySettings = queryClient.getQueryData<BirthdaySettings>(['/api/birthday-settings']) || birthdaySettings;
+            console.log('🔄 [Card Save] Using latest settings from cache. Has themes:', !!latestBirthdaySettings?.customThemeData);
             let existingThemeData: Record<string, any> = {};
-            if (latestECardSettings?.customThemeData) {
+            if (latestBirthdaySettings?.customThemeData) {
               try {
-                const parsed = JSON.parse(latestECardSettings.customThemeData);
+                const parsed = JSON.parse(latestBirthdaySettings.customThemeData);
                 // Check if it's the new structure (has themes property) or old structure
                 if (parsed.themes) {
                   existingThemeData = parsed;
@@ -2220,20 +2377,8 @@ export default function ECardsPage() {
             };
             console.log('💾 [Card Save] Updated theme data structure:', JSON.stringify(updatedThemeData));
 
-            // Check if user has made any customizations (title, signature, or image)
-            const defaultThemeImage = themeMetadataById[currentThemeId]?.image;
-            const hasImageCustomization = themeData.imageUrl !== defaultThemeImage;
+            // Check if user has made any text customizations (title or signature)
             const hasTextCustomizations = data.title !== '' || data.signature !== '';
-            const hasCustomizations = hasTextCustomizations || hasImageCustomization;
-
-            console.log('🔍 [Card Save] Customization check:', {
-              currentThemeId,
-              defaultThemeImage,
-              currentImageUrl: themeData.imageUrl,
-              hasImageCustomization,
-              hasTextCustomizations,
-              hasCustomizations
-            });
 
             // Save button should save theme-specific data and update emailTemplate to the specific theme variant
             if (designerThemeId === 'custom') {
@@ -2242,20 +2387,17 @@ export default function ECardsPage() {
               // Update real-time preview immediately for instant visual feedback
               setCustomThemePreview(themeData);
 
-              const savePayload = {
-                ...latestECardSettings,
+              // Update both the custom theme data and keep the email template as custom
+              updateSettingsMutation.mutate({
+                ...latestBirthdaySettings,
                 emailTemplate: 'custom',
                 customMessage: data.message,
                 customThemeData: JSON.stringify(updatedThemeData),
-              };
-              console.log('📤 [Card Save] Sending to server:', { customThemeData: savePayload.customThemeData });
-
-              // Update both the custom theme data and keep the email template as custom
-              updateSettingsMutation.mutate(savePayload, {
+              }, {
                 onSuccess: () => {
                   // Clear localStorage draft since data is now saved to DB
                   try {
-                    localStorage.removeItem(`eCardDesignerDraft:${currentThemeId}`);
+                    localStorage.removeItem(`birthdayCardDesignerDraft:${currentThemeId}`);
                     console.log('🗑️ [Card Save] Cleared localStorage draft for theme:', currentThemeId);
                   } catch (error) {
                     console.warn('⚠️ [Card Save] Failed to clear localStorage draft:', error);
@@ -2265,28 +2407,22 @@ export default function ECardsPage() {
                     title: "Card Saved",
                     description: "Your custom card has been saved.",
                   });
-                  
-                  setDesignerOpen(false);
                 }
               });
-            } else if (hasCustomizations || data.message !== (latestECardSettings?.customMessage || '')) {
-              // For holiday theme variants with any customizations (text or image), save the theme-specific data
+            } else if (hasTextCustomizations || data.message !== (latestBirthdaySettings?.customMessage || '')) {
+              // For holiday theme variants with any customizations, save the theme-specific data
               // and set emailTemplate to the specific theme variant ID
               console.log('🎨 [Birthday Cards] Saving theme-specific customizations for', currentThemeId, 'with data:', themeData);
-              
-              const savePayload = {
-                ...latestECardSettings,
+              updateSettingsMutation.mutate({
+                ...latestBirthdaySettings,
                 emailTemplate: currentThemeId, // Set to the specific theme variant ID
                 customMessage: data.message,
                 customThemeData: JSON.stringify(updatedThemeData), // Save theme-specific data
-              };
-              console.log('📤 [Card Save] Sending to server (customizations):', { customThemeData: savePayload.customThemeData });
-
-              updateSettingsMutation.mutate(savePayload, {
+              }, {
                 onSuccess: () => {
                   // Clear localStorage draft since data is now saved to DB
                   try {
-                    localStorage.removeItem(`eCardDesignerDraft:${currentThemeId}`);
+                    localStorage.removeItem(`birthdayCardDesignerDraft:${currentThemeId}`);
                     console.log('🗑️ [Card Save] Cleared localStorage draft for theme:', currentThemeId);
                   } catch (error) {
                     console.warn('⚠️ [Card Save] Failed to clear localStorage draft:', error);
@@ -2296,22 +2432,20 @@ export default function ECardsPage() {
                     title: "Card Saved",
                     description: "Your card customizations have been saved.",
                   });
-                  
-                  setDesignerOpen(false);
                 }
               });
             } else {
               // For default themes with no customizations, just save the message
               // but still update emailTemplate if we're editing a specific theme
               updateSettingsMutation.mutate({
-                ...latestECardSettings,
+                ...latestBirthdaySettings,
                 emailTemplate: currentThemeId || 'default', // Use current theme ID
                 customMessage: data.message,
               }, {
                 onSuccess: () => {
                   // Clear localStorage draft since data is now saved to DB
                   try {
-                    localStorage.removeItem(`eCardDesignerDraft:${currentThemeId}`);
+                    localStorage.removeItem(`birthdayCardDesignerDraft:${currentThemeId}`);
                     console.log('🗑️ [Card Save] Cleared localStorage draft for theme:', currentThemeId);
                   } catch (error) {
                     console.warn('⚠️ [Card Save] Failed to clear localStorage draft:', error);
@@ -2321,33 +2455,20 @@ export default function ECardsPage() {
                     title: "Card Saved",
                     description: "Your card has been saved.",
                   });
-                  
-                  setDesignerOpen(false);
                 }
               });
             }
           }}
-          senderName={eCardSettings?.senderName}
+          senderName={birthdaySettings?.senderName}
           businessName={company?.name || currentUser?.name}
           holidayId={designerThemeId || undefined}
           isHolidayDisabled={designerThemeId ? disabledHolidays.includes(getParentHolidayId(designerThemeId) || designerThemeId) : false}
           onToggleHoliday={handleToggleHoliday}
-          customCardActive={
-            designerThemeId && (designerThemeId.startsWith("custom-") || customCards.some(c => c.id === designerThemeId))
-              ? customCards.find(c => c.id === designerThemeId)?.active 
-              : undefined
-          }
-          onToggleCustomCardActive={
-            designerThemeId && (designerThemeId.startsWith("custom-") || customCards.some(c => c.id === designerThemeId))
-              ? handleToggleCustomCardActive 
-              : undefined
-          }
-          customCardToggleLoading={customCardToggleLoading}
+          customCardActive={designerThemeId?.startsWith("custom-") ? customCards.find(c => c.id === designerThemeId)?.active : undefined}
+          onToggleCustomCardActive={designerThemeId?.startsWith("custom-") ? handleToggleCustomCardActive : undefined}
           selectedPromotions={designerThemeId ? (cardPromotions[designerThemeId] || []) : []}
-          onPromotionsChange={designerThemeId ? (promotionIds: string[]) => handleCardPromotionsChange(designerThemeId, promotionIds) : undefined}
-          hideDescription={false}
+          onPromotionsChange={designerThemeId ? (promotionIds) => handleCardPromotionsChange(designerThemeId, promotionIds) : undefined}
         />
-        </Suspense>
 
         {/* Settings Tab */}
         {activeTab === "settings" && (
@@ -2358,20 +2479,20 @@ export default function ECardsPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Settings className="h-5 w-5" />
-                    {t('ecards.settings.title')}
+                    Birthday Email Settings
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Global Enable/Disable */}
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label className="text-base font-medium">{t('ecards.settings.enableTitle')}</Label>
+                      <Label className="text-base font-medium">Enable Birthday Emails</Label>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {t('ecards.settings.enableDescription')}
+                        Automatically send birthday emails to customers
                       </p>
                     </div>
                     <Switch
-                      checked={eCardSettings?.enabled || false}
+                      checked={birthdaySettings?.enabled || false}
                       onCheckedChange={handleToggleGlobalEnabled}
                       disabled={updateSettingsMutation.isPending}
                     />
@@ -2392,20 +2513,20 @@ export default function ECardsPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <BarChart3 className="h-5 w-5" />
-                    {t('ecards.settings.overview.title')}
+                    Overview
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">{t('ecards.settings.overview.totalCustomers')}</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Total Customers</span>
                     <Badge variant="outline">{contacts.length}</Badge>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">{t('ecards.settings.overview.withBirthdays')}</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">With Birthdays</span>
                     <Badge variant="outline">{customersWithBirthdays.length}</Badge>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">{t('ecards.settings.overview.emailsEnabled')}</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Birthday Emails Enabled</span>
                     <Badge variant="outline">
                       {customersWithBirthdays.filter(c => c.birthdayEmailEnabled).length}
                     </Badge>
@@ -2419,7 +2540,7 @@ export default function ECardsPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <CakeIcon className="h-5 w-5" />
-                    {t('ecards.settings.upcomingBirthdays.title')}
+                    Upcoming Birthdays
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -2427,7 +2548,7 @@ export default function ECardsPage() {
                     <div className="text-center py-4">
                       <CakeIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {t('ecards.settings.upcomingBirthdays.noBirthdays')}
+                        No birthdays in the next 30 days
                       </p>
                     </div>
                   ) : (
@@ -2462,6 +2583,241 @@ export default function ECardsPage() {
 
 
 
+        {/* Customers Tab */}
+        {activeTab === "customers" && (
+          <Card className="w-11/12">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  {t('ecards.title')}
+                </CardTitle>
+                <Button onClick={handleAddCustomer}>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  {t('common.add')} {t('ecards.customer')}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {/* Search and Filter Controls */}
+              <div className="flex items-center gap-4 p-6 border-b">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder={t('ecards.filters.searchPlaceholder')}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t('ecards.filters.allStatuses')}</SelectItem>
+                    <SelectItem value="active">{t('ecards.filters.active')}</SelectItem>
+                    <SelectItem value="unsubscribed">{t('ecards.filters.unsubscribed')}</SelectItem>
+                    <SelectItem value="bounced">{t('ecards.filters.bounced')}</SelectItem>
+                    <SelectItem value="pending">{t('ecards.filters.pending')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Bulk Actions */}
+              {selectedContacts.length > 0 && (
+                <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-4 border-b">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{selectedContacts.length} {t('ecards.bulkActions.selected')}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedContacts([])}
+                    >
+                      {t('ecards.bulkActions.clearSelection')}
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleBulkEnableBirthdayEmail}
+                      disabled={bulkUpdateBirthdayEmailMutation.isPending}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      {t('ecards.bulkActions.enableBirthdayEmails')}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleBulkDisableBirthdayEmail}
+                      disabled={bulkUpdateBirthdayEmailMutation.isPending}
+                    >
+                      <XCircle className="h-4 w-4 mr-2" />
+                      {t('ecards.bulkActions.disableBirthdayEmails')}
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={handleSendBirthdayCard} disabled={sendBirthdayCardMutation.isPending}>
+                          <CakeIcon className="h-4 w-4 mr-2" />
+                          {sendBirthdayCardMutation.isPending ? t('ecards.bulkActions.sending') : t('ecards.bulkActions.sendBirthdayCard')}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleBulkRequestBirthdays} disabled={sendInvitationMutation.isPending}>
+                          <Mail className="h-4 w-4 mr-2" />
+                          {sendInvitationMutation.isPending ? t('ecards.bulkActions.sending') : t('ecards.bulkActions.requestBirthdays')}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem>
+                          <Download className="h-4 w-4 mr-2" />
+                          {t('ecards.bulkActions.exportSelected')}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="text-red-600">
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          {t('ecards.bulkActions.removeSelected')}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              )}
+
+              {contactsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
+                </div>
+              ) : contacts.length === 0 ? (
+                <div className="text-center py-12">
+                  <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">{t('ecards.empty.noCustomers')}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">{t('ecards.empty.noCustomersDescription')}</p>
+                  <Button onClick={handleAddCustomer}>
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    {t('ecards.empty.addFirstCustomer')}
+                  </Button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">
+                          <Checkbox
+                            checked={isAllSelected}
+                            onCheckedChange={handleSelectAll}
+                            aria-label={t('ecards.selectAllCustomers')}
+                          />
+                        </TableHead>
+                        <TableHead>{t('ecards.table.name')}</TableHead>
+                        <TableHead>{t('ecards.table.status')}</TableHead>
+                        <TableHead>{t('ecards.table.birthday')}</TableHead>
+
+                        <TableHead>{t('ecards.table.campaigns')}</TableHead>
+                        <TableHead>{t('ecards.table.actions')}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {contacts.map((contact) => (
+                        <TableRow key={contact.id}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedContacts.includes(contact.id)}
+                              onCheckedChange={(checked) => handleSelectContact(contact.id, checked as boolean)}
+                              aria-label={`Select ${getContactName(contact)}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <button
+                                type="button"
+                                onClick={() => handleCustomerClick(contact)}
+                                className="font-medium text-left hover:text-blue-600 hover:underline transition-colors cursor-pointer"
+                              >
+                                {getContactName(contact)}
+                              </button>
+                              <p className="text-sm text-gray-500">{contact.email}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={getStatusColor(contact.status)}>
+                              {contact.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {contact.birthday ? (
+                              <button
+                                type="button"
+                                onClick={() => openBirthdayModal(contact.id)}
+                                className="flex items-center gap-2 text-left hover:bg-gray-50 p-1 rounded transition-colors"
+                              >
+                                <CakeIcon className="h-4 w-4 text-pink-500" />
+                                <span className="text-sm">{(() => {
+                                  // Parse date as local to avoid timezone shifts
+                                  const [year, month, day] = contact.birthday.split('-').map(Number);
+                                  const localDate = new Date(year, month - 1, day);
+                                  return localDate.toLocaleDateString();
+                                })()}</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => openBirthdayModal(contact.id)}
+                                className="text-gray-400 text-sm underline underline-offset-2 hover:text-gray-600"
+                              >
+                                {t('ecards.table.notSet')}
+                              </button>
+                            )}
+                          </TableCell>
+
+
+                          <TableCell>
+                            {contact.birthday ? (
+                              contact.birthdayUnsubscribedAt ? (
+                                <Badge className="bg-orange-100 text-orange-800">
+                                  {t('ecards.unsubscribed')}
+                                </Badge>
+                              ) : (
+                                <Switch
+                                  checked={contact.birthdayEmailEnabled || false}
+                                  onCheckedChange={() => handleToggleBirthdayEmail(contact.id, contact.birthdayEmailEnabled || false)}
+                                  disabled={toggleBirthdayEmailMutation.isPending}
+                                />
+                              )
+                            ) : (
+                              <span className="text-gray-400 text-sm">{t('ecards.table.na')}</span>
+                            )}
+                          </TableCell>
+
+                        
+                          <TableCell>
+                            {!contact.birthday && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleSendBirthdayInvitation(contact.id)}
+                                disabled={sendInvitationMutation.isPending || tokenLoading}
+                                className="flex items-center gap-2"
+                              >
+                                <Mail className="h-4 w-4" />
+                                {tokenLoading ? t('ecards.refreshing') : sendInvitationMutation.isPending ? t('ecards.bulkActions.sending') : t('ecards.requestBirthday')}
+                              </Button>
+                            )}
+                          </TableCell>
+</TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Test Tab */}
         {activeTab === "test" && (
           <Card className="w-11/12">
@@ -2469,19 +2825,19 @@ export default function ECardsPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Mail className="h-5 w-5" />
-                  {t('ecards.test.title')}
+                  Test Birthday Cards
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                    {t('ecards.test.testMode')}
+                    Test Mode
                   </Badge>
                   <Badge variant="secondary">
-                    {users.length} {t('ecards.test.users')}
+                    {users.length} Users
                   </Badge>
                 </div>
               </div>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {t('ecards.test.description')}
+                Send test birthday cards to users individually or select multiple users for bulk sending. Test emails will be sent to the selected user's actual email address.
               </p>
             </CardHeader>
             <CardContent className="p-0">
@@ -2489,13 +2845,13 @@ export default function ECardsPage() {
               {selectedUsers.length > 0 && (
                 <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-4 border-b">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{selectedUsers.length} {t('ecards.test.usersSelected')}</span>
+                    <span className="text-sm font-medium">{selectedUsers.length} user(s) selected</span>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setSelectedUsers([])}
                     >
-                      {t('ecards.test.clearSelection')}
+                      Clear Selection
                     </Button>
                   </div>
                   <div className="flex items-center gap-2">
@@ -2511,7 +2867,7 @@ export default function ECardsPage() {
                       disabled={sendTestBirthdayMutation.isPending || tokenLoading}
                     >
                       <Mail className="h-4 w-4 mr-2" />
-                      {tokenLoading ? t('ecards.test.refreshing') : sendTestBirthdayMutation.isPending ? t('ecards.test.sending') : t('ecards.test.sendTestCards')}
+                      {tokenLoading ? "Refreshing..." : sendTestBirthdayMutation.isPending ? "Sending..." : "Send Test Cards to Selected"}
                     </Button>
                   </div>
                 </div>
@@ -2524,8 +2880,8 @@ export default function ECardsPage() {
               ) : users.length === 0 ? (
                 <div className="text-center py-12">
                   <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">{t('ecards.test.noUsers')}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">{t('ecards.test.noUsersDescription')}</p>
+                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">No users found</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">No users available in your tenant for testing</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -2536,14 +2892,14 @@ export default function ECardsPage() {
                           <Checkbox
                             checked={isAllUsersSelected}
                             onCheckedChange={handleSelectAllUsers}
-                            aria-label={t('ecards.test.selectAllUsers')}
+                            aria-label="Select all users"
                           />
                         </TableHead>
-                        <TableHead>{t('ecards.test.name')}</TableHead>
-                        <TableHead>{t('ecards.test.email')}</TableHead>
-                        <TableHead>{t('ecards.test.role')}</TableHead>
-                        <TableHead>{t('ecards.test.emailVerified')}</TableHead>
-                        <TableHead>{t('ecards.test.actions')}</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Email Verified</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -2553,7 +2909,7 @@ export default function ECardsPage() {
                             <Checkbox
                               checked={selectedUsers.includes(user.id)}
                               onCheckedChange={(checked) => handleSelectUser(user.id, checked as boolean)}
-                              aria-label={`${t('common.select')} ${getUserName(user)}`}
+                              aria-label={`Select ${getUserName(user)}`}
                             />
                           </TableCell>
                           <TableCell>
@@ -2583,7 +2939,7 @@ export default function ECardsPage() {
                               className="flex items-center gap-2"
                             >
                               <Mail className="h-4 w-4" />
-                              {tokenLoading ? t('ecards.test.refreshing') : sendTestBirthdayMutation.isPending ? t('ecards.test.sending') : t('ecards.test.sendTestCard')}
+                              {tokenLoading ? "Refreshing..." : sendTestBirthdayMutation.isPending ? "Sending..." : "Send Test Card"}
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -2631,7 +2987,7 @@ export default function ECardsPage() {
                   </div>
                   {selectedCustomer.birthday && (
                     <div>
-                      <Label className="text-sm font-medium text-gray-700">Special Date</Label>
+                      <Label className="text-sm font-medium text-gray-700">Birthday</Label>
                       <div className="flex items-center gap-2">
                         <CakeIcon className="h-4 w-4 text-pink-500" />
                         <span className="text-sm">{(() => {
@@ -2644,11 +3000,11 @@ export default function ECardsPage() {
                     </div>
                   )}
                   <div>
-                    <Label className="text-sm font-medium text-gray-700">E-Card Email Status</Label>
+                    <Label className="text-sm font-medium text-gray-700">Birthday Email Status</Label>
                     {selectedCustomer.birthdayUnsubscribedAt ? (
                       <div className="space-y-1">
                         <Badge className="bg-orange-100 text-orange-800">
-                          Unsubscribed from E-Card Emails
+                          Unsubscribed from Birthday Emails
                         </Badge>
                         <p className="text-xs text-gray-500 mt-1">
                           Unsubscribed on {new Date(selectedCustomer.birthdayUnsubscribedAt).toLocaleString()}
@@ -2656,10 +3012,10 @@ export default function ECardsPage() {
                       </div>
                     ) : selectedCustomer.birthday ? (
                       <Badge className="bg-green-100 text-green-800">
-                        Subscribed to E-Card Emails
+                        Subscribed to Birthday Emails
                       </Badge>
                     ) : (
-                      <span className="text-sm text-gray-500">No date set</span>
+                      <span className="text-sm text-gray-500">No birthday set</span>
                     )}
                   </div>
                 </div>
@@ -2733,7 +3089,7 @@ export default function ECardsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Special Date Modal */}
+        {/* Birthday Modal */}
         <Dialog open={birthdayModalOpen} onOpenChange={setBirthdayModalOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
@@ -2750,7 +3106,7 @@ export default function ECardsPage() {
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="birthday-date">Special Date</Label>
+                <Label htmlFor="birthday-date">Birthday Date</Label>
                 <Input
                   id="birthday-date"
                   type="date"

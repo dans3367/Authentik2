@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Plus, Loader2, Calendar, Megaphone, Settings, ChevronDown, ChevronUp, Save, Upload, Wand2, Code, Copy, RefreshCw } from 'lucide-react';
@@ -17,6 +18,29 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { generatePromotionalCodes, parseUserCodes, validatePromotionalCodes, formatCodesForDisplay, CODE_GENERATION_PRESETS, type CodeFormat } from '@/utils/codeGeneration';
 import RichTextEditor from '@/components/RichTextEditor';
 
+const getPromotionTypeOptions = (t: any) => [
+  { value: 'newsletter', label: t('promotionsPage.types.newsletter') },
+  { value: 'survey', label: t('promotionsPage.types.survey') },
+  { value: 'birthday', label: t('promotionsPage.types.birthday') },
+  { value: 'announcement', label: t('promotionsPage.types.announcement') },
+  { value: 'sale', label: t('promotionsPage.types.sale') },
+  { value: 'event', label: t('promotionsPage.types.event') },
+];
+
+const getTargetAudienceOptions = (t: any) => [
+  { value: 'all', label: t('promotionsPage.createPage.targetOptions.all') },
+  { value: 'subscribers', label: t('promotionsPage.createPage.targetOptions.subscribers') },
+  { value: 'customers', label: t('promotionsPage.createPage.targetOptions.customers') },
+  { value: 'prospects', label: t('promotionsPage.createPage.targetOptions.prospects') },
+  { value: 'vip', label: t('promotionsPage.createPage.targetOptions.vip') },
+];
+
+const getCodeFormatOptions = (t: any) => [
+  { value: 'alphanumeric', label: t('promotionsPage.createPage.codeFormats.alphanumeric') },
+  { value: 'alphabetic', label: t('promotionsPage.createPage.codeFormats.alphabetic') },
+  { value: 'numeric', label: t('promotionsPage.createPage.codeFormats.numeric') },
+];
+
 const promotionTypeColors = {
   newsletter: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
   survey: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
@@ -29,6 +53,7 @@ const promotionTypeColors = {
 export default function CreatePromotionPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState({
@@ -65,15 +90,15 @@ export default function CreatePromotionPage() {
       queryClient.invalidateQueries({ queryKey: ['/api/promotions'] });
       queryClient.invalidateQueries({ queryKey: ['/api/promotion-stats'] });
       toast({
-        title: "Success",
-        description: "Promotion created successfully",
+        title: t('promotionsPage.toasts.success'),
+        description: t('promotionsPage.toasts.promotionCreated'),
       });
       setLocation('/promotions');
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create promotion",
+        title: t('promotionsPage.toasts.error'),
+        description: error.message || t('promotionsPage.toasts.createError'),
         variant: "destructive",
       });
     },
@@ -98,13 +123,13 @@ export default function CreatePromotionPage() {
       const codes = generatePromotionalCodes(generateOptions);
       setFormData({ ...formData, promotionalCodes: codes });
       toast({
-        title: "Success",
-        description: `Generated ${codes.length} promotional codes`,
+        title: t('promotionsPage.toasts.success'),
+        description: t('promotionsPage.toasts.codesGenerated', { count: codes.length }),
       });
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to generate codes",
+        title: t('promotionsPage.toasts.error'),
+        description: error.message || t('promotionsPage.toasts.codesError'),
         variant: "destructive",
       });
     }
@@ -116,13 +141,13 @@ export default function CreatePromotionPage() {
     try {
       await navigator.clipboard.writeText(formatCodesForDisplay(formData.promotionalCodes));
       toast({
-        title: "Success",
-        description: "Promotional codes copied to clipboard",
+        title: t('promotionsPage.toasts.success'),
+        description: t('promotionsPage.toasts.codesCopied'),
       });
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to copy codes to clipboard",
+        title: t('promotionsPage.toasts.error'),
+        description: t('promotionsPage.toasts.copyError'),
         variant: "destructive",
       });
     }
@@ -132,8 +157,8 @@ export default function CreatePromotionPage() {
     e.preventDefault();
     if (!formData.title.trim() || !formData.content.trim()) {
       toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields",
+        title: t('promotionsPage.validation.error'),
+        description: t('promotionsPage.validation.fillRequired'),
         variant: "destructive",
       });
       return;
@@ -144,7 +169,7 @@ export default function CreatePromotionPage() {
       const validation = validatePromotionalCodes(formData.promotionalCodes);
       if (validation.errors.length > 0) {
         toast({
-          title: "Validation Error",
+          title: t('promotionsPage.validation.error'),
           description: validation.errors.join('. '),
           variant: "destructive",
         });
@@ -164,8 +189,8 @@ export default function CreatePromotionPage() {
     // Validate date range
     if (submitData.validFrom && submitData.validTo && submitData.validFrom >= submitData.validTo) {
       toast({
-        title: "Validation Error",
-        description: "Valid From date must be before Valid To date",
+        title: t('promotionsPage.validation.error'),
+        description: t('promotionsPage.validation.dateRangeInvalid'),
         variant: "destructive",
       });
       return;
@@ -178,6 +203,10 @@ export default function CreatePromotionPage() {
     setLocation('/promotions');
   };
 
+  const promotionTypeOptions = getPromotionTypeOptions(t);
+  const targetAudienceOptions = getTargetAudienceOptions(t);
+  const codeFormatOptions = getCodeFormatOptions(t);
+
   return (
     <div className="container mx-auto p-4 lg:p-6 space-y-6 lg:space-y-8 max-w-4xl">
       {/* Header */}
@@ -189,14 +218,14 @@ export default function CreatePromotionPage() {
           className="flex items-center gap-2"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Promotions
+          {t('promotionsPage.createPage.backToPromotions')}
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
-            Create New Promotion
+            {t('promotionsPage.createPage.title')}
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Create promotional content template for your email campaigns
+            {t('promotionsPage.createPage.subtitle')}
           </p>
         </div>
       </div>
@@ -210,61 +239,60 @@ export default function CreatePromotionPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Megaphone className="h-5 w-5" />
-                  Basic Information
+                  {t('promotionsPage.createPage.basicInformation')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="title">Title *</Label>
+                    <Label htmlFor="title">{t('promotionsPage.createPage.title')}</Label>
                     <Input
                       id="title"
                       value={formData.title}
                       onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                      placeholder="Enter promotion title"
+                      placeholder={t('promotionsPage.createPage.titlePlaceholder')}
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="type">Type</Label>
+                    <Label htmlFor="type">{t('promotionsPage.createPage.type')}</Label>
                     <Select value={formData.type} onValueChange={(value: any) => setFormData({ ...formData, type: value })}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="newsletter">Newsletter</SelectItem>
-                        <SelectItem value="survey">Survey</SelectItem>
-                        <SelectItem value="birthday">Birthday</SelectItem>
-                        <SelectItem value="announcement">Announcement</SelectItem>
-                        <SelectItem value="sale">Sale</SelectItem>
-                        <SelectItem value="event">Event</SelectItem>
+                        {promotionTypeOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="description">{t('promotionsPage.createPage.description')}</Label>
                   <Input
                     id="description"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Brief description of the promotion"
+                    placeholder={t('promotionsPage.createPage.descriptionPlaceholder')}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="targetAudience">Target Audience</Label>
+                  <Label htmlFor="targetAudience">{t('promotionsPage.createPage.targetAudience')}</Label>
                   <Select value={formData.targetAudience} onValueChange={(value) => setFormData({ ...formData, targetAudience: value })}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Contacts</SelectItem>
-                      <SelectItem value="subscribers">Subscribers Only</SelectItem>
-                      <SelectItem value="customers">Customers</SelectItem>
-                      <SelectItem value="prospects">Prospects</SelectItem>
-                      <SelectItem value="vip">VIP Customers</SelectItem>
+                      {targetAudienceOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -275,7 +303,7 @@ export default function CreatePromotionPage() {
                     checked={formData.isActive}
                     onCheckedChange={(checked) => setFormData({ ...formData, isActive: !!checked })}
                   />
-                  <Label htmlFor="isActive">Active (available for use)</Label>
+                  <Label htmlFor="isActive">{t('promotionsPage.createPage.active')}</Label>
                 </div>
               </CardContent>
             </Card>
@@ -283,19 +311,19 @@ export default function CreatePromotionPage() {
             {/* Content Card */}
             <Card>
               <CardHeader>
-                <CardTitle>Promotion Content</CardTitle>
+                <CardTitle>{t('promotionsPage.createPage.promotionContent')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  <Label htmlFor="content">Content *</Label>
+                  <Label htmlFor="content">{t('promotionsPage.createPage.content')}</Label>
                   <RichTextEditor
                     value={formData.content}
                     onChange={(html) => setFormData({ ...formData, content: html })}
-                    placeholder="Enter the promotional content..."
+                    placeholder={t('promotionsPage.createPage.contentPlaceholder')}
                     className="min-h-[300px]"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Use the rich text editor to format your promotional content. You can use the toolbar for formatting, insert placeholders, and use AI features.
+                    {t('promotionsPage.createPage.contentHelp')}
                   </p>
                 </div>
               </CardContent>
@@ -306,7 +334,7 @@ export default function CreatePromotionPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Code className="h-5 w-5" />
-                  Promotional Codes
+                  {t('promotionsPage.createPage.promotionalCodes')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -320,7 +348,7 @@ export default function CreatePromotionPage() {
                     >
                       <div className="flex items-center gap-2">
                         <Code className="h-4 w-4" />
-                        Code Generation Options
+                        {t('promotionsPage.createPage.codeGenerationOptions')}
                       </div>
                       {isCodeSectionOpen ? (
                         <ChevronUp className="h-4 w-4" />
@@ -332,7 +360,7 @@ export default function CreatePromotionPage() {
                   <CollapsibleContent className="space-y-4">
                     {/* Code Generation Mode Selection */}
                     <div className="space-y-3">
-                      <Label>Choose how to add promotional codes:</Label>
+                      <Label>{t('promotionsPage.createPage.chooseMethod')}</Label>
                       <RadioGroup 
                         value={codeGenerationMode} 
                         onValueChange={(value: 'upload' | 'generate') => setCodeGenerationMode(value)}
@@ -343,8 +371,8 @@ export default function CreatePromotionPage() {
                           <Label htmlFor="upload" className="flex items-center gap-2 cursor-pointer flex-1">
                             <Upload className="h-4 w-4" />
                             <div>
-                              <div className="font-medium">Upload my own codes</div>
-                              <div className="text-sm text-muted-foreground">Paste your promotional codes separated by spaces</div>
+                              <div className="font-medium">{t('promotionsPage.createPage.uploadOwnCodes')}</div>
+                              <div className="text-sm text-muted-foreground">{t('promotionsPage.createPage.uploadCodesDescription')}</div>
                             </div>
                           </Label>
                         </div>
@@ -353,8 +381,8 @@ export default function CreatePromotionPage() {
                           <Label htmlFor="generate" className="flex items-center gap-2 cursor-pointer flex-1">
                             <Wand2 className="h-4 w-4" />
                             <div>
-                              <div className="font-medium">Generate codes for me</div>
-                              <div className="text-sm text-muted-foreground">Automatically generate unique promotional codes</div>
+                              <div className="font-medium">{t('promotionsPage.createPage.generateCodes')}</div>
+                              <div className="text-sm text-muted-foreground">{t('promotionsPage.createPage.generateCodesDescription')}</div>
                             </div>
                           </Label>
                         </div>
@@ -364,18 +392,17 @@ export default function CreatePromotionPage() {
                     {/* Upload Mode */}
                     {codeGenerationMode === 'upload' && (
                       <div className="space-y-3">
-                        <Label htmlFor="userCodes">Promotional Codes</Label>
+                        <Label htmlFor="userCodes">{t('promotionsPage.createPage.promotionalCodes')}</Label>
                         <Textarea
                           id="userCodes"
                           value={userCodesInput}
                           onChange={(e) => handleUserCodesChange(e.target.value)}
-                          placeholder="Paste your promotional codes here, separated by spaces, commas, or new lines&#10;Example: SAVE20 WELCOME10 NEWUSER15"
+                          placeholder={t('promotionsPage.createPage.promotionalCodesPlaceholder')}
                           rows={6}
                           className="font-mono text-sm"
                         />
                         <p className="text-xs text-muted-foreground">
-                          Enter your promotional codes separated by spaces, commas, or line breaks. 
-                          Codes will be automatically converted to uppercase and duplicates will be removed.
+                          {t('promotionsPage.createPage.codesHelp')}
                         </p>
                       </div>
                     )}
@@ -385,7 +412,7 @@ export default function CreatePromotionPage() {
                       <div className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <Label htmlFor="codeCount">Number of Codes</Label>
+                            <Label htmlFor="codeCount">{t('promotionsPage.createPage.numberOfCodes')}</Label>
                             <Input
                               id="codeCount"
                               type="number"
@@ -399,7 +426,7 @@ export default function CreatePromotionPage() {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="codeLength">Code Length</Label>
+                            <Label htmlFor="codeLength">{t('promotionsPage.createPage.codeLength')}</Label>
                             <Input
                               id="codeLength"
                               type="number"
@@ -415,7 +442,7 @@ export default function CreatePromotionPage() {
                         </div>
 
                         <div className="space-y-2">
-                          <Label>Code Format</Label>
+                          <Label>{t('promotionsPage.createPage.codeFormat')}</Label>
                           <Select 
                             value={generateOptions.format} 
                             onValueChange={(value: CodeFormat) => setGenerateOptions({ 
@@ -427,16 +454,18 @@ export default function CreatePromotionPage() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="alphanumeric">Alphanumeric (A-Z, 0-9)</SelectItem>
-                              <SelectItem value="alphabetic">Alphabetic only (A-Z)</SelectItem>
-                              <SelectItem value="numeric">Numbers only (0-9)</SelectItem>
+                              {codeFormatOptions.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <Label htmlFor="codePrefix">Prefix (Optional)</Label>
+                            <Label htmlFor="codePrefix">{t('promotionsPage.createPage.prefix')}</Label>
                             <Input
                               id="codePrefix"
                               value={generateOptions.prefix}
@@ -444,12 +473,12 @@ export default function CreatePromotionPage() {
                                 ...generateOptions, 
                                 prefix: e.target.value.toUpperCase() 
                               })}
-                              placeholder="e.g., SALE"
+                              placeholder={t('promotionsPage.createPage.prefixPlaceholder')}
                               maxLength={10}
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="codeSuffix">Suffix (Optional)</Label>
+                            <Label htmlFor="codeSuffix">{t('promotionsPage.createPage.suffix')}</Label>
                             <Input
                               id="codeSuffix"
                               value={generateOptions.suffix}
@@ -457,7 +486,7 @@ export default function CreatePromotionPage() {
                                 ...generateOptions, 
                                 suffix: e.target.value.toUpperCase() 
                               })}
-                              placeholder="e.g., OFF"
+                              placeholder={t('promotionsPage.createPage.suffixPlaceholder')}
                               maxLength={10}
                             />
                           </div>
@@ -469,7 +498,7 @@ export default function CreatePromotionPage() {
                           className="w-full"
                         >
                           <RefreshCw className="h-4 w-4 mr-2" />
-                          Generate Codes
+                          {t('promotionsPage.createPage.generateCodes')}
                         </Button>
                       </div>
                     )}
@@ -478,7 +507,7 @@ export default function CreatePromotionPage() {
                     {formData.promotionalCodes.length > 0 && (
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <Label>Generated Codes ({formData.promotionalCodes.length})</Label>
+                          <Label>{t('promotionsPage.createPage.generatedCodes', { count: formData.promotionalCodes.length })}</Label>
                           <Button
                             type="button"
                             variant="outline"
@@ -486,7 +515,7 @@ export default function CreatePromotionPage() {
                             onClick={handleCopyCodesList}
                           >
                             <Copy className="h-4 w-4 mr-2" />
-                            Copy All
+                            {t('promotionsPage.createPage.copyAll')}
                           </Button>
                         </div>
                         <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded-lg border max-h-32 overflow-y-auto">
@@ -496,7 +525,7 @@ export default function CreatePromotionPage() {
                         </div>
                         {codeGenerationMode === 'upload' && (
                           <p className="text-xs text-muted-foreground">
-                            Codes have been parsed and validated. Invalid codes were automatically removed.
+                            {t('promotionsPage.createPage.codesParsed')}
                           </p>
                         )}
                       </div>
@@ -509,7 +538,10 @@ export default function CreatePromotionPage() {
             {/* Advanced Settings Card */}
             <Card>
               <CardHeader>
-                <CardTitle>Advanced Settings</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  {t('promotionsPage.createPage.advancedSettings')}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
@@ -522,7 +554,7 @@ export default function CreatePromotionPage() {
                     >
                       <div className="flex items-center gap-2">
                         <Settings className="h-4 w-4" />
-                        Advanced Options
+                        {t('promotionsPage.createPage.advancedOptions')}
                       </div>
                       {isAdvancedOpen ? (
                         <ChevronUp className="h-4 w-4" />
@@ -535,24 +567,24 @@ export default function CreatePromotionPage() {
                     <div className="grid grid-cols-1 gap-4">
                       {/* Max Uses */}
                       <div className="space-y-2">
-                        <Label htmlFor="maxUses">Maximum Uses</Label>
+                        <Label htmlFor="maxUses">{t('promotionsPage.createPage.maxUses')}</Label>
                         <Input
                           id="maxUses"
                           type="number"
                           min="1"
                           value={formData.maxUses}
                           onChange={(e) => setFormData({ ...formData, maxUses: e.target.value })}
-                          placeholder="Leave empty for unlimited uses"
+                          placeholder={t('promotionsPage.createPage.maxUsesPlaceholder')}
                         />
                         <p className="text-xs text-muted-foreground">
-                          Limit how many times this promotion can be used across all campaigns
+                          {t('promotionsPage.createPage.maxUsesHelp')}
                         </p>
                       </div>
 
                       {/* Date Range */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="validFrom">Valid From</Label>
+                          <Label htmlFor="validFrom">{t('promotionsPage.createPage.validFrom')}</Label>
                           <Input
                             id="validFrom"
                             type="date"
@@ -560,11 +592,11 @@ export default function CreatePromotionPage() {
                             onChange={(e) => setFormData({ ...formData, validFrom: e.target.value })}
                           />
                           <p className="text-xs text-muted-foreground">
-                            Promotion becomes active from this date
+                            {t('promotionsPage.createPage.validFromHelp')}
                           </p>
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="validTo">Valid To</Label>
+                          <Label htmlFor="validTo">{t('promotionsPage.createPage.validTo')}</Label>
                           <Input
                             id="validTo"
                             type="date"
@@ -572,24 +604,30 @@ export default function CreatePromotionPage() {
                             onChange={(e) => setFormData({ ...formData, validTo: e.target.value })}
                           />
                           <p className="text-xs text-muted-foreground">
-                            Promotion expires after this date
+                            {t('promotionsPage.createPage.validToHelp')}
                           </p>
                         </div>
                       </div>
 
                       {/* Additional Information */}
-                      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                        <div className="flex items-start gap-2">
-                          <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
-                          <div className="text-xs text-blue-800 dark:text-blue-200">
-                            <p className="font-medium mb-1">Advanced Settings Help:</p>
-                            <ul className="list-disc list-inside space-y-1">
-                              <li>Max uses limit applies globally across all campaigns</li>
-                              <li>Date range controls when the promotion is available for selection</li>
-                              <li>Expired promotions are automatically hidden from selection</li>
-                            </ul>
-                          </div>
-                        </div>
+                      <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                        <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-3">
+                          {t('promotionsPage.createPage.advancedHelp.title')}
+                        </h4>
+                        <ul className="space-y-2 text-sm text-blue-800 dark:text-blue-200">
+                          <li className="flex items-start gap-2">
+                            <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                            <span>{t('promotionsPage.createPage.advancedHelp.maxUsesGlobal')}</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                            <span>{t('promotionsPage.createPage.advancedHelp.dateRangeControls')}</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                            <span>{t('promotionsPage.createPage.advancedHelp.expiredHidden')}</span>
+                          </li>
+                        </ul>
                       </div>
                     </div>
                   </CollapsibleContent>
@@ -603,80 +641,81 @@ export default function CreatePromotionPage() {
             {/* Preview Card */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Preview</CardTitle>
+                <CardTitle className="text-lg">{t('promotionsPage.createPage.preview')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  <div className="space-y-2">
-                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Title
+                  <div>
+                    <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                      {t('promotionsPage.createPage.previewTitle')}
                     </div>
-                    <div className="text-sm font-medium">
-                      {formData.title || "Your promotion title will appear here"}
-                    </div>
+                    <div className="font-semibold">{formData.title || t('promotionsPage.createPage.titlePlaceholder')}</div>
                   </div>
                   
-                  <div className="space-y-2">
-                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Type
+                  <div>
+                    <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                      {t('promotionsPage.createPage.previewType')}
                     </div>
                     <Badge className={promotionTypeColors[formData.type]}>
-                      {formData.type}
+                      {promotionTypeOptions.find(opt => opt.value === formData.type)?.label}
                     </Badge>
                   </div>
-
+                  
                   {formData.description && (
-                    <div className="space-y-2">
-                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        Description
+                    <div>
+                      <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                        {t('promotionsPage.createPage.previewDescription')}
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        {formData.description}
-                      </div>
+                      <div className="text-sm">{formData.description}</div>
                     </div>
                   )}
                   
-                  <div className="space-y-2">
-                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Content Preview
+                  <div>
+                    <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                      {t('promotionsPage.createPage.previewContent')}
                     </div>
                     <div 
-                      className="text-sm text-muted-foreground max-h-32 overflow-y-auto leading-relaxed bg-gray-50 dark:bg-gray-900 p-2 rounded text-xs prose prose-sm max-w-none"
+                      className="text-sm prose prose-sm dark:prose-invert max-w-none"
                       dangerouslySetInnerHTML={{ __html: formData.content || "<p class='text-gray-400'>Your promotional content will appear here as you type...</p>" }}
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Target Audience
+                  <div>
+                    <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                      {t('promotionsPage.createPage.previewTargetAudience')}
                     </div>
                     <div className="text-sm">
-                      {formData.targetAudience}
+                      {targetAudienceOptions.find(opt => opt.value === formData.targetAudience)?.label}
                     </div>
                   </div>
-
-                  <div className="space-y-2">
-                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Status
+                  
+                  <div>
+                    <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                      {t('promotionsPage.createPage.previewStatus')}
                     </div>
-                    <Badge variant={formData.isActive ? "default" : "secondary"}>
-                      {formData.isActive ? "Active" : "Inactive"}
-                    </Badge>
+                    <div className="text-sm">
+                      {formData.isActive ? (
+                        <Badge variant="outline" className="text-green-600 border-green-600">
+                          {t('promotionsPage.status.active')}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-gray-600 border-gray-600">
+                          {t('promotionsPage.status.inactive')}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-
+                  
                   {formData.promotionalCodes.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        Promotional Codes
+                    <div>
+                      <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                        {t('promotionsPage.createPage.previewCodes')}
                       </div>
-                      <div className="text-sm">
-                        {formData.promotionalCodes.length} code{formData.promotionalCodes.length !== 1 ? 's' : ''} added
-                      </div>
-                      <div className="bg-gray-50 dark:bg-gray-900 p-2 rounded text-xs max-h-20 overflow-y-auto">
-                        <code className="text-wrap break-all">
-                          {formData.promotionalCodes.slice(0, 5).join(' ')}
-                          {formData.promotionalCodes.length > 5 && ' ...'}
-                        </code>
+                      <div className="text-sm font-mono bg-gray-50 dark:bg-gray-900 p-2 rounded border">
+                        {t('promotionsPage.createPage.codesAdded', { 
+                          count: formData.promotionalCodes.length, 
+                          plural: formData.promotionalCodes.length !== 1 ? 's' : '' 
+                        })}
                       </div>
                     </div>
                   )}
@@ -687,24 +726,31 @@ export default function CreatePromotionPage() {
             {/* Action Buttons */}
             <Card>
               <CardContent className="pt-6">
-                <div className="space-y-3">
-                  <Button 
-                    type="submit" 
-                    className="w-full"
-                    disabled={createPromotionMutation.isPending}
-                  >
-                    {createPromotionMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    <Save className="h-4 w-4 mr-2" />
-                    Create Promotion
-                  </Button>
+                <div className="flex items-center gap-4">
                   <Button 
                     type="button" 
                     variant="outline" 
-                    className="w-full"
                     onClick={handleCancel}
                     disabled={createPromotionMutation.isPending}
                   >
-                    Cancel
+                    {t('promotionsPage.createPage.cancel')}
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={createPromotionMutation.isPending}
+                    className="flex items-center gap-2"
+                  >
+                    {createPromotionMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {t('promotionsPage.createPage.creating')}
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4" />
+                        {t('promotionsPage.createPage.createPromotion')}
+                      </>
+                    )}
                   </Button>
                 </div>
               </CardContent>

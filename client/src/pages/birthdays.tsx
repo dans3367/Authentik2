@@ -131,10 +131,11 @@ export default function BirthdaysPage() {
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
   const { t, currentLanguage } = useLanguage();
-  const { user: currentUser } = useAuth();
-
-  // Use Better Auth session to get external token
+  
+  // Use Better Auth session to get external token - call this before useAuth to maintain consistent hook order
   const { data: session } = useSession();
+  
+  const { user: currentUser } = useAuth();
 
   // Query to get external service token when authenticated
   const { data: tokenData, isLoading: tokenLoading, error: tokenError, refetch: refetchToken } = useQuery({
@@ -771,7 +772,20 @@ export default function BirthdaysPage() {
       }
 
       // Call the cardprocessor API directly for test birthday cards
-      const cardprocessorUrl = import.meta.env.VITE_CARDPROCESSOR_URL || 'http://localhost:5004';
+      const getCardprocessorUrl = () => {
+        if (import.meta.env.VITE_CARDPROCESSOR_URL) {
+          return import.meta.env.VITE_CARDPROCESSOR_URL;
+        }
+        if (typeof window !== 'undefined') {
+          const { hostname, protocol } = window.location;
+          if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return 'http://localhost:5004';
+          }
+          return `${protocol}//${hostname}:5004`;
+        }
+        return 'http://localhost:5004';
+      };
+      const cardprocessorUrl = getCardprocessorUrl();
 
       // Prepare request payload
       const requestPayload = {

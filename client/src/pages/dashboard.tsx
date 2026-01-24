@@ -3,12 +3,20 @@ import { useLocation } from "wouter";
 import { NewsletterCard } from "@/components/ui/newsletter-card";
 import { HighlightsCard } from "@/components/ui/highlights-card";
 import { UpcomingBirthdaysCard } from "@/components/ui/upcoming-birthdays-card";
+import { UpcomingAppointmentsCard } from "@/components/ui/upcoming-appointments-card";
+import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
+import { LayoutDashboard } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user, isLoading } = useReduxAuth();
   const { t } = useTranslation();
+
+  // Set breadcrumbs in header (dashboard is the root, so only show current page)
+  useSetBreadcrumbs([
+    { label: "Dashboard", icon: LayoutDashboard }
+  ]);
 
   if (isLoading) {
     return (
@@ -62,9 +70,10 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Upcoming Birthdays Card */}
-        <div className="max-w-7xl w-full">
+        {/* Upcoming Birthdays + Appointments */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl w-full">
           <UpcomingBirthdaysCard />
+          <UpcomingAppointmentsCard />
         </div>
       </div>
     </div>

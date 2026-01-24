@@ -16,7 +16,8 @@ import { useAuthErrorHandler, setGlobalAuthErrorHandler } from "@/hooks/useAuthE
 const AuthPage = lazy(() => import("@/pages/auth"));
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const NewsletterPage = lazy(() => import("@/pages/newsletter"));
-const NewsletterCreatePage = lazy(() => import("@/pages/newsletter-create"));
+const NewsletterCreatePage = lazy(() => import("@/pages/newsletter/create"));
+const NewsletterEditPage = lazy(() => import("@/pages/newsletter/edit"));
 const NewsletterViewPage = lazy(() => import("@/pages/newsletter/view"));
 const ProfilePage = lazy(() => import("@/pages/profile"));
 const SessionsPage = lazy(() => import("@/pages/sessions"));
@@ -54,10 +55,28 @@ const EmailComposePage = lazy(() => import("@/pages/email-compose"));
 const CreatePromotionPage = lazy(() => import("@/pages/promotions/create"));
 const EditPromotionPage = lazy(() => import("@/pages/promotions/edit"));
 const TemplatesPage = lazy(() => import("@/pages/templates"));
+const CreateTemplatePage = lazy(() => import("@/pages/templates/create"));
 const EditEmailCampaignPage = lazy(() => import("@/pages/email-campaigns/edit"));
 const UpdateProfilePage = lazy(() => import("@/pages/update-profile"));
 const SegmentationPage = lazy(() => import("@/pages/segmentation"));
 const ManagementPage = lazy(() => import("@/pages/management"));
+
+// Redirect components for legacy routes
+function BirthdaysRedirect() {
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    setLocation('/cards?type=birthday');
+  }, [setLocation]);
+  return null;
+}
+
+function ECardsRedirect() {
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    setLocation('/cards?type=ecard');
+  }, [setLocation]);
+  return null;
+}
 
 // Loading component for Suspense fallback
 const PageLoader = () => (
@@ -233,10 +252,12 @@ function Router() {
                   <Route path="/newsletter" component={NewsletterPage} />
                   <Route path="/newsletters" component={NewsletterPage} />
                   <Route path="/newsletter/create" component={NewsletterCreatePage} />
+                  <Route path="/newsletter/edit/:id" component={NewsletterEditPage} />
                   <Route path="/newsletters/:id" component={NewsletterViewPage} />
                   <Route path="/promotions" component={PromotionsPage} />
                   <Route path="/promotions/create" component={CreatePromotionPage} />
                   <Route path="/promotions/:id/edit" component={EditPromotionPage} />
+                  <Route path="/templates/create" component={CreateTemplatePage} />
                   <Route path="/templates" component={TemplatesPage} />
                   <Route path="/company" component={CompanyPage} />
                   <Route path="/campaigns/create" component={CreateCampaignPage} />
@@ -253,24 +274,8 @@ function Router() {
                   <Route path="/email-analytics" component={EmailAnalyticsPage} />
                   <Route path="/segmentation" component={SegmentationPage} />
                   <Route path="/cards" component={CardsPage} />
-                  <Route path="/birthdays">
-                    {() => {
-                      const [, setLocation] = useLocation();
-                      useEffect(() => {
-                        setLocation('/cards?type=birthday');
-                      }, []);
-                      return null;
-                    }}
-                  </Route>
-                  <Route path="/e-cards">
-                    {() => {
-                      const [, setLocation] = useLocation();
-                      useEffect(() => {
-                        setLocation('/cards?type=ecard');
-                      }, []);
-                      return null;
-                    }}
-                  </Route>
+                  <Route path="/birthdays" component={BirthdaysRedirect} />
+                  <Route path="/e-cards" component={ECardsRedirect} />
                   <Route path="/reminders" component={RemindersPage} />
                   <Route path="/shops" component={ShopsPage} />
                   <Route path="/shops/new" component={NewShopPage} />

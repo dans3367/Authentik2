@@ -129,14 +129,14 @@ templateRoutes.get("/stats", authenticateToken, requireTenant, async (req: any, 
     console.log('🔍 [Templates Stats] Fetching stats for tenant:', req.user.tenantId);
 
     const stats = await db.select({
-      totalTemplates: sql<number>`count(*)`,
+      totalTemplates: sql<number>`count(*) filter (where is_active = true)`,
       activeTemplates: sql<number>`count(*) filter (where is_active = true)`,
-      favoriteTemplates: sql<number>`count(*) filter (where is_favorite = true)`,
-      individualTemplates: sql<number>`count(*) filter (where channel = 'individual')`,
-      promotionalTemplates: sql<number>`count(*) filter (where channel = 'promotional')`,
-      newsletterTemplates: sql<number>`count(*) filter (where channel = 'newsletter')`,
-      transactionalTemplates: sql<number>`count(*) filter (where channel = 'transactional')`,
-      averageUsageCount: sql<number>`avg(usage_count)`,
+      favoriteTemplates: sql<number>`count(*) filter (where is_favorite = true and is_active = true)`,
+      individualTemplates: sql<number>`count(*) filter (where channel = 'individual' and is_active = true)`,
+      promotionalTemplates: sql<number>`count(*) filter (where channel = 'promotional' and is_active = true)`,
+      newsletterTemplates: sql<number>`count(*) filter (where channel = 'newsletter' and is_active = true)`,
+      transactionalTemplates: sql<number>`count(*) filter (where channel = 'transactional' and is_active = true)`,
+      averageUsageCount: sql<number>`avg(usage_count) filter (where is_active = true)`,
     }).from(templates).where(sql`${templates.tenantId} = ${req.user.tenantId}`);
 
     console.log('✅ [Templates Stats] Returning stats for tenant:', req.user.tenantId, 'total templates:', stats[0].totalTemplates);

@@ -30,6 +30,8 @@ import { promotionRoutes } from "./routes/promotionRoutes";
 import customCardsRoutes from "./routes/customCardsRoutes";
 import appointmentRoutes from "./routes/appointmentRoutes";
 import appointmentRemindersRoutes from "./routes/appointmentRemindersRoutes";
+import appointmentNotesRoutes from "./routes/appointmentNotesRoutes";
+import appointmentConfirmationRoutes from "./routes/appointmentConfirmationRoutes";
 import newsletterWorkerRoutes from "./routes/newsletterWorkerRoutes";
 import suppressionManagementRoutes from "./routes/suppressionManagementRoutes";
 import aiRoutes from "./routes/aiRoutes";
@@ -55,6 +57,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // API Routes
   // Note: Auth routes handled by better-auth middleware
+  // Public routes (no authentication required)
+  app.use("/api/appointments", appointmentConfirmationRoutes); // Public appointment confirmation/decline
+  
   app.use("/api/signup", signupRoutes); // Signup helper endpoints
   app.use("/api/tenant-fix", tenantFixRoutes); // Admin tools to fix tenant assignments
   app.use("/api/admin", adminRoutes);
@@ -71,6 +76,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/custom-cards", customCardsRoutes);
   app.use("/api/appointments", appointmentRoutes);
   app.use("/api/appointment-reminders", appointmentRemindersRoutes);
+  app.use("/api/appointment-notes", appointmentNotesRoutes);
   app.use("/api/newsletter-worker", newsletterWorkerRoutes);
   app.use("/api/birthday-worker", birthdayWorkerRoutes);
   app.use("/api/ai", aiRoutes);

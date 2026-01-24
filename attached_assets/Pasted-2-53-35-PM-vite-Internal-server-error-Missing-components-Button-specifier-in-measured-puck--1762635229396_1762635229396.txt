@@ -1,0 +1,19 @@
+2:53:35 PM [vite] Internal server error: Missing "./components/Button" specifier in "@measured/puck" package
+  Plugin: vite:import-analysis
+  File: /Users/root1/Documents/GitHub/Authentik/client/src/config/puck/blocks/Button/index.tsx
+      at e (/Users/root1/Documents/GitHub/Authentik/node_modules/vite/dist/node/chunks/dep-C6uTJdX2.js:46042:25)
+      at n (/Users/root1/Documents/GitHub/Authentik/node_modules/vite/dist/node/chunks/dep-C6uTJdX2.js:46042:627)
+      at o (/Users/root1/Documents/GitHub/Authentik/node_modules/vite/dist/node/chunks/dep-C6uTJdX2.js:46042:1297)
+      at resolveExportsOrImports (/Users/root1/Documents/GitHub/Authentik/node_modules/vite/dist/node/chunks/dep-C6uTJdX2.js:46663:18)
+      at resolveDeepImport (/Users/root1/Documents/GitHub/Authentik/node_modules/vite/dist/node/chunks/dep-C6uTJdX2.js:46686:25)
+      at tryNodeResolve (/Users/root1/Documents/GitHub/Authentik/node_modules/vite/dist/node/chunks/dep-C6uTJdX2.js:46451:16)
+      at ResolveIdContext.resolveId (/Users/root1/Documents/GitHub/Authentik/node_modules/vite/dist/node/chunks/dep-C6uTJdX2.js:46201:19)
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async PluginContainer.resolveId (/Users/root1/Documents/GitHub/Authentik/node_modules/vite/dist/node/chunks/dep-C6uTJdX2.js:49017:22)
+      at async TransformPluginContext.resolve (/Users/root1/Documents/GitHub/Authentik/node_modules/vite/dist/node/chunks/dep-C6uTJdX2.js:49178:15)
+      at async normalizeUrl (/Users/root1/Documents/GitHub/Authentik/node_modules/vite/dist/node/chunks/dep-C6uTJdX2.js:64284:26)
+      at async <anonymous> (/Users/root1/Documents/GitHub/Authentik/node_modules/vite/dist/node/chunks/dep-C6uTJdX2.js:64423:39)
+      at async Promise.all (index 1)
+      at async TransformPluginContext.transform (/Users/root1/Documents/GitHub/Authentik/node_modules/vite/dist/node/chunks/dep-C6uTJdX2.js:64350:7)
+      at async PluginContainer.transform (/Users/root1/Documents/GitHub/Authentik/node_modules/vite/dist/node/chunks/dep-C6uTJdX2.js:49099:18)
+      at async loadAndTransform (/Users/root1

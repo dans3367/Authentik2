@@ -22,18 +22,27 @@ export interface ExtendedUser {
 
 // Dynamically determine the base URL based on the current environment
 const getBaseURL = () => {
-  // Always use window.location.origin if available (prevents CORS issues)
-  if (typeof window !== 'undefined') {
-    return window.location.origin;
-  }
-  
-  // Server-side fallback
+  // Use environment variable if set
   if (import.meta.env.VITE_BETTER_AUTH_URL) {
     return import.meta.env.VITE_BETTER_AUTH_URL;
   }
   
+  // In browser, determine based on current location
+  if (typeof window !== 'undefined') {
+    const { hostname, protocol } = window.location;
+    
+    // If accessing via localhost, use relative URLs (Vite proxy handles it)
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return window.location.origin;
+    }
+    
+    // If accessing via IP address, point directly to the API server port
+    const apiPort = import.meta.env.VITE_API_PORT || '5002';
+    return `${protocol}//${hostname}:${apiPort}`;
+  }
+  
   // Final fallback for localhost development
-  return "http://localhost:5000";
+  return "http://localhost:5002";
 };
 
 export const authClient = createAuthClient({

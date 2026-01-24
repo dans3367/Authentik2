@@ -364,7 +364,7 @@ emailManagementRoutes.get("/email-contacts/:id/stats", authenticateToken, requir
 // Create email contact with batch operations
 emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, async (req: any, res) => {
   try {
-    const { email, firstName, lastName, tags, lists, status, consentGiven, consentMethod, consentIpAddress, consentUserAgent } = req.body;
+    const { email, firstName, lastName, tags, lists, status, consentGiven, consentMethod, consentIpAddress, consentUserAgent, address, city, state, zipCode, country, phoneNumber } = req.body;
 
     if (!email) {
       return res.status(400).json({ message: 'Email is required' });
@@ -373,6 +373,12 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
     const sanitizedEmail = sanitizeEmail(email);
     const sanitizedFirstName = firstName ? sanitizeString(firstName) : null;
     const sanitizedLastName = lastName ? sanitizeString(lastName) : null;
+    const sanitizedAddress = address ? sanitizeString(address) : null;
+    const sanitizedCity = city ? sanitizeString(city) : null;
+    const sanitizedState = state ? sanitizeString(state) : null;
+    const sanitizedZipCode = zipCode ? sanitizeString(zipCode) : null;
+    const sanitizedCountry = country ? sanitizeString(country) : null;
+    const sanitizedPhoneNumber = phoneNumber ? sanitizeString(phoneNumber) : null;
 
     // Check if contact already exists
     const existingContact = await db.query.emailContacts.findFirst({
@@ -435,6 +441,12 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
         consentIpAddress: consentIpAddress || null,
         consentUserAgent: consentUserAgent || null,
         addedByUserId: userExists ? req.user.id : null,
+        address: sanitizedAddress,
+        city: sanitizedCity,
+        state: sanitizedState,
+        zipCode: sanitizedZipCode,
+        country: sanitizedCountry,
+        phoneNumber: sanitizedPhoneNumber,
         createdAt: now,
         updatedAt: now,
       }).returning();
@@ -477,7 +489,7 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
 emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
-    const { email, firstName, lastName, status, birthday } = req.body;
+    const { email, firstName, lastName, status, birthday, address, city, state, zipCode, country, phoneNumber } = req.body;
 
     const contact = await db.query.emailContacts.findFirst({
       where: sql`${emailContacts.id} = ${id}`,
@@ -526,6 +538,32 @@ emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenan
         return res.status(400).json({ message: 'Birthday must be in YYYY-MM-DD format' });
       }
       updateData.birthday = birthday || null;
+    }
+
+    // Optional address fields
+    if (address !== undefined) {
+      updateData.address = address ? sanitizeString(address) : null;
+    }
+
+    if (city !== undefined) {
+      updateData.city = city ? sanitizeString(city) : null;
+    }
+
+    if (state !== undefined) {
+      updateData.state = state ? sanitizeString(state) : null;
+    }
+
+    if (zipCode !== undefined) {
+      updateData.zipCode = zipCode ? sanitizeString(zipCode) : null;
+    }
+
+    if (country !== undefined) {
+      updateData.country = country ? sanitizeString(country) : null;
+    }
+
+    // Optional phone number
+    if (phoneNumber !== undefined) {
+      updateData.phoneNumber = phoneNumber ? sanitizeString(phoneNumber) : null;
     }
 
     const updatedContact = await db.update(emailContacts)
@@ -3174,6 +3212,176 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     res.status(500).json({
       success: false,
       message: error.message || "Failed to send email"
+    });
+  }
+});
+
+// Email Template Management Routes
+
+// Get email templates
+emailManagementRoutes.get("/email-templates", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    // For now, return mock data. In production, this would query a database table
+    const mockTemplates = [
+      {
+        id: "1",
+        name: "Summer Sale Template",
+        category: "promotional",
+        subject: "🌞 Summer Sale - Up to 50% Off!",
+        preview: "Get ready for summer with our biggest sale of the year.",
+        htmlContent: "<html><body>Sample HTML</body></html>",
+        primaryColor: "#EC4899",
+        secondaryColor: "#BE185D",
+        usageCount: 15,
+        lastUsed: "2025-07-25",
+        createdAt: "2025-06-10",
+        isFavorite: true,
+        tenantId: req.user.tenantId,
+      },
+      {
+        id: "2",
+        name: "Welcome Email Series",
+        category: "welcome",
+        subject: "Welcome to {{company_name}}! 🎉",
+        preview: "Hi {{first_name}}, Welcome aboard! We're thrilled to have you.",
+        htmlContent: "<html><body>Sample HTML</body></html>",
+        primaryColor: "#3B82F6",
+        secondaryColor: "#1E40AF",
+        usageCount: 243,
+        lastUsed: "2025-07-29",
+        createdAt: "2025-03-15",
+        isFavorite: true,
+        tenantId: req.user.tenantId,
+      },
+    ];
+
+    res.json({ templates: mockTemplates });
+  } catch (error: any) {
+    console.error('[EmailManagementRoutes] Get email templates error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to get email templates"
+    });
+  }
+});
+
+// Create email template
+emailManagementRoutes.post("/email-templates", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { name, category, subject, preview, htmlContent, primaryColor, secondaryColor } = req.body;
+
+    if (!name || !category || !subject) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, category, and subject are required"
+      });
+    }
+
+    // In production, this would insert into a database table
+    const newTemplate = {
+      id: crypto.randomBytes(16).toString('hex'),
+      name: sanitizeString(name),
+      category,
+      subject: sanitizeString(subject),
+      preview: preview ? sanitizeString(preview) : "",
+      htmlContent: htmlContent || "",
+      primaryColor: primaryColor || "#3B82F6",
+      secondaryColor: secondaryColor || "#1E40AF",
+      usageCount: 0,
+      isFavorite: false,
+      createdAt: new Date().toISOString(),
+      tenantId: req.user.tenantId,
+    };
+
+    res.json({
+      success: true,
+      template: newTemplate
+    });
+  } catch (error: any) {
+    console.error('[EmailManagementRoutes] Create email template error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to create email template"
+    });
+  }
+});
+
+// Update email template
+emailManagementRoutes.put("/email-templates/:id", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { name, category, subject, preview, htmlContent, primaryColor, secondaryColor, isFavorite } = req.body;
+
+    if (!name || !category || !subject) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, category, and subject are required"
+      });
+    }
+
+    // In production, this would update the database table
+    const updatedTemplate = {
+      id,
+      name: sanitizeString(name),
+      category,
+      subject: sanitizeString(subject),
+      preview: preview ? sanitizeString(preview) : "",
+      htmlContent: htmlContent || "",
+      primaryColor: primaryColor || "#3B82F6",
+      secondaryColor: secondaryColor || "#1E40AF",
+      isFavorite: isFavorite || false,
+      updatedAt: new Date().toISOString(),
+      tenantId: req.user.tenantId,
+    };
+
+    res.json({
+      success: true,
+      template: updatedTemplate
+    });
+  } catch (error: any) {
+    console.error('[EmailManagementRoutes] Update email template error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to update email template"
+    });
+  }
+});
+
+// Delete email template
+emailManagementRoutes.delete("/email-templates/:id", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+
+    // In production, this would delete from the database table
+    res.json({
+      success: true,
+      message: "Email template deleted successfully"
+    });
+  } catch (error: any) {
+    console.error('[EmailManagementRoutes] Delete email template error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to delete email template"
+    });
+  }
+});
+
+// Toggle favorite status
+emailManagementRoutes.patch("/email-templates/:id/favorite", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { isFavorite } = req.body;
+
+    // In production, this would update the database table
+    res.json({
+      success: true,
+      isFavorite
+    });
+  } catch (error: any) {
+    console.error('[EmailManagementRoutes] Toggle favorite error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to toggle favorite status"
     });
   }
 });

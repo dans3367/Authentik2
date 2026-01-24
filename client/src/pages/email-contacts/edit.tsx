@@ -45,6 +45,12 @@ const editContactSchema = z.object({
   consentMethod: z.string().optional(),
   consentIpAddress: z.string().optional(),
   consentDate: z.date().optional(),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zipCode: z.string().optional(),
+  country: z.string().optional(),
+  phoneNumber: z.string().optional(),
 });
 
 type EditContactForm = z.infer<typeof editContactSchema>;
@@ -106,6 +112,12 @@ export default function EditEmailContact() {
       consentMethod: "",
       consentIpAddress: "",
       consentDate: undefined,
+      address: "",
+      city: "",
+      state: "",
+      zipCode: "",
+      country: "",
+      phoneNumber: "",
     },
   });
 
@@ -124,6 +136,12 @@ export default function EditEmailContact() {
         consentMethod: contact.consentMethod || "",
         consentIpAddress: contact.consentIpAddress || "",
         consentDate: contact.consentDate ? new Date(contact.consentDate) : undefined,
+        address: contact.address || "",
+        city: contact.city || "",
+        state: contact.state || "",
+        zipCode: contact.zipCode || "",
+        country: contact.country || "",
+        phoneNumber: contact.phoneNumber || "",
       });
       setSelectedTags(contact.tags?.map((tag: any) => tag.id) || []);
       setSelectedLists(contact.lists?.map((list: any) => list.id) || []);
@@ -290,6 +308,99 @@ export default function EditEmailContact() {
                           <FormLabel>Last Name</FormLabel>
                           <FormControl>
                             <Input placeholder="Last name" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Address Fields */}
+                  <div className="space-y-4 border-t pt-6">
+                    <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200">Address Information (Optional)</h3>
+                    
+                    <FormField
+                      control={form.control}
+                      name="address"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Street Address</FormLabel>
+                          <FormControl>
+                            <Input placeholder="123 Main St" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="city"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>City</FormLabel>
+                            <FormControl>
+                              <Input placeholder="New York" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="state"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>State/Province</FormLabel>
+                            <FormControl>
+                              <Input placeholder="NY" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="zipCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Zip/Postal Code</FormLabel>
+                            <FormControl>
+                              <Input placeholder="10001" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="country"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Country</FormLabel>
+                            <FormControl>
+                              <Input placeholder="United States" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="phoneNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone Number</FormLabel>
+                          <FormControl>
+                            <Input placeholder="+1 (555) 123-4567" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

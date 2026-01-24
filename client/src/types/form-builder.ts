@@ -17,7 +17,12 @@ export interface FormElement {
   rateVariant?: 'numbers' | 'faces' | 'stars'; // for rate-scale components
   booleanVariant?: 'yes-no' | 'true-false' | 'on-off'; // for boolean-switch components
   dateTimeVariant?: 'date-only' | 'time-only' | 'datetime'; // for datetime-picker components
-  numberVariant?: 'number' | 'phone' | 'currency'; // for number-input components
+  numberVariant?: 'number' | 'phone' | 'country-phone' | 'currency'; // for number-input components
+  // Label/text display component properties
+  labelSize?: 'h1' | 'h2' | 'h3' | 'h4' | 'body' | 'small'; // for label components
+  labelSubtext?: string; // subtext displayed below the main label text
+  labelTextColor?: string; // custom text color for label
+  labelSubtextColor?: string; // custom color for subtext
 }
 
 export interface ValidationRules {
@@ -52,7 +57,8 @@ export type FormElementType =
   | 'rate-scale'
   | 'boolean-switch'
   | 'datetime-picker'
-  | 'full-name';
+  | 'full-name'
+  | 'label';
 
 export interface ComponentPaletteItem {
   type: FormElementType;
@@ -89,6 +95,16 @@ export interface CustomColors {
   buttonGradient?: string;
   header: string;
   headerGradient?: string;
+  // New appearance options
+  label?: string;
+  labelGradient?: string;
+  inputBackground?: string;
+  inputBorder?: string;
+  inputText?: string;
+  borderRadius?: 'none' | 'small' | 'medium' | 'large' | 'full';
+  containerShadow?: 'none' | 'small' | 'medium' | 'large';
+  progressBar?: string;
+  progressBarGradient?: string;
 }
 
 export interface FormTheme {

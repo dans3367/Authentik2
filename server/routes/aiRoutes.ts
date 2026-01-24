@@ -338,6 +338,53 @@ ${text}`;
   }
 });
 
+// POST /api/ai/transform-text
+// Generic text transformation endpoint for Puck editor
+router.post("/transform-text", async (req, res) => {
+  try {
+    const { text, prompt } = req.body;
+
+    if (!text || typeof text !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "Text is required",
+      });
+    }
+
+    if (!prompt || typeof prompt !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "Prompt is required",
+      });
+    }
+
+    if (!ensureApiKey(res)) {
+      return;
+    }
+
+    const fullPrompt = `${prompt}. Return only the transformed text without any explanations, markdown, or code fences.
+
+TEXT TO TRANSFORM:
+${text}`;
+
+    const { text: transformedText } = await generateText({
+      model: AI_MODEL,
+      prompt: fullPrompt,
+    });
+
+    res.json({
+      success: true,
+      text: transformedText.trim(),
+    });
+  } catch (error: any) {
+    console.error("Error transforming text:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to transform text",
+    });
+  }
+});
+
 // POST /api/ai/translate
 // Translate selected text to various languages
 router.post("/translate", async (req, res) => {

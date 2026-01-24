@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +14,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ContactSearch } from "@/components/ContactSearch";
 import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
 import { AddContactDialog } from "@/components/AddContactDialog";
+import ContactViewDrawer from "@/components/ContactViewDrawer";
 import { 
   Users, 
   Plus, 
@@ -30,7 +32,8 @@ import {
   AlertCircle,
   Edit,
   Trash2,
-  UserCheck
+  UserCheck,
+  LayoutDashboard
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -100,11 +103,18 @@ export default function EmailContacts() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [addContactOpen, setAddContactOpen] = useState(false);
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
 
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { t } = useLanguage();
   const queryClient = useQueryClient();
+  
+  // Set breadcrumbs in header
+  useSetBreadcrumbs([
+    { label: "Dashboard", href: "/", icon: LayoutDashboard },
+    { label: "Email Contacts", icon: Users }
+  ]);
   
   // Store search params in a ref to use in query function without changing dependencies
   const searchParamsRef = useRef({
@@ -326,95 +336,111 @@ export default function EmailContacts() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-800">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
-      {/* Page Header */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">{t('emailContacts.title')}</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
-              {t('emailContacts.subtitle')}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button 
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => setAddContactOpen(true)}
-            >
-              <UserPlus className="w-4 h-4 mr-2" />
-              {t('emailContacts.addContact')}
-            </Button>
-          </div>
+    <div className="container mx-auto p-4 lg:p-6 space-y-6 lg:space-y-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
+            {t('emailContacts.title')}
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            {t('emailContacts.subtitle')}
+          </p>
         </div>
-        
-        {/* Add Contact Dialog */}
-        <AddContactDialog 
-          open={addContactOpen} 
-          onOpenChange={setAddContactOpen}
-        />
+        <Button onClick={() => setAddContactOpen(true)}>
+          <UserPlus className="h-4 w-4 mr-2" />
+          {t('emailContacts.addContact')}
+        </Button>
+      </div>
+      
+      {/* Add Contact Dialog */}
+      <AddContactDialog 
+        open={addContactOpen} 
+        onOpenChange={setAddContactOpen}
+      />
 
-        {/* Add minimal spacer after the header section */}
-        <div className="h-3"></div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              {t('emailContacts.stats.totalContacts')}
+            </CardTitle>
+            <Users className="h-4 w-4 text-gray-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              {stats.totalContacts.toLocaleString()}
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {t('emailContacts.stats.allContacts')}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              {t('emailContacts.stats.activeSubscribers')}
+            </CardTitle>
+            <UserCheck className="h-4 w-4 text-gray-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              {stats.activeContacts.toLocaleString()}
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {stats.totalContacts > 0 ? Math.round((stats.activeContacts / stats.totalContacts) * 100) : 0}% {t('emailContacts.stats.ofTotal')}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              {t('emailContacts.stats.lists')}
+            </CardTitle>
+            <Tag className="h-4 w-4 text-gray-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              {stats.totalLists}
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {t('emailContacts.stats.emailLists')}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              {t('emailContacts.stats.avgEngagement')}
+            </CardTitle>
+            <Mail className="h-4 w-4 text-gray-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              {stats.averageEngagementRate}%
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {t('emailContacts.stats.openRate')}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">{t('emailContacts.stats.totalContacts')}</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalContacts.toLocaleString()}</p>
-              </div>
-              <Users className="text-blue-500 w-8 h-8" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">{t('emailContacts.stats.activeSubscribers')}</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.activeContacts.toLocaleString()}</p>
-                <p className="text-sm text-green-600">
-                  {stats.totalContacts > 0 ? Math.round((stats.activeContacts / stats.totalContacts) * 100) : 0}%
-                </p>
-              </div>
-              <UserCheck className="text-green-500 w-8 h-8" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">{t('emailContacts.stats.lists')}</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalLists}</p>
-              </div>
-              <Tag className="text-purple-500 w-8 h-8" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">{t('emailContacts.stats.avgEngagement')}</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.averageEngagementRate}%</p>
-              </div>
-              <Mail className="text-orange-500 w-8 h-8" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main Content */}
-      {/* Filters and Search */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+      {/* Contacts List */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            {t('emailContacts.list.title')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Filters and Search */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
       <ContactSearch
         value={searchQuery}
         onSearchChange={handleSearchChange}
@@ -440,29 +466,29 @@ export default function EmailContacts() {
         <Download className="w-4 h-4 mr-2" />
         {t('emailContacts.filters.export')}
       </Button>
-      </div>
+          </div>
 
-      {/* Bulk Actions */}
+          {/* Bulk Actions */}
       {selectedContacts.length > 0 && (
         <Card className="mb-4">
           <CardContent className="py-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <span className="text-sm text-gray-600 dark:text-gray-400">
                 {selectedContacts.length} {t('emailContacts.bulkActions.selected')}
               </span>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
                   <Tag className="w-4 h-4 mr-2" />
                   {t('emailContacts.bulkActions.addTags')}
                 </Button>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
                   <Users className="w-4 h-4 mr-2" />
                   {t('emailContacts.bulkActions.addToList')}
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="text-red-600"
+                  className="text-red-600 flex-1 sm:flex-none"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -476,12 +502,11 @@ export default function EmailContacts() {
               </div>
             </div>
           </CardContent>
-        </Card>
-      )}
+          </Card>
+        )}
 
-      {/* Contacts Table */}
-      <Card className="relative">
-      <CardContent className="p-0">
+          {/* Contacts Table */}
+          <div className="relative">
         {/* Search Loading Indicator */}
         {isFetching && (
           <div className="absolute right-4 top-4 z-10">
@@ -556,7 +581,7 @@ export default function EmailContacts() {
                                   ? 'text-green-700 dark:text-green-400'
                                   : 'text-gray-900 dark:text-white'
                               }`}
-                              onClick={() => !contact.id.startsWith('temp-') && setLocation(`/email-contacts/view/${contact.id}`)}
+                              onClick={() => !contact.id.startsWith('temp-') && setSelectedContactId(contact.id)}
                               data-testid={`text-contact-name-table-${contact.id}`}
                             >
                               {contact.firstName || contact.lastName
@@ -575,7 +600,7 @@ export default function EmailContacts() {
                                   ? 'text-green-600 dark:text-green-500 cursor-default'
                                   : 'text-gray-500 cursor-pointer'
                               }`}
-                              onClick={() => !contact.id.startsWith('temp-') && setLocation(`/email-contacts/view/${contact.id}`)}
+                              onClick={() => !contact.id.startsWith('temp-') && setSelectedContactId(contact.id)}
                               data-testid={`text-contact-email-table-${contact.id}`}
                             >
                               {contact.email}
@@ -628,7 +653,7 @@ export default function EmailContacts() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setLocation(`/email-contacts/view/${contact.id}`)}>
+                            <DropdownMenuItem onClick={() => setSelectedContactId(contact.id)}>
                               <UserCheck className="w-4 h-4 mr-2" />
                               {t('emailContacts.actions.viewContact')}
                             </DropdownMenuItem>
@@ -727,7 +752,7 @@ export default function EmailContacts() {
                                   ? 'text-green-700 dark:text-green-400'
                                   : 'text-gray-900 dark:text-white'
                               }`}
-                              onClick={() => !contact.id.startsWith('temp-') && setLocation(`/email-contacts/view/${contact.id}`)}
+                              onClick={() => !contact.id.startsWith('temp-') && setSelectedContactId(contact.id)}
                               data-testid={`text-contact-name-card-${contact.id}`}
                             >
                               {contact.firstName || contact.lastName
@@ -746,7 +771,7 @@ export default function EmailContacts() {
                                   ? 'text-green-600 dark:text-green-500 cursor-default'
                                   : 'text-gray-500 cursor-pointer'
                               }`}
-                              onClick={() => !contact.id.startsWith('temp-') && setLocation(`/email-contacts/view/${contact.id}`)}
+                              onClick={() => !contact.id.startsWith('temp-') && setSelectedContactId(contact.id)}
                               data-testid={`text-contact-email-card-${contact.id}`}
                             >
                               {contact.email}
@@ -760,7 +785,7 @@ export default function EmailContacts() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setLocation(`/email-contacts/view/${contact.id}`)}>
+                            <DropdownMenuItem onClick={() => setSelectedContactId(contact.id)}>
                               <UserCheck className="w-4 h-4 mr-2" />
                               {t('emailContacts.actions.viewContact')}
                             </DropdownMenuItem>
@@ -851,9 +876,16 @@ export default function EmailContacts() {
             )}
           </div>
         </div>
+          </div>
         </CardContent>
       </Card>
-      </div>
+
+      {/* Contact View Drawer */}
+      <ContactViewDrawer
+        contactId={selectedContactId}
+        open={!!selectedContactId}
+        onOpenChange={(open) => !open && setSelectedContactId(null)}
+      />
     </div>
   );
 }

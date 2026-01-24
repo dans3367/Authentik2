@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { db } from '../db';
 import { bouncedEmails, emailContacts } from '@shared/schema';
-import { eq, and, sql, count, inArray, like } from 'drizzle-orm';
+import { eq, and, sql, count, inArray, ilike } from 'drizzle-orm';
 
 export const suppressionManagementRoutes = Router();
 
@@ -86,7 +86,7 @@ suppressionManagementRoutes.get("/list", authenticateToken, requireTenant, async
     let whereConditions = [eq(bouncedEmails.isActive, true)];
     
     if (search) {
-      whereConditions.push(like(bouncedEmails.email, `%${search}%`));
+      whereConditions.push(ilike(bouncedEmails.email, `%${search}%`));
     }
     
     if (type) {

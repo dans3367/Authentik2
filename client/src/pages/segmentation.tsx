@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +24,7 @@ import {
   Target,
   Copy,
   Eye,
+  LayoutDashboard,
 } from "lucide-react";
 import {
   Dialog,
@@ -60,6 +63,14 @@ interface SegmentStats {
 }
 
 export default function SegmentationPage() {
+  const { t } = useTranslation();
+
+  // Set breadcrumbs in header
+  useSetBreadcrumbs([
+    { label: t('navigation.dashboard'), href: "/", icon: LayoutDashboard },
+    { label: t('segmentation.title'), icon: Target }
+  ]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -123,16 +134,16 @@ export default function SegmentationPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/segment-lists"] });
       queryClient.invalidateQueries({ queryKey: ["/api/segment-lists-stats"] });
       toast({
-        title: "Success",
-        description: "Segment list created successfully",
+        title: t('segmentation.toasts.success'),
+        description: t('segmentation.toasts.createSuccess'),
       });
       setIsCreateModalOpen(false);
       resetForm();
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create segment list",
+        title: t('segmentation.toasts.error'),
+        description: error.message || t('segmentation.toasts.createError'),
         variant: "destructive",
       });
     },
@@ -148,16 +159,16 @@ export default function SegmentationPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/segment-lists"] });
       queryClient.invalidateQueries({ queryKey: ["/api/segment-lists-stats"] });
       toast({
-        title: "Success",
-        description: "Segment list updated successfully",
+        title: t('segmentation.toasts.success'),
+        description: t('segmentation.toasts.updateSuccess'),
       });
       setIsEditModalOpen(false);
       resetForm();
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update segment list",
+        title: t('segmentation.toasts.error'),
+        description: error.message || t('segmentation.toasts.updateError'),
         variant: "destructive",
       });
     },
@@ -173,16 +184,16 @@ export default function SegmentationPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/segment-lists"] });
       queryClient.invalidateQueries({ queryKey: ["/api/segment-lists-stats"] });
       toast({
-        title: "Success",
-        description: "Segment list deleted successfully",
+        title: t('segmentation.toasts.success'),
+        description: t('segmentation.toasts.deleteSuccess'),
       });
       setIsDeleteModalOpen(false);
       setSelectedList(null);
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete segment list",
+        title: t('segmentation.toasts.error'),
+        description: error.message || t('segmentation.toasts.deleteError'),
         variant: "destructive",
       });
     },
@@ -235,8 +246,8 @@ export default function SegmentationPage() {
   const handleSubmitCreate = () => {
     if (!formData.name.trim()) {
       toast({
-        title: "Error",
-        description: "Please enter a list name",
+        title: t('segmentation.toasts.error'),
+        description: t('segmentation.toasts.nameRequired'),
         variant: "destructive",
       });
       return;
@@ -247,8 +258,8 @@ export default function SegmentationPage() {
   const handleSubmitEdit = () => {
     if (!formData.name.trim()) {
       toast({
-        title: "Error",
-        description: "Please enter a list name",
+        title: t('segmentation.toasts.error'),
+        description: t('segmentation.toasts.nameRequired'),
         variant: "destructive",
       });
       return;
@@ -298,68 +309,38 @@ export default function SegmentationPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="container mx-auto p-4 lg:p-6 space-y-6 lg:space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Target className="h-8 w-8 text-indigo-600" />
-            Segmentation
+          <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
+            {t('segmentation.title')}
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Create and manage customer segments for targeted email campaigns
+            {t('segmentation.subtitle')}
           </p>
         </div>
-        <Button onClick={handleCreate} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Create Segment
+        <Button onClick={handleCreate}>
+          <Plus className="h-4 w-4 mr-2" />
+          {t('segmentation.createSegment')}
         </Button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Segments</CardTitle>
-            <List className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalLists}</div>
-            <p className="text-xs text-muted-foreground">Active segment lists</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Contacts</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalContacts}</div>
-            <p className="text-xs text-muted-foreground">Across all segments</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg. Segment Size</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{Math.round(stats.averageListSize)}</div>
-            <p className="text-xs text-muted-foreground">Contacts per segment</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters and Search */}
+      {/* Segments List */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="h-5 w-5" />
+            {t('segmentation.list.title')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Filters and Search */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
-                placeholder="Search segments..."
+                placeholder={t('segmentation.filters.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -367,25 +348,18 @@ export default function SegmentationPage() {
             </div>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
               <SelectTrigger className="w-full sm:w-[200px]">
-                <SelectValue placeholder="Filter by type" />
+                <SelectValue placeholder={t('segmentation.filters.filterByType')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="all">All Customers</SelectItem>
-                <SelectItem value="selected">Selected Customers</SelectItem>
-                <SelectItem value="tags">Tag-based</SelectItem>
+                <SelectItem value="all">{t('segmentation.filters.allTypes')}</SelectItem>
+                <SelectItem value="allCustomers">{t('segmentation.filters.allCustomers')}</SelectItem>
+                <SelectItem value="selected">{t('segmentation.filters.selectedCustomers')}</SelectItem>
+                <SelectItem value="tags">{t('segmentation.filters.tagBased')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Segments Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Segment Lists</CardTitle>
-        </CardHeader>
-        <CardContent>
+          {/* Segments Content */}
           {listsLoading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -394,22 +368,22 @@ export default function SegmentationPage() {
             <div className="text-center py-12">
               <Target className="h-12 w-12 mx-auto text-gray-400 mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                No segments found
+                {t('segmentation.list.noSegmentsFound')}
               </h3>
               <p className="text-gray-600 dark:text-gray-400 mb-4">
                 {searchQuery || typeFilter !== "all"
-                  ? "Try adjusting your filters"
-                  : "Create your first segment to get started"}
+                  ? t('segmentation.list.tryAdjustingFilters')
+                  : t('segmentation.list.createFirstSegment')}
               </p>
               {!searchQuery && typeFilter === "all" && (
                 <Button onClick={handleCreate} className="gap-2">
                   <Plus className="h-4 w-4" />
-                  Create Segment
+                  {t('segmentation.createSegment')}
                 </Button>
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
               {filteredLists.map((list) => (
                 <Card key={list.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
@@ -423,10 +397,10 @@ export default function SegmentationPage() {
                           <Badge className={`gap-1 ${getTypeBadgeColor(list.type)}`}>
                             {getTypeIcon(list.type)}
                             {list.type === "all"
-                              ? "All Customers"
+                              ? t('segmentation.filters.allCustomers')
                               : list.type === "selected"
-                              ? "Selected"
-                              : "Tags"}
+                              ? t('segmentation.list.selected')
+                              : t('segmentation.list.tags')}
                           </Badge>
                         </div>
                       </div>
@@ -436,7 +410,7 @@ export default function SegmentationPage() {
                         {list.description ? (
                           <p className="line-clamp-2">{list.description}</p>
                         ) : (
-                          <p className="text-gray-400 italic">No description</p>
+                          <p className="text-gray-400 italic">{t('segmentation.list.noDescription')}</p>
                         )}
                       </div>
 
@@ -444,7 +418,7 @@ export default function SegmentationPage() {
                       <div className="flex items-center justify-between text-sm">
                         <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
                           <Users className="h-4 w-4" />
-                          <span>{list.contactCount} contacts</span>
+                          <span>{list.contactCount} {t('segmentation.list.contacts')}</span>
                         </div>
                         <div className="text-gray-500 dark:text-gray-500">
                           {new Date(list.createdAt).toLocaleDateString()}
@@ -460,7 +434,7 @@ export default function SegmentationPage() {
                           className="flex-1"
                         >
                           <Edit className="h-4 w-4 mr-1" />
-                          Edit
+                          {t('segmentation.actions.edit')}
                         </Button>
                         <Button
                           variant="outline"
@@ -469,7 +443,7 @@ export default function SegmentationPage() {
                           className="flex-1"
                         >
                           <Copy className="h-4 w-4 mr-1" />
-                          Duplicate
+                          {t('segmentation.actions.duplicate')}
                         </Button>
                         <Button
                           variant="outline"
@@ -493,33 +467,33 @@ export default function SegmentationPage() {
       <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Create Segment List</DialogTitle>
+            <DialogTitle>{t('segmentation.createModal.title')}</DialogTitle>
             <DialogDescription>
-              Create a new segment list to organize your contacts for targeted campaigns
+              {t('segmentation.createModal.description')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Name *</Label>
+              <Label htmlFor="name">{t('segmentation.createModal.nameLabel')}</Label>
               <Input
                 id="name"
-                placeholder="e.g., VIP Customers, Newsletter Subscribers"
+                placeholder={t('segmentation.createModal.namePlaceholder')}
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">{t('segmentation.createModal.descriptionLabel')}</Label>
               <Textarea
                 id="description"
-                placeholder="Describe this segment..."
+                placeholder={t('segmentation.createModal.descriptionPlaceholder')}
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={3}
               />
             </div>
             <div className="space-y-2">
-              <Label>Segment Criteria</Label>
+              <Label>{t('segmentation.createModal.segmentCriteria')}</Label>
               <Button
                 type="button"
                 variant="outline"
@@ -528,19 +502,19 @@ export default function SegmentationPage() {
               >
                 <Filter className="h-4 w-4 mr-2" />
                 {formData.type === "all"
-                  ? "All Customers"
+                  ? t('segmentation.filters.allCustomers')
                   : formData.type === "selected"
-                  ? `${formData.selectedContactIds.length} Selected Customers`
-                  : `${formData.selectedTagIds.length} Selected Tags`}
+                  ? t('segmentation.createModal.selectedCustomers', { count: formData.selectedContactIds.length })
+                  : t('segmentation.createModal.selectedTags', { count: formData.selectedTagIds.length })}
               </Button>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>
-              Cancel
+              {t('segmentation.createModal.cancel')}
             </Button>
             <Button onClick={handleSubmitCreate} disabled={createMutation.isPending}>
-              {createMutation.isPending ? "Creating..." : "Create Segment"}
+              {createMutation.isPending ? t('segmentation.createModal.creating') : t('segmentation.createModal.create')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -550,33 +524,33 @@ export default function SegmentationPage() {
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Edit Segment List</DialogTitle>
+            <DialogTitle>{t('segmentation.editModal.title')}</DialogTitle>
             <DialogDescription>
-              Update the segment list details and criteria
+              {t('segmentation.editModal.description')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-name">Name *</Label>
+              <Label htmlFor="edit-name">{t('segmentation.editModal.nameLabel')}</Label>
               <Input
                 id="edit-name"
-                placeholder="e.g., VIP Customers, Newsletter Subscribers"
+                placeholder={t('segmentation.editModal.namePlaceholder')}
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-description">Description</Label>
+              <Label htmlFor="edit-description">{t('segmentation.editModal.descriptionLabel')}</Label>
               <Textarea
                 id="edit-description"
-                placeholder="Describe this segment..."
+                placeholder={t('segmentation.editModal.descriptionPlaceholder')}
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={3}
               />
             </div>
             <div className="space-y-2">
-              <Label>Segment Criteria</Label>
+              <Label>{t('segmentation.editModal.segmentCriteria')}</Label>
               <Button
                 type="button"
                 variant="outline"
@@ -585,19 +559,19 @@ export default function SegmentationPage() {
               >
                 <Filter className="h-4 w-4 mr-2" />
                 {formData.type === "all"
-                  ? "All Customers"
+                  ? t('segmentation.filters.allCustomers')
                   : formData.type === "selected"
-                  ? `${formData.selectedContactIds.length} Selected Customers`
-                  : `${formData.selectedTagIds.length} Selected Tags`}
+                  ? t('segmentation.createModal.selectedCustomers', { count: formData.selectedContactIds.length })
+                  : t('segmentation.createModal.selectedTags', { count: formData.selectedTagIds.length })}
               </Button>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
-              Cancel
+              {t('segmentation.editModal.cancel')}
             </Button>
             <Button onClick={handleSubmitEdit} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? "Saving..." : "Save Changes"}
+              {updateMutation.isPending ? t('segmentation.editModal.saving') : t('segmentation.editModal.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -607,22 +581,21 @@ export default function SegmentationPage() {
       <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Segment List</DialogTitle>
+            <DialogTitle>{t('segmentation.deleteModal.title')}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{selectedList?.name}"? This action cannot be
-              undone.
+              {t('segmentation.deleteModal.description', { name: selectedList?.name })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)}>
-              Cancel
+              {t('segmentation.deleteModal.cancel')}
             </Button>
             <Button
               variant="destructive"
               onClick={() => selectedList && deleteMutation.mutate(selectedList.id)}
               disabled={deleteMutation.isPending}
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              {deleteMutation.isPending ? t('segmentation.deleteModal.deleting') : t('segmentation.deleteModal.delete')}
             </Button>
           </DialogFooter>
         </DialogContent>

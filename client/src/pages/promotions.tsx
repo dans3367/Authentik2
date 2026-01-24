@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar, Megaphone, MoreVertical, Eye, Edit, Trash2, Mail, Gift, FileText, Users, TrendingUp, Target, Settings } from 'lucide-react';
+import { Plus, Calendar, Megaphone, MoreVertical, Eye, Edit, Trash2, Mail, Gift, FileText, Users, TrendingUp, Target, Settings, LayoutDashboard } from 'lucide-react';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
+import { useSetBreadcrumbs } from '@/contexts/PageTitleContext';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 
@@ -29,6 +31,15 @@ interface Promotion {
   updatedAt: string;
 }
 
+const getPromotionTypeOptions = (t: any) => ({
+  newsletter: t('promotionsPage.types.newsletter'),
+  survey: t('promotionsPage.types.survey'),
+  birthday: t('promotionsPage.types.birthday'),
+  announcement: t('promotionsPage.types.announcement'),
+  sale: t('promotionsPage.types.sale'),
+  event: t('promotionsPage.types.event'),
+});
+
 const promotionTypeColors = {
   newsletter: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
   survey: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
@@ -48,6 +59,7 @@ const promotionTypeIcons = {
 };
 
 function PromotionStats() {
+  const { t } = useTranslation();
   const { data: stats, isLoading } = useQuery({
     queryKey: ['/api/promotion-stats'],
   });
@@ -73,28 +85,28 @@ function PromotionStats() {
 
   const statsData = [
     {
-      title: 'Total Promotions',
+      title: t('promotionsPage.stats.totalPromotions'),
       value: (stats as any)?.totalPromotions || 0,
       icon: Target,
-      description: 'All promotional templates',
+      description: t('promotionsPage.stats.allPromotionalTemplates'),
     },
     {
-      title: 'Active Promotions',
+      title: t('promotionsPage.stats.activePromotions'),
       value: (stats as any)?.activePromotions || 0,
       icon: TrendingUp,
-      description: 'Currently in use',
+      description: t('promotionsPage.stats.currentlyInUse'),
     },
     {
-      title: 'Used This Month',
+      title: t('promotionsPage.stats.monthlyUsage'),
       value: (stats as any)?.monthlyUsage || 0,
       icon: Mail,
-      description: 'Campaigns sent',
+      description: t('promotionsPage.stats.campaignsSent'),
     },
     {
-      title: 'Total Reach',
+      title: t('promotionsPage.stats.totalReach'),
       value: (stats as any)?.totalReach || 0,
       icon: Users,
-      description: 'People reached',
+      description: t('promotionsPage.stats.peopleReached'),
     },
   ];
 
@@ -124,6 +136,7 @@ function PromotionStats() {
 
 function CreatePromotionButton() {
   const [, setLocation] = useLocation();
+  const { t } = useTranslation();
 
   const handleCreatePromotion = () => {
     setLocation('/promotions/create');
@@ -132,7 +145,7 @@ function CreatePromotionButton() {
   return (
     <Button onClick={handleCreatePromotion}>
       <Plus className="h-4 w-4 mr-2" />
-      Create Promotion
+      {t('promotionsPage.createPromotion')}
     </Button>
   );
 }
@@ -140,13 +153,21 @@ function CreatePromotionButton() {
 export default function PromotionsPage() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
+
+  // Set breadcrumbs in header
+  useSetBreadcrumbs([
+    { label: t('navigation.dashboard'), href: "/", icon: LayoutDashboard },
+    { label: t('promotionsPage.title'), icon: Megaphone }
+  ]);
 
   const { data: promotionsData, isLoading, error } = useQuery({
     queryKey: ['/api/promotions'],
   });
 
   const promotions = (promotionsData as any)?.promotions || [];
+  const promotionTypeOptions = getPromotionTypeOptions(t);
 
   const deletePromotionMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -156,14 +177,14 @@ export default function PromotionsPage() {
       queryClient.invalidateQueries({ queryKey: ['/api/promotions'] });
       queryClient.invalidateQueries({ queryKey: ['/api/promotion-stats'] });
       toast({
-        title: "Success",
-        description: "Promotion deleted successfully",
+        title: t('promotionsPage.toasts.success'),
+        description: t('promotionsPage.toasts.promotionDeleted'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete promotion",
+        title: t('promotionsPage.toasts.error'),
+        description: error.message || t('promotionsPage.toasts.deleteError'),
         variant: "destructive",
       });
     },
@@ -176,14 +197,14 @@ export default function PromotionsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/promotions'] });
       toast({
-        title: "Success",
-        description: "Promotion status updated",
+        title: t('promotionsPage.toasts.success'),
+        description: t('promotionsPage.toasts.statusUpdated'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update promotion",
+        title: t('promotionsPage.toasts.error'),
+        description: error.message || t('promotionsPage.toasts.statusError'),
         variant: "destructive",
       });
     },
@@ -194,10 +215,10 @@ export default function PromotionsPage() {
       <div className="min-h-screen flex items-center justify-center">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-red-600">Error</CardTitle>
+            <CardTitle className="text-red-600">{t('promotionsPage.toasts.error')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-600">Failed to load promotions. Please try again later.</p>
+            <p className="text-gray-600">{t('promotionsPage.toasts.loadError')}</p>
           </CardContent>
         </Card>
       </div>
@@ -210,10 +231,10 @@ export default function PromotionsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
-            Promotions
+            {t('promotionsPage.title')}
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Create and manage promotional content for your email campaigns
+            {t('promotionsPage.subtitle')}
           </p>
         </div>
         <CreatePromotionButton />
@@ -227,7 +248,7 @@ export default function PromotionsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Megaphone className="h-5 w-5" />
-            Your Promotions
+            {t('promotionsPage.list.title')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -266,15 +287,15 @@ export default function PromotionsPage() {
                           </div>
                           <div className="flex items-center gap-2">
                             <Badge className={promotionTypeColors[promotion.type]}>
-                              {promotion.type}
+                              {promotionTypeOptions[promotion.type]}
                             </Badge>
                             {promotion.isActive ? (
                               <Badge variant="outline" className="text-green-600 border-green-600">
-                                Active
+                                {t('promotionsPage.status.active')}
                               </Badge>
                             ) : (
                               <Badge variant="outline" className="text-gray-600 border-gray-600">
-                                Inactive
+                                {t('promotionsPage.status.inactive')}
                               </Badge>
                             )}
                           </div>
@@ -288,18 +309,18 @@ export default function PromotionsPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem>
                               <Eye className="h-4 w-4 mr-2" />
-                              Preview
+                              {t('promotionsPage.actions.preview')}
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => setLocation(`/promotions/${promotion.id}/edit`)}
                             >
                               <Edit className="h-4 w-4 mr-2" />
-                              Edit
+                              {t('promotionsPage.actions.edit')}
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => togglePromotionMutation.mutate({ id: promotion.id, isActive: !promotion.isActive })}
                             >
-                              {promotion.isActive ? 'Deactivate' : 'Activate'}
+                              {promotion.isActive ? t('promotionsPage.actions.deactivate') : t('promotionsPage.actions.activate')}
                             </DropdownMenuItem>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
@@ -308,24 +329,23 @@ export default function PromotionsPage() {
                                   onSelect={(e) => e.preventDefault()}
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete
+                                  {t('promotionsPage.actions.delete')}
                                 </DropdownMenuItem>
                               </AlertDialogTrigger>
                               <AlertDialogContent>
                                 <AlertDialogHeader>
-                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogTitle>{t('promotionsPage.confirmDelete.title')}</AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the promotion
-                                    "{promotion.title}" and remove it from all campaigns.
+                                    {t('promotionsPage.confirmDelete.description', { title: promotion.title })}
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogCancel>{t('promotionsPage.confirmDelete.cancel')}</AlertDialogCancel>
                                   <AlertDialogAction
                                     onClick={() => deletePromotionMutation.mutate(promotion.id)}
                                     className="bg-red-600 hover:bg-red-700"
                                   >
-                                    Delete
+                                    {t('promotionsPage.confirmDelete.delete')}
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
@@ -341,28 +361,28 @@ export default function PromotionsPage() {
                         </p>
                       )}
                       <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                        <span>Used {promotion.usageCount}{promotion.maxUses ? `/${promotion.maxUses}` : ''} times</span>
-                        <span>Created {format(new Date(promotion.createdAt), 'MMM d, yyyy')}</span>
-                        <span>Target: {promotion.targetAudience}</span>
+                        <span>{t('promotionsPage.list.used', { count: promotion.usageCount, max: promotion.maxUses ? `/${promotion.maxUses}` : '' })}</span>
+                        <span>{t('promotionsPage.list.created', { date: format(new Date(promotion.createdAt), 'MMM d, yyyy') })}</span>
+                        <span>{t('promotionsPage.list.target', { target: promotion.targetAudience })}</span>
                       </div>
                       {(promotion.validFrom || promotion.validTo || promotion.maxUses) && (
                         <div className="flex flex-wrap items-center gap-4 text-xs text-blue-600 dark:text-blue-400 mt-2">
                           {promotion.maxUses && (
                             <span className="flex items-center gap-1">
                               <Settings className="h-3 w-3" />
-                              Max: {promotion.maxUses} uses
+                              {t('promotionsPage.list.max', { max: promotion.maxUses })}
                             </span>
                           )}
                           {promotion.validFrom && (
                             <span className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
-                              From: {format(new Date(promotion.validFrom), 'MMM d, yyyy')}
+                              {t('promotionsPage.list.from', { date: format(new Date(promotion.validFrom), 'MMM d, yyyy') })}
                             </span>
                           )}
                           {promotion.validTo && (
                             <span className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
-                              Until: {format(new Date(promotion.validTo), 'MMM d, yyyy')}
+                              {t('promotionsPage.list.until', { date: format(new Date(promotion.validTo), 'MMM d, yyyy') })}
                             </span>
                           )}
                         </div>
@@ -376,10 +396,10 @@ export default function PromotionsPage() {
             <div className="text-center py-12">
               <Megaphone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                No promotions yet
+                {t('promotionsPage.list.noPromotions')}
               </h3>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
-                Create your first promotional template to get started with email marketing campaigns.
+                {t('promotionsPage.list.noPromotionsDescription')}
               </p>
               <CreatePromotionButton />
             </div>

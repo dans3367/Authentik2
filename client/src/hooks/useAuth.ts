@@ -1,6 +1,7 @@
 import { useSession, signIn, signOut, signUp, type ExtendedUser } from "@/lib/betterAuthClient";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { getApiBaseUrl } from "@/lib/apiConfig";
 import type {
   LoginCredentials,
   RegisterData,
@@ -80,7 +81,7 @@ export function useRegister() {
       try {
         // Step 1: Store company name on the server before signup
         // This allows the auth hook to access it when creating the tenant/company
-        await fetch('/api/signup/store-company-name', {
+        await fetch(`${getApiBaseUrl()}/api/signup/store-company-name`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -280,7 +281,7 @@ export function useSetup2FA() {
   const mutateAsync = async () => {
     setIsPending(true);
     try {
-      const response = await fetch('/api/2fa/setup', {
+      const response = await fetch(`${getApiBaseUrl()}/api/2fa/setup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -327,7 +328,7 @@ export function useEnable2FA() {
   const mutateAsync = async (token: string, secret: string) => {
     setIsPending(true);
     try {
-      const response = await fetch('/api/2fa/enable', {
+      const response = await fetch(`${getApiBaseUrl()}/api/2fa/enable`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -371,7 +372,7 @@ export function useDisable2FA() {
   const mutateAsync = async (token: string) => {
     setIsPending(true);
     try {
-      const response = await fetch('/api/2fa/disable', {
+      const response = await fetch(`${getApiBaseUrl()}/api/2fa/disable`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
