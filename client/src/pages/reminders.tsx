@@ -61,7 +61,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Calendar as DateCalendar } from "@/components/ui/calendar";
+
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -131,6 +131,7 @@ export default function RemindersPage() {
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<"appointments" | "settings">("appointments");
+  const [appointmentsTab, setAppointmentsTab] = useState<"upcoming" | "past">("upcoming");
   
   // Set breadcrumbs in header
   useSetBreadcrumbs([
@@ -139,7 +140,10 @@ export default function RemindersPage() {
   ]);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [pastSearchQuery, setPastSearchQuery] = useState("");
+  const [debouncedPastSearchQuery, setDebouncedPastSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [pastStatusFilter, setPastStatusFilter] = useState("all");
   const [showArchived, setShowArchived] = useState(false);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
@@ -165,10 +169,24 @@ export default function RemindersPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Debounce past search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPastSearchQuery(pastSearchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [pastSearchQuery]);
+
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [debouncedSearchQuery, statusFilter, showArchived, dateFrom, dateTo]);
+
+  // Reset past page to 1 when past filters change
+  useEffect(() => {
+    setPastCurrentPage(1);
+  }, [debouncedPastSearchQuery, pastStatusFilter]);
 
   useEffect(() => {
     queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
@@ -317,11 +335,9 @@ export default function RemindersPage() {
     isFetching: appointmentsFetching,
     refetch: refetchAppointments 
   } = useQuery<{appointments: Appointment[]}>({
-    queryKey: ['/api/appointments', debouncedSearchQuery, statusFilter, showArchived, dateFrom, dateTo],
+    queryKey: ['/api/appointments', showArchived, dateFrom, dateTo],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (debouncedSearchQuery) params.append('search', debouncedSearchQuery);
-      if (statusFilter !== 'all') params.append('status', statusFilter);
       if (showArchived) params.append('archived', 'true');
       if (dateFrom) params.append('dateFrom', dateFrom.toISOString());
       if (dateTo) params.append('dateTo', dateTo.toISOString());
@@ -380,8 +396,46 @@ export default function RemindersPage() {
 
   // Split appointments into upcoming and past based on current time
   const now = new Date();
-  const upcomingAppointmentsAll = allAppointments.filter(a => new Date(a.appointmentDate) >= now);
-  const pastAppointmentsAll = allAppointments.filter(a => new Date(a.appointmentDate) < now);
+  const upcomingAppointmentsUnfiltered = allAppointments.filter(a => new Date(a.appointmentDate) >= now);
+  const pastAppointmentsAllUnfiltered = allAppointments.filter(a => new Date(a.appointmentDate) < now);
+  
+  // Filter upcoming appointments by search query and status
+  const upcomingAppointmentsAll = upcomingAppointmentsUnfiltered.filter(appointment => {
+    // Filter by status
+    if (statusFilter !== 'all' && appointment.status !== statusFilter) {
+      return false;
+    }
+    // Filter by search query
+    if (!debouncedSearchQuery) return true;
+    const searchLower = debouncedSearchQuery.toLowerCase();
+    const customerName = getCustomerNameForSort(appointment.customer).toLowerCase();
+    const customerEmail = (appointment.customer?.email || '').toLowerCase();
+    const title = (appointment.title || '').toLowerCase();
+    const location = (appointment.location || '').toLowerCase();
+    return customerName.includes(searchLower) || 
+           customerEmail.includes(searchLower) || 
+           title.includes(searchLower) || 
+           location.includes(searchLower);
+  });
+  
+  // Filter past appointments by search query and status
+  const pastAppointmentsAll = pastAppointmentsAllUnfiltered.filter(appointment => {
+    // Filter by status
+    if (pastStatusFilter !== 'all' && appointment.status !== pastStatusFilter) {
+      return false;
+    }
+    // Filter by search query
+    if (!debouncedPastSearchQuery) return true;
+    const searchLower = debouncedPastSearchQuery.toLowerCase();
+    const customerName = getCustomerNameForSort(appointment.customer).toLowerCase();
+    const customerEmail = (appointment.customer?.email || '').toLowerCase();
+    const title = (appointment.title || '').toLowerCase();
+    const location = (appointment.location || '').toLowerCase();
+    return customerName.includes(searchLower) || 
+           customerEmail.includes(searchLower) || 
+           title.includes(searchLower) || 
+           location.includes(searchLower);
+  });
 
   // Sort upcoming appointments
   const sortedUpcomingAppointments = [...upcomingAppointmentsAll].sort((a, b) => {
@@ -1353,13 +1407,13 @@ export default function RemindersPage() {
               </Card>
             </div>
 
-            {/* Upcoming Appointments Table */}
+            {/* Appointments Table with Tabs */}
             <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
                       <Calendar className="h-5 w-5" />
-                      Upcoming Appointments
+                      Appointments
                     </CardTitle>
                     <div className="flex items-center gap-2">
                       <Button
@@ -1669,6 +1723,21 @@ export default function RemindersPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
+                  <Tabs value={appointmentsTab} onValueChange={(v) => setAppointmentsTab(v as "upcoming" | "past")} className="w-full">
+                    <div className="flex items-center justify-between p-4 border-b">
+                      <TabsList>
+                        <TabsTrigger value="upcoming" className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          Upcoming
+                        </TabsTrigger>
+                        <TabsTrigger value="past" className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          Past
+                        </TabsTrigger>
+                      </TabsList>
+                    </div>
+
+                  <TabsContent value="upcoming" className="mt-0">
                   {/* Search and Filter Controls */}
                   <div className="flex items-center gap-4 p-6 border-b">
                     <div className="relative flex-1 max-w-sm">
@@ -1722,23 +1791,89 @@ export default function RemindersPage() {
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-3" align="start" sideOffset={5} avoidCollisions={true}>
-                        <div className="flex flex-col md:flex-row gap-3">
+                        {/* Quick Date Range Presets */}
+                        <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const today = new Date();
+                              today.setHours(0, 0, 0, 0);
+                              const endOfDay = new Date(today);
+                              endOfDay.setHours(23, 59, 59, 999);
+                              setDateFrom(today);
+                              setDateTo(endOfDay);
+                            }}
+                            className="text-xs"
+                          >
+                            Today
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const today = new Date();
+                              today.setHours(0, 0, 0, 0);
+                              const oneWeekLater = new Date(today);
+                              oneWeekLater.setDate(oneWeekLater.getDate() + 7);
+                              oneWeekLater.setHours(23, 59, 59, 999);
+                              setDateFrom(today);
+                              setDateTo(oneWeekLater);
+                            }}
+                            className="text-xs"
+                          >
+                            1 Week
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const today = new Date();
+                              today.setHours(0, 0, 0, 0);
+                              const oneMonthLater = new Date(today);
+                              oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
+                              oneMonthLater.setHours(23, 59, 59, 999);
+                              setDateFrom(today);
+                              setDateTo(oneMonthLater);
+                            }}
+                            className="text-xs"
+                          >
+                            1 Month
+                          </Button>
+                        </div>
+                        <div className="flex flex-col gap-3">
                           <div className="flex flex-col gap-1">
                             <Label className="text-xs font-medium">{t('reminders.appointments.fromDate')}</Label>
-                            <DateCalendar
-                              selected={dateFrom}
-                              onSelect={setDateFrom}
-                              className="text-sm [&_table]:w-full [&_td]:p-0 [&_th]:p-0 [&_button]:h-7 [&_button]:w-7 [&_button]:text-xs"
+                            <Input
+                              type="date"
+                              value={dateFrom ? dateFrom.toISOString().split('T')[0] : ''}
+                              max={dateTo ? dateTo.toISOString().split('T')[0] : undefined}
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  const date = new Date(e.target.value + 'T00:00:00');
+                                  setDateFrom(date);
+                                } else {
+                                  setDateFrom(undefined);
+                                }
+                              }}
+                              className="w-full"
                             />
                           </div>
-                          <Separator className="hidden md:block md:h-auto md:w-px" orientation="vertical" />
-                          <Separator className="md:hidden" />
                           <div className="flex flex-col gap-1">
                             <Label className="text-xs font-medium">{t('reminders.appointments.toDate')}</Label>
-                            <DateCalendar
-                              selected={dateTo}
-                              onSelect={setDateTo}
-                              className="text-sm [&_table]:w-full [&_td]:p-0 [&_th]:p-0 [&_button]:h-7 [&_button]:w-7 [&_button]:text-xs"
+                            <Input
+                              type="date"
+                              value={dateTo ? dateTo.toISOString().split('T')[0] : ''}
+                              min={dateFrom ? dateFrom.toISOString().split('T')[0] : undefined}
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  const date = new Date(e.target.value + 'T23:59:59');
+                                  setDateTo(date);
+                                } else {
+                                  setDateTo(undefined);
+                                }
+                              }}
+                              className="w-full"
                             />
                           </div>
                         </div>
@@ -1801,14 +1936,14 @@ export default function RemindersPage() {
                     </div>
                   )}
 
-                  <div>
+                  <div className="min-h-[400px]">
                     {appointmentsLoading ? (
-                      <div className="flex items-center justify-center py-12">
+                      <div className="flex items-center justify-center py-12 min-h-[400px]">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
                       </div>
                     ) : appointments.length === 0 ? (
-                      <div className="text-center py-12">
-                        <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                      <div className="text-center py-12 min-h-[400px] flex flex-col items-center justify-center">
+                        <Calendar className="h-16 w-16 text-gray-400 mb-4" />
                         <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">{t('reminders.appointments.noAppointments')}</p>
                         <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">{t('reminders.appointments.createFirst')}</p>
                         <Button onClick={() => setNewAppointmentModalOpen(true)}>
@@ -2327,29 +2462,70 @@ export default function RemindersPage() {
                       </div>
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                  </TabsContent>
 
-              {/* Past Appointments Table */}
-              <Card className="mt-6">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      <Clock className="h-5 w-5" />
-                      Past Appointments
-                    </CardTitle>
+                  <TabsContent value="past" className="mt-0">
+                  {/* Past Appointments Search and Filter */}
+                  <div className="flex items-center gap-4 p-6 border-b">
+                    <div className="relative flex-1 max-w-sm">
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        placeholder="Search past appointments..."
+                        value={pastSearchQuery}
+                        onChange={(e) => setPastSearchQuery(e.target.value)}
+                        className="pl-10 pr-10"
+                      />
+                      {pastSearchQuery && (
+                        <button
+                          onClick={() => setPastSearchQuery("")}
+                          className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                          aria-label="Clear search"
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                    <Select value={pastStatusFilter} onValueChange={setPastStatusFilter}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{t('reminders.appointments.allStatuses')}</SelectItem>
+                        <SelectItem value="scheduled">{t('reminders.appointments.scheduled')}</SelectItem>
+                        <SelectItem value="confirmed">{t('reminders.appointments.confirmed')}</SelectItem>
+                        <SelectItem value="cancelled">{t('reminders.appointments.cancelled')}</SelectItem>
+                        <SelectItem value="completed">{t('reminders.appointments.completed')}</SelectItem>
+                        <SelectItem value="no_show">{t('reminders.appointments.noShow')}</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="min-h-[200px]">
-                    {appointmentsLoading ? (
-                      <div className="flex items-center justify-center py-12">
+
+                  <div className="min-h-[400px]">
+                    {(appointmentsLoading || pastSearchQuery !== debouncedPastSearchQuery) ? (
+                      <div className="flex items-center justify-center py-12 min-h-[400px]">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
                       </div>
                     ) : pastAppointments.length === 0 ? (
-                      <div className="text-center py-12">
-                        <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                        <p className="text-gray-600 dark:text-gray-400">No past appointments</p>
+                      <div className="text-center py-12 min-h-[400px] flex flex-col items-center justify-center">
+                        <Clock className="h-12 w-12 text-gray-400 mb-4" />
+                        <p className="text-gray-600 dark:text-gray-400">
+                          {(debouncedPastSearchQuery || pastStatusFilter !== 'all') 
+                            ? 'No past appointments found matching your filters' 
+                            : 'No past appointments'}
+                        </p>
+                        {(debouncedPastSearchQuery || pastStatusFilter !== 'all') && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => {
+                              setPastSearchQuery("");
+                              setPastStatusFilter("all");
+                            }}
+                            className="mt-4"
+                          >
+                            Clear filters
+                          </Button>
+                        )}
                       </div>
                     ) : (
                       <>
@@ -2563,6 +2739,8 @@ export default function RemindersPage() {
                       </div>
                     </div>
                   )}
+                  </TabsContent>
+                  </Tabs>
                 </CardContent>
               </Card>
           </div>
