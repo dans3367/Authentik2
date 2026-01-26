@@ -61,6 +61,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import ContactViewDrawer from "@/components/ContactViewDrawer";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -72,6 +73,12 @@ interface Customer {
   firstName: string | null;
   lastName: string | null;
   status: "active" | "unsubscribed" | "bounced" | "pending";
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zipCode?: string | null;
+  country?: string | null;
+  phoneNumber?: string | null;
 }
 
 interface Appointment {
@@ -130,7 +137,7 @@ export default function RemindersPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<"appointments" | "settings">("appointments");
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [appointmentsTab, setAppointmentsTab] = useState<"upcoming" | "past">("upcoming");
   
   // Set breadcrumbs in header
@@ -197,6 +204,8 @@ export default function RemindersPage() {
   const [viewAppointmentPanelOpen, setViewAppointmentPanelOpen] = useState(false);
   const [viewingAppointment, setViewingAppointment] = useState<Appointment | null>(null);
   const [viewAppointmentTab, setViewAppointmentTab] = useState<"details" | "notes">("details");
+  const [showExpandedCustomerInfo, setShowExpandedCustomerInfo] = useState(false);
+  const [customerProfilePanelOpen, setCustomerProfilePanelOpen] = useState(false);
   const [newAppointmentData, setNewAppointmentData] = useState({
     customerId: "",
     title: "",
@@ -1273,60 +1282,19 @@ export default function RemindersPage() {
               {t('reminders.pageSubtitle')}
             </p>
           </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-full"
-                aria-label="Reminders info"
-              >
-                <Info className="h-5 w-5" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-96">
-              <div className="space-y-2">
-                <div className="font-semibold leading-none tracking-tight">
-                  {t('reminders.title')}
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  {t('reminders.subtitle')}
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        {/* Navigation Tabs */}
-        <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg w-fit">
           <Button
-            variant={activeTab === "appointments" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setActiveTab("appointments")}
-            className="flex items-center gap-2"
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-full"
+            aria-label="Settings"
+            onClick={() => setSettingsModalOpen(true)}
           >
-            <Calendar className="h-4 w-4" />
-            {t('reminders.tabs.appointments')}
-            {allAppointments.length > 0 && (
-              <Badge variant="secondary" className="ml-1">
-                {allAppointments.length}
-              </Badge>
-            )}
-          </Button>
-          <Button
-            variant={activeTab === "settings" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setActiveTab("settings")}
-            className="flex items-center gap-2"
-          >
-            <Settings className="h-4 w-4" />
-            {t('reminders.tabs.settings')}
+            <Settings className="h-5 w-5" />
           </Button>
         </div>
 
-        {/* Appointments Tab */}
-        {activeTab === "appointments" && (
-          <div className="space-y-6">
+        {/* Appointments Content */}
+        <div className="space-y-6">
             {/* Overview and Upcoming Side by Side */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Overview Stats */}
@@ -2744,8 +2712,6 @@ export default function RemindersPage() {
                 </CardContent>
               </Card>
           </div>
-        )}
-
 
         {/* Schedule Reminder Modal */}
         <Dialog open={scheduleReminderModalOpen} onOpenChange={setScheduleReminderModalOpen}>
@@ -3311,11 +3277,24 @@ export default function RemindersPage() {
                   <TabsContent value="details" className="space-y-6 mt-6 focus-visible:outline-none focus-visible:ring-0">
                   {/* Customer Information */}
                   <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      {t('reminders.details.customerInfo')}
-                    </h3>
-                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        {t('reminders.details.customerInfo')}
+                      </h3>
+                      {viewingAppointment.customer?.id && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => setCustomerProfilePanelOpen(true)}
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          View Full Profile
+                        </Button>
+                      )}
+                    </div>
+                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-3">
                       <div>
                         <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.name')}</p>
                         <p className="font-medium">{getCustomerName(viewingAppointment.customer)}</p>
@@ -3324,6 +3303,41 @@ export default function RemindersPage() {
                         <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.email')}</p>
                         <p className="text-sm">{viewingAppointment.customer?.email || 'N/A'}</p>
                       </div>
+                      
+                      {showExpandedCustomerInfo && (
+                        <>
+                          <Separator className="my-2" />
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Phone Number</p>
+                            <p className="text-sm">{viewingAppointment.customer?.phoneNumber || 'N/A'}</p>
+                          </div>
+                          {viewingAppointment.customer?.address && (
+                            <>
+                              <div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Address</p>
+                                <p className="text-sm">{viewingAppointment.customer.address}</p>
+                                {(viewingAppointment.customer.city || viewingAppointment.customer.state || viewingAppointment.customer.zipCode) && (
+                                  <p className="text-sm">
+                                    {[viewingAppointment.customer.city, viewingAppointment.customer.state, viewingAppointment.customer.zipCode].filter(Boolean).join(', ')}
+                                  </p>
+                                )}
+                                {viewingAppointment.customer.country && (
+                                  <p className="text-sm">{viewingAppointment.customer.country}</p>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </>
+                      )}
+                      
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 text-xs w-full justify-center"
+                        onClick={() => setShowExpandedCustomerInfo(!showExpandedCustomerInfo)}
+                      >
+                        {showExpandedCustomerInfo ? 'Show Less' : 'Load More'}
+                      </Button>
                     </div>
                   </div>
 
@@ -3739,16 +3753,16 @@ export default function RemindersPage() {
           </SheetContent>
         </Sheet>
 
-        {/* Settings Tab */}
-        {activeTab === "settings" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+        {/* Settings Modal */}
+        <Dialog open={settingsModalOpen} onOpenChange={setSettingsModalOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
                 <Settings className="h-5 w-5" />
                 {t('reminders.settings.title')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -3809,9 +3823,16 @@ export default function RemindersPage() {
                   </p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Customer Profile Side Panel */}
+        <ContactViewDrawer
+          contactId={viewingAppointment?.customer?.id || null}
+          open={customerProfilePanelOpen}
+          onOpenChange={setCustomerProfilePanelOpen}
+        />
       </div>
     </div>
   );

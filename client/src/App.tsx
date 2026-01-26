@@ -44,6 +44,7 @@ const ViewEmailContactPage = lazy(() => import("@/pages/email-contacts/view"));
 const ScheduleEmailContactPage = lazy(() => import("@/pages/email-contacts/schedule"));
 const ScheduledTimelineContactPage = lazy(() => import("@/pages/email-contacts/scheduled"));
 const EditEmailContactPage = lazy(() => import("@/pages/email-contacts/edit"));
+const CustomerViewPage = lazy(() => import("@/pages/email-contacts/customer"));
 const EmailAnalyticsPage = lazy(() => import("@/pages/email-analytics"));
 const BirthdaysPage = lazy(() => import("@/pages/birthdays"));
 const ECardsPage = lazy(() => import("@/pages/e-cards"));
@@ -271,6 +272,7 @@ function Router() {
                   <Route path="/email-contacts/view/:id/schedule" component={ScheduleEmailContactPage} />
                   <Route path="/email-contacts/view/:id/scheduled" component={ScheduledTimelineContactPage} />
                   <Route path="/email-contacts/edit/:id" component={EditEmailContactPage} />
+                  <Route path="/email-contacts/customer/:id" component={CustomerViewPage} />
                   <Route path="/email-analytics" component={EmailAnalyticsPage} />
                   <Route path="/segmentation" component={SegmentationPage} />
                   <Route path="/cards" component={CardsPage} />

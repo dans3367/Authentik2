@@ -136,6 +136,12 @@ router.get('/', async (req: Request, res: Response) => {
           firstName: emailContacts.firstName,
           lastName: emailContacts.lastName,
           status: emailContacts.status,
+          address: emailContacts.address,
+          city: emailContacts.city,
+          state: emailContacts.state,
+          zipCode: emailContacts.zipCode,
+          country: emailContacts.country,
+          phoneNumber: emailContacts.phoneNumber,
         }
       })
       .from(appointments)
@@ -220,6 +226,12 @@ router.get('/:id', async (req: Request, res: Response) => {
           firstName: emailContacts.firstName,
           lastName: emailContacts.lastName,
           status: emailContacts.status,
+          address: emailContacts.address,
+          city: emailContacts.city,
+          state: emailContacts.state,
+          zipCode: emailContacts.zipCode,
+          country: emailContacts.country,
+          phoneNumber: emailContacts.phoneNumber,
         }
       })
       .from(appointments)
