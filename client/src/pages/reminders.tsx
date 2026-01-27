@@ -50,7 +50,8 @@ import {
   RefreshCw,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  BellOff
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -3397,490 +3398,505 @@ export default function RemindersPage() {
 
         {/* View Appointment Side Panel */}
         <Sheet open={viewAppointmentPanelOpen} onOpenChange={setViewAppointmentPanelOpen}>
-          <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetContent className="w-full sm:max-w-lg flex flex-col overflow-hidden p-0">
             {viewingAppointment && (
               <>
-                <SheetHeader>
-                  <SheetTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
-                    {t('reminders.details.title')}
-                  </SheetTitle>
-                  <SheetDescription>
-                    {t('reminders.details.viewDescription')}
-                  </SheetDescription>
-                </SheetHeader>
+                <div className="flex-1 overflow-y-auto p-6 pb-24">
+                  <div>
+                    <SheetHeader>
+                      <SheetTitle className="flex items-center gap-2">
+                        <Calendar className="h-5 w-5" />
+                        {t('reminders.details.title')}
+                      </SheetTitle>
+                      <SheetDescription>
+                        {t('reminders.details.viewDescription')}
+                      </SheetDescription>
+                    </SheetHeader>
 
-                <Tabs value={viewAppointmentTab} onValueChange={(value) => setViewAppointmentTab(value as "details" | "notes")} className="mt-6">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="details">{t('reminders.details.tabs.details')}</TabsTrigger>
-                    <TabsTrigger value="notes">
-                      {t('reminders.details.tabs.notes')}
-                      {notesData?.notes && notesData.notes.length > 0 && (
-                        <Badge variant="secondary" className="ml-2 text-xs">
-                          {notesData.notes.length}
-                        </Badge>
-                      )}
-                    </TabsTrigger>
-                  </TabsList>
+                    <Tabs value={viewAppointmentTab} onValueChange={(value) => setViewAppointmentTab(value as "details" | "notes")} className="mt-6">
+                      <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="details">{t('reminders.details.tabs.details')}</TabsTrigger>
+                        <TabsTrigger value="notes">
+                          {t('reminders.details.tabs.notes')}
+                          {notesData?.notes && notesData.notes.length > 0 && (
+                            <Badge variant="secondary" className="ml-2 text-xs">
+                              {notesData.notes.length}
+                            </Badge>
+                          )}
+                        </TabsTrigger>
+                      </TabsList>
 
-                  <TabsContent value="details" className="space-y-6 mt-6 focus-visible:outline-none focus-visible:ring-0">
-                    {/* Customer Information */}
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                          <Users className="h-4 w-4" />
-                          {t('reminders.details.customerInfo')}
-                        </h3>
-                        {viewingAppointment.customer?.id && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => setCustomerProfilePanelOpen(true)}
-                          >
-                            <Eye className="h-3 w-3 mr-1" />
-                            View Full Profile
-                          </Button>
-                        )}
-                      </div>
-                      <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-3">
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.name')}</p>
-                          <p className="font-medium">{getCustomerName(viewingAppointment.customer)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.email')}</p>
-                          <p className="text-sm">{viewingAppointment.customer?.email || 'N/A'}</p>
-                        </div>
-
-                        {showExpandedCustomerInfo && (
-                          <>
-                            <Separator className="my-2" />
-                            <div>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">Phone Number</p>
-                              <p className="text-sm">{viewingAppointment.customer?.phoneNumber || 'N/A'}</p>
-                            </div>
-                            {viewingAppointment.customer?.address && (
-                              <>
-                                <div>
-                                  <p className="text-xs text-gray-500 dark:text-gray-400">Address</p>
-                                  <p className="text-sm">{viewingAppointment.customer.address}</p>
-                                  {(viewingAppointment.customer.city || viewingAppointment.customer.state || viewingAppointment.customer.zipCode) && (
-                                    <p className="text-sm">
-                                      {[viewingAppointment.customer.city, viewingAppointment.customer.state, viewingAppointment.customer.zipCode].filter(Boolean).join(', ')}
-                                    </p>
-                                  )}
-                                  {viewingAppointment.customer.country && (
-                                    <p className="text-sm">{viewingAppointment.customer.country}</p>
-                                  )}
-                                </div>
-                              </>
+                      <TabsContent value="details" className="space-y-6 mt-6 focus-visible:outline-none focus-visible:ring-0">
+                        {/* Customer Information */}
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                              <Users className="h-4 w-4 text-primary" />
+                              {t('reminders.details.customerInfo')}
+                            </h3>
+                            {viewingAppointment.customer?.id && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-xs hover:bg-primary/10 hover:text-primary transition-colors"
+                                onClick={() => setCustomerProfilePanelOpen(true)}
+                              >
+                                <Eye className="h-3.5 w-3.5 mr-1.5" />
+                                View Full Profile
+                              </Button>
                             )}
-                          </>
-                        )}
+                          </div>
+                          <div className="bg-card border rounded-xl p-5 shadow-sm space-y-4 transition-all hover:shadow-md">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.details.name')}</p>
+                                <p className="font-semibold text-base text-foreground">{getCustomerName(viewingAppointment.customer)}</p>
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.details.email')}</p>
+                                <p className="font-medium text-base text-foreground break-all">{viewingAppointment.customer?.email || 'N/A'}</p>
+                              </div>
+                            </div>
 
-                        <Button
-                          variant="link"
-                          size="sm"
-                          className="h-auto p-0 text-xs w-full justify-center"
-                          onClick={() => setShowExpandedCustomerInfo(!showExpandedCustomerInfo)}
-                        >
-                          {showExpandedCustomerInfo ? 'Show Less' : 'Load More'}
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Appointment Details */}
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        {t('reminders.details.appointmentDetails')}
-                      </h3>
-                      <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-3">
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.appointments.title')}</p>
-                          <p className="font-medium">{viewingAppointment.title}</p>
-                        </div>
-                        {viewingAppointment.description && (
-                          <div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.descriptionLabel')}</p>
-                            <p className="text-sm">{viewingAppointment.description}</p>
-                          </div>
-                        )}
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.appointments.dateTime')}</p>
-                          <p className="text-sm font-medium">{formatDateTime(viewingAppointment.appointmentDate)}</p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.appointments.duration')}</p>
-                            <p className="text-sm flex items-center gap-1">
-                              <Timer className="h-3 w-3" />
-                              {viewingAppointment.duration} {t('reminders.appointments.minutes')}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.appointments.status')}</p>
-                            <Select
-                              value={viewingAppointment.status}
-                              onValueChange={(value: Appointment['status']) => {
-                                updateAppointmentMutation.mutate(
-                                  { id: viewingAppointment.id, data: { status: value } },
-                                  {
-                                    onSuccess: () => {
-                                      setViewingAppointment(prev => prev ? { ...prev, status: value } : null);
-                                    }
-                                  }
-                                );
-                              }}
-                            >
-                              <SelectTrigger className="h-7 w-[130px] text-xs focus-visible:ring-0 focus:ring-0">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="scheduled">{t('reminders.appointments.scheduled')}</SelectItem>
-                                <SelectItem value="confirmed">{t('reminders.appointments.confirmed')}</SelectItem>
-                                <SelectItem value="completed">{t('reminders.appointments.completed')}</SelectItem>
-                                <SelectItem value="cancelled">{t('reminders.appointments.cancelled')}</SelectItem>
-                                <SelectItem value="no_show">{t('reminders.appointments.noShow')}</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        {viewingAppointment.location && (
-                          <div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.appointments.location')}</p>
-                            <p className="text-sm flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                              {viewingAppointment.location}
-                            </p>
-                          </div>
-                        )}
-                        {viewingAppointment.serviceType && (
-                          <div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.serviceType')}</p>
-                            <p className="text-sm">{viewingAppointment.serviceType}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Reminder Status */}
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                        <Bell className="h-4 w-4" />
-                        {t('reminders.details.reminderStatus')}
-                      </h3>
-                      <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-3">
-                        {(() => {
-                          const appointmentReminders = reminders.filter(r => r.appointmentId === viewingAppointment.id);
-                          const sentReminders = appointmentReminders.filter(r => r.status === 'sent');
-                          const pendingReminders = appointmentReminders.filter(r => r.status === 'pending');
-                          const hasSentReminder = sentReminders.length > 0 || viewingAppointment.reminderSent;
-
-                          return (
-                            <>
-                              {/* Overall Status */}
-                              <div className="flex items-center justify-between">
-                                <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.reminderSent')}</p>
-                                {hasSentReminder ? (
-                                  <div className="flex items-center gap-1 text-green-600">
-                                    <CheckCircle className="h-4 w-4" />
-                                    <span className="text-sm font-medium">{t('common.yes')}</span>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-1 text-gray-400">
-                                    <XCircle className="h-4 w-4" />
-                                    <span className="text-sm">{t('common.no')}</span>
+                            {showExpandedCustomerInfo && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t mt-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <div className="space-y-1">
+                                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Phone Number</p>
+                                  <p className="font-medium text-base text-foreground">{viewingAppointment.customer?.phoneNumber || 'N/A'}</p>
+                                </div>
+                                {viewingAppointment.customer?.address && (
+                                  <div className="space-y-1 sm:col-span-2">
+                                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Address</p>
+                                    <p className="font-medium text-base text-foreground">{viewingAppointment.customer.address}</p>
+                                    {(viewingAppointment.customer.city || viewingAppointment.customer.state || viewingAppointment.customer.zipCode) && (
+                                      <p className="text-sm text-muted-foreground">
+                                        {[viewingAppointment.customer.city, viewingAppointment.customer.state, viewingAppointment.customer.zipCode].filter(Boolean).join(', ')}
+                                      </p>
+                                    )}
+                                    {viewingAppointment.customer.country && (
+                                      <p className="text-sm text-muted-foreground">{viewingAppointment.customer.country}</p>
+                                    )}
                                   </div>
                                 )}
                               </div>
+                            )}
 
-                              {/* Sent Reminders Details */}
-                              {sentReminders.length > 0 && (
-                                <div className="border-t pt-3 space-y-2">
-                                  <p className="text-xs font-medium text-green-600">Sent Reminders ({sentReminders.length})</p>
-                                  {sentReminders.map((reminder) => (
-                                    <div key={reminder.id} className="bg-green-50 dark:bg-green-900/20 p-2 rounded text-sm space-y-1">
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-xs text-gray-500 capitalize">{reminder.reminderType}</span>
-                                        <span className="text-xs text-gray-500">{reminder.reminderTiming === 'custom' ? `${reminder.customMinutesBefore}m before` : reminder.reminderTiming}</span>
-                                      </div>
-                                      {reminder.sentAt && (
-                                        <div className="flex items-center gap-1 text-green-700 dark:text-green-400">
-                                          <CheckCircle className="h-3 w-3" />
-                                          <span className="text-xs">Sent: {formatDateTime(reminder.sentAt)}</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full h-8 text-xs font-medium text-muted-foreground hover:text-foreground"
+                              onClick={() => setShowExpandedCustomerInfo(!showExpandedCustomerInfo)}
+                            >
+                              {showExpandedCustomerInfo ? 'Show Less' : 'View More Details'}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Appointment Details */}
+                        <div className="space-y-4">
+                          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-primary" />
+                            {t('reminders.details.appointmentDetails')}
+                          </h3>
+                          <div className="bg-card border rounded-xl p-5 shadow-sm space-y-4 transition-all hover:shadow-md">
+                            <div className="space-y-1 pb-3 border-b">
+                              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.appointments.title')}</p>
+                              <p className="font-bold text-lg text-foreground">{viewingAppointment.title}</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-6">
+                              <div className="col-span-2 sm:col-span-1 space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.appointments.dateTime')}</p>
+                                <p className="font-medium text-sm text-foreground">{formatDateTime(viewingAppointment.appointmentDate)}</p>
+                              </div>
+
+                              <div className="col-span-2 sm:col-span-1 space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.appointments.status')}</p>
+                                <Select
+                                  value={viewingAppointment.status}
+                                  onValueChange={(value: Appointment['status']) => {
+                                    updateAppointmentMutation.mutate(
+                                      { id: viewingAppointment.id, data: { status: value } },
+                                      {
+                                        onSuccess: () => {
+                                          setViewingAppointment(prev => prev ? { ...prev, status: value } : null);
+                                        }
+                                      }
+                                    );
+                                  }}
+                                >
+                                  <SelectTrigger className="h-8 w-full text-xs font-medium bg-background hover:bg-muted/50 transition-colors">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="scheduled">{t('reminders.appointments.scheduled')}</SelectItem>
+                                    <SelectItem value="confirmed">{t('reminders.appointments.confirmed')}</SelectItem>
+                                    <SelectItem value="completed">{t('reminders.appointments.completed')}</SelectItem>
+                                    <SelectItem value="cancelled">{t('reminders.appointments.cancelled')}</SelectItem>
+                                    <SelectItem value="no_show">{t('reminders.appointments.noShow')}</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.appointments.duration')}</p>
+                                <p className="text-sm font-medium flex items-center gap-1.5 text-foreground">
+                                  <Timer className="h-3.5 w-3.5 text-muted-foreground" />
+                                  {viewingAppointment.duration} {t('reminders.appointments.minutes')}
+                                </p>
+                              </div>
+
+                              {viewingAppointment.location && (
+                                <div className="space-y-1">
+                                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.appointments.location')}</p>
+                                  <p className="text-sm font-medium flex items-center gap-1.5 text-foreground">
+                                    <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                                    {viewingAppointment.location}
+                                  </p>
+                                </div>
+                              )}
+
+                              {viewingAppointment.serviceType && (
+                                <div className="col-span-2 space-y-1">
+                                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.details.serviceType')}</p>
+                                  <Badge variant="outline" className="font-normal text-foreground bg-muted/30">
+                                    {viewingAppointment.serviceType}
+                                  </Badge>
+                                </div>
+                              )}
+                            </div>
+
+                            {viewingAppointment.description && (
+                              <div className="pt-3 border-t space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.details.descriptionLabel')}</p>
+                                <p className="text-sm text-foreground/90 leading-relaxed bg-muted/30 p-2.5 rounded-md border border-dashed border-muted-foreground/20">
+                                  {viewingAppointment.description}
+                                </p>
+                              </div>
+                            )}
+
+                          </div>
+                        </div>
+
+                        {/* Reminder Status */}
+                        <div className="space-y-4">
+                          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                            <Bell className="h-4 w-4 text-primary" />
+                            {t('reminders.details.reminderStatus')}
+                          </h3>
+                          <div className="bg-card border rounded-xl p-5 shadow-sm space-y-4 transition-all hover:shadow-md">
+                            {(() => {
+                              const appointmentReminders = reminders.filter(r => r.appointmentId === viewingAppointment.id);
+                              const sentReminders = appointmentReminders.filter(r => r.status === 'sent');
+                              const pendingReminders = appointmentReminders.filter(r => r.status === 'pending');
+                              const hasSentReminder = sentReminders.length > 0 || viewingAppointment.reminderSent;
+
+                              return (
+                                <>
+                                  {/* Overall Status */}
+                                  <div className="flex items-center justify-between pb-3 border-b">
+                                    <p className="text-sm font-medium text-foreground">{t('reminders.details.reminderSent')}</p>
+                                    {hasSentReminder ? (
+                                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800 flex items-center gap-1.5 pl-1.5 pr-2.5 py-0.5">
+                                        <CheckCircle className="h-3.5 w-3.5" />
+                                        {t('common.yes')}
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="text-muted-foreground flex items-center gap-1.5 pl-1.5 pr-2.5 py-0.5">
+                                        <XCircle className="h-3.5 w-3.5" />
+                                        {t('common.no')}
+                                      </Badge>
+                                    )}
+                                  </div>
+
+                                  {/* Sent Reminders Details */}
+                                  {sentReminders.length > 0 && (
+                                    <div className="space-y-3">
+                                      <p className="text-xs font-semibold uppercase tracking-wider text-green-600 dark:text-green-500">Sent Reminders ({sentReminders.length})</p>
+                                      {sentReminders.map((reminder) => (
+                                        <div key={reminder.id} className="bg-green-50/50 dark:bg-green-900/10 p-3 rounded-md border border-green-100 dark:border-green-900/30 space-y-2">
+                                          <div className="flex items-center justify-between">
+                                            <Badge variant="secondary" className="bg-white dark:bg-gray-800 shadow-sm capitalize text-[10px] h-5">{reminder.reminderType}</Badge>
+                                            <span className="text-xs font-medium text-muted-foreground">{reminder.reminderTiming === 'custom' ? `${reminder.customMinutesBefore}m before` : reminder.reminderTiming}</span>
+                                          </div>
+                                          {reminder.sentAt && (
+                                            <div className="flex items-center gap-1.5 text-xs text-green-700 dark:text-green-400 font-medium">
+                                              <CheckCircle className="h-3.5 w-3.5" />
+                                              <span>Sent: {formatDateTime(reminder.sentAt)}</span>
+                                            </div>
+                                          )}
                                         </div>
-                                      )}
+                                      ))}
                                     </div>
-                                  ))}
-                                </div>
-                              )}
+                                  )}
 
-                              {/* Legacy sent at (if no reminder records but appointment shows sent) */}
-                              {sentReminders.length === 0 && viewingAppointment.reminderSentAt && (
-                                <div>
-                                  <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.sentAt')}</p>
-                                  <p className="text-sm">{formatDateTime(viewingAppointment.reminderSentAt)}</p>
-                                </div>
-                              )}
-
-                              {/* Scheduled/Pending Reminders Details */}
-                              {pendingReminders.length > 0 && (
-                                <div className="border-t pt-3 space-y-2">
-                                  <p className="text-xs font-medium text-blue-600">Scheduled Reminders ({pendingReminders.length})</p>
-                                  {pendingReminders.map((reminder) => (
-                                    <div key={reminder.id} className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded text-sm space-y-1">
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-xs text-gray-500 capitalize">{reminder.reminderType}</span>
-                                        <span className="text-xs text-gray-500">{reminder.reminderTiming === 'custom' ? `${reminder.customMinutesBefore}m before` : reminder.reminderTiming}</span>
-                                      </div>
-                                      <div className="flex items-center gap-1 text-blue-700 dark:text-blue-400">
-                                        <Clock className="h-3 w-3" />
-                                        <span className="text-xs">Scheduled for: {formatDateTime(reminder.scheduledFor)}</span>
-                                      </div>
+                                  {/* Legacy sent at (if no reminder records but appointment shows sent) */}
+                                  {sentReminders.length === 0 && viewingAppointment.reminderSentAt && (
+                                    <div className="space-y-1">
+                                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.details.sentAt')}</p>
+                                      <p className="text-sm font-medium text-foreground">{formatDateTime(viewingAppointment.reminderSentAt)}</p>
                                     </div>
-                                  ))}
-                                </div>
-                              )}
+                                  )}
 
-                              {/* No reminders message */}
-                              {appointmentReminders.length === 0 && !viewingAppointment.reminderSent && (
-                                <div className="text-center py-2 text-gray-400 text-sm">
-                                  No reminders configured
-                                </div>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </div>
-                    </div>
+                                  {/* Scheduled/Pending Reminders Details */}
+                                  {pendingReminders.length > 0 && (
+                                    <div className="space-y-3 pt-2">
+                                      <p className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-500">Scheduled Reminders ({pendingReminders.length})</p>
+                                      {pendingReminders.map((reminder) => (
+                                        <div key={reminder.id} className="bg-blue-50/50 dark:bg-blue-900/10 p-3 rounded-md border border-blue-100 dark:border-blue-900/30 space-y-2">
+                                          <div className="flex items-center justify-between">
+                                            <Badge variant="secondary" className="bg-white dark:bg-gray-800 shadow-sm capitalize text-[10px] h-5">{reminder.reminderType}</Badge>
+                                            <span className="text-xs font-medium text-muted-foreground">{reminder.reminderTiming === 'custom' ? `${reminder.customMinutesBefore}m before` : reminder.reminderTiming}</span>
+                                          </div>
+                                          <div className="flex items-center gap-1.5 text-xs text-blue-700 dark:text-blue-400 font-medium">
+                                            <Clock className="h-3.5 w-3.5" />
+                                            <span>Scheduled: {formatDateTime(reminder.scheduledFor)}</span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
 
-                    {/* Confirmation Status */}
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4" />
-                        {t('reminders.details.confirmationStatus')}
-                      </h3>
-                      <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.confirmed')}</p>
-                          {viewingAppointment.confirmationReceived ? (
-                            <div className="flex items-center gap-1 text-green-600">
-                              <CheckCircle className="h-4 w-4" />
-                              <span className="text-sm font-medium">{t('common.yes')}</span>
+                                  {/* No reminders message */}
+                                  {appointmentReminders.length === 0 && !viewingAppointment.reminderSent && (
+                                    <div className="text-center py-6 border-2 border-dashed rounded-lg border-muted">
+                                      <BellOff className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+                                      <p className="text-sm text-muted-foreground">No reminders configured</p>
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </div>
+
+                        {/* Confirmation Status */}
+                        <div className="space-y-4">
+                          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-primary" />
+                            {t('reminders.details.confirmationStatus')}
+                          </h3>
+                          <div className="bg-card border rounded-xl p-5 shadow-sm space-y-4 transition-all hover:shadow-md">
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-medium text-foreground">{t('reminders.details.confirmed')}</p>
+                              {viewingAppointment.confirmationReceived ? (
+                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800 flex items-center gap-1.5 pl-1.5 pr-2.5 py-0.5">
+                                  <CheckCircle className="h-3.5 w-3.5" />
+                                  {t('common.yes')}
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-muted-foreground flex items-center gap-1.5 pl-1.5 pr-2.5 py-0.5">
+                                  <XCircle className="h-3.5 w-3.5" />
+                                  {t('common.no')}
+                                </Badge>
+                              )}
+                            </div>
+                            {viewingAppointment.confirmationReceivedAt && (
+                              <div className="space-y-1 pt-3 border-t">
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.details.confirmedAt')}</p>
+                                <p className="text-sm font-medium text-foreground">{formatDateTime(viewingAppointment.confirmationReceivedAt)}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Metadata */}
+                        <div className="space-y-4">
+                          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                            <Info className="h-4 w-4 text-primary" />
+                            {t('reminders.details.metadata')}
+                          </h3>
+                          <div className="bg-card border rounded-xl p-5 shadow-sm space-y-2 text-xs transition-all hover:shadow-md">
+                            <div className="flex justify-between items-center py-1">
+                              <span className="text-muted-foreground font-medium">{t('reminders.details.created')}</span>
+                              <span className="font-mono bg-muted/50 px-2 py-0.5 rounded text-foreground">{formatDateTime(viewingAppointment.createdAt)}</span>
+                            </div>
+                            <div className="flex justify-between items-center py-1 border-t border-border/50">
+                              <span className="text-muted-foreground font-medium">{t('reminders.details.lastUpdated')}</span>
+                              <span className="font-mono bg-muted/50 px-2 py-0.5 rounded text-foreground">{formatDateTime(viewingAppointment.updatedAt)}</span>
+                            </div>
+                            <div className="flex justify-between items-center py-1 border-t border-border/50">
+                              <span className="text-muted-foreground font-medium">{t('reminders.details.appointmentId')}</span>
+                              <span className="font-mono text-[10px] text-muted-foreground bg-muted/30 px-2 py-0.5 rounded select-all">{viewingAppointment.id}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="notes" className="space-y-6 mt-6 focus-visible:outline-none focus-visible:ring-0">
+                        {/* Legacy Notes (single field) */}
+                        {viewingAppointment.notes && (
+                          <div className="space-y-3">
+                            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                              <MessageSquare className="h-4 w-4" />
+                              {t('reminders.details.quickNotes')}
+                            </h3>
+                            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                              <p className="text-sm whitespace-pre-wrap">{viewingAppointment.notes}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Appointment Notes (multiple entries) */}
+                        <div className="space-y-3">
+                          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                            <StickyNote className="h-4 w-4" />
+                            {t('reminders.details.appointmentNotes')}
+                            {notesData?.notes && notesData.notes.length > 0 && (
+                              <Badge variant="secondary" className="ml-1 text-xs">
+                                {notesData.notes.length}
+                              </Badge>
+                            )}
+                          </h3>
+
+                          {/* Add new note form */}
+                          <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-3">
+                            <Textarea
+                              placeholder={t('reminders.details.addNotePlaceholder')}
+                              value={newNoteContent}
+                              onChange={(e) => setNewNoteContent(e.target.value)}
+                              rows={3}
+                              className="resize-none focus-visible:ring-0"
+                            />
+                            <div className="flex justify-end">
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  if (newNoteContent.trim() && viewingAppointment?.id) {
+                                    createNoteMutation.mutate({
+                                      appointmentId: viewingAppointment.id,
+                                      content: newNoteContent.trim(),
+                                    });
+                                  }
+                                }}
+                                disabled={!newNoteContent.trim() || createNoteMutation.isPending}
+                              >
+                                {createNoteMutation.isPending ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    {t('reminders.details.adding')}
+                                  </>
+                                ) : (
+                                  <>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    {t('reminders.details.addNote')}
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Notes list */}
+                          {notesLoading ? (
+                            <div className="flex items-center justify-center py-4">
+                              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                            </div>
+                          ) : notesData?.notes && notesData.notes.length > 0 ? (
+                            <div className="space-y-3">
+                              {notesData.notes.map((note) => (
+                                <div key={note.id} className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
+                                  {editingNoteId === note.id ? (
+                                    <>
+                                      <Textarea
+                                        value={editingNoteContent}
+                                        onChange={(e) => setEditingNoteContent(e.target.value)}
+                                        rows={3}
+                                        className="resize-none focus-visible:ring-0"
+                                        autoFocus
+                                      />
+                                      <div className="flex justify-end gap-2">
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => {
+                                            setEditingNoteId(null);
+                                            setEditingNoteContent("");
+                                          }}
+                                        >
+                                          Cancel
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          onClick={() => {
+                                            if (editingNoteContent.trim()) {
+                                              updateNoteMutation.mutate({
+                                                noteId: note.id,
+                                                content: editingNoteContent.trim(),
+                                              });
+                                            }
+                                          }}
+                                          disabled={!editingNoteContent.trim() || updateNoteMutation.isPending}
+                                        >
+                                          {updateNoteMutation.isPending ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                          ) : (
+                                            'Save'
+                                          )}
+                                        </Button>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                                      <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                                          <span>
+                                            {note.user?.firstName && note.user?.lastName
+                                              ? `${note.user.firstName} ${note.user.lastName}`
+                                              : note.user?.name || 'Unknown'}
+                                          </span>
+                                          <span className="mx-1">•</span>
+                                          <span>{new Date(note.createdAt).toLocaleDateString('en-US', {
+                                            month: 'short',
+                                            day: 'numeric',
+                                            hour: 'numeric',
+                                            minute: '2-digit'
+                                          })}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-7 w-7 p-0"
+                                            onClick={() => {
+                                              setEditingNoteId(note.id);
+                                              setEditingNoteContent(note.content);
+                                            }}
+                                          >
+                                            <Edit className="h-3 w-3" />
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                            onClick={() => deleteNoteMutation.mutate(note.id)}
+                                            disabled={deleteNoteMutation.isPending}
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              ))}
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1 text-gray-400">
-                              <XCircle className="h-4 w-4" />
-                              <span className="text-sm">{t('common.no')}</span>
+                            <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">
+                              {t('reminders.details.noNotes')}
                             </div>
                           )}
                         </div>
-                        {viewingAppointment.confirmationReceivedAt && (
-                          <div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.confirmedAt')}</p>
-                            <p className="text-sm">{formatDateTime(viewingAppointment.confirmationReceivedAt)}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Metadata */}
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                        <Info className="h-4 w-4" />
-                        {t('reminders.details.metadata')}
-                      </h3>
-                      <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-gray-500 dark:text-gray-400">{t('reminders.details.created')}</span>
-                          <span>{formatDateTime(viewingAppointment.createdAt)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500 dark:text-gray-400">{t('reminders.details.lastUpdated')}</span>
-                          <span>{formatDateTime(viewingAppointment.updatedAt)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500 dark:text-gray-400">{t('reminders.details.appointmentId')}</span>
-                          <span className="font-mono text-[10px]">{viewingAppointment.id}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="notes" className="space-y-6 mt-6 focus-visible:outline-none focus-visible:ring-0">
-                    {/* Legacy Notes (single field) */}
-                    {viewingAppointment.notes && (
-                      <div className="space-y-3">
-                        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                          <MessageSquare className="h-4 w-4" />
-                          {t('reminders.details.quickNotes')}
-                        </h3>
-                        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                          <p className="text-sm whitespace-pre-wrap">{viewingAppointment.notes}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Appointment Notes (multiple entries) */}
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                        <StickyNote className="h-4 w-4" />
-                        {t('reminders.details.appointmentNotes')}
-                        {notesData?.notes && notesData.notes.length > 0 && (
-                          <Badge variant="secondary" className="ml-1 text-xs">
-                            {notesData.notes.length}
-                          </Badge>
-                        )}
-                      </h3>
-
-                      {/* Add new note form */}
-                      <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-3">
-                        <Textarea
-                          placeholder={t('reminders.details.addNotePlaceholder')}
-                          value={newNoteContent}
-                          onChange={(e) => setNewNoteContent(e.target.value)}
-                          rows={3}
-                          className="resize-none focus-visible:ring-0"
-                        />
-                        <div className="flex justify-end">
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              if (newNoteContent.trim() && viewingAppointment?.id) {
-                                createNoteMutation.mutate({
-                                  appointmentId: viewingAppointment.id,
-                                  content: newNoteContent.trim(),
-                                });
-                              }
-                            }}
-                            disabled={!newNoteContent.trim() || createNoteMutation.isPending}
-                          >
-                            {createNoteMutation.isPending ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                {t('reminders.details.adding')}
-                              </>
-                            ) : (
-                              <>
-                                <Plus className="h-4 w-4 mr-2" />
-                                {t('reminders.details.addNote')}
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Notes list */}
-                      {notesLoading ? (
-                        <div className="flex items-center justify-center py-4">
-                          <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-                        </div>
-                      ) : notesData?.notes && notesData.notes.length > 0 ? (
-                        <div className="space-y-3">
-                          {notesData.notes.map((note) => (
-                            <div key={note.id} className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
-                              {editingNoteId === note.id ? (
-                                <>
-                                  <Textarea
-                                    value={editingNoteContent}
-                                    onChange={(e) => setEditingNoteContent(e.target.value)}
-                                    rows={3}
-                                    className="resize-none focus-visible:ring-0"
-                                    autoFocus
-                                  />
-                                  <div className="flex justify-end gap-2">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => {
-                                        setEditingNoteId(null);
-                                        setEditingNoteContent("");
-                                      }}
-                                    >
-                                      Cancel
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      onClick={() => {
-                                        if (editingNoteContent.trim()) {
-                                          updateNoteMutation.mutate({
-                                            noteId: note.id,
-                                            content: editingNoteContent.trim(),
-                                          });
-                                        }
-                                      }}
-                                      disabled={!editingNoteContent.trim() || updateNoteMutation.isPending}
-                                    >
-                                      {updateNoteMutation.isPending ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        'Save'
-                                      )}
-                                    </Button>
-                                  </div>
-                                </>
-                              ) : (
-                                <>
-                                  <p className="text-sm whitespace-pre-wrap">{note.content}</p>
-                                  <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                                      <span>
-                                        {note.user?.firstName && note.user?.lastName
-                                          ? `${note.user.firstName} ${note.user.lastName}`
-                                          : note.user?.name || 'Unknown'}
-                                      </span>
-                                      <span className="mx-1">•</span>
-                                      <span>{new Date(note.createdAt).toLocaleDateString('en-US', {
-                                        month: 'short',
-                                        day: 'numeric',
-                                        hour: 'numeric',
-                                        minute: '2-digit'
-                                      })}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-7 w-7 p-0"
-                                        onClick={() => {
-                                          setEditingNoteId(note.id);
-                                          setEditingNoteContent(note.content);
-                                        }}
-                                      >
-                                        <Edit className="h-3 w-3" />
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
-                                        onClick={() => deleteNoteMutation.mutate(note.id)}
-                                        disabled={deleteNoteMutation.isPending}
-                                      >
-                                        <Trash2 className="h-3 w-3" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">
-                          {t('reminders.details.noNotes')}
-                        </div>
-                      )}
-                    </div>
-                  </TabsContent>
-                </Tabs>
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                </div>
 
                 {/* Actions */}
-                <div className="mt-6">
-                  <div className="flex gap-2 pt-4 border-t">
+                <div className="absolute bottom-0 left-0 right-0 px-6 py-4 border-t bg-background/80 backdrop-blur-md shadow-[0_-4px_12px_-4px_rgba(0,0,0,0.1)]">
+                  <div className="flex flex-col sm:flex-row gap-3">
                     <Button
-                      className="flex-1"
+                      className="flex-1 shadow-sm hover:shadow-md transition-all active:scale-[0.98]"
                       onClick={() => {
                         setViewAppointmentPanelOpen(false);
                         handleEditAppointment(viewingAppointment);
@@ -3891,6 +3907,7 @@ export default function RemindersPage() {
                     </Button>
                     <Button
                       variant="outline"
+                      className="flex-1 sm:flex-none sm:w-1/3 hover:bg-muted/50 transition-colors active:scale-[0.98]"
                       onClick={() => setViewAppointmentPanelOpen(false)}
                     >
                       {t('reminders.details.close')}
