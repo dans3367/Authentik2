@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { and, eq, desc, gte, lte } from 'drizzle-orm';
+import { and, eq, desc, gte, lte, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db';
 import { 
@@ -344,8 +344,7 @@ router.post('/send', async (req: Request, res: Response) => {
       .leftJoin(emailContacts, eq(appointments.customerId, emailContacts.id))
       .where(and(
         eq(appointments.tenantId, tenantId),
-        // Only include appointments in the provided IDs
-        ...appointmentIds.map(id => eq(appointments.id, id))
+        inArray(appointments.id, appointmentIds)
       ));
 
     if (appointmentsList.length === 0) {
