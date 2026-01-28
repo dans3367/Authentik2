@@ -81,49 +81,6 @@ async function cancelPendingRemindersForAppointment(appointmentId: string): Prom
   return { cancelled, errors };
 }
 
-// Function to check appointment records after creation
-async function checkAppointmentRecord(appointmentId: string, tenantId: string, checkNumber: number) {
-  try {
-    console.log(`[Record Check ${checkNumber}] Checking appointment ${appointmentId} for tenant ${tenantId}`);
-    
-    const appointment = await db
-      .select()
-      .from(appointments)
-      .where(and(
-        eq(appointments.id, appointmentId),
-        eq(appointments.tenantId, tenantId)
-      ))
-      .limit(1);
-
-    if (appointment.length > 0) {
-      console.log(`[Record Check ${checkNumber}] Appointment found:`, {
-        id: appointment[0].id,
-        status: appointment[0].status,
-        customerId: appointment[0].customerId,
-        appointmentDate: appointment[0].appointmentDate
-      });
-    } else {
-      console.log(`[Record Check ${checkNumber}] Appointment not found`);
-    }
-  } catch (error) {
-    console.error(`[Record Check ${checkNumber}] Error checking appointment:`, error);
-  }
-}
-
-// Schedule two record checks at 5-second intervals
-function scheduleRecordChecks(appointmentId: string, tenantId: string) {
-  console.log(`[Record Check] Scheduling checks for appointment ${appointmentId}`);
-  
-  // First check after 5 seconds
-  setTimeout(() => {
-    checkAppointmentRecord(appointmentId, tenantId, 1);
-  }, 5000);
-
-  // Second check after 10 seconds
-  setTimeout(() => {
-    checkAppointmentRecord(appointmentId, tenantId, 2);
-  }, 10000);
-}
 
 // Apply authentication to all routes
 router.use(authenticateToken);
@@ -353,9 +310,6 @@ router.post('/', async (req: Request, res: Response) => {
         ...validatedData,
       })
       .returning();
-
-    // Schedule record checks after appointment creation
-    scheduleRecordChecks(newAppointment[0].id, tenantId);
 
     res.status(201).json({ 
       appointment: newAppointment[0],
