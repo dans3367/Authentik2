@@ -18,6 +18,7 @@ export interface ExtendedUser {
   theme?: string;
   menuExpanded?: boolean;
   avatarUrl?: string | null;
+  timezone?: string | null;
 }
 
 // Dynamically determine the base URL based on the current environment

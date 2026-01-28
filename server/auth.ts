@@ -122,6 +122,11 @@ const authInstance = betterAuth({
         type: "string",
         required: false,
       },
+      timezone: {
+        type: "string",
+        defaultValue: "America/Chicago",
+        required: false,
+      },
     },
   },
   // Hooks to create tenant automatically on user signup

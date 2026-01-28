@@ -15,6 +15,7 @@ export function useReduxAuth() {
     isInitialized: auth.hasInitialized,
     error: auth.error,
     accessToken: null, // Better-auth handles tokens internally
+    refetch: auth.refetch, // Expose refetch to refresh session data
   };
 }
 

@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useTranslation } from 'react-i18next';
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
+import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -138,6 +139,8 @@ export default function RemindersPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
+  const { user } = useReduxAuth();
+  const userTimezone = user?.timezone || 'America/Chicago';
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [appointmentsTab, setAppointmentsTab] = useState<"upcoming" | "past">("upcoming");
 
@@ -327,9 +330,18 @@ export default function RemindersPage() {
     reminderType: 'email',
     reminderTiming: '1h',
     scheduledFor: new Date(),
-    timezone: 'America/Chicago',
+    timezone: userTimezone,
     content: ''
   });
+
+  // Update timezone defaults when user data loads
+  useEffect(() => {
+    if (userTimezone) {
+      setNewAppointmentReminderData(prev => ({ ...prev, timezone: userTimezone }));
+      setEditAppointmentReminderData(prev => ({ ...prev, timezone: userTimezone }));
+      setScheduleData(prev => ({ ...prev, timezone: userTimezone }));
+    }
+  }, [userTimezone]);
 
   // Cancel appointment confirmation state
   const [cancelAppointmentId, setCancelAppointmentId] = useState<string>("");
@@ -901,7 +913,7 @@ export default function RemindersPage() {
       reminderType: 'email',
       reminderTiming: '1h',
       customMinutesBefore: undefined,
-      timezone: 'America/Chicago',
+      timezone: userTimezone,
       content: '',
     });
   };
@@ -911,7 +923,7 @@ export default function RemindersPage() {
     const baseDate = apt ? new Date(apt.appointmentDate) : new Date();
     const defaultScheduled = new Date(baseDate.getTime() - 1 * 60 * 60 * 1000); // default 1h before
     setScheduleAppointmentId(appointmentId);
-    setScheduleData({ reminderType: 'email', reminderTiming: '1h', scheduledFor: defaultScheduled, timezone: 'America/Chicago', content: '' });
+    setScheduleData({ reminderType: 'email', reminderTiming: '1h', scheduledFor: defaultScheduled, timezone: userTimezone, content: '' });
     setScheduleReminderModalOpen(true);
   };
 
@@ -1658,22 +1670,29 @@ export default function RemindersPage() {
                                 <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
                                   <SelectValue placeholder="Select timezone" />
                                 </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="America/New_York">Eastern Time (ET)</SelectItem>
-                                  <SelectItem value="America/Chicago">Central Time (CT)</SelectItem>
-                                  <SelectItem value="America/Denver">Mountain Time (MT)</SelectItem>
-                                  <SelectItem value="America/Los_Angeles">Pacific Time (PT)</SelectItem>
-                                  <SelectItem value="America/Anchorage">Alaska Time (AKT)</SelectItem>
-                                  <SelectItem value="Pacific/Honolulu">Hawaii Time (HT)</SelectItem>
-                                  <SelectItem value="America/Phoenix">Arizona (MST)</SelectItem>
-                                  <SelectItem value="UTC">UTC</SelectItem>
-                                  <SelectItem value="Europe/London">London (GMT/BST)</SelectItem>
-                                  <SelectItem value="Europe/Paris">Paris (CET/CEST)</SelectItem>
-                                  <SelectItem value="Europe/Berlin">Berlin (CET/CEST)</SelectItem>
-                                  <SelectItem value="Asia/Tokyo">Tokyo (JST)</SelectItem>
-                                  <SelectItem value="Asia/Shanghai">Shanghai (CST)</SelectItem>
-                                  <SelectItem value="Asia/Kolkata">India (IST)</SelectItem>
-                                  <SelectItem value="Australia/Sydney">Sydney (AEST/AEDT)</SelectItem>
+                                <SelectContent className="max-h-[300px]">
+                                  <SelectItem value="America/New_York">🇺🇸 Eastern Time (ET)</SelectItem>
+                                  <SelectItem value="America/Chicago">🇺🇸 Central Time (CT)</SelectItem>
+                                  <SelectItem value="America/Denver">🇺🇸 Mountain Time (MT)</SelectItem>
+                                  <SelectItem value="America/Los_Angeles">🇺🇸 Pacific Time (PT)</SelectItem>
+                                  <SelectItem value="America/Anchorage">🇺🇸 Alaska Time (AKT)</SelectItem>
+                                  <SelectItem value="Pacific/Honolulu">🇺🇸 Hawaii Time (HT)</SelectItem>
+                                  <SelectItem value="America/Phoenix">🇺🇸 Arizona (MST)</SelectItem>
+                                  <SelectItem value="America/Toronto">🇨🇦 Toronto (ET)</SelectItem>
+                                  <SelectItem value="America/Vancouver">🇨🇦 Vancouver (PT)</SelectItem>
+                                  <SelectItem value="America/Mexico_City">🇲🇽 Mexico City (CST)</SelectItem>
+                                  <SelectItem value="Europe/London">🇬🇧 London (GMT/BST)</SelectItem>
+                                  <SelectItem value="Europe/Paris">🇫🇷 Paris (CET)</SelectItem>
+                                  <SelectItem value="Europe/Berlin">🇩🇪 Berlin (CET)</SelectItem>
+                                  <SelectItem value="Europe/Madrid">🇪🇸 Madrid (CET)</SelectItem>
+                                  <SelectItem value="Asia/Tokyo">🇯🇵 Tokyo (JST)</SelectItem>
+                                  <SelectItem value="Asia/Shanghai">🇨🇳 Shanghai (CST)</SelectItem>
+                                  <SelectItem value="Asia/Singapore">🇸🇬 Singapore (SGT)</SelectItem>
+                                  <SelectItem value="Asia/Dubai">🇦🇪 Dubai (GST)</SelectItem>
+                                  <SelectItem value="Australia/Sydney">🇦🇺 Sydney (AEST)</SelectItem>
+                                  <SelectItem value="Australia/Perth">🇦🇺 Perth (AWST)</SelectItem>
+                                  <SelectItem value="Pacific/Auckland">🇳🇿 Auckland (NZST)</SelectItem>
+                                  <SelectItem value="UTC">🌐 UTC</SelectItem>
                                 </SelectContent>
                               </Select>
                               <p className="text-xs text-gray-500 mt-1">
@@ -2944,22 +2963,29 @@ export default function RemindersPage() {
                   <SelectTrigger>
                     <SelectValue placeholder="Select timezone" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="America/New_York">Eastern Time (ET)</SelectItem>
-                    <SelectItem value="America/Chicago">Central Time (CT)</SelectItem>
-                    <SelectItem value="America/Denver">Mountain Time (MT)</SelectItem>
-                    <SelectItem value="America/Los_Angeles">Pacific Time (PT)</SelectItem>
-                    <SelectItem value="America/Anchorage">Alaska Time (AKT)</SelectItem>
-                    <SelectItem value="Pacific/Honolulu">Hawaii Time (HT)</SelectItem>
-                    <SelectItem value="America/Phoenix">Arizona (MST)</SelectItem>
-                    <SelectItem value="UTC">UTC</SelectItem>
-                    <SelectItem value="Europe/London">London (GMT/BST)</SelectItem>
-                    <SelectItem value="Europe/Paris">Paris (CET/CEST)</SelectItem>
-                    <SelectItem value="Europe/Berlin">Berlin (CET/CEST)</SelectItem>
-                    <SelectItem value="Asia/Tokyo">Tokyo (JST)</SelectItem>
-                    <SelectItem value="Asia/Shanghai">Shanghai (CST)</SelectItem>
-                    <SelectItem value="Asia/Kolkata">India (IST)</SelectItem>
-                    <SelectItem value="Australia/Sydney">Sydney (AEST/AEDT)</SelectItem>
+                  <SelectContent className="max-h-[300px]">
+                    <SelectItem value="America/New_York">🇺🇸 Eastern Time (ET)</SelectItem>
+                    <SelectItem value="America/Chicago">🇺🇸 Central Time (CT)</SelectItem>
+                    <SelectItem value="America/Denver">🇺🇸 Mountain Time (MT)</SelectItem>
+                    <SelectItem value="America/Los_Angeles">🇺🇸 Pacific Time (PT)</SelectItem>
+                    <SelectItem value="America/Anchorage">🇺🇸 Alaska Time (AKT)</SelectItem>
+                    <SelectItem value="Pacific/Honolulu">🇺🇸 Hawaii Time (HT)</SelectItem>
+                    <SelectItem value="America/Phoenix">🇺🇸 Arizona (MST)</SelectItem>
+                    <SelectItem value="America/Toronto">🇨🇦 Toronto (ET)</SelectItem>
+                    <SelectItem value="America/Vancouver">🇨🇦 Vancouver (PT)</SelectItem>
+                    <SelectItem value="America/Mexico_City">🇲🇽 Mexico City (CST)</SelectItem>
+                    <SelectItem value="Europe/London">🇬🇧 London (GMT/BST)</SelectItem>
+                    <SelectItem value="Europe/Paris">🇫🇷 Paris (CET)</SelectItem>
+                    <SelectItem value="Europe/Berlin">🇩🇪 Berlin (CET)</SelectItem>
+                    <SelectItem value="Europe/Madrid">🇪🇸 Madrid (CET)</SelectItem>
+                    <SelectItem value="Asia/Tokyo">🇯🇵 Tokyo (JST)</SelectItem>
+                    <SelectItem value="Asia/Shanghai">🇨🇳 Shanghai (CST)</SelectItem>
+                    <SelectItem value="Asia/Singapore">🇸🇬 Singapore (SGT)</SelectItem>
+                    <SelectItem value="Asia/Dubai">🇦🇪 Dubai (GST)</SelectItem>
+                    <SelectItem value="Australia/Sydney">🇦🇺 Sydney (AEST)</SelectItem>
+                    <SelectItem value="Australia/Perth">🇦🇺 Perth (AWST)</SelectItem>
+                    <SelectItem value="Pacific/Auckland">🇳🇿 Auckland (NZST)</SelectItem>
+                    <SelectItem value="UTC">🌐 UTC</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-gray-500 mt-1">
@@ -3227,22 +3253,29 @@ export default function RemindersPage() {
                           <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
                             <SelectValue placeholder="Select timezone" />
                           </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="America/New_York">Eastern Time (ET)</SelectItem>
-                            <SelectItem value="America/Chicago">Central Time (CT)</SelectItem>
-                            <SelectItem value="America/Denver">Mountain Time (MT)</SelectItem>
-                            <SelectItem value="America/Los_Angeles">Pacific Time (PT)</SelectItem>
-                            <SelectItem value="America/Anchorage">Alaska Time (AKT)</SelectItem>
-                            <SelectItem value="Pacific/Honolulu">Hawaii Time (HT)</SelectItem>
-                            <SelectItem value="America/Phoenix">Arizona (MST)</SelectItem>
-                            <SelectItem value="UTC">UTC</SelectItem>
-                            <SelectItem value="Europe/London">London (GMT/BST)</SelectItem>
-                            <SelectItem value="Europe/Paris">Paris (CET/CEST)</SelectItem>
-                            <SelectItem value="Europe/Berlin">Berlin (CET/CEST)</SelectItem>
-                            <SelectItem value="Asia/Tokyo">Tokyo (JST)</SelectItem>
-                            <SelectItem value="Asia/Shanghai">Shanghai (CST)</SelectItem>
-                            <SelectItem value="Asia/Kolkata">India (IST)</SelectItem>
-                            <SelectItem value="Australia/Sydney">Sydney (AEST/AEDT)</SelectItem>
+                          <SelectContent className="max-h-[300px]">
+                            <SelectItem value="America/New_York">🇺🇸 Eastern Time (ET)</SelectItem>
+                            <SelectItem value="America/Chicago">🇺🇸 Central Time (CT)</SelectItem>
+                            <SelectItem value="America/Denver">🇺🇸 Mountain Time (MT)</SelectItem>
+                            <SelectItem value="America/Los_Angeles">🇺🇸 Pacific Time (PT)</SelectItem>
+                            <SelectItem value="America/Anchorage">🇺🇸 Alaska Time (AKT)</SelectItem>
+                            <SelectItem value="Pacific/Honolulu">🇺🇸 Hawaii Time (HT)</SelectItem>
+                            <SelectItem value="America/Phoenix">🇺🇸 Arizona (MST)</SelectItem>
+                            <SelectItem value="America/Toronto">🇨🇦 Toronto (ET)</SelectItem>
+                            <SelectItem value="America/Vancouver">🇨🇦 Vancouver (PT)</SelectItem>
+                            <SelectItem value="America/Mexico_City">🇲🇽 Mexico City (CST)</SelectItem>
+                            <SelectItem value="Europe/London">🇬🇧 London (GMT/BST)</SelectItem>
+                            <SelectItem value="Europe/Paris">🇫🇷 Paris (CET)</SelectItem>
+                            <SelectItem value="Europe/Berlin">🇩🇪 Berlin (CET)</SelectItem>
+                            <SelectItem value="Europe/Madrid">🇪🇸 Madrid (CET)</SelectItem>
+                            <SelectItem value="Asia/Tokyo">🇯🇵 Tokyo (JST)</SelectItem>
+                            <SelectItem value="Asia/Shanghai">🇨🇳 Shanghai (CST)</SelectItem>
+                            <SelectItem value="Asia/Singapore">🇸🇬 Singapore (SGT)</SelectItem>
+                            <SelectItem value="Asia/Dubai">🇦🇪 Dubai (GST)</SelectItem>
+                            <SelectItem value="Australia/Sydney">🇦🇺 Sydney (AEST)</SelectItem>
+                            <SelectItem value="Australia/Perth">🇦🇺 Perth (AWST)</SelectItem>
+                            <SelectItem value="Pacific/Auckland">🇳🇿 Auckland (NZST)</SelectItem>
+                            <SelectItem value="UTC">🌐 UTC</SelectItem>
                           </SelectContent>
                         </Select>
                         <p className="text-xs text-gray-500 mt-1">

@@ -15,8 +15,71 @@ import {
 import { authenticateToken } from '../middleware/auth-middleware';
 import { requireRole } from '../middleware/auth-middleware';
 import { v4 as uuidv4 } from 'uuid';
+import { cancelReminderRun } from '../lib/trigger';
 
 const router = Router();
+
+/**
+ * Cancels all pending reminders for an appointment when it's rescheduled.
+ * This prevents old reminders from firing at incorrect times.
+ */
+async function cancelPendingRemindersForAppointment(appointmentId: string): Promise<{ cancelled: number; errors: string[] }> {
+  const errors: string[] = [];
+  let cancelled = 0;
+
+  try {
+    // Find all pending reminders for this appointment
+    const pendingReminders = await db
+      .select()
+      .from(appointmentReminders)
+      .where(and(
+        eq(appointmentReminders.appointmentId, appointmentId),
+        eq(appointmentReminders.status, 'pending')
+      ));
+
+    console.log(`[Reschedule] Found ${pendingReminders.length} pending reminders for appointment ${appointmentId}`);
+
+    for (const reminder of pendingReminders) {
+      try {
+        // Cancel the Trigger.dev run if we have a run ID (stored in inngestEventId field for backwards compatibility)
+        if (reminder.inngestEventId) {
+          try {
+            const result = await cancelReminderRun(reminder.inngestEventId);
+            if (!result.success) {
+              console.warn(`[Reschedule] Failed to cancel Trigger.dev run ${reminder.inngestEventId}: ${result.error}`);
+            } else {
+              console.log(`[Reschedule] Cancelled Trigger.dev run ${reminder.inngestEventId}`);
+            }
+          } catch (triggerError) {
+            console.warn(`[Reschedule] Error cancelling Trigger.dev run:`, triggerError);
+          }
+        }
+
+        // Update reminder status to cancelled in database
+        await db
+          .update(appointmentReminders)
+          .set({
+            status: 'cancelled',
+            updatedAt: new Date(),
+          })
+          .where(eq(appointmentReminders.id, reminder.id));
+
+        cancelled++;
+        console.log(`[Reschedule] Cancelled reminder ${reminder.id}`);
+      } catch (reminderError) {
+        const errorMsg = `Failed to cancel reminder ${reminder.id}: ${reminderError}`;
+        console.error(`[Reschedule] ${errorMsg}`);
+        errors.push(errorMsg);
+      }
+    }
+  } catch (error) {
+    const errorMsg = `Failed to fetch pending reminders: ${error}`;
+    console.error(`[Reschedule] ${errorMsg}`);
+    errors.push(errorMsg);
+  }
+
+  return { cancelled, errors };
+}
 
 // Function to check appointment records after creation
 async function checkAppointmentRecord(appointmentId: string, tenantId: string, checkNumber: number) {
@@ -334,11 +397,31 @@ router.put('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Appointment not found' });
     }
 
+    // Check if appointment date/time is being changed - if so, cancel pending reminders
+    const existing = existingAppointment[0];
+    const isDateChanging = validatedData.appointmentDate && 
+      new Date(validatedData.appointmentDate).getTime() !== new Date(existing.appointmentDate).getTime();
+
+    let remindersCancelled = 0;
+    if (isDateChanging) {
+      console.log(`[Reschedule] Appointment ${id} date/time is changing, cancelling pending reminders`);
+      const cancelResult = await cancelPendingRemindersForAppointment(id);
+      remindersCancelled = cancelResult.cancelled;
+      if (cancelResult.errors.length > 0) {
+        console.warn(`[Reschedule] Some reminders failed to cancel:`, cancelResult.errors);
+      }
+    }
+
     // Update appointment
     const updatedAppointment = await db
       .update(appointments)
       .set({
         ...validatedData,
+        // Reset reminder flags if date/time changed so new reminders can be scheduled
+        ...(isDateChanging ? {
+          reminderSent: false,
+          reminderSentAt: null,
+        } : {}),
         updatedAt: new Date(),
       })
       .where(eq(appointments.id, id))
@@ -346,7 +429,8 @@ router.put('/:id', async (req: Request, res: Response) => {
 
     res.json({ 
       appointment: updatedAppointment[0],
-      message: 'Appointment updated successfully' 
+      message: 'Appointment updated successfully',
+      remindersCancelled: remindersCancelled > 0 ? remindersCancelled : undefined,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -395,11 +479,31 @@ router.patch('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Appointment not found' });
     }
 
+    // Check if appointment date/time is being changed - if so, cancel pending reminders
+    const existing = existingAppointment[0];
+    const isDateChanging = updateData.appointmentDate && 
+      new Date(updateData.appointmentDate).getTime() !== new Date(existing.appointmentDate).getTime();
+
+    let remindersCancelled = 0;
+    if (isDateChanging) {
+      console.log(`[Reschedule] Appointment ${id} date/time is changing, cancelling pending reminders`);
+      const cancelResult = await cancelPendingRemindersForAppointment(id);
+      remindersCancelled = cancelResult.cancelled;
+      if (cancelResult.errors.length > 0) {
+        console.warn(`[Reschedule] Some reminders failed to cancel:`, cancelResult.errors);
+      }
+    }
+
     // Update appointment with partial data
     const updatedAppointment = await db
       .update(appointments)
       .set({
         ...updateData,
+        // Reset reminder flags if date/time changed so new reminders can be scheduled
+        ...(isDateChanging ? {
+          reminderSent: false,
+          reminderSentAt: null,
+        } : {}),
         updatedAt: new Date(),
       })
       .where(eq(appointments.id, id))
@@ -407,7 +511,8 @@ router.patch('/:id', async (req: Request, res: Response) => {
 
     res.json({ 
       appointment: updatedAppointment[0],
-      message: 'Appointment updated successfully' 
+      message: 'Appointment updated successfully',
+      remindersCancelled: remindersCancelled > 0 ? remindersCancelled : undefined, 
     });
   } catch (error) {
     console.error('Failed to update appointment:', error);

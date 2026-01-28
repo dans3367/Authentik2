@@ -9,12 +9,12 @@ import {
   createAppointmentReminderSchema,
 } from '@shared/schema';
 import { authenticateToken } from '../middleware/auth-middleware';
-
-const INNGEST_URL = process.env.INNGEST_URL || 'http://localhost:3006';
+import { triggerSendReminder, triggerScheduleReminder, cancelReminderRun } from '../lib/trigger';
+import type { ReminderPayload } from '../../src/trigger/reminders';
 
 const router = Router();
 
-// Internal endpoint for Inngest to update reminder status (no auth required)
+// Internal endpoint for Trigger.dev webhook to update reminder status (no auth required)
 router.put('/internal/:id/status', async (req: Request, res: Response) => {
   console.log('📧 [Internal Status] Received request:', {
     id: req.params.id,
@@ -23,7 +23,7 @@ router.put('/internal/:id/status', async (req: Request, res: Response) => {
   });
   
   try {
-    // Verify internal service header
+    // Verify internal service header (accepts both 'trigger' and 'inngest' for backwards compatibility)
     const internalHeader = req.headers['x-internal-service'];
     const internalService = Array.isArray(internalHeader)
       ? internalHeader[0]
@@ -31,7 +31,8 @@ router.put('/internal/:id/status', async (req: Request, res: Response) => {
     
     console.log('📧 [Internal Status] Header check:', { internalHeader, internalService });
     
-    if ((internalService || '').toString().toLowerCase() !== 'inngest') {
+    const validServices = ['trigger', 'trigger.dev', 'inngest'];
+    if (!validServices.includes((internalService || '').toString().toLowerCase())) {
       console.log('📧 [Internal Status] Rejecting - invalid header');
       return res.status(403).json({ error: 'Forbidden', reason: 'missing_or_invalid_internal_header' });
     }
@@ -216,13 +217,13 @@ router.post('/', async (req: Request, res: Response) => {
       .values(reminderData)
       .returning();
 
-    // Prepare common Inngest payload data
+    // Prepare common payload data for Trigger.dev
     const appointmentDate = new Date(appointment.appointmentDate);
     const customerName = appointment.customer?.firstName 
       ? `${appointment.customer.firstName} ${appointment.customer.lastName || ''}`.trim()
       : 'Valued Customer';
 
-    const inngestPayload = {
+    const reminderPayload = {
       reminderId: newReminder[0].id,
       appointmentId: appointment.id,
       customerId: appointment.customerId,
@@ -249,73 +250,56 @@ router.post('/', async (req: Request, res: Response) => {
       timezone: validatedData.timezone || 'America/Chicago',
     };
 
-    // Send to Inngest - either immediately or scheduled
+    // Send to Trigger.dev - either immediately or scheduled
     if (appointment.customer?.email) {
       try {
-        let inngestEndpoint: string;
-        let inngestBody: any;
+        const triggerPayload: ReminderPayload = {
+          ...reminderPayload,
+          scheduledFor: isSendNow ? undefined : validatedData.scheduledFor.toISOString(),
+        };
 
+        let result;
         if (isSendNow) {
-          // Send immediately
-          inngestEndpoint = `${INNGEST_URL}/api/send-reminder`;
-          inngestBody = inngestPayload;
+          // Send immediately via Trigger.dev
+          console.log(`📧 [Trigger.dev] Sending immediate reminder:`, JSON.stringify(triggerPayload, null, 2));
+          result = await triggerSendReminder(triggerPayload);
         } else {
-          // Schedule for later - use the schedule-reminder endpoint
-          inngestEndpoint = `${INNGEST_URL}/api/schedule-reminder`;
-          inngestBody = {
-            ...inngestPayload,
-            scheduledFor: validatedData.scheduledFor.toISOString(),
-          };
+          // Schedule for later via Trigger.dev
+          console.log(`📅 [Trigger.dev] Scheduling reminder for ${validatedData.scheduledFor.toISOString()}:`, JSON.stringify(triggerPayload, null, 2));
+          result = await triggerScheduleReminder(triggerPayload);
         }
 
-        console.log(`📅 [Inngest] Sending to ${inngestEndpoint}:`, JSON.stringify(inngestBody, null, 2));
-
-        const response = await fetch(inngestEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(inngestBody),
-        });
-        
-        console.log(`📅 [Inngest] Response status: ${response.status}`);
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`Failed to ${isSendNow ? 'send' : 'schedule'} reminder via Inngest:`, errorText);
+        if (!result.success) {
+          console.error(`Failed to ${isSendNow ? 'send' : 'schedule'} reminder via Trigger.dev:`, result.error);
           // Update reminder status to failed
           await db
             .update(appointmentReminders)
-            .set({ status: 'failed', errorMessage: `Failed to ${isSendNow ? 'send' : 'schedule'} via Inngest`, updatedAt: new Date() })
+            .set({ status: 'failed', errorMessage: `Failed to ${isSendNow ? 'send' : 'schedule'} via Trigger.dev: ${result.error}`, updatedAt: new Date() })
             .where(eq(appointmentReminders.id, newReminder[0].id));
         } else {
-          const responseData = await response.json();
+          // Store the Trigger.dev run ID for potential cancellation later (using inngestEventId field for backwards compatibility)
+          await db
+            .update(appointmentReminders)
+            .set({ 
+              inngestEventId: result.runId || null,
+              updatedAt: new Date() 
+            })
+            .where(eq(appointmentReminders.id, newReminder[0].id));
           
           if (isSendNow) {
-            // Update reminder status to sent on success
-            await db
-              .update(appointmentReminders)
-              .set({ status: 'sent', sentAt: new Date(), updatedAt: new Date() })
-              .where(eq(appointmentReminders.id, newReminder[0].id));
-            console.log(`📧 Immediate reminder sent for appointment ${appointment.id} to ${appointment.customer.email}`);
+            console.log(`📧 Immediate reminder triggered for appointment ${appointment.id} to ${appointment.customer.email}, runId: ${result.runId}`);
           } else {
-            // Store the Inngest event ID for potential cancellation later
-            await db
-              .update(appointmentReminders)
-              .set({ 
-                inngestEventId: responseData.eventId || null,
-                updatedAt: new Date() 
-              })
-              .where(eq(appointmentReminders.id, newReminder[0].id));
-            console.log(`📅 Scheduled reminder for appointment ${appointment.id} at ${validatedData.scheduledFor.toISOString()} (${validatedData.timezone || 'America/Chicago'})`);
+            console.log(`📅 Scheduled reminder for appointment ${appointment.id} at ${validatedData.scheduledFor.toISOString()} (${validatedData.timezone || 'America/Chicago'}), runId: ${result.runId}`);
           }
         }
-      } catch (inngestError) {
-        console.error('Error calling Inngest for reminder:', inngestError);
+      } catch (triggerError) {
+        console.error('Error calling Trigger.dev for reminder:', triggerError);
         // Update reminder status to failed
         await db
           .update(appointmentReminders)
           .set({ 
             status: 'failed', 
-            errorMessage: inngestError instanceof Error ? inngestError.message : 'Unknown error' 
+            errorMessage: triggerError instanceof Error ? triggerError.message : 'Unknown error' 
           })
           .where(eq(appointmentReminders.id, newReminder[0].id));
       }
@@ -505,14 +489,176 @@ Your Team`;
   }
 });
 
+// PUT /api/appointment-reminders/:id/reschedule - Reschedule a pending reminder
+router.put('/:id/reschedule', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { scheduledFor, timezone } = req.body;
+    const user = (req as any).user;
+    const tenantId = user.tenantId;
+
+    if (!scheduledFor) {
+      return res.status(400).json({ error: 'scheduledFor is required' });
+    }
+
+    const newScheduledTime = new Date(scheduledFor);
+    if (isNaN(newScheduledTime.getTime())) {
+      return res.status(400).json({ error: 'Invalid scheduledFor date' });
+    }
+
+    // Verify reminder exists and belongs to tenant
+    const existingReminder = await db
+      .select()
+      .from(appointmentReminders)
+      .where(and(
+        eq(appointmentReminders.id, id),
+        eq(appointmentReminders.tenantId, tenantId)
+      ))
+      .limit(1);
+
+    if (existingReminder.length === 0) {
+      return res.status(404).json({ error: 'Reminder not found' });
+    }
+
+    const reminder = existingReminder[0];
+
+    // Only allow rescheduling pending reminders
+    if (reminder.status !== 'pending') {
+      return res.status(400).json({ 
+        error: 'Can only reschedule pending reminders',
+        currentStatus: reminder.status 
+      });
+    }
+
+    // Cancel the existing Trigger.dev run if it exists
+    let oldRunCancelled = false;
+    if (reminder.inngestEventId && reminder.inngestEventId.startsWith('run_')) {
+      try {
+        const cancelResult = await cancelReminderRun(reminder.inngestEventId);
+        if (cancelResult.success) {
+          console.log(`🔄 [Reschedule] Cancelled old Trigger.dev run ${reminder.inngestEventId}`);
+          oldRunCancelled = true;
+        } else {
+          console.warn(`🔄 [Reschedule] Failed to cancel old run: ${cancelResult.error}`);
+        }
+      } catch (cancelError) {
+        console.warn(`🔄 [Reschedule] Error cancelling old run:`, cancelError);
+      }
+    }
+
+    // Get appointment details for the new trigger payload
+    const appointmentWithCustomer = await db
+      .select({
+        id: appointments.id,
+        customerId: appointments.customerId,
+        title: appointments.title,
+        appointmentDate: appointments.appointmentDate,
+        location: appointments.location,
+        customer: {
+          id: emailContacts.id,
+          email: emailContacts.email,
+          firstName: emailContacts.firstName,
+          lastName: emailContacts.lastName,
+        }
+      })
+      .from(appointments)
+      .leftJoin(emailContacts, eq(appointments.customerId, emailContacts.id))
+      .where(eq(appointments.id, reminder.appointmentId))
+      .limit(1);
+
+    if (appointmentWithCustomer.length === 0) {
+      return res.status(400).json({ error: 'Associated appointment not found' });
+    }
+
+    const appointment = appointmentWithCustomer[0];
+    const reminderTimezone = timezone || reminder.timezone || 'America/Chicago';
+
+    // Create new Trigger.dev run with updated schedule
+    let newRunId: string | null = null;
+    if (appointment.customer?.email) {
+      const appointmentDate = new Date(appointment.appointmentDate);
+      const customerName = appointment.customer?.firstName 
+        ? `${appointment.customer.firstName} ${appointment.customer.lastName || ''}`.trim()
+        : 'Valued Customer';
+
+      const triggerPayload: ReminderPayload = {
+        reminderId: reminder.id,
+        appointmentId: appointment.id,
+        customerId: appointment.customerId,
+        customerEmail: appointment.customer.email,
+        customerName,
+        appointmentTitle: appointment.title,
+        appointmentDate: appointmentDate.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          timeZone: reminderTimezone,
+        }),
+        appointmentTime: appointmentDate.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+          timeZone: reminderTimezone,
+        }),
+        location: appointment.location || undefined,
+        reminderType: reminder.reminderType as 'email' | 'sms' | 'push',
+        content: reminder.content || undefined,
+        tenantId,
+        timezone: reminderTimezone,
+        scheduledFor: newScheduledTime.toISOString(),
+      };
+
+      try {
+        console.log(`🔄 [Reschedule] Creating new Trigger.dev run for ${newScheduledTime.toISOString()}`);
+        const result = await triggerScheduleReminder(triggerPayload);
+        
+        if (result.success) {
+          newRunId = result.runId || null;
+          console.log(`🔄 [Reschedule] New run created: ${newRunId}`);
+        } else {
+          console.error(`🔄 [Reschedule] Failed to create new run: ${result.error}`);
+        }
+      } catch (triggerError) {
+        console.error('🔄 [Reschedule] Error creating new Trigger.dev run:', triggerError);
+      }
+    }
+
+    // Update reminder in database
+    const updatedReminder = await db
+      .update(appointmentReminders)
+      .set({
+        scheduledFor: newScheduledTime,
+        timezone: reminderTimezone,
+        inngestEventId: newRunId,
+        updatedAt: new Date(),
+      })
+      .where(eq(appointmentReminders.id, id))
+      .returning();
+
+    console.log(`🔄 [Reschedule] Reminder ${id} rescheduled from ${reminder.scheduledFor} to ${newScheduledTime.toISOString()}`);
+
+    res.json({ 
+      reminder: updatedReminder[0],
+      message: 'Reminder rescheduled successfully',
+      oldRunCancelled,
+      newRunId,
+    });
+  } catch (error) {
+    console.error('Failed to reschedule reminder:', error);
+    res.status(500).json({ error: 'Failed to reschedule reminder' });
+  }
+});
+
 // PUT /api/appointment-reminders/:id/status - Update reminder status
 router.put('/:id/status', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status, errorMessage } = req.body;
     
-    // Check for internal service call (from Inngest)
-    const isInternalService = req.headers['x-internal-service'] === 'inngest';
+    // Check for internal service call (from Trigger.dev or legacy Inngest)
+    const internalHeader = req.headers['x-internal-service'];
+    const isInternalService = internalHeader === 'trigger' || internalHeader === 'trigger.dev' || internalHeader === 'inngest';
     
     if (!['pending', 'sent', 'failed', 'cancelled'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
@@ -544,6 +690,24 @@ router.put('/:id/status', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Reminder not found' });
     }
 
+    const reminder = existingReminder[0];
+
+    // If cancelling a pending reminder, also cancel the Trigger.dev run
+    let triggerCancelled = false;
+    if (status === 'cancelled' && reminder.status === 'pending' && reminder.inngestEventId) {
+      try {
+        const cancelResult = await cancelReminderRun(reminder.inngestEventId);
+        if (cancelResult.success) {
+          console.log(`🚫 [Reminder] Cancelled Trigger.dev run ${reminder.inngestEventId} for reminder ${id}`);
+          triggerCancelled = true;
+        } else {
+          console.warn(`🚫 [Reminder] Failed to cancel Trigger.dev run ${reminder.inngestEventId}: ${cancelResult.error}`);
+        }
+      } catch (cancelError) {
+        console.warn(`🚫 [Reminder] Error cancelling Trigger.dev run:`, cancelError);
+      }
+    }
+
     // Update reminder status
     const updatedReminder = await db
       .update(appointmentReminders)
@@ -558,7 +722,8 @@ router.put('/:id/status', async (req: Request, res: Response) => {
 
     res.json({ 
       reminder: updatedReminder[0],
-      message: 'Reminder status updated successfully' 
+      message: 'Reminder status updated successfully',
+      triggerCancelled,
     });
   } catch (error) {
     console.error('Failed to update reminder status:', error);

@@ -28,6 +28,7 @@ export const betterAuthUser = pgTable("better_auth_user", {
   menuExpanded: boolean("menu_expanded").default(false), // New field for menu preference
   theme: text("theme").default('light'), // Theme preference: 'light' or 'dark'
   language: text("language").default('en'), // Language preference: 'en' or 'es'
+  timezone: text("timezone").default('America/Chicago'), // User timezone in IANA format
   avatarUrl: text("avatar_url"), // User avatar URL from Cloudflare R2
   tokenValidAfter: timestamp("token_valid_after").defaultNow(), // Tokens issued before this time are invalid
   // Stripe fields for subscription management
@@ -805,6 +806,7 @@ export const updateProfileSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   theme: z.enum(['light', 'dark']).optional(),
   language: z.enum(['en', 'es']).optional(),
+  timezone: z.string().optional(),
 });
 
 export const verifyEmailSchema = z.object({
@@ -2130,7 +2132,7 @@ export const appointmentReminders = pgTable("appointment_reminders", {
   customMinutesBefore: integer("custom_minutes_before"), // Custom minutes before appointment when reminder should be sent
   scheduledFor: timestamp("scheduled_for").notNull(),
   timezone: text("timezone").default('America/Chicago'), // Timezone for the reminder (IANA timezone identifier)
-  inngestEventId: text("inngest_event_id"), // Inngest event ID for tracking/cancellation
+  inngestEventId: text("inngest_event_id"), // Task queue run ID for tracking/cancellation (Trigger.dev run ID or legacy Inngest event ID)
   sentAt: timestamp("sent_at"),
   status: text("status").notNull().default('pending'), // pending, sent, failed, cancelled
   content: text("content"), // The reminder message content
