@@ -1,6 +1,99 @@
 import { tasks, runs } from "@trigger.dev/sdk/v3";
 import { createHmac } from 'crypto';
+import { db } from '../db';
+import { triggerTasks, type TriggerTaskStatus, type TriggerTaskRelatedType } from '@shared/schema';
+import { eq } from 'drizzle-orm';
 import type { sendReminderTask, scheduleReminderTask, sendBulkRemindersTask, ReminderPayload } from "../../src/trigger/reminders";
+
+/**
+ * Log a task to the trigger_tasks table for local tracking
+ */
+export async function logTriggerTask(params: {
+  taskId: string;
+  runId?: string;
+  payload: object;
+  status: TriggerTaskStatus;
+  tenantId?: string;
+  relatedType?: TriggerTaskRelatedType;
+  relatedId?: string;
+  scheduledFor?: Date;
+  idempotencyKey?: string;
+}): Promise<string | null> {
+  try {
+    const result = await db.insert(triggerTasks).values({
+      taskId: params.taskId,
+      runId: params.runId,
+      payload: JSON.stringify(params.payload),
+      status: params.status,
+      tenantId: params.tenantId,
+      relatedType: params.relatedType,
+      relatedId: params.relatedId,
+      scheduledFor: params.scheduledFor,
+      idempotencyKey: params.idempotencyKey,
+      triggeredAt: params.runId ? new Date() : null,
+    }).returning({ id: triggerTasks.id });
+    
+    console.log(`📝 [Trigger Tasks] Logged task ${params.taskId}, id: ${result[0]?.id}`);
+    return result[0]?.id || null;
+  } catch (error) {
+    console.error('[Trigger Tasks] Failed to log task:', error);
+    return null;
+  }
+}
+
+/**
+ * Update a task's status in the trigger_tasks table
+ */
+export async function updateTriggerTaskStatus(params: {
+  id?: string;
+  runId?: string;
+  status: TriggerTaskStatus;
+  output?: object;
+  errorMessage?: string;
+  errorCode?: string;
+}): Promise<boolean> {
+  try {
+    const updateData: Record<string, any> = {
+      status: params.status,
+      updatedAt: new Date(),
+    };
+
+    if (params.output) {
+      updateData.output = JSON.stringify(params.output);
+    }
+    if (params.errorMessage) {
+      updateData.errorMessage = params.errorMessage;
+    }
+    if (params.errorCode) {
+      updateData.errorCode = params.errorCode;
+    }
+    if (params.status === 'running') {
+      updateData.startedAt = new Date();
+    }
+    if (params.status === 'completed' || params.status === 'failed' || params.status === 'cancelled') {
+      updateData.completedAt = new Date();
+    }
+
+    if (params.id) {
+      await db.update(triggerTasks)
+        .set(updateData)
+        .where(eq(triggerTasks.id, params.id));
+    } else if (params.runId) {
+      await db.update(triggerTasks)
+        .set(updateData)
+        .where(eq(triggerTasks.runId, params.runId));
+    } else {
+      console.error('[Trigger Tasks] No id or runId provided for status update');
+      return false;
+    }
+
+    console.log(`📝 [Trigger Tasks] Updated status to ${params.status}`);
+    return true;
+  } catch (error) {
+    console.error('[Trigger Tasks] Failed to update task status:', error);
+    return false;
+  }
+}
 
 /**
  * Generate HMAC signature for internal service authentication.
@@ -93,23 +186,47 @@ export async function updateReminderStatus(
 export async function triggerSendReminder(payload: ReminderPayload): Promise<{
   success: boolean;
   runId?: string;
+  taskLogId?: string;
   error?: string;
 }> {
-  try {
-    const handle = await tasks.trigger<typeof sendReminderTask>(
-      "send-appointment-reminder",
-      payload
-    );
+  const taskId = "send-appointment-reminder";
+  let taskLogId: string | null = null;
 
-    console.log(`📧 [Trigger.dev] Triggered send-appointment-reminder, runId: ${handle.id}`);
+  try {
+    const handle = await tasks.trigger<typeof sendReminderTask>(taskId, payload);
+
+    console.log(`📧 [Trigger.dev] Triggered ${taskId}, runId: ${handle.id}`);
+
+    // Log to trigger_tasks table
+    taskLogId = await logTriggerTask({
+      taskId,
+      runId: handle.id,
+      payload,
+      status: 'triggered',
+      tenantId: payload.tenantId,
+      relatedType: 'appointment_reminder',
+      relatedId: payload.reminderId,
+    });
 
     return {
       success: true,
       runId: handle.id,
+      taskLogId: taskLogId || undefined,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error(`📧 [Trigger.dev] Failed to trigger send-appointment-reminder:`, errorMessage);
+    console.error(`📧 [Trigger.dev] Failed to trigger ${taskId}:`, errorMessage);
+
+    // Log failed attempt
+    await logTriggerTask({
+      taskId,
+      payload,
+      status: 'failed',
+      tenantId: payload.tenantId,
+      relatedType: 'appointment_reminder',
+      relatedId: payload.reminderId,
+    });
+
     return {
       success: false,
       error: errorMessage,
@@ -124,30 +241,55 @@ export async function triggerSendReminder(payload: ReminderPayload): Promise<{
 export async function triggerScheduleReminder(payload: ReminderPayload): Promise<{
   success: boolean;
   runId?: string;
+  taskLogId?: string;
   error?: string;
 }> {
+  const taskId = "schedule-appointment-reminder";
+
+  if (!payload.scheduledFor) {
+    return {
+      success: false,
+      error: "scheduledFor is required for scheduled reminders",
+    };
+  }
+
   try {
-    if (!payload.scheduledFor) {
-      return {
-        success: false,
-        error: "scheduledFor is required for scheduled reminders",
-      };
-    }
+    const handle = await tasks.trigger<typeof scheduleReminderTask>(taskId, payload);
 
-    const handle = await tasks.trigger<typeof scheduleReminderTask>(
-      "schedule-appointment-reminder",
-      payload
-    );
+    console.log(`📅 [Trigger.dev] Triggered ${taskId} for ${payload.scheduledFor}, runId: ${handle.id}`);
 
-    console.log(`📅 [Trigger.dev] Triggered schedule-appointment-reminder for ${payload.scheduledFor}, runId: ${handle.id}`);
+    // Log to trigger_tasks table
+    const taskLogId = await logTriggerTask({
+      taskId,
+      runId: handle.id,
+      payload,
+      status: 'triggered',
+      tenantId: payload.tenantId,
+      relatedType: 'appointment_reminder',
+      relatedId: payload.reminderId,
+      scheduledFor: new Date(payload.scheduledFor),
+    });
 
     return {
       success: true,
       runId: handle.id,
+      taskLogId: taskLogId || undefined,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error(`📅 [Trigger.dev] Failed to trigger schedule-appointment-reminder:`, errorMessage);
+    console.error(`📅 [Trigger.dev] Failed to trigger ${taskId}:`, errorMessage);
+
+    // Log failed attempt
+    await logTriggerTask({
+      taskId,
+      payload,
+      status: 'failed',
+      tenantId: payload.tenantId,
+      relatedType: 'appointment_reminder',
+      relatedId: payload.reminderId,
+      scheduledFor: new Date(payload.scheduledFor),
+    });
+
     return {
       success: false,
       error: errorMessage,
@@ -161,23 +303,46 @@ export async function triggerScheduleReminder(payload: ReminderPayload): Promise
 export async function triggerBulkReminders(reminders: ReminderPayload[]): Promise<{
   success: boolean;
   runId?: string;
+  taskLogId?: string;
   error?: string;
 }> {
-  try {
-    const handle = await tasks.trigger<typeof sendBulkRemindersTask>(
-      "send-bulk-reminders",
-      { reminders }
-    );
+  const taskId = "send-bulk-reminders";
+  const payload = { reminders };
+  const tenantId = reminders[0]?.tenantId;
 
-    console.log(`📧 [Trigger.dev] Triggered send-bulk-reminders for ${reminders.length} reminders, runId: ${handle.id}`);
+  try {
+    const handle = await tasks.trigger<typeof sendBulkRemindersTask>(taskId, payload);
+
+    console.log(`📧 [Trigger.dev] Triggered ${taskId} for ${reminders.length} reminders, runId: ${handle.id}`);
+
+    // Log to trigger_tasks table
+    const taskLogId = await logTriggerTask({
+      taskId,
+      runId: handle.id,
+      payload,
+      status: 'triggered',
+      tenantId,
+      relatedType: 'bulk_email',
+    });
 
     return {
       success: true,
       runId: handle.id,
+      taskLogId: taskLogId || undefined,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error(`📧 [Trigger.dev] Failed to trigger send-bulk-reminders:`, errorMessage);
+    console.error(`📧 [Trigger.dev] Failed to trigger ${taskId}:`, errorMessage);
+
+    // Log failed attempt
+    await logTriggerTask({
+      taskId,
+      payload,
+      status: 'failed',
+      tenantId,
+      relatedType: 'bulk_email',
+    });
+
     return {
       success: false,
       error: errorMessage,
@@ -206,6 +371,13 @@ export async function cancelReminderRun(runId: string): Promise<{
     console.log(`🚫 [Trigger.dev] Attempting to cancel run ${runId}...`);
     await runs.cancel(runId);
     console.log(`🚫 [Trigger.dev] Successfully cancelled run ${runId}`);
+
+    // Update task status in trigger_tasks table
+    await updateTriggerTaskStatus({
+      runId,
+      status: 'cancelled',
+    });
+
     return { success: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";

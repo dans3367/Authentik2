@@ -149,7 +149,7 @@
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.3.2",
     "autoprefixer": "^10.4.20",
-    "drizzle-kit": "^0.30.4",
+    "drizzle-kit": "^0.31.8",
     "esbuild": "^0.25.0",
     "playwright": "^1.55.1",
     "postcss": "^8.4.47",

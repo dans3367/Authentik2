@@ -2216,68 +2216,79 @@ export const tenantRelationsUpdated = relations(tenants, ({ many }) => ({
   appointments: many(appointments),
   appointmentReminders: many(appointmentReminders),
   templates: many(templates),
-  inngestEvents: many(inngestEvents),
+  triggerTasks: many(triggerTasks),
 }));
 
-// Inngest Events tracking table for recording all events sent to Inngest
-export const inngestEvents = pgTable("inngest_events", {
+// Trigger.dev Tasks tracking table for recording all background tasks
+// Tracks outgoing tasks and their status updates at a local level
+export const triggerTasks = pgTable("trigger_tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }),
   
-  // Event identification
-  eventName: text("event_name").notNull(), // e.g., 'email/send', 'reminder/send'
-  eventId: text("event_id"), // Inngest's returned event ID
-  idempotencyKey: text("idempotency_key").unique(), // Prevent duplicate sends
+  // Task identification
+  taskId: text("task_id").notNull(), // Trigger.dev task identifier e.g., 'send-appointment-reminder'
+  runId: text("run_id"), // Trigger.dev run ID (starts with 'run_')
+  idempotencyKey: text("idempotency_key").unique(), // Prevent duplicate triggers
   
-  // Event payload
-  eventData: text("event_data").notNull(), // JSON payload
+  // Task payload
+  payload: text("payload").notNull(), // JSON payload sent to Trigger.dev
   
   // Status tracking
-  status: text("status").notNull().default('pending'), // pending, sent, processing, completed, failed, cancelled
+  status: text("status").notNull().default('pending'), // pending, triggered, running, completed, failed, cancelled
   
   // Retry tracking
-  retryCount: integer("retry_count").default(0),
-  maxRetries: integer("max_retries").default(3),
-  lastRetryAt: timestamp("last_retry_at"),
-  nextRetryAt: timestamp("next_retry_at"),
+  attemptCount: integer("attempt_count").default(0),
+  maxAttempts: integer("max_attempts").default(3),
+  lastAttemptAt: timestamp("last_attempt_at"),
   
   // Scheduling
-  scheduledFor: timestamp("scheduled_for"),
+  scheduledFor: timestamp("scheduled_for"), // If task is scheduled for future execution
   
   // Result tracking
-  result: text("result"), // JSON result from Inngest
+  output: text("output"), // JSON output from task execution
   errorMessage: text("error_message"),
+  errorCode: text("error_code"), // Error code if failed
   
-  // Related records
-  relatedType: text("related_type"), // 'appointment_reminder', 'newsletter', 'email'
-  relatedId: varchar("related_id"),
+  // Related records (for easier querying)
+  relatedType: text("related_type"), // 'appointment_reminder', 'newsletter', 'email', 'bulk_email'
+  relatedId: varchar("related_id"), // ID of the related record
   
   // Timestamps
-  sentAt: timestamp("sent_at"),
-  completedAt: timestamp("completed_at"),
+  triggeredAt: timestamp("triggered_at"), // When task was triggered to Trigger.dev
+  startedAt: timestamp("started_at"), // When task started executing
+  completedAt: timestamp("completed_at"), // When task finished (success or failure)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Inngest events relations
-export const inngestEventRelations = relations(inngestEvents, ({ one }) => ({
+// Trigger tasks relations
+export const triggerTaskRelations = relations(triggerTasks, ({ one }) => ({
   tenant: one(tenants, {
-    fields: [inngestEvents.tenantId],
+    fields: [triggerTasks.tenantId],
     references: [tenants.id],
   }),
 }));
 
-// Inngest event status enum
-export const inngestEventStatuses = ['pending', 'sent', 'processing', 'completed', 'failed', 'cancelled'] as const;
-export type InngestEventStatus = typeof inngestEventStatuses[number];
+// Trigger task status enum
+export const triggerTaskStatuses = ['pending', 'triggered', 'running', 'completed', 'failed', 'cancelled'] as const;
+export type TriggerTaskStatus = typeof triggerTaskStatuses[number];
 
-// Inngest event related types
-export const inngestEventRelatedTypes = ['appointment_reminder', 'newsletter', 'email', 'bulk_email', 'scheduled_email'] as const;
-export type InngestEventRelatedType = typeof inngestEventRelatedTypes[number];
+// Trigger task related types
+export const triggerTaskRelatedTypes = ['appointment_reminder', 'newsletter', 'email', 'bulk_email', 'scheduled_email'] as const;
+export type TriggerTaskRelatedType = typeof triggerTaskRelatedTypes[number];
 
-// Inngest event types
-export type InngestEvent = typeof inngestEvents.$inferSelect;
-export type InsertInngestEvent = typeof inngestEvents.$inferInsert;
+// Trigger task types
+export type TriggerTask = typeof triggerTasks.$inferSelect;
+export type InsertTriggerTask = typeof triggerTasks.$inferInsert;
+
+// Legacy aliases for backwards compatibility during migration
+export const inngestEvents = triggerTasks;
+export const inngestEventStatuses = triggerTaskStatuses;
+export type InngestEventStatus = TriggerTaskStatus;
+export const inngestEventRelatedTypes = triggerTaskRelatedTypes;
+export type InngestEventRelatedType = TriggerTaskRelatedType;
+export type InngestEvent = TriggerTask;
+export type InsertInngestEvent = InsertTriggerTask;
 
 // Appointment schemas
 export const createAppointmentSchema = z.object({
