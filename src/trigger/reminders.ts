@@ -1,9 +1,54 @@
 import { task, wait, logger } from "@trigger.dev/sdk/v3";
 import { Resend } from "resend";
+import { createHmac } from "crypto";
 import { z } from "zod";
 
 // Initialize Resend for email sending
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+/**
+ * Update reminder status via authenticated internal endpoint.
+ * Called from within Trigger.dev tasks after sending reminders.
+ */
+async function updateReminderStatusInternal(
+  reminderId: string,
+  status: 'pending' | 'sent' | 'failed' | 'cancelled',
+  errorMessage?: string
+): Promise<void> {
+  const apiUrl = process.env.API_URL || 'http://localhost:5002';
+  const secret = process.env.INTERNAL_SERVICE_SECRET;
+
+  if (!secret) {
+    logger.warn('INTERNAL_SERVICE_SECRET not configured, skipping status update');
+    return;
+  }
+
+  const timestamp = Date.now();
+  const body = { status, errorMessage };
+  const signaturePayload = `${timestamp}.${JSON.stringify(body)}`;
+  const signature = createHmac('sha256', secret).update(signaturePayload).digest('hex');
+
+  try {
+    const response = await fetch(`${apiUrl}/api/appointment-reminders/internal/${reminderId}/status`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-service': 'trigger.dev',
+        'x-internal-timestamp': timestamp.toString(),
+        'x-internal-signature': signature,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      logger.warn(`Failed to update reminder status: ${response.status}`);
+    } else {
+      logger.info(`Reminder ${reminderId} status updated to: ${status}`);
+    }
+  } catch (err) {
+    logger.warn(`Error updating reminder status: ${err}`);
+  }
+}
 
 // Schema for reminder payload
 const reminderPayloadSchema = z.object({
@@ -84,6 +129,9 @@ export const sendReminderTask = task({
         reminderId: data.reminderId,
       });
 
+      // Update reminder status to 'sent' via internal endpoint
+      await updateReminderStatusInternal(data.reminderId, 'sent');
+
       return {
         success: true,
         emailId: emailData?.id,
@@ -96,6 +144,10 @@ export const sendReminderTask = task({
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
       logger.error("Exception sending reminder", { error: errorMessage });
+      
+      // Update reminder status to 'failed' via internal endpoint
+      await updateReminderStatusInternal(data.reminderId, 'failed', errorMessage);
+      
       throw new Error(`Failed to send reminder: ${errorMessage}`);
     }
   },

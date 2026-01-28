@@ -924,9 +924,14 @@ export default function ProfilePage() {
                         <Select 
                           value={selectedTimezone} 
                           onValueChange={async (value) => {
-                            setSelectedTimezone(value); // Immediately update UI
-                            await updateProfileMutation.mutateAsync({ timezone: value } as any);
-                            refetch?.(); // Refresh session in background
+                            const previousTimezone = selectedTimezone;
+                            setSelectedTimezone(value);
+                            try {
+                              await updateProfileMutation.mutateAsync({ timezone: value } as any);
+                              refetch?.();
+                            } catch {
+                              setSelectedTimezone(previousTimezone);
+                            }
                           }}
                           disabled={updateProfileMutation.isPending}
                         >
