@@ -9,34 +9,22 @@ import {
   createAppointmentReminderSchema,
 } from '@shared/schema';
 import { authenticateToken } from '../middleware/auth-middleware';
+import { authenticateInternalService, InternalServiceRequest } from '../middleware/internal-service-auth';
 import { triggerSendReminder, triggerScheduleReminder, cancelReminderRun } from '../lib/trigger';
 import type { ReminderPayload } from '../../src/trigger/reminders';
 
 const router = Router();
 
-// Internal endpoint for Trigger.dev webhook to update reminder status (no auth required)
-router.put('/internal/:id/status', async (req: Request, res: Response) => {
-  console.log('📧 [Internal Status] Received request:', {
+// Internal endpoint for Trigger.dev webhook to update reminder status
+// Secured with HMAC signature verification
+router.put('/internal/:id/status', authenticateInternalService, async (req: InternalServiceRequest, res: Response) => {
+  console.log('📧 [Internal Status] Received authenticated request:', {
     id: req.params.id,
-    headers: req.headers['x-internal-service'],
+    service: req.internalService?.service,
     body: req.body,
   });
   
   try {
-    // Verify internal service header (accepts both 'trigger' and 'inngest' for backwards compatibility)
-    const internalHeader = req.headers['x-internal-service'];
-    const internalService = Array.isArray(internalHeader)
-      ? internalHeader[0]
-      : internalHeader;
-    
-    console.log('📧 [Internal Status] Header check:', { internalHeader, internalService });
-    
-    const validServices = ['trigger', 'trigger.dev', 'inngest'];
-    if (!validServices.includes((internalService || '').toString().toLowerCase())) {
-      console.log('📧 [Internal Status] Rejecting - invalid header');
-      return res.status(403).json({ error: 'Forbidden', reason: 'missing_or_invalid_internal_header' });
-    }
-
     const { id } = req.params;
     const { status, errorMessage } = req.body;
 

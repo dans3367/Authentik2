@@ -1,5 +1,91 @@
 import { tasks, runs } from "@trigger.dev/sdk/v3";
+import { createHmac } from 'crypto';
 import type { sendReminderTask, scheduleReminderTask, sendBulkRemindersTask, ReminderPayload } from "../../src/trigger/reminders";
+
+/**
+ * Generate HMAC signature for internal service authentication.
+ * This should be used when making requests to internal endpoints from Trigger.dev tasks.
+ */
+export function generateInternalSignature(
+  payload: object,
+  timestamp: number,
+  secret: string
+): string {
+  const signaturePayload = `${timestamp}.${JSON.stringify(payload)}`;
+  return createHmac('sha256', secret)
+    .update(signaturePayload)
+    .digest('hex');
+}
+
+/**
+ * Make an authenticated request to an internal endpoint.
+ * Used by Trigger.dev tasks to call back to the main server securely.
+ */
+export async function callInternalEndpoint(
+  endpoint: string,
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  payload?: object
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  const apiUrl = process.env.API_URL || 'http://localhost:5002';
+  const secret = process.env.INTERNAL_SERVICE_SECRET;
+
+  if (!secret) {
+    console.error('[Internal API] INTERNAL_SERVICE_SECRET is not configured');
+    return { success: false, error: 'Internal service secret not configured' };
+  }
+
+  const timestamp = Date.now();
+  const body = payload || {};
+  const signature = generateInternalSignature(body, timestamp, secret);
+
+  try {
+    const response = await fetch(`${apiUrl}${endpoint}`, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-service': 'trigger.dev',
+        'x-internal-timestamp': timestamp.toString(),
+        'x-internal-signature': signature,
+      },
+      body: method !== 'GET' ? JSON.stringify(body) : undefined,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error(`[Internal API] Request failed: ${response.status}`, data);
+      return { success: false, error: data.error || `HTTP ${response.status}` };
+    }
+
+    return { success: true, data };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Internal API] Request error:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Update reminder status via authenticated internal endpoint.
+ * Used by Trigger.dev tasks after sending reminders.
+ */
+export async function updateReminderStatus(
+  reminderId: string,
+  status: 'pending' | 'sent' | 'failed' | 'cancelled',
+  errorMessage?: string
+): Promise<{ success: boolean; error?: string }> {
+  const result = await callInternalEndpoint(
+    `/api/appointment-reminders/internal/${reminderId}/status`,
+    'PUT',
+    { status, errorMessage }
+  );
+
+  if (result.success) {
+    console.log(`[Internal API] Reminder ${reminderId} status updated to: ${status}`);
+  }
+
+  return result;
+}
 
 /**
  * Trigger an immediate reminder send via Trigger.dev
