@@ -418,29 +418,46 @@ export class NewsletterWorker extends EventEmitter {
     }));
 
     try {
-      // Send batch using enhanced email service
-      const result = await enhancedEmailService.sendBatchEmails(emails, {
-        batchSize: Math.min(batch.length, 10), // Sub-batch size for rate limiting
-        delayBetweenBatches: 500,
-      });
+      // Send emails individually (batch method removed - use Trigger.dev for bulk sending)
+      let sentCount = 0;
+      let failedCount = 0;
+
+      for (const emailData of emails) {
+        try {
+          const result = await enhancedEmailService.sendCustomEmail(
+            emailData.to,
+            emailData.subject,
+            emailData.html,
+            { text: emailData.text, metadata: emailData.metadata }
+          );
+          if (result.success) {
+            sentCount++;
+          } else {
+            failedCount++;
+            progress.errors.push({
+              email: emailData.to,
+              error: result.error || 'Send failed',
+              timestamp: new Date(),
+            });
+          }
+        } catch (err) {
+          failedCount++;
+          progress.errors.push({
+            email: emailData.to,
+            error: err instanceof Error ? err.message : 'Unknown error',
+            timestamp: new Date(),
+          });
+        }
+      }
 
       // Update progress
-      progress.sent += result.queued.length;
-      progress.failed += result.errors.length;
-
-      // Add errors to progress
-      for (const error of result.errors) {
-        progress.errors.push({
-          email: error.email,
-          error: error.error,
-          timestamp: new Date(),
-        });
-      }
+      progress.sent += sentCount;
+      progress.failed += failedCount;
 
       // Update progress percentage
       progress.progress = Math.round((progress.sent + progress.failed) / progress.total * 100);
 
-      console.log(`✅ [NewsletterWorker] Batch ${batchNumber} complete: ${result.queued.length} sent, ${result.errors.length} failed`);
+      console.log(`✅ [NewsletterWorker] Batch ${batchNumber} complete: ${sentCount} sent, ${failedCount} failed`);
 
     } catch (error) {
       console.error(`❌ [NewsletterWorker] Batch ${batchNumber} failed:`, error);

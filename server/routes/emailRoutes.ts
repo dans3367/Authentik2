@@ -68,54 +68,6 @@ emailRoutes.post('/unsubscribe', async (req, res) => {
   }
 });
 
-// Queue status endpoint
-emailRoutes.get('/queue/status', async (req, res) => {
-  try {
-    const queueStatus = enhancedEmailService.getQueueStatus();
-    const statistics = enhancedEmailService.getStatus().queue;
-    
-    res.json({
-      status: queueStatus,
-      statistics,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('[EmailRoutes] Queue status check failed:', error);
-    res.status(500).json({
-      status: 'error',
-      timestamp: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-// Get specific email status
-emailRoutes.get('/status/:emailId', async (req, res) => {
-  try {
-    const { emailId } = req.params;
-    const emailStatus = enhancedEmailService.getEmailStatus(emailId);
-    
-    if (!emailStatus) {
-      return res.status(404).json({
-        status: 'not_found',
-        message: 'Email not found in queue',
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-    res.json({
-      email: emailStatus,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('[EmailRoutes] Email status check failed:', error);
-    res.status(500).json({
-      status: 'error',
-      timestamp: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
 
 // Send custom email endpoint (for testing)
 emailRoutes.post('/send', async (req, res) => {
@@ -149,7 +101,6 @@ emailRoutes.post('/send', async (req, res) => {
         text,
         from: fromEmail,
         preferredProvider,
-        useQueue: useQueue || false,
         metadata: {
           source: 'api',
           requestId: req.get('x-request-id') || 'unknown',
@@ -175,68 +126,6 @@ emailRoutes.post('/send', async (req, res) => {
   }
 });
 
-// Batch email sending endpoint
-emailRoutes.post('/send/batch', async (req, res) => {
-  try {
-    const { emails, options = {} } = req.body;
-    
-    if (!Array.isArray(emails) || emails.length === 0) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'emails must be a non-empty array',
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-    // Validate each email object
-    for (const email of emails) {
-      if (!email.to || !email.subject || !email.html) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'Each email must have to, subject, and html fields',
-          timestamp: new Date().toISOString()
-        });
-      }
-    }
-    
-    const result = await enhancedEmailService.sendBatchEmails(emails, options);
-    
-    res.json({
-      status: 'success',
-      result,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('[EmailRoutes] Batch send failed:', error);
-    res.status(500).json({
-      status: 'error',
-      timestamp: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-// Cleanup old emails
-emailRoutes.post('/cleanup', async (req, res) => {
-  try {
-    const { olderThanHours = 24 } = req.body;
-    
-    enhancedEmailService.cleanupOldEmails(olderThanHours);
-    
-    res.json({
-      status: 'success',
-      message: `Cleanup initiated for emails older than ${olderThanHours} hours`,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('[EmailRoutes] Cleanup failed:', error);
-    res.status(500).json({
-      status: 'error',
-      timestamp: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
 
 // Health check endpoint
 emailRoutes.get('/health', async (req, res) => {

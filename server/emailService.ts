@@ -347,9 +347,8 @@ export class EmailService {
   }
 
   cleanup(olderThanHours?: number) {
-    if (this.useEnhanced) {
-      enhancedEmailService.cleanupOldEmails(olderThanHours);
-    }
+    // Queue cleanup removed - email processing handled by Trigger.dev
+    console.log('[EmailService] cleanup() called but queue processing is now handled by Trigger.dev');
   }
 
   shutdown() {

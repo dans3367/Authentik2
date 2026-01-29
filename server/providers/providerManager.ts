@@ -1,24 +1,11 @@
 import { EmailProvider, EmailMessage, EmailSendResult, ProviderConfig } from './types';
-import { InMemoryEmailQueue } from './emailQueue';
 import { ResendProvider } from './resendProvider';
 
 export class EmailProviderManager {
   private providers: Map<string, EmailProvider> = new Map();
-  private queue: InMemoryEmailQueue;
 
   constructor() {
-    this.queue = new InMemoryEmailQueue();
-    this.initializeQueue();
-  }
-
-  // Initialize the queue by loading scheduled emails from database
-  private async initializeQueue(): Promise<void> {
-    try {
-      await this.queue.initialize();
-      console.log('[ProviderManager] Queue initialized successfully');
-    } catch (error) {
-      console.error('[ProviderManager] Failed to initialize queue:', error);
-    }
+    console.log('[ProviderManager] Initialized (queue processing handled by Trigger.dev)');
   }
 
   // Register a provider
@@ -123,30 +110,6 @@ export class EmailProviderManager {
     };
   }
 
-  // Send email with queueing (for high-volume scenarios)
-  async queueEmail(message: EmailMessage, preferredProviderId?: string): Promise<string> {
-    return await this.queue.enqueue(message, preferredProviderId);
-  }
-
-  // Schedule email for a specific future time
-  async queueEmailAt(message: EmailMessage, runAt: Date, preferredProviderId?: string): Promise<string> {
-    return await this.queue.enqueueAt(message, runAt, preferredProviderId);
-  }
-
-  // Return snapshot of all queued emails
-  getAllQueuedEmails() {
-    return this.queue.getAllEmails();
-  }
-
-  // Remove a queued email by ID
-  removeQueuedEmail(emailId: string): boolean {
-    return this.queue.remove(emailId);
-  }
-
-  // Update a queued email message or schedule time
-  updateQueuedEmail(emailId: string, updates: { message?: Partial<EmailMessage>; nextRetryAt?: Date }): boolean {
-    return this.queue.update(emailId, updates);
-  }
 
   // Attempt to send email with a specific provider
   private async attemptSend(provider: EmailProvider, message: EmailMessage): Promise<EmailSendResult> {
@@ -174,7 +137,6 @@ export class EmailProviderManager {
 
   // Stop and cleanup
   stop(): void {
-    this.queue.stop();
     console.log('[ProviderManager] Stopped');
   }
 
@@ -194,9 +156,7 @@ export class EmailProviderManager {
     });
 
     return {
-      providers: providerStatuses,
-      queue: this.queue.getStatistics(),
-      queueStatus: this.queue.getQueueStatus()
+      providers: providerStatuses
     };
   }
 
@@ -220,18 +180,4 @@ export class EmailProviderManager {
     return results;
   }
 
-  // Get queue status
-  getQueueStatus() {
-    return this.queue.getQueueStatus();
-  }
-
-  // Get specific email status
-  getEmailStatus(emailId: string) {
-    return this.queue.getEmailStatus(emailId);
-  }
-
-  // Cleanup old emails
-  cleanupOldEmails(olderThanHours: number = 24): void {
-    this.queue.cleanup(olderThanHours);
-  }
 }
