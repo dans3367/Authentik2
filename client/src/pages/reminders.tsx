@@ -3461,90 +3461,76 @@ export default function RemindersPage() {
 
                       <TabsContent value="details" className="space-y-6 mt-6 focus-visible:outline-none focus-visible:ring-0">
                         {/* Customer Information */}
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                           <div className="flex items-center justify-between">
-                            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                              <Users className="h-4 w-4 text-primary" />
+                            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                              <Users className="h-3.5 w-3.5" />
                               {t('reminders.details.customerInfo')}
                             </h3>
                             {viewingAppointment.customer?.id && (
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-8 text-xs hover:bg-primary/10 hover:text-primary transition-colors"
+                                className="h-7 text-xs text-muted-foreground hover:text-primary transition-colors"
                                 onClick={() => setCustomerProfilePanelOpen(true)}
                               >
-                                <Eye className="h-3.5 w-3.5 mr-1.5" />
-                                View Full Profile
+                                <Eye className="h-3 w-3 mr-1" />
+                                View Profile
                               </Button>
                             )}
                           </div>
-                          <div className="bg-card border rounded-xl p-5 shadow-sm space-y-4 transition-all hover:shadow-md">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              <div className="space-y-1">
-                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.details.name')}</p>
-                                <p className="font-semibold text-base text-foreground">{getCustomerName(viewingAppointment.customer)}</p>
-                              </div>
-                              <div className="space-y-1">
-                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.details.email')}</p>
-                                <p className="font-medium text-base text-foreground break-all">{viewingAppointment.customer?.email || 'N/A'}</p>
+                          <div className="space-y-3">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <p className="font-medium text-foreground">{getCustomerName(viewingAppointment.customer)}</p>
+                                <p className="text-sm text-muted-foreground">{viewingAppointment.customer?.email || 'N/A'}</p>
                               </div>
                             </div>
 
                             {showExpandedCustomerInfo && (
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t mt-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                                <div className="space-y-1">
-                                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Phone Number</p>
-                                  <p className="font-medium text-base text-foreground">{viewingAppointment.customer?.phoneNumber || 'N/A'}</p>
+                              <div className="space-y-2 pt-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <span>{viewingAppointment.customer?.phoneNumber || 'No phone'}</span>
                                 </div>
                                 {viewingAppointment.customer?.address && (
-                                  <div className="space-y-1 sm:col-span-2">
-                                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Address</p>
-                                    <p className="font-medium text-base text-foreground">{viewingAppointment.customer.address}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {viewingAppointment.customer.address}
                                     {(viewingAppointment.customer.city || viewingAppointment.customer.state || viewingAppointment.customer.zipCode) && (
-                                      <p className="text-sm text-muted-foreground">
-                                        {[viewingAppointment.customer.city, viewingAppointment.customer.state, viewingAppointment.customer.zipCode].filter(Boolean).join(', ')}
-                                      </p>
+                                      <>, {[viewingAppointment.customer.city, viewingAppointment.customer.state, viewingAppointment.customer.zipCode].filter(Boolean).join(', ')}</>
                                     )}
-                                    {viewingAppointment.customer.country && (
-                                      <p className="text-sm text-muted-foreground">{viewingAppointment.customer.country}</p>
-                                    )}
-                                  </div>
+                                  </p>
                                 )}
                               </div>
                             )}
 
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="w-full h-8 text-xs font-medium text-muted-foreground hover:text-foreground"
+                            <button
+                              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                               onClick={() => setShowExpandedCustomerInfo(!showExpandedCustomerInfo)}
                             >
-                              {showExpandedCustomerInfo ? 'Show Less' : 'View More Details'}
-                            </Button>
+                              {showExpandedCustomerInfo ? 'Show less' : 'Show more'}
+                            </button>
                           </div>
                         </div>
 
                         {/* Appointment Details */}
-                        <div className="space-y-4">
-                          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-primary" />
+                        <div className="space-y-3 pt-4 border-t">
+                          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                            <Calendar className="h-3.5 w-3.5" />
                             {t('reminders.details.appointmentDetails')}
                           </h3>
-                          <div className="bg-card border rounded-xl p-5 shadow-sm space-y-4 transition-all hover:shadow-md">
-                            <div className="space-y-1 pb-3 border-b">
-                              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.appointments.title')}</p>
-                              <p className="font-bold text-lg text-foreground">{viewingAppointment.title}</p>
+                          <div className="space-y-4">
+                            <div>
+                              <p className="font-semibold text-lg text-foreground">{viewingAppointment.title}</p>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-6">
-                              <div className="col-span-2 sm:col-span-1 space-y-1">
-                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.appointments.dateTime')}</p>
-                                <p className="font-medium text-sm text-foreground">{formatDateTime(viewingAppointment.appointmentDate)}</p>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground">{t('reminders.appointments.dateTime')}</p>
+                                <p className="text-sm text-foreground">{formatDateTime(viewingAppointment.appointmentDate)}</p>
                               </div>
 
-                              <div className="col-span-2 sm:col-span-1 space-y-1">
-                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.appointments.status')}</p>
+                              <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground">{t('reminders.appointments.status')}</p>
                                 <Select
                                   value={viewingAppointment.status}
                                   onValueChange={(value: Appointment['status']) => {
@@ -3558,7 +3544,7 @@ export default function RemindersPage() {
                                     );
                                   }}
                                 >
-                                  <SelectTrigger className="h-8 w-full text-xs font-medium bg-background hover:bg-muted/50 transition-colors">
+                                  <SelectTrigger className="h-8 w-full text-xs bg-transparent border-muted hover:bg-muted/30 transition-colors">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -3572,18 +3558,18 @@ export default function RemindersPage() {
                               </div>
 
                               <div className="space-y-1">
-                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.appointments.duration')}</p>
-                                <p className="text-sm font-medium flex items-center gap-1.5 text-foreground">
-                                  <Timer className="h-3.5 w-3.5 text-muted-foreground" />
+                                <p className="text-xs text-muted-foreground">{t('reminders.appointments.duration')}</p>
+                                <p className="text-sm text-foreground flex items-center gap-1.5">
+                                  <Timer className="h-3 w-3 text-muted-foreground" />
                                   {viewingAppointment.duration} {t('reminders.appointments.minutes')}
                                 </p>
                               </div>
 
                               {viewingAppointment.location && (
                                 <div className="space-y-1">
-                                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.appointments.location')}</p>
-                                  <p className="text-sm font-medium flex items-center gap-1.5 text-foreground">
-                                    <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                                  <p className="text-xs text-muted-foreground">{t('reminders.appointments.location')}</p>
+                                  <p className="text-sm text-foreground flex items-center gap-1.5">
+                                    <MapPin className="h-3 w-3 text-muted-foreground" />
                                     {viewingAppointment.location}
                                   </p>
                                 </div>
@@ -3591,18 +3577,16 @@ export default function RemindersPage() {
 
                               {viewingAppointment.serviceType && (
                                 <div className="col-span-2 space-y-1">
-                                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.details.serviceType')}</p>
-                                  <Badge variant="outline" className="font-normal text-foreground bg-muted/30">
-                                    {viewingAppointment.serviceType}
-                                  </Badge>
+                                  <p className="text-xs text-muted-foreground">{t('reminders.details.serviceType')}</p>
+                                  <span className="text-sm text-foreground">{viewingAppointment.serviceType}</span>
                                 </div>
                               )}
                             </div>
 
                             {viewingAppointment.description && (
-                              <div className="pt-3 border-t space-y-1">
-                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.details.descriptionLabel')}</p>
-                                <p className="text-sm text-foreground/90 leading-relaxed bg-muted/30 p-2.5 rounded-md border border-dashed border-muted-foreground/20">
+                              <div className="pt-3 border-t border-dashed space-y-1">
+                                <p className="text-xs text-muted-foreground">{t('reminders.details.descriptionLabel')}</p>
+                                <p className="text-sm text-foreground/80 leading-relaxed">
                                   {viewingAppointment.description}
                                 </p>
                               </div>
@@ -3612,12 +3596,12 @@ export default function RemindersPage() {
                         </div>
 
                         {/* Reminder Status */}
-                        <div className="space-y-4">
-                          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                            <Bell className="h-4 w-4 text-primary" />
+                        <div className="space-y-3 pt-4 border-t">
+                          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                            <Bell className="h-3.5 w-3.5" />
                             {t('reminders.details.reminderStatus')}
                           </h3>
-                          <div className="bg-card border rounded-xl p-5 shadow-sm space-y-4 transition-all hover:shadow-md">
+                          <div className="space-y-3">
                             {(() => {
                               const appointmentReminders = reminders.filter(r => r.appointmentId === viewingAppointment.id);
                               const sentReminders = appointmentReminders.filter(r => r.status === 'sent');
@@ -3627,36 +3611,33 @@ export default function RemindersPage() {
                               return (
                                 <>
                                   {/* Overall Status */}
-                                  <div className="flex items-center justify-between pb-3 border-b">
-                                    <p className="text-sm font-medium text-foreground">{t('reminders.details.reminderSent')}</p>
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-sm text-foreground">{t('reminders.details.reminderSent')}</p>
                                     {hasSentReminder ? (
-                                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800 flex items-center gap-1.5 pl-1.5 pr-2.5 py-0.5">
-                                        <CheckCircle className="h-3.5 w-3.5" />
+                                      <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                                        <CheckCircle className="h-3 w-3" />
                                         {t('common.yes')}
-                                      </Badge>
+                                      </span>
                                     ) : (
-                                      <Badge variant="outline" className="text-muted-foreground flex items-center gap-1.5 pl-1.5 pr-2.5 py-0.5">
-                                        <XCircle className="h-3.5 w-3.5" />
+                                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                        <XCircle className="h-3 w-3" />
                                         {t('common.no')}
-                                      </Badge>
+                                      </span>
                                     )}
                                   </div>
 
                                   {/* Sent Reminders Details */}
                                   {sentReminders.length > 0 && (
-                                    <div className="space-y-3">
-                                      <p className="text-xs font-semibold uppercase tracking-wider text-green-600 dark:text-green-500">Sent Reminders ({sentReminders.length})</p>
+                                    <div className="space-y-2 pt-2">
+                                      <p className="text-xs text-green-600 dark:text-green-500">Sent ({sentReminders.length})</p>
                                       {sentReminders.map((reminder) => (
-                                        <div key={reminder.id} className="bg-green-50/50 dark:bg-green-900/10 p-3 rounded-md border border-green-100 dark:border-green-900/30 space-y-2">
-                                          <div className="flex items-center justify-between">
-                                            <Badge variant="secondary" className="bg-white dark:bg-gray-800 shadow-sm capitalize text-[10px] h-5">{reminder.reminderType}</Badge>
-                                            <span className="text-xs font-medium text-muted-foreground">{reminder.reminderTiming === 'custom' ? `${reminder.customMinutesBefore}m before` : reminder.reminderTiming}</span>
+                                        <div key={reminder.id} className="flex items-center justify-between py-1.5">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs capitalize text-foreground">{reminder.reminderType}</span>
+                                            <span className="text-xs text-muted-foreground">• {reminder.reminderTiming === 'custom' ? `${reminder.customMinutesBefore}m before` : reminder.reminderTiming}</span>
                                           </div>
                                           {reminder.sentAt && (
-                                            <div className="flex items-center gap-1.5 text-xs text-green-700 dark:text-green-400 font-medium">
-                                              <CheckCircle className="h-3.5 w-3.5" />
-                                              <span>Sent: {formatDateTime(reminder.sentAt)}</span>
-                                            </div>
+                                            <span className="text-xs text-muted-foreground">{formatDateTime(reminder.sentAt)}</span>
                                           )}
                                         </div>
                                       ))}
@@ -3665,26 +3646,26 @@ export default function RemindersPage() {
 
                                   {/* Legacy sent at (if no reminder records but appointment shows sent) */}
                                   {sentReminders.length === 0 && viewingAppointment.reminderSentAt && (
-                                    <div className="space-y-1">
-                                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.details.sentAt')}</p>
-                                      <p className="text-sm font-medium text-foreground">{formatDateTime(viewingAppointment.reminderSentAt)}</p>
+                                    <div className="flex items-center justify-between py-1.5">
+                                      <p className="text-xs text-muted-foreground">{t('reminders.details.sentAt')}</p>
+                                      <p className="text-xs text-foreground">{formatDateTime(viewingAppointment.reminderSentAt)}</p>
                                     </div>
                                   )}
 
                                   {/* Scheduled/Pending Reminders Details */}
                                   {pendingReminders.length > 0 && (
-                                    <div className="space-y-3 pt-2">
-                                      <p className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-500">Scheduled Reminders ({pendingReminders.length})</p>
+                                    <div className="space-y-2 pt-2">
+                                      <p className="text-xs text-blue-600 dark:text-blue-500">Scheduled ({pendingReminders.length})</p>
                                       {pendingReminders.map((reminder) => (
-                                        <div key={reminder.id} className="bg-blue-50/50 dark:bg-blue-900/10 p-3 rounded-md border border-blue-100 dark:border-blue-900/30 space-y-2">
-                                          <div className="flex items-center justify-between">
-                                            <Badge variant="secondary" className="bg-white dark:bg-gray-800 shadow-sm capitalize text-[10px] h-5">{reminder.reminderType}</Badge>
-                                            <span className="text-xs font-medium text-muted-foreground">{reminder.reminderTiming === 'custom' ? `${reminder.customMinutesBefore}m before` : reminder.reminderTiming}</span>
+                                        <div key={reminder.id} className="flex items-center justify-between py-1.5">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs capitalize text-foreground">{reminder.reminderType}</span>
+                                            <span className="text-xs text-muted-foreground">• {reminder.reminderTiming === 'custom' ? `${reminder.customMinutesBefore}m before` : reminder.reminderTiming}</span>
                                           </div>
-                                          <div className="flex items-center gap-1.5 text-xs text-blue-700 dark:text-blue-400 font-medium">
-                                            <Clock className="h-3.5 w-3.5" />
-                                            <span>Scheduled: {formatDateTime(reminder.scheduledFor)}</span>
-                                          </div>
+                                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                            <Clock className="h-3 w-3" />
+                                            {formatDateTime(reminder.scheduledFor)}
+                                          </span>
                                         </div>
                                       ))}
                                     </div>
@@ -3692,9 +3673,9 @@ export default function RemindersPage() {
 
                                   {/* No reminders message */}
                                   {appointmentReminders.length === 0 && !viewingAppointment.reminderSent && (
-                                    <div className="text-center py-6 border-2 border-dashed rounded-lg border-muted">
-                                      <BellOff className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
-                                      <p className="text-sm text-muted-foreground">No reminders configured</p>
+                                    <div className="py-4 text-center">
+                                      <BellOff className="h-5 w-5 mx-auto text-muted-foreground/40 mb-1" />
+                                      <p className="text-xs text-muted-foreground">No reminders configured</p>
                                     </div>
                                   )}
                                 </>
@@ -3704,53 +3685,53 @@ export default function RemindersPage() {
                         </div>
 
                         {/* Confirmation Status */}
-                        <div className="space-y-4">
-                          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                            <CheckCircle className="h-4 w-4 text-primary" />
+                        <div className="space-y-3 pt-4 border-t">
+                          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                            <CheckCircle className="h-3.5 w-3.5" />
                             {t('reminders.details.confirmationStatus')}
                           </h3>
-                          <div className="bg-card border rounded-xl p-5 shadow-sm space-y-4 transition-all hover:shadow-md">
+                          <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                              <p className="text-sm font-medium text-foreground">{t('reminders.details.confirmed')}</p>
+                              <p className="text-sm text-foreground">{t('reminders.details.confirmed')}</p>
                               {viewingAppointment.confirmationReceived ? (
-                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800 flex items-center gap-1.5 pl-1.5 pr-2.5 py-0.5">
-                                  <CheckCircle className="h-3.5 w-3.5" />
+                                <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                                  <CheckCircle className="h-3 w-3" />
                                   {t('common.yes')}
-                                </Badge>
+                                </span>
                               ) : (
-                                <Badge variant="outline" className="text-muted-foreground flex items-center gap-1.5 pl-1.5 pr-2.5 py-0.5">
-                                  <XCircle className="h-3.5 w-3.5" />
+                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <XCircle className="h-3 w-3" />
                                   {t('common.no')}
-                                </Badge>
+                                </span>
                               )}
                             </div>
                             {viewingAppointment.confirmationReceivedAt && (
-                              <div className="space-y-1 pt-3 border-t">
-                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.details.confirmedAt')}</p>
-                                <p className="text-sm font-medium text-foreground">{formatDateTime(viewingAppointment.confirmationReceivedAt)}</p>
+                              <div className="flex items-center justify-between py-1">
+                                <p className="text-xs text-muted-foreground">{t('reminders.details.confirmedAt')}</p>
+                                <p className="text-xs text-foreground">{formatDateTime(viewingAppointment.confirmationReceivedAt)}</p>
                               </div>
                             )}
                           </div>
                         </div>
 
                         {/* Metadata */}
-                        <div className="space-y-4">
-                          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                            <Info className="h-4 w-4 text-primary" />
+                        <div className="space-y-3 pt-4 border-t">
+                          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                            <Info className="h-3.5 w-3.5" />
                             {t('reminders.details.metadata')}
                           </h3>
-                          <div className="bg-card border rounded-xl p-5 shadow-sm space-y-2 text-xs transition-all hover:shadow-md">
-                            <div className="flex justify-between items-center py-1">
-                              <span className="text-muted-foreground font-medium">{t('reminders.details.created')}</span>
-                              <span className="font-mono bg-muted/50 px-2 py-0.5 rounded text-foreground">{formatDateTime(viewingAppointment.createdAt)}</span>
+                          <div className="space-y-1.5 text-xs">
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground">{t('reminders.details.created')}</span>
+                              <span className="text-foreground">{formatDateTime(viewingAppointment.createdAt)}</span>
                             </div>
-                            <div className="flex justify-between items-center py-1 border-t border-border/50">
-                              <span className="text-muted-foreground font-medium">{t('reminders.details.lastUpdated')}</span>
-                              <span className="font-mono bg-muted/50 px-2 py-0.5 rounded text-foreground">{formatDateTime(viewingAppointment.updatedAt)}</span>
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground">{t('reminders.details.lastUpdated')}</span>
+                              <span className="text-foreground">{formatDateTime(viewingAppointment.updatedAt)}</span>
                             </div>
-                            <div className="flex justify-between items-center py-1 border-t border-border/50">
-                              <span className="text-muted-foreground font-medium">{t('reminders.details.appointmentId')}</span>
-                              <span className="font-mono text-[10px] text-muted-foreground bg-muted/30 px-2 py-0.5 rounded select-all">{viewingAppointment.id}</span>
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground">{t('reminders.details.appointmentId')}</span>
+                              <span className="font-mono text-[10px] text-muted-foreground select-all">{viewingAppointment.id}</span>
                             </div>
                           </div>
                         </div>
