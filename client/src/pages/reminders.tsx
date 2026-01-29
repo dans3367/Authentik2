@@ -28,6 +28,7 @@ import {
   Plus,
   Trash2,
   Edit,
+  Copy,
   CheckCircle,
   XCircle,
   Eye,
@@ -3611,46 +3612,43 @@ export default function RemindersPage() {
                               return (
                                 <>
                                   {/* Overall Status */}
-                                  <div className="flex items-center justify-between">
-                                    <p className="text-sm text-foreground">{t('reminders.details.reminderSent')}</p>
-                                    {hasSentReminder ? (
-                                      <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                                        <CheckCircle className="h-3 w-3" />
-                                        {t('common.yes')}
-                                      </span>
-                                    ) : (
-                                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                        <XCircle className="h-3 w-3" />
-                                        {t('common.no')}
-                                      </span>
+                                  <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                      <p className="text-sm text-foreground">{t('reminders.details.reminderSent')}</p>
+                                      {hasSentReminder ? (
+                                        <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                                          <CheckCircle className="h-3 w-3" />
+                                          {t('common.yes')}
+                                        </span>
+                                      ) : (
+                                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                          <XCircle className="h-3 w-3" />
+                                          {t('common.no')}
+                                        </span>
+                                      )}
+                                    </div>
+                                    
+                                    {/* Show sent at time directly under Reminder Sent */}
+                                    {hasSentReminder && (
+                                      <div className="pl-0.5 space-y-1">
+                                        {sentReminders.length > 0 ? (
+                                          sentReminders.map((reminder) => (
+                                            <div key={reminder.id} className="flex items-center justify-between text-xs text-muted-foreground">
+                                              <span className="capitalize">{reminder.reminderType} • {reminder.reminderTiming === 'custom' ? `${reminder.customMinutesBefore}m before` : reminder.reminderTiming}</span>
+                                              {reminder.sentAt && (
+                                                <span>{formatDateTime(reminder.sentAt)}</span>
+                                              )}
+                                            </div>
+                                          ))
+                                        ) : viewingAppointment.reminderSentAt ? (
+                                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                            <span>{t('reminders.details.sentAt')}</span>
+                                            <span>{formatDateTime(viewingAppointment.reminderSentAt)}</span>
+                                          </div>
+                                        ) : null}
+                                      </div>
                                     )}
                                   </div>
-
-                                  {/* Sent Reminders Details */}
-                                  {sentReminders.length > 0 && (
-                                    <div className="space-y-2 pt-2">
-                                      <p className="text-xs text-green-600 dark:text-green-500">Sent ({sentReminders.length})</p>
-                                      {sentReminders.map((reminder) => (
-                                        <div key={reminder.id} className="flex items-center justify-between py-1.5">
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-xs capitalize text-foreground">{reminder.reminderType}</span>
-                                            <span className="text-xs text-muted-foreground">• {reminder.reminderTiming === 'custom' ? `${reminder.customMinutesBefore}m before` : reminder.reminderTiming}</span>
-                                          </div>
-                                          {reminder.sentAt && (
-                                            <span className="text-xs text-muted-foreground">{formatDateTime(reminder.sentAt)}</span>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-
-                                  {/* Legacy sent at (if no reminder records but appointment shows sent) */}
-                                  {sentReminders.length === 0 && viewingAppointment.reminderSentAt && (
-                                    <div className="flex items-center justify-between py-1.5">
-                                      <p className="text-xs text-muted-foreground">{t('reminders.details.sentAt')}</p>
-                                      <p className="text-xs text-foreground">{formatDateTime(viewingAppointment.reminderSentAt)}</p>
-                                    </div>
-                                  )}
 
                                   {/* Scheduled/Pending Reminders Details */}
                                   {pendingReminders.length > 0 && (
@@ -3909,16 +3907,41 @@ export default function RemindersPage() {
                 {/* Actions */}
                 <div className="absolute bottom-0 left-0 right-0 px-6 py-4 border-t bg-background/80 backdrop-blur-md shadow-[0_-4px_12px_-4px_rgba(0,0,0,0.1)]">
                   <div className="flex flex-col sm:flex-row gap-3">
-                    <Button
-                      className="flex-1 shadow-sm hover:shadow-md transition-all active:scale-[0.98]"
-                      onClick={() => {
-                        setViewAppointmentPanelOpen(false);
-                        handleEditAppointment(viewingAppointment);
-                      }}
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      {t('reminders.details.editAppointment')}
-                    </Button>
+                    {new Date(viewingAppointment.appointmentDate) < new Date() ? (
+                      <Button
+                        className="flex-1 shadow-sm hover:shadow-md transition-all active:scale-[0.98]"
+                        onClick={() => {
+                          setViewAppointmentPanelOpen(false);
+                          // Copy appointment details to new appointment form
+                          setNewAppointmentData({
+                            customerId: viewingAppointment.customerId || "",
+                            title: viewingAppointment.title,
+                            description: viewingAppointment.description || "",
+                            appointmentDate: new Date(),
+                            duration: viewingAppointment.duration,
+                            location: viewingAppointment.location || "",
+                            serviceType: viewingAppointment.serviceType || "",
+                            status: 'scheduled' as const,
+                            notes: "",
+                          });
+                          setNewAppointmentModalOpen(true);
+                        }}
+                      >
+                        <Copy className="h-4 w-4 mr-2" />
+                        {t('reminders.details.createNewAppointment')}
+                      </Button>
+                    ) : (
+                      <Button
+                        className="flex-1 shadow-sm hover:shadow-md transition-all active:scale-[0.98]"
+                        onClick={() => {
+                          setViewAppointmentPanelOpen(false);
+                          handleEditAppointment(viewingAppointment);
+                        }}
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        {t('reminders.details.editAppointment')}
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       className="flex-1 sm:flex-none sm:w-1/3 hover:bg-muted/50 transition-colors active:scale-[0.98]"
