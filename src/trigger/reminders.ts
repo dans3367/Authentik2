@@ -226,6 +226,9 @@ export const scheduleReminderTask = task({
         scheduledFor: data.scheduledFor,
       });
 
+      // Update reminder status to 'sent' via internal endpoint
+      await updateReminderStatusInternal(data.reminderId, 'sent');
+
       return {
         success: true,
         emailId: emailData?.id,
@@ -239,6 +242,10 @@ export const scheduleReminderTask = task({
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
       logger.error("Exception sending scheduled reminder", { error: errorMessage });
+      
+      // Update reminder status to 'failed' via internal endpoint
+      await updateReminderStatusInternal(data.reminderId, 'failed', errorMessage);
+      
       throw new Error(`Failed to send scheduled reminder: ${errorMessage}`);
     }
   },
