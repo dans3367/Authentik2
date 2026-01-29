@@ -82,8 +82,14 @@ export class NewsletterWorker extends EventEmitter {
 
   /**
    * Start the worker
+   * DISABLED: Newsletter processing is now handled by Trigger.dev
    */
   start(): void {
+    console.log('🚫 [NewsletterWorker] Start called but DISABLED - newsletter processing handled by Trigger.dev');
+    return;
+
+    // Original code commented out - newsletter processing now handled by Trigger.dev
+    /*
     if (this.isRunning) {
       console.log('⚠️ [NewsletterWorker] Already running');
       return;
@@ -107,6 +113,7 @@ export class NewsletterWorker extends EventEmitter {
 
     this.emit('started');
     console.log('✅ [NewsletterWorker] Worker started successfully');
+    */
   }
 
   /**

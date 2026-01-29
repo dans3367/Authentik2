@@ -5,13 +5,10 @@ import { ResendProvider } from './resendProvider';
 export class EmailProviderManager {
   private providers: Map<string, EmailProvider> = new Map();
   private queue: InMemoryEmailQueue;
-  private isProcessing = false;
-  private processingInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     this.queue = new InMemoryEmailQueue();
     this.initializeQueue();
-    this.startQueueProcessing();
   }
 
   // Initialize the queue by loading scheduled emails from database
@@ -175,67 +172,8 @@ export class EmailProviderManager {
     return await provider.sendEmail(message);
   }
 
-  // Start processing the email queue
-  private startQueueProcessing(): void {
-    if (this.processingInterval) {
-      return; // Already started
-    }
-
-    this.processingInterval = setInterval(async () => {
-      if (this.isProcessing) {
-        return; // Skip if already processing
-      }
-
-      try {
-        this.isProcessing = true;
-        await this.processQueuedEmails();
-      } catch (error) {
-        console.error('[ProviderManager] Queue processing error:', error);
-      } finally {
-        this.isProcessing = false;
-      }
-    }, 1000); // Process every second
-
-    console.log('[ProviderManager] Queue processing started');
-  }
-
-  // Process queued emails
-  private async processQueuedEmails(): Promise<void> {
-    const readyEmails = this.queue.getReadyEmails();
-    
-    if (readyEmails.length === 0) {
-      return;
-    }
-
-    console.log(`[ProviderManager] Processing ${readyEmails.length} queued emails`);
-
-    for (const queuedEmail of readyEmails) {
-      try {
-        const result = await this.sendEmail(queuedEmail.message, queuedEmail.providerId);
-        
-        if (result.success) {
-          this.queue.markAsSent(queuedEmail.id);
-        } else {
-          // Check if we should retry
-          if (result.nextRetryAt) {
-            this.queue.markAsFailed(queuedEmail.id, result.error || 'Unknown error', result.nextRetryAt);
-          } else {
-            this.queue.markAsFailed(queuedEmail.id, result.error || 'Unknown error');
-          }
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        this.queue.markAsFailed(queuedEmail.id, errorMessage);
-      }
-    }
-  }
-
-  // Stop queue processing
+  // Stop and cleanup
   stop(): void {
-    if (this.processingInterval) {
-      clearInterval(this.processingInterval);
-      this.processingInterval = null;
-    }
     this.queue.stop();
     console.log('[ProviderManager] Stopped');
   }
@@ -258,8 +196,7 @@ export class EmailProviderManager {
     return {
       providers: providerStatuses,
       queue: this.queue.getStatistics(),
-      queueStatus: this.queue.getQueueStatus(),
-      isProcessing: this.isProcessing
+      queueStatus: this.queue.getQueueStatus()
     };
   }
 
