@@ -168,7 +168,8 @@ app.use((req, res, next) => {
   */
   serverLogger.info('🚫 Birthday Worker Service: DISABLED (handled by cardprocessor-go)');
 
-  // Appointment Reminder Worker - ENABLED
+  // Appointment Reminder Worker - DISABLED (handled by Trigger.dev)
+  /*
   try {
     serverLogger.info('🔔 Starting Appointment Reminder Worker...');
     appointmentReminderWorker.start();
@@ -176,6 +177,8 @@ app.use((req, res, next) => {
   } catch (error) {
     serverLogger.error({ err: error }, 'Failed to start Appointment Reminder Worker');
   }
+  */
+  serverLogger.info('🚫 Appointment Reminder Worker: DISABLED (handled by Trigger.dev)');
 
   // Display service architecture
   serverLogger.info('🔄 Service Architecture:');
