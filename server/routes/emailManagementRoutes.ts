@@ -1017,23 +1017,27 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
     }
 
     // Schedule via Trigger.dev
-    const { scheduleEmailTask } = await import('../../src/trigger/email');
-    const payload: Parameters<typeof scheduleEmailTask.trigger>[0] = {
-      to: String(contact.email),
-      subject: sanitizeString(String(subject)),
-      html: String(html),
-      scheduledFor: scheduleDate.toISOString(),
-      metadata: {
-        type: 'b2c',
-        contactId: id,
-        tenantId: req.user.tenantId,
-        scheduledBy: req.user.id,
-      },
-    };
-    if (text) payload.text = String(text);
-    const handle = await scheduleEmailTask.trigger(payload);
-
-    return res.status(201).json({ message: 'Email scheduled via Trigger.dev', runId: handle.id, contactId: id, scheduleAt: scheduleDate.toISOString() });
+    try {
+      const { scheduleEmailTask } = await import('../../src/trigger/email');
+      const payload: Parameters<typeof scheduleEmailTask.trigger>[0] = {
+        to: String(contact.email),
+        subject: sanitizeString(String(subject)),
+        html: String(html),
+        scheduledFor: scheduleDate.toISOString(),
+        metadata: {
+          type: 'b2c',
+          contactId: id,
+          tenantId: req.user.tenantId,
+          scheduledBy: req.user.id,
+        },
+      };
+      if (text) payload.text = String(text);
+      const handle = await scheduleEmailTask.trigger(payload);
+      return res.status(201).json({ message: 'Email scheduled via Trigger.dev', runId: handle.id, contactId: id, scheduleAt: scheduleDate.toISOString() });
+    } catch (importError) {
+      console.error('Failed to import or trigger email task:', importError);
+      return res.status(503).json({ message: 'Email scheduling service unavailable' });
+    }
   } catch (error) {
     console.error('Schedule single contact email error:', error);
     res.status(500).json({ message: 'Failed to schedule email' });
