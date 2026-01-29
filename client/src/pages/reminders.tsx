@@ -3907,7 +3907,7 @@ export default function RemindersPage() {
                 {/* Actions */}
                 <div className="absolute bottom-0 left-0 right-0 px-6 py-4 border-t bg-background/80 backdrop-blur-md shadow-[0_-4px_12px_-4px_rgba(0,0,0,0.1)]">
                   <div className="flex flex-col sm:flex-row gap-3">
-                    {new Date(viewingAppointment.appointmentDate) < new Date() ? (
+                    {new Date(new Date(viewingAppointment.appointmentDate).toDateString()) < new Date(new Date().toDateString()) ? (
                       <Button
                         className="flex-1 shadow-sm hover:shadow-md transition-all active:scale-[0.98]"
                         onClick={() => {
