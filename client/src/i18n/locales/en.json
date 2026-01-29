@@ -129,6 +129,10 @@
         "description": "Choose your preferred language for the interface",
         "english": "English",
         "spanish": "Spanish"
+      },
+      "timezone": {
+        "title": "Timezone",
+        "description": "Set your timezone for accurate scheduling and reminders"
       }
     },
     "security": {

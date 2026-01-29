@@ -1130,6 +1130,10 @@
       "language": {
         "title": "Idioma",
         "description": "Elige tu idioma preferido"
+      },
+      "timezone": {
+        "title": "Zona Horaria",
+        "description": "Configura tu zona horaria para programación y recordatorios precisos"
       }
     },
     "security": {

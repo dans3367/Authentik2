@@ -83,7 +83,7 @@ app.use(sanitizeMiddleware);
 // Only handle standard better-auth routes, exclude custom routes like verify-login
 app.all("/api/auth/*", (req, res, next) => {
   // Skip custom auth routes that should be handled by our custom routes
-  const customRoutes = ['verify-login', 'verify-2fa', 'check-2fa-requirement', 'verify-session-2fa', '2fa-status', 'verify-email', 'resend-verification'];
+  const customRoutes = ['verify-login', 'verify-2fa', 'check-2fa-requirement', 'verify-session-2fa', '2fa-status', 'verify-email', 'resend-verification', 'profile', 'avatar'];
   const path = req.path.replace('/api/auth/', '');
 
   if (customRoutes.includes(path)) {

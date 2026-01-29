@@ -296,7 +296,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
 
 export default function ProfilePage() {
   const [, setLocation] = useLocation();
-  const { user, isLoading: authLoading, isAuthenticated, isInitialized } = useReduxAuth();
+  const { user, isLoading: authLoading, isAuthenticated, isInitialized, refetch } = useReduxAuth();
   const { toast } = useToast();
   
   // Debug logging
@@ -335,6 +335,16 @@ export default function ProfilePage() {
       userEmail: user?.email
     });
   }, [twoFactorEnabled, twoFALoading, user?.email]);
+
+  // Local timezone state for immediate UI update
+  const [selectedTimezone, setSelectedTimezone] = useState<string>(user?.timezone || 'America/Chicago');
+
+  // Update local timezone when user data changes
+  useEffect(() => {
+    if (user?.timezone) {
+      setSelectedTimezone(user.timezone);
+    }
+  }, [user?.timezone]);
 
   // Subscription-related state and queries
   const [clientSecret, setClientSecret] = useState("");
@@ -888,6 +898,69 @@ export default function ProfilePage() {
                                 </div>
                               </SelectItem>
                             ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Timezone Setting */}
+                  <div className="bg-green-50/50 dark:bg-green-900/20 border border-green-200/50 dark:border-green-700/30 rounded-lg p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-3">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-green-600 dark:text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="2" y1="12" x2="22" y2="12"/>
+                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                          </svg>
+                          <Label className="text-base font-medium text-gray-800 dark:text-gray-200">{t('profile.preferences.timezone.title')}</Label>
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 ml-8">
+                          {t('profile.preferences.timezone.description')}
+                        </p>
+                      </div>
+                      <div className="min-w-[200px]">
+                        <Select 
+                          value={selectedTimezone} 
+                          onValueChange={async (value) => {
+                            const previousTimezone = selectedTimezone;
+                            setSelectedTimezone(value);
+                            try {
+                              await updateProfileMutation.mutateAsync({ timezone: value } as any);
+                              refetch?.();
+                            } catch {
+                              setSelectedTimezone(previousTimezone);
+                            }
+                          }}
+                          disabled={updateProfileMutation.isPending}
+                        >
+                          <SelectTrigger className="bg-white/70 dark:bg-gray-700/50 border-green-200 dark:border-green-700/50 focus:border-green-500 dark:focus:border-green-400">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[300px]">
+                            <SelectItem value="America/New_York">🇺🇸 Eastern Time (ET)</SelectItem>
+                            <SelectItem value="America/Chicago">🇺🇸 Central Time (CT)</SelectItem>
+                            <SelectItem value="America/Denver">🇺🇸 Mountain Time (MT)</SelectItem>
+                            <SelectItem value="America/Los_Angeles">🇺🇸 Pacific Time (PT)</SelectItem>
+                            <SelectItem value="America/Anchorage">🇺🇸 Alaska Time (AKT)</SelectItem>
+                            <SelectItem value="Pacific/Honolulu">🇺🇸 Hawaii Time (HT)</SelectItem>
+                            <SelectItem value="America/Phoenix">🇺🇸 Arizona (MST)</SelectItem>
+                            <SelectItem value="America/Toronto">🇨🇦 Toronto (ET)</SelectItem>
+                            <SelectItem value="America/Vancouver">🇨🇦 Vancouver (PT)</SelectItem>
+                            <SelectItem value="America/Mexico_City">🇲🇽 Mexico City (CST)</SelectItem>
+                            <SelectItem value="Europe/London">🇬🇧 London (GMT/BST)</SelectItem>
+                            <SelectItem value="Europe/Paris">🇫🇷 Paris (CET)</SelectItem>
+                            <SelectItem value="Europe/Berlin">🇩🇪 Berlin (CET)</SelectItem>
+                            <SelectItem value="Europe/Madrid">🇪🇸 Madrid (CET)</SelectItem>
+                            <SelectItem value="Asia/Tokyo">🇯🇵 Tokyo (JST)</SelectItem>
+                            <SelectItem value="Asia/Shanghai">🇨🇳 Shanghai (CST)</SelectItem>
+                            <SelectItem value="Asia/Singapore">🇸🇬 Singapore (SGT)</SelectItem>
+                            <SelectItem value="Asia/Dubai">🇦🇪 Dubai (GST)</SelectItem>
+                            <SelectItem value="Australia/Sydney">🇦🇺 Sydney (AEST)</SelectItem>
+                            <SelectItem value="Australia/Perth">🇦🇺 Perth (AWST)</SelectItem>
+                            <SelectItem value="Pacific/Auckland">🇳🇿 Auckland (NZST)</SelectItem>
+                            <SelectItem value="UTC">🌐 UTC</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

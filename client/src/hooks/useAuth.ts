@@ -1,7 +1,8 @@
-import { useSession, signIn, signOut, signUp, type ExtendedUser } from "@/lib/betterAuthClient";
+import { useSession, signIn, signOut, signUp, authClient, type ExtendedUser } from "@/lib/betterAuthClient";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { getApiBaseUrl } from "@/lib/apiConfig";
+import { queryClient } from "@/lib/queryClient";
 import type {
   LoginCredentials,
   RegisterData,
@@ -18,6 +19,7 @@ export function useAuth() {
     isAuthenticated: !!session.data?.user,
     hasInitialized: !session.isPending,
     error: session.error,
+    refetch: session.refetch,
   };
 }
 
@@ -183,18 +185,45 @@ export function useUpdateProfile() {
   const { toast } = useToast();
   const [isPending, setIsPending] = useState(false);
 
-  const mutateAsync = async (data: UpdateProfileData) => {
+  const mutateAsync = async (data: Partial<UpdateProfileData>) => {
     setIsPending(true);
     try {
-      // TODO: Implement with better-auth API
-      console.log('Profile update requested:', data);
+      const response = await fetch('/api/user/profile', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to update profile';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch {
+          // Response body might be empty
+        }
+        throw new Error(errorMessage);
+      }
+
+      let result = {};
+      try {
+        result = await response.json();
+      } catch {
+        // Response might be empty on success
+      }
+
+      // Refetch the session to get updated user data
+      await authClient.getSession({ fetchOptions: { cache: 'no-store' } });
 
       toast({
         title: "Profile Updated",
         description: "Your profile has been updated successfully.",
       });
 
-      return data;
+      return result;
     } catch (error: any) {
       toast({
         title: "Update Failed",

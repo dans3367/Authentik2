@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useTranslation } from 'react-i18next';
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
+import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -17,13 +18,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { 
-  Bell, 
-  Users, 
-  Mail, 
-  Calendar, 
-  Settings, 
-  Filter, 
+import {
+  Bell,
+  Users,
+  Mail,
+  Calendar,
+  Settings,
+  Filter,
   Plus,
   Trash2,
   Edit,
@@ -50,7 +51,8 @@ import {
   RefreshCw,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  BellOff
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -61,7 +63,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Calendar as DateCalendar } from "@/components/ui/calendar";
+import ContactViewDrawer from "@/components/ContactViewDrawer";
+
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -72,6 +75,12 @@ interface Customer {
   firstName: string | null;
   lastName: string | null;
   status: "active" | "unsubscribed" | "bounced" | "pending";
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zipCode?: string | null;
+  country?: string | null;
+  phoneNumber?: string | null;
 }
 
 interface Appointment {
@@ -130,8 +139,11 @@ export default function RemindersPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<"appointments" | "settings">("appointments");
-  
+  const { user } = useReduxAuth();
+  const userTimezone = user?.timezone || 'America/Chicago';
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [appointmentsTab, setAppointmentsTab] = useState<"upcoming" | "past">("upcoming");
+
   // Set breadcrumbs in header
   useSetBreadcrumbs([
     { label: t('navigation.dashboard'), href: "/", icon: LayoutDashboard },
@@ -139,10 +151,15 @@ export default function RemindersPage() {
   ]);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [pastSearchQuery, setPastSearchQuery] = useState("");
+  const [debouncedPastSearchQuery, setDebouncedPastSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [pastStatusFilter, setPastStatusFilter] = useState("all");
   const [showArchived, setShowArchived] = useState(false);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [pastDateFrom, setPastDateFrom] = useState<Date | undefined>(undefined);
+  const [pastDateTo, setPastDateTo] = useState<Date | undefined>(undefined);
   const [selectedAppointments, setSelectedAppointments] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -155,6 +172,8 @@ export default function RemindersPage() {
   const [pastSortDirection, setPastSortDirection] = useState<'asc' | 'desc'>('desc');
   const [newAppointmentModalOpen, setNewAppointmentModalOpen] = useState(false);
   const [newAppointmentReminderModalOpen, setNewAppointmentReminderModalOpen] = useState(false);
+  const [dateFilterOpen, setDateFilterOpen] = useState(false);
+  const [pastDateFilterOpen, setPastDateFilterOpen] = useState(false);
 
   // Debounce search query to avoid jittery API calls
   useEffect(() => {
@@ -165,10 +184,24 @@ export default function RemindersPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Debounce past search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPastSearchQuery(pastSearchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [pastSearchQuery]);
+
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [debouncedSearchQuery, statusFilter, showArchived, dateFrom, dateTo]);
+
+  // Reset past page to 1 when past filters change
+  useEffect(() => {
+    setPastCurrentPage(1);
+  }, [debouncedPastSearchQuery, pastStatusFilter, pastDateFrom, pastDateTo]);
 
   useEffect(() => {
     queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
@@ -179,6 +212,8 @@ export default function RemindersPage() {
   const [viewAppointmentPanelOpen, setViewAppointmentPanelOpen] = useState(false);
   const [viewingAppointment, setViewingAppointment] = useState<Appointment | null>(null);
   const [viewAppointmentTab, setViewAppointmentTab] = useState<"details" | "notes">("details");
+  const [showExpandedCustomerInfo, setShowExpandedCustomerInfo] = useState(false);
+  const [customerProfilePanelOpen, setCustomerProfilePanelOpen] = useState(false);
   const [newAppointmentData, setNewAppointmentData] = useState({
     customerId: "",
     title: "",
@@ -295,9 +330,18 @@ export default function RemindersPage() {
     reminderType: 'email',
     reminderTiming: '1h',
     scheduledFor: new Date(),
-    timezone: 'America/Chicago',
+    timezone: userTimezone,
     content: ''
   });
+
+  // Update timezone defaults when user data loads
+  useEffect(() => {
+    if (userTimezone) {
+      setNewAppointmentReminderData(prev => ({ ...prev, timezone: userTimezone }));
+      setEditAppointmentReminderData(prev => ({ ...prev, timezone: userTimezone }));
+      setScheduleData(prev => ({ ...prev, timezone: userTimezone }));
+    }
+  }, [userTimezone]);
 
   // Cancel appointment confirmation state
   const [cancelAppointmentId, setCancelAppointmentId] = useState<string>("");
@@ -310,22 +354,20 @@ export default function RemindersPage() {
   // Past date confirmation state
   const [pastDateConfirmModalOpen, setPastDateConfirmModalOpen] = useState(false);
 
-  // Fetch appointments
-  const { 
+  // Fetch appointments - no date filtering on server, only archived filter
+  // All date filtering is done client-side to ensure both upcoming and past tabs
+  // have access to all appointment data
+  const {
     data: appointmentsData,
     isLoading: appointmentsLoading,
     isFetching: appointmentsFetching,
-    refetch: refetchAppointments 
-  } = useQuery<{appointments: Appointment[]}>({
-    queryKey: ['/api/appointments', debouncedSearchQuery, statusFilter, showArchived, dateFrom, dateTo],
+    refetch: refetchAppointments
+  } = useQuery<{ appointments: Appointment[] }>({
+    queryKey: ['/api/appointments', showArchived],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (debouncedSearchQuery) params.append('search', debouncedSearchQuery);
-      if (statusFilter !== 'all') params.append('status', statusFilter);
       if (showArchived) params.append('archived', 'true');
-      if (dateFrom) params.append('dateFrom', dateFrom.toISOString());
-      if (dateTo) params.append('dateTo', dateTo.toISOString());
-      
+
       const response = await apiRequest('GET', `/api/appointments?${params.toString()}`);
       return response.json();
     },
@@ -334,7 +376,7 @@ export default function RemindersPage() {
   });
 
   // Fetch upcoming appointments (always non-archived for the sidebar)
-  const { data: upcomingAppointmentsData, refetch: refetchUpcomingAppointments } = useQuery<{appointments: Appointment[]}>({
+  const { data: upcomingAppointmentsData, refetch: refetchUpcomingAppointments } = useQuery<{ appointments: Appointment[] }>({
     queryKey: ['/api/appointments/upcoming'],
     queryFn: async () => {
       // Always fetch non-archived appointments for upcoming section
@@ -346,7 +388,7 @@ export default function RemindersPage() {
   });
 
   // Fetch customers for appointment creation
-  const { data: customersData } = useQuery<{contacts: Customer[]}>({
+  const { data: customersData } = useQuery<{ contacts: Customer[] }>({
     queryKey: ['/api/email-contacts'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/email-contacts');
@@ -355,11 +397,11 @@ export default function RemindersPage() {
   });
 
   // Fetch appointment reminders
-  const { 
+  const {
     data: remindersData,
     isLoading: remindersLoading,
-    refetch: refetchReminders 
-  } = useQuery<{reminders: AppointmentReminder[]}>({
+    refetch: refetchReminders
+  } = useQuery<{ reminders: AppointmentReminder[] }>({
     queryKey: ['/api/appointment-reminders'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/appointment-reminders');
@@ -371,7 +413,7 @@ export default function RemindersPage() {
 
   const allAppointments: Appointment[] = appointmentsData?.appointments || [];
   const upcomingAppointmentsForSidebar: Appointment[] = upcomingAppointmentsData?.appointments || [];
-  
+
   // Helper to get customer name for sorting
   const getCustomerNameForSort = (customer: Customer | undefined): string => {
     if (!customer) return '';
@@ -380,8 +422,62 @@ export default function RemindersPage() {
 
   // Split appointments into upcoming and past based on current time
   const now = new Date();
-  const upcomingAppointmentsAll = allAppointments.filter(a => new Date(a.appointmentDate) >= now);
-  const pastAppointmentsAll = allAppointments.filter(a => new Date(a.appointmentDate) < now);
+  const upcomingAppointmentsUnfiltered = allAppointments.filter(a => new Date(a.appointmentDate) >= now);
+  const pastAppointmentsAllUnfiltered = allAppointments.filter(a => new Date(a.appointmentDate) < now);
+
+  // Filter upcoming appointments by search query, status, and date range
+  const upcomingAppointmentsAll = upcomingAppointmentsUnfiltered.filter(appointment => {
+    // Filter by status
+    if (statusFilter !== 'all' && appointment.status !== statusFilter) {
+      return false;
+    }
+    // Filter by date range
+    const appointmentDate = new Date(appointment.appointmentDate);
+    if (dateFrom && appointmentDate < dateFrom) {
+      return false;
+    }
+    if (dateTo && appointmentDate > dateTo) {
+      return false;
+    }
+    // Filter by search query
+    if (!debouncedSearchQuery) return true;
+    const searchLower = debouncedSearchQuery.toLowerCase();
+    const customerName = getCustomerNameForSort(appointment.customer).toLowerCase();
+    const customerEmail = (appointment.customer?.email || '').toLowerCase();
+    const title = (appointment.title || '').toLowerCase();
+    const location = (appointment.location || '').toLowerCase();
+    return customerName.includes(searchLower) ||
+      customerEmail.includes(searchLower) ||
+      title.includes(searchLower) ||
+      location.includes(searchLower);
+  });
+
+  // Filter past appointments by search query, status, and date range
+  const pastAppointmentsAll = pastAppointmentsAllUnfiltered.filter(appointment => {
+    // Filter by status
+    if (pastStatusFilter !== 'all' && appointment.status !== pastStatusFilter) {
+      return false;
+    }
+    // Filter by date range
+    const appointmentDate = new Date(appointment.appointmentDate);
+    if (pastDateFrom && appointmentDate < pastDateFrom) {
+      return false;
+    }
+    if (pastDateTo && appointmentDate > pastDateTo) {
+      return false;
+    }
+    // Filter by search query
+    if (!debouncedPastSearchQuery) return true;
+    const searchLower = debouncedPastSearchQuery.toLowerCase();
+    const customerName = getCustomerNameForSort(appointment.customer).toLowerCase();
+    const customerEmail = (appointment.customer?.email || '').toLowerCase();
+    const title = (appointment.title || '').toLowerCase();
+    const location = (appointment.location || '').toLowerCase();
+    return customerName.includes(searchLower) ||
+      customerEmail.includes(searchLower) ||
+      title.includes(searchLower) ||
+      location.includes(searchLower);
+  });
 
   // Sort upcoming appointments
   const sortedUpcomingAppointments = [...upcomingAppointmentsAll].sort((a, b) => {
@@ -477,7 +573,7 @@ export default function RemindersPage() {
     if (sortColumn !== column) {
       return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
     }
-    return sortDirection === 'asc' 
+    return sortDirection === 'asc'
       ? <ArrowUp className="h-4 w-4 ml-1" />
       : <ArrowDown className="h-4 w-4 ml-1" />;
   };
@@ -487,17 +583,17 @@ export default function RemindersPage() {
     if (pastSortColumn !== column) {
       return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
     }
-    return pastSortDirection === 'asc' 
+    return pastSortDirection === 'asc'
       ? <ArrowUp className="h-4 w-4 ml-1" />
       : <ArrowDown className="h-4 w-4 ml-1" />;
   };
 
   // Fetch appointment notes when viewing an appointment
-  const { 
+  const {
     data: notesData,
     isLoading: notesLoading,
-    refetch: refetchNotes 
-  } = useQuery<{notes: AppointmentNote[]}>({
+    refetch: refetchNotes
+  } = useQuery<{ notes: AppointmentNote[] }>({
     queryKey: ['/api/appointment-notes', viewingAppointment?.id],
     queryFn: async () => {
       if (!viewingAppointment?.id) return { notes: [] };
@@ -613,27 +709,27 @@ export default function RemindersPage() {
         title: t('reminders.toasts.success'),
         description: t('reminders.toasts.appointmentCreated'),
       });
-      
+
       // Invalidate all appointment queries to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] });
-      
+
       // Schedule delayed refreshes to ensure data is fully synced
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
         queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] });
       }, 5000);
-      
+
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
         queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] });
       }, 15000);
-      
+
       // Schedule reminder if enabled
       if (newAppointmentReminderEnabled && data.appointment) {
         const appointmentDate = new Date(data.appointment.appointmentDate);
         let scheduledFor: Date;
-        
+
         if (newAppointmentReminderData.reminderTiming === 'now') {
           scheduledFor = new Date();
         } else if (newAppointmentReminderData.reminderTiming === 'custom' && newAppointmentReminderData.customMinutesBefore) {
@@ -649,7 +745,7 @@ export default function RemindersPage() {
           const minutes = timingMap[newAppointmentReminderData.reminderTiming] || 60;
           scheduledFor = new Date(appointmentDate.getTime() - minutes * 60 * 1000);
         }
-        
+
         createScheduledReminderMutation.mutate({
           appointmentId: data.appointment.id,
           data: {
@@ -662,7 +758,7 @@ export default function RemindersPage() {
           },
         });
       }
-      
+
       setNewAppointmentModalOpen(false);
       resetNewAppointmentData();
     },
@@ -817,7 +913,7 @@ export default function RemindersPage() {
       reminderType: 'email',
       reminderTiming: '1h',
       customMinutesBefore: undefined,
-      timezone: 'America/Chicago',
+      timezone: userTimezone,
       content: '',
     });
   };
@@ -827,7 +923,7 @@ export default function RemindersPage() {
     const baseDate = apt ? new Date(apt.appointmentDate) : new Date();
     const defaultScheduled = new Date(baseDate.getTime() - 1 * 60 * 60 * 1000); // default 1h before
     setScheduleAppointmentId(appointmentId);
-    setScheduleData({ reminderType: 'email', reminderTiming: '1h', scheduledFor: defaultScheduled, timezone: 'America/Chicago', content: '' });
+    setScheduleData({ reminderType: 'email', reminderTiming: '1h', scheduledFor: defaultScheduled, timezone: userTimezone, content: '' });
     setScheduleReminderModalOpen(true);
   };
 
@@ -867,7 +963,7 @@ export default function RemindersPage() {
 
     // Check for existing reminder
     const existingReminder = reminders.find(r => r.appointmentId === appointment.id && r.status === 'pending');
-    
+
     if (existingReminder) {
       setEditAppointmentReminderEnabled(true);
       setEditAppointmentReminderModalOpen(false);
@@ -895,9 +991,9 @@ export default function RemindersPage() {
 
   const handleUpdateAppointment = () => {
     if (!editingAppointment) return;
-    
+
     const errors: typeof editAppointmentErrors = {};
-    
+
     if (editAppointmentReminderEnabled && editAppointmentReminderData.reminderTiming === 'custom' && !editAppointmentReminderData.customMinutesBefore) {
       errors.customMinutesBefore = true;
     }
@@ -905,7 +1001,7 @@ export default function RemindersPage() {
     if (editAppointmentReminderEnabled) {
       const appointmentDate = new Date(editingAppointment.appointmentDate);
       let scheduledFor: Date;
-      
+
       if (editAppointmentReminderData.reminderTiming === 'custom' && editAppointmentReminderData.customMinutesBefore) {
         scheduledFor = new Date(appointmentDate.getTime() - editAppointmentReminderData.customMinutesBefore * 60 * 1000);
       } else {
@@ -919,7 +1015,7 @@ export default function RemindersPage() {
         const minutes = timingMap[editAppointmentReminderData.reminderTiming] || 60;
         scheduledFor = new Date(appointmentDate.getTime() - minutes * 60 * 1000);
       }
-      
+
       if (scheduledFor < new Date()) {
         toast({
           title: t('reminders.toasts.validationError'),
@@ -929,7 +1025,7 @@ export default function RemindersPage() {
         return;
       }
     }
-    
+
     if (Object.keys(errors).length > 0) {
       setEditAppointmentErrors(errors);
       toast({
@@ -939,12 +1035,12 @@ export default function RemindersPage() {
       });
       return;
     }
-    
+
     setEditAppointmentErrors({});
-    
+
     // Set status to 'scheduled' if reminder is enabled
     const appointmentStatus = editingAppointment.status;
-    
+
     updateAppointmentMutation.mutate({
       id: editingAppointment.id,
       data: {
@@ -958,15 +1054,15 @@ export default function RemindersPage() {
         notes: editingAppointment.notes,
       },
     });
-    
+
     // Check if there's an existing reminder
     const existingReminder = reminders.find(r => r.appointmentId === editingAppointment.id && r.status === 'pending');
-    
+
     // Handle reminder based on toggle state
     if (editAppointmentReminderEnabled) {
       const appointmentDate = new Date(editingAppointment.appointmentDate);
       let scheduledFor: Date;
-      
+
       if (editAppointmentReminderData.reminderTiming === 'custom' && editAppointmentReminderData.customMinutesBefore) {
         scheduledFor = new Date(appointmentDate.getTime() - editAppointmentReminderData.customMinutesBefore * 60 * 1000);
       } else {
@@ -980,12 +1076,12 @@ export default function RemindersPage() {
         const minutes = timingMap[editAppointmentReminderData.reminderTiming] || 60;
         scheduledFor = new Date(appointmentDate.getTime() - minutes * 60 * 1000);
       }
-      
+
       // Delete existing reminder first if it exists, then create new one
       if (existingReminder) {
         deleteReminderMutation.mutate(existingReminder.id);
       }
-      
+
       // Create new reminder
       createScheduledReminderMutation.mutate({
         appointmentId: editingAppointment.id,
@@ -1006,7 +1102,7 @@ export default function RemindersPage() {
 
   const handleCreateAppointment = () => {
     const errors: typeof newAppointmentErrors = {};
-    
+
     if (!newAppointmentData.customerId) {
       errors.customerId = true;
     }
@@ -1020,7 +1116,7 @@ export default function RemindersPage() {
     if (newAppointmentReminderEnabled && newAppointmentReminderData.reminderTiming !== 'now') {
       const appointmentDate = new Date(newAppointmentData.appointmentDate);
       let scheduledFor: Date;
-      
+
       if (newAppointmentReminderData.reminderTiming === 'custom' && newAppointmentReminderData.customMinutesBefore) {
         scheduledFor = new Date(appointmentDate.getTime() - newAppointmentReminderData.customMinutesBefore * 60 * 1000);
       } else {
@@ -1034,7 +1130,7 @@ export default function RemindersPage() {
         const minutes = timingMap[newAppointmentReminderData.reminderTiming] || 60;
         scheduledFor = new Date(appointmentDate.getTime() - minutes * 60 * 1000);
       }
-      
+
       if (scheduledFor < new Date()) {
         toast({
           title: t('reminders.toasts.validationError'),
@@ -1044,7 +1140,7 @@ export default function RemindersPage() {
         return;
       }
     }
-    
+
     if (Object.keys(errors).length > 0) {
       setNewAppointmentErrors(errors);
       toast({
@@ -1054,9 +1150,9 @@ export default function RemindersPage() {
       });
       return;
     }
-    
+
     setNewAppointmentErrors({});
-    
+
     // Check if appointment date is in the past
     const appointmentDate = new Date(newAppointmentData.appointmentDate);
     const now = new Date();
@@ -1064,7 +1160,7 @@ export default function RemindersPage() {
       setPastDateConfirmModalOpen(true);
       return;
     }
-    
+
     createAppointmentMutation.mutate(newAppointmentData);
   };
 
@@ -1093,7 +1189,7 @@ export default function RemindersPage() {
 
   const confirmCancelAppointment = () => {
     if (!cancelAppointmentId) return;
-    
+
     cancelAppointmentMutation.mutate(cancelAppointmentId);
     setCancelConfirmModalOpen(false);
     setCancelAppointmentId("");
@@ -1106,7 +1202,7 @@ export default function RemindersPage() {
 
   const confirmArchiveAppointment = () => {
     if (!archiveAppointmentId) return;
-    
+
     archiveAppointmentMutation.mutate(archiveAppointmentId);
   };
 
@@ -1196,7 +1292,7 @@ export default function RemindersPage() {
 
   // Check if all appointments are selected
   const isAllSelected = allAppointments.length > 0 && selectedAppointments.length === allAppointments.length;
-  
+
   // Check if some appointments are selected (for indeterminate state)
   const isSomeSelected = selectedAppointments.length > 0 && selectedAppointments.length < allAppointments.length;
 
@@ -1219,456 +1315,437 @@ export default function RemindersPage() {
               {t('reminders.pageSubtitle')}
             </p>
           </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-full"
-                aria-label="Reminders info"
-              >
-                <Info className="h-5 w-5" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-96">
-              <div className="space-y-2">
-                <div className="font-semibold leading-none tracking-tight">
-                  {t('reminders.title')}
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  {t('reminders.subtitle')}
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        {/* Navigation Tabs */}
-        <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg w-fit">
           <Button
-            variant={activeTab === "appointments" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setActiveTab("appointments")}
-            className="flex items-center gap-2"
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-full"
+            aria-label="Settings"
+            onClick={() => setSettingsModalOpen(true)}
           >
-            <Calendar className="h-4 w-4" />
-            {t('reminders.tabs.appointments')}
-            {allAppointments.length > 0 && (
-              <Badge variant="secondary" className="ml-1">
-                {allAppointments.length}
-              </Badge>
-            )}
-          </Button>
-          <Button
-            variant={activeTab === "settings" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setActiveTab("settings")}
-            className="flex items-center gap-2"
-          >
-            <Settings className="h-4 w-4" />
-            {t('reminders.tabs.settings')}
+            <Settings className="h-5 w-5" />
           </Button>
         </div>
 
-        {/* Appointments Tab */}
-        {activeTab === "appointments" && (
-          <div className="space-y-6">
-            {/* Overview and Upcoming Side by Side */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Overview Stats */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5" />
-                    {t('reminders.overview.title')}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">{t('reminders.overview.total')}</span>
-                    <Badge variant="outline">{allAppointments.length}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">{t('reminders.overview.upcoming')}</span>
-                    <Badge variant="outline">{upcomingAppointments.length}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">{t('reminders.overview.confirmed')}</span>
-                    <Badge variant="outline">
-                      {allAppointments.filter(apt => apt.status === 'confirmed').length}
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">{t('reminders.overview.remindersSent')}</span>
-                    <Badge variant="outline">
-                      {allAppointments.filter(apt => apt.reminderSent).length}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Upcoming Appointments */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-5 w-5" />
-                    {t('reminders.overview.upcomingThisWeek')}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {upcomingAppointments.length === 0 ? (
-                    <div className="text-center py-4">
-                      <Calendar className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-600">
-                        {t('reminders.appointments.noUpcoming')}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-1">
-                      {upcomingAppointments.map((appointment) => (
-                        <div
-                          key={appointment.id}
-                          className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 hover:bg-muted/50 transition-colors"
-                        >
-                          <div className="text-left min-w-0 flex-1 mr-3">
-                            <button
-                              type="button"
-                              onClick={() => handleViewAppointment(appointment)}
-                              className="text-sm font-medium text-left hover:underline focus:outline-none focus:ring-2 focus:ring-primary/50 rounded block w-full truncate"
-                            >
-                              {appointment.title}
-                            </button>
-                            <p className="text-xs text-muted-foreground truncate">
-                              {getCustomerName(appointment.customer)} • {formatDateTime(appointment.appointmentDate)}
-                            </p>
-                          </div>
-                          <Badge className={`${getStatusColor(appointment.status)} text-[10px] px-1.5 py-0 h-5 whitespace-nowrap`} variant="outline">
-                            {appointment.status}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Upcoming Appointments Table */}
+        {/* Appointments Content */}
+        <div className="space-y-6">
+          {/* Overview and Upcoming Side by Side */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Overview Stats */}
             <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      <Calendar className="h-5 w-5" />
-                      Upcoming Appointments
-                    </CardTitle>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        disabled={appointmentsFetching}
-                        onClick={async () => {
-                          // Invalidate queries to trigger refetch
-                          await Promise.all([
-                            queryClient.invalidateQueries({ queryKey: ['/api/appointments'] }),
-                            queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] }),
-                            queryClient.invalidateQueries({ queryKey: ['/api/appointment-reminders'] })
-                          ]);
-                          setLastRefreshedAt(new Date());
-                          toast({ title: t('reminders.toasts.success'), description: 'Appointments refreshed' });
-                        }}
-                        title="Refresh appointments"
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  {t('reminders.overview.title')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">{t('reminders.overview.total')}</span>
+                  <Badge variant="outline">{allAppointments.length}</Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">{t('reminders.overview.upcoming')}</span>
+                  <Badge variant="outline">{upcomingAppointments.length}</Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">{t('reminders.overview.confirmed')}</span>
+                  <Badge variant="outline">
+                    {allAppointments.filter(apt => apt.status === 'confirmed').length}
+                  </Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">{t('reminders.overview.remindersSent')}</span>
+                  <Badge variant="outline">
+                    {allAppointments.filter(apt => apt.reminderSent).length}
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Upcoming Appointments */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  {t('reminders.overview.upcomingThisWeek')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {upcomingAppointments.length === 0 ? (
+                  <div className="text-center py-4">
+                    <Calendar className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600">
+                      {t('reminders.appointments.noUpcoming')}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {upcomingAppointments.map((appointment) => (
+                      <div
+                        key={appointment.id}
+                        className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 hover:bg-muted/50 transition-colors"
                       >
-                        <RefreshCw className={`h-4 w-4 ${appointmentsFetching ? 'animate-spin' : ''}`} />
+                        <div className="text-left min-w-0 flex-1 mr-3">
+                          <button
+                            type="button"
+                            onClick={() => handleViewAppointment(appointment)}
+                            className="text-sm font-medium text-left hover:underline focus:outline-none focus:ring-2 focus:ring-primary/50 rounded block w-full truncate"
+                          >
+                            {appointment.title}
+                          </button>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {getCustomerName(appointment.customer)} • {formatDateTime(appointment.appointmentDate)}
+                          </p>
+                        </div>
+                        <Badge className={`${getStatusColor(appointment.status)} text-[10px] px-1.5 py-0 h-5 whitespace-nowrap`} variant="outline">
+                          {appointment.status}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Appointments Table with Tabs */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Appointments
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    disabled={appointmentsFetching}
+                    onClick={async () => {
+                      // Invalidate queries to trigger refetch
+                      await Promise.all([
+                        queryClient.invalidateQueries({ queryKey: ['/api/appointments'] }),
+                        queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] }),
+                        queryClient.invalidateQueries({ queryKey: ['/api/appointment-reminders'] })
+                      ]);
+                      setLastRefreshedAt(new Date());
+                      toast({ title: t('reminders.toasts.success'), description: 'Appointments refreshed' });
+                    }}
+                    title="Refresh appointments"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${appointmentsFetching ? 'animate-spin' : ''}`} />
+                  </Button>
+                  {lastRefreshedAt && (
+                    <span className="text-sm text-muted-foreground">
+                      Last refreshed: {lastRefreshedAt.toLocaleTimeString()}
+                    </span>
+                  )}
+                  <Dialog open={newAppointmentModalOpen} onOpenChange={setNewAppointmentModalOpen}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <CalendarPlus className="h-4 w-4 mr-2" />
+                        {t('reminders.appointments.newAppointment')}
                       </Button>
-                      {lastRefreshedAt && (
-                        <span className="text-sm text-muted-foreground">
-                          Last refreshed: {lastRefreshedAt.toLocaleTimeString()}
-                        </span>
-                      )}
-                      <Dialog open={newAppointmentModalOpen} onOpenChange={setNewAppointmentModalOpen}>
-                        <DialogTrigger asChild>
-                          <Button>
-                            <CalendarPlus className="h-4 w-4 mr-2" />
-                            {t('reminders.appointments.newAppointment')}
-                          </Button>
-                        </DialogTrigger>
-                      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
-                        <DialogHeader>
-                          <DialogTitle>{t('reminders.appointments.createAppointment')}</DialogTitle>
-                          <DialogDescription>
-                            {t('reminders.appointments.scheduleDescription')}
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 overflow-y-auto flex-1">
-                          <div>
-                            <Label className={newAppointmentErrors.customerId ? "text-red-500" : ""}>
-                              {t('reminders.appointments.customer')} <span className="text-red-500">*</span>
-                            </Label>
-                            <Select value={newAppointmentData.customerId} onValueChange={(value) => {
-                              setNewAppointmentData(prev => ({...prev, customerId: value}));
-                              setNewAppointmentErrors(prev => ({...prev, customerId: false}));
-                            }}>
-                              <SelectTrigger className={`focus-visible:ring-0 focus:ring-0 ${newAppointmentErrors.customerId ? 'border-red-500' : ''}`}>
-                                <SelectValue placeholder={t('reminders.appointments.selectCustomer')} />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {customers.map((customer) => (
-                                  <SelectItem key={customer.id} value={customer.id}>
-                                    {getCustomerName(customer)} ({customer.email})
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          
-                          <div>
-                            <Label className={newAppointmentErrors.title ? "text-red-500" : ""}>
-                              {t('reminders.appointments.title')} <span className="text-red-500">*</span>
-                            </Label>
-                            <Input 
-                              value={newAppointmentData.title}
-                              onChange={(e) => {
-                                setNewAppointmentData(prev => ({...prev, title: e.target.value}));
-                                setNewAppointmentErrors(prev => ({...prev, title: false}));
-                              }}
-                              placeholder={t('reminders.appointments.titlePlaceholder')}
-                              className={`focus-visible:ring-0 ${newAppointmentErrors.title ? 'border-red-500' : ''}`}
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+                      <DialogHeader>
+                        <DialogTitle>{t('reminders.appointments.createAppointment')}</DialogTitle>
+                        <DialogDescription>
+                          {t('reminders.appointments.scheduleDescription')}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 overflow-y-auto flex-1">
+                        <div>
+                          <Label className={newAppointmentErrors.customerId ? "text-red-500" : ""}>
+                            {t('reminders.appointments.customer')} <span className="text-red-500">*</span>
+                          </Label>
+                          <Select value={newAppointmentData.customerId} onValueChange={(value) => {
+                            setNewAppointmentData(prev => ({ ...prev, customerId: value }));
+                            setNewAppointmentErrors(prev => ({ ...prev, customerId: false }));
+                          }}>
+                            <SelectTrigger className={`focus-visible:ring-0 focus:ring-0 ${newAppointmentErrors.customerId ? 'border-red-500' : ''}`}>
+                              <SelectValue placeholder={t('reminders.appointments.selectCustomer')} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {customers.map((customer) => (
+                                <SelectItem key={customer.id} value={customer.id}>
+                                  {getCustomerName(customer)} ({customer.email})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label className={newAppointmentErrors.title ? "text-red-500" : ""}>
+                            {t('reminders.appointments.title')} <span className="text-red-500">*</span>
+                          </Label>
+                          <Input
+                            value={newAppointmentData.title}
+                            onChange={(e) => {
+                              setNewAppointmentData(prev => ({ ...prev, title: e.target.value }));
+                              setNewAppointmentErrors(prev => ({ ...prev, title: false }));
+                            }}
+                            placeholder={t('reminders.appointments.titlePlaceholder')}
+                            className={`focus-visible:ring-0 ${newAppointmentErrors.title ? 'border-red-500' : ''}`}
+                          />
+                        </div>
+
+                        <div>
+                          <Label>{t('reminders.appointments.dateTime')}</Label>
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <Input
+                              type="date"
+                              value={toLocalDateString(newAppointmentData.appointmentDate)}
+                              onChange={(e) => setNewAppointmentData(prev => ({
+                                ...prev,
+                                appointmentDate: mergeDateAndTime(prev.appointmentDate, e.target.value, undefined)
+                              }))}
+                              className="focus-visible:ring-0"
+                            />
+                            <Input
+                              type="time"
+                              value={toLocalTimeString(newAppointmentData.appointmentDate)}
+                              onChange={(e) => setNewAppointmentData(prev => ({
+                                ...prev,
+                                appointmentDate: mergeDateAndTime(prev.appointmentDate, undefined, e.target.value)
+                              }))}
+                              className="focus-visible:ring-0"
                             />
                           </div>
+                        </div>
 
-                          <div>
-                            <Label>{t('reminders.appointments.dateTime')}</Label>
-                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                              <Input 
-                                type="date"
-                                value={toLocalDateString(newAppointmentData.appointmentDate)}
-                                onChange={(e) => setNewAppointmentData(prev => ({
-                                  ...prev,
-                                  appointmentDate: mergeDateAndTime(prev.appointmentDate, e.target.value, undefined)
-                                }))}
-                                className="focus-visible:ring-0"
-                              />
-                              <Input 
-                                type="time"
-                                value={toLocalTimeString(newAppointmentData.appointmentDate)}
-                                onChange={(e) => setNewAppointmentData(prev => ({
-                                  ...prev,
-                                  appointmentDate: mergeDateAndTime(prev.appointmentDate, undefined, e.target.value)
-                                }))}
+                        <div>
+                          <Label>{t('reminders.appointments.duration')}</Label>
+                          <Input
+                            type="number"
+                            value={newAppointmentData.duration}
+                            onChange={(e) => setNewAppointmentData(prev => ({ ...prev, duration: parseInt(e.target.value) }))}
+                            min="15"
+                            step="15"
+                            className="focus-visible:ring-0"
+                          />
+                        </div>
+
+                        <div>
+                          <Label>{t('reminders.appointments.location')}</Label>
+                          <Input
+                            value={newAppointmentData.location}
+                            onChange={(e) => setNewAppointmentData(prev => ({ ...prev, location: e.target.value }))}
+                            placeholder={t('reminders.appointments.locationPlaceholder')}
+                            className="focus-visible:ring-0"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 pt-4 border-t">
+                        <div className="flex items-center gap-3">
+                          <Label htmlFor="new-reminder-enabled" className="cursor-pointer">
+                            {t('reminders.scheduleReminder.title')}
+                          </Label>
+                          <Switch
+                            id="new-reminder-enabled"
+                            checked={newAppointmentReminderEnabled}
+                            onCheckedChange={(checked) => {
+                              setNewAppointmentReminderEnabled(checked);
+                              if (checked) {
+                                setNewAppointmentReminderModalOpen(true);
+                              } else {
+                                setNewAppointmentReminderModalOpen(false);
+                                setNewAppointmentErrors(prev => ({ ...prev, customMinutesBefore: false }));
+                              }
+                            }}
+                            className="focus-visible:ring-0"
+                          />
+                          {newAppointmentReminderEnabled && (
+                            <button
+                              type="button"
+                              onClick={() => setNewAppointmentReminderModalOpen(true)}
+                              className="text-sm underline text-muted-foreground hover:text-foreground"
+                            >
+                              {t('common.modify')}
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="flex justify-end gap-2">
+                          <Button variant="outline" onClick={() => {
+                            setNewAppointmentModalOpen(false);
+                            setNewAppointmentReminderModalOpen(false);
+                          }}>
+                            {t('reminders.appointments.cancel')}
+                          </Button>
+                          <Button
+                            onClick={handleCreateAppointment}
+                            disabled={createAppointmentMutation.isPending}
+                          >
+                            {t('reminders.appointments.createAppointment')}
+                          </Button>
+                        </div>
+                      </div>
+
+                      <Dialog open={newAppointmentReminderModalOpen} onOpenChange={(open) => {
+                        setNewAppointmentReminderModalOpen(open);
+                        if (!open) {
+                          setNewAppointmentReminderEnabled(false);
+                        }
+                      }}>
+                        <DialogContent className="max-w-lg">
+                          <DialogHeader>
+                            <DialogTitle>{t('reminders.scheduleReminder.title')}</DialogTitle>
+                            <DialogDescription>
+                              {t('reminders.appointments.scheduleDescription')}
+                            </DialogDescription>
+                          </DialogHeader>
+
+                          <div className="space-y-4">
+                            <div>
+                              <Label>{t('reminders.scheduleReminder.reminderType')}</Label>
+                              <Select
+                                value={newAppointmentReminderData.reminderType}
+                                onValueChange={(value: 'email' | 'sms' | 'push') => setNewAppointmentReminderData(prev => ({ ...prev, reminderType: value }))}
+                              >
+                                <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="email">{t('reminders.scheduleReminder.email')}</SelectItem>
+                                  <SelectItem value="sms" disabled>{t('reminders.scheduleReminder.sms')}</SelectItem>
+                                  <SelectItem value="push" disabled>{t('reminders.scheduleReminder.push')}</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div>
+                              <Label>{t('reminders.scheduleReminder.timing')}</Label>
+                              <Select
+                                value={newAppointmentReminderData.reminderTiming}
+                                onValueChange={(value: 'now' | '5m' | '30m' | '1h' | '5h' | '10h' | 'custom') => setNewAppointmentReminderData(prev => ({ ...prev, reminderTiming: value }))}
+                              >
+                                <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="now">{t('reminders.scheduleReminder.sendNow')}</SelectItem>
+                                  <SelectItem value="5m">{t('reminders.scheduleReminder.5mBefore')}</SelectItem>
+                                  <SelectItem value="30m">{t('reminders.scheduleReminder.30mBefore')}</SelectItem>
+                                  <SelectItem value="1h">{t('reminders.scheduleReminder.1hBefore')}</SelectItem>
+                                  <SelectItem value="5h">{t('reminders.scheduleReminder.5hBefore')}</SelectItem>
+                                  <SelectItem value="10h">{t('reminders.scheduleReminder.10hBefore')}</SelectItem>
+                                  <SelectItem value="custom">{t('reminders.scheduleReminder.customTime')}</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {newAppointmentReminderData.reminderTiming === 'custom' && (
+                              <div>
+                                <Label className={newAppointmentErrors.customMinutesBefore ? "text-red-500" : ""}>
+                                  {t('reminders.scheduleReminder.customMinutesLabel')} <span className="text-red-500">*</span>
+                                </Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  max="10080"
+                                  placeholder={t('reminders.scheduleReminder.customMinutesPlaceholder')}
+                                  value={newAppointmentReminderData.customMinutesBefore || ''}
+                                  onChange={(e) => {
+                                    setNewAppointmentReminderData(prev => ({
+                                      ...prev,
+                                      customMinutesBefore: e.target.value ? parseInt(e.target.value) : undefined
+                                    }));
+                                    setNewAppointmentErrors(prev => ({ ...prev, customMinutesBefore: false }));
+                                  }}
+                                  className={`focus-visible:ring-0 ${newAppointmentErrors.customMinutesBefore ? 'border-red-500' : ''}`}
+                                />
+                                <p className="text-xs text-gray-500 mt-1">{t('reminders.scheduleReminder.customMinutesHelp')}</p>
+                              </div>
+                            )}
+
+                            <div>
+                              <Label>Timezone</Label>
+                              <Select
+                                value={newAppointmentReminderData.timezone}
+                                onValueChange={(value) => setNewAppointmentReminderData(prev => ({ ...prev, timezone: value }))}
+                              >
+                                <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
+                                  <SelectValue placeholder="Select timezone" />
+                                </SelectTrigger>
+                                <SelectContent className="max-h-[300px]">
+                                  <SelectItem value="America/New_York">🇺🇸 Eastern Time (ET)</SelectItem>
+                                  <SelectItem value="America/Chicago">🇺🇸 Central Time (CT)</SelectItem>
+                                  <SelectItem value="America/Denver">🇺🇸 Mountain Time (MT)</SelectItem>
+                                  <SelectItem value="America/Los_Angeles">🇺🇸 Pacific Time (PT)</SelectItem>
+                                  <SelectItem value="America/Anchorage">🇺🇸 Alaska Time (AKT)</SelectItem>
+                                  <SelectItem value="Pacific/Honolulu">🇺🇸 Hawaii Time (HT)</SelectItem>
+                                  <SelectItem value="America/Phoenix">🇺🇸 Arizona (MST)</SelectItem>
+                                  <SelectItem value="America/Toronto">🇨🇦 Toronto (ET)</SelectItem>
+                                  <SelectItem value="America/Vancouver">🇨🇦 Vancouver (PT)</SelectItem>
+                                  <SelectItem value="America/Mexico_City">🇲🇽 Mexico City (CST)</SelectItem>
+                                  <SelectItem value="Europe/London">🇬🇧 London (GMT/BST)</SelectItem>
+                                  <SelectItem value="Europe/Paris">🇫🇷 Paris (CET)</SelectItem>
+                                  <SelectItem value="Europe/Berlin">🇩🇪 Berlin (CET)</SelectItem>
+                                  <SelectItem value="Europe/Madrid">🇪🇸 Madrid (CET)</SelectItem>
+                                  <SelectItem value="Asia/Tokyo">🇯🇵 Tokyo (JST)</SelectItem>
+                                  <SelectItem value="Asia/Shanghai">🇨🇳 Shanghai (CST)</SelectItem>
+                                  <SelectItem value="Asia/Singapore">🇸🇬 Singapore (SGT)</SelectItem>
+                                  <SelectItem value="Asia/Dubai">🇦🇪 Dubai (GST)</SelectItem>
+                                  <SelectItem value="Australia/Sydney">🇦🇺 Sydney (AEST)</SelectItem>
+                                  <SelectItem value="Australia/Perth">🇦🇺 Perth (AWST)</SelectItem>
+                                  <SelectItem value="Pacific/Auckland">🇳🇿 Auckland (NZST)</SelectItem>
+                                  <SelectItem value="UTC">🌐 UTC</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-gray-500 mt-1">
+                                The reminder will be sent at the scheduled time in this timezone
+                              </p>
+                            </div>
+
+                            <div>
+                              <Label>{t('reminders.scheduleReminder.message')}</Label>
+                              <Textarea
+                                placeholder={t('reminders.scheduleReminder.messagePlaceholder')}
+                                value={newAppointmentReminderData.content}
+                                onChange={(e) => setNewAppointmentReminderData(prev => ({ ...prev, content: e.target.value }))}
+                                rows={4}
                                 className="focus-visible:ring-0"
                               />
                             </div>
                           </div>
 
-                          <div>
-                            <Label>{t('reminders.appointments.duration')}</Label>
-                            <Input 
-                              type="number"
-                              value={newAppointmentData.duration}
-                              onChange={(e) => setNewAppointmentData(prev => ({...prev, duration: parseInt(e.target.value)}))}
-                              min="15"
-                              step="15"
-                              className="focus-visible:ring-0"
-                            />
-                          </div>
-
-                          <div>
-                            <Label>{t('reminders.appointments.location')}</Label>
-                            <Input 
-                              value={newAppointmentData.location}
-                              onChange={(e) => setNewAppointmentData(prev => ({...prev, location: e.target.value}))}
-                              placeholder={t('reminders.appointments.locationPlaceholder')}
-                              className="focus-visible:ring-0"
-                            />
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center justify-between gap-2 pt-4 border-t">
-                          <div className="flex items-center gap-3">
-                            <Label htmlFor="new-reminder-enabled" className="cursor-pointer">
-                              {t('reminders.scheduleReminder.title')}
-                            </Label>
-                            <Switch
-                              id="new-reminder-enabled"
-                              checked={newAppointmentReminderEnabled}
-                              onCheckedChange={(checked) => {
-                                setNewAppointmentReminderEnabled(checked);
-                                if (checked) {
-                                  setNewAppointmentReminderModalOpen(true);
-                                } else {
-                                  setNewAppointmentReminderModalOpen(false);
-                                  setNewAppointmentErrors(prev => ({ ...prev, customMinutesBefore: false }));
-                                }
-                              }}
-                              className="focus-visible:ring-0"
-                            />
-                            {newAppointmentReminderEnabled && (
-                              <button
-                                type="button"
-                                onClick={() => setNewAppointmentReminderModalOpen(true)}
-                                className="text-sm underline text-muted-foreground hover:text-foreground"
-                              >
-                                {t('common.modify')}
-                              </button>
-                            )}
-                          </div>
-
-                          <div className="flex justify-end gap-2">
+                          <div className="flex justify-end gap-2 pt-4">
                             <Button variant="outline" onClick={() => {
-                              setNewAppointmentModalOpen(false);
                               setNewAppointmentReminderModalOpen(false);
+                              setNewAppointmentReminderEnabled(false);
                             }}>
                               {t('reminders.appointments.cancel')}
                             </Button>
-                            <Button 
-                              onClick={handleCreateAppointment}
-                              disabled={createAppointmentMutation.isPending}
-                            >
-                              {t('reminders.appointments.createAppointment')}
+                            <Button onClick={() => setNewAppointmentReminderModalOpen(false)}>
+                              {t('common.save')}
                             </Button>
                           </div>
-                        </div>
+                        </DialogContent>
+                      </Dialog>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Tabs value={appointmentsTab} onValueChange={(v) => setAppointmentsTab(v as "upcoming" | "past")} className="w-full">
+                <div className="flex items-center justify-between p-4 border-b">
+                  <TabsList>
+                    <TabsTrigger value="upcoming" className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Upcoming
+                    </TabsTrigger>
+                    <TabsTrigger value="past" className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Past
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
 
-                        <Dialog open={newAppointmentReminderModalOpen} onOpenChange={(open) => {
-                          setNewAppointmentReminderModalOpen(open);
-                          if (!open) {
-                            setNewAppointmentReminderEnabled(false);
-                          }
-                        }}>
-                          <DialogContent className="max-w-lg">
-                            <DialogHeader>
-                              <DialogTitle>{t('reminders.scheduleReminder.title')}</DialogTitle>
-                              <DialogDescription>
-                                {t('reminders.appointments.scheduleDescription')}
-                              </DialogDescription>
-                            </DialogHeader>
-
-                            <div className="space-y-4">
-                              <div>
-                                <Label>{t('reminders.scheduleReminder.reminderType')}</Label>
-                                <Select 
-                                  value={newAppointmentReminderData.reminderType} 
-                                  onValueChange={(value: 'email' | 'sms' | 'push') => setNewAppointmentReminderData(prev => ({...prev, reminderType: value}))}
-                                >
-                                  <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="email">{t('reminders.scheduleReminder.email')}</SelectItem>
-                                    <SelectItem value="sms" disabled>{t('reminders.scheduleReminder.sms')}</SelectItem>
-                                    <SelectItem value="push" disabled>{t('reminders.scheduleReminder.push')}</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-                              <div>
-                                <Label>{t('reminders.scheduleReminder.timing')}</Label>
-                                <Select 
-                                  value={newAppointmentReminderData.reminderTiming} 
-                                  onValueChange={(value: 'now' | '5m' | '30m' | '1h' | '5h' | '10h' | 'custom') => setNewAppointmentReminderData(prev => ({...prev, reminderTiming: value}))}
-                                >
-                                  <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="now">{t('reminders.scheduleReminder.sendNow')}</SelectItem>
-                                    <SelectItem value="5m">{t('reminders.scheduleReminder.5mBefore')}</SelectItem>
-                                    <SelectItem value="30m">{t('reminders.scheduleReminder.30mBefore')}</SelectItem>
-                                    <SelectItem value="1h">{t('reminders.scheduleReminder.1hBefore')}</SelectItem>
-                                    <SelectItem value="5h">{t('reminders.scheduleReminder.5hBefore')}</SelectItem>
-                                    <SelectItem value="10h">{t('reminders.scheduleReminder.10hBefore')}</SelectItem>
-                                    <SelectItem value="custom">{t('reminders.scheduleReminder.customTime')}</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-                              {newAppointmentReminderData.reminderTiming === 'custom' && (
-                                <div>
-                                  <Label className={newAppointmentErrors.customMinutesBefore ? "text-red-500" : ""}>
-                                    {t('reminders.scheduleReminder.customMinutesLabel')} <span className="text-red-500">*</span>
-                                  </Label>
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    max="10080"
-                                    placeholder={t('reminders.scheduleReminder.customMinutesPlaceholder')}
-                                    value={newAppointmentReminderData.customMinutesBefore || ''}
-                                    onChange={(e) => {
-                                      setNewAppointmentReminderData(prev => ({
-                                        ...prev,
-                                        customMinutesBefore: e.target.value ? parseInt(e.target.value) : undefined
-                                      }));
-                                      setNewAppointmentErrors(prev => ({...prev, customMinutesBefore: false}));
-                                    }}
-                                    className={`focus-visible:ring-0 ${newAppointmentErrors.customMinutesBefore ? 'border-red-500' : ''}`}
-                                  />
-                                  <p className="text-xs text-gray-500 mt-1">{t('reminders.scheduleReminder.customMinutesHelp')}</p>
-                                </div>
-                              )}
-
-                              <div>
-                                <Label>Timezone</Label>
-                                <Select 
-                                  value={newAppointmentReminderData.timezone} 
-                                  onValueChange={(value) => setNewAppointmentReminderData(prev => ({...prev, timezone: value}))}
-                                >
-                                  <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
-                                    <SelectValue placeholder="Select timezone" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="America/New_York">Eastern Time (ET)</SelectItem>
-                                    <SelectItem value="America/Chicago">Central Time (CT)</SelectItem>
-                                    <SelectItem value="America/Denver">Mountain Time (MT)</SelectItem>
-                                    <SelectItem value="America/Los_Angeles">Pacific Time (PT)</SelectItem>
-                                    <SelectItem value="America/Anchorage">Alaska Time (AKT)</SelectItem>
-                                    <SelectItem value="Pacific/Honolulu">Hawaii Time (HT)</SelectItem>
-                                    <SelectItem value="America/Phoenix">Arizona (MST)</SelectItem>
-                                    <SelectItem value="UTC">UTC</SelectItem>
-                                    <SelectItem value="Europe/London">London (GMT/BST)</SelectItem>
-                                    <SelectItem value="Europe/Paris">Paris (CET/CEST)</SelectItem>
-                                    <SelectItem value="Europe/Berlin">Berlin (CET/CEST)</SelectItem>
-                                    <SelectItem value="Asia/Tokyo">Tokyo (JST)</SelectItem>
-                                    <SelectItem value="Asia/Shanghai">Shanghai (CST)</SelectItem>
-                                    <SelectItem value="Asia/Kolkata">India (IST)</SelectItem>
-                                    <SelectItem value="Australia/Sydney">Sydney (AEST/AEDT)</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <p className="text-xs text-gray-500 mt-1">
-                                  The reminder will be sent at the scheduled time in this timezone
-                                </p>
-                              </div>
-
-                              <div>
-                                <Label>{t('reminders.scheduleReminder.message')}</Label>
-                                <Textarea
-                                  placeholder={t('reminders.scheduleReminder.messagePlaceholder')}
-                                  value={newAppointmentReminderData.content}
-                                  onChange={(e) => setNewAppointmentReminderData(prev => ({...prev, content: e.target.value}))}
-                                  rows={4}
-                                  className="focus-visible:ring-0"
-                                />
-                              </div>
-                            </div>
-
-                            <div className="flex justify-end gap-2 pt-4">
-                              <Button variant="outline" onClick={() => {
-                                setNewAppointmentReminderModalOpen(false);
-                                setNewAppointmentReminderEnabled(false);
-                              }}>
-                                {t('reminders.appointments.cancel')}
-                              </Button>
-                              <Button onClick={() => setNewAppointmentReminderModalOpen(false)}>
-                                {t('common.save')}
-                              </Button>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0">
+                <TabsContent value="upcoming" className="mt-0">
                   {/* Search and Filter Controls */}
                   <div className="flex items-center gap-4 p-6 border-b">
                     <div className="relative flex-1 max-w-sm">
@@ -1702,9 +1779,9 @@ export default function RemindersPage() {
                         <SelectItem value="no_show">{t('reminders.appointments.noShow')}</SelectItem>
                       </SelectContent>
                     </Select>
-                    
+
                     {/* Date Range Filter */}
-                    <Popover>
+                    <Popover open={dateFilterOpen} onOpenChange={setDateFilterOpen}>
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
@@ -1722,23 +1799,89 @@ export default function RemindersPage() {
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-3" align="start" sideOffset={5} avoidCollisions={true}>
-                        <div className="flex flex-col md:flex-row gap-3">
+                        {/* Quick Date Range Presets */}
+                        <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const today = new Date();
+                              today.setHours(0, 0, 0, 0);
+                              const endOfDay = new Date(today);
+                              endOfDay.setHours(23, 59, 59, 999);
+                              setDateFrom(today);
+                              setDateTo(endOfDay);
+                            }}
+                            className="text-xs"
+                          >
+                            Today
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const today = new Date();
+                              today.setHours(0, 0, 0, 0);
+                              const oneWeekLater = new Date(today);
+                              oneWeekLater.setDate(oneWeekLater.getDate() + 7);
+                              oneWeekLater.setHours(23, 59, 59, 999);
+                              setDateFrom(today);
+                              setDateTo(oneWeekLater);
+                            }}
+                            className="text-xs"
+                          >
+                            1 Week
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const today = new Date();
+                              today.setHours(0, 0, 0, 0);
+                              const oneMonthLater = new Date(today);
+                              oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
+                              oneMonthLater.setHours(23, 59, 59, 999);
+                              setDateFrom(today);
+                              setDateTo(oneMonthLater);
+                            }}
+                            className="text-xs"
+                          >
+                            1 Month
+                          </Button>
+                        </div>
+                        <div className="flex flex-col gap-3">
                           <div className="flex flex-col gap-1">
                             <Label className="text-xs font-medium">{t('reminders.appointments.fromDate')}</Label>
-                            <DateCalendar
-                              selected={dateFrom}
-                              onSelect={setDateFrom}
-                              className="text-sm [&_table]:w-full [&_td]:p-0 [&_th]:p-0 [&_button]:h-7 [&_button]:w-7 [&_button]:text-xs"
+                            <Input
+                              type="date"
+                              value={dateFrom ? dateFrom.toISOString().split('T')[0] : ''}
+                              max={dateTo ? dateTo.toISOString().split('T')[0] : undefined}
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  const date = new Date(e.target.value + 'T00:00:00');
+                                  setDateFrom(date);
+                                } else {
+                                  setDateFrom(undefined);
+                                }
+                              }}
+                              className="w-full"
                             />
                           </div>
-                          <Separator className="hidden md:block md:h-auto md:w-px" orientation="vertical" />
-                          <Separator className="md:hidden" />
                           <div className="flex flex-col gap-1">
                             <Label className="text-xs font-medium">{t('reminders.appointments.toDate')}</Label>
-                            <DateCalendar
-                              selected={dateTo}
-                              onSelect={setDateTo}
-                              className="text-sm [&_table]:w-full [&_td]:p-0 [&_th]:p-0 [&_button]:h-7 [&_button]:w-7 [&_button]:text-xs"
+                            <Input
+                              type="date"
+                              value={dateTo ? dateTo.toISOString().split('T')[0] : ''}
+                              min={dateFrom ? dateFrom.toISOString().split('T')[0] : undefined}
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  const date = new Date(e.target.value + 'T23:59:59');
+                                  setDateTo(date);
+                                } else {
+                                  setDateTo(undefined);
+                                }
+                              }}
+                              className="w-full"
                             />
                           </div>
                         </div>
@@ -1750,6 +1893,7 @@ export default function RemindersPage() {
                               onClick={() => {
                                 setDateFrom(undefined);
                                 setDateTo(undefined);
+                                setDateFilterOpen(false);
                               }}
                               className="w-full"
                             >
@@ -1760,7 +1904,7 @@ export default function RemindersPage() {
                         )}
                       </PopoverContent>
                     </Popover>
-                    
+
                     <Button
                       variant={showArchived ? "default" : "outline"}
                       size="sm"
@@ -1779,18 +1923,18 @@ export default function RemindersPage() {
                     <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-4 border-b">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium">{selectedAppointments.length} {t('reminders.appointments.selected')}</span>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => setSelectedAppointments([])}
                         >
                           {t('reminders.appointments.clearSelection')}
                         </Button>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={handleSendReminders}
                           disabled={sendReminderMutation.isPending}
                         >
@@ -1801,14 +1945,14 @@ export default function RemindersPage() {
                     </div>
                   )}
 
-                  <div>
+                  <div className="min-h-[400px]">
                     {appointmentsLoading ? (
-                      <div className="flex items-center justify-center py-12">
+                      <div className="flex items-center justify-center py-12 min-h-[400px]">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
                       </div>
                     ) : appointments.length === 0 ? (
-                      <div className="text-center py-12">
-                        <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                      <div className="text-center py-12 min-h-[400px] flex flex-col items-center justify-center">
+                        <Calendar className="h-16 w-16 text-gray-400 mb-4" />
                         <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">{t('reminders.appointments.noAppointments')}</p>
                         <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">{t('reminders.appointments.createFirst')}</p>
                         <Button onClick={() => setNewAppointmentModalOpen(true)}>
@@ -1821,445 +1965,445 @@ export default function RemindersPage() {
                         {/* Desktop Table View - hidden on mobile/tablet */}
                         <div className="hidden lg:block overflow-x-auto">
                           <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-12">
-                                <Checkbox
-                                  checked={isAllSelected}
-                                  onCheckedChange={handleSelectAll}
-                                  aria-label="Select all appointments"
-                                />
-                              </TableHead>
-                              <TableHead 
-                                className="cursor-pointer hover:bg-muted/50 select-none"
-                                onClick={() => handleSort('customer')}
-                              >
-                                <div className="flex items-center">
-                                  {t('reminders.table.customer')}
-                                  <SortIcon column="customer" />
-                                </div>
-                              </TableHead>
-                              <TableHead 
-                                className="cursor-pointer hover:bg-muted/50 select-none"
-                                onClick={() => handleSort('title')}
-                              >
-                                <div className="flex items-center">
-                                  {t('reminders.table.appointment')}
-                                  <SortIcon column="title" />
-                                </div>
-                              </TableHead>
-                              <TableHead 
-                                className="cursor-pointer hover:bg-muted/50 select-none"
-                                onClick={() => handleSort('date')}
-                              >
-                                <div className="flex items-center">
-                                  {t('reminders.table.dateTime')}
-                                  <SortIcon column="date" />
-                                </div>
-                              </TableHead>
-                              <TableHead 
-                                className="cursor-pointer hover:bg-muted/50 select-none"
-                                onClick={() => handleSort('status')}
-                              >
-                                <div className="flex items-center">
-                                  {t('reminders.table.status')}
-                                  <SortIcon column="status" />
-                                </div>
-                              </TableHead>
-                              <TableHead>{t('reminders.table.reminder')}</TableHead>
-                              <TableHead>{t('reminders.table.actions')}</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {(appointmentsFetching || searchQuery !== debouncedSearchQuery) ? (
-                              // Skeleton loading rows
-                              Array.from({ length: 5 }).map((_, index) => (
-                                <TableRow key={`skeleton-${index}`}>
-                                  <TableCell><Skeleton className="h-4 w-4" /></TableCell>
-                                  <TableCell>
-                                    <div className="space-y-2">
-                                      <Skeleton className="h-4 w-32" />
-                                      <Skeleton className="h-3 w-40" />
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="space-y-2">
-                                      <Skeleton className="h-4 w-28" />
-                                      <Skeleton className="h-3 w-24" />
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="space-y-2">
-                                      <Skeleton className="h-4 w-36" />
-                                      <Skeleton className="h-3 w-20" />
-                                    </div>
-                                  </TableCell>
-                                  <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
-                                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                                  <TableCell><Skeleton className="h-8 w-24" /></TableCell>
-                                </TableRow>
-                              ))
-                            ) : (
-                              appointments.map((appointment) => (
-                              <TableRow
-                                key={appointment.id}
-                                onClick={() => handleViewAppointment(appointment)}
-                                className="cursor-pointer"
-                              >
-                                <TableCell onClick={(event) => event.stopPropagation()}>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-12">
                                   <Checkbox
-                                    checked={selectedAppointments.includes(appointment.id)}
-                                    onCheckedChange={(checked) => handleSelectAppointment(appointment.id, checked as boolean)}
+                                    checked={isAllSelected}
+                                    onCheckedChange={handleSelectAll}
+                                    aria-label="Select all appointments"
                                   />
-                                </TableCell>
-                                <TableCell>
-                                  <div>
-                                    <p className="font-medium">{getCustomerName(appointment.customer)}</p>
-                                    <p className="text-sm text-gray-500">{appointment.customer?.email}</p>
+                                </TableHead>
+                                <TableHead
+                                  className="cursor-pointer hover:bg-muted/50 select-none"
+                                  onClick={() => handleSort('customer')}
+                                >
+                                  <div className="flex items-center">
+                                    {t('reminders.table.customer')}
+                                    <SortIcon column="customer" />
                                   </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div>
-                                    <p className="font-medium">{appointment.title}</p>
-                                    {appointment.location && (
-                                      <p className="text-sm text-gray-500 flex items-center gap-1">
-                                        <MapPin className="h-3 w-3" />
-                                        {appointment.location}
-                                      </p>
-                                    )}
+                                </TableHead>
+                                <TableHead
+                                  className="cursor-pointer hover:bg-muted/50 select-none"
+                                  onClick={() => handleSort('title')}
+                                >
+                                  <div className="flex items-center">
+                                    {t('reminders.table.appointment')}
+                                    <SortIcon column="title" />
                                   </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div>
-                                    <p className="font-medium">{formatDateTime(appointment.appointmentDate)}</p>
-                                    <p className="text-sm text-gray-500 flex items-center gap-1">
-                                      <Timer className="h-3 w-3" />
-                                      {appointment.duration} {t('reminders.appointments.minutes')}
-                                    </p>
+                                </TableHead>
+                                <TableHead
+                                  className="cursor-pointer hover:bg-muted/50 select-none"
+                                  onClick={() => handleSort('date')}
+                                >
+                                  <div className="flex items-center">
+                                    {t('reminders.table.dateTime')}
+                                    <SortIcon column="date" />
                                   </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge className={getStatusColor(appointment.status)}>
-                                    {appointment.status.replace('_', ' ')}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    {(() => {
-                                      // Check reminder records for this appointment
-                                      const appointmentReminders = reminders.filter(r => r.appointmentId === appointment.id);
-                                      const hasSentReminder = appointmentReminders.some(r => r.status === 'sent') || appointment.reminderSent;
-                                      const hasPendingReminder = appointmentReminders.some(r => r.status === 'pending');
-                                      
-                                      if (hasSentReminder) {
-                                        return (
-                                          <div className="flex items-center gap-1 text-green-600">
-                                            <CheckCircle className="h-4 w-4" />
-                                            <span className="text-sm">{t('reminders.reminderHistory.sent')}</span>
-                                          </div>
-                                        );
-                                      } else if (hasPendingReminder) {
-                                        return (
-                                          <div className="flex items-center gap-1 text-blue-600">
-                                            <Clock className="h-4 w-4" />
-                                            <span className="text-sm">Scheduled</span>
-                                          </div>
-                                        );
-                                      } else {
-                                        return (
-                                          <div className="flex items-center gap-1 text-gray-400">
-                                            <Clock className="h-4 w-4" />
-                                            <span className="text-sm">{t('reminders.reminderHistory.notSet')}</span>
-                                          </div>
-                                        );
-                                      }
-                                    })()}
+                                </TableHead>
+                                <TableHead
+                                  className="cursor-pointer hover:bg-muted/50 select-none"
+                                  onClick={() => handleSort('status')}
+                                >
+                                  <div className="flex items-center">
+                                    {t('reminders.table.status')}
+                                    <SortIcon column="status" />
                                   </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        handleEditAppointment(appointment);
-                                      }}
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        handleViewAppointment(appointment);
-                                      }}
-                                    >
-                                      <Eye className="h-4 w-4" />
-                                    </Button>
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={(event) => event.stopPropagation()}
-                                        >
-                                          <MoreVertical className="h-4 w-4" />
-                                        </Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent>
-                                        {!showArchived && (
-                                          <>
-                                            <DropdownMenuItem onClick={() => confirmAppointmentMutation.mutate(appointment.id)}>
-                                              <CheckCircle className="h-4 w-4 mr-2" />
-                                              Confirm Appointment
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={() => sendReminderMutation.mutate({ appointmentIds: [appointment.id] })}>
-                                              <Send className="h-4 w-4 mr-2" />
-                                              {t('reminders.actions.sendReminder')}
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => openScheduleReminder(appointment.id)}>
-                                              <Clock className="h-4 w-4 mr-2" />
-                                              {t('reminders.actions.scheduleReminder')}
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={() => handleArchiveAppointment(appointment.id)}>
-                                              <Archive className="h-4 w-4 mr-2" />
-                                              Archive
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem className="text-red-600" onClick={() => handleCancelAppointment(appointment.id)}>
-                                              <Trash2 className="h-4 w-4 mr-2" />
-                                              Delete
-                                            </DropdownMenuItem>
-                                          </>
-                                        )}
-                                        {showArchived && (
-                                          <>
-                                            <DropdownMenuItem onClick={() => handleUnarchiveAppointment(appointment.id)}>
-                                              <ArchiveRestore className="h-4 w-4 mr-2" />
-                                              Restore
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem className="text-red-600" onClick={() => handleCancelAppointment(appointment.id)}>
-                                              <Trash2 className="h-4 w-4 mr-2" />
-                                              Delete Permanently
-                                            </DropdownMenuItem>
-                                          </>
-                                        )}
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                  </div>
-                                </TableCell>
+                                </TableHead>
+                                <TableHead>{t('reminders.table.reminder')}</TableHead>
+                                <TableHead>{t('reminders.table.actions')}</TableHead>
                               </TableRow>
-                            ))
-                            )}
-                          </TableBody>
-                        </Table>
-                      </div>
-
-                      {/* Mobile/Tablet Card View - visible only on mobile/tablet */}
-                      <div className="lg:hidden space-y-4">
-                        {(appointmentsFetching || searchQuery !== debouncedSearchQuery) ? (
-                          // Skeleton loading cards
-                          Array.from({ length: 3 }).map((_, index) => (
-                            <Card key={`skeleton-card-${index}`} className="overflow-hidden">
-                              <CardContent className="p-4">
-                                <div className="space-y-3">
-                                  <div className="flex items-start justify-between">
-                                    <div className="flex items-start gap-3">
-                                      <Skeleton className="h-4 w-4 mt-1" />
+                            </TableHeader>
+                            <TableBody>
+                              {(appointmentsFetching || searchQuery !== debouncedSearchQuery) ? (
+                                // Skeleton loading rows
+                                Array.from({ length: 5 }).map((_, index) => (
+                                  <TableRow key={`skeleton-${index}`}>
+                                    <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                                    <TableCell>
                                       <div className="space-y-2">
-                                        <Skeleton className="h-5 w-40" />
                                         <Skeleton className="h-4 w-32" />
-                                        <Skeleton className="h-3 w-44" />
+                                        <Skeleton className="h-3 w-40" />
                                       </div>
-                                    </div>
-                                    <Skeleton className="h-6 w-20 rounded-full" />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                      <Skeleton className="h-4 w-4" />
-                                      <Skeleton className="h-4 w-36" />
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <Skeleton className="h-4 w-4" />
-                                      <Skeleton className="h-4 w-24" />
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center justify-between pt-2">
-                                    <Skeleton className="h-4 w-20" />
-                                    <Skeleton className="h-8 w-8 rounded" />
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))
-                        ) : (
-                          appointments.map((appointment) => (
-                          <Card
-                            key={appointment.id}
-                            className="overflow-hidden cursor-pointer"
-                            onClick={() => handleViewAppointment(appointment)}
-                          >
-                            <CardContent className="p-4">
-                              <div className="space-y-3">
-                                {/* Header with checkbox and status */}
-                                <div className="flex items-start justify-between">
-                                  <div className="flex items-start gap-3">
-                                    <div onClick={(event) => event.stopPropagation()}>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="space-y-2">
+                                        <Skeleton className="h-4 w-28" />
+                                        <Skeleton className="h-3 w-24" />
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="space-y-2">
+                                        <Skeleton className="h-4 w-36" />
+                                        <Skeleton className="h-3 w-20" />
+                                      </div>
+                                    </TableCell>
+                                    <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                                    <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                                    <TableCell><Skeleton className="h-8 w-24" /></TableCell>
+                                  </TableRow>
+                                ))
+                              ) : (
+                                appointments.map((appointment) => (
+                                  <TableRow
+                                    key={appointment.id}
+                                    onClick={() => handleViewAppointment(appointment)}
+                                    className="cursor-pointer"
+                                  >
+                                    <TableCell onClick={(event) => event.stopPropagation()}>
                                       <Checkbox
                                         checked={selectedAppointments.includes(appointment.id)}
                                         onCheckedChange={(checked) => handleSelectAppointment(appointment.id, checked as boolean)}
-                                        className="mt-1"
                                       />
-                                    </div>
-                                    <div className="flex-1">
-                                      <h3 className="font-semibold text-base">{appointment.title}</h3>
-                                      <p className="text-sm text-gray-600 dark:text-gray-400">{getCustomerName(appointment.customer)}</p>
-                                      <p className="text-xs text-gray-500 dark:text-gray-500">{appointment.customer?.email}</p>
-                                    </div>
-                                  </div>
-                                  <Badge className={getStatusColor(appointment.status)}>
-                                    {appointment.status.replace('_', ' ')}
-                                  </Badge>
-                                </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div>
+                                        <p className="font-medium">{getCustomerName(appointment.customer)}</p>
+                                        <p className="text-sm text-gray-500">{appointment.customer?.email}</p>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div>
+                                        <p className="font-medium">{appointment.title}</p>
+                                        {appointment.location && (
+                                          <p className="text-sm text-gray-500 flex items-center gap-1">
+                                            <MapPin className="h-3 w-3" />
+                                            {appointment.location}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div>
+                                        <p className="font-medium">{formatDateTime(appointment.appointmentDate)}</p>
+                                        <p className="text-sm text-gray-500 flex items-center gap-1">
+                                          <Timer className="h-3 w-3" />
+                                          {appointment.duration} {t('reminders.appointments.minutes')}
+                                        </p>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge className={getStatusColor(appointment.status)}>
+                                        {appointment.status.replace('_', ' ')}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex items-center gap-2">
+                                        {(() => {
+                                          // Check reminder records for this appointment
+                                          const appointmentReminders = reminders.filter(r => r.appointmentId === appointment.id);
+                                          const hasSentReminder = appointmentReminders.some(r => r.status === 'sent') || appointment.reminderSent;
+                                          const hasPendingReminder = appointmentReminders.some(r => r.status === 'pending');
 
-                                {/* Appointment details */}
-                                <div className="space-y-2 text-sm">
-                                  <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                                    <Calendar className="h-4 w-4 text-gray-500" />
-                                    <span>{formatDateTime(appointment.appointmentDate)}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                                    <Timer className="h-4 w-4 text-gray-500" />
-                                    <span>{appointment.duration} {t('reminders.appointments.minutes')}</span>
-                                  </div>
-                                  {appointment.location && (
-                                    <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                                      <MapPin className="h-4 w-4 text-gray-500" />
-                                      <span>{appointment.location}</span>
-                                    </div>
-                                  )}
-                                  
-                                  {/* Reminder status */}
-                                  <div className="flex items-center gap-2">
-                                    {(() => {
-                                      const appointmentReminders = reminders.filter(r => r.appointmentId === appointment.id);
-                                      const hasSentReminder = appointmentReminders.some(r => r.status === 'sent') || appointment.reminderSent;
-                                      const hasPendingReminder = appointmentReminders.some(r => r.status === 'pending');
-                                      
-                                      if (hasSentReminder) {
-                                        return (
-                                          <div className="flex items-center gap-1 text-green-600">
-                                            <CheckCircle className="h-4 w-4" />
-                                            <span className="text-sm">{t('reminders.reminderHistory.sent')}</span>
-                                          </div>
-                                        );
-                                      } else if (hasPendingReminder) {
-                                        return (
-                                          <div className="flex items-center gap-1 text-blue-600">
-                                            <Clock className="h-4 w-4" />
-                                            <span className="text-sm">Scheduled</span>
-                                          </div>
-                                        );
-                                      } else {
-                                        return (
-                                          <div className="flex items-center gap-1 text-gray-400">
-                                            <Clock className="h-4 w-4" />
-                                            <span className="text-sm">{t('reminders.reminderHistory.notSet')}</span>
-                                          </div>
-                                        );
-                                      }
-                                    })()}
-                                  </div>
-                                </div>
+                                          if (hasSentReminder) {
+                                            return (
+                                              <div className="flex items-center gap-1 text-green-600">
+                                                <CheckCircle className="h-4 w-4" />
+                                                <span className="text-sm">{t('reminders.reminderHistory.sent')}</span>
+                                              </div>
+                                            );
+                                          } else if (hasPendingReminder) {
+                                            return (
+                                              <div className="flex items-center gap-1 text-blue-600">
+                                                <Clock className="h-4 w-4" />
+                                                <span className="text-sm">Scheduled</span>
+                                              </div>
+                                            );
+                                          } else {
+                                            return (
+                                              <div className="flex items-center gap-1 text-gray-400">
+                                                <Clock className="h-4 w-4" />
+                                                <span className="text-sm">{t('reminders.reminderHistory.notSet')}</span>
+                                              </div>
+                                            );
+                                          }
+                                        })()}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex items-center gap-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            handleEditAppointment(appointment);
+                                          }}
+                                        >
+                                          <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            handleViewAppointment(appointment);
+                                          }}
+                                        >
+                                          <Eye className="h-4 w-4" />
+                                        </Button>
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={(event) => event.stopPropagation()}
+                                            >
+                                              <MoreVertical className="h-4 w-4" />
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent>
+                                            {!showArchived && (
+                                              <>
+                                                <DropdownMenuItem onClick={() => confirmAppointmentMutation.mutate(appointment.id)}>
+                                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                                  Confirm Appointment
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onClick={() => sendReminderMutation.mutate({ appointmentIds: [appointment.id] })}>
+                                                  <Send className="h-4 w-4 mr-2" />
+                                                  {t('reminders.actions.sendReminder')}
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => openScheduleReminder(appointment.id)}>
+                                                  <Clock className="h-4 w-4 mr-2" />
+                                                  {t('reminders.actions.scheduleReminder')}
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onClick={() => handleArchiveAppointment(appointment.id)}>
+                                                  <Archive className="h-4 w-4 mr-2" />
+                                                  Archive
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem className="text-red-600" onClick={() => handleCancelAppointment(appointment.id)}>
+                                                  <Trash2 className="h-4 w-4 mr-2" />
+                                                  Delete
+                                                </DropdownMenuItem>
+                                              </>
+                                            )}
+                                            {showArchived && (
+                                              <>
+                                                <DropdownMenuItem onClick={() => handleUnarchiveAppointment(appointment.id)}>
+                                                  <ArchiveRestore className="h-4 w-4 mr-2" />
+                                                  Restore
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem className="text-red-600" onClick={() => handleCancelAppointment(appointment.id)}>
+                                                  <Trash2 className="h-4 w-4 mr-2" />
+                                                  Delete Permanently
+                                                </DropdownMenuItem>
+                                              </>
+                                            )}
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
 
-                                {/* Actions */}
-                                <div className="flex items-center gap-2 pt-2 border-t">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      handleEditAppointment(appointment);
-                                    }}
-                                    className="flex-1"
-                                  >
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      handleViewAppointment(appointment);
-                                    }}
-                                    className="flex-1"
-                                  >
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    View
-                                  </Button>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
+                        {/* Mobile/Tablet Card View - visible only on mobile/tablet */}
+                        <div className="lg:hidden space-y-4">
+                          {(appointmentsFetching || searchQuery !== debouncedSearchQuery) ? (
+                            // Skeleton loading cards
+                            Array.from({ length: 3 }).map((_, index) => (
+                              <Card key={`skeleton-card-${index}`} className="overflow-hidden">
+                                <CardContent className="p-4">
+                                  <div className="space-y-3">
+                                    <div className="flex items-start justify-between">
+                                      <div className="flex items-start gap-3">
+                                        <Skeleton className="h-4 w-4 mt-1" />
+                                        <div className="space-y-2">
+                                          <Skeleton className="h-5 w-40" />
+                                          <Skeleton className="h-4 w-32" />
+                                          <Skeleton className="h-3 w-44" />
+                                        </div>
+                                      </div>
+                                      <Skeleton className="h-6 w-20 rounded-full" />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <div className="flex items-center gap-2">
+                                        <Skeleton className="h-4 w-4" />
+                                        <Skeleton className="h-4 w-36" />
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Skeleton className="h-4 w-4" />
+                                        <Skeleton className="h-4 w-24" />
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center justify-between pt-2">
+                                      <Skeleton className="h-4 w-20" />
+                                      <Skeleton className="h-8 w-8 rounded" />
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))
+                          ) : (
+                            appointments.map((appointment) => (
+                              <Card
+                                key={appointment.id}
+                                className="overflow-hidden cursor-pointer"
+                                onClick={() => handleViewAppointment(appointment)}
+                              >
+                                <CardContent className="p-4">
+                                  <div className="space-y-3">
+                                    {/* Header with checkbox and status */}
+                                    <div className="flex items-start justify-between">
+                                      <div className="flex items-start gap-3">
+                                        <div onClick={(event) => event.stopPropagation()}>
+                                          <Checkbox
+                                            checked={selectedAppointments.includes(appointment.id)}
+                                            onCheckedChange={(checked) => handleSelectAppointment(appointment.id, checked as boolean)}
+                                            className="mt-1"
+                                          />
+                                        </div>
+                                        <div className="flex-1">
+                                          <h3 className="font-semibold text-base">{appointment.title}</h3>
+                                          <p className="text-sm text-gray-600 dark:text-gray-400">{getCustomerName(appointment.customer)}</p>
+                                          <p className="text-xs text-gray-500 dark:text-gray-500">{appointment.customer?.email}</p>
+                                        </div>
+                                      </div>
+                                      <Badge className={getStatusColor(appointment.status)}>
+                                        {appointment.status.replace('_', ' ')}
+                                      </Badge>
+                                    </div>
+
+                                    {/* Appointment details */}
+                                    <div className="space-y-2 text-sm">
+                                      <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                                        <Calendar className="h-4 w-4 text-gray-500" />
+                                        <span>{formatDateTime(appointment.appointmentDate)}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                                        <Timer className="h-4 w-4 text-gray-500" />
+                                        <span>{appointment.duration} {t('reminders.appointments.minutes')}</span>
+                                      </div>
+                                      {appointment.location && (
+                                        <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                                          <MapPin className="h-4 w-4 text-gray-500" />
+                                          <span>{appointment.location}</span>
+                                        </div>
+                                      )}
+
+                                      {/* Reminder status */}
+                                      <div className="flex items-center gap-2">
+                                        {(() => {
+                                          const appointmentReminders = reminders.filter(r => r.appointmentId === appointment.id);
+                                          const hasSentReminder = appointmentReminders.some(r => r.status === 'sent') || appointment.reminderSent;
+                                          const hasPendingReminder = appointmentReminders.some(r => r.status === 'pending');
+
+                                          if (hasSentReminder) {
+                                            return (
+                                              <div className="flex items-center gap-1 text-green-600">
+                                                <CheckCircle className="h-4 w-4" />
+                                                <span className="text-sm">{t('reminders.reminderHistory.sent')}</span>
+                                              </div>
+                                            );
+                                          } else if (hasPendingReminder) {
+                                            return (
+                                              <div className="flex items-center gap-1 text-blue-600">
+                                                <Clock className="h-4 w-4" />
+                                                <span className="text-sm">Scheduled</span>
+                                              </div>
+                                            );
+                                          } else {
+                                            return (
+                                              <div className="flex items-center gap-1 text-gray-400">
+                                                <Clock className="h-4 w-4" />
+                                                <span className="text-sm">{t('reminders.reminderHistory.notSet')}</span>
+                                              </div>
+                                            );
+                                          }
+                                        })()}
+                                      </div>
+                                    </div>
+
+                                    {/* Actions */}
+                                    <div className="flex items-center gap-2 pt-2 border-t">
                                       <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={(event) => event.stopPropagation()}
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          handleEditAppointment(appointment);
+                                        }}
+                                        className="flex-1"
                                       >
-                                        <MoreVertical className="h-4 w-4" />
+                                        <Edit className="h-4 w-4 mr-2" />
+                                        Edit
                                       </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      {!showArchived && (
-                                        <>
-                                          <DropdownMenuItem onClick={() => confirmAppointmentMutation.mutate(appointment.id)}>
-                                            <CheckCircle className="h-4 w-4 mr-2" />
-                                            Confirm Appointment
-                                          </DropdownMenuItem>
-                                          <DropdownMenuSeparator />
-                                          <DropdownMenuItem onClick={() => sendReminderMutation.mutate({ appointmentIds: [appointment.id] })}>
-                                            <Send className="h-4 w-4 mr-2" />
-                                            {t('reminders.actions.sendReminder')}
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem onClick={() => openScheduleReminder(appointment.id)}>
-                                            <Clock className="h-4 w-4 mr-2" />
-                                            {t('reminders.actions.scheduleReminder')}
-                                          </DropdownMenuItem>
-                                          <DropdownMenuSeparator />
-                                          <DropdownMenuItem onClick={() => handleArchiveAppointment(appointment.id)}>
-                                            <Archive className="h-4 w-4 mr-2" />
-                                            Archive
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem className="text-red-600" onClick={() => handleCancelAppointment(appointment.id)}>
-                                            <Trash2 className="h-4 w-4 mr-2" />
-                                            Delete
-                                          </DropdownMenuItem>
-                                        </>
-                                      )}
-                                      {showArchived && (
-                                        <>
-                                          <DropdownMenuItem onClick={() => handleUnarchiveAppointment(appointment.id)}>
-                                            <ArchiveRestore className="h-4 w-4 mr-2" />
-                                            Restore
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem className="text-red-600" onClick={() => handleCancelAppointment(appointment.id)}>
-                                            <Trash2 className="h-4 w-4 mr-2" />
-                                            Delete Permanently
-                                          </DropdownMenuItem>
-                                        </>
-                                      )}
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))
-                        )}
-                      </div>
-                    </>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          handleViewAppointment(appointment);
+                                        }}
+                                        className="flex-1"
+                                      >
+                                        <Eye className="h-4 w-4 mr-2" />
+                                        View
+                                      </Button>
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={(event) => event.stopPropagation()}
+                                          >
+                                            <MoreVertical className="h-4 w-4" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                          {!showArchived && (
+                                            <>
+                                              <DropdownMenuItem onClick={() => confirmAppointmentMutation.mutate(appointment.id)}>
+                                                <CheckCircle className="h-4 w-4 mr-2" />
+                                                Confirm Appointment
+                                              </DropdownMenuItem>
+                                              <DropdownMenuSeparator />
+                                              <DropdownMenuItem onClick={() => sendReminderMutation.mutate({ appointmentIds: [appointment.id] })}>
+                                                <Send className="h-4 w-4 mr-2" />
+                                                {t('reminders.actions.sendReminder')}
+                                              </DropdownMenuItem>
+                                              <DropdownMenuItem onClick={() => openScheduleReminder(appointment.id)}>
+                                                <Clock className="h-4 w-4 mr-2" />
+                                                {t('reminders.actions.scheduleReminder')}
+                                              </DropdownMenuItem>
+                                              <DropdownMenuSeparator />
+                                              <DropdownMenuItem onClick={() => handleArchiveAppointment(appointment.id)}>
+                                                <Archive className="h-4 w-4 mr-2" />
+                                                Archive
+                                              </DropdownMenuItem>
+                                              <DropdownMenuItem className="text-red-600" onClick={() => handleCancelAppointment(appointment.id)}>
+                                                <Trash2 className="h-4 w-4 mr-2" />
+                                                Delete
+                                              </DropdownMenuItem>
+                                            </>
+                                          )}
+                                          {showArchived && (
+                                            <>
+                                              <DropdownMenuItem onClick={() => handleUnarchiveAppointment(appointment.id)}>
+                                                <ArchiveRestore className="h-4 w-4 mr-2" />
+                                                Restore
+                                              </DropdownMenuItem>
+                                              <DropdownMenuItem className="text-red-600" onClick={() => handleCancelAppointment(appointment.id)}>
+                                                <Trash2 className="h-4 w-4 mr-2" />
+                                                Delete Permanently
+                                              </DropdownMenuItem>
+                                            </>
+                                          )}
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))
+                          )}
+                        </div>
+                      </>
                     )}
 
                   </div>
@@ -2327,29 +2471,198 @@ export default function RemindersPage() {
                       </div>
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </TabsContent>
 
-              {/* Past Appointments Table */}
-              <Card className="mt-6">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      <Clock className="h-5 w-5" />
-                      Past Appointments
-                    </CardTitle>
+                <TabsContent value="past" className="mt-0">
+                  {/* Past Appointments Search and Filter */}
+                  <div className="flex items-center gap-4 p-6 border-b">
+                    <div className="relative flex-1 max-w-sm">
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        placeholder="Search past appointments..."
+                        value={pastSearchQuery}
+                        onChange={(e) => setPastSearchQuery(e.target.value)}
+                        className="pl-10 pr-10"
+                      />
+                      {pastSearchQuery && (
+                        <button
+                          onClick={() => setPastSearchQuery("")}
+                          className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                          aria-label="Clear search"
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                    <Select value={pastStatusFilter} onValueChange={setPastStatusFilter}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{t('reminders.appointments.allStatuses')}</SelectItem>
+                        <SelectItem value="scheduled">{t('reminders.appointments.scheduled')}</SelectItem>
+                        <SelectItem value="confirmed">{t('reminders.appointments.confirmed')}</SelectItem>
+                        <SelectItem value="cancelled">{t('reminders.appointments.cancelled')}</SelectItem>
+                        <SelectItem value="completed">{t('reminders.appointments.completed')}</SelectItem>
+                        <SelectItem value="no_show">{t('reminders.appointments.noShow')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {/* Past Appointments Date Range Filter */}
+                    <Popover open={pastDateFilterOpen} onOpenChange={setPastDateFilterOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={`flex items-center gap-2 ${(pastDateFrom || pastDateTo) ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                        >
+                          <Calendar className="h-4 w-4" />
+                          {(pastDateFrom || pastDateTo) ? (
+                            <span className="text-sm">
+                              {pastDateFrom ? pastDateFrom.toLocaleDateString() : '...'} - {pastDateTo ? pastDateTo.toLocaleDateString() : '...'}
+                            </span>
+                          ) : (
+                            <span className="text-sm">{t('reminders.appointments.filterByDate')}</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-3" align="start" sideOffset={5} avoidCollisions={true}>
+                        {/* Quick Date Range Presets for Past */}
+                        <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const today = new Date();
+                              today.setHours(23, 59, 59, 999);
+                              const oneWeekAgo = new Date(today);
+                              oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+                              oneWeekAgo.setHours(0, 0, 0, 0);
+                              setPastDateFrom(oneWeekAgo);
+                              setPastDateTo(today);
+                            }}
+                            className="text-xs"
+                          >
+                            Last Week
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const today = new Date();
+                              today.setHours(23, 59, 59, 999);
+                              const oneMonthAgo = new Date(today);
+                              oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+                              oneMonthAgo.setHours(0, 0, 0, 0);
+                              setPastDateFrom(oneMonthAgo);
+                              setPastDateTo(today);
+                            }}
+                            className="text-xs"
+                          >
+                            Last Month
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const today = new Date();
+                              today.setHours(23, 59, 59, 999);
+                              const threeMonthsAgo = new Date(today);
+                              threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+                              threeMonthsAgo.setHours(0, 0, 0, 0);
+                              setPastDateFrom(threeMonthsAgo);
+                              setPastDateTo(today);
+                            }}
+                            className="text-xs"
+                          >
+                            Last 3 Months
+                          </Button>
+                        </div>
+                        <div className="flex flex-col gap-3">
+                          <div className="flex flex-col gap-1">
+                            <Label className="text-xs font-medium">{t('reminders.appointments.fromDate')}</Label>
+                            <Input
+                              type="date"
+                              value={pastDateFrom ? pastDateFrom.toISOString().split('T')[0] : ''}
+                              max={pastDateTo ? pastDateTo.toISOString().split('T')[0] : undefined}
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  const date = new Date(e.target.value + 'T00:00:00');
+                                  setPastDateFrom(date);
+                                } else {
+                                  setPastDateFrom(undefined);
+                                }
+                              }}
+                              className="w-full"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <Label className="text-xs font-medium">{t('reminders.appointments.toDate')}</Label>
+                            <Input
+                              type="date"
+                              value={pastDateTo ? pastDateTo.toISOString().split('T')[0] : ''}
+                              min={pastDateFrom ? pastDateFrom.toISOString().split('T')[0] : undefined}
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  const date = new Date(e.target.value + 'T23:59:59');
+                                  setPastDateTo(date);
+                                } else {
+                                  setPastDateTo(undefined);
+                                }
+                              }}
+                              className="w-full"
+                            />
+                          </div>
+                        </div>
+                        {(pastDateFrom || pastDateTo) && (
+                          <div className="mt-4 pt-4 border-t">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setPastDateFrom(undefined);
+                                setPastDateTo(undefined);
+                                setPastDateFilterOpen(false);
+                              }}
+                              className="w-full"
+                            >
+                              <XCircle className="h-4 w-4 mr-2" />
+                              {t('reminders.appointments.clearDates')}
+                            </Button>
+                          </div>
+                        )}
+                      </PopoverContent>
+                    </Popover>
                   </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="min-h-[200px]">
-                    {appointmentsLoading ? (
-                      <div className="flex items-center justify-center py-12">
+
+                  <div className="min-h-[400px]">
+                    {(appointmentsLoading || pastSearchQuery !== debouncedPastSearchQuery) ? (
+                      <div className="flex items-center justify-center py-12 min-h-[400px]">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
                       </div>
                     ) : pastAppointments.length === 0 ? (
-                      <div className="text-center py-12">
-                        <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                        <p className="text-gray-600 dark:text-gray-400">No past appointments</p>
+                      <div className="text-center py-12 min-h-[400px] flex flex-col items-center justify-center">
+                        <Clock className="h-12 w-12 text-gray-400 mb-4" />
+                        <p className="text-gray-600 dark:text-gray-400">
+                          {(debouncedPastSearchQuery || pastStatusFilter !== 'all' || pastDateFrom || pastDateTo)
+                            ? 'No past appointments found matching your filters'
+                            : 'No past appointments'}
+                        </p>
+                        {(debouncedPastSearchQuery || pastStatusFilter !== 'all' || pastDateFrom || pastDateTo) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setPastSearchQuery("");
+                              setPastStatusFilter("all");
+                              setPastDateFrom(undefined);
+                              setPastDateTo(undefined);
+                            }}
+                            className="mt-4"
+                          >
+                            Clear filters
+                          </Button>
+                        )}
                       </div>
                     ) : (
                       <>
@@ -2358,7 +2671,7 @@ export default function RemindersPage() {
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead 
+                                <TableHead
                                   className="cursor-pointer hover:bg-muted/50 select-none"
                                   onClick={() => handlePastSort('customer')}
                                 >
@@ -2367,7 +2680,7 @@ export default function RemindersPage() {
                                     <PastSortIcon column="customer" />
                                   </div>
                                 </TableHead>
-                                <TableHead 
+                                <TableHead
                                   className="cursor-pointer hover:bg-muted/50 select-none"
                                   onClick={() => handlePastSort('title')}
                                 >
@@ -2376,7 +2689,7 @@ export default function RemindersPage() {
                                     <PastSortIcon column="title" />
                                   </div>
                                 </TableHead>
-                                <TableHead 
+                                <TableHead
                                   className="cursor-pointer hover:bg-muted/50 select-none"
                                   onClick={() => handlePastSort('date')}
                                 >
@@ -2385,7 +2698,7 @@ export default function RemindersPage() {
                                     <PastSortIcon column="date" />
                                   </div>
                                 </TableHead>
-                                <TableHead 
+                                <TableHead
                                   className="cursor-pointer hover:bg-muted/50 select-none"
                                   onClick={() => handlePastSort('status')}
                                 >
@@ -2563,11 +2876,11 @@ export default function RemindersPage() {
                       </div>
                     </div>
                   )}
-                </CardContent>
-              </Card>
-          </div>
-        )}
-
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Schedule Reminder Modal */}
         <Dialog open={scheduleReminderModalOpen} onOpenChange={setScheduleReminderModalOpen}>
@@ -2598,11 +2911,11 @@ export default function RemindersPage() {
                   value={scheduleData.reminderTiming}
                   onValueChange={(v) => {
                     const timing = v as '5m' | '30m' | '1h' | '5h' | '10h' | 'custom';
-                    setScheduleData(prev => ({ 
-                      ...prev, 
-                      reminderTiming: timing, 
+                    setScheduleData(prev => ({
+                      ...prev,
+                      reminderTiming: timing,
                       customMinutesBefore: timing === 'custom' ? prev.customMinutesBefore : undefined,
-                      scheduledFor: timing === 'custom' ? prev.scheduledFor : computeScheduledFor(timing) 
+                      scheduledFor: timing === 'custom' ? prev.scheduledFor : computeScheduledFor(timing)
                     }));
                   }}
                 >
@@ -2631,8 +2944,8 @@ export default function RemindersPage() {
                     onChange={(e) => {
                       const minutes = parseInt(e.target.value);
                       if (!isNaN(minutes) && minutes > 0 && minutes <= 10080) {
-                        setScheduleData(prev => ({ 
-                          ...prev, 
+                        setScheduleData(prev => ({
+                          ...prev,
                           customMinutesBefore: minutes,
                           scheduledFor: computeScheduledFor('custom', minutes)
                         }));
@@ -2650,22 +2963,29 @@ export default function RemindersPage() {
                   <SelectTrigger>
                     <SelectValue placeholder="Select timezone" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="America/New_York">Eastern Time (ET)</SelectItem>
-                    <SelectItem value="America/Chicago">Central Time (CT)</SelectItem>
-                    <SelectItem value="America/Denver">Mountain Time (MT)</SelectItem>
-                    <SelectItem value="America/Los_Angeles">Pacific Time (PT)</SelectItem>
-                    <SelectItem value="America/Anchorage">Alaska Time (AKT)</SelectItem>
-                    <SelectItem value="Pacific/Honolulu">Hawaii Time (HT)</SelectItem>
-                    <SelectItem value="America/Phoenix">Arizona (MST)</SelectItem>
-                    <SelectItem value="UTC">UTC</SelectItem>
-                    <SelectItem value="Europe/London">London (GMT/BST)</SelectItem>
-                    <SelectItem value="Europe/Paris">Paris (CET/CEST)</SelectItem>
-                    <SelectItem value="Europe/Berlin">Berlin (CET/CEST)</SelectItem>
-                    <SelectItem value="Asia/Tokyo">Tokyo (JST)</SelectItem>
-                    <SelectItem value="Asia/Shanghai">Shanghai (CST)</SelectItem>
-                    <SelectItem value="Asia/Kolkata">India (IST)</SelectItem>
-                    <SelectItem value="Australia/Sydney">Sydney (AEST/AEDT)</SelectItem>
+                  <SelectContent className="max-h-[300px]">
+                    <SelectItem value="America/New_York">🇺🇸 Eastern Time (ET)</SelectItem>
+                    <SelectItem value="America/Chicago">🇺🇸 Central Time (CT)</SelectItem>
+                    <SelectItem value="America/Denver">🇺🇸 Mountain Time (MT)</SelectItem>
+                    <SelectItem value="America/Los_Angeles">🇺🇸 Pacific Time (PT)</SelectItem>
+                    <SelectItem value="America/Anchorage">🇺🇸 Alaska Time (AKT)</SelectItem>
+                    <SelectItem value="Pacific/Honolulu">🇺🇸 Hawaii Time (HT)</SelectItem>
+                    <SelectItem value="America/Phoenix">🇺🇸 Arizona (MST)</SelectItem>
+                    <SelectItem value="America/Toronto">🇨🇦 Toronto (ET)</SelectItem>
+                    <SelectItem value="America/Vancouver">🇨🇦 Vancouver (PT)</SelectItem>
+                    <SelectItem value="America/Mexico_City">🇲🇽 Mexico City (CST)</SelectItem>
+                    <SelectItem value="Europe/London">🇬🇧 London (GMT/BST)</SelectItem>
+                    <SelectItem value="Europe/Paris">🇫🇷 Paris (CET)</SelectItem>
+                    <SelectItem value="Europe/Berlin">🇩🇪 Berlin (CET)</SelectItem>
+                    <SelectItem value="Europe/Madrid">🇪🇸 Madrid (CET)</SelectItem>
+                    <SelectItem value="Asia/Tokyo">🇯🇵 Tokyo (JST)</SelectItem>
+                    <SelectItem value="Asia/Shanghai">🇨🇳 Shanghai (CST)</SelectItem>
+                    <SelectItem value="Asia/Singapore">🇸🇬 Singapore (SGT)</SelectItem>
+                    <SelectItem value="Asia/Dubai">🇦🇪 Dubai (GST)</SelectItem>
+                    <SelectItem value="Australia/Sydney">🇦🇺 Sydney (AEST)</SelectItem>
+                    <SelectItem value="Australia/Perth">🇦🇺 Perth (AWST)</SelectItem>
+                    <SelectItem value="Pacific/Auckland">🇳🇿 Auckland (NZST)</SelectItem>
+                    <SelectItem value="UTC">🌐 UTC</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-gray-500 mt-1">
@@ -2715,93 +3035,93 @@ export default function RemindersPage() {
             {editingAppointment && (
               <>
                 <div className="space-y-4 overflow-y-auto flex-1">
-                    <div>
-                      <Label>{t('reminders.appointments.title')}</Label>
-                      <Input 
-                        value={editingAppointment.title}
-                        onChange={(e) => setEditingAppointment(prev => prev ? {...prev, title: e.target.value} : null)}
-                        placeholder={t('reminders.appointments.titlePlaceholder')}
+                  <div>
+                    <Label>{t('reminders.appointments.title')}</Label>
+                    <Input
+                      value={editingAppointment.title}
+                      onChange={(e) => setEditingAppointment(prev => prev ? { ...prev, title: e.target.value } : null)}
+                      placeholder={t('reminders.appointments.titlePlaceholder')}
+                      className="focus-visible:ring-0"
+                    />
+                  </div>
+
+                  <div>
+                    <Label>{t('reminders.appointments.dateTime')}</Label>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <Input
+                        type="date"
+                        value={toLocalDateString(new Date(editingAppointment.appointmentDate))}
+                        onChange={(e) => setEditingAppointment(prev => prev ? {
+                          ...prev,
+                          appointmentDate: mergeDateAndTime(new Date(prev.appointmentDate), e.target.value, undefined)
+                        } : null)}
+                        className="focus-visible:ring-0"
+                      />
+                      <Input
+                        type="time"
+                        value={toLocalTimeString(new Date(editingAppointment.appointmentDate))}
+                        onChange={(e) => setEditingAppointment(prev => prev ? {
+                          ...prev,
+                          appointmentDate: mergeDateAndTime(new Date(prev.appointmentDate), undefined, e.target.value)
+                        } : null)}
                         className="focus-visible:ring-0"
                       />
                     </div>
+                  </div>
 
-                    <div>
-                      <Label>{t('reminders.appointments.dateTime')}</Label>
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        <Input 
-                          type="date"
-                          value={toLocalDateString(new Date(editingAppointment.appointmentDate))}
-                          onChange={(e) => setEditingAppointment(prev => prev ? {
-                            ...prev,
-                            appointmentDate: mergeDateAndTime(new Date(prev.appointmentDate), e.target.value, undefined)
-                          } : null)}
-                          className="focus-visible:ring-0"
-                        />
-                        <Input 
-                          type="time"
-                          value={toLocalTimeString(new Date(editingAppointment.appointmentDate))}
-                          onChange={(e) => setEditingAppointment(prev => prev ? {
-                            ...prev,
-                            appointmentDate: mergeDateAndTime(new Date(prev.appointmentDate), undefined, e.target.value)
-                          } : null)}
-                          className="focus-visible:ring-0"
-                        />
-                      </div>
-                    </div>
+                  <div>
+                    <Label>{t('reminders.appointments.duration')}</Label>
+                    <Input
+                      type="number"
+                      value={editingAppointment.duration}
+                      onChange={(e) => setEditingAppointment(prev => prev ? { ...prev, duration: parseInt(e.target.value) } : null)}
+                      min="15"
+                      step="15"
+                      className="focus-visible:ring-0"
+                    />
+                  </div>
 
-                    <div>
-                      <Label>{t('reminders.appointments.duration')}</Label>
-                      <Input 
-                        type="number"
-                        value={editingAppointment.duration}
-                        onChange={(e) => setEditingAppointment(prev => prev ? {...prev, duration: parseInt(e.target.value)} : null)}
-                        min="15"
-                        step="15"
-                        className="focus-visible:ring-0"
-                      />
-                    </div>
+                  <div>
+                    <Label>{t('reminders.appointments.location')}</Label>
+                    <Input
+                      value={editingAppointment.location || ''}
+                      onChange={(e) => setEditingAppointment(prev => prev ? { ...prev, location: e.target.value } : null)}
+                      placeholder={t('reminders.appointments.locationPlaceholder')}
+                      className="focus-visible:ring-0"
+                    />
+                  </div>
 
-                    <div>
-                      <Label>{t('reminders.appointments.location')}</Label>
-                      <Input 
-                        value={editingAppointment.location || ''}
-                        onChange={(e) => setEditingAppointment(prev => prev ? {...prev, location: e.target.value} : null)}
-                        placeholder={t('reminders.appointments.locationPlaceholder')}
-                        className="focus-visible:ring-0"
-                      />
-                    </div>
+                  <div>
+                    <Label>{t('reminders.appointments.status')}</Label>
+                    <Select
+                      value={editingAppointment.status}
+                      onValueChange={(value) => setEditingAppointment(prev => prev ? { ...prev, status: value as Appointment['status'] } : null)}
+                    >
+                      <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="scheduled">{t('reminders.appointments.scheduled')}</SelectItem>
+                        <SelectItem value="confirmed">{t('reminders.appointments.confirmed')}</SelectItem>
+                        <SelectItem value="cancelled">{t('reminders.appointments.cancelled')}</SelectItem>
+                        <SelectItem value="completed">{t('reminders.appointments.completed')}</SelectItem>
+                        <SelectItem value="no_show">{t('reminders.appointments.noShow')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                    <div>
-                      <Label>{t('reminders.appointments.status')}</Label>
-                      <Select 
-                        value={editingAppointment.status} 
-                        onValueChange={(value) => setEditingAppointment(prev => prev ? {...prev, status: value as Appointment['status']} : null)}
-                      >
-                        <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="scheduled">{t('reminders.appointments.scheduled')}</SelectItem>
-                          <SelectItem value="confirmed">{t('reminders.appointments.confirmed')}</SelectItem>
-                          <SelectItem value="cancelled">{t('reminders.appointments.cancelled')}</SelectItem>
-                          <SelectItem value="completed">{t('reminders.appointments.completed')}</SelectItem>
-                          <SelectItem value="no_show">{t('reminders.appointments.noShow')}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label>{t('reminders.appointments.notes')}</Label>
-                      <Textarea 
-                        value={editingAppointment.notes || ''}
-                        onChange={(e) => setEditingAppointment(prev => prev ? {...prev, notes: e.target.value} : null)}
-                        placeholder={t('reminders.appointments.notesPlaceholder')}
-                        rows={3}
-                        className="focus-visible:ring-0"
-                      />
-                    </div>
+                  <div>
+                    <Label>{t('reminders.appointments.notes')}</Label>
+                    <Textarea
+                      value={editingAppointment.notes || ''}
+                      onChange={(e) => setEditingAppointment(prev => prev ? { ...prev, notes: e.target.value } : null)}
+                      placeholder={t('reminders.appointments.notesPlaceholder')}
+                      rows={3}
+                      className="focus-visible:ring-0"
+                    />
+                  </div>
                 </div>
-                
+
                 <div className="flex items-center justify-between gap-2 pt-4 border-t">
                   <div className="flex items-center gap-3">
                     <Label htmlFor="edit-reminder-enabled" className="cursor-pointer">
@@ -2839,7 +3159,7 @@ export default function RemindersPage() {
                     }}>
                       {t('reminders.appointments.cancel')}
                     </Button>
-                    <Button 
+                    <Button
                       onClick={handleUpdateAppointment}
                       disabled={updateAppointmentMutation.isPending}
                     >
@@ -2865,9 +3185,9 @@ export default function RemindersPage() {
                     <div className="space-y-4">
                       <div>
                         <Label>{t('reminders.scheduleReminder.reminderType')}</Label>
-                        <Select 
-                          value={editAppointmentReminderData.reminderType} 
-                          onValueChange={(value: 'email' | 'sms' | 'push') => setEditAppointmentReminderData(prev => ({...prev, reminderType: value}))}
+                        <Select
+                          value={editAppointmentReminderData.reminderType}
+                          onValueChange={(value: 'email' | 'sms' | 'push') => setEditAppointmentReminderData(prev => ({ ...prev, reminderType: value }))}
                         >
                           <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
                             <SelectValue />
@@ -2882,9 +3202,9 @@ export default function RemindersPage() {
 
                       <div>
                         <Label>{t('reminders.scheduleReminder.timing')}</Label>
-                        <Select 
-                          value={editAppointmentReminderData.reminderTiming} 
-                          onValueChange={(value: '5m' | '30m' | '1h' | '5h' | '10h' | 'custom') => setEditAppointmentReminderData(prev => ({...prev, reminderTiming: value}))}
+                        <Select
+                          value={editAppointmentReminderData.reminderTiming}
+                          onValueChange={(value: '5m' | '30m' | '1h' | '5h' | '10h' | 'custom') => setEditAppointmentReminderData(prev => ({ ...prev, reminderTiming: value }))}
                         >
                           <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
                             <SelectValue />
@@ -2916,7 +3236,7 @@ export default function RemindersPage() {
                                 ...prev,
                                 customMinutesBefore: e.target.value ? parseInt(e.target.value) : undefined
                               }));
-                              setEditAppointmentErrors(prev => ({...prev, customMinutesBefore: false}));
+                              setEditAppointmentErrors(prev => ({ ...prev, customMinutesBefore: false }));
                             }}
                             className={`focus-visible:ring-0 ${editAppointmentErrors.customMinutesBefore ? 'border-red-500' : ''}`}
                           />
@@ -2926,29 +3246,36 @@ export default function RemindersPage() {
 
                       <div>
                         <Label>Timezone</Label>
-                        <Select 
-                          value={editAppointmentReminderData.timezone} 
-                          onValueChange={(value) => setEditAppointmentReminderData(prev => ({...prev, timezone: value}))}
+                        <Select
+                          value={editAppointmentReminderData.timezone}
+                          onValueChange={(value) => setEditAppointmentReminderData(prev => ({ ...prev, timezone: value }))}
                         >
                           <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
                             <SelectValue placeholder="Select timezone" />
                           </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="America/New_York">Eastern Time (ET)</SelectItem>
-                            <SelectItem value="America/Chicago">Central Time (CT)</SelectItem>
-                            <SelectItem value="America/Denver">Mountain Time (MT)</SelectItem>
-                            <SelectItem value="America/Los_Angeles">Pacific Time (PT)</SelectItem>
-                            <SelectItem value="America/Anchorage">Alaska Time (AKT)</SelectItem>
-                            <SelectItem value="Pacific/Honolulu">Hawaii Time (HT)</SelectItem>
-                            <SelectItem value="America/Phoenix">Arizona (MST)</SelectItem>
-                            <SelectItem value="UTC">UTC</SelectItem>
-                            <SelectItem value="Europe/London">London (GMT/BST)</SelectItem>
-                            <SelectItem value="Europe/Paris">Paris (CET/CEST)</SelectItem>
-                            <SelectItem value="Europe/Berlin">Berlin (CET/CEST)</SelectItem>
-                            <SelectItem value="Asia/Tokyo">Tokyo (JST)</SelectItem>
-                            <SelectItem value="Asia/Shanghai">Shanghai (CST)</SelectItem>
-                            <SelectItem value="Asia/Kolkata">India (IST)</SelectItem>
-                            <SelectItem value="Australia/Sydney">Sydney (AEST/AEDT)</SelectItem>
+                          <SelectContent className="max-h-[300px]">
+                            <SelectItem value="America/New_York">🇺🇸 Eastern Time (ET)</SelectItem>
+                            <SelectItem value="America/Chicago">🇺🇸 Central Time (CT)</SelectItem>
+                            <SelectItem value="America/Denver">🇺🇸 Mountain Time (MT)</SelectItem>
+                            <SelectItem value="America/Los_Angeles">🇺🇸 Pacific Time (PT)</SelectItem>
+                            <SelectItem value="America/Anchorage">🇺🇸 Alaska Time (AKT)</SelectItem>
+                            <SelectItem value="Pacific/Honolulu">🇺🇸 Hawaii Time (HT)</SelectItem>
+                            <SelectItem value="America/Phoenix">🇺🇸 Arizona (MST)</SelectItem>
+                            <SelectItem value="America/Toronto">🇨🇦 Toronto (ET)</SelectItem>
+                            <SelectItem value="America/Vancouver">🇨🇦 Vancouver (PT)</SelectItem>
+                            <SelectItem value="America/Mexico_City">🇲🇽 Mexico City (CST)</SelectItem>
+                            <SelectItem value="Europe/London">🇬🇧 London (GMT/BST)</SelectItem>
+                            <SelectItem value="Europe/Paris">🇫🇷 Paris (CET)</SelectItem>
+                            <SelectItem value="Europe/Berlin">🇩🇪 Berlin (CET)</SelectItem>
+                            <SelectItem value="Europe/Madrid">🇪🇸 Madrid (CET)</SelectItem>
+                            <SelectItem value="Asia/Tokyo">🇯🇵 Tokyo (JST)</SelectItem>
+                            <SelectItem value="Asia/Shanghai">🇨🇳 Shanghai (CST)</SelectItem>
+                            <SelectItem value="Asia/Singapore">🇸🇬 Singapore (SGT)</SelectItem>
+                            <SelectItem value="Asia/Dubai">🇦🇪 Dubai (GST)</SelectItem>
+                            <SelectItem value="Australia/Sydney">🇦🇺 Sydney (AEST)</SelectItem>
+                            <SelectItem value="Australia/Perth">🇦🇺 Perth (AWST)</SelectItem>
+                            <SelectItem value="Pacific/Auckland">🇳🇿 Auckland (NZST)</SelectItem>
+                            <SelectItem value="UTC">🌐 UTC</SelectItem>
                           </SelectContent>
                         </Select>
                         <p className="text-xs text-gray-500 mt-1">
@@ -2961,7 +3288,7 @@ export default function RemindersPage() {
                         <Textarea
                           placeholder={t('reminders.scheduleReminder.messagePlaceholder')}
                           value={editAppointmentReminderData.content}
-                          onChange={(e) => setEditAppointmentReminderData(prev => ({...prev, content: e.target.value}))}
+                          onChange={(e) => setEditAppointmentReminderData(prev => ({ ...prev, content: e.target.value }))}
                           rows={4}
                           className="focus-visible:ring-0"
                         />
@@ -3012,7 +3339,7 @@ export default function RemindersPage() {
                 <Button variant="outline" onClick={() => setCancelConfirmModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button 
+                <Button
                   variant="destructive"
                   onClick={confirmCancelAppointment}
                   disabled={cancelAppointmentMutation.isPending}
@@ -3053,7 +3380,7 @@ export default function RemindersPage() {
                 }}>
                   Cancel
                 </Button>
-                <Button 
+                <Button
                   onClick={confirmArchiveAppointment}
                   disabled={archiveAppointmentMutation.isPending}
                 >
@@ -3091,7 +3418,7 @@ export default function RemindersPage() {
                 <Button variant="outline" onClick={() => setPastDateConfirmModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button 
+                <Button
                   onClick={confirmPastDateAppointment}
                   disabled={createAppointmentMutation.isPending}
                 >
@@ -3104,442 +3431,505 @@ export default function RemindersPage() {
 
         {/* View Appointment Side Panel */}
         <Sheet open={viewAppointmentPanelOpen} onOpenChange={setViewAppointmentPanelOpen}>
-          <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetContent className="w-full sm:max-w-lg flex flex-col overflow-hidden p-0">
             {viewingAppointment && (
               <>
-                <SheetHeader>
-                  <SheetTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
-                    {t('reminders.details.title')}
-                  </SheetTitle>
-                  <SheetDescription>
-                    {t('reminders.details.viewDescription')}
-                  </SheetDescription>
-                </SheetHeader>
+                <div className="flex-1 overflow-y-auto p-6 pb-24">
+                  <div>
+                    <SheetHeader>
+                      <SheetTitle className="flex items-center gap-2">
+                        <Calendar className="h-5 w-5" />
+                        {t('reminders.details.title')}
+                      </SheetTitle>
+                      <SheetDescription>
+                        {t('reminders.details.viewDescription')}
+                      </SheetDescription>
+                    </SheetHeader>
 
-                <Tabs value={viewAppointmentTab} onValueChange={(value) => setViewAppointmentTab(value as "details" | "notes")} className="mt-6">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="details">{t('reminders.details.tabs.details')}</TabsTrigger>
-                    <TabsTrigger value="notes">
-                      {t('reminders.details.tabs.notes')}
-                      {notesData?.notes && notesData.notes.length > 0 && (
-                        <Badge variant="secondary" className="ml-2 text-xs">
-                          {notesData.notes.length}
-                        </Badge>
-                      )}
-                    </TabsTrigger>
-                  </TabsList>
+                    <Tabs value={viewAppointmentTab} onValueChange={(value) => setViewAppointmentTab(value as "details" | "notes")} className="mt-6">
+                      <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="details">{t('reminders.details.tabs.details')}</TabsTrigger>
+                        <TabsTrigger value="notes">
+                          {t('reminders.details.tabs.notes')}
+                          {notesData?.notes && notesData.notes.length > 0 && (
+                            <Badge variant="secondary" className="ml-2 text-xs">
+                              {notesData.notes.length}
+                            </Badge>
+                          )}
+                        </TabsTrigger>
+                      </TabsList>
 
-                  <TabsContent value="details" className="space-y-6 mt-6 focus-visible:outline-none focus-visible:ring-0">
-                  {/* Customer Information */}
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      {t('reminders.details.customerInfo')}
-                    </h3>
-                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
-                      <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.name')}</p>
-                        <p className="font-medium">{getCustomerName(viewingAppointment.customer)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.email')}</p>
-                        <p className="text-sm">{viewingAppointment.customer?.email || 'N/A'}</p>
-                      </div>
-                    </div>
-                  </div>
+                      <TabsContent value="details" className="space-y-6 mt-6 focus-visible:outline-none focus-visible:ring-0">
+                        {/* Customer Information */}
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                              <Users className="h-4 w-4 text-primary" />
+                              {t('reminders.details.customerInfo')}
+                            </h3>
+                            {viewingAppointment.customer?.id && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-xs hover:bg-primary/10 hover:text-primary transition-colors"
+                                onClick={() => setCustomerProfilePanelOpen(true)}
+                              >
+                                <Eye className="h-3.5 w-3.5 mr-1.5" />
+                                View Full Profile
+                              </Button>
+                            )}
+                          </div>
+                          <div className="bg-card border rounded-xl p-5 shadow-sm space-y-4 transition-all hover:shadow-md">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.details.name')}</p>
+                                <p className="font-semibold text-base text-foreground">{getCustomerName(viewingAppointment.customer)}</p>
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.details.email')}</p>
+                                <p className="font-medium text-base text-foreground break-all">{viewingAppointment.customer?.email || 'N/A'}</p>
+                              </div>
+                            </div>
 
-                  {/* Appointment Details */}
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      {t('reminders.details.appointmentDetails')}
-                    </h3>
-                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-3">
-                      <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.appointments.title')}</p>
-                        <p className="font-medium">{viewingAppointment.title}</p>
-                      </div>
-                      {viewingAppointment.description && (
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.descriptionLabel')}</p>
-                          <p className="text-sm">{viewingAppointment.description}</p>
-                        </div>
-                      )}
-                      <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.appointments.dateTime')}</p>
-                        <p className="text-sm font-medium">{formatDateTime(viewingAppointment.appointmentDate)}</p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.appointments.duration')}</p>
-                          <p className="text-sm flex items-center gap-1">
-                            <Timer className="h-3 w-3" />
-                            {viewingAppointment.duration} {t('reminders.appointments.minutes')}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.appointments.status')}</p>
-                          <Select
-                            value={viewingAppointment.status}
-                            onValueChange={(value: Appointment['status']) => {
-                              updateAppointmentMutation.mutate(
-                                { id: viewingAppointment.id, data: { status: value } },
-                                {
-                                  onSuccess: () => {
-                                    setViewingAppointment(prev => prev ? { ...prev, status: value } : null);
-                                  }
-                                }
-                              );
-                            }}
-                          >
-                            <SelectTrigger className="h-7 w-[130px] text-xs focus-visible:ring-0 focus:ring-0">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="scheduled">{t('reminders.appointments.scheduled')}</SelectItem>
-                              <SelectItem value="confirmed">{t('reminders.appointments.confirmed')}</SelectItem>
-                              <SelectItem value="completed">{t('reminders.appointments.completed')}</SelectItem>
-                              <SelectItem value="cancelled">{t('reminders.appointments.cancelled')}</SelectItem>
-                              <SelectItem value="no_show">{t('reminders.appointments.noShow')}</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      {viewingAppointment.location && (
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.appointments.location')}</p>
-                          <p className="text-sm flex items-center gap-1">
-                            <MapPin className="h-3 w-3" />
-                            {viewingAppointment.location}
-                          </p>
-                        </div>
-                      )}
-                      {viewingAppointment.serviceType && (
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.serviceType')}</p>
-                          <p className="text-sm">{viewingAppointment.serviceType}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Reminder Status */}
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                      <Bell className="h-4 w-4" />
-                      {t('reminders.details.reminderStatus')}
-                    </h3>
-                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-3">
-                      {(() => {
-                        const appointmentReminders = reminders.filter(r => r.appointmentId === viewingAppointment.id);
-                        const sentReminders = appointmentReminders.filter(r => r.status === 'sent');
-                        const pendingReminders = appointmentReminders.filter(r => r.status === 'pending');
-                        const hasSentReminder = sentReminders.length > 0 || viewingAppointment.reminderSent;
-                        
-                        return (
-                          <>
-                            {/* Overall Status */}
-                            <div className="flex items-center justify-between">
-                              <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.reminderSent')}</p>
-                              {hasSentReminder ? (
-                                <div className="flex items-center gap-1 text-green-600">
-                                  <CheckCircle className="h-4 w-4" />
-                                  <span className="text-sm font-medium">{t('common.yes')}</span>
+                            {showExpandedCustomerInfo && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t mt-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <div className="space-y-1">
+                                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Phone Number</p>
+                                  <p className="font-medium text-base text-foreground">{viewingAppointment.customer?.phoneNumber || 'N/A'}</p>
                                 </div>
-                              ) : (
-                                <div className="flex items-center gap-1 text-gray-400">
-                                  <XCircle className="h-4 w-4" />
-                                  <span className="text-sm">{t('common.no')}</span>
+                                {viewingAppointment.customer?.address && (
+                                  <div className="space-y-1 sm:col-span-2">
+                                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Address</p>
+                                    <p className="font-medium text-base text-foreground">{viewingAppointment.customer.address}</p>
+                                    {(viewingAppointment.customer.city || viewingAppointment.customer.state || viewingAppointment.customer.zipCode) && (
+                                      <p className="text-sm text-muted-foreground">
+                                        {[viewingAppointment.customer.city, viewingAppointment.customer.state, viewingAppointment.customer.zipCode].filter(Boolean).join(', ')}
+                                      </p>
+                                    )}
+                                    {viewingAppointment.customer.country && (
+                                      <p className="text-sm text-muted-foreground">{viewingAppointment.customer.country}</p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full h-8 text-xs font-medium text-muted-foreground hover:text-foreground"
+                              onClick={() => setShowExpandedCustomerInfo(!showExpandedCustomerInfo)}
+                            >
+                              {showExpandedCustomerInfo ? 'Show Less' : 'View More Details'}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Appointment Details */}
+                        <div className="space-y-4">
+                          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-primary" />
+                            {t('reminders.details.appointmentDetails')}
+                          </h3>
+                          <div className="bg-card border rounded-xl p-5 shadow-sm space-y-4 transition-all hover:shadow-md">
+                            <div className="space-y-1 pb-3 border-b">
+                              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.appointments.title')}</p>
+                              <p className="font-bold text-lg text-foreground">{viewingAppointment.title}</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-6">
+                              <div className="col-span-2 sm:col-span-1 space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.appointments.dateTime')}</p>
+                                <p className="font-medium text-sm text-foreground">{formatDateTime(viewingAppointment.appointmentDate)}</p>
+                              </div>
+
+                              <div className="col-span-2 sm:col-span-1 space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.appointments.status')}</p>
+                                <Select
+                                  value={viewingAppointment.status}
+                                  onValueChange={(value: Appointment['status']) => {
+                                    updateAppointmentMutation.mutate(
+                                      { id: viewingAppointment.id, data: { status: value } },
+                                      {
+                                        onSuccess: () => {
+                                          setViewingAppointment(prev => prev ? { ...prev, status: value } : null);
+                                        }
+                                      }
+                                    );
+                                  }}
+                                >
+                                  <SelectTrigger className="h-8 w-full text-xs font-medium bg-background hover:bg-muted/50 transition-colors">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="scheduled">{t('reminders.appointments.scheduled')}</SelectItem>
+                                    <SelectItem value="confirmed">{t('reminders.appointments.confirmed')}</SelectItem>
+                                    <SelectItem value="completed">{t('reminders.appointments.completed')}</SelectItem>
+                                    <SelectItem value="cancelled">{t('reminders.appointments.cancelled')}</SelectItem>
+                                    <SelectItem value="no_show">{t('reminders.appointments.noShow')}</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.appointments.duration')}</p>
+                                <p className="text-sm font-medium flex items-center gap-1.5 text-foreground">
+                                  <Timer className="h-3.5 w-3.5 text-muted-foreground" />
+                                  {viewingAppointment.duration} {t('reminders.appointments.minutes')}
+                                </p>
+                              </div>
+
+                              {viewingAppointment.location && (
+                                <div className="space-y-1">
+                                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.appointments.location')}</p>
+                                  <p className="text-sm font-medium flex items-center gap-1.5 text-foreground">
+                                    <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                                    {viewingAppointment.location}
+                                  </p>
+                                </div>
+                              )}
+
+                              {viewingAppointment.serviceType && (
+                                <div className="col-span-2 space-y-1">
+                                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.details.serviceType')}</p>
+                                  <Badge variant="outline" className="font-normal text-foreground bg-muted/30">
+                                    {viewingAppointment.serviceType}
+                                  </Badge>
                                 </div>
                               )}
                             </div>
 
-                            {/* Sent Reminders Details */}
-                            {sentReminders.length > 0 && (
-                              <div className="border-t pt-3 space-y-2">
-                                <p className="text-xs font-medium text-green-600">Sent Reminders ({sentReminders.length})</p>
-                                {sentReminders.map((reminder) => (
-                                  <div key={reminder.id} className="bg-green-50 dark:bg-green-900/20 p-2 rounded text-sm space-y-1">
-                                    <div className="flex items-center justify-between">
-                                      <span className="text-xs text-gray-500 capitalize">{reminder.reminderType}</span>
-                                      <span className="text-xs text-gray-500">{reminder.reminderTiming === 'custom' ? `${reminder.customMinutesBefore}m before` : reminder.reminderTiming}</span>
-                                    </div>
-                                    {reminder.sentAt && (
-                                      <div className="flex items-center gap-1 text-green-700 dark:text-green-400">
-                                        <CheckCircle className="h-3 w-3" />
-                                        <span className="text-xs">Sent: {formatDateTime(reminder.sentAt)}</span>
-                                      </div>
+                            {viewingAppointment.description && (
+                              <div className="pt-3 border-t space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.details.descriptionLabel')}</p>
+                                <p className="text-sm text-foreground/90 leading-relaxed bg-muted/30 p-2.5 rounded-md border border-dashed border-muted-foreground/20">
+                                  {viewingAppointment.description}
+                                </p>
+                              </div>
+                            )}
+
+                          </div>
+                        </div>
+
+                        {/* Reminder Status */}
+                        <div className="space-y-4">
+                          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                            <Bell className="h-4 w-4 text-primary" />
+                            {t('reminders.details.reminderStatus')}
+                          </h3>
+                          <div className="bg-card border rounded-xl p-5 shadow-sm space-y-4 transition-all hover:shadow-md">
+                            {(() => {
+                              const appointmentReminders = reminders.filter(r => r.appointmentId === viewingAppointment.id);
+                              const sentReminders = appointmentReminders.filter(r => r.status === 'sent');
+                              const pendingReminders = appointmentReminders.filter(r => r.status === 'pending');
+                              const hasSentReminder = sentReminders.length > 0 || viewingAppointment.reminderSent;
+
+                              return (
+                                <>
+                                  {/* Overall Status */}
+                                  <div className="flex items-center justify-between pb-3 border-b">
+                                    <p className="text-sm font-medium text-foreground">{t('reminders.details.reminderSent')}</p>
+                                    {hasSentReminder ? (
+                                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800 flex items-center gap-1.5 pl-1.5 pr-2.5 py-0.5">
+                                        <CheckCircle className="h-3.5 w-3.5" />
+                                        {t('common.yes')}
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="text-muted-foreground flex items-center gap-1.5 pl-1.5 pr-2.5 py-0.5">
+                                        <XCircle className="h-3.5 w-3.5" />
+                                        {t('common.no')}
+                                      </Badge>
                                     )}
                                   </div>
-                                ))}
-                              </div>
-                            )}
 
-                            {/* Legacy sent at (if no reminder records but appointment shows sent) */}
-                            {sentReminders.length === 0 && viewingAppointment.reminderSentAt && (
-                              <div>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.sentAt')}</p>
-                                <p className="text-sm">{formatDateTime(viewingAppointment.reminderSentAt)}</p>
-                              </div>
-                            )}
-
-                            {/* Scheduled/Pending Reminders Details */}
-                            {pendingReminders.length > 0 && (
-                              <div className="border-t pt-3 space-y-2">
-                                <p className="text-xs font-medium text-blue-600">Scheduled Reminders ({pendingReminders.length})</p>
-                                {pendingReminders.map((reminder) => (
-                                  <div key={reminder.id} className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded text-sm space-y-1">
-                                    <div className="flex items-center justify-between">
-                                      <span className="text-xs text-gray-500 capitalize">{reminder.reminderType}</span>
-                                      <span className="text-xs text-gray-500">{reminder.reminderTiming === 'custom' ? `${reminder.customMinutesBefore}m before` : reminder.reminderTiming}</span>
+                                  {/* Sent Reminders Details */}
+                                  {sentReminders.length > 0 && (
+                                    <div className="space-y-3">
+                                      <p className="text-xs font-semibold uppercase tracking-wider text-green-600 dark:text-green-500">Sent Reminders ({sentReminders.length})</p>
+                                      {sentReminders.map((reminder) => (
+                                        <div key={reminder.id} className="bg-green-50/50 dark:bg-green-900/10 p-3 rounded-md border border-green-100 dark:border-green-900/30 space-y-2">
+                                          <div className="flex items-center justify-between">
+                                            <Badge variant="secondary" className="bg-white dark:bg-gray-800 shadow-sm capitalize text-[10px] h-5">{reminder.reminderType}</Badge>
+                                            <span className="text-xs font-medium text-muted-foreground">{reminder.reminderTiming === 'custom' ? `${reminder.customMinutesBefore}m before` : reminder.reminderTiming}</span>
+                                          </div>
+                                          {reminder.sentAt && (
+                                            <div className="flex items-center gap-1.5 text-xs text-green-700 dark:text-green-400 font-medium">
+                                              <CheckCircle className="h-3.5 w-3.5" />
+                                              <span>Sent: {formatDateTime(reminder.sentAt)}</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      ))}
                                     </div>
-                                    <div className="flex items-center gap-1 text-blue-700 dark:text-blue-400">
-                                      <Clock className="h-3 w-3" />
-                                      <span className="text-xs">Scheduled for: {formatDateTime(reminder.scheduledFor)}</span>
+                                  )}
+
+                                  {/* Legacy sent at (if no reminder records but appointment shows sent) */}
+                                  {sentReminders.length === 0 && viewingAppointment.reminderSentAt && (
+                                    <div className="space-y-1">
+                                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.details.sentAt')}</p>
+                                      <p className="text-sm font-medium text-foreground">{formatDateTime(viewingAppointment.reminderSentAt)}</p>
                                     </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                                  )}
 
-                            {/* No reminders message */}
-                            {appointmentReminders.length === 0 && !viewingAppointment.reminderSent && (
-                              <div className="text-center py-2 text-gray-400 text-sm">
-                                No reminders configured
-                              </div>
-                            )}
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </div>
+                                  {/* Scheduled/Pending Reminders Details */}
+                                  {pendingReminders.length > 0 && (
+                                    <div className="space-y-3 pt-2">
+                                      <p className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-500">Scheduled Reminders ({pendingReminders.length})</p>
+                                      {pendingReminders.map((reminder) => (
+                                        <div key={reminder.id} className="bg-blue-50/50 dark:bg-blue-900/10 p-3 rounded-md border border-blue-100 dark:border-blue-900/30 space-y-2">
+                                          <div className="flex items-center justify-between">
+                                            <Badge variant="secondary" className="bg-white dark:bg-gray-800 shadow-sm capitalize text-[10px] h-5">{reminder.reminderType}</Badge>
+                                            <span className="text-xs font-medium text-muted-foreground">{reminder.reminderTiming === 'custom' ? `${reminder.customMinutesBefore}m before` : reminder.reminderTiming}</span>
+                                          </div>
+                                          <div className="flex items-center gap-1.5 text-xs text-blue-700 dark:text-blue-400 font-medium">
+                                            <Clock className="h-3.5 w-3.5" />
+                                            <span>Scheduled: {formatDateTime(reminder.scheduledFor)}</span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
 
-                  {/* Confirmation Status */}
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4" />
-                      {t('reminders.details.confirmationStatus')}
-                    </h3>
-                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.confirmed')}</p>
-                        {viewingAppointment.confirmationReceived ? (
-                          <div className="flex items-center gap-1 text-green-600">
-                            <CheckCircle className="h-4 w-4" />
-                            <span className="text-sm font-medium">{t('common.yes')}</span>
+                                  {/* No reminders message */}
+                                  {appointmentReminders.length === 0 && !viewingAppointment.reminderSent && (
+                                    <div className="text-center py-6 border-2 border-dashed rounded-lg border-muted">
+                                      <BellOff className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+                                      <p className="text-sm text-muted-foreground">No reminders configured</p>
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
-                        ) : (
-                          <div className="flex items-center gap-1 text-gray-400">
-                            <XCircle className="h-4 w-4" />
-                            <span className="text-sm">{t('common.no')}</span>
+                        </div>
+
+                        {/* Confirmation Status */}
+                        <div className="space-y-4">
+                          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-primary" />
+                            {t('reminders.details.confirmationStatus')}
+                          </h3>
+                          <div className="bg-card border rounded-xl p-5 shadow-sm space-y-4 transition-all hover:shadow-md">
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-medium text-foreground">{t('reminders.details.confirmed')}</p>
+                              {viewingAppointment.confirmationReceived ? (
+                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800 flex items-center gap-1.5 pl-1.5 pr-2.5 py-0.5">
+                                  <CheckCircle className="h-3.5 w-3.5" />
+                                  {t('common.yes')}
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-muted-foreground flex items-center gap-1.5 pl-1.5 pr-2.5 py-0.5">
+                                  <XCircle className="h-3.5 w-3.5" />
+                                  {t('common.no')}
+                                </Badge>
+                              )}
+                            </div>
+                            {viewingAppointment.confirmationReceivedAt && (
+                              <div className="space-y-1 pt-3 border-t">
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('reminders.details.confirmedAt')}</p>
+                                <p className="text-sm font-medium text-foreground">{formatDateTime(viewingAppointment.confirmationReceivedAt)}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Metadata */}
+                        <div className="space-y-4">
+                          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                            <Info className="h-4 w-4 text-primary" />
+                            {t('reminders.details.metadata')}
+                          </h3>
+                          <div className="bg-card border rounded-xl p-5 shadow-sm space-y-2 text-xs transition-all hover:shadow-md">
+                            <div className="flex justify-between items-center py-1">
+                              <span className="text-muted-foreground font-medium">{t('reminders.details.created')}</span>
+                              <span className="font-mono bg-muted/50 px-2 py-0.5 rounded text-foreground">{formatDateTime(viewingAppointment.createdAt)}</span>
+                            </div>
+                            <div className="flex justify-between items-center py-1 border-t border-border/50">
+                              <span className="text-muted-foreground font-medium">{t('reminders.details.lastUpdated')}</span>
+                              <span className="font-mono bg-muted/50 px-2 py-0.5 rounded text-foreground">{formatDateTime(viewingAppointment.updatedAt)}</span>
+                            </div>
+                            <div className="flex justify-between items-center py-1 border-t border-border/50">
+                              <span className="text-muted-foreground font-medium">{t('reminders.details.appointmentId')}</span>
+                              <span className="font-mono text-[10px] text-muted-foreground bg-muted/30 px-2 py-0.5 rounded select-all">{viewingAppointment.id}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="notes" className="space-y-6 mt-6 focus-visible:outline-none focus-visible:ring-0">
+                        {/* Legacy Notes (single field) */}
+                        {viewingAppointment.notes && (
+                          <div className="space-y-3">
+                            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                              <MessageSquare className="h-4 w-4" />
+                              {t('reminders.details.quickNotes')}
+                            </h3>
+                            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                              <p className="text-sm whitespace-pre-wrap">{viewingAppointment.notes}</p>
+                            </div>
                           </div>
                         )}
-                      </div>
-                      {viewingAppointment.confirmationReceivedAt && (
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('reminders.details.confirmedAt')}</p>
-                          <p className="text-sm">{formatDateTime(viewingAppointment.confirmationReceivedAt)}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Metadata */}
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                      <Info className="h-4 w-4" />
-                      {t('reminders.details.metadata')}
-                    </h3>
-                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500 dark:text-gray-400">{t('reminders.details.created')}</span>
-                        <span>{formatDateTime(viewingAppointment.createdAt)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500 dark:text-gray-400">{t('reminders.details.lastUpdated')}</span>
-                        <span>{formatDateTime(viewingAppointment.updatedAt)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500 dark:text-gray-400">{t('reminders.details.appointmentId')}</span>
-                        <span className="font-mono text-[10px]">{viewingAppointment.id}</span>
-                      </div>
-                    </div>
-                  </div>
-                  </TabsContent>
-
-                  <TabsContent value="notes" className="space-y-6 mt-6 focus-visible:outline-none focus-visible:ring-0">
-                  {/* Legacy Notes (single field) */}
-                  {viewingAppointment.notes && (
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                        <MessageSquare className="h-4 w-4" />
-                        {t('reminders.details.quickNotes')}
-                      </h3>
-                      <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                        <p className="text-sm whitespace-pre-wrap">{viewingAppointment.notes}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Appointment Notes (multiple entries) */}
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                      <StickyNote className="h-4 w-4" />
-                      {t('reminders.details.appointmentNotes')}
-                      {notesData?.notes && notesData.notes.length > 0 && (
-                        <Badge variant="secondary" className="ml-1 text-xs">
-                          {notesData.notes.length}
-                        </Badge>
-                      )}
-                    </h3>
-                    
-                    {/* Add new note form */}
-                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-3">
-                      <Textarea
-                        placeholder={t('reminders.details.addNotePlaceholder')}
-                        value={newNoteContent}
-                        onChange={(e) => setNewNoteContent(e.target.value)}
-                        rows={3}
-                        className="resize-none focus-visible:ring-0"
-                      />
-                      <div className="flex justify-end">
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            if (newNoteContent.trim() && viewingAppointment?.id) {
-                              createNoteMutation.mutate({
-                                appointmentId: viewingAppointment.id,
-                                content: newNoteContent.trim(),
-                              });
-                            }
-                          }}
-                          disabled={!newNoteContent.trim() || createNoteMutation.isPending}
-                        >
-                          {createNoteMutation.isPending ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              {t('reminders.details.adding')}
-                            </>
-                          ) : (
-                            <>
-                              <Plus className="h-4 w-4 mr-2" />
-                              {t('reminders.details.addNote')}
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Notes list */}
-                    {notesLoading ? (
-                      <div className="flex items-center justify-center py-4">
-                        <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-                      </div>
-                    ) : notesData?.notes && notesData.notes.length > 0 ? (
-                      <div className="space-y-3">
-                        {notesData.notes.map((note) => (
-                          <div key={note.id} className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
-                            {editingNoteId === note.id ? (
-                              <>
-                                <Textarea
-                                  value={editingNoteContent}
-                                  onChange={(e) => setEditingNoteContent(e.target.value)}
-                                  rows={3}
-                                  className="resize-none focus-visible:ring-0"
-                                  autoFocus
-                                />
-                                <div className="flex justify-end gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setEditingNoteId(null);
-                                      setEditingNoteContent("");
-                                    }}
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => {
-                                      if (editingNoteContent.trim()) {
-                                        updateNoteMutation.mutate({
-                                          noteId: note.id,
-                                          content: editingNoteContent.trim(),
-                                        });
-                                      }
-                                    }}
-                                    disabled={!editingNoteContent.trim() || updateNoteMutation.isPending}
-                                  >
-                                    {updateNoteMutation.isPending ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      'Save'
-                                    )}
-                                  </Button>
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <p className="text-sm whitespace-pre-wrap">{note.content}</p>
-                                <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
-                                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                                    <span>
-                                      {note.user?.firstName && note.user?.lastName 
-                                        ? `${note.user.firstName} ${note.user.lastName}`
-                                        : note.user?.name || 'Unknown'}
-                                    </span>
-                                    <span className="mx-1">•</span>
-                                    <span>{new Date(note.createdAt).toLocaleDateString('en-US', { 
-                                      month: 'short', 
-                                      day: 'numeric',
-                                      hour: 'numeric',
-                                      minute: '2-digit'
-                                    })}</span>
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-7 w-7 p-0"
-                                      onClick={() => {
-                                        setEditingNoteId(note.id);
-                                        setEditingNoteContent(note.content);
-                                      }}
-                                    >
-                                      <Edit className="h-3 w-3" />
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
-                                      onClick={() => deleteNoteMutation.mutate(note.id)}
-                                      disabled={deleteNoteMutation.isPending}
-                                    >
-                                      <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              </>
+                        {/* Appointment Notes (multiple entries) */}
+                        <div className="space-y-3">
+                          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                            <StickyNote className="h-4 w-4" />
+                            {t('reminders.details.appointmentNotes')}
+                            {notesData?.notes && notesData.notes.length > 0 && (
+                              <Badge variant="secondary" className="ml-1 text-xs">
+                                {notesData.notes.length}
+                              </Badge>
                             )}
+                          </h3>
+
+                          {/* Add new note form */}
+                          <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-3">
+                            <Textarea
+                              placeholder={t('reminders.details.addNotePlaceholder')}
+                              value={newNoteContent}
+                              onChange={(e) => setNewNoteContent(e.target.value)}
+                              rows={3}
+                              className="resize-none focus-visible:ring-0"
+                            />
+                            <div className="flex justify-end">
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  if (newNoteContent.trim() && viewingAppointment?.id) {
+                                    createNoteMutation.mutate({
+                                      appointmentId: viewingAppointment.id,
+                                      content: newNoteContent.trim(),
+                                    });
+                                  }
+                                }}
+                                disabled={!newNoteContent.trim() || createNoteMutation.isPending}
+                              >
+                                {createNoteMutation.isPending ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    {t('reminders.details.adding')}
+                                  </>
+                                ) : (
+                                  <>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    {t('reminders.details.addNote')}
+                                  </>
+                                )}
+                              </Button>
+                            </div>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">
-                        {t('reminders.details.noNotes')}
-                      </div>
-                    )}
+
+                          {/* Notes list */}
+                          {notesLoading ? (
+                            <div className="flex items-center justify-center py-4">
+                              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                            </div>
+                          ) : notesData?.notes && notesData.notes.length > 0 ? (
+                            <div className="space-y-3">
+                              {notesData.notes.map((note) => (
+                                <div key={note.id} className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
+                                  {editingNoteId === note.id ? (
+                                    <>
+                                      <Textarea
+                                        value={editingNoteContent}
+                                        onChange={(e) => setEditingNoteContent(e.target.value)}
+                                        rows={3}
+                                        className="resize-none focus-visible:ring-0"
+                                        autoFocus
+                                      />
+                                      <div className="flex justify-end gap-2">
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => {
+                                            setEditingNoteId(null);
+                                            setEditingNoteContent("");
+                                          }}
+                                        >
+                                          Cancel
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          onClick={() => {
+                                            if (editingNoteContent.trim()) {
+                                              updateNoteMutation.mutate({
+                                                noteId: note.id,
+                                                content: editingNoteContent.trim(),
+                                              });
+                                            }
+                                          }}
+                                          disabled={!editingNoteContent.trim() || updateNoteMutation.isPending}
+                                        >
+                                          {updateNoteMutation.isPending ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                          ) : (
+                                            'Save'
+                                          )}
+                                        </Button>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                                      <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                                          <span>
+                                            {note.user?.firstName && note.user?.lastName
+                                              ? `${note.user.firstName} ${note.user.lastName}`
+                                              : note.user?.name || 'Unknown'}
+                                          </span>
+                                          <span className="mx-1">•</span>
+                                          <span>{new Date(note.createdAt).toLocaleDateString('en-US', {
+                                            month: 'short',
+                                            day: 'numeric',
+                                            hour: 'numeric',
+                                            minute: '2-digit'
+                                          })}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-7 w-7 p-0"
+                                            onClick={() => {
+                                              setEditingNoteId(note.id);
+                                              setEditingNoteContent(note.content);
+                                            }}
+                                          >
+                                            <Edit className="h-3 w-3" />
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                            onClick={() => deleteNoteMutation.mutate(note.id)}
+                                            disabled={deleteNoteMutation.isPending}
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">
+                              {t('reminders.details.noNotes')}
+                            </div>
+                          )}
+                        </div>
+                      </TabsContent>
+                    </Tabs>
                   </div>
-                  </TabsContent>
-                </Tabs>
+                </div>
 
                 {/* Actions */}
-                <div className="mt-6">
-                  <div className="flex gap-2 pt-4 border-t">
-                    <Button 
-                      className="flex-1" 
+                <div className="absolute bottom-0 left-0 right-0 px-6 py-4 border-t bg-background/80 backdrop-blur-md shadow-[0_-4px_12px_-4px_rgba(0,0,0,0.1)]">
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button
+                      className="flex-1 shadow-sm hover:shadow-md transition-all active:scale-[0.98]"
                       onClick={() => {
                         setViewAppointmentPanelOpen(false);
                         handleEditAppointment(viewingAppointment);
@@ -3548,8 +3938,9 @@ export default function RemindersPage() {
                       <Edit className="h-4 w-4 mr-2" />
                       {t('reminders.details.editAppointment')}
                     </Button>
-                    <Button 
+                    <Button
                       variant="outline"
+                      className="flex-1 sm:flex-none sm:w-1/3 hover:bg-muted/50 transition-colors active:scale-[0.98]"
                       onClick={() => setViewAppointmentPanelOpen(false)}
                     >
                       {t('reminders.details.close')}
@@ -3561,16 +3952,16 @@ export default function RemindersPage() {
           </SheetContent>
         </Sheet>
 
-        {/* Settings Tab */}
-        {activeTab === "settings" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+        {/* Settings Modal */}
+        <Dialog open={settingsModalOpen} onOpenChange={setSettingsModalOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
                 <Settings className="h-5 w-5" />
                 {t('reminders.settings.title')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -3586,7 +3977,7 @@ export default function RemindersPage() {
 
                 <div className="space-y-4">
                   <Label className="text-base font-medium">{t('reminders.settings.defaultSettings')}</Label>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label className="text-sm">{t('reminders.settings.sendReminder')}</Label>
@@ -3622,7 +4013,7 @@ export default function RemindersPage() {
 
                 <div className="space-y-4">
                   <Label className="text-base font-medium">{t('reminders.settings.emailTemplate')}</Label>
-                  <Textarea 
+                  <Textarea
                     placeholder={t('reminders.settings.emailTemplatePlaceholder')}
                     rows={4}
                   />
@@ -3631,9 +4022,16 @@ export default function RemindersPage() {
                   </p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Customer Profile Side Panel */}
+        <ContactViewDrawer
+          contactId={viewingAppointment?.customer?.id || null}
+          open={customerProfilePanelOpen}
+          onOpenChange={setCustomerProfilePanelOpen}
+        />
       </div>
     </div>
   );
