@@ -422,7 +422,9 @@ export class NewsletterWorker extends EventEmitter {
       let sentCount = 0;
       let failedCount = 0;
 
-      for (const emailData of emails) {
+      for (let i = 0; i < emails.length; i++) {
+        const emailData = emails[i];
+        if (i > 0) await new Promise(resolve => setTimeout(resolve, 500)); // Rate limit delay
         try {
           const result = await enhancedEmailService.sendCustomEmail(
             emailData.to,
