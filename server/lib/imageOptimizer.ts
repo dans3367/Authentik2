@@ -42,11 +42,13 @@ export async function optimizeImage(
   let pipeline = sharp(buffer)
     .rotate() // Auto-rotate based on EXIF orientation
 
-  // Resize while maintaining aspect ratio
-  pipeline = pipeline.resize(opts.maxWidth, opts.maxHeight, {
-    fit: 'inside',
-    withoutEnlargement: true
-  })
+  // Resize only if dimensions are specified
+  if (opts.maxWidth || opts.maxHeight) {
+    pipeline = pipeline.resize(opts.maxWidth, opts.maxHeight, {
+      fit: 'inside',
+      withoutEnlargement: true
+    })
+  }
 
   // Convert to target format with quality settings
   switch (opts.format) {
