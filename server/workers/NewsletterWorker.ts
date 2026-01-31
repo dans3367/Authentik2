@@ -279,9 +279,11 @@ export class NewsletterWorker extends EventEmitter {
     try {
       // Check if job should be delayed
       if (job.scheduledFor && job.scheduledFor > new Date()) {
-        const delay = job.scheduledFor.getTime() - Date.now();
-        console.log(`⏰ [NewsletterWorker] Job ${jobId} scheduled for later, waiting ${delay}ms`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        const delay = Math.max(0, job.scheduledFor.getTime() - Date.now());
+        if (delay > 0) {
+          console.log(`⏰ [NewsletterWorker] Job ${jobId} scheduled for later, waiting ${delay}ms`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
 
       // Filter out bounced/suppressed emails

@@ -711,20 +711,9 @@ export default function RemindersPage() {
         description: t('reminders.toasts.appointmentCreated'),
       });
 
-      // Invalidate all appointment queries to ensure fresh data
+      // Invalidate all appointment queries to ensure fresh data (single refresh)
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] });
-
-      // Schedule delayed refreshes to ensure data is fully synced
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] });
-      }, 5000);
-
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] });
-      }, 15000);
 
       // Schedule reminder if enabled
       if (newAppointmentReminderEnabled && data.appointment) {
