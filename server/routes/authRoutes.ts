@@ -252,8 +252,14 @@ authRoutes.post("/avatar", authenticateToken, (req: any, res) => {
       }
 
       // Optimize image using sharp before upload
-      const optimized = await optimizeAvatar(file.buffer);
-      console.log(`📸 [Avatar] Optimized image: ${optimized.originalSize} -> ${optimized.optimizedSize} bytes (${Math.round((1 - optimized.optimizedSize / optimized.originalSize) * 100)}% reduction)`);
+      let optimized;
+      try {
+        optimized = await optimizeAvatar(file.buffer);
+        console.log(`📸 [Avatar] Optimized image: ${optimized.originalSize} -> ${optimized.optimizedSize} bytes (${Math.round((1 - optimized.optimizedSize / optimized.originalSize) * 100)}% reduction)`);
+      } catch (error) {
+        console.error('Image optimization error:', error);
+        return res.status(400).json({ success: false, error: 'Failed to process image. Please ensure the file is a valid image.' });
+      }
 
       // Generate unique filename with webp extension (optimized format)
       const uniqueFilename = `${userId}-${crypto.randomBytes(8).toString('hex')}.webp`;
