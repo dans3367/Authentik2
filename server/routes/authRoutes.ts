@@ -5,6 +5,7 @@ import { eq, and, not } from 'drizzle-orm';
 import { authenticateToken } from '../middleware/auth-middleware';
 import { avatarUpload, handleUploadError } from '../middleware/upload';
 import { uploadToR2, deleteImageFromR2, R2_CONFIG } from '../config/r2';
+import { optimizeAvatar } from '../lib/imageOptimizer';
 import crypto from 'crypto';
 
 export const authRoutes = Router();
@@ -250,13 +251,16 @@ authRoutes.post("/avatar", authenticateToken, (req: any, res) => {
         });
       }
 
-      // Generate unique filename
-      const fileExtension = file.originalname.split('.').pop();
-      const uniqueFilename = `${userId}-${crypto.randomBytes(8).toString('hex')}.${fileExtension}`;
+      // Optimize image using sharp before upload
+      const optimized = await optimizeAvatar(file.buffer);
+      console.log(`📸 [Avatar] Optimized image: ${optimized.originalSize} -> ${optimized.optimizedSize} bytes (${Math.round((1 - optimized.optimizedSize / optimized.originalSize) * 100)}% reduction)`);
+
+      // Generate unique filename with webp extension (optimized format)
+      const uniqueFilename = `${userId}-${crypto.randomBytes(8).toString('hex')}.webp`;
       const key = `avatars/${uniqueFilename}`;
 
-      // Upload to R2
-      const avatarUrl = await uploadToR2(key, file.buffer, file.mimetype);
+      // Upload optimized image to R2
+      const avatarUrl = await uploadToR2(key, optimized.buffer, optimized.mimetype);
 
       // Update user record with new avatar URL
       const updatedUser = await db.update(betterAuthUser)
