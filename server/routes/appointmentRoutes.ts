@@ -684,7 +684,7 @@ async function handlePublicAppointmentView(req: Request, res: Response) {
 }
 
 // POST /api/appointments/:id/send-reschedule-email - Send reschedule invitation email to customer
-router.post('/:id/send-reschedule-email', async (req: Request, res: Response) => {
+router.post('/:id/send-reschedule-email', requireRole(['Owner', 'Administrator', 'Manager', 'User']), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const user = (req as any).user;

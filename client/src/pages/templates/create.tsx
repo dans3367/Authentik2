@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Copy, LayoutDashboard, ArrowLeft, Eye, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import RichTextEditor from "@/components/RichTextEditor";
+import RichTextEditor from "@/components/LazyRichTextEditor";
 import {
   Dialog,
   DialogContent,
@@ -109,7 +109,7 @@ function hasContent(html: string): boolean {
 
 function getThemePreviewHTML(theme: string, content: string): string {
   const sampleContent = content || "<p>Your email content will appear here. This is a preview of how your message will look with the selected theme.</p>";
-  
+
   switch (theme) {
     case "minimal":
       return `
@@ -122,7 +122,7 @@ function getThemePreviewHTML(theme: string, content: string): string {
           </div>
         </div>
       `;
-    
+
     case "modern":
       return `
         <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f9fafb;">
@@ -137,7 +137,7 @@ function getThemePreviewHTML(theme: string, content: string): string {
           </div>
         </div>
       `;
-    
+
     case "classic":
       return `
         <div style="font-family: Georgia, serif; max-width: 600px; margin: 0 auto; background-color: #ffffff;">
@@ -152,7 +152,7 @@ function getThemePreviewHTML(theme: string, content: string): string {
           </div>
         </div>
       `;
-    
+
     case "newsletter":
       return `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff;">
@@ -181,7 +181,7 @@ function getThemePreviewHTML(theme: string, content: string): string {
           </div>
         </div>
       `;
-    
+
     case "promotional":
       return `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #fef3c7;">
@@ -200,7 +200,7 @@ function getThemePreviewHTML(theme: string, content: string): string {
           </div>
         </div>
       `;
-    
+
     default:
       return sampleContent;
   }
@@ -225,7 +225,7 @@ const createTemplate = async (templateData: CreateTemplatePayload) => {
 
 export default function CreateTemplatePage() {
   const { t } = useTranslation();
-  
+
   useSetBreadcrumbs([
     { label: t('navigation.dashboard'), href: "/", icon: LayoutDashboard },
     { label: t('templatesPage.title'), href: "/templates", icon: Copy },
@@ -235,7 +235,7 @@ export default function CreateTemplatePage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // Get localized options
   const localizedChannelOptions = getChannelOptions(t);
   const localizedCategoryOptions = getCategoryOptions(t);
@@ -314,194 +314,193 @@ export default function CreateTemplatePage() {
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="template-name">{t('templatesPage.createTemplatePage.templateName')}</Label>
-                  <Input
-                    id="template-name"
-                    placeholder={t('templatesPage.createTemplatePage.templateNamePlaceholder')}
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="template-channel">{t('templatesPage.createTemplatePage.channel')}</Label>
-                  <Select value={channel} onValueChange={(value: TemplateChannel) => setChannel(value)}>
-                    <SelectTrigger id="template-channel">
-                      <SelectValue placeholder={t('templatesPage.createTemplatePage.selectChannel')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {localizedChannelOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{option.label}</span>
-                            <span className="text-xs text-muted-foreground">{option.description}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="template-category">{t('templatesPage.createTemplatePage.category')}</Label>
-                  <Select value={category} onValueChange={(value: TemplateCategory) => setCategory(value)}>
-                    <SelectTrigger id="template-category">
-                      <SelectValue placeholder={t('templatesPage.createTemplatePage.selectCategory')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {localizedCategoryOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="template-subject">{t('templatesPage.createTemplatePage.subjectLine')}</Label>
-                  <Input
-                    id="template-subject"
-                    placeholder={t('templatesPage.createTemplatePage.subjectLinePlaceholder')}
-                    value={subjectLine}
-                    onChange={(event) => setSubjectLine(event.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="template-content">{t('templatesPage.createTemplatePage.content')}</Label>
-                  <RichTextEditor
-                    value={content}
-                    onChange={setContent}
-                    placeholder={t('templatesPage.createTemplatePage.contentPlaceholder')}
-                    className="min-h-[300px]"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {t('templatesPage.createTemplatePage.contentHelp')}
-                  </p>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="template-theme">{t('templatesPage.createTemplatePage.emailTheme')}</Label>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    {t('templatesPage.createTemplatePage.emailThemeDescription')}
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {themeOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setTheme(option.value as TemplateTheme)}
-                        className={`p-4 rounded-lg border-2 text-left transition-all hover:shadow-md ${
-                          theme === option.value
-                            ? "border-primary bg-primary/5 shadow-sm"
-                            : "border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between mb-2">
-                          <h4 className="font-semibold text-sm">{option.label}</h4>
-                          {theme === option.value && (
-                            <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                              <svg
-                                className="w-3 h-3 text-white"
-                                fill="none"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="2"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path d="M5 13l4 4L19 7"></path>
-                              </svg>
-                            </div>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground mb-2">{option.description}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 italic">{option.preview}</p>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPreviewTheme(option.value as TemplateTheme);
-                            setPreviewOpen(true);
-                          }}
-                          className="mt-2 w-full gap-2 text-xs"
-                        >
-                          <Eye className="h-3 w-3" />
-                          {t('templatesPage.createTemplatePage.preview')}
-                        </Button>
-                      </button>
-                    ))}
+                  <div className="grid gap-2">
+                    <Label htmlFor="template-name">{t('templatesPage.createTemplatePage.templateName')}</Label>
+                    <Input
+                      id="template-name"
+                      placeholder={t('templatesPage.createTemplatePage.templateNamePlaceholder')}
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      required
+                    />
                   </div>
-                </div>
 
-                <div className="grid gap-2">
-                  <Label htmlFor="template-tags">{t('templatesPage.createTemplatePage.tags')}</Label>
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap gap-2 min-h-[40px] p-2 border rounded-md bg-background">
-                      {tags.length === 0 && (
-                        <span className="text-sm text-muted-foreground">{t('templatesPage.createTemplatePage.noTagsAdded')}</span>
-                      )}
-                      {tags.map((tag, index) => (
-                        <Badge
-                          key={index}
-                          variant="secondary"
-                          className="gap-1 pr-1"
+                  <div className="grid gap-2">
+                    <Label htmlFor="template-channel">{t('templatesPage.createTemplatePage.channel')}</Label>
+                    <Select value={channel} onValueChange={(value: TemplateChannel) => setChannel(value)}>
+                      <SelectTrigger id="template-channel">
+                        <SelectValue placeholder={t('templatesPage.createTemplatePage.selectChannel')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {localizedChannelOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{option.label}</span>
+                              <span className="text-xs text-muted-foreground">{option.description}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="template-category">{t('templatesPage.createTemplatePage.category')}</Label>
+                    <Select value={category} onValueChange={(value: TemplateCategory) => setCategory(value)}>
+                      <SelectTrigger id="template-category">
+                        <SelectValue placeholder={t('templatesPage.createTemplatePage.selectCategory')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {localizedCategoryOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="template-subject">{t('templatesPage.createTemplatePage.subjectLine')}</Label>
+                    <Input
+                      id="template-subject"
+                      placeholder={t('templatesPage.createTemplatePage.subjectLinePlaceholder')}
+                      value={subjectLine}
+                      onChange={(event) => setSubjectLine(event.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="template-content">{t('templatesPage.createTemplatePage.content')}</Label>
+                    <RichTextEditor
+                      value={content}
+                      onChange={setContent}
+                      placeholder={t('templatesPage.createTemplatePage.contentPlaceholder')}
+                      className="min-h-[300px]"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t('templatesPage.createTemplatePage.contentHelp')}
+                    </p>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="template-theme">{t('templatesPage.createTemplatePage.emailTheme')}</Label>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      {t('templatesPage.createTemplatePage.emailThemeDescription')}
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {themeOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setTheme(option.value as TemplateTheme)}
+                          className={`p-4 rounded-lg border-2 text-left transition-all hover:shadow-md ${theme === option.value
+                              ? "border-primary bg-primary/5 shadow-sm"
+                              : "border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600"
+                            }`}
                         >
-                          {tag}
-                          <button
+                          <div className="flex items-start justify-between mb-2">
+                            <h4 className="font-semibold text-sm">{option.label}</h4>
+                            {theme === option.value && (
+                              <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                                <svg
+                                  className="w-3 h-3 text-white"
+                                  fill="none"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path d="M5 13l4 4L19 7"></path>
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-2">{option.description}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 italic">{option.preview}</p>
+                          <Button
                             type="button"
-                            onClick={() => setTags(tags.filter((_, i) => i !== index))}
-                            className="ml-1 rounded-full hover:bg-muted p-0.5"
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPreviewTheme(option.value as TemplateTheme);
+                              setPreviewOpen(true);
+                            }}
+                            className="mt-2 w-full gap-2 text-xs"
                           >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </Badge>
+                            <Eye className="h-3 w-3" />
+                            {t('templatesPage.createTemplatePage.preview')}
+                          </Button>
+                        </button>
                       ))}
                     </div>
-                    <div className="flex gap-2">
-                      <Input
-                        id="template-tags"
-                        placeholder={t('templatesPage.createTemplatePage.addTagPlaceholder')}
-                        value={tagInput}
-                        onChange={(event) => setTagInput(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault();
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="template-tags">{t('templatesPage.createTemplatePage.tags')}</Label>
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-2 min-h-[40px] p-2 border rounded-md bg-background">
+                        {tags.length === 0 && (
+                          <span className="text-sm text-muted-foreground">{t('templatesPage.createTemplatePage.noTagsAdded')}</span>
+                        )}
+                        {tags.map((tag, index) => (
+                          <Badge
+                            key={index}
+                            variant="secondary"
+                            className="gap-1 pr-1"
+                          >
+                            {tag}
+                            <button
+                              type="button"
+                              onClick={() => setTags(tags.filter((_, i) => i !== index))}
+                              className="ml-1 rounded-full hover:bg-muted p-0.5"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          id="template-tags"
+                          placeholder={t('templatesPage.createTemplatePage.addTagPlaceholder')}
+                          value={tagInput}
+                          onChange={(event) => setTagInput(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault();
+                              const newTag = tagInput.trim();
+                              if (newTag && !tags.includes(newTag)) {
+                                setTags([...tags, newTag]);
+                                setTagInput("");
+                              }
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
                             const newTag = tagInput.trim();
                             if (newTag && !tags.includes(newTag)) {
                               setTags([...tags, newTag]);
                               setTagInput("");
                             }
-                          }
-                        }}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          const newTag = tagInput.trim();
-                          if (newTag && !tags.includes(newTag)) {
-                            setTags([...tags, newTag]);
-                            setTagInput("");
-                          }
-                        }}
-                        disabled={!tagInput.trim()}
-                      >
-                        {t('common.add')}
-                      </Button>
+                          }}
+                          disabled={!tagInput.trim()}
+                        >
+                          {t('common.add')}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {t('templatesPage.createTemplatePage.addTagHelp')}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {t('templatesPage.createTemplatePage.addTagHelp')}
-                    </p>
                   </div>
                 </div>
-              </div>
 
                 <div className="flex gap-3 justify-end pt-4 border-t">
                   <Button
@@ -534,9 +533,9 @@ export default function CreateTemplatePage() {
           </DialogHeader>
           <div className="mt-4">
             <div className="bg-gray-100 dark:bg-gray-900 p-6 rounded-lg">
-              <div 
-                dangerouslySetInnerHTML={{ 
-                  __html: getThemePreviewHTML(previewTheme, content) 
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: getThemePreviewHTML(previewTheme, content)
                 }}
               />
             </div>

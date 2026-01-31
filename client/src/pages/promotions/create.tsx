@@ -16,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { generatePromotionalCodes, parseUserCodes, validatePromotionalCodes, formatCodesForDisplay, CODE_GENERATION_PRESETS, type CodeFormat } from '@/utils/codeGeneration';
-import RichTextEditor from '@/components/RichTextEditor';
+import RichTextEditor from '@/components/LazyRichTextEditor';
 
 const getPromotionTypeOptions = (t: any) => [
   { value: 'newsletter', label: t('promotionsPage.types.newsletter') },
@@ -69,7 +69,7 @@ export default function CreatePromotionPage() {
     promotionalCodes: [] as string[],
   });
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
-  
+
   // Code generation state
   const [codeGenerationMode, setCodeGenerationMode] = useState<'upload' | 'generate'>('upload');
   const [userCodesInput, setUserCodesInput] = useState('');
@@ -109,7 +109,7 @@ export default function CreatePromotionPage() {
     setUserCodesInput(value);
     const codes = parseUserCodes(value);
     const validation = validatePromotionalCodes(codes);
-    
+
     if (validation.errors.length > 0) {
       // Don't show toast for every keystroke, just update the codes
       setFormData({ ...formData, promotionalCodes: validation.valid });
@@ -137,7 +137,7 @@ export default function CreatePromotionPage() {
 
   const handleCopyCodesList = async () => {
     if (formData.promotionalCodes.length === 0) return;
-    
+
     try {
       await navigator.clipboard.writeText(formatCodesForDisplay(formData.promotionalCodes));
       toast({
@@ -211,9 +211,9 @@ export default function CreatePromotionPage() {
     <div className="container mx-auto p-4 lg:p-6 space-y-6 lg:space-y-8 max-w-4xl">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button 
-          variant="outline" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           onClick={handleCancel}
           className="flex items-center gap-2"
         >
@@ -270,7 +270,7 @@ export default function CreatePromotionPage() {
                     </Select>
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="description">{t('promotionsPage.createPage.description')}</Label>
                   <Input
@@ -340,10 +340,10 @@ export default function CreatePromotionPage() {
               <CardContent>
                 <Collapsible open={isCodeSectionOpen} onOpenChange={setIsCodeSectionOpen}>
                   <CollapsibleTrigger asChild>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
                       className="w-full justify-between mb-4"
                     >
                       <div className="flex items-center gap-2">
@@ -361,8 +361,8 @@ export default function CreatePromotionPage() {
                     {/* Code Generation Mode Selection */}
                     <div className="space-y-3">
                       <Label>{t('promotionsPage.createPage.chooseMethod')}</Label>
-                      <RadioGroup 
-                        value={codeGenerationMode} 
+                      <RadioGroup
+                        value={codeGenerationMode}
                         onValueChange={(value: 'upload' | 'generate') => setCodeGenerationMode(value)}
                         className="grid grid-cols-1 gap-4"
                       >
@@ -419,9 +419,9 @@ export default function CreatePromotionPage() {
                               min="1"
                               max="10000"
                               value={generateOptions.count}
-                              onChange={(e) => setGenerateOptions({ 
-                                ...generateOptions, 
-                                count: parseInt(e.target.value) || 1 
+                              onChange={(e) => setGenerateOptions({
+                                ...generateOptions,
+                                count: parseInt(e.target.value) || 1
                               })}
                             />
                           </div>
@@ -433,9 +433,9 @@ export default function CreatePromotionPage() {
                               min="4"
                               max="20"
                               value={generateOptions.length}
-                              onChange={(e) => setGenerateOptions({ 
-                                ...generateOptions, 
-                                length: parseInt(e.target.value) || 8 
+                              onChange={(e) => setGenerateOptions({
+                                ...generateOptions,
+                                length: parseInt(e.target.value) || 8
                               })}
                             />
                           </div>
@@ -443,11 +443,11 @@ export default function CreatePromotionPage() {
 
                         <div className="space-y-2">
                           <Label>{t('promotionsPage.createPage.codeFormat')}</Label>
-                          <Select 
-                            value={generateOptions.format} 
-                            onValueChange={(value: CodeFormat) => setGenerateOptions({ 
-                              ...generateOptions, 
-                              format: value 
+                          <Select
+                            value={generateOptions.format}
+                            onValueChange={(value: CodeFormat) => setGenerateOptions({
+                              ...generateOptions,
+                              format: value
                             })}
                           >
                             <SelectTrigger>
@@ -469,9 +469,9 @@ export default function CreatePromotionPage() {
                             <Input
                               id="codePrefix"
                               value={generateOptions.prefix}
-                              onChange={(e) => setGenerateOptions({ 
-                                ...generateOptions, 
-                                prefix: e.target.value.toUpperCase() 
+                              onChange={(e) => setGenerateOptions({
+                                ...generateOptions,
+                                prefix: e.target.value.toUpperCase()
                               })}
                               placeholder={t('promotionsPage.createPage.prefixPlaceholder')}
                               maxLength={10}
@@ -482,9 +482,9 @@ export default function CreatePromotionPage() {
                             <Input
                               id="codeSuffix"
                               value={generateOptions.suffix}
-                              onChange={(e) => setGenerateOptions({ 
-                                ...generateOptions, 
-                                suffix: e.target.value.toUpperCase() 
+                              onChange={(e) => setGenerateOptions({
+                                ...generateOptions,
+                                suffix: e.target.value.toUpperCase()
                               })}
                               placeholder={t('promotionsPage.createPage.suffixPlaceholder')}
                               maxLength={10}
@@ -546,10 +546,10 @@ export default function CreatePromotionPage() {
               <CardContent>
                 <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
                   <CollapsibleTrigger asChild>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
                       className="w-full justify-between"
                     >
                       <div className="flex items-center gap-2">
@@ -651,7 +651,7 @@ export default function CreatePromotionPage() {
                     </div>
                     <div className="font-semibold">{formData.title || t('promotionsPage.createPage.titlePlaceholder')}</div>
                   </div>
-                  
+
                   <div>
                     <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
                       {t('promotionsPage.createPage.previewType')}
@@ -660,7 +660,7 @@ export default function CreatePromotionPage() {
                       {promotionTypeOptions.find(opt => opt.value === formData.type)?.label}
                     </Badge>
                   </div>
-                  
+
                   {formData.description && (
                     <div>
                       <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -669,12 +669,12 @@ export default function CreatePromotionPage() {
                       <div className="text-sm">{formData.description}</div>
                     </div>
                   )}
-                  
+
                   <div>
                     <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
                       {t('promotionsPage.createPage.previewContent')}
                     </div>
-                    <div 
+                    <div
                       className="text-sm prose prose-sm dark:prose-invert max-w-none"
                       dangerouslySetInnerHTML={{ __html: formData.content || "<p class='text-gray-400'>Your promotional content will appear here as you type...</p>" }}
                     />
@@ -688,7 +688,7 @@ export default function CreatePromotionPage() {
                       {targetAudienceOptions.find(opt => opt.value === formData.targetAudience)?.label}
                     </div>
                   </div>
-                  
+
                   <div>
                     <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
                       {t('promotionsPage.createPage.previewStatus')}
@@ -705,16 +705,16 @@ export default function CreatePromotionPage() {
                       )}
                     </div>
                   </div>
-                  
+
                   {formData.promotionalCodes.length > 0 && (
                     <div>
                       <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
                         {t('promotionsPage.createPage.previewCodes')}
                       </div>
                       <div className="text-sm font-mono bg-gray-50 dark:bg-gray-900 p-2 rounded border">
-                        {t('promotionsPage.createPage.codesAdded', { 
-                          count: formData.promotionalCodes.length, 
-                          plural: formData.promotionalCodes.length !== 1 ? 's' : '' 
+                        {t('promotionsPage.createPage.codesAdded', {
+                          count: formData.promotionalCodes.length,
+                          plural: formData.promotionalCodes.length !== 1 ? 's' : ''
                         })}
                       </div>
                     </div>
@@ -727,9 +727,9 @@ export default function CreatePromotionPage() {
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center gap-4">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={handleCancel}
                     disabled={createPromotionMutation.isPending}
                   >

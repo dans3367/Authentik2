@@ -10,7 +10,7 @@ export default defineConfig({
     react(),
   ],
   optimizeDeps: {
-    exclude: ['stripe','framer-motion']
+    exclude: ['stripe']
   },
   resolve: {
     alias: {
@@ -28,13 +28,13 @@ export default defineConfig({
         manualChunks: {
           // Core React libraries
           'react-vendor': ['react', 'react-dom'],
-          
+
           // State management
           'state-vendor': ['@reduxjs/toolkit', 'react-redux', 'redux-persist'],
-          
+
           // Data fetching
           'query-vendor': ['@tanstack/react-query', '@tanstack/react-table'],
-          
+
           // UI component libraries
           'radix-vendor': [
             '@radix-ui/react-accordion',
@@ -50,29 +50,27 @@ export default defineConfig({
             '@radix-ui/react-toast',
             '@radix-ui/react-tooltip'
           ],
-          
+
           // Form handling
           'form-vendor': ['react-hook-form', '@hookform/resolvers', 'zod'],
-          
-          // Charts and data visualization
-          'charts-vendor': ['recharts'],
-          
+
+          // NOTE: recharts is NOT in manual chunks - it will be code-split 
+          // with email-analytics page for better initial load performance
+
           // Icons and styling
           'ui-vendor': [
             'lucide-react',
-            'react-icons',
-            'framer-motion',
             'class-variance-authority',
             'clsx',
             'tailwind-merge'
           ],
-          
+
           // Date and utility libraries
           'utils-vendor': ['date-fns', 'nanoid'],
-          
+
           // Payment processing
           'stripe-vendor': ['@stripe/stripe-js', '@stripe/react-stripe-js', 'stripe'],
-          
+
           // AWS and cloud services
           'aws-vendor': ['@aws-sdk/client-s3', '@aws-sdk/s3-request-presigner']
         }

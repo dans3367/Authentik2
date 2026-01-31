@@ -98,9 +98,14 @@ function generateRescheduleEmailHtml(data: RescheduleEmailPayload, statusText: s
         ? `<p style="margin: 0 0 10px 0;"><strong>Location:</strong> ${data.location}</p>`
         : "";
 
-    const bookingSection = data.bookingUrl
+    // Validate URL is HTTP/HTTPS only to prevent XSS via javascript: protocol
+    const safeBookingUrl = data.bookingUrl && /^https?:\/\//i.test(data.bookingUrl)
+        ? data.bookingUrl
+        : null;
+
+    const bookingSection = safeBookingUrl
         ? `<div style="margin: 30px 0; text-align: center;">
-        <a href="${data.bookingUrl}" style="display: inline-block; padding: 14px 36px; background-color: #10b981; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">Book a New Appointment</a>
+        <a href="${safeBookingUrl}" style="display: inline-block; padding: 14px 36px; background-color: #10b981; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">Book a New Appointment</a>
       </div>`
         : `<p style="margin: 20px 0; text-align: center; color: #6b7280;">
         Please contact us to schedule a new appointment at your convenience.
