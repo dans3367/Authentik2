@@ -255,7 +255,10 @@ authRoutes.post("/avatar", authenticateToken, (req: any, res) => {
       let optimized;
       try {
         optimized = await optimizeAvatar(file.buffer);
-        console.log(`📸 [Avatar] Optimized image: ${optimized.originalSize} -> ${optimized.optimizedSize} bytes (${Math.round((1 - optimized.optimizedSize / optimized.originalSize) * 100)}% reduction)`);
+        const reduction = optimized.originalSize > 0 
+          ? `(${Math.round((1 - optimized.optimizedSize / optimized.originalSize) * 100)}% reduction)` 
+          : '';
+        console.log(`📸 [Avatar] Optimized image: ${optimized.originalSize} -> ${optimized.optimizedSize} bytes ${reduction}`);
       } catch (error) {
         console.error('Image optimization error:', error);
         return res.status(400).json({ success: false, error: 'Failed to process image. Please ensure the file is a valid image.' });

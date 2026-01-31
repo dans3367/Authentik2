@@ -16,7 +16,12 @@ export interface OptimizedImage {
   optimizedSize: number
 }
 
-const DEFAULT_AVATAR_OPTIONS: ImageOptimizationOptions = {
+const DEFAULT_OPTIONS: ImageOptimizationOptions = {
+  quality: 80,
+  format: 'webp'
+}
+
+const AVATAR_OPTIONS: ImageOptimizationOptions = {
   maxWidth: 400,
   maxHeight: 400,
   quality: 80,
@@ -31,7 +36,7 @@ export async function optimizeImage(
   buffer: Buffer,
   options: ImageOptimizationOptions = {}
 ): Promise<OptimizedImage> {
-  const opts = { ...DEFAULT_AVATAR_OPTIONS, ...options }
+  const opts = { ...DEFAULT_OPTIONS, ...options }
   const originalSize = buffer.length
 
   let pipeline = sharp(buffer)
@@ -74,5 +79,5 @@ export async function optimizeImage(
  * Returns WebP format at 400x400 max dimensions
  */
 export async function optimizeAvatar(buffer: Buffer): Promise<OptimizedImage> {
-  return optimizeImage(buffer, DEFAULT_AVATAR_OPTIONS)
+  return optimizeImage(buffer, AVATAR_OPTIONS)
 }
