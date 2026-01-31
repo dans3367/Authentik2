@@ -110,11 +110,10 @@ export class EnhancedEmailService {
       text?: string;
       from?: string;
       preferredProvider?: string;
-      useQueue?: boolean;
       headers?: Record<string, string>;
       metadata?: Record<string, any>;
     } = {}
-  ): Promise<EmailSendResult | string> {
+  ): Promise<EmailSendResult> {
     const recipients = Array.isArray(to) ? to : [to];
     
     const message: EmailMessage = {
@@ -130,105 +129,7 @@ export class EnhancedEmailService {
       }
     };
 
-    if (options.useQueue || this.config.enableQueue) {
-      return await this.manager.queueEmail(message, options.preferredProvider);
-    } else {
-      return await this.manager.sendEmail(message, options.preferredProvider);
-    }
-  }
-
-  // Schedule a custom email for a future time
-  async scheduleCustomEmail(
-    to: string | string[],
-    subject: string,
-    html: string,
-    scheduleAt: Date,
-    options: {
-      text?: string;
-      from?: string;
-      preferredProvider?: string;
-      headers?: Record<string, string>;
-      metadata?: Record<string, any>;
-    } = {}
-  ): Promise<string> {
-    const recipients = Array.isArray(to) ? to : [to];
-    const message: EmailMessage = {
-      to: recipients,
-      from: options.from || this.config.fromEmail,
-      subject,
-      html,
-      text: options.text,
-      headers: options.headers,
-      metadata: {
-        type: 'scheduled_custom',
-        scheduledAt: scheduleAt.toISOString(),
-        ...options.metadata,
-      },
-    };
-
-    return await this.manager.queueEmailAt(message, scheduleAt, options.preferredProvider);
-  }
-
-  // Batch email sending with automatic queueing
-  async sendBatchEmails(
-    emails: Array<{
-      to: string;
-      subject: string;
-      html: string;
-      text?: string;
-      headers?: Record<string, string>;
-      metadata?: Record<string, any>;
-    }>,
-    options: {
-      preferredProvider?: string;
-      batchSize?: number;
-      delayBetweenBatches?: number;
-    } = {}
-  ): Promise<{ queued: string[]; errors: Array<{ email: string; error: string }> }> {
-    const batchSize = options.batchSize || 10;
-    const delay = options.delayBetweenBatches || 1000;
-    const queued: string[] = [];
-    const errors: Array<{ email: string; error: string }> = [];
-
-    for (let i = 0; i < emails.length; i += batchSize) {
-      const batch = emails.slice(i, i + batchSize);
-      
-      console.log(`[EnhancedEmailService] Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(emails.length / batchSize)}`);
-
-      for (const emailData of batch) {
-        try {
-          const message: EmailMessage = {
-            to: [emailData.to],
-            from: this.config.fromEmail,
-            subject: emailData.subject,
-            html: emailData.html,
-            text: emailData.text,
-            headers: emailData.headers,
-            metadata: {
-              type: 'batch',
-              ...emailData.metadata
-            }
-          };
-
-          const queueId = await this.manager.queueEmail(message, options.preferredProvider);
-          queued.push(queueId);
-        } catch (error) {
-          console.error(`[EnhancedEmailService] Failed to queue email for ${emailData.to}:`, error);
-          errors.push({
-            email: emailData.to,
-            error: error instanceof Error ? error.message : 'Unknown error'
-          });
-        }
-      }
-
-      // Add delay between batches to avoid overwhelming the system
-      if (i + batchSize < emails.length && delay > 0) {
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-
-    console.log(`[EnhancedEmailService] Batch processing complete: ${queued.length} queued, ${errors.length} errors`);
-    return { queued, errors };
+    return await this.manager.sendEmail(message, options.preferredProvider);
   }
 
   // Health check and status methods
@@ -245,24 +146,6 @@ export class EnhancedEmailService {
       config: this.config,
       ...this.manager.getStatus()
     };
-  }
-
-  getQueueStatus() {
-    return this.manager.getQueueStatus();
-  }
-
-  getEmailStatus(emailId: string) {
-    return this.manager.getEmailStatus(emailId);
-  }
-
-  // Retrieve all queued emails (for admin/inspection endpoints)
-  getAllQueuedEmails() {
-    return this.manager.getAllQueuedEmails();
-  }
-
-  // Cleanup methods
-  cleanupOldEmails(olderThanHours: number = 24): void {
-    this.manager.cleanupOldEmails(olderThanHours);
   }
 
   // Graceful shutdown

@@ -16,7 +16,6 @@ import {
 import { auth } from "./auth";
 import { toNodeHandler } from "better-auth/node";
 import { serverLogger } from "./logger";
-import { appointmentReminderWorker } from "./workers/AppointmentReminderWorker";
 
 const app = express();
 
@@ -168,14 +167,8 @@ app.use((req, res, next) => {
   */
   serverLogger.info('🚫 Birthday Worker Service: DISABLED (handled by cardprocessor-go)');
 
-  // Appointment Reminder Worker - ENABLED
-  try {
-    serverLogger.info('🔔 Starting Appointment Reminder Worker...');
-    appointmentReminderWorker.start();
-    serverLogger.info('✅ Appointment Reminder Worker started');
-  } catch (error) {
-    serverLogger.error({ err: error }, 'Failed to start Appointment Reminder Worker');
-  }
+  // Appointment Reminder Worker - handled by Trigger.dev (src/trigger/reminders.ts)
+  serverLogger.info('🚫 Appointment Reminder Worker: handled by Trigger.dev');
 
   // Display service architecture
   serverLogger.info('🔄 Service Architecture:');

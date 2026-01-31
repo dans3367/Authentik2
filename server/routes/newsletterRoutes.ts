@@ -836,21 +836,37 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
           };
         });
 
-        // Send emails in batches
+        // Send emails individually (batch method removed - use Trigger.dev for bulk sending)
         console.log(`[Newsletter] Sending ${emails.length} emails for newsletter ${id} (after suppression filter)`);
-        const result = await enhancedEmailService.sendBatchEmails(emails, {
-          batchSize: 10,
-          delayBetweenBatches: 1000 // 1 second delay between batches
-        });
+        let successful = 0;
+        let failed = 0;
+        const errors: Array<{ email: string; error: string }> = [];
+
+        for (const emailData of emails) {
+          try {
+            const result = await enhancedEmailService.sendCustomEmail(
+              emailData.to,
+              emailData.subject,
+              emailData.html,
+              { text: emailData.text, headers: emailData.headers, metadata: emailData.metadata }
+            );
+            if (result.success) {
+              successful++;
+            } else {
+              failed++;
+              errors.push({ email: emailData.to, error: result.error || 'Send failed' });
+            }
+          } catch (err) {
+            failed++;
+            errors.push({ email: emailData.to, error: err instanceof Error ? err.message : 'Unknown error' });
+          }
+        }
 
         console.log(`[Newsletter] Batch sending complete for ${id}:`, {
-          queued: result.queued.length,
-          errors: result.errors.length
+          successful,
+          failed
         });
 
-        // Update newsletter status based on results
-        const successful = result.queued.length;
-        const failed = result.errors.length;
         const totalSent = successful + failed;
 
         await db.update(newsletters)

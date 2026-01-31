@@ -138,119 +138,21 @@ emailManagementRoutes.get("/email-contacts", authenticateToken, requireTenant, a
 
 // List scheduled emails for a specific contact (timeline)
 emailManagementRoutes.get("/email-contacts/:id/scheduled", authenticateToken, requireTenant, async (req: any, res) => {
-  try {
-    const { id } = req.params;
-
-    // Ensure contact belongs to tenant
-    const contact = await db.query.emailContacts.findFirst({
-      where: sql`${emailContacts.id} = ${id} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
-    });
-    if (!contact) {
-      return res.status(404).json({ message: 'Contact not found' });
-    }
-
-    // Get all queued emails and filter by metadata.contactId and status
-    const all = enhancedEmailService.getAllQueuedEmails();
-    const now = new Date();
-    const scheduled = all
-      .filter((q: any) => {
-        const meta = q?.message?.metadata || {};
-        const contactId = meta.contactId || meta.recipientId; // support alt keys
-        const isForContact = String(contactId) === String(id);
-        const isFuture = q.nextRetryAt && new Date(q.nextRetryAt) > now;
-        const isScheduledState = q.status === 'retrying' || q.status === 'pending';
-        return isForContact && isScheduledState && (isFuture || q.status === 'pending');
-      })
-      .map((q) => ({
-        id: q.id,
-        to: q.message.to,
-        subject: q.message.subject,
-        html: q.message.html,
-        text: q.message.text,
-        metadata: q.message.metadata || {},
-        status: q.status,
-        scheduledAt: q.nextRetryAt || q.createdAt,
-        createdAt: q.createdAt,
-        providerId: q.providerId,
-      }))
-      .sort((a, b) => new Date(a.scheduledAt as any).getTime() - new Date(b.scheduledAt as any).getTime());
-
-    res.json({ scheduled });
-  } catch (error) {
-    console.error('List scheduled emails error:', error);
-    res.status(500).json({ message: 'Failed to list scheduled emails' });
-  }
+  // Scheduled email queue removed - email scheduling now handled by Trigger.dev
+  // Return empty array for backwards compatibility
+  res.json({ scheduled: [], message: 'Scheduled email queue migrated to Trigger.dev' });
 });
 
 // Update a scheduled email for a specific contact
 emailManagementRoutes.put("/email-contacts/:id/scheduled/:queueId", authenticateToken, requireTenant, async (req: any, res) => {
-  try {
-    const { id, queueId } = req.params;
-    const { subject, html, text, scheduleAt } = req.body || {};
-
-    const contact = await db.query.emailContacts.findFirst({
-      where: sql`${emailContacts.id} = ${id} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
-    });
-    if (!contact) return res.status(404).json({ message: 'Contact not found' });
-
-    const all = enhancedEmailService.getAllQueuedEmails();
-    const item = all.find((q: any) => q.id === queueId);
-    if (!item) return res.status(404).json({ message: 'Scheduled item not found' });
-
-    const meta = item?.message?.metadata || {};
-    const isForContact = String(meta.contactId || meta.recipientId) === String(id);
-    if (!isForContact) return res.status(403).json({ message: 'Forbidden' });
-
-    let nextRetryAt: Date | undefined;
-    if (scheduleAt) {
-      const dt = new Date(scheduleAt);
-      if (isNaN(dt.getTime())) return res.status(400).json({ message: 'Invalid scheduleAt' });
-      nextRetryAt = dt;
-    }
-
-    const messageUpdates: any = {};
-    if (subject !== undefined) messageUpdates.subject = sanitizeString(subject);
-    if (html !== undefined) messageUpdates.html = html;
-    if (text !== undefined) messageUpdates.text = text;
-
-    const ok = (enhancedEmailService as any).manager.updateQueuedEmail(queueId, {
-      message: Object.keys(messageUpdates).length ? messageUpdates : undefined,
-      nextRetryAt,
-    });
-
-    if (!ok) return res.status(400).json({ message: 'Failed to update scheduled item' });
-    res.json({ message: 'Scheduled item updated' });
-  } catch (error) {
-    console.error('Update scheduled email error:', error);
-    res.status(500).json({ message: 'Failed to update scheduled email' });
-  }
+  // Scheduled email queue removed - email scheduling now handled by Trigger.dev
+  res.status(501).json({ message: 'Scheduled email updates not available - use Trigger.dev dashboard' });
 });
 
 // Delete a scheduled email for a specific contact
 emailManagementRoutes.delete("/email-contacts/:id/scheduled/:queueId", authenticateToken, requireTenant, async (req: any, res) => {
-  try {
-    const { id, queueId } = req.params;
-
-    const contact = await db.query.emailContacts.findFirst({
-      where: sql`${emailContacts.id} = ${id} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
-    });
-    if (!contact) return res.status(404).json({ message: 'Contact not found' });
-
-    const all = enhancedEmailService.getAllQueuedEmails();
-    const item = all.find((q: any) => q.id === queueId);
-    if (!item) return res.status(404).json({ message: 'Scheduled item not found' });
-
-    const meta = item?.message?.metadata || {};
-    const isForContact = String(meta.contactId || meta.recipientId) === String(id);
-    if (!isForContact) return res.status(403).json({ message: 'Forbidden' });
-
-    const ok = (enhancedEmailService as any).manager.removeQueuedEmail(queueId);
-    if (!ok) return res.status(400).json({ message: 'Failed to delete scheduled item' });
-    res.json({ message: 'Scheduled item deleted' });
-  } catch (error) {
-    console.error('Delete scheduled email error:', error);
-    res.status(500).json({ message: 'Failed to delete scheduled email' });
-  }
+  // Scheduled email queue removed - email scheduling now handled by Trigger.dev
+  res.status(501).json({ message: 'Scheduled email deletion not available - use Trigger.dev dashboard' });
 });
 
 // Get specific email contact
@@ -1114,24 +1016,28 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       return res.status(400).json({ message: 'scheduleAt must be at least 30 seconds in the future' });
     }
 
-    // Schedule via enhanced email service
-    const queueId = await enhancedEmailService.scheduleCustomEmail(
-      String(contact.email),
-      sanitizeString(String(subject)),
-      String(html),
-      scheduleDate,
-      {
-        text: text,
+    // Schedule via Trigger.dev
+    try {
+      const { scheduleEmailTask } = await import('../../src/trigger/email');
+      const payload: Parameters<typeof scheduleEmailTask.trigger>[0] = {
+        to: String(contact.email),
+        subject: sanitizeString(String(subject)),
+        html: String(html),
+        scheduledFor: scheduleDate.toISOString(),
         metadata: {
           type: 'b2c',
           contactId: id,
           tenantId: req.user.tenantId,
           scheduledBy: req.user.id,
         },
-      }
-    );
-
-    return res.status(201).json({ message: 'Email scheduled', queueId, contactId: id, scheduleAt: scheduleDate.toISOString() });
+      };
+      if (text) payload.text = String(text);
+      const handle = await scheduleEmailTask.trigger(payload);
+      return res.status(201).json({ message: 'Email scheduled via Trigger.dev', runId: handle.id, contactId: id, scheduleAt: scheduleDate.toISOString() });
+    } catch (importError) {
+      console.error('Failed to import or trigger email task:', importError);
+      return res.status(503).json({ message: 'Email scheduling service unavailable' });
+    }
   } catch (error) {
     console.error('Schedule single contact email error:', error);
     res.status(500).json({ message: 'Failed to schedule email' });
