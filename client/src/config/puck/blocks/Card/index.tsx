@@ -1,18 +1,62 @@
-import { ReactElement } from "react";
+import { ReactElement, ComponentType } from "react";
 import { ComponentConfig } from "@measured/puck";
 import styles from "./styles.module.css";
 import { getClassNameFactory } from "../../lib/get-class-name-factory";
-import * as LucideIcons from "lucide-react";
+import {
+  // Common UI icons
+  Star, Heart, Home, Settings, User, Users, Mail, Phone, Calendar, Clock,
+  Search, Check, X, Plus, Minus, ChevronRight, ChevronLeft, ChevronDown, ChevronUp,
+  ArrowRight, ArrowLeft, ArrowUp, ArrowDown, ExternalLink, Link, Download, Upload,
+  // Content icons
+  FileText, Image, Video, Music, Folder, File, Bookmark, Tag, Hash, AtSign,
+  // Actions icons
+  Edit, Trash, Copy, Clipboard, Share, Send, Save, Printer, RefreshCw, RotateCcw,
+  // Business icons
+  ShoppingCart, CreditCard, DollarSign, TrendingUp, BarChart, PieChart, Activity,
+  // Communication icons
+  MessageCircle, MessageSquare, Bell, Volume2, Mic, Camera, Globe, Wifi,
+  // Nature icons
+  Sun, Moon, Cloud, Zap, Feather, Leaf, Flower, Mountain,
+  // Objects icons
+  Gift, Award, Shield, Key, Lock, Unlock, Eye, EyeOff, Map, MapPin,
+  // Tech icons  
+  Code, Terminal, Cpu, Monitor, Smartphone, Laptop, Database, Server, HardDrive,
+  // Misc icons
+  AlertCircle, AlertTriangle, Info, HelpCircle, CheckCircle, XCircle, Sparkles, Lightbulb
+} from "lucide-react";
 import { withLayout, WithLayout } from "../../components/Layout";
 
 const getClassName = getClassNameFactory("Card", styles);
 
-const iconOptions = Object.keys(LucideIcons)
-  .filter(key => key !== 'default' && typeof (LucideIcons as any)[key] === 'function')
-  .map((iconName) => ({
-    label: iconName,
-    value: iconName,
-  }));
+// Curated list of commonly used icons for cards
+const iconMap: Record<string, ComponentType<{ className?: string }>> = {
+  // Common UI
+  Star, Heart, Home, Settings, User, Users, Mail, Phone, Calendar, Clock,
+  Search, Check, X, Plus, Minus, ChevronRight, ChevronLeft, ChevronDown, ChevronUp,
+  ArrowRight, ArrowLeft, ArrowUp, ArrowDown, ExternalLink, Link, Download, Upload,
+  // Content
+  FileText, Image, Video, Music, Folder, File, Bookmark, Tag, Hash, AtSign,
+  // Actions
+  Edit, Trash, Copy, Clipboard, Share, Send, Save, Printer, RefreshCw, RotateCcw,
+  // Business
+  ShoppingCart, CreditCard, DollarSign, TrendingUp, BarChart, PieChart, Activity,
+  // Communication
+  MessageCircle, MessageSquare, Bell, Volume2, Mic, Camera, Globe, Wifi,
+  // Nature
+  Sun, Moon, Cloud, Zap, Feather, Leaf, Flower, Mountain,
+  // Objects
+  Gift, Award, Shield, Key, Lock, Unlock, Eye, EyeOff, Map, MapPin,
+  // Tech
+  Code, Terminal, Cpu, Monitor, Smartphone, Laptop, Database, Server, HardDrive,
+  // Misc
+  AlertCircle, AlertTriangle, Info, HelpCircle, CheckCircle, XCircle, Sparkles, Lightbulb
+};
+
+const iconOptions = Object.keys(iconMap).map((iconName) => ({
+  label: iconName,
+  value: iconName,
+}));
+
 
 export type CardProps = WithLayout<{
   title: string;
@@ -50,8 +94,8 @@ const CardInner: ComponentConfig<CardProps> = {
     mode: "flat",
   },
   render: ({ title, icon, description, mode }) => {
-    const IconComponent = icon ? (LucideIcons as any)[icon] : null;
-    
+    const IconComponent = icon ? iconMap[icon] : null;
+
     return (
       <div className={getClassName({ [mode]: mode })}>
         <div className={getClassName("inner")}>

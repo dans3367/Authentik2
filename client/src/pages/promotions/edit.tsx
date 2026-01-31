@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { generatePromotionalCodes, parseUserCodes, validatePromotionalCodes, formatCodesForDisplay, type CodeFormat } from '@/utils/codeGeneration';
-import RichTextEditor from '@/components/RichTextEditor';
+import RichTextEditor from '@/components/LazyRichTextEditor';
 
 const getPromotionTypeOptions = (t: any) => [
   { value: 'newsletter', label: t('promotionsPage.types.newsletter') },
@@ -74,7 +74,7 @@ export default function EditPromotionPage() {
     promotionalCodes: [] as string[],
   });
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
-  
+
   // Code generation state
   const [codeGenerationMode, setCodeGenerationMode] = useState<'upload' | 'generate'>('upload');
   const [userCodesInput, setUserCodesInput] = useState('');
@@ -108,7 +108,7 @@ export default function EditPromotionPage() {
       const promotionData = promotion as any;
       const validFrom = promotionData.validFrom ? new Date(promotionData.validFrom).toISOString().split('T')[0] : '';
       const validTo = promotionData.validTo ? new Date(promotionData.validTo).toISOString().split('T')[0] : '';
-      
+
       setFormData({
         title: promotionData.title || '',
         description: promotionData.description || '',
@@ -157,7 +157,7 @@ export default function EditPromotionPage() {
     setUserCodesInput(value);
     const codes = parseUserCodes(value);
     const validation = validatePromotionalCodes(codes);
-    
+
     if (validation.errors.length > 0) {
       setFormData({ ...formData, promotionalCodes: validation.valid });
     } else {
@@ -184,7 +184,7 @@ export default function EditPromotionPage() {
 
   const handleCopyCodesList = async () => {
     if (formData.promotionalCodes.length === 0) return;
-    
+
     try {
       await navigator.clipboard.writeText(formatCodesForDisplay(formData.promotionalCodes));
       toast({
@@ -283,9 +283,9 @@ export default function EditPromotionPage() {
     <div className="container mx-auto p-4 lg:p-6 space-y-6 lg:space-y-8 max-w-4xl">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button 
-          variant="outline" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           onClick={handleCancel}
           className="flex items-center gap-2"
         >
@@ -342,7 +342,7 @@ export default function EditPromotionPage() {
                     </Select>
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="description">{t('promotionsPage.createPage.description')}</Label>
                   <Input
@@ -412,10 +412,10 @@ export default function EditPromotionPage() {
               <CardContent>
                 <Collapsible open={isCodeSectionOpen} onOpenChange={setIsCodeSectionOpen}>
                   <CollapsibleTrigger asChild>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
                       className="w-full justify-between mb-4"
                     >
                       <div className="flex items-center gap-2">
@@ -433,8 +433,8 @@ export default function EditPromotionPage() {
                     {/* Code Generation Mode Selection */}
                     <div className="space-y-3">
                       <Label>{t('promotionsPage.createPage.chooseMethod')}</Label>
-                      <RadioGroup 
-                        value={codeGenerationMode} 
+                      <RadioGroup
+                        value={codeGenerationMode}
                         onValueChange={(value: 'upload' | 'generate') => setCodeGenerationMode(value)}
                         className="grid grid-cols-1 gap-4"
                       >
@@ -491,9 +491,9 @@ export default function EditPromotionPage() {
                               min="1"
                               max="10000"
                               value={generateOptions.count}
-                              onChange={(e) => setGenerateOptions({ 
-                                ...generateOptions, 
-                                count: parseInt(e.target.value) || 1 
+                              onChange={(e) => setGenerateOptions({
+                                ...generateOptions,
+                                count: parseInt(e.target.value) || 1
                               })}
                             />
                           </div>
@@ -505,9 +505,9 @@ export default function EditPromotionPage() {
                               min="4"
                               max="20"
                               value={generateOptions.length}
-                              onChange={(e) => setGenerateOptions({ 
-                                ...generateOptions, 
-                                length: parseInt(e.target.value) || 8 
+                              onChange={(e) => setGenerateOptions({
+                                ...generateOptions,
+                                length: parseInt(e.target.value) || 8
                               })}
                             />
                           </div>
@@ -515,8 +515,8 @@ export default function EditPromotionPage() {
 
                         <div className="space-y-2">
                           <Label htmlFor="codeFormat">{t('promotionsPage.createPage.codeFormat')}</Label>
-                          <Select 
-                            value={generateOptions.format} 
+                          <Select
+                            value={generateOptions.format}
                             onValueChange={(value: CodeFormat) => setGenerateOptions({ ...generateOptions, format: value })}
                           >
                             <SelectTrigger>
@@ -538,9 +538,9 @@ export default function EditPromotionPage() {
                             <Input
                               id="codePrefix"
                               value={generateOptions.prefix}
-                              onChange={(e) => setGenerateOptions({ 
-                                ...generateOptions, 
-                                prefix: e.target.value.toUpperCase() 
+                              onChange={(e) => setGenerateOptions({
+                                ...generateOptions,
+                                prefix: e.target.value.toUpperCase()
                               })}
                               placeholder={t('promotionsPage.createPage.prefixPlaceholder')}
                               maxLength={10}
@@ -551,9 +551,9 @@ export default function EditPromotionPage() {
                             <Input
                               id="codeSuffix"
                               value={generateOptions.suffix}
-                              onChange={(e) => setGenerateOptions({ 
-                                ...generateOptions, 
-                                suffix: e.target.value.toUpperCase() 
+                              onChange={(e) => setGenerateOptions({
+                                ...generateOptions,
+                                suffix: e.target.value.toUpperCase()
                               })}
                               placeholder={t('promotionsPage.createPage.suffixPlaceholder')}
                               maxLength={10}
@@ -561,8 +561,8 @@ export default function EditPromotionPage() {
                           </div>
                         </div>
 
-                        <Button 
-                          type="button" 
+                        <Button
+                          type="button"
                           onClick={handleGenerateCodes}
                           className="w-full"
                           variant="secondary"
@@ -619,9 +619,9 @@ export default function EditPromotionPage() {
               <CardHeader>
                 <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
                   <CollapsibleTrigger asChild>
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
+                    <Button
+                      type="button"
+                      variant="ghost"
                       className="w-full justify-between p-0 h-auto hover:bg-transparent"
                     >
                       <CardTitle className="flex items-center gap-2">
@@ -694,8 +694,8 @@ export default function EditPromotionPage() {
                 <CardTitle>{t('promotionsPage.editPage.actions')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   className="w-full"
                   disabled={updatePromotionMutation.isPending}
                 >
@@ -711,9 +711,9 @@ export default function EditPromotionPage() {
                     </>
                   )}
                 </Button>
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   className="w-full"
                   onClick={handleCancel}
                   disabled={updatePromotionMutation.isPending}

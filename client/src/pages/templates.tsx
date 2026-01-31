@@ -43,7 +43,7 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import RichTextEditor from "@/components/RichTextEditor";
+import RichTextEditor from "@/components/LazyRichTextEditor";
 
 const channelOptions = [
   { value: "individual", label: "Individual Email", description: "Send one-to-one emails quickly" },
@@ -365,7 +365,7 @@ function TemplateCard({ template, onToggleFavorite, onDuplicate, onDelete, onUse
         </div>
         <div>
           <p className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{t('templatesPage.card.preview')}</p>
-          <div 
+          <div
             className="text-sm text-gray-600 dark:text-gray-300 line-clamp-3"
             dangerouslySetInnerHTML={{ __html: template.preview || t('templatesPage.card.noPreview') }}
           />
@@ -394,7 +394,7 @@ function TemplateCard({ template, onToggleFavorite, onDuplicate, onDelete, onUse
                   {t('templatesPage.subject')}: {template.subjectLine}
                 </DialogDescription>
               </DialogHeader>
-              <div 
+              <div
                 className="max-h-[60vh] overflow-y-auto rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-4 py-3 text-sm"
                 dangerouslySetInnerHTML={{ __html: template.body }}
               />
@@ -663,7 +663,7 @@ export default function TemplatesPage() {
     const timeoutId = setTimeout(() => {
       loadTemplates();
     }, 300); // Debounce search
-    
+
     return () => clearTimeout(timeoutId);
   }, [searchTerm, channelFilter, categoryFilter, favoritesOnly, pagination.page]);
 
@@ -763,10 +763,10 @@ export default function TemplatesPage() {
         content: payload.content,
         tags: payload.tags,
       });
-      
+
       await loadTemplates();
       await loadStats();
-      
+
       toast({
         title: t('templatesPage.toasts.templateUpdated'),
         description: t('templatesPage.toasts.templateUpdatedDesc', { name: payload.name }),
@@ -790,7 +790,7 @@ export default function TemplatesPage() {
               {t('templatesPage.subtitle')}
             </p>
           </div>
-          <Button 
+          <Button
             className="bg-blue-600 hover:bg-blue-700"
             onClick={() => setLocation('/templates/create')}
           >

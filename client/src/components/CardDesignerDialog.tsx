@@ -6,7 +6,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import RichTextEditor from "@/components/RichTextEditor";
+import RichTextEditor from "@/components/LazyRichTextEditor";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Search, ZoomIn, ZoomOut, Move, RotateCcw, Smile, RefreshCw, ChevronLeft, ChevronRight, X, AlertTriangle, Palette, Gift, CalendarIcon } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -276,7 +276,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
 
     // Check if this is a custom card (starts with 'custom-')
     const isCustomCard = initialThemeId && initialThemeId.startsWith('custom-');
-    
+
     // Don't run this effect for custom cards - they manage their own images
     if (isCustomCard) {
       console.log('🔒 [Card Designer] Custom card detected, skipping theme change effect');
@@ -1028,101 +1028,101 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
           {/* Tabs for Design and Promotions - or just design content if hideTabs is true */}
           {hideTabs ? (
             <div className="w-full mt-4">
-          {/* Designer Canvas - responsive width with forced LTR */}
-          <div className="mx-auto w-full max-w-[600px] rounded-2xl overflow-hidden border bg-white" dir="ltr" style={{ direction: 'ltr' }}>
-            {/* Image header */}
-            <div
-              ref={imageContainerRef}
-              className={`relative bg-gray-100 overflow-hidden transition-all duration-200 ${showImageControls && imageUrl && !imageError
-                ? 'ring-2 ring-blue-400 ring-opacity-50'
-                : ''
-                }`}
-              // TEMPORARILY DISABLED - Image manipulation event handlers
-              // onClick={imageUrl && !imageError ? handleImageClick : undefined}
-              // onMouseDown={imageUrl && !imageError ? handleMouseDown : undefined}
-              // onMouseMove={isDragging ? handleMouseMove : undefined}
-              // onMouseUp={handleMouseUp}
-              // onMouseLeave={handleMouseUp}
-              // onWheel={imageUrl && !imageError ? handleWheel : undefined}
-              style={{
-                // cursor: isDragging ? 'grabbing' : (imageUrl && !imageError ? 'grab' : 'default'),
-                cursor: 'default',
-                height: 'clamp(200px, 40vw, 300px)',
-                willChange: isDragging ? 'transform' : 'auto'
-              }}
-            >
-              {(() => {
-                console.log('🔍 [Card Designer] Render state:', {
-                  uploading,
-                  imageUrl,
-                  imageError,
-                  customImage,
-                  hasImageUrl: !!imageUrl,
-                  condition: imageUrl && !imageError ? 'SHOW IMAGE' : imageUrl && imageError ? 'SHOW ERROR' : 'SHOW ADD IMAGE'
-                });
-                return null;
-              })()}
-              {uploading ? (
-                <div className="w-full h-full flex items-center justify-center text-blue-500 bg-blue-50">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                    <div className="text-xs sm:text-sm">Uploading image...</div>
-                  </div>
-                </div>
-              ) : imageUrl && !imageError ? (
-                <img
-                  key={`card-image-${imageUrl}-${customImage}`} // Force re-render on image change
-                  src={imageUrl}
-                  alt="Card header"
-                  className="w-full h-full object-cover select-none"
-                  onLoadStart={() => {
-                    console.log('🔄 [Card Designer] Image loading started:', imageUrl);
-                  }}
+              {/* Designer Canvas - responsive width with forced LTR */}
+              <div className="mx-auto w-full max-w-[600px] rounded-2xl overflow-hidden border bg-white" dir="ltr" style={{ direction: 'ltr' }}>
+                {/* Image header */}
+                <div
+                  ref={imageContainerRef}
+                  className={`relative bg-gray-100 overflow-hidden transition-all duration-200 ${showImageControls && imageUrl && !imageError
+                    ? 'ring-2 ring-blue-400 ring-opacity-50'
+                    : ''
+                    }`}
+                  // TEMPORARILY DISABLED - Image manipulation event handlers
+                  // onClick={imageUrl && !imageError ? handleImageClick : undefined}
+                  // onMouseDown={imageUrl && !imageError ? handleMouseDown : undefined}
+                  // onMouseMove={isDragging ? handleMouseMove : undefined}
+                  // onMouseUp={handleMouseUp}
+                  // onMouseLeave={handleMouseUp}
+                  // onWheel={imageUrl && !imageError ? handleWheel : undefined}
                   style={{
-                    transform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale})`,
-                    transformOrigin: 'center center',
-                    transition: isDragging ? 'none' : 'transform 0.1s ease-out',
-                    imageRendering: 'crisp-edges',
-                    backfaceVisibility: 'hidden',
-                    WebkitBackfaceVisibility: 'hidden',
-                    WebkitTransform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale})`,
-                    MozTransform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale})`,
-                    msTransform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale})`,
-                    filter: 'none',
-                    WebkitFilter: 'none'
+                    // cursor: isDragging ? 'grabbing' : (imageUrl && !imageError ? 'grab' : 'default'),
+                    cursor: 'default',
+                    height: 'clamp(200px, 40vw, 300px)',
+                    willChange: isDragging ? 'transform' : 'auto'
                   }}
-                  onLoad={() => {
-                    console.log('📸 [Card Designer] Image loaded successfully:', imageUrl);
-                    setImageError(false);
-                  }}
-                  onError={(e) => {
-                    console.error('❌ [Card Designer] Image failed to load:', imageUrl);
-                    console.error('Error event:', e);
-                    setImageError(true);
-                  }}
-                  onDragStart={(e) => e.preventDefault()}
-                />
-              ) : imageUrl && imageError ? (
-                <div className="w-full h-full flex items-center justify-center text-red-400 bg-red-50">
-                  <div className="text-center px-4">
-                    <ImageOff className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2" />
-                    <div className="text-xs sm:text-sm">Failed to load image</div>
-                    <Button variant="outline" size="sm" className="mt-2 text-xs" onClick={() => setImageError(false)}>
-                      Retry
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-400">
-                  <div className="flex items-center gap-2 text-xs sm:text-sm">
-                    <ImagePlus className="w-3 h-3 sm:w-4 sm:h-4" />
-                    Add an image
-                  </div>
-                </div>
-              )}
+                >
+                  {(() => {
+                    console.log('🔍 [Card Designer] Render state:', {
+                      uploading,
+                      imageUrl,
+                      imageError,
+                      customImage,
+                      hasImageUrl: !!imageUrl,
+                      condition: imageUrl && !imageError ? 'SHOW IMAGE' : imageUrl && imageError ? 'SHOW ERROR' : 'SHOW ADD IMAGE'
+                    });
+                    return null;
+                  })()}
+                  {uploading ? (
+                    <div className="w-full h-full flex items-center justify-center text-blue-500 bg-blue-50">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                        <div className="text-xs sm:text-sm">Uploading image...</div>
+                      </div>
+                    </div>
+                  ) : imageUrl && !imageError ? (
+                    <img
+                      key={`card-image-${imageUrl}-${customImage}`} // Force re-render on image change
+                      src={imageUrl}
+                      alt="Card header"
+                      className="w-full h-full object-cover select-none"
+                      onLoadStart={() => {
+                        console.log('🔄 [Card Designer] Image loading started:', imageUrl);
+                      }}
+                      style={{
+                        transform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale})`,
+                        transformOrigin: 'center center',
+                        transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+                        imageRendering: 'crisp-edges',
+                        backfaceVisibility: 'hidden',
+                        WebkitBackfaceVisibility: 'hidden',
+                        WebkitTransform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale})`,
+                        MozTransform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale})`,
+                        msTransform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale})`,
+                        filter: 'none',
+                        WebkitFilter: 'none'
+                      }}
+                      onLoad={() => {
+                        console.log('📸 [Card Designer] Image loaded successfully:', imageUrl);
+                        setImageError(false);
+                      }}
+                      onError={(e) => {
+                        console.error('❌ [Card Designer] Image failed to load:', imageUrl);
+                        console.error('Error event:', e);
+                        setImageError(true);
+                      }}
+                      onDragStart={(e) => e.preventDefault()}
+                    />
+                  ) : imageUrl && imageError ? (
+                    <div className="w-full h-full flex items-center justify-center text-red-400 bg-red-50">
+                      <div className="text-center px-4">
+                        <ImageOff className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2" />
+                        <div className="text-xs sm:text-sm">Failed to load image</div>
+                        <Button variant="outline" size="sm" className="mt-2 text-xs" onClick={() => setImageError(false)}>
+                          Retry
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <div className="flex items-center gap-2 text-xs sm:text-sm">
+                        <ImagePlus className="w-3 h-3 sm:w-4 sm:h-4" />
+                        Add an image
+                      </div>
+                    </div>
+                  )}
 
-              {/* Image Overlay Controls - only show when focused */}
-              {/* TEMPORARILY DISABLED - Image zoom and position controls
+                  {/* Image Overlay Controls - only show when focused */}
+                  {/* TEMPORARILY DISABLED - Image zoom and position controls
             {imageUrl && !imageError && !uploading && showImageControls && (
               <div className="absolute top-2 right-2 sm:top-3 sm:right-3 flex flex-col gap-1 sm:gap-2 animate-in fade-in-0 duration-200">
                 <div className="bg-black/70 backdrop-blur-sm rounded-lg p-1.5 sm:p-2 flex flex-col gap-0.5 sm:gap-1 shadow-lg">
@@ -1174,8 +1174,8 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
             )}
             */}
 
-              {/* Click to focus hint - only show when not focused and image is present */}
-              {/* TEMPORARILY DISABLED - Click to show controls hint
+                  {/* Click to focus hint - only show when not focused and image is present */}
+                  {/* TEMPORARILY DISABLED - Click to show controls hint
             {imageUrl && !imageError && !uploading && !showImageControls && (
               <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-300">
                 <div className="bg-black/50 backdrop-blur-sm rounded-lg px-3 py-2 sm:px-4 text-white text-xs sm:text-sm">
@@ -1186,171 +1186,171 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
             )}
             */}
 
-              <div className="absolute left-3 bottom-3 flex items-center gap-3">
-                {/* Card Active/Inactive Switch - Show for custom cards */}
-                {onToggleCustomCardActive && (
-                  <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm">
-                    <Switch
-                      id="enable-custom-card-inline"
-                      checked={customCardActive !== false}
-                      onCheckedChange={onToggleCustomCardActive}
-                    />
-                    <Label
-                      htmlFor="enable-custom-card-inline"
-                      className="text-sm font-medium cursor-pointer whitespace-nowrap"
-                    >
-                      Card is active
-                    </Label>
-                  </div>
-                )}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="secondary" size="icon" className="rounded-full">
-                      <MoreVertical className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    {/* Image controls - available for all cards */}
-                    <DropdownMenuItem onClick={handlePickImage} disabled={uploading}>
-                      <Edit className="w-4 h-4 mr-2" />
-                      {uploading ? 'Uploading...' : 'Upload Image'}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setUnsplashOpen(true)}>
-                      <Search className="w-4 h-4 mr-2" />
-                      Browse Unsplash
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleRemoveImage}>
-                      <ImageOff className="w-4 h-4 mr-2" />
-                      Remove Image
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="text-red-600" onClick={handleReset}>
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Reset {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) ? 'Card' : 'Text'}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-
-            {/* Body */}
-            <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
-              <div className="relative">
-                <Input
-                  ref={titleInputRef}
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Add your greeting here..."
-                  className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold border-0 shadow-none px-0 pr-8 sm:pr-12 focus-visible:ring-0 text-center placeholder:text-gray-400 placeholder:font-normal h-auto min-h-[3rem] sm:min-h-[4rem] md:min-h-[5rem] lg:min-h-[6rem] py-2 sm:py-3 md:py-4 leading-tight"
-                />
-                <div className="absolute right-0 top-1/2 transform -translate-y-1/2">
-                  <DropdownMenu open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-gray-400 hover:text-gray-600"
-                        onClick={() => setShowEmojiPicker(true)}
-                      >
-                        <Smile className="w-4 h-4 sm:w-5 sm:h-5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="end"
-                      className="w-72 sm:w-80 p-3 sm:p-4"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="space-y-2 sm:space-y-3">
-                        <div className="text-xs sm:text-sm font-medium text-gray-700">Birthday Emojis</div>
-                        <div className="grid grid-cols-6 sm:grid-cols-8 gap-1 sm:gap-2">
-                          {birthdayEmojis.map((emoji, index) => (
-                            <button
-                              key={index}
-                              onClick={() => insertEmoji(emoji)}
-                              className="w-7 h-7 sm:w-8 sm:h-8 text-base sm:text-lg hover:bg-gray-100 rounded transition-colors flex items-center justify-center"
-                              title={`Insert ${emoji}`}
-                            >
-                              {emoji}
-                            </button>
-                          ))}
-                        </div>
+                  <div className="absolute left-3 bottom-3 flex items-center gap-3">
+                    {/* Card Active/Inactive Switch - Show for custom cards */}
+                    {onToggleCustomCardActive && (
+                      <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm">
+                        <Switch
+                          id="enable-custom-card-inline"
+                          checked={customCardActive !== false}
+                          onCheckedChange={onToggleCustomCardActive}
+                        />
+                        <Label
+                          htmlFor="enable-custom-card-inline"
+                          className="text-sm font-medium cursor-pointer whitespace-nowrap"
+                        >
+                          Card is active
+                        </Label>
                       </div>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="secondary" size="icon" className="rounded-full">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start">
+                        {/* Image controls - available for all cards */}
+                        <DropdownMenuItem onClick={handlePickImage} disabled={uploading}>
+                          <Edit className="w-4 h-4 mr-2" />
+                          {uploading ? 'Uploading...' : 'Upload Image'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setUnsplashOpen(true)}>
+                          <Search className="w-4 h-4 mr-2" />
+                          Browse Unsplash
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleRemoveImage}>
+                          <ImageOff className="w-4 h-4 mr-2" />
+                          Remove Image
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-red-600" onClick={handleReset}>
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          Reset {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) ? 'Card' : 'Text'}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+
+                {/* Body */}
+                <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
+                  <div className="relative">
+                    <Input
+                      ref={titleInputRef}
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="Add your greeting here..."
+                      className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold border-0 shadow-none px-0 pr-8 sm:pr-12 focus-visible:ring-0 text-center placeholder:text-gray-400 placeholder:font-normal h-auto min-h-[3rem] sm:min-h-[4rem] md:min-h-[5rem] lg:min-h-[6rem] py-2 sm:py-3 md:py-4 leading-tight"
+                    />
+                    <div className="absolute right-0 top-1/2 transform -translate-y-1/2">
+                      <DropdownMenu open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-gray-400 hover:text-gray-600"
+                            onClick={() => setShowEmojiPicker(true)}
+                          >
+                            <Smile className="w-4 h-4 sm:w-5 sm:h-5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="end"
+                          className="w-72 sm:w-80 p-3 sm:p-4"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="space-y-2 sm:space-y-3">
+                            <div className="text-xs sm:text-sm font-medium text-gray-700">Birthday Emojis</div>
+                            <div className="grid grid-cols-6 sm:grid-cols-8 gap-1 sm:gap-2">
+                              {birthdayEmojis.map((emoji, index) => (
+                                <button
+                                  key={index}
+                                  onClick={() => insertEmoji(emoji)}
+                                  className="w-7 h-7 sm:w-8 sm:h-8 text-base sm:text-lg hover:bg-gray-100 rounded transition-colors flex items-center justify-center"
+                                  title={`Insert ${emoji}`}
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  {!hideDescription && (
+                    <div>
+                      <Input
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Add a short description (optional)..."
+                        className="text-sm sm:text-base border-0 shadow-none px-0 focus-visible:ring-0 text-center placeholder:text-gray-400"
+                      />
+                    </div>
+                  )}
+
+                  {/* Rich text editor with bubble (tooltip) menu */}
+                  <RichTextEditor
+                    value={typeof message === 'string' ? message : ''}
+                    onChange={(html) => setMessage(html)}
+                    placeholder="Type your birthday message here..."
+                    className="text-sm sm:text-base text-gray-800"
+                    customerInfo={customerInfo}
+                    businessName={businessName}
+                    occasionType={occasionType}
+                  />
+
+                  {/* Emoji counter and deliverability warning */}
+                  <div className="mt-2">
+                    <div className="text-xs text-gray-500">Emojis detected in message: {emojiCount}</div>
+                    {emojiCount > 1 && (
+                      <div className="mt-2 flex items-start gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 rounded p-2">
+                        <AlertTriangle className="h-4 w-4 mt-0.5 text-orange-700" />
+                        <span>
+                          <strong>Warning:</strong> More than one emoji could affect email delivery to inbox and place your mail under Promotions or Spam.
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-end text-gray-500 text-xs sm:text-sm">
+                    <Input
+                      value={signature}
+                      onChange={(e) => setSignature(e.target.value)}
+                      placeholder={senderName ? `From ${senderName}` : "From [Your Name]"}
+                      className="w-full max-w-[180px] sm:max-w-[220px] text-right border-0 shadow-none px-0 focus-visible:ring-0 placeholder:text-gray-400"
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Description */}
-              {!hideDescription && (
-                <div>
-                  <Input
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Add a short description (optional)..."
-                    className="text-sm sm:text-base border-0 shadow-none px-0 focus-visible:ring-0 text-center placeholder:text-gray-400"
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+
+              {/* Holiday Enable/Disable Checkbox - Only show for holiday themes */}
+              {holidayId && onToggleHoliday && !initialThemeId?.startsWith('custom-') && (
+                <div className="flex items-center space-x-2 py-3 border-t">
+                  <Checkbox
+                    id="enable-holiday-card"
+                    checked={!isHolidayDisabled}
+                    onCheckedChange={() => onToggleHoliday?.(holidayId)}
                   />
+                  <Label
+                    htmlFor="enable-holiday-card"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Enable this holiday card
+                  </Label>
                 </div>
               )}
-
-              {/* Rich text editor with bubble (tooltip) menu */}
-              <RichTextEditor
-                value={typeof message === 'string' ? message : ''}
-                onChange={(html) => setMessage(html)}
-                placeholder="Type your birthday message here..."
-                className="text-sm sm:text-base text-gray-800"
-                customerInfo={customerInfo}
-                businessName={businessName}
-                occasionType={occasionType}
-              />
-
-              {/* Emoji counter and deliverability warning */}
-              <div className="mt-2">
-                <div className="text-xs text-gray-500">Emojis detected in message: {emojiCount}</div>
-                {emojiCount > 1 && (
-                  <div className="mt-2 flex items-start gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 rounded p-2">
-                    <AlertTriangle className="h-4 w-4 mt-0.5 text-orange-700" />
-                    <span>
-                      <strong>Warning:</strong> More than one emoji could affect email delivery to inbox and place your mail under Promotions or Spam.
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-end text-gray-500 text-xs sm:text-sm">
-                <Input
-                  value={signature}
-                  onChange={(e) => setSignature(e.target.value)}
-                  placeholder={senderName ? `From ${senderName}` : "From [Your Name]"}
-                  className="w-full max-w-[180px] sm:max-w-[220px] text-right border-0 shadow-none px-0 focus-visible:ring-0 placeholder:text-gray-400"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
-            onChange={handleFileChange}
-            className="hidden"
-          />
-
-          {/* Holiday Enable/Disable Checkbox - Only show for holiday themes */}
-          {holidayId && onToggleHoliday && !initialThemeId?.startsWith('custom-') && (
-            <div className="flex items-center space-x-2 py-3 border-t">
-              <Checkbox
-                id="enable-holiday-card"
-                checked={!isHolidayDisabled}
-                onCheckedChange={() => onToggleHoliday?.(holidayId)}
-              />
-              <Label
-                htmlFor="enable-holiday-card"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-              >
-                Enable this holiday card
-              </Label>
-            </div>
-          )}
 
             </div>
           ) : (
@@ -1369,87 +1369,87 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
               </TabsList>
 
               <TabsContent value="design" className="mt-4">
-          {/* Designer Canvas - responsive width with forced LTR */}
-          <div className="mx-auto w-full max-w-[600px] rounded-2xl overflow-hidden border bg-white" dir="ltr" style={{ direction: 'ltr' }}>
-            {/* Image header */}
-            <div
-              ref={imageContainerRef}
-              className={`relative bg-gray-100 overflow-hidden transition-all duration-200 ${showImageControls && imageUrl && !imageError
-                ? 'ring-2 ring-blue-400 ring-opacity-50'
-                : ''
-                }`}
-              // TEMPORARILY DISABLED - Image manipulation event handlers
-              // onClick={imageUrl && !imageError ? handleImageClick : undefined}
-              // onMouseDown={imageUrl && !imageError ? handleMouseDown : undefined}
-              // onMouseMove={isDragging ? handleMouseMove : undefined}
-              // onMouseUp={handleMouseUp}
-              // onMouseLeave={handleMouseUp}
-              // onWheel={imageUrl && !imageError ? handleWheel : undefined}
-              style={{
-                // cursor: isDragging ? 'grabbing' : (imageUrl && !imageError ? 'grab' : 'default'),
-                cursor: 'default',
-                height: 'clamp(200px, 40vw, 300px)',
-                willChange: isDragging ? 'transform' : 'auto'
-              }}
-            >
-              {uploading ? (
-                <div className="w-full h-full flex items-center justify-center text-blue-500 bg-blue-50">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                    <div className="text-xs sm:text-sm">Uploading image...</div>
-                  </div>
-                </div>
-              ) : imageUrl && !imageError ? (
-                <img
-                  key={`card-image-${imageUrl}-${customImage}`} // Force re-render on image change
-                  src={imageUrl}
-                  alt="Card header"
-                  className="w-full h-full object-cover select-none"
-                  style={{
-                    transform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale})`,
-                    transformOrigin: 'center center',
-                    transition: isDragging ? 'none' : 'transform 0.1s ease-out',
-                    imageRendering: 'crisp-edges',
-                    backfaceVisibility: 'hidden',
-                    WebkitBackfaceVisibility: 'hidden',
-                    WebkitTransform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale})`,
-                    MozTransform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale})`,
-                    msTransform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale})`,
-                    filter: 'none',
-                    WebkitFilter: 'none'
-                  }}
-                  onLoad={() => {
-                    console.log('📸 [Card Designer] Image loaded successfully:', imageUrl);
-                    setImageError(false);
-                  }}
-                  onError={(e) => {
-                    console.error('❌ [Card Designer] Image failed to load:', imageUrl);
-                    console.error('Error event:', e);
-                    setImageError(true);
-                  }}
-                  onDragStart={(e) => e.preventDefault()}
-                />
-              ) : imageUrl && imageError ? (
-                <div className="w-full h-full flex items-center justify-center text-red-400 bg-red-50">
-                  <div className="text-center px-4">
-                    <ImageOff className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2" />
-                    <div className="text-xs sm:text-sm">Failed to load image</div>
-                    <Button variant="outline" size="sm" className="mt-2 text-xs" onClick={() => setImageError(false)}>
-                      Retry
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-400">
-                  <div className="flex items-center gap-2 text-xs sm:text-sm">
-                    <ImagePlus className="w-3 h-3 sm:w-4 sm:h-4" />
-                    Add an image
-                  </div>
-                </div>
-              )}
+                {/* Designer Canvas - responsive width with forced LTR */}
+                <div className="mx-auto w-full max-w-[600px] rounded-2xl overflow-hidden border bg-white" dir="ltr" style={{ direction: 'ltr' }}>
+                  {/* Image header */}
+                  <div
+                    ref={imageContainerRef}
+                    className={`relative bg-gray-100 overflow-hidden transition-all duration-200 ${showImageControls && imageUrl && !imageError
+                      ? 'ring-2 ring-blue-400 ring-opacity-50'
+                      : ''
+                      }`}
+                    // TEMPORARILY DISABLED - Image manipulation event handlers
+                    // onClick={imageUrl && !imageError ? handleImageClick : undefined}
+                    // onMouseDown={imageUrl && !imageError ? handleMouseDown : undefined}
+                    // onMouseMove={isDragging ? handleMouseMove : undefined}
+                    // onMouseUp={handleMouseUp}
+                    // onMouseLeave={handleMouseUp}
+                    // onWheel={imageUrl && !imageError ? handleWheel : undefined}
+                    style={{
+                      // cursor: isDragging ? 'grabbing' : (imageUrl && !imageError ? 'grab' : 'default'),
+                      cursor: 'default',
+                      height: 'clamp(200px, 40vw, 300px)',
+                      willChange: isDragging ? 'transform' : 'auto'
+                    }}
+                  >
+                    {uploading ? (
+                      <div className="w-full h-full flex items-center justify-center text-blue-500 bg-blue-50">
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                          <div className="text-xs sm:text-sm">Uploading image...</div>
+                        </div>
+                      </div>
+                    ) : imageUrl && !imageError ? (
+                      <img
+                        key={`card-image-${imageUrl}-${customImage}`} // Force re-render on image change
+                        src={imageUrl}
+                        alt="Card header"
+                        className="w-full h-full object-cover select-none"
+                        style={{
+                          transform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale})`,
+                          transformOrigin: 'center center',
+                          transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+                          imageRendering: 'crisp-edges',
+                          backfaceVisibility: 'hidden',
+                          WebkitBackfaceVisibility: 'hidden',
+                          WebkitTransform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale})`,
+                          MozTransform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale})`,
+                          msTransform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale})`,
+                          filter: 'none',
+                          WebkitFilter: 'none'
+                        }}
+                        onLoad={() => {
+                          console.log('📸 [Card Designer] Image loaded successfully:', imageUrl);
+                          setImageError(false);
+                        }}
+                        onError={(e) => {
+                          console.error('❌ [Card Designer] Image failed to load:', imageUrl);
+                          console.error('Error event:', e);
+                          setImageError(true);
+                        }}
+                        onDragStart={(e) => e.preventDefault()}
+                      />
+                    ) : imageUrl && imageError ? (
+                      <div className="w-full h-full flex items-center justify-center text-red-400 bg-red-50">
+                        <div className="text-center px-4">
+                          <ImageOff className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2" />
+                          <div className="text-xs sm:text-sm">Failed to load image</div>
+                          <Button variant="outline" size="sm" className="mt-2 text-xs" onClick={() => setImageError(false)}>
+                            Retry
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        <div className="flex items-center gap-2 text-xs sm:text-sm">
+                          <ImagePlus className="w-3 h-3 sm:w-4 sm:h-4" />
+                          Add an image
+                        </div>
+                      </div>
+                    )}
 
-              {/* Image Overlay Controls - only show when focused */}
-              {/* TEMPORARILY DISABLED - Image zoom and position controls
+                    {/* Image Overlay Controls - only show when focused */}
+                    {/* TEMPORARILY DISABLED - Image zoom and position controls
             {imageUrl && !imageError && !uploading && showImageControls && (
               <div className="absolute top-2 right-2 sm:top-3 sm:right-3 flex flex-col gap-1 sm:gap-2 animate-in fade-in-0 duration-200">
                 <div className="bg-black/70 backdrop-blur-sm rounded-lg p-1.5 sm:p-2 flex flex-col gap-0.5 sm:gap-1 shadow-lg">
@@ -1501,8 +1501,8 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
             )}
             */}
 
-              {/* Click to focus hint - only show when not focused and image is present */}
-              {/* TEMPORARILY DISABLED - Click to show controls hint
+                    {/* Click to focus hint - only show when not focused and image is present */}
+                    {/* TEMPORARILY DISABLED - Click to show controls hint
             {imageUrl && !imageError && !uploading && !showImageControls && (
               <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-300">
                 <div className="bg-black/50 backdrop-blur-sm rounded-lg px-3 py-2 sm:px-4 text-white text-xs sm:text-sm">
@@ -1513,159 +1513,159 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
             )}
             */}
 
-              <div className="absolute left-3 bottom-3 flex items-center gap-3">
-                {/* Card Active/Inactive Switch - Show for custom cards */}
-                {onToggleCustomCardActive && (
-                  <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm">
-                    <Switch
-                      id="enable-custom-card-inline-tabs"
-                      checked={customCardActive !== false}
-                      onCheckedChange={onToggleCustomCardActive}
+                    <div className="absolute left-3 bottom-3 flex items-center gap-3">
+                      {/* Card Active/Inactive Switch - Show for custom cards */}
+                      {onToggleCustomCardActive && (
+                        <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm">
+                          <Switch
+                            id="enable-custom-card-inline-tabs"
+                            checked={customCardActive !== false}
+                            onCheckedChange={onToggleCustomCardActive}
+                          />
+                          <Label
+                            htmlFor="enable-custom-card-inline-tabs"
+                            className="text-sm font-medium cursor-pointer whitespace-nowrap"
+                          >
+                            Card is active
+                          </Label>
+                        </div>
+                      )}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="secondary" size="icon" className="rounded-full">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          {/* Image controls - available for all cards */}
+                          <DropdownMenuItem onClick={handlePickImage} disabled={uploading}>
+                            <Edit className="w-4 h-4 mr-2" />
+                            {uploading ? 'Uploading...' : 'Upload Image'}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setUnsplashOpen(true)}>
+                            <Search className="w-4 h-4 mr-2" />
+                            Browse Unsplash
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={handleRemoveImage}>
+                            <ImageOff className="w-4 h-4 mr-2" />
+                            Remove Image
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-red-600" onClick={handleReset}>
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            Reset {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) ? 'Card' : 'Text'}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+
+                  {/* Body */}
+                  <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
+                    <div className="relative">
+                      <Input
+                        ref={titleInputRef}
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        placeholder="Add your greeting here..."
+                        className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold border-0 shadow-none px-0 pr-8 sm:pr-12 focus-visible:ring-0 text-center placeholder:text-gray-400 placeholder:font-normal h-auto min-h-[3rem] sm:min-h-[4rem] md:min-h-[5rem] lg:min-h-[6rem] py-2 sm:py-3 md:py-4 leading-tight"
+                      />
+                      <div className="absolute right-0 top-1/2 transform -translate-y-1/2">
+                        <DropdownMenu open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-gray-400 hover:text-gray-600"
+                              onClick={() => setShowEmojiPicker(true)}
+                            >
+                              <Smile className="w-4 h-4 sm:w-5 sm:h-5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            className="w-72 sm:w-80 p-3 sm:p-4"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="space-y-2 sm:space-y-3">
+                              <div className="text-xs sm:text-sm font-medium text-gray-700">Birthday Emojis</div>
+                              <div className="grid grid-cols-6 sm:grid-cols-8 gap-1 sm:gap-2">
+                                {birthdayEmojis.map((emoji, index) => (
+                                  <button
+                                    key={index}
+                                    onClick={() => insertEmoji(emoji)}
+                                    className="w-7 h-7 sm:w-8 sm:h-8 text-base sm:text-lg hover:bg-gray-100 rounded transition-colors flex items-center justify-center"
+                                    title={`Insert ${emoji}`}
+                                  >
+                                    {emoji}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+
+                    {/* Rich text editor with bubble (tooltip) menu */}
+                    <RichTextEditor
+                      value={typeof message === 'string' ? message : ''}
+                      onChange={(html) => setMessage(html)}
+                      placeholder="Type your birthday message here..."
+                      className="text-sm sm:text-base text-gray-800"
+                      customerInfo={customerInfo}
+                      businessName={businessName}
+                      occasionType={occasionType}
+                    />
+
+                    {/* Emoji counter and deliverability warning */}
+                    <div className="mt-2">
+                      <div className="text-xs text-gray-500">Emojis detected in message: {emojiCount}</div>
+                      {emojiCount > 1 && (
+                        <div className="mt-2 flex items-start gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 rounded p-2">
+                          <AlertTriangle className="h-4 w-4 mt-0.5 text-orange-700" />
+                          <span>
+                            <strong>Warning:</strong> More than one emoji could affect email delivery to inbox and place your mail under Promotions or Spam.
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-end text-gray-500 text-xs sm:text-sm">
+                      <Input
+                        value={signature}
+                        onChange={(e) => setSignature(e.target.value)}
+                        placeholder={senderName ? `From ${senderName}` : "From [Your Name]"}
+                        className="w-full max-w-[180px] sm:max-w-[220px] text-right border-0 shadow-none px-0 focus-visible:ring-0 placeholder:text-gray-400"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Hidden file input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+
+                {/* Holiday Enable/Disable Checkbox - Only show for holiday themes */}
+                {holidayId && onToggleHoliday && !initialThemeId?.startsWith('custom-') && (
+                  <div className="flex items-center space-x-2 py-3 border-t">
+                    <Checkbox
+                      id="enable-holiday-card"
+                      checked={!isHolidayDisabled}
+                      onCheckedChange={() => onToggleHoliday?.(holidayId)}
                     />
                     <Label
-                      htmlFor="enable-custom-card-inline-tabs"
-                      className="text-sm font-medium cursor-pointer whitespace-nowrap"
+                      htmlFor="enable-holiday-card"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                     >
-                      Card is active
+                      Enable this holiday card
                     </Label>
                   </div>
                 )}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="secondary" size="icon" className="rounded-full">
-                      <MoreVertical className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    {/* Image controls - available for all cards */}
-                    <DropdownMenuItem onClick={handlePickImage} disabled={uploading}>
-                      <Edit className="w-4 h-4 mr-2" />
-                      {uploading ? 'Uploading...' : 'Upload Image'}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setUnsplashOpen(true)}>
-                      <Search className="w-4 h-4 mr-2" />
-                      Browse Unsplash
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleRemoveImage}>
-                      <ImageOff className="w-4 h-4 mr-2" />
-                      Remove Image
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="text-red-600" onClick={handleReset}>
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Reset {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) ? 'Card' : 'Text'}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-
-            {/* Body */}
-            <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
-              <div className="relative">
-                <Input
-                  ref={titleInputRef}
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Add your greeting here..."
-                  className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold border-0 shadow-none px-0 pr-8 sm:pr-12 focus-visible:ring-0 text-center placeholder:text-gray-400 placeholder:font-normal h-auto min-h-[3rem] sm:min-h-[4rem] md:min-h-[5rem] lg:min-h-[6rem] py-2 sm:py-3 md:py-4 leading-tight"
-                />
-                <div className="absolute right-0 top-1/2 transform -translate-y-1/2">
-                  <DropdownMenu open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-gray-400 hover:text-gray-600"
-                        onClick={() => setShowEmojiPicker(true)}
-                      >
-                        <Smile className="w-4 h-4 sm:w-5 sm:h-5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="end"
-                      className="w-72 sm:w-80 p-3 sm:p-4"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="space-y-2 sm:space-y-3">
-                        <div className="text-xs sm:text-sm font-medium text-gray-700">Birthday Emojis</div>
-                        <div className="grid grid-cols-6 sm:grid-cols-8 gap-1 sm:gap-2">
-                          {birthdayEmojis.map((emoji, index) => (
-                            <button
-                              key={index}
-                              onClick={() => insertEmoji(emoji)}
-                              className="w-7 h-7 sm:w-8 sm:h-8 text-base sm:text-lg hover:bg-gray-100 rounded transition-colors flex items-center justify-center"
-                              title={`Insert ${emoji}`}
-                            >
-                              {emoji}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-
-              {/* Rich text editor with bubble (tooltip) menu */}
-              <RichTextEditor
-                value={typeof message === 'string' ? message : ''}
-                onChange={(html) => setMessage(html)}
-                placeholder="Type your birthday message here..."
-                className="text-sm sm:text-base text-gray-800"
-                customerInfo={customerInfo}
-                businessName={businessName}
-                occasionType={occasionType}
-              />
-
-              {/* Emoji counter and deliverability warning */}
-              <div className="mt-2">
-                <div className="text-xs text-gray-500">Emojis detected in message: {emojiCount}</div>
-                {emojiCount > 1 && (
-                  <div className="mt-2 flex items-start gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 rounded p-2">
-                    <AlertTriangle className="h-4 w-4 mt-0.5 text-orange-700" />
-                    <span>
-                      <strong>Warning:</strong> More than one emoji could affect email delivery to inbox and place your mail under Promotions or Spam.
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-end text-gray-500 text-xs sm:text-sm">
-                <Input
-                  value={signature}
-                  onChange={(e) => setSignature(e.target.value)}
-                  placeholder={senderName ? `From ${senderName}` : "From [Your Name]"}
-                  className="w-full max-w-[180px] sm:max-w-[220px] text-right border-0 shadow-none px-0 focus-visible:ring-0 placeholder:text-gray-400"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
-            onChange={handleFileChange}
-            className="hidden"
-          />
-
-          {/* Holiday Enable/Disable Checkbox - Only show for holiday themes */}
-          {holidayId && onToggleHoliday && !initialThemeId?.startsWith('custom-') && (
-            <div className="flex items-center space-x-2 py-3 border-t">
-              <Checkbox
-                id="enable-holiday-card"
-                checked={!isHolidayDisabled}
-                onCheckedChange={() => onToggleHoliday?.(holidayId)}
-              />
-              <Label
-                htmlFor="enable-holiday-card"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-              >
-                Enable this holiday card
-              </Label>
-            </div>
-          )}
 
               </TabsContent>
 
