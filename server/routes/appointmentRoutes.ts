@@ -2,9 +2,9 @@ import { Router, Request, Response } from 'express';
 import { and, eq, desc, asc, like, ilike, gte, lte, isNull, isNotNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db';
-import { 
-  appointments, 
-  appointmentReminders, 
+import {
+  appointments,
+  appointmentReminders,
   emailContacts,
   createAppointmentSchema,
   updateAppointmentSchema,
@@ -15,7 +15,7 @@ import {
 import { authenticateToken } from '../middleware/auth-middleware';
 import { requireRole } from '../middleware/auth-middleware';
 import { v4 as uuidv4 } from 'uuid';
-import { cancelReminderRun } from '../lib/trigger';
+import { cancelReminderRun, triggerRescheduleEmail } from '../lib/trigger';
 
 const router = Router();
 
@@ -92,7 +92,7 @@ router.get('/', async (req: Request, res: Response) => {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     res.set('Pragma', 'no-cache');
     res.set('Expires', '0');
-    
+
     const { search, status, customerId, dateFrom, dateTo, serviceType, archived } = req.query;
     const user = (req as any).user;
     const tenantId = user.tenantId;
@@ -192,9 +192,9 @@ router.get('/', async (req: Request, res: Response) => {
 
     const appointmentsList = await query.orderBy(desc(appointments.appointmentDate));
 
-    res.json({ 
+    res.json({
       appointments: appointmentsList,
-      total: appointmentsList.length 
+      total: appointmentsList.length
     });
   } catch (error) {
     console.error('Failed to fetch appointments:', error);
@@ -206,12 +206,12 @@ router.get('/', async (req: Request, res: Response) => {
 router.get('/:id', async (req: Request, res: Response) => {
   // Check if this is a public confirmation request
   const { token } = req.query;
-  
+
   if (token) {
     // Public endpoint for appointment confirmation
     return handlePublicAppointmentView(req, res);
   }
-  
+
   // Private endpoint - require authentication
   try {
     const { id } = req.params;
@@ -311,15 +311,15 @@ router.post('/', async (req: Request, res: Response) => {
       })
       .returning();
 
-    res.status(201).json({ 
+    res.status(201).json({
       appointment: newAppointment[0],
-      message: 'Appointment created successfully' 
+      message: 'Appointment created successfully'
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ 
-        error: 'Validation failed', 
-        details: error.errors 
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: error.errors
       });
     }
     console.error('Failed to create appointment:', error);
@@ -353,7 +353,7 @@ router.put('/:id', async (req: Request, res: Response) => {
 
     // Check if appointment date/time is being changed - if so, cancel pending reminders
     const existing = existingAppointment[0];
-    const isDateChanging = validatedData.appointmentDate && 
+    const isDateChanging = validatedData.appointmentDate &&
       new Date(validatedData.appointmentDate).getTime() !== new Date(existing.appointmentDate).getTime();
 
     let remindersCancelled = 0;
@@ -381,16 +381,16 @@ router.put('/:id', async (req: Request, res: Response) => {
       .where(eq(appointments.id, id))
       .returning();
 
-    res.json({ 
+    res.json({
       appointment: updatedAppointment[0],
       message: 'Appointment updated successfully',
       remindersCancelled: remindersCancelled > 0 ? remindersCancelled : undefined,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ 
-        error: 'Validation failed', 
-        details: error.errors 
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: error.errors
       });
     }
     console.error('Failed to update appointment:', error);
@@ -407,7 +407,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
 
     // For PATCH, we accept partial updates but need to convert date strings
     const updateData: any = { ...req.body };
-    
+
     // Convert date strings to Date objects if present
     if (updateData.appointmentDate) {
       updateData.appointmentDate = new Date(updateData.appointmentDate);
@@ -435,7 +435,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
 
     // Check if appointment date/time is being changed - if so, cancel pending reminders
     const existing = existingAppointment[0];
-    const isDateChanging = updateData.appointmentDate && 
+    const isDateChanging = updateData.appointmentDate &&
       new Date(updateData.appointmentDate).getTime() !== new Date(existing.appointmentDate).getTime();
 
     let remindersCancelled = 0;
@@ -463,10 +463,10 @@ router.patch('/:id', async (req: Request, res: Response) => {
       .where(eq(appointments.id, id))
       .returning();
 
-    res.json({ 
+    res.json({
       appointment: updatedAppointment[0],
       message: 'Appointment updated successfully',
-      remindersCancelled: remindersCancelled > 0 ? remindersCancelled : undefined, 
+      remindersCancelled: remindersCancelled > 0 ? remindersCancelled : undefined,
     });
   } catch (error) {
     console.error('Failed to update appointment:', error);
@@ -506,9 +506,9 @@ router.post('/:id/archive', async (req: Request, res: Response) => {
       .where(eq(appointments.id, id))
       .returning();
 
-    res.json({ 
+    res.json({
       appointment: archivedAppointment[0],
-      message: 'Appointment archived successfully' 
+      message: 'Appointment archived successfully'
     });
   } catch (error) {
     console.error('Failed to archive appointment:', error);
@@ -548,9 +548,9 @@ router.post('/:id/unarchive', async (req: Request, res: Response) => {
       .where(eq(appointments.id, id))
       .returning();
 
-    res.json({ 
+    res.json({
       appointment: unarchivedAppointment[0],
-      message: 'Appointment unarchived successfully' 
+      message: 'Appointment unarchived successfully'
     });
   } catch (error) {
     console.error('Failed to unarchive appointment:', error);
@@ -627,7 +627,7 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
       .where(eq(appointments.id, id))
       .returning();
 
-    res.json({ 
+    res.json({
       message: 'Appointment confirmed successfully',
       appointment: updatedAppointment[0]
     });
@@ -683,4 +683,108 @@ async function handlePublicAppointmentView(req: Request, res: Response) {
   }
 }
 
+// POST /api/appointments/:id/send-reschedule-email - Send reschedule invitation email to customer
+router.post('/:id/send-reschedule-email', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const user = (req as any).user;
+    const tenantId = user.tenantId;
+
+    // Fetch appointment with customer details
+    const appointment = await db
+      .select({
+        id: appointments.id,
+        title: appointments.title,
+        appointmentDate: appointments.appointmentDate,
+        duration: appointments.duration,
+        location: appointments.location,
+        status: appointments.status,
+        customerId: appointments.customerId,
+        customer: {
+          id: emailContacts.id,
+          email: emailContacts.email,
+          firstName: emailContacts.firstName,
+          lastName: emailContacts.lastName,
+        }
+      })
+      .from(appointments)
+      .leftJoin(emailContacts, eq(appointments.customerId, emailContacts.id))
+      .where(and(
+        eq(appointments.id, id),
+        eq(appointments.tenantId, tenantId)
+      ))
+      .limit(1);
+
+    if (appointment.length === 0) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+
+    const appt = appointment[0];
+
+    // Verify status is cancelled or no_show
+    if (appt.status !== 'cancelled' && appt.status !== 'no_show') {
+      return res.status(400).json({
+        error: 'Reschedule emails can only be sent for cancelled or no-show appointments'
+      });
+    }
+
+    // Verify customer has email
+    if (!appt.customer?.email) {
+      return res.status(400).json({ error: 'Customer does not have an email address' });
+    }
+
+    // Format date and time for email
+    const appointmentDate = new Date(appt.appointmentDate);
+    const formattedDate = appointmentDate.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    const formattedTime = appointmentDate.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    // Build customer name
+    const customerName = appt.customer.firstName
+      ? `${appt.customer.firstName}${appt.customer.lastName ? ' ' + appt.customer.lastName : ''}`
+      : 'Valued Customer';
+
+    // Trigger the reschedule email via Trigger.dev
+    const result = await triggerRescheduleEmail({
+      appointmentId: appt.id,
+      customerId: appt.customer.id,
+      customerEmail: appt.customer.email,
+      customerName,
+      appointmentTitle: appt.title,
+      appointmentDate: formattedDate,
+      appointmentTime: formattedTime,
+      location: appt.location || undefined,
+      status: appt.status as 'cancelled' | 'no_show',
+      tenantId,
+    });
+
+    if (!result.success) {
+      console.error('Failed to trigger reschedule email:', result.error);
+      return res.status(500).json({
+        error: 'Failed to send reschedule email',
+        details: result.error
+      });
+    }
+
+    console.log(`📧 Reschedule email triggered for appointment ${id}, runId: ${result.runId}`);
+
+    res.json({
+      message: 'Reschedule email sent successfully',
+      runId: result.runId
+    });
+  } catch (error) {
+    console.error('Failed to send reschedule email:', error);
+    res.status(500).json({ error: 'Failed to send reschedule email' });
+  }
+});
+
 export default router;
+
