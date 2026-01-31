@@ -63,14 +63,13 @@ export async function optimizeImage(
       break
   }
 
-  const optimizedBuffer = await pipeline.toBuffer()
-  const metadata = await sharp(optimizedBuffer).metadata()
+  const { data: optimizedBuffer, info } = await pipeline.toBuffer({ resolveWithObject: true })
 
   return {
     buffer: optimizedBuffer,
     mimetype: `image/${opts.format}`,
-    width: metadata.width || 0,
-    height: metadata.height || 0,
+    width: info.width,
+    height: info.height,
     originalSize,
     optimizedSize: optimizedBuffer.length
   }
