@@ -11,6 +11,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import EmailActivityTimeline from "@/components/EmailActivityTimeline";
 import SendEmailModal from "@/components/SendEmailModal";
 import ManageContactTagsModal from "@/components/ManageContactTagsModal";
+import CustomerAppointmentsTab from "@/components/CustomerAppointmentsTab";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
   Mail,
@@ -84,11 +86,11 @@ export default function CustomerViewPage() {
     queryFn: async () => {
       if (!id) return null;
       const apiResponse = await apiRequest('GET', `/api/email-contacts/${id}`);
-      
+
       if (!apiResponse.ok) {
         throw new Error(`Failed to fetch contact: ${apiResponse.status} ${apiResponse.statusText}`);
       }
-      
+
       const data = await apiResponse.json();
       return data;
     },
@@ -149,7 +151,7 @@ export default function CustomerViewPage() {
 
   const handleDeleteContact = () => {
     if (!contact) return;
-    
+
     if (window.confirm('Are you sure you want to delete this contact? This action cannot be undone.')) {
       deleteContactMutation.mutate(contact.id);
     }
@@ -165,7 +167,7 @@ export default function CustomerViewPage() {
 
     const config = statusConfig[status];
     const Icon = config.icon;
-    
+
     return (
       <Badge className={`${config.color} gap-1`}>
         <Icon className="w-3 h-3" />
@@ -183,10 +185,10 @@ export default function CustomerViewPage() {
   const formatDateShort = (date: Date | string | null) => {
     if (!date) return 'Not set';
     const dateObj = typeof date === 'string' ? new Date(date) : date;
-    return dateObj.toLocaleDateString("en-US", { 
-      month: "short", 
-      day: "numeric", 
-      year: "numeric" 
+    return dateObj.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric"
     });
   };
 
@@ -240,8 +242,8 @@ export default function CustomerViewPage() {
           <p className="text-gray-600 dark:text-gray-400 mb-4">
             {error instanceof Error ? error.message : 'Unknown error'}
           </p>
-          <Button 
-            onClick={() => setLocation(returnUrl)} 
+          <Button
+            onClick={() => setLocation(returnUrl)}
             variant="outline"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -260,8 +262,8 @@ export default function CustomerViewPage() {
           <p className="text-gray-600 dark:text-gray-400 mb-4">
             The contact you're looking for doesn't exist or you don't have permission to view it.
           </p>
-          <Button 
-            onClick={() => setLocation(returnUrl)} 
+          <Button
+            onClick={() => setLocation(returnUrl)}
             variant="outline"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -275,8 +277,8 @@ export default function CustomerViewPage() {
   return (
     <div className="max-w-4xl mx-auto p-4 lg:p-6 space-y-6">
       {/* Back Button */}
-      <Button 
-        variant="ghost" 
+      <Button
+        variant="ghost"
         onClick={() => setLocation(returnUrl)}
         className="mb-2"
       >
@@ -329,7 +331,7 @@ export default function CustomerViewPage() {
           <Clock className="w-4 h-4 mr-2" />
           Send Later
         </Button>
-        <Button 
+        <Button
           variant="outline"
           size="sm"
           onClick={() => setLocation(`/email-contacts/edit/${contact.id}`)}
@@ -358,321 +360,335 @@ export default function CustomerViewPage() {
         );
       })()}
 
-      {/* Contact Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <UserCheck className="w-5 h-5" />
-            Contact Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">First Name</label>
-              <p className="text-gray-900 dark:text-white">{contact.firstName || 'Not provided'}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Name</label>
-              <p className="text-gray-900 dark:text-white">{contact.lastName || 'Not provided'}</p>
-            </div>
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Email Address</label>
-            <p className="text-gray-900 dark:text-white font-mono text-sm break-all">{contact.email}</p>
-          </div>
-          
-          {/* Address Information */}
-          {(contact.address || contact.city || contact.state || contact.zipCode || contact.country || contact.phoneNumber) && (
-            <>
-              <Separator />
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Address & Contact</h4>
-                
-                {contact.address && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Street Address</label>
-                    <p className="text-gray-900 dark:text-white">{contact.address}</p>
-                  </div>
-                )}
-                
-                <div className="grid grid-cols-2 gap-4">
-                  {contact.city && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">City</label>
-                      <p className="text-gray-900 dark:text-white">{contact.city}</p>
-                    </div>
-                  )}
-                  
-                  {contact.state && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">State/Province</label>
-                      <p className="text-gray-900 dark:text-white">{contact.state}</p>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  {contact.zipCode && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Zip/Postal Code</label>
-                      <p className="text-gray-900 dark:text-white">{contact.zipCode}</p>
-                    </div>
-                  )}
-                  
-                  {contact.country && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Country</label>
-                      <p className="text-gray-900 dark:text-white">{contact.country}</p>
-                    </div>
-                  )}
-                </div>
-                
-                {contact.phoneNumber && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Phone Number</label>
-                    <p className="text-gray-900 dark:text-white font-mono text-sm">{contact.phoneNumber}</p>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+      {/* Tabs for Profile and Appointments */}
+      <Tabs defaultValue="profile" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="appointments">Appointments</TabsTrigger>
+        </TabsList>
 
-      {/* Engagement Stats */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <BarChart3 className="w-5 h-5" />
-            Engagement Statistics
-            {statsLoading && (
-              <div className="ml-2 animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {statsLoading ? (
-            <div className="flex items-center justify-center py-6">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Loading stats...</span>
-            </div>
-          ) : engagementStats ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <Send className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{engagementStats.emailsSent}</p>
-                  <span className="text-xs text-gray-600 dark:text-gray-400">Sent</span>
-                </div>
-                
-                <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <Eye className="w-4 h-4 text-green-600 dark:text-green-400" />
-                  </div>
-                  <p className="text-xl font-bold text-green-600 dark:text-green-400">{engagementStats.emailsOpened}</p>
-                  <span className="text-xs text-gray-600 dark:text-gray-400">Opened</span>
-                </div>
-                
-                <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <TrendingUp className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <p className="text-xl font-bold text-purple-600 dark:text-purple-400">{engagementStats.openRate}%</p>
-                  <span className="text-xs text-gray-600 dark:text-gray-400">Rate</span>
-                </div>
-              </div>
-
-              {(engagementStats.emailsClicked > 0 || engagementStats.emailsBounced > 0) && (
-                <div className="grid grid-cols-2 gap-3">
-                  {engagementStats.emailsClicked > 0 && (
-                    <div className="text-center p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                      <p className="text-lg font-bold text-yellow-600 dark:text-yellow-400">{engagementStats.emailsClicked}</p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">Clicked ({engagementStats.clickRate}%)</p>
-                    </div>
-                  )}
-                  
-                  {engagementStats.emailsBounced > 0 && (
-                    <div className="text-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                      <p className="text-lg font-bold text-red-600 dark:text-red-400">{engagementStats.emailsBounced}</p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">Bounced ({engagementStats.bounceRate}%)</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-3">
-              <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{contact.emailsSent || 0}</p>
-                <span className="text-xs text-gray-600 dark:text-gray-400">Sent</span>
-              </div>
-              
-              <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                <p className="text-xl font-bold text-green-600 dark:text-green-400">{contact.emailsOpened || 0}</p>
-                <span className="text-xs text-gray-600 dark:text-gray-400">Opened</span>
-              </div>
-              
-              <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                <p className="text-xl font-bold text-purple-600 dark:text-purple-400">
-                  {getEngagementRate(contact.emailsSent || 0, contact.emailsOpened || 0)}%
-                </p>
-                <span className="text-xs text-gray-600 dark:text-gray-400">Rate</span>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Tags */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Tag className="w-4 h-4" />
-            Tags
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {Array.isArray(contact.tags) && contact.tags.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {contact.tags.map((tag) => (
-                <Badge 
-                  key={tag.id} 
-                  variant="outline" 
-                  className="text-xs"
-                  style={{ 
-                    backgroundColor: tag.color + '20', 
-                    borderColor: tag.color,
-                    color: tag.color 
-                  }}
-                >
-                  {tag.name}
-                </Badge>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500 dark:text-gray-400">No tags assigned</p>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Activity Timeline */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Calendar className="w-4 h-4" />
-            Activity Timeline
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div>
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Added Date</label>
-            <p className="text-sm text-gray-900 dark:text-white">{formatDateShort(contact.addedDate)}</p>
-          </div>
-          
-          <Separator />
-          
-          <div>
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Activity</label>
-            <p className="text-sm text-gray-900 dark:text-white">{formatDateShort(contact.lastActivity || null)}</p>
-          </div>
-          
-          <Separator />
-          
-          <div>
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Updated</label>
-            <p className="text-sm text-gray-900 dark:text-white">{formatDateShort(contact.updatedAt)}</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Consent Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <CheckCircle2 className="w-4 h-4" />
-            Consent Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div>
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Consent Given</label>
-            <div className="flex items-center gap-2 mt-1">
-              {contact.consentGiven ? (
-                <>
-                  <CheckCircle2 className="w-4 h-4 text-green-600" />
-                  <span className="text-sm text-green-600 font-medium">Yes</span>
-                </>
-              ) : (
-                <>
-                  <XCircle className="w-4 h-4 text-red-600" />
-                  <span className="text-sm text-red-600 font-medium">No</span>
-                </>
-              )}
-            </div>
-          </div>
-
-          {contact.consentGiven && (
-            <>
-              <Separator />
-              
-              <div>
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Consent Date</label>
-                <p className="text-sm text-gray-900 dark:text-white">{formatDateShort(contact.consentDate || null)}</p>
-              </div>
-              
-              {contact.consentMethod && (
+        <TabsContent value="profile" className="space-y-6 mt-4">
+          {/* Contact Details */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <UserCheck className="w-5 h-5" />
+                Contact Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Consent Method</label>
-                  <p className="text-sm text-gray-900 dark:text-white capitalize">
-                    {contact.consentMethod.replace(/_/g, ' ')}
-                  </p>
+                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">First Name</label>
+                  <p className="text-gray-900 dark:text-white">{contact.firstName || 'Not provided'}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Name</label>
+                  <p className="text-gray-900 dark:text-white">{contact.lastName || 'Not provided'}</p>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Email Address</label>
+                <p className="text-gray-900 dark:text-white font-mono text-sm break-all">{contact.email}</p>
+              </div>
+
+              {/* Address Information */}
+              {(contact.address || contact.city || contact.state || contact.zipCode || contact.country || contact.phoneNumber) && (
+                <>
+                  <Separator />
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Address & Contact</h4>
+
+                    {contact.address && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Street Address</label>
+                        <p className="text-gray-900 dark:text-white">{contact.address}</p>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4">
+                      {contact.city && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">City</label>
+                          <p className="text-gray-900 dark:text-white">{contact.city}</p>
+                        </div>
+                      )}
+
+                      {contact.state && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">State/Province</label>
+                          <p className="text-gray-900 dark:text-white">{contact.state}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      {contact.zipCode && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Zip/Postal Code</label>
+                          <p className="text-gray-900 dark:text-white">{contact.zipCode}</p>
+                        </div>
+                      )}
+
+                      {contact.country && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Country</label>
+                          <p className="text-gray-900 dark:text-white">{contact.country}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {contact.phoneNumber && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Phone Number</label>
+                        <p className="text-gray-900 dark:text-white font-mono text-sm">{contact.phoneNumber}</p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Engagement Stats */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <BarChart3 className="w-5 h-5" />
+                Engagement Statistics
+                {statsLoading && (
+                  <div className="ml-2 animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {statsLoading ? (
+                <div className="flex items-center justify-center py-6">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Loading stats...</span>
+                </div>
+              ) : engagementStats ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <Send className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{engagementStats.emailsSent}</p>
+                      <span className="text-xs text-gray-600 dark:text-gray-400">Sent</span>
+                    </div>
+
+                    <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <Eye className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      </div>
+                      <p className="text-xl font-bold text-green-600 dark:text-green-400">{engagementStats.emailsOpened}</p>
+                      <span className="text-xs text-gray-600 dark:text-gray-400">Opened</span>
+                    </div>
+
+                    <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <TrendingUp className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <p className="text-xl font-bold text-purple-600 dark:text-purple-400">{engagementStats.openRate}%</p>
+                      <span className="text-xs text-gray-600 dark:text-gray-400">Rate</span>
+                    </div>
+                  </div>
+
+                  {(engagementStats.emailsClicked > 0 || engagementStats.emailsBounced > 0) && (
+                    <div className="grid grid-cols-2 gap-3">
+                      {engagementStats.emailsClicked > 0 && (
+                        <div className="text-center p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                          <p className="text-lg font-bold text-yellow-600 dark:text-yellow-400">{engagementStats.emailsClicked}</p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">Clicked ({engagementStats.clickRate}%)</p>
+                        </div>
+                      )}
+
+                      {engagementStats.emailsBounced > 0 && (
+                        <div className="text-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                          <p className="text-lg font-bold text-red-600 dark:text-red-400">{engagementStats.emailsBounced}</p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">Bounced ({engagementStats.bounceRate}%)</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{contact.emailsSent || 0}</p>
+                    <span className="text-xs text-gray-600 dark:text-gray-400">Sent</span>
+                  </div>
+
+                  <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <p className="text-xl font-bold text-green-600 dark:text-green-400">{contact.emailsOpened || 0}</p>
+                    <span className="text-xs text-gray-600 dark:text-gray-400">Opened</span>
+                  </div>
+
+                  <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                    <p className="text-xl font-bold text-purple-600 dark:text-purple-400">
+                      {getEngagementRate(contact.emailsSent || 0, contact.emailsOpened || 0)}%
+                    </p>
+                    <span className="text-xs text-gray-600 dark:text-gray-400">Rate</span>
+                  </div>
                 </div>
               )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
 
-      {/* Email Activity Timeline */}
-      <div>
-        <EmailActivityTimeline contactId={contact.id} />
-      </div>
+          {/* Tags */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Tag className="w-4 h-4" />
+                Tags
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {Array.isArray(contact.tags) && contact.tags.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {contact.tags.map((tag) => (
+                    <Badge
+                      key={tag.id}
+                      variant="outline"
+                      className="text-xs"
+                      style={{
+                        backgroundColor: tag.color + '20',
+                        borderColor: tag.color,
+                        color: tag.color
+                      }}
+                    >
+                      {tag.name}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 dark:text-gray-400">No tags assigned</p>
+              )}
+            </CardContent>
+          </Card>
 
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <ManageContactTagsModal
-            contactId={contact.id}
-            currentTagIds={Array.isArray(contact.tags) ? contact.tags.map((t) => t.id) : []}
-            contactName={getFullName(contact)}
-            onUpdated={() => {
-              queryClient.invalidateQueries({ queryKey: ['/api/email-contacts', id] });
-            }}
-            trigger={
-              <Button variant="outline" size="sm" className="w-full justify-start">
-                <Tag className="w-4 h-4 mr-2" />
-                Manage Tags
+          {/* Activity Timeline */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Calendar className="w-4 h-4" />
+                Activity Timeline
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Added Date</label>
+                <p className="text-sm text-gray-900 dark:text-white">{formatDateShort(contact.addedDate)}</p>
+              </div>
+
+              <Separator />
+
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Activity</label>
+                <p className="text-sm text-gray-900 dark:text-white">{formatDateShort(contact.lastActivity || null)}</p>
+              </div>
+
+              <Separator />
+
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Updated</label>
+                <p className="text-sm text-gray-900 dark:text-white">{formatDateShort(contact.updatedAt)}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Consent Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <CheckCircle2 className="w-4 h-4" />
+                Consent Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Consent Given</label>
+                <div className="flex items-center gap-2 mt-1">
+                  {contact.consentGiven ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-green-600" />
+                      <span className="text-sm text-green-600 font-medium">Yes</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="w-4 h-4 text-red-600" />
+                      <span className="text-sm text-red-600 font-medium">No</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {contact.consentGiven && (
+                <>
+                  <Separator />
+
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Consent Date</label>
+                    <p className="text-sm text-gray-900 dark:text-white">{formatDateShort(contact.consentDate || null)}</p>
+                  </div>
+
+                  {contact.consentMethod && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Consent Method</label>
+                      <p className="text-sm text-gray-900 dark:text-white capitalize">
+                        {contact.consentMethod.replace(/_/g, ' ')}
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Email Activity Timeline */}
+          <div>
+            <EmailActivityTimeline contactId={contact.id} />
+          </div>
+
+          {/* Quick Actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <ManageContactTagsModal
+                contactId={contact.id}
+                currentTagIds={Array.isArray(contact.tags) ? contact.tags.map((t) => t.id) : []}
+                contactName={getFullName(contact)}
+                onUpdated={() => {
+                  queryClient.invalidateQueries({ queryKey: ['/api/email-contacts', id] });
+                }}
+                trigger={
+                  <Button variant="outline" size="sm" className="w-full justify-start">
+                    <Tag className="w-4 h-4 mr-2" />
+                    Manage Tags
+                  </Button>
+                }
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start text-red-600 hover:text-red-700"
+                onClick={handleDeleteContact}
+                disabled={deleteContactMutation.isPending}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                {deleteContactMutation.isPending ? 'Deleting...' : 'Delete Contact'}
               </Button>
-            }
-          />
-          <Button 
-            variant="outline"
-            size="sm"
-            className="w-full justify-start text-red-600 hover:text-red-700"
-            onClick={handleDeleteContact}
-            disabled={deleteContactMutation.isPending}
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            {deleteContactMutation.isPending ? 'Deleting...' : 'Delete Contact'}
-          </Button>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="appointments" className="mt-4">
+          <CustomerAppointmentsTab customerId={contact.id} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
