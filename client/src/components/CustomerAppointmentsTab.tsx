@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { isPast } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -105,11 +106,10 @@ export default function CustomerAppointmentsTab({
     });
 
     const appointments = appointmentsData?.appointments || [];
-    const now = new Date();
 
-    // Split into upcoming and past appointments
+    // Split into upcoming and past appointments using date-fns for timezone-safe comparison
     const upcomingAppointments = appointments
-        .filter((a) => new Date(a.appointmentDate) >= now)
+        .filter((a) => !isPast(new Date(a.appointmentDate)))
         .sort(
             (a, b) =>
                 new Date(a.appointmentDate).getTime() -
@@ -117,7 +117,7 @@ export default function CustomerAppointmentsTab({
         );
 
     const pastAppointments = appointments
-        .filter((a) => new Date(a.appointmentDate) < now)
+        .filter((a) => isPast(new Date(a.appointmentDate)))
         .sort(
             (a, b) =>
                 new Date(b.appointmentDate).getTime() -
