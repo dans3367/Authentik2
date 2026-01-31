@@ -67,6 +67,7 @@ interface ExtendedUser {
   theme?: string;
   menuExpanded?: boolean;
   tenantId?: string;
+  avatarUrl?: string | null;
 }
 
 const getNavigation = (userRole?: string, t?: any) => {
