@@ -4,6 +4,7 @@ import { db } from '../db';
 import { triggerTasks, type TriggerTaskStatus, type TriggerTaskRelatedType } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import type { sendReminderTask, scheduleReminderTask, sendBulkRemindersTask, ReminderPayload } from "../../src/trigger/reminders";
+import type { sendRescheduleEmailTask, RescheduleEmailPayload } from "../../src/trigger/appointmentRescheduleEmail";
 
 /**
  * Log a task to the trigger_tasks table for local tracking
@@ -32,7 +33,7 @@ export async function logTriggerTask(params: {
       idempotencyKey: params.idempotencyKey,
       triggeredAt: params.runId ? new Date() : null,
     }).returning({ id: triggerTasks.id });
-    
+
     console.log(`📝 [Trigger Tasks] Logged task ${params.taskId}, id: ${result[0]?.id}`);
     return result[0]?.id || null;
   } catch (error) {
@@ -408,6 +409,61 @@ export async function getReminderRunStatus(runId: string): Promise<{
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     console.error(`📊 [Trigger.dev] Failed to get run status ${runId}:`, errorMessage);
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+}
+
+/**
+ * Trigger a reschedule invitation email via Trigger.dev
+ * Sent when an appointment is marked as cancelled or no-show
+ */
+export async function triggerRescheduleEmail(payload: RescheduleEmailPayload): Promise<{
+  success: boolean;
+  runId?: string;
+  taskLogId?: string;
+  error?: string;
+}> {
+  const taskId = "send-reschedule-email";
+  let taskLogId: string | null = null;
+
+  try {
+    const handle = await tasks.trigger<typeof sendRescheduleEmailTask>(taskId, payload);
+
+    console.log(`📧 [Trigger.dev] Triggered ${taskId}, runId: ${handle.id}`);
+
+    // Log to trigger_tasks table
+    taskLogId = await logTriggerTask({
+      taskId,
+      runId: handle.id,
+      payload,
+      status: 'triggered',
+      tenantId: payload.tenantId,
+      relatedType: 'email',
+      relatedId: payload.appointmentId,
+    });
+
+    return {
+      success: true,
+      runId: handle.id,
+      taskLogId: taskLogId || undefined,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error(`📧 [Trigger.dev] Failed to trigger ${taskId}:`, errorMessage);
+
+    // Log failed attempt
+    await logTriggerTask({
+      taskId,
+      payload,
+      status: 'failed',
+      tenantId: payload.tenantId,
+      relatedType: 'email',
+      relatedId: payload.appointmentId,
+    });
+
     return {
       success: false,
       error: errorMessage,

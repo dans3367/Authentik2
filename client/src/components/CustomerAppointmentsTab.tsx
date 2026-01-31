@@ -15,6 +15,16 @@ import {
     SheetTitle,
 } from "@/components/ui/sheet";
 import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
     Select,
     SelectContent,
     SelectItem,
@@ -34,6 +44,8 @@ import {
     Bell,
     FileText,
     ChevronRight,
+    Mail,
+    Send,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -65,6 +77,8 @@ export default function CustomerAppointmentsTab({
     const queryClient = useQueryClient();
     const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
     const [detailsPanelOpen, setDetailsPanelOpen] = useState(false);
+    const [rescheduleEmailDialogOpen, setRescheduleEmailDialogOpen] = useState(false);
+    const [pendingStatusChange, setPendingStatusChange] = useState<Appointment["status"] | null>(null);
 
     // Fetch appointments for this customer
     const {
@@ -100,6 +114,27 @@ export default function CustomerAppointmentsTab({
             toast({
                 title: "Error",
                 description: error.message || "Failed to update appointment",
+                variant: "destructive",
+            });
+        },
+    });
+
+    // Send reschedule email mutation
+    const sendRescheduleEmailMutation = useMutation({
+        mutationFn: async (appointmentId: string) => {
+            const response = await apiRequest("POST", `/api/appointments/${appointmentId}/send-reschedule-email`);
+            return response.json();
+        },
+        onSuccess: () => {
+            toast({
+                title: "Email Sent",
+                description: "Reschedule invitation email sent to customer",
+            });
+        },
+        onError: (error: any) => {
+            toast({
+                title: "Error",
+                description: error.message || "Failed to send reschedule email",
                 variant: "destructive",
             });
         },
@@ -215,11 +250,43 @@ export default function CustomerAppointmentsTab({
 
     const handleStatusChange = (status: Appointment["status"]) => {
         if (!selectedAppointment) return;
+
+        // If changing to cancelled or no_show, prompt to send reschedule email
+        if (status === 'cancelled' || status === 'no_show') {
+            setPendingStatusChange(status);
+            setRescheduleEmailDialogOpen(true);
+            return;
+        }
+
+        // For other status changes, update directly
         updateAppointmentMutation.mutate(
             { id: selectedAppointment.id, data: { status } },
             {
                 onSuccess: () => {
                     setSelectedAppointment(prev => prev ? { ...prev, status } : null);
+                }
+            }
+        );
+    };
+
+    const handleRescheduleEmailConfirm = async (sendEmail: boolean) => {
+        if (!selectedAppointment || !pendingStatusChange) return;
+
+        // Update the appointment status
+        updateAppointmentMutation.mutate(
+            { id: selectedAppointment.id, data: { status: pendingStatusChange } },
+            {
+                onSuccess: () => {
+                    setSelectedAppointment(prev => prev ? { ...prev, status: pendingStatusChange } : null);
+
+                    // Send reschedule email if requested
+                    if (sendEmail) {
+                        sendRescheduleEmailMutation.mutate(selectedAppointment.id);
+                    }
+
+                    // Reset dialog state
+                    setRescheduleEmailDialogOpen(false);
+                    setPendingStatusChange(null);
                 }
             }
         );
@@ -544,8 +611,12 @@ export default function CustomerAppointmentsTab({
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="scheduled">Scheduled</SelectItem>
-                                                <SelectItem value="confirmed">Confirmed</SelectItem>
+                                                {!isPast(new Date(selectedAppointment.appointmentDate)) && (
+                                                    <>
+                                                        <SelectItem value="scheduled">Scheduled</SelectItem>
+                                                        <SelectItem value="confirmed">Confirmed</SelectItem>
+                                                    </>
+                                                )}
                                                 <SelectItem value="completed">Completed</SelectItem>
                                                 <SelectItem value="cancelled">Cancelled</SelectItem>
                                                 <SelectItem value="no_show">No Show</SelectItem>
@@ -569,6 +640,44 @@ export default function CustomerAppointmentsTab({
                     )}
                 </SheetContent>
             </Sheet>
+
+            {/* Reschedule Email Confirmation Dialog */}
+            <AlertDialog open={rescheduleEmailDialogOpen} onOpenChange={setRescheduleEmailDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2">
+                            <Mail className="h-5 w-5 text-amber-500" />
+                            Send Reschedule Invitation?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="space-y-2">
+                            <p>
+                                Would you like to send a friendly email to the customer
+                                inviting them to reschedule their appointment?
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                                The email will include the original appointment details and
+                                encourage them to book a new time.
+                            </p>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+                        <AlertDialogCancel
+                            onClick={() => handleRescheduleEmailConfirm(false)}
+                            disabled={updateAppointmentMutation.isPending}
+                        >
+                            No, Just Update Status
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => handleRescheduleEmailConfirm(true)}
+                            disabled={updateAppointmentMutation.isPending || sendRescheduleEmailMutation.isPending}
+                            className="bg-amber-500 hover:bg-amber-600"
+                        >
+                            <Send className="h-4 w-4 mr-2" />
+                            Yes, Send Email
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     );
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { isPast } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useTranslation } from 'react-i18next';
@@ -63,6 +64,16 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import ContactViewDrawer from "@/components/ContactViewDrawer";
 
@@ -268,6 +279,14 @@ export default function RemindersPage() {
   const [newNoteContent, setNewNoteContent] = useState("");
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteContent, setEditingNoteContent] = useState("");
+
+  // Reschedule email dialog state
+  const [rescheduleEmailDialogOpen, setRescheduleEmailDialogOpen] = useState(false);
+  const [pendingStatusChange, setPendingStatusChange] = useState<{
+    appointmentId: string;
+    status: Appointment['status'];
+    updateLocal: boolean;
+  } | null>(null);
 
   // Pagination state for reminders table
   const [remindersPage, setRemindersPage] = useState(1);
@@ -699,6 +718,27 @@ export default function RemindersPage() {
     },
   });
 
+  // Send reschedule email mutation
+  const sendRescheduleEmailMutation = useMutation({
+    mutationFn: async (appointmentId: string) => {
+      const response = await apiRequest("POST", `/api/appointments/${appointmentId}/send-reschedule-email`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Email Sent",
+        description: "Reschedule invitation email sent to customer",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t("reminders.toasts.error"),
+        description: error.message || "Failed to send reschedule email",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Create appointment mutation
   const createAppointmentMutation = useMutation({
     mutationFn: async (appointmentData: any) => {
@@ -945,6 +985,34 @@ export default function RemindersPage() {
     setViewingAppointment(appointment);
     setViewAppointmentPanelOpen(true);
     setViewAppointmentTab("details");
+  };
+
+  const handleRescheduleEmailConfirm = (sendEmail: boolean) => {
+    if (!pendingStatusChange) return;
+
+    const { appointmentId, status, updateLocal } = pendingStatusChange;
+
+    // Update the appointment status
+    updateAppointmentMutation.mutate(
+      { id: appointmentId, data: { status } },
+      {
+        onSuccess: () => {
+          // Update local state if needed (for the viewing panel)
+          if (updateLocal) {
+            setViewingAppointment(prev => prev ? { ...prev, status } : null);
+          }
+
+          // Send reschedule email if requested
+          if (sendEmail) {
+            sendRescheduleEmailMutation.mutate(appointmentId);
+          }
+
+          // Reset dialog state
+          setRescheduleEmailDialogOpen(false);
+          setPendingStatusChange(null);
+        }
+      }
+    );
   };
 
   const handleEditAppointment = (appointment: Appointment) => {
@@ -3091,8 +3159,12 @@ export default function RemindersPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="scheduled">{t('reminders.appointments.scheduled')}</SelectItem>
-                        <SelectItem value="confirmed">{t('reminders.appointments.confirmed')}</SelectItem>
+                        {!isPast(new Date(editingAppointment.appointmentDate)) && (
+                          <>
+                            <SelectItem value="scheduled">{t('reminders.appointments.scheduled')}</SelectItem>
+                            <SelectItem value="confirmed">{t('reminders.appointments.confirmed')}</SelectItem>
+                          </>
+                        )}
                         <SelectItem value="cancelled">{t('reminders.appointments.cancelled')}</SelectItem>
                         <SelectItem value="completed">{t('reminders.appointments.completed')}</SelectItem>
                         <SelectItem value="no_show">{t('reminders.appointments.noShow')}</SelectItem>
@@ -3524,6 +3596,17 @@ export default function RemindersPage() {
                                 <Select
                                   value={viewingAppointment.status}
                                   onValueChange={(value: Appointment['status']) => {
+                                    // If changing to cancelled or no_show, prompt to send reschedule email
+                                    if (value === 'cancelled' || value === 'no_show') {
+                                      setPendingStatusChange({
+                                        appointmentId: viewingAppointment.id,
+                                        status: value,
+                                        updateLocal: true,
+                                      });
+                                      setRescheduleEmailDialogOpen(true);
+                                      return;
+                                    }
+                                    // For other statuses, update directly
                                     updateAppointmentMutation.mutate(
                                       { id: viewingAppointment.id, data: { status: value } },
                                       {
@@ -3538,8 +3621,12 @@ export default function RemindersPage() {
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="scheduled">{t('reminders.appointments.scheduled')}</SelectItem>
-                                    <SelectItem value="confirmed">{t('reminders.appointments.confirmed')}</SelectItem>
+                                    {!isPast(new Date(viewingAppointment.appointmentDate)) && (
+                                      <>
+                                        <SelectItem value="scheduled">{t('reminders.appointments.scheduled')}</SelectItem>
+                                        <SelectItem value="confirmed">{t('reminders.appointments.confirmed')}</SelectItem>
+                                      </>
+                                    )}
                                     <SelectItem value="completed">{t('reminders.appointments.completed')}</SelectItem>
                                     <SelectItem value="cancelled">{t('reminders.appointments.cancelled')}</SelectItem>
                                     <SelectItem value="no_show">{t('reminders.appointments.noShow')}</SelectItem>
@@ -3616,7 +3703,7 @@ export default function RemindersPage() {
                                         </span>
                                       )}
                                     </div>
-                                    
+
                                     {/* Show sent at time directly under Reminder Sent */}
                                     {hasSentReminder && (
                                       <div className="pl-0.5 space-y-1">
@@ -4018,6 +4105,44 @@ export default function RemindersPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Reschedule Email Confirmation Dialog */}
+        <AlertDialog open={rescheduleEmailDialogOpen} onOpenChange={setRescheduleEmailDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <Mail className="h-5 w-5 text-amber-500" />
+                Send Reschedule Invitation?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2">
+                <p>
+                  Would you like to send a friendly email to the customer
+                  inviting them to reschedule their appointment?
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  The email will include the original appointment details and
+                  encourage them to book a new time.
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+              <AlertDialogCancel
+                onClick={() => handleRescheduleEmailConfirm(false)}
+                disabled={updateAppointmentMutation.isPending}
+              >
+                No, Just Update Status
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => handleRescheduleEmailConfirm(true)}
+                disabled={updateAppointmentMutation.isPending || sendRescheduleEmailMutation.isPending}
+                className="bg-amber-500 hover:bg-amber-600"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Yes, Send Email
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Customer Profile Side Panel */}
         <ContactViewDrawer
