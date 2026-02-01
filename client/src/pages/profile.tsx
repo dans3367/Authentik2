@@ -8,9 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useAuth, useUpdateTheme, useUpdateMenuPreference, useUpdateProfile, useChangePassword, useDeleteAccount, useSetup2FA, useEnable2FA, useDisable2FA } from "@/hooks/useAuth";
+import { useAuth, useUpdateProfile, useChangePassword, useDeleteAccount, useSetup2FA, useEnable2FA, useDisable2FA } from "@/hooks/useAuth";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { use2FA } from "@/hooks/use2FA";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -33,7 +32,6 @@ import {
   AlertTriangle,
   Smartphone,
   Settings,
-  Menu,
   Camera,
   QrCode,
   CreditCard,
@@ -322,7 +320,6 @@ export default function ProfilePage() {
   const setup2FAMutation = useSetup2FA();
   const enable2FAMutation = useEnable2FA();
   const disable2FAMutation = useDisable2FA();
-  const updateMenuPreferenceMutation = useUpdateMenuPreference();
 
   // Language management
   const { currentLanguage, supportedLanguages, changeLanguage, isChanging, t } = useLanguage();
@@ -808,45 +805,6 @@ export default function ProfilePage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-8">
-                  {/* Menu Display Preference */}
-                  <div className="bg-green-50/50 dark:bg-green-900/20 border border-green-200/50 dark:border-green-700/30 rounded-lg p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-3">
-                          <Menu className="w-5 h-5 text-green-600 dark:text-green-400" />
-                          <Label className="text-base font-medium text-gray-800 dark:text-gray-200">{t('profile.preferences.expandedMenu.title')}</Label>
-                        </div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 ml-8">
-                          {t('profile.preferences.expandedMenu.description')}
-                        </p>
-                      </div>
-                      <Switch
-                        checked={user?.menuExpanded || false}
-                        onCheckedChange={(checked) => {
-                          // Update localStorage immediately for instant UI feedback
-                          localStorage.setItem('menuExpanded', JSON.stringify(checked));
-
-                          // Dispatch custom event for immediate UI update in same tab
-                          window.dispatchEvent(new CustomEvent('menuPreferenceChanged', {
-                            detail: { menuExpanded: checked }
-                          }));
-
-                          // Update backend preference
-                          updateMenuPreferenceMutation.mutateAsync({ menuExpanded: checked })
-                            .catch(() => {
-                              // Revert localStorage on failure
-                              localStorage.setItem('menuExpanded', JSON.stringify(!checked));
-                              window.dispatchEvent(new CustomEvent('menuPreferenceChanged', {
-                                detail: { menuExpanded: !checked }
-                              }));
-                            });
-                        }}
-                        disabled={updateMenuPreferenceMutation.isPending}
-                        className="data-[state=checked]:bg-green-600"
-                      />
-                    </div>
-                  </div>
-
                   {/* Language Preference */}
                   <div className="bg-green-50/50 dark:bg-green-900/20 border border-green-200/50 dark:border-green-700/30 rounded-lg p-6">
                     <div className="flex items-center justify-between">

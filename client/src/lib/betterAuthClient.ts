@@ -17,6 +17,7 @@ export interface ExtendedUser {
   twoFactorEnabled?: boolean;
   theme?: string;
   menuExpanded?: boolean;
+  language?: string;
   avatarUrl?: string | null;
   timezone?: string | null;
 }
