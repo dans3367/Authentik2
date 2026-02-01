@@ -745,7 +745,7 @@ export default function RemindersPage() {
       const previousUpcoming = queryClient.getQueryData<{ appointments: Appointment[] }>(['/api/appointments/upcoming']);
 
       // Create optimistic appointment with temporary ID
-      const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
       const selectedCustomer = customers.find(c => c.id === appointmentData.customerId);
       if (!selectedCustomer) {
         console.warn('Customer not found for optimistic update, proceeding without customer details');
