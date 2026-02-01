@@ -7,15 +7,109 @@ import { sql, eq, and, count } from 'drizzle-orm';
 
 export const userRoutes = Router();
 
+// Update current user's profile (self-service)
+userRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
+  console.log('📝 [Profile] Update request received:', {
+    userId: req.user.id,
+    body: req.body
+  });
+  try {
+    const { firstName, lastName, email } = req.body;
+    const userId = req.user.id;
+    const tenantId = req.user.tenantId;
+
+    // Validate input
+    if (!firstName && !lastName && !email) {
+      return res.status(400).json({ message: 'At least one field (firstName, lastName, or email) is required' });
+    }
+
+    // Check if user exists
+    const existingUser = await db.query.betterAuthUser.findFirst({
+      where: and(
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, tenantId)
+      ),
+    });
+
+    if (!existingUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if email is already taken by another user
+    if (email && email !== existingUser.email) {
+      const emailCheck = await db.query.betterAuthUser.findFirst({
+        where: and(
+          eq(betterAuthUser.email, email),
+          eq(betterAuthUser.tenantId, tenantId)
+        ),
+      });
+
+      if (emailCheck) {
+        return res.status(400).json({ message: 'Email is already in use' });
+      }
+    }
+
+    // Build update object
+    const updateData: Record<string, any> = {
+      updatedAt: new Date(),
+    };
+
+    if (firstName !== undefined) updateData.firstName = firstName;
+    if (lastName !== undefined) updateData.lastName = lastName;
+    if (email !== undefined) updateData.email = email;
+
+    // Also update the name field for compatibility
+    if (firstName !== undefined || lastName !== undefined) {
+      const newFirstName = firstName !== undefined ? firstName : existingUser.firstName;
+      const newLastName = lastName !== undefined ? lastName : existingUser.lastName;
+      updateData.name = `${newFirstName || ''} ${newLastName || ''}`.trim();
+    }
+
+    console.log('📝 [Profile] Update data:', updateData);
+
+    // Update user profile
+    const updateResult = await db.update(betterAuthUser)
+      .set(updateData)
+      .where(and(
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, tenantId)
+      ))
+      .returning();
+
+    console.log('✅ [Profile] Update result:', updateResult);
+
+    // Fetch updated user to return
+    const updatedUser = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.id, userId),
+    });
+
+    console.log('✅ [Profile] Updated user from DB:', {
+      id: updatedUser?.id,
+      name: updatedUser?.name,
+      firstName: updatedUser?.firstName,
+      lastName: updatedUser?.lastName,
+      email: updatedUser?.email
+    });
+
+    res.json({
+      message: 'Profile updated successfully',
+      user: updatedUser
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ message: 'Failed to update profile' });
+  }
+});
+
 // Get users for tenant
 userRoutes.get("/", authenticateToken, requireRole(['Owner', 'Administrator', 'Manager']), async (req: any, res) => {
   try {
     const { search, role, status, showInactive } = req.query;
-    
+
     const filters = {
       search: search as string | undefined,
-      role: (role && ['Owner', 'Administrator', 'Manager', 'Employee'].includes(role as string)) 
-        ? role as 'Owner' | 'Administrator' | 'Manager' | 'Employee' 
+      role: (role && ['Owner', 'Administrator', 'Manager', 'Employee'].includes(role as string))
+        ? role as 'Owner' | 'Administrator' | 'Manager' | 'Employee'
         : undefined,
       status: (status === 'active' || status === 'inactive') ? status : undefined,
       showInactive: showInactive === 'true'
@@ -39,10 +133,10 @@ userRoutes.post("/", authenticateToken, requireRole(['Owner', 'Administrator']),
     };
 
     const user = await storage.createUser(userData);
-    
-    res.status(201).json({ 
+
+    res.status(201).json({
       message: 'User created successfully',
-      user 
+      user
     });
   } catch (error) {
     console.error('Create user error:', error);
@@ -70,7 +164,7 @@ userRoutes.get("/stats", authenticateToken, requireRole(['Owner', 'Administrator
       .where(eq(betterAuthUser.tenantId, tenantId));
 
     const result = stats[0];
-    
+
     res.json({
       totalUsers: result.totalUsers,
       activeUsers: result.activeUsers,

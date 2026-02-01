@@ -80,57 +80,57 @@ export function useRegister() {
 
   const mutateAsync = async (data: RegisterData) => {
     setIsPending(true);
-      try {
-        // Step 1: Store company name on the server before signup
-        // This allows the auth hook to access it when creating the tenant/company
-        await fetch(`${getApiBaseUrl()}/api/signup/store-company-name`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: data.email,
-            companyName: data.companyName,
-          }),
-        });
-        
-        // Step 2: Proceed with Better Auth signup
-        const result = await signUp.email({
+    try {
+      // Step 1: Store company name on the server before signup
+      // This allows the auth hook to access it when creating the tenant/company
+      await fetch(`${getApiBaseUrl()}/api/signup/store-company-name`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           email: data.email,
-          password: data.password,
-          name: `${data.firstName} ${data.lastName}`,
-        });
+          companyName: data.companyName,
+        }),
+      });
 
-        if (result.error) {
-          throw new Error(result.error.message);
-        }
+      // Step 2: Proceed with Better Auth signup
+      const result = await signUp.email({
+        email: data.email,
+        password: data.password,
+        name: `${data.firstName} ${data.lastName}`,
+      });
 
-        toast({
-          title: "Account Created!",
-          description: "Please check your email to verify your account before logging in.",
-        });
-
-        return result.data;
-      } catch (error: any) {
-        let message = "Registration failed. Please try again.";
-
-        if (error.message.includes("409") || error.message.includes("exists")) {
-          message = "An account with this email already exists.";
-        } else if (error.message.includes("400")) {
-          message = "Please check your input and try again.";
-        }
-
-        toast({
-          title: "Registration Failed",
-          description: message,
-          variant: "destructive",
-        });
-
-        throw error;
-      } finally {
-        setIsPending(false);
+      if (result.error) {
+        throw new Error(result.error.message);
       }
-    };
+
+      toast({
+        title: "Account Created!",
+        description: "Please check your email to verify your account before logging in.",
+      });
+
+      return result.data;
+    } catch (error: any) {
+      let message = "Registration failed. Please try again.";
+
+      if (error.message.includes("409") || error.message.includes("exists")) {
+        message = "An account with this email already exists.";
+      } else if (error.message.includes("400")) {
+        message = "Please check your input and try again.";
+      }
+
+      toast({
+        title: "Registration Failed",
+        description: message,
+        variant: "destructive",
+      });
+
+      throw error;
+    } finally {
+      setIsPending(false);
+    }
+  };
 
   return {
     mutateAsync,
@@ -188,7 +188,7 @@ export function useUpdateProfile() {
   const mutateAsync = async (data: Partial<UpdateProfileData>) => {
     setIsPending(true);
     try {
-      const response = await fetch('/api/user/profile', {
+      const response = await fetch('/api/users/profile', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -215,8 +215,15 @@ export function useUpdateProfile() {
         // Response might be empty on success
       }
 
-      // Refetch the session to get updated user data
+      // Force invalidate all session-related caches
+      await queryClient.invalidateQueries({ queryKey: ['session'] });
+      await queryClient.invalidateQueries({ queryKey: ['better-auth'] });
+
+      // Force refetch the session with no-cache to get fresh data from server
       await authClient.getSession({ fetchOptions: { cache: 'no-store' } });
+
+      // Invalidate all queries to ensure React components re-render with fresh data
+      await queryClient.invalidateQueries();
 
       toast({
         title: "Profile Updated",

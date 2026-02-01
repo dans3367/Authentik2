@@ -71,8 +71,7 @@ const authInstance = betterAuth({
     updateAge: 24 * 60 * 60, // 24 hours
     expiresIn: 60 * 60 * 24 * 7, // 7 days
     cookieCache: {
-      enabled: true,
-      maxAge: 5 * 60, // 5 minutes
+      enabled: false, // Disable cookie caching to ensure profile updates are reflected immediately
     },
   },
   // Cookie configuration for cross-origin/IP access
@@ -135,7 +134,7 @@ const authInstance = betterAuth({
       // Declare variables outside try block for accessibility in catch
       let userRecord: any = null;
       let email = '';
-      
+
       try {
         // Only run after sign-up endpoints
         const path = ctx?.path || "";
@@ -152,112 +151,112 @@ const authInstance = betterAuth({
         userRecord = await db.query.betterAuthUser.findFirst({
           where: eq(betterAuthUser.email, email.toLowerCase())
         });
-        
+
         if (!userRecord) {
           console.log(`⚠️  [Signup Hook] User not found: ${email}`);
           return {};
         }
-        
+
         // Check if user already has a valid tenant (not a placeholder)
         const placeholderTenantIds = [
           '00000000-0000-0000-0000-000000000000', // New placeholder
           '29c69b4f-3129-4aa4-a475-7bf892e5c5b9', // Old default tenant
           '2f6f5ec2-a56f-47d0-887d-c6b9c1bb56ff', // Old temp default tenant
         ];
-        
+
         if (userRecord.tenantId && !placeholderTenantIds.includes(userRecord.tenantId)) {
           console.log(`✅ [Signup Hook] User ${userRecord.email} already has valid tenant: ${userRecord.tenantId}`);
           return {};
         }
-        
+
         console.log(`🔧 [Signup Hook] Creating NEW tenant and company for user: ${userRecord.email}`);
 
-          // Get company name from pending signups (stored by /api/signup/store-company-name)
-          const pendingCompanyName = (global as any).pendingCompanyNames?.[userRecord.email.toLowerCase()];
-          
-          // Create a tenant for the new user
-          const companyName = pendingCompanyName || (userRecord.name ? `${userRecord.name}'s Organization` : "My Organization");
-          
-          console.log(`📝 Company name for ${userRecord.email}: ${companyName}${pendingCompanyName ? ' (from signup form)' : ' (auto-generated)'}`);
-          
-          // Generate a unique slug
-          let baseSlug = userRecord.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '-');
-          let slug = baseSlug;
-          let attempts = 0;
-          
-          // Check for slug conflicts and add suffix if needed
-          while (attempts < 10) {
-            const existingTenant = await db.query.tenants.findFirst({
-              where: eq(tenants.slug, slug)
-            });
-            
-            if (!existingTenant) break;
-            
-            attempts++;
-            slug = `${baseSlug}-${attempts}`;
-          }
+        // Get company name from pending signups (stored by /api/signup/store-company-name)
+        const pendingCompanyName = (global as any).pendingCompanyNames?.[userRecord.email.toLowerCase()];
 
-          console.log(`📝 [Signup Hook] Inserting tenant with slug: ${slug}`);
-          const [newTenant] = await db.insert(tenants).values({
-            name: companyName,
-            slug: slug,
-            isActive: true,
-            maxUsers: 10,
-          }).returning();
+        // Create a tenant for the new user
+        const companyName = pendingCompanyName || (userRecord.name ? `${userRecord.name}'s Organization` : "My Organization");
 
-          if (!newTenant || !newTenant.id) {
-            throw new Error('Failed to create tenant - no tenant returned');
-          }
-          
-          console.log(`✅ [Signup Hook] Tenant created: ${newTenant.id}`);
+        console.log(`📝 Company name for ${userRecord.email}: ${companyName}${pendingCompanyName ? ' (from signup form)' : ' (auto-generated)'}`);
 
-          // Update the user with the new tenant ID
-          console.log(`📝 [Signup Hook] Updating user ${userRecord.email} with tenant ${newTenant.id}`);
-          const updatedUsers = await db.update(betterAuthUser)
-            .set({
-              tenantId: newTenant.id,
-              role: 'Owner',
-              updatedAt: new Date(),
-            })
-            .where(eq(betterAuthUser.id, userRecord.id))
-            .returning();
+        // Generate a unique slug
+        let baseSlug = userRecord.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '-');
+        let slug = baseSlug;
+        let attempts = 0;
 
-          if (!updatedUsers || updatedUsers.length === 0) {
-            throw new Error('Failed to update user with tenant ID');
-          }
-          
-          console.log(`✅ [Signup Hook] User updated with tenant ID`);
-
-          // Create company record for onboarding
-          console.log(`📝 [Signup Hook] Creating company record`);
-          const [newCompany] = await db.insert(companies).values({
-            tenantId: newTenant.id,
-            ownerId: userRecord.id,
-            name: companyName,
-            setupCompleted: false, // This will trigger the onboarding modal
-            isActive: true,
-          }).returning();
-
-          if (!newCompany) {
-            throw new Error('Failed to create company record');
-          }
-          
-          console.log(`✅ [Signup Hook] Company created: ${newCompany.id}`);
-
-          // Clean up the pending company name
-          if ((global as any).pendingCompanyNames && (global as any).pendingCompanyNames[userRecord.email.toLowerCase()]) {
-            delete (global as any).pendingCompanyNames[userRecord.email.toLowerCase()];
-          }
-
-          console.log(`✅ ✅ ✅ [Signup Hook] SUCCESS! Complete tenant setup for ${userRecord.email}:`, {
-            userId: userRecord.id,
-            tenantId: newTenant.id,
-            tenantName: newTenant.name,
-            tenantSlug: newTenant.slug,
-            companyId: newCompany.id,
-            companyName: companyName,
+        // Check for slug conflicts and add suffix if needed
+        while (attempts < 10) {
+          const existingTenant = await db.query.tenants.findFirst({
+            where: eq(tenants.slug, slug)
           });
-          return {};
+
+          if (!existingTenant) break;
+
+          attempts++;
+          slug = `${baseSlug}-${attempts}`;
+        }
+
+        console.log(`📝 [Signup Hook] Inserting tenant with slug: ${slug}`);
+        const [newTenant] = await db.insert(tenants).values({
+          name: companyName,
+          slug: slug,
+          isActive: true,
+          maxUsers: 10,
+        }).returning();
+
+        if (!newTenant || !newTenant.id) {
+          throw new Error('Failed to create tenant - no tenant returned');
+        }
+
+        console.log(`✅ [Signup Hook] Tenant created: ${newTenant.id}`);
+
+        // Update the user with the new tenant ID
+        console.log(`📝 [Signup Hook] Updating user ${userRecord.email} with tenant ${newTenant.id}`);
+        const updatedUsers = await db.update(betterAuthUser)
+          .set({
+            tenantId: newTenant.id,
+            role: 'Owner',
+            updatedAt: new Date(),
+          })
+          .where(eq(betterAuthUser.id, userRecord.id))
+          .returning();
+
+        if (!updatedUsers || updatedUsers.length === 0) {
+          throw new Error('Failed to update user with tenant ID');
+        }
+
+        console.log(`✅ [Signup Hook] User updated with tenant ID`);
+
+        // Create company record for onboarding
+        console.log(`📝 [Signup Hook] Creating company record`);
+        const [newCompany] = await db.insert(companies).values({
+          tenantId: newTenant.id,
+          ownerId: userRecord.id,
+          name: companyName,
+          setupCompleted: false, // This will trigger the onboarding modal
+          isActive: true,
+        }).returning();
+
+        if (!newCompany) {
+          throw new Error('Failed to create company record');
+        }
+
+        console.log(`✅ [Signup Hook] Company created: ${newCompany.id}`);
+
+        // Clean up the pending company name
+        if ((global as any).pendingCompanyNames && (global as any).pendingCompanyNames[userRecord.email.toLowerCase()]) {
+          delete (global as any).pendingCompanyNames[userRecord.email.toLowerCase()];
+        }
+
+        console.log(`✅ ✅ ✅ [Signup Hook] SUCCESS! Complete tenant setup for ${userRecord.email}:`, {
+          userId: userRecord.id,
+          tenantId: newTenant.id,
+          tenantName: newTenant.name,
+          tenantSlug: newTenant.slug,
+          companyId: newCompany.id,
+          companyName: companyName,
+        });
+        return {};
       } catch (error) {
         console.error('❌ ❌ ❌ [Signup Hook] CRITICAL ERROR - Failed to create tenant for new user:', error);
         console.error('❌ [Signup Hook] User email:', userRecord?.email || email || 'unknown');
