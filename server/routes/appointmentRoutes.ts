@@ -322,7 +322,7 @@ router.post('/', async (req: Request, res: Response) => {
           phoneNumber: emailContacts.phoneNumber,
         })
         .from(emailContacts)
-        .where(eq(emailContacts.id, newAppointment[0].customerId))
+        .where(and(eq(emailContacts.id, newAppointment[0].customerId), eq(emailContacts.tenantId, tenantId)))
         .limit(1);
       appointmentCustomer = customerData[0] || null;
     }

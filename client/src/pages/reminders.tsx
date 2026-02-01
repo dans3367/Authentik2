@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { isPast } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -110,8 +110,6 @@ interface Appointment {
   confirmationReceivedAt?: Date;
   confirmationToken?: string;
   reminderSettings?: string;
-  isArchived?: boolean;
-  archivedAt?: Date;
   customer?: Customer;
   createdAt: Date;
   updatedAt: Date;
@@ -322,8 +320,9 @@ export default function RemindersPage() {
       setScheduleAppointmentId("");
       refetchReminders();
       // Invalidate appointments queries to refresh the list with updated reminder status
-      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === '/api/appointments' 
+      });
     },
     onError: (error: any) => {
       toast({ title: t('reminders.toasts.error'), description: error?.message || t('reminders.toasts.reminderScheduleError'), variant: 'destructive' });
@@ -366,6 +365,41 @@ export default function RemindersPage() {
 
   // Track newly created appointments that are still syncing (for optimistic UI)
   const [pendingAppointmentIds, setPendingAppointmentIds] = useState<Set<string>>(new Set());
+  const isMountedRef = useRef(true);
+
+  // Cleanup pendingAppointmentIds on unmount to prevent memory leaks
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      setPendingAppointmentIds(new Set());
+    };
+  }, []);
+
+  // Cleanup function to remove any old cached queries with deprecated parameters
+  const cleanupOldQueryCache = () => {
+    const queryCache = queryClient.getQueryCache();
+    const allQueries = queryCache.getAll();
+    
+    // Remove any queries that might have old showArchived parameter
+    allQueries.forEach(query => {
+      const queryKey = query.queryKey;
+      if (
+        Array.isArray(queryKey) && 
+        queryKey[0] === '/api/appointments' && 
+        (queryKey.some(key => typeof key === 'object' && key && 'showArchived' in key) ||
+         queryKey.some(key => typeof key === 'string' && key.includes('showArchived')))
+      ) {
+        queryCache.remove(query);
+        console.log('Cleaned up old query with showArchived parameter:', queryKey);
+      }
+    });
+  };
+
+  // Cleanup old queries on component mount
+  useEffect(() => {
+    cleanupOldQueryCache();
+  }, []);
 
   // Fetch appointments - no date filtering on server
   // All date filtering is done client-side to ensure both upcoming and past tabs
@@ -385,17 +419,11 @@ export default function RemindersPage() {
     refetchOnWindowFocus: false,
   });
 
-  // Fetch upcoming appointments (always non-archived for the sidebar)
-  const { data: upcomingAppointmentsData, refetch: refetchUpcomingAppointments } = useQuery<{ appointments: Appointment[] }>({
-    queryKey: ['/api/appointments/upcoming'],
-    queryFn: async () => {
-      // Always fetch non-archived appointments for upcoming section
-      const response = await apiRequest('GET', '/api/appointments');
-      return response.json();
-    },
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
+  // Derive upcoming appointments from the same data source to avoid duplicate API calls
+  const upcomingAppointmentsData = appointmentsData ? {
+    appointments: appointmentsData.appointments
+  } : { appointments: [] };
+  const refetchUpcomingAppointments = refetchAppointments;
 
   // Fetch customers for appointment creation
   const { data: customersData } = useQuery<{ contacts: Customer[] }>({
@@ -694,7 +722,9 @@ export default function RemindersPage() {
         );
       }
 
-      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === '/api/appointments' 
+      });
       refetchAppointments();
       setEditAppointmentModalOpen(false);
       setEditingAppointment(null);
@@ -736,20 +766,21 @@ export default function RemindersPage() {
       return response.json();
     },
     onMutate: async (appointmentData: any) => {
+      // Validate customer exists before proceeding with optimistic update
+      const selectedCustomer = customers.find(c => c.id === appointmentData.customerId);
+      if (!selectedCustomer) {
+        // Don't proceed with optimistic update if customer doesn't exist
+        throw new Error('Selected customer not found. Please select a valid customer.');
+      }
+
       // Cancel any outgoing refetches to avoid overwriting optimistic update
       await queryClient.cancelQueries({ queryKey: ['/api/appointments'] });
-      await queryClient.cancelQueries({ queryKey: ['/api/appointments/upcoming'] });
 
       // Snapshot previous values
       const previousAppointments = queryClient.getQueryData<{ appointments: Appointment[] }>(['/api/appointments']);
-      const previousUpcoming = queryClient.getQueryData<{ appointments: Appointment[] }>(['/api/appointments/upcoming']);
 
       // Create optimistic appointment with temporary ID
       const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-      const selectedCustomer = customers.find(c => c.id === appointmentData.customerId);
-      if (!selectedCustomer) {
-        console.warn('Customer not found for optimistic update, proceeding without customer details');
-      }
       const optimisticAppointment: Appointment = {
         id: tempId,
         customerId: appointmentData.customerId,
@@ -769,7 +800,9 @@ export default function RemindersPage() {
       };
 
       // Add to pending set for loading indicator
-      setPendingAppointmentIds(prev => new Set(prev).add(tempId));
+      if (isMountedRef.current) {
+        setPendingAppointmentIds(prev => new Set(prev).add(tempId));
+      }
 
       // Optimistically update cache
       queryClient.setQueryData<{ appointments: Appointment[] }>(
@@ -778,14 +811,8 @@ export default function RemindersPage() {
           appointments: old?.appointments ? [optimisticAppointment, ...old.appointments] : [optimisticAppointment],
         })
       );
-      queryClient.setQueryData<{ appointments: Appointment[] }>(
-        ['/api/appointments/upcoming'],
-        (old) => ({
-          appointments: old?.appointments ? [optimisticAppointment, ...old.appointments] : [optimisticAppointment],
-        })
-      );
 
-      return { previousAppointments, previousUpcoming, tempId };
+      return { previousAppointments, tempId };
     },
     onSuccess: (data, _variables, context) => {
       toast({
@@ -794,7 +821,7 @@ export default function RemindersPage() {
       });
 
       // Remove temp ID from pending and add real ID briefly for smooth transition
-      if (context?.tempId) {
+      if (context?.tempId && isMountedRef.current) {
         setPendingAppointmentIds(prev => {
           const next = new Set(prev);
           next.delete(context.tempId);
@@ -813,26 +840,16 @@ export default function RemindersPage() {
             if (!old?.appointments) return old;
             return {
               appointments: old.appointments.map(apt => 
-                apt.id === context?.tempId ? { ...realAppointment, customer: apt.customer } : apt
-              ),
-            };
-          }
-        );
-        queryClient.setQueryData<{ appointments: Appointment[] }>(
-          ['/api/appointments/upcoming'],
-          (old) => {
-            if (!old?.appointments) return old;
-            return {
-              appointments: old.appointments.map(apt => 
-                apt.id === context?.tempId ? { ...realAppointment, customer: apt.customer } : apt
+                apt.id === context?.tempId ? { ...realAppointment, customer: realAppointment.customer || apt.customer } : apt
               ),
             };
           }
         );
       } else {
         // Fallback: invalidate to get fresh data if server response format is unexpected
-        queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] });
+        queryClient.invalidateQueries({ 
+          predicate: (query) => query.queryKey[0] === '/api/appointments' 
+        });
       }
 
       // Schedule reminder if enabled
@@ -856,6 +873,7 @@ export default function RemindersPage() {
           scheduledFor = new Date(appointmentDate.getTime() - minutes * 60 * 1000);
         }
 
+        // Create reminder but don't close modal if it fails
         createScheduledReminderMutation.mutate({
           appointmentId: data.appointment.id,
           data: {
@@ -866,7 +884,18 @@ export default function RemindersPage() {
             timezone: newAppointmentReminderData.timezone,
             content: newAppointmentReminderData.content,
           },
+        }, {
+          onError: () => {
+            // Don't close modal on reminder error, let user try again
+            return;
+          },
+          onSuccess: () => {
+            // Only close modal after both appointment and reminder are created successfully
+            setNewAppointmentModalOpen(false);
+            resetNewAppointmentData();
+          }
         });
+        return; // Don't close modal yet, wait for reminder creation result
       }
 
       setNewAppointmentModalOpen(false);
@@ -877,20 +906,32 @@ export default function RemindersPage() {
       if (context?.previousAppointments) {
         queryClient.setQueryData(['/api/appointments'], context.previousAppointments);
       }
-      if (context?.previousUpcoming) {
-        queryClient.setQueryData(['/api/appointments/upcoming'], context.previousUpcoming);
-      }
       // Remove temp ID from pending
-      if (context?.tempId) {
+      if (context?.tempId && isMountedRef.current) {
         setPendingAppointmentIds(prev => {
           const next = new Set(prev);
           next.delete(context.tempId);
           return next;
         });
       }
+      
+      // Provide specific error messages for different types of failures
+      let errorMessage = error?.message || t('reminders.toasts.appointmentCreateError');
+      let errorDescription = '';
+      
+      if (errorMessage.includes('Customer not found') || errorMessage.includes('Selected customer not found')) {
+        errorDescription = 'Please select a valid customer from the list and try again.';
+      } else if (errorMessage.includes('does not belong to your organization')) {
+        errorDescription = 'The selected customer is not available in your organization.';
+      } else if (errorMessage.includes('Validation failed')) {
+        errorDescription = 'Please check all required fields and try again.';
+      } else {
+        errorDescription = errorMessage;
+      }
+      
       toast({
         title: t('reminders.toasts.error'),
-        description: error?.message || t('reminders.toasts.appointmentCreateError'),
+        description: errorDescription,
         variant: "destructive",
       });
     },
@@ -961,8 +1002,9 @@ export default function RemindersPage() {
         description: 'Appointment confirmed successfully',
       });
       refetchAppointments();
-      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === '/api/appointments' 
+      });
     },
     onError: (error: any) => {
       toast({
@@ -1217,6 +1259,20 @@ export default function RemindersPage() {
     }
     if (newAppointmentReminderEnabled && newAppointmentReminderData.reminderTiming === 'custom' && !newAppointmentReminderData.customMinutesBefore) {
       errors.customMinutesBefore = true;
+    }
+
+    // Validate that the selected customer actually exists in the customers list
+    if (newAppointmentData.customerId) {
+      const selectedCustomer = customers.find(c => c.id === newAppointmentData.customerId);
+      if (!selectedCustomer) {
+        errors.customerId = true;
+        toast({
+          title: t('reminders.toasts.validationError'),
+          description: 'Selected customer not found. Please select a valid customer.',
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     if (newAppointmentReminderEnabled && newAppointmentReminderData.reminderTiming !== 'now') {
@@ -1517,8 +1573,9 @@ export default function RemindersPage() {
                     onClick={async () => {
                       // Invalidate queries to trigger refetch
                       await Promise.all([
-                        queryClient.invalidateQueries({ queryKey: ['/api/appointments'] }),
-                        queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] }),
+                        queryClient.invalidateQueries({ 
+                          predicate: (query) => query.queryKey[0] === '/api/appointments' 
+                        }),
                         queryClient.invalidateQueries({ queryKey: ['/api/appointment-reminders'] })
                       ]);
                       setLastRefreshedAt(new Date());

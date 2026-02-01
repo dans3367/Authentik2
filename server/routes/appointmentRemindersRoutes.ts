@@ -493,6 +493,11 @@ router.put('/:id/reschedule', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid scheduledFor date' });
     }
 
+    // Reject past dates
+    if (newScheduledTime <= new Date()) {
+      return res.status(400).json({ error: 'Reminder scheduled time must be in the future' });
+    }
+
     // Verify reminder exists and belongs to tenant
     const existingReminder = await db
       .select()

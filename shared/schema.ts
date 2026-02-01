@@ -2104,8 +2104,6 @@ export const appointments = pgTable("appointments", {
   confirmationReceivedAt: timestamp("confirmation_received_at"),
   confirmationToken: text("confirmation_token"), // Unique token for confirmation links
   reminderSettings: text("reminder_settings"), // JSON: when to send reminders
-  isArchived: boolean("is_archived").default(false), // Whether the appointment is archived
-  archivedAt: timestamp("archived_at"), // When the appointment was archived
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -2295,7 +2293,10 @@ export const createAppointmentSchema = z.object({
   customerId: z.string().uuid("Please select a valid customer"),
   title: z.string().min(1, "Appointment title is required"),
   description: z.string().optional(),
-  appointmentDate: z.coerce.date(),
+  appointmentDate: z.coerce.date().refine(
+    (date) => date > new Date(),
+    { message: "Appointment date must be in the future" }
+  ),
   duration: z.number().int().positive().default(60),
   location: z.string().optional(),
   serviceType: z.string().optional(),
@@ -2306,7 +2307,10 @@ export const createAppointmentSchema = z.object({
 export const updateAppointmentSchema = z.object({
   title: z.string().min(1, "Appointment title is required").optional(),
   description: z.string().optional(),
-  appointmentDate: z.coerce.date().optional(),
+  appointmentDate: z.coerce.date().refine(
+    (date) => date > new Date(),
+    { message: "Appointment date must be in the future" }
+  ).optional(),
   duration: z.number().int().positive().optional(),
   location: z.string().optional(),
   serviceType: z.string().optional(),
@@ -2320,7 +2324,10 @@ export const createAppointmentReminderSchema = z.object({
   reminderType: z.enum(['email', 'sms', 'push']).default('email'),
   reminderTiming: z.enum(['now', '5m', '30m', '1h', '5h', '10h', 'custom']).default('1h'),
   customMinutesBefore: z.number().min(1).max(10080).optional(), // Up to 1 week before
-  scheduledFor: z.coerce.date(),
+  scheduledFor: z.coerce.date().refine(
+    (date) => date > new Date(),
+    { message: "Reminder scheduled time must be in the future" }
+  ),
   timezone: z.string().default('America/Chicago'), // IANA timezone identifier
   content: z.string().optional(),
 });
