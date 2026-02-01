@@ -8,9 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useAuth, useUpdateTheme, useUpdateMenuPreference, useUpdateProfile, useChangePassword, useDeleteAccount, useSetup2FA, useEnable2FA, useDisable2FA } from "@/hooks/useAuth";
+import { useAuth, useUpdateProfile, useChangePassword, useDeleteAccount, useSetup2FA, useEnable2FA, useDisable2FA } from "@/hooks/useAuth";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { use2FA } from "@/hooks/use2FA";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -33,7 +32,6 @@ import {
   AlertTriangle,
   Smartphone,
   Settings,
-  Menu,
   Camera,
   QrCode,
   CreditCard,
@@ -322,7 +320,6 @@ export default function ProfilePage() {
   const setup2FAMutation = useSetup2FA();
   const enable2FAMutation = useEnable2FA();
   const disable2FAMutation = useDisable2FA();
-  const updateMenuPreferenceMutation = useUpdateMenuPreference();
 
   // Language management
   const { currentLanguage, supportedLanguages, changeLanguage, isChanging, t } = useLanguage();
