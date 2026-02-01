@@ -48,8 +48,6 @@ import {
   LayoutDashboard,
   StickyNote,
   Loader2,
-  Archive,
-  ArchiveRestore,
   RefreshCw,
   ArrowUpDown,
   ArrowUp,
@@ -167,7 +165,6 @@ export default function RemindersPage() {
   const [debouncedPastSearchQuery, setDebouncedPastSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [pastStatusFilter, setPastStatusFilter] = useState("all");
-  const [showArchived, setShowArchived] = useState(false);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [pastDateFrom, setPastDateFrom] = useState<Date | undefined>(undefined);
@@ -208,16 +205,13 @@ export default function RemindersPage() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchQuery, statusFilter, showArchived, dateFrom, dateTo]);
+  }, [debouncedSearchQuery, statusFilter, dateFrom, dateTo]);
 
   // Reset past page to 1 when past filters change
   useEffect(() => {
     setPastCurrentPage(1);
   }, [debouncedPastSearchQuery, pastStatusFilter, pastDateFrom, pastDateTo]);
 
-  useEffect(() => {
-    queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-  }, [showArchived]);
   const [editAppointmentModalOpen, setEditAppointmentModalOpen] = useState(false);
   const [editAppointmentReminderModalOpen, setEditAppointmentReminderModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
@@ -367,17 +361,13 @@ export default function RemindersPage() {
   const [cancelAppointmentId, setCancelAppointmentId] = useState<string>("");
   const [cancelConfirmModalOpen, setCancelConfirmModalOpen] = useState(false);
 
-  // Archive appointment confirmation state
-  const [archiveAppointmentId, setArchiveAppointmentId] = useState<string>("");
-  const [archiveConfirmModalOpen, setArchiveConfirmModalOpen] = useState(false);
-
   // Past date confirmation state
   const [pastDateConfirmModalOpen, setPastDateConfirmModalOpen] = useState(false);
 
   // Track newly created appointments that are still syncing (for optimistic UI)
   const [pendingAppointmentIds, setPendingAppointmentIds] = useState<Set<string>>(new Set());
 
-  // Fetch appointments - no date filtering on server, only archived filter
+  // Fetch appointments - no date filtering on server
   // All date filtering is done client-side to ensure both upcoming and past tabs
   // have access to all appointment data
   const {
@@ -386,12 +376,9 @@ export default function RemindersPage() {
     isFetching: appointmentsFetching,
     refetch: refetchAppointments
   } = useQuery<{ appointments: Appointment[] }>({
-    queryKey: ['/api/appointments', showArchived],
+    queryKey: ['/api/appointments'],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (showArchived) params.append('archived', 'true');
-
-      const response = await apiRequest('GET', `/api/appointments?${params.toString()}`);
+      const response = await apiRequest('GET', '/api/appointments');
       return response.json();
     },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
@@ -750,16 +737,19 @@ export default function RemindersPage() {
     },
     onMutate: async (appointmentData: any) => {
       // Cancel any outgoing refetches to avoid overwriting optimistic update
-      await queryClient.cancelQueries({ queryKey: ['/api/appointments', showArchived] });
+      await queryClient.cancelQueries({ queryKey: ['/api/appointments'] });
       await queryClient.cancelQueries({ queryKey: ['/api/appointments/upcoming'] });
 
       // Snapshot previous values
-      const previousAppointments = queryClient.getQueryData<{ appointments: Appointment[] }>(['/api/appointments', showArchived]);
+      const previousAppointments = queryClient.getQueryData<{ appointments: Appointment[] }>(['/api/appointments']);
       const previousUpcoming = queryClient.getQueryData<{ appointments: Appointment[] }>(['/api/appointments/upcoming']);
 
       // Create optimistic appointment with temporary ID
-      const tempId = `temp-${Date.now()}`;
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const selectedCustomer = customers.find(c => c.id === appointmentData.customerId);
+      if (!selectedCustomer) {
+        console.warn('Customer not found for optimistic update, proceeding without customer details');
+      }
       const optimisticAppointment: Appointment = {
         id: tempId,
         customerId: appointmentData.customerId,
@@ -783,7 +773,7 @@ export default function RemindersPage() {
 
       // Optimistically update cache
       queryClient.setQueryData<{ appointments: Appointment[] }>(
-        ['/api/appointments', showArchived],
+        ['/api/appointments'],
         (old) => ({
           appointments: old?.appointments ? [optimisticAppointment, ...old.appointments] : [optimisticAppointment],
         })
@@ -818,7 +808,7 @@ export default function RemindersPage() {
         
         // Update cache with real appointment data (replace temp with real)
         queryClient.setQueryData<{ appointments: Appointment[] }>(
-          ['/api/appointments', showArchived],
+          ['/api/appointments'],
           (old) => {
             if (!old?.appointments) return old;
             return {
@@ -839,6 +829,10 @@ export default function RemindersPage() {
             };
           }
         );
+      } else {
+        // Fallback: invalidate to get fresh data if server response format is unexpected
+        queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] });
       }
 
       // Schedule reminder if enabled
@@ -881,7 +875,7 @@ export default function RemindersPage() {
     onError: (error: any, _variables, context) => {
       // Rollback optimistic update on error
       if (context?.previousAppointments) {
-        queryClient.setQueryData(['/api/appointments', showArchived], context.previousAppointments);
+        queryClient.setQueryData(['/api/appointments'], context.previousAppointments);
       }
       if (context?.previousUpcoming) {
         queryClient.setQueryData(['/api/appointments/upcoming'], context.previousUpcoming);
@@ -948,53 +942,6 @@ export default function RemindersPage() {
       toast({
         title: t('reminders.toasts.error'),
         description: error?.message || 'Failed to delete appointment',
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Archive appointment mutation
-  const archiveAppointmentMutation = useMutation({
-    mutationFn: async (appointmentId: string) => {
-      const response = await apiRequest('POST', `/api/appointments/${appointmentId}/archive`);
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: t('reminders.toasts.success'),
-        description: 'Appointment archived successfully',
-      });
-      refetchAppointments();
-      setSelectedAppointments(prev => prev.filter(id => id !== archiveAppointmentId));
-      setArchiveConfirmModalOpen(false);
-      setArchiveAppointmentId("");
-    },
-    onError: (error: any) => {
-      toast({
-        title: t('reminders.toasts.error'),
-        description: error?.message || 'Failed to archive appointment',
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Unarchive appointment mutation
-  const unarchiveAppointmentMutation = useMutation({
-    mutationFn: async (appointmentId: string) => {
-      const response = await apiRequest('POST', `/api/appointments/${appointmentId}/unarchive`);
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: t('reminders.toasts.success'),
-        description: 'Appointment restored successfully',
-      });
-      refetchAppointments();
-    },
-    onError: (error: any) => {
-      toast({
-        title: t('reminders.toasts.error'),
-        description: error?.message || 'Failed to restore appointment',
         variant: "destructive",
       });
     },
@@ -1352,21 +1299,6 @@ export default function RemindersPage() {
     cancelAppointmentMutation.mutate(cancelAppointmentId);
     setCancelConfirmModalOpen(false);
     setCancelAppointmentId("");
-  };
-
-  const handleArchiveAppointment = (appointmentId: string) => {
-    setArchiveAppointmentId(appointmentId);
-    setArchiveConfirmModalOpen(true);
-  };
-
-  const confirmArchiveAppointment = () => {
-    if (!archiveAppointmentId) return;
-
-    archiveAppointmentMutation.mutate(archiveAppointmentId);
-  };
-
-  const handleUnarchiveAppointment = (appointmentId: string) => {
-    unarchiveAppointmentMutation.mutate(appointmentId);
   };
 
   const handleSelectAll = (checked: boolean) => {
@@ -2065,18 +1997,6 @@ export default function RemindersPage() {
                         )}
                       </PopoverContent>
                     </Popover>
-
-                    <Button
-                      variant={showArchived ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => {
-                        setShowArchived(prev => !prev);
-                      }}
-                      className="flex items-center gap-2"
-                    >
-                      <Archive className="h-4 w-4" />
-                      {showArchived ? 'Viewing Archived' : 'View Archived'}
-                    </Button>
                   </div>
 
                   {/* Bulk Actions */}
@@ -2327,44 +2247,24 @@ export default function RemindersPage() {
                                             </Button>
                                           </DropdownMenuTrigger>
                                           <DropdownMenuContent>
-                                            {!showArchived && (
-                                              <>
-                                                <DropdownMenuItem onClick={() => confirmAppointmentMutation.mutate(appointment.id)}>
-                                                  <CheckCircle className="h-4 w-4 mr-2" />
-                                                  Confirm Appointment
-                                                </DropdownMenuItem>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem onClick={() => sendReminderMutation.mutate({ appointmentIds: [appointment.id] })}>
-                                                  <Send className="h-4 w-4 mr-2" />
-                                                  {t('reminders.actions.sendReminder')}
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => openScheduleReminder(appointment.id)}>
-                                                  <Clock className="h-4 w-4 mr-2" />
-                                                  {t('reminders.actions.scheduleReminder')}
-                                                </DropdownMenuItem>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem onClick={() => handleArchiveAppointment(appointment.id)}>
-                                                  <Archive className="h-4 w-4 mr-2" />
-                                                  Archive
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleCancelAppointment(appointment.id); }}>
-                                                  <Trash2 className="h-4 w-4 mr-2" />
-                                                  Delete
-                                                </DropdownMenuItem>
-                                              </>
-                                            )}
-                                            {showArchived && (
-                                              <>
-                                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleUnarchiveAppointment(appointment.id); }}>
-                                                  <ArchiveRestore className="h-4 w-4 mr-2" />
-                                                  Restore
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleCancelAppointment(appointment.id); }}>
-                                                  <Trash2 className="h-4 w-4 mr-2" />
-                                                  Delete Permanently
-                                                </DropdownMenuItem>
-                                              </>
-                                            )}
+                                            <DropdownMenuItem onClick={() => confirmAppointmentMutation.mutate(appointment.id)}>
+                                              <CheckCircle className="h-4 w-4 mr-2" />
+                                              Confirm Appointment
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={() => sendReminderMutation.mutate({ appointmentIds: [appointment.id] })}>
+                                              <Send className="h-4 w-4 mr-2" />
+                                              {t('reminders.actions.sendReminder')}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => openScheduleReminder(appointment.id)}>
+                                              <Clock className="h-4 w-4 mr-2" />
+                                              {t('reminders.actions.scheduleReminder')}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleCancelAppointment(appointment.id); }}>
+                                              <Trash2 className="h-4 w-4 mr-2" />
+                                              Delete
+                                            </DropdownMenuItem>
                                           </DropdownMenuContent>
                                         </DropdownMenu>
                                       </div>
@@ -2544,44 +2444,24 @@ export default function RemindersPage() {
                                           </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
-                                          {!showArchived && (
-                                            <>
-                                              <DropdownMenuItem onClick={() => confirmAppointmentMutation.mutate(appointment.id)}>
-                                                <CheckCircle className="h-4 w-4 mr-2" />
-                                                Confirm Appointment
-                                              </DropdownMenuItem>
-                                              <DropdownMenuSeparator />
-                                              <DropdownMenuItem onClick={() => sendReminderMutation.mutate({ appointmentIds: [appointment.id] })}>
-                                                <Send className="h-4 w-4 mr-2" />
-                                                {t('reminders.actions.sendReminder')}
-                                              </DropdownMenuItem>
-                                              <DropdownMenuItem onClick={() => openScheduleReminder(appointment.id)}>
-                                                <Clock className="h-4 w-4 mr-2" />
-                                                {t('reminders.actions.scheduleReminder')}
-                                              </DropdownMenuItem>
-                                              <DropdownMenuSeparator />
-                                              <DropdownMenuItem onClick={() => handleArchiveAppointment(appointment.id)}>
-                                                <Archive className="h-4 w-4 mr-2" />
-                                                Archive
-                                              </DropdownMenuItem>
-                                              <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleCancelAppointment(appointment.id); }}>
-                                                <Trash2 className="h-4 w-4 mr-2" />
-                                                Delete
-                                              </DropdownMenuItem>
-                                            </>
-                                          )}
-                                          {showArchived && (
-                                            <>
-                                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleUnarchiveAppointment(appointment.id); }}>
-                                                <ArchiveRestore className="h-4 w-4 mr-2" />
-                                                Restore
-                                              </DropdownMenuItem>
-                                              <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleCancelAppointment(appointment.id); }}>
-                                                <Trash2 className="h-4 w-4 mr-2" />
-                                                Delete Permanently
-                                              </DropdownMenuItem>
-                                            </>
-                                          )}
+                                          <DropdownMenuItem onClick={() => confirmAppointmentMutation.mutate(appointment.id)}>
+                                            <CheckCircle className="h-4 w-4 mr-2" />
+                                            Confirm Appointment
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem onClick={() => sendReminderMutation.mutate({ appointmentIds: [appointment.id] })}>
+                                            <Send className="h-4 w-4 mr-2" />
+                                            {t('reminders.actions.sendReminder')}
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => openScheduleReminder(appointment.id)}>
+                                            <Clock className="h-4 w-4 mr-2" />
+                                            {t('reminders.actions.scheduleReminder')}
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleCancelAppointment(appointment.id); }}>
+                                            <Trash2 className="h-4 w-4 mr-2" />
+                                            Delete
+                                          </DropdownMenuItem>
                                         </DropdownMenuContent>
                                       </DropdownMenu>
                                     </div>
@@ -3538,46 +3418,6 @@ export default function RemindersPage() {
                   disabled={cancelAppointmentMutation.isPending}
                 >
                   {cancelAppointmentMutation.isPending ? 'Deleting...' : 'Delete'}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Archive Appointment Confirmation Modal */}
-        <Dialog open={archiveConfirmModalOpen} onOpenChange={setArchiveConfirmModalOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Archive className="h-5 w-5" />
-                Archive Appointment
-              </DialogTitle>
-              <DialogDescription>
-                This appointment will be moved to the archive. You can restore it later if needed.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                <p className="font-medium">{appointments.find(apt => apt.id === archiveAppointmentId)?.title}</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {getCustomerName(appointments.find(apt => apt.id === archiveAppointmentId)?.customer)}
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-500">
-                  {archiveAppointmentId && formatDateTime(appointments.find(apt => apt.id === archiveAppointmentId)?.appointmentDate || new Date())}
-                </p>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => {
-                  setArchiveConfirmModalOpen(false);
-                  setArchiveAppointmentId("");
-                }}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={confirmArchiveAppointment}
-                  disabled={archiveAppointmentMutation.isPending}
-                >
-                  {archiveAppointmentMutation.isPending ? 'Archiving...' : 'Archive'}
                 </Button>
               </div>
             </div>

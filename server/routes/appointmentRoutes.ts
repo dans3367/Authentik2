@@ -93,19 +93,12 @@ router.get('/', async (req: Request, res: Response) => {
     res.set('Pragma', 'no-cache');
     res.set('Expires', '0');
 
-    const { search, status, customerId, dateFrom, dateTo, serviceType, archived } = req.query;
+    const { search, status, customerId, dateFrom, dateTo, serviceType } = req.query;
     const user = (req as any).user;
     const tenantId = user.tenantId;
 
     // Build where conditions
     const conditions = [eq(appointments.tenantId, tenantId)];
-
-    // Filter by archived status - by default show non-archived, use archived=true to show archived only, archived=all to show all
-    if (archived === 'true') {
-      conditions.push(eq(appointments.isArchived, true));
-    } else if (archived !== 'all') {
-      conditions.push(eq(appointments.isArchived, false));
-    }
 
     if (status && status !== 'all') {
       conditions.push(eq(appointments.status, status as string));
@@ -311,8 +304,24 @@ router.post('/', async (req: Request, res: Response) => {
       })
       .returning();
 
+    // Fetch customer data if customerId exists to match GET response structure
+    let appointmentCustomer = null;
+    if (newAppointment[0].customerId) {
+      const customerData = await db
+        .select({
+          id: emailContacts.id,
+          email: emailContacts.email,
+          firstName: emailContacts.firstName,
+          lastName: emailContacts.lastName,
+        })
+        .from(emailContacts)
+        .where(eq(emailContacts.id, newAppointment[0].customerId))
+        .limit(1);
+      appointmentCustomer = customerData[0] || null;
+    }
+
     res.status(201).json({
-      appointment: newAppointment[0],
+      appointment: { ...newAppointment[0], customer: appointmentCustomer },
       message: 'Appointment created successfully'
     });
   } catch (error) {
@@ -471,90 +480,6 @@ router.patch('/:id', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Failed to update appointment:', error);
     res.status(500).json({ error: 'Failed to update appointment' });
-  }
-});
-
-// POST /api/appointments/:id/archive - Archive appointment
-router.post('/:id/archive', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const user = (req as any).user;
-    const tenantId = user.tenantId;
-
-    // Check if appointment exists and belongs to tenant
-    const existingAppointment = await db
-      .select()
-      .from(appointments)
-      .where(and(
-        eq(appointments.id, id),
-        eq(appointments.tenantId, tenantId)
-      ))
-      .limit(1);
-
-    if (existingAppointment.length === 0) {
-      return res.status(404).json({ error: 'Appointment not found' });
-    }
-
-    // Archive the appointment
-    const archivedAppointment = await db
-      .update(appointments)
-      .set({
-        isArchived: true,
-        archivedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(appointments.id, id))
-      .returning();
-
-    res.json({
-      appointment: archivedAppointment[0],
-      message: 'Appointment archived successfully'
-    });
-  } catch (error) {
-    console.error('Failed to archive appointment:', error);
-    res.status(500).json({ error: 'Failed to archive appointment' });
-  }
-});
-
-// POST /api/appointments/:id/unarchive - Unarchive appointment
-router.post('/:id/unarchive', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const user = (req as any).user;
-    const tenantId = user.tenantId;
-
-    // Check if appointment exists and belongs to tenant
-    const existingAppointment = await db
-      .select()
-      .from(appointments)
-      .where(and(
-        eq(appointments.id, id),
-        eq(appointments.tenantId, tenantId)
-      ))
-      .limit(1);
-
-    if (existingAppointment.length === 0) {
-      return res.status(404).json({ error: 'Appointment not found' });
-    }
-
-    // Unarchive the appointment
-    const unarchivedAppointment = await db
-      .update(appointments)
-      .set({
-        isArchived: false,
-        archivedAt: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(appointments.id, id))
-      .returning();
-
-    res.json({
-      appointment: unarchivedAppointment[0],
-      message: 'Appointment unarchived successfully'
-    });
-  } catch (error) {
-    console.error('Failed to unarchive appointment:', error);
-    res.status(500).json({ error: 'Failed to unarchive appointment' });
   }
 });
 
