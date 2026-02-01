@@ -303,11 +303,6 @@ export default function RemindersPage() {
   // Create scheduled reminder mutation
   const createScheduledReminderMutation = useMutation({
     mutationFn: async ({ appointmentId, data }: { appointmentId: string; data: { reminderType: 'email' | 'sms' | 'push'; reminderTiming: 'now' | '5m' | '30m' | '1h' | '5h' | '10h' | 'custom'; customMinutesBefore?: number; scheduledFor: Date; timezone?: string; content?: string } }) => {
-      // Add to pending reminders set
-      if (isMountedRef.current) {
-        setPendingReminderAppointmentIds(prev => new Set(prev).add(appointmentId));
-      }
-      
       const response = await apiRequest('POST', '/api/appointment-reminders', {
         appointmentId,
         reminderType: data.reminderType,
@@ -319,20 +314,30 @@ export default function RemindersPage() {
       });
       return response.json();
     },
+    onMutate: async (variables) => {
+      // Add to pending reminders set before the API call
+      if (isMountedRef.current) {
+        setPendingReminderAppointmentIds(prev => new Set(prev).add(variables.appointmentId));
+      }
+    },
     onSuccess: async (_data, variables) => {
       toast({ title: t('reminders.toasts.success'), description: t('reminders.toasts.reminderScheduled') });
       setScheduleReminderModalOpen(false);
       setScheduleAppointmentId("");
       
-      // Refetch reminders and wait for it to complete before removing pending state
-      await refetchReminders();
+      // Refetch reminders with error handling
+      try {
+        await refetchReminders();
+      } catch (error) {
+        console.error('Failed to refetch reminders:', error);
+      }
       
       // Invalidate appointments queries to refresh the list with updated reminder status
       queryClient.invalidateQueries({ 
         predicate: (query) => query.queryKey[0] === '/api/appointments' 
       });
       
-      // Remove from pending reminders set after data is refreshed
+      // Remove from pending reminders set (this will always execute even if refetch fails)
       if (isMountedRef.current) {
         setPendingReminderAppointmentIds(prev => {
           const next = new Set(prev);
@@ -1345,16 +1350,16 @@ export default function RemindersPage() {
     const shouldCreateReminder = newAppointmentReminderEnabled;
     const reminderSettings = { ...newAppointmentReminderData };
     
-    // Close modal immediately
-    setNewAppointmentModalOpen(false);
-    resetNewAppointmentData();
-    
     // Pass reminder data with mutation
     createAppointmentMutation.mutate({
       appointmentData: newAppointmentData,
       createReminder: shouldCreateReminder,
       reminderSettings: reminderSettings
     });
+    
+    // Close modal and reset form after mutation is initiated
+    setNewAppointmentModalOpen(false);
+    resetNewAppointmentData();
   };
 
   const confirmPastDateAppointment = () => {
@@ -1364,16 +1369,16 @@ export default function RemindersPage() {
     const shouldCreateReminder = newAppointmentReminderEnabled;
     const reminderSettings = { ...newAppointmentReminderData };
     
-    // Close modal immediately
-    setNewAppointmentModalOpen(false);
-    resetNewAppointmentData();
-    
     // Pass reminder data with mutation
     createAppointmentMutation.mutate({
       appointmentData: newAppointmentData,
       createReminder: shouldCreateReminder,
       reminderSettings: reminderSettings
     });
+    
+    // Close modal and reset form after mutation is initiated
+    setNewAppointmentModalOpen(false);
+    resetNewAppointmentData();
   };
 
   const handleSendReminders = () => {
