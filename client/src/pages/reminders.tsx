@@ -314,17 +314,48 @@ export default function RemindersPage() {
       });
       return response.json();
     },
-    onSuccess: () => {
+    onMutate: async (variables) => {
+      // Add to pending reminders set before the API call
+      if (isMountedRef.current) {
+        setPendingReminderAppointmentIds(prev => new Set(prev).add(variables.appointmentId));
+      }
+    },
+    onSuccess: async (_data, variables) => {
       toast({ title: t('reminders.toasts.success'), description: t('reminders.toasts.reminderScheduled') });
       setScheduleReminderModalOpen(false);
       setScheduleAppointmentId("");
-      refetchReminders();
+      
+      // Refetch reminders with error handling
+      try {
+        await refetchReminders();
+      } catch (error) {
+        console.error('Failed to refetch reminders:', error);
+      }
+      
       // Invalidate appointments queries to refresh the list with updated reminder status
       queryClient.invalidateQueries({ 
         predicate: (query) => query.queryKey[0] === '/api/appointments' 
       });
+      
+      // Remove from pending reminders set (this will always execute even if refetch fails)
+      if (isMountedRef.current) {
+        setPendingReminderAppointmentIds(prev => {
+          const next = new Set(prev);
+          next.delete(variables.appointmentId);
+          return next;
+        });
+      }
     },
-    onError: (error: any) => {
+    onError: (error: any, variables) => {
+      // Remove from pending reminders set on error
+      if (isMountedRef.current) {
+        setPendingReminderAppointmentIds(prev => {
+          const next = new Set(prev);
+          next.delete(variables.appointmentId);
+          return next;
+        });
+      }
+      
       toast({ title: t('reminders.toasts.error'), description: error?.message || t('reminders.toasts.reminderScheduleError'), variant: 'destructive' });
     }
   });
@@ -365,6 +396,8 @@ export default function RemindersPage() {
 
   // Track newly created appointments that are still syncing (for optimistic UI)
   const [pendingAppointmentIds, setPendingAppointmentIds] = useState<Set<string>>(new Set());
+  // Track appointments that are awaiting reminder updates
+  const [pendingReminderAppointmentIds, setPendingReminderAppointmentIds] = useState<Set<string>>(new Set());
   const isMountedRef = useRef(true);
 
   // Cleanup pendingAppointmentIds on unmount to prevent memory leaks
@@ -373,6 +406,7 @@ export default function RemindersPage() {
     return () => {
       isMountedRef.current = false;
       setPendingAppointmentIds(new Set());
+      setPendingReminderAppointmentIds(new Set());
     };
   }, []);
 
@@ -761,11 +795,13 @@ export default function RemindersPage() {
 
   // Create appointment mutation with optimistic updates
   const createAppointmentMutation = useMutation({
-    mutationFn: async (appointmentData: any) => {
-      const response = await apiRequest('POST', '/api/appointments', appointmentData);
+    mutationFn: async (params: { appointmentData: any; createReminder: boolean; reminderSettings: any }) => {
+      const response = await apiRequest('POST', '/api/appointments', params.appointmentData);
       return response.json();
     },
-    onMutate: async (appointmentData: any) => {
+    onMutate: async (params: { appointmentData: any; createReminder: boolean; reminderSettings: any }) => {
+      const { appointmentData } = params;
+      
       // Validate customer exists before proceeding with optimistic update
       const selectedCustomer = customers.find(c => c.id === appointmentData.customerId);
       if (!selectedCustomer) {
@@ -814,7 +850,7 @@ export default function RemindersPage() {
 
       return { previousAppointments, tempId };
     },
-    onSuccess: (data, _variables, context) => {
+    onSuccess: (data, variables, context) => {
       toast({
         title: t('reminders.toasts.success'),
         description: t('reminders.toasts.appointmentCreated'),
@@ -852,15 +888,16 @@ export default function RemindersPage() {
         });
       }
 
-      // Schedule reminder if enabled
-      if (newAppointmentReminderEnabled && data.appointment) {
+      // Schedule reminder if enabled (use captured settings from variables)
+      if (variables.createReminder && data.appointment) {
         const appointmentDate = new Date(data.appointment.appointmentDate);
+        const reminderSettings = variables.reminderSettings;
         let scheduledFor: Date;
 
-        if (newAppointmentReminderData.reminderTiming === 'now') {
+        if (reminderSettings.reminderTiming === 'now') {
           scheduledFor = new Date();
-        } else if (newAppointmentReminderData.reminderTiming === 'custom' && newAppointmentReminderData.customMinutesBefore) {
-          scheduledFor = new Date(appointmentDate.getTime() - newAppointmentReminderData.customMinutesBefore * 60 * 1000);
+        } else if (reminderSettings.reminderTiming === 'custom' && reminderSettings.customMinutesBefore) {
+          scheduledFor = new Date(appointmentDate.getTime() - reminderSettings.customMinutesBefore * 60 * 1000);
         } else {
           const timingMap: Record<string, number> = {
             '5m': 5,
@@ -869,37 +906,23 @@ export default function RemindersPage() {
             '5h': 300,
             '10h': 600,
           };
-          const minutes = timingMap[newAppointmentReminderData.reminderTiming] || 60;
+          const minutes = timingMap[reminderSettings.reminderTiming] || 60;
           scheduledFor = new Date(appointmentDate.getTime() - minutes * 60 * 1000);
         }
 
-        // Create reminder but don't close modal if it fails
+        // Create reminder in background (modal already closed)
         createScheduledReminderMutation.mutate({
           appointmentId: data.appointment.id,
           data: {
-            reminderType: newAppointmentReminderData.reminderType,
-            reminderTiming: newAppointmentReminderData.reminderTiming,
-            customMinutesBefore: newAppointmentReminderData.customMinutesBefore,
+            reminderType: reminderSettings.reminderType,
+            reminderTiming: reminderSettings.reminderTiming,
+            customMinutesBefore: reminderSettings.customMinutesBefore,
             scheduledFor,
-            timezone: newAppointmentReminderData.timezone,
-            content: newAppointmentReminderData.content,
+            timezone: reminderSettings.timezone,
+            content: reminderSettings.content,
           },
-        }, {
-          onError: () => {
-            // Don't close modal on reminder error, let user try again
-            return;
-          },
-          onSuccess: () => {
-            // Only close modal after both appointment and reminder are created successfully
-            setNewAppointmentModalOpen(false);
-            resetNewAppointmentData();
-          }
         });
-        return; // Don't close modal yet, wait for reminder creation result
       }
-
-      setNewAppointmentModalOpen(false);
-      resetNewAppointmentData();
     },
     onError: (error: any, _variables, context) => {
       // Rollback optimistic update on error
@@ -1323,12 +1346,39 @@ export default function RemindersPage() {
       return;
     }
 
-    createAppointmentMutation.mutate(newAppointmentData);
+    // Capture reminder settings before resetting form
+    const shouldCreateReminder = newAppointmentReminderEnabled;
+    const reminderSettings = { ...newAppointmentReminderData };
+    
+    // Pass reminder data with mutation
+    createAppointmentMutation.mutate({
+      appointmentData: newAppointmentData,
+      createReminder: shouldCreateReminder,
+      reminderSettings: reminderSettings
+    });
+    
+    // Close modal and reset form after mutation is initiated
+    setNewAppointmentModalOpen(false);
+    resetNewAppointmentData();
   };
 
   const confirmPastDateAppointment = () => {
     setPastDateConfirmModalOpen(false);
-    createAppointmentMutation.mutate(newAppointmentData);
+    
+    // Capture reminder settings before resetting form
+    const shouldCreateReminder = newAppointmentReminderEnabled;
+    const reminderSettings = { ...newAppointmentReminderData };
+    
+    // Pass reminder data with mutation
+    createAppointmentMutation.mutate({
+      appointmentData: newAppointmentData,
+      createReminder: shouldCreateReminder,
+      reminderSettings: reminderSettings
+    });
+    
+    // Close modal and reset form after mutation is initiated
+    setNewAppointmentModalOpen(false);
+    resetNewAppointmentData();
   };
 
   const handleSendReminders = () => {
@@ -2240,7 +2290,12 @@ export default function RemindersPage() {
                                     </TableCell>
                                     <TableCell>
                                       <div className="flex items-center gap-2">
-                                        {(() => {
+                                        {(isPending || pendingReminderAppointmentIds.has(appointment.id)) ? (
+                                          <div className="flex items-center gap-1 text-blue-600">
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            <span className="text-sm">Loading...</span>
+                                          </div>
+                                        ) : (() => {
                                           // Check reminder records for this appointment
                                           const appointmentReminders = reminders.filter(r => r.appointmentId === appointment.id);
                                           const hasSentReminder = appointmentReminders.some(r => r.status === 'sent') || appointment.reminderSent;
@@ -2433,7 +2488,12 @@ export default function RemindersPage() {
 
                                       {/* Reminder status */}
                                       <div className="flex items-center gap-2">
-                                        {(() => {
+                                        {(isPending || pendingReminderAppointmentIds.has(appointment.id)) ? (
+                                          <div className="flex items-center gap-1 text-blue-600">
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            <span className="text-sm">Loading...</span>
+                                          </div>
+                                        ) : (() => {
                                           const appointmentReminders = reminders.filter(r => r.appointmentId === appointment.id);
                                           const hasSentReminder = appointmentReminders.some(r => r.status === 'sent') || appointment.reminderSent;
                                           const hasPendingReminder = appointmentReminders.some(r => r.status === 'pending');
