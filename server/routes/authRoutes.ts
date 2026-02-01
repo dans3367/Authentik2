@@ -244,13 +244,6 @@ authRoutes.post("/avatar", authenticateToken, (req: any, res) => {
         where: eq(betterAuthUser.id, userId)
       });
 
-      // Delete old avatar if exists
-      if (currentUser?.avatarUrl) {
-        await deleteImageFromR2(currentUser.avatarUrl).catch(err => {
-          console.warn('Failed to delete old avatar:', err);
-        });
-      }
-
       // Optimize image using sharp before upload
       let optimized;
       try {
@@ -282,6 +275,13 @@ authRoutes.post("/avatar", authenticateToken, (req: any, res) => {
 
       if (updatedUser.length === 0) {
         return res.status(404).json({ success: false, error: 'User not found' });
+      }
+
+      // Delete old avatar after successful update (safe rollback)
+      if (currentUser?.avatarUrl) {
+        await deleteImageFromR2(currentUser.avatarUrl).catch(err => {
+          console.warn('Failed to delete old avatar:', err);
+        });
       }
 
       console.log('✅ [Avatar] Successfully uploaded avatar for user:', userId);

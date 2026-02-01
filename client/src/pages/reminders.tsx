@@ -1345,7 +1345,9 @@ export default function RemindersPage() {
   const mergeDateAndTime = (current: Date, nextDate?: string, nextTime?: string) => {
     const datePart = nextDate ?? toLocalDateString(current);
     const timePart = nextTime ?? toLocalTimeString(current);
-    return new Date(`${datePart}T${timePart}`);
+    const merged = new Date(`${datePart}T${timePart}`);
+    // Return current date if the merged result is invalid (e.g., partial time input)
+    return isNaN(merged.getTime()) ? current : merged;
   };
 
   // Check if all appointments are selected
