@@ -60,14 +60,12 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       '00000000-0000-0000-0000-000000000000',
     ];
 
-    // Use default tenant as fallback for users with placeholder/missing tenant
-    // This allows them to log in, but they should be fixed via admin tools
-    let finalTenantId = userRecord.tenantId || '29c69b4f-3129-4aa4-a475-7bf892e5c5b9';
+    let finalTenantId = userRecord.tenantId;
 
     if (!userRecord.tenantId || placeholderTenantIds.includes(userRecord.tenantId)) {
-      console.log('⚠️  [Auth] WARNING: User has placeholder tenant ID:', userRecord.tenantId, 'Email:', userRecord.email);
-      console.log('⚠️  [Auth] Using default tenant as fallback. This user should be fixed!');
-      finalTenantId = '29c69b4f-3129-4aa4-a475-7bf892e5c5b9';
+      console.log('⚠️  [Auth] WARNING: User has placeholder/missing tenant ID:', userRecord.tenantId, 'Email:', userRecord.email);
+      // We no longer provide a fallback. This will likely cause downstream failures if the route requires a tenant,
+      // which is the intended stricter behavior.
     }
 
     // Create authenticated user object using Better Auth session data
@@ -148,8 +146,8 @@ export const requireTenant = (req: AuthRequest, res: Response, next: NextFunctio
   const uuidRegexExact = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   const uuidRegexExtract = /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i;
 
-  // Check if it's a perfect UUID or the default tenant ID
-  if (uuidRegexExact.test(req.user.tenantId) || req.user.tenantId === '29c69b4f-3129-4aa4-a475-7bf892e5c5b9') {
+  // Check if it's a perfect UUID
+  if (uuidRegexExact.test(req.user.tenantId)) {
     // Valid tenant ID, continue
   } else {
     // Check if tenant ID contains a valid UUID (e.g., "tenant-owner2-uuid-here")
@@ -195,8 +193,8 @@ export const requireValidTenant = async (req: AuthRequest, res: Response, next: 
   const uuidRegexExact = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   const uuidRegexExtract = /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i;
 
-  // Check if it's a perfect UUID or the default tenant ID
-  if (uuidRegexExact.test(req.user.tenantId) || req.user.tenantId === '29c69b4f-3129-4aa4-a475-7bf892e5c5b9') {
+  // Check if it's a perfect UUID
+  if (uuidRegexExact.test(req.user.tenantId)) {
     // Valid tenant ID, continue
   } else {
     // Check if tenant ID contains a valid UUID (e.g., "tenant-owner2-uuid-here")
@@ -214,31 +212,29 @@ export const requireValidTenant = async (req: AuthRequest, res: Response, next: 
     }
   }
 
-  // Skip tenant existence check for default tenant (for development/testing)
-  if (req.user.tenantId !== '29c69b4f-3129-4aa4-a475-7bf892e5c5b9') {
-    try {
-      // Verify tenant exists in database
-      const tenant = await db.query.tenants.findFirst({
-        where: eq(tenants.id, req.user.tenantId),
+  // Verify tenant exists in database
+  try {
+    // Verify tenant exists in database
+    const tenant = await db.query.tenants.findFirst({
+      where: eq(tenants.id, req.user.tenantId),
+    });
+
+    if (!tenant) {
+      return res.status(404).json({
+        message: 'Tenant not found',
+        tenantId: req.user.tenantId
       });
-
-      if (!tenant) {
-        return res.status(404).json({
-          message: 'Tenant not found',
-          tenantId: req.user.tenantId
-        });
-      }
-
-      if (!tenant.isActive) {
-        return res.status(403).json({
-          message: 'Tenant is inactive',
-          tenantId: req.user.tenantId
-        });
-      }
-    } catch (error) {
-      console.error('Tenant validation error:', error);
-      return res.status(500).json({ message: 'Tenant validation failed' });
     }
+
+    if (!tenant.isActive) {
+      return res.status(403).json({
+        message: 'Tenant is inactive',
+        tenantId: req.user.tenantId
+      });
+    }
+  } catch (error) {
+    console.error('Tenant validation error:', error);
+    return res.status(500).json({ message: 'Tenant validation failed' });
   }
 
   // Add tenant context to request for easier access in route handlers
