@@ -276,11 +276,11 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
 
                   <div className="mt-4 pt-4 border-t text-xs text-muted-foreground">
                     <div className="space-y-1">
-                      {plan.maxUsers && <div>{t('profile.subscription.upTo')} {plan.maxUsers} {t('profile.subscription.users')}</div>}
-                      {plan.maxShops && <div>{t('profile.subscription.upTo')} {plan.maxShops} {t('profile.subscription.shops')}</div>}
-                      {plan.maxProjects && <div>{t('profile.subscription.upTo')} {plan.maxProjects} {t('profile.subscription.projects')}</div>}
-                      {plan.storageLimit && <div>{plan.storageLimit}GB {t('profile.subscription.storage')}</div>}
-                      <div className="capitalize">{plan.supportLevel} {t('profile.subscription.support')}</div>
+                      {plan.maxUsers && <div>{t('profile.subscription.maxUsers', { count: plan.maxUsers })}</div>}
+                      {plan.maxShops && <div>{t('profile.subscription.maxShops', { count: plan.maxShops })}</div>}
+                      {plan.maxProjects && <div>{t('profile.subscription.maxProjects', { count: plan.maxProjects })}</div>}
+                      {plan.storageLimit && <div>{t('profile.subscription.storageLimit', { size: plan.storageLimit })}</div>}
+                      <div className="capitalize">{t('profile.subscription.supportLevel', { level: plan.supportLevel })}</div>
                     </div>
                   </div>
                 </CardContent>
