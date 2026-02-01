@@ -274,6 +274,48 @@ webhookRoutes.post("/postmark", async (req, res) => {
   }
 });
 
+// Helper function to resolve tenant ID from webhook data
+async function resolveTenantId(data: any): Promise<string | null> {
+  try {
+    const metadata = data.metadata || data.Metadata;
+
+    // 1. Check for tenantId in metadata
+    if (metadata?.tenantId) return metadata.tenantId;
+    if (data.tenantId) return data.tenantId;
+    if (data.TenantId) return data.TenantId;
+
+    // 2. Check for newsletterId
+    const newsletterId = data.newsletterId || metadata?.newsletterId || data.NewsletterId;
+    if (newsletterId) {
+      const newsletter = await db.query.newsletters.findFirst({
+        where: sql`${schema.newsletters.id} = ${newsletterId}`,
+        columns: { tenantId: true }
+      });
+      if (newsletter) return newsletter.tenantId;
+    }
+
+    // 3. Check for campaignId
+    const campaignId = data.campaignId || metadata?.campaignId || data.CampaignId;
+    if (campaignId) {
+      const campaign = await db.query.campaigns.findFirst({
+        where: sql`${schema.campaigns.id} = ${campaignId}`,
+        columns: { tenantId: true }
+      });
+      if (campaign) return campaign.tenantId;
+    }
+
+    // 4. Fallback to default tenant ID if configured
+    if (process.env.DEFAULT_TENANT_ID) {
+      return process.env.DEFAULT_TENANT_ID;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error resolving tenant ID:', error);
+    return null;
+  }
+}
+
 // Helper functions for webhook event handling
 async function handleEmailSent(data: any) {
   try {
@@ -288,10 +330,17 @@ async function handleEmailSent(data: any) {
 
     console.log(`Processing sent event for: ${recipientEmail}`);
 
+    // Resolve tenant ID
+    const tenantId = await resolveTenantId(data);
+    if (!tenantId) {
+      console.error(`Could not resolve tenant ID for email: ${recipientEmail}`);
+      return;
+    }
+
     // Find the contact record
-    const contact = await findContactByEmail(recipientEmail);
+    const contact = await findContactByEmail(recipientEmail, tenantId);
     if (!contact) {
-      console.log(`Contact not found for email: ${recipientEmail}`);
+      console.log(`Contact not found for email: ${recipientEmail} in tenant: ${tenantId}`);
       return;
     }
 
@@ -299,7 +348,7 @@ async function handleEmailSent(data: any) {
     await updateContactMetrics(contact.id, 'sent');
 
     // Create email activity record
-    await createEmailActivity(contact.id, data, 'sent', recipientEmail);
+    await createEmailActivity(contact.id, data, 'sent', recipientEmail, tenantId);
 
     // Update newsletter statistics if newsletterId is provided
     if (data.newsletterId) {
@@ -324,10 +373,17 @@ async function handleEmailDelivered(data: any) {
 
     console.log(`Processing delivered event for: ${recipientEmail}`);
 
+    // Resolve tenant ID
+    const tenantId = await resolveTenantId(data);
+    if (!tenantId) {
+      console.error(`Could not resolve tenant ID for email: ${recipientEmail}`);
+      return;
+    }
+
     // Find the contact record
-    const contact = await findContactByEmail(recipientEmail);
+    const contact = await findContactByEmail(recipientEmail, tenantId);
     if (!contact) {
-      console.log(`Contact not found for email: ${recipientEmail}`);
+      console.log(`Contact not found for email: ${recipientEmail} in tenant: ${tenantId}`);
       return;
     }
 
@@ -335,7 +391,7 @@ async function handleEmailDelivered(data: any) {
     await updateContactMetrics(contact.id, 'delivered');
 
     // Create email activity record
-    await createEmailActivity(contact.id, data, 'delivered', recipientEmail);
+    await createEmailActivity(contact.id, data, 'delivered', recipientEmail, tenantId);
 
     // Update newsletter statistics if newsletterId is provided
     if (data.newsletterId) {
@@ -421,10 +477,17 @@ async function handleEmailOpened(data: any) {
 
     console.log(`Processing opened event for: ${recipientEmail}`);
 
+    // Resolve tenant ID
+    const tenantId = await resolveTenantId(data);
+    if (!tenantId) {
+      console.error(`Could not resolve tenant ID for email: ${recipientEmail}`);
+      return;
+    }
+
     // Find the contact record
-    const contact = await findContactByEmail(recipientEmail);
+    const contact = await findContactByEmail(recipientEmail, tenantId);
     if (!contact) {
-      console.log(`Contact not found for email: ${recipientEmail}`);
+      console.log(`Contact not found for email: ${recipientEmail} in tenant: ${tenantId}`);
       return;
     }
 
@@ -432,7 +495,7 @@ async function handleEmailOpened(data: any) {
     await updateContactMetrics(contact.id, 'opened');
 
     // Create email activity record
-    await createEmailActivity(contact.id, data, 'opened', recipientEmail);
+    await createEmailActivity(contact.id, data, 'opened', recipientEmail, tenantId);
 
     // Update newsletter statistics if newsletterId is provided
     if (data.newsletterId) {
@@ -456,10 +519,17 @@ async function handleEmailClicked(data: any) {
 
     console.log(`Processing clicked event for: ${recipientEmail}`);
 
+    // Resolve tenant ID
+    const tenantId = await resolveTenantId(data);
+    if (!tenantId) {
+      console.error(`Could not resolve tenant ID for email: ${recipientEmail}`);
+      return;
+    }
+
     // Find the contact record
-    const contact = await findContactByEmail(recipientEmail);
+    const contact = await findContactByEmail(recipientEmail, tenantId);
     if (!contact) {
-      console.log(`Contact not found for email: ${recipientEmail}`);
+      console.log(`Contact not found for email: ${recipientEmail} in tenant: ${tenantId}`);
       return;
     }
 
@@ -467,7 +537,7 @@ async function handleEmailClicked(data: any) {
     await updateContactMetrics(contact.id, 'clicked');
 
     // Create email activity record
-    await createEmailActivity(contact.id, data, 'clicked', recipientEmail);
+    await createEmailActivity(contact.id, data, 'clicked', recipientEmail, tenantId);
 
     // Update newsletter statistics if newsletterId is provided
     if (data.newsletterId) {
@@ -522,12 +592,8 @@ function extractRecipientEmail(data: any): string | null {
 }
 
 // Helper function to find contact by email
-async function findContactByEmail(email: string) {
+async function findContactByEmail(email: string, tenantId: string) {
   try {
-    // Get tenant ID from environment or request context
-    // For now, using default tenant ID - this should be improved to handle multi-tenancy properly
-    const tenantId = process.env.DEFAULT_TENANT_ID || '991c761b-bc2e-40c4-ac8e-aa9391f58eef';
-
     const contact = await db.query.emailContacts.findFirst({
       where: sql`${schema.emailContacts.email} = ${email} AND ${schema.emailContacts.tenantId} = ${tenantId}`,
     });
@@ -575,11 +641,8 @@ async function updateContactMetrics(contactId: string, activityType: string) {
 }
 
 // Helper function to create email activity record
-async function createEmailActivity(contactId: string, webhookData: any, activityType: string, recipientEmail: string) {
+async function createEmailActivity(contactId: string, webhookData: any, activityType: string, recipientEmail: string, tenantId: string) {
   try {
-    // Get tenant ID from environment or request context
-    const tenantId = process.env.DEFAULT_TENANT_ID || '991c761b-bc2e-40c4-ac8e-aa9391f58eef';
-
     // Extract additional data from webhook
     const userAgent = webhookData.user_agent || webhookData.UserAgent;
     const ipAddress = webhookData.ip_address || webhookData.IPAddress;
