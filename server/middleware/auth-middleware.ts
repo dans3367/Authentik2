@@ -27,7 +27,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     const session = await auth.api.getSession({
       headers: req.headers as any
     });
-    
+
     console.log('🔍 [Auth] Session result:', !!session, session?.user?.id);
 
     if (!session) {
@@ -45,9 +45,11 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     }
 
     // Parse user name for firstName/lastName
-    let firstName: string | undefined;
-    let lastName: string | undefined;
-    if (userRecord.name) {
+    let firstName: string | undefined = userRecord.firstName || undefined;
+    let lastName: string | undefined = userRecord.lastName || undefined;
+
+    // Fallback to parsing name if fields are missing
+    if (!firstName && !lastName && userRecord.name) {
       const nameParts = userRecord.name.split(' ');
       firstName = nameParts[0];
       lastName = nameParts.slice(1).join(' ') || undefined;
@@ -57,11 +59,11 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     const placeholderTenantIds = [
       '00000000-0000-0000-0000-000000000000',
     ];
-    
+
     // Use default tenant as fallback for users with placeholder/missing tenant
     // This allows them to log in, but they should be fixed via admin tools
     let finalTenantId = userRecord.tenantId || '29c69b4f-3129-4aa4-a475-7bf892e5c5b9';
-    
+
     if (!userRecord.tenantId || placeholderTenantIds.includes(userRecord.tenantId)) {
       console.log('⚠️  [Auth] WARNING: User has placeholder tenant ID:', userRecord.tenantId, 'Email:', userRecord.email);
       console.log('⚠️  [Auth] Using default tenant as fallback. This user should be fixed!');
@@ -97,7 +99,7 @@ export const requireRole = (requiredRole: string | string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     console.log('🔍 [Role] requireRole middleware called, required:', requiredRole);
     console.log('🔍 [Role] req.user exists:', !!req.user, 'role:', req.user?.role);
-    
+
     if (!req.user) {
       console.error('❌ [Role] req.user is undefined in requireRole!');
       return res.status(401).json({ message: 'Authentication required' });
@@ -112,10 +114,10 @@ export const requireRole = (requiredRole: string | string[]) => {
     };
 
     const userRoleLevel = roleHierarchy[req.user.role as keyof typeof roleHierarchy] || 0;
-    
+
     // Handle both single role and array of roles
     const requiredRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
-    
+
     // Check if user's role is in the list of required roles or has higher hierarchy
     const hasAccess = requiredRoles.some(role => {
       const requiredRoleLevel = roleHierarchy[role as keyof typeof roleHierarchy] || 0;

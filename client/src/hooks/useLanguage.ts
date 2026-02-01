@@ -46,7 +46,7 @@ export function useLanguage() {
   // Mutation to update language preference in the database
   const updateLanguageMutation = useMutation({
     mutationFn: async (language: SupportedLanguage) => {
-      const response = await apiRequest('PATCH', '/api/user/profile', {
+      const response = await apiRequest('PATCH', '/api/users/profile', {
         language,
       });
       return response.json();
