@@ -374,6 +374,9 @@ export default function RemindersPage() {
   // Past date confirmation state
   const [pastDateConfirmModalOpen, setPastDateConfirmModalOpen] = useState(false);
 
+  // Track newly created appointments that are still syncing (for optimistic UI)
+  const [pendingAppointmentIds, setPendingAppointmentIds] = useState<Set<string>>(new Set());
+
   // Fetch appointments - no date filtering on server, only archived filter
   // All date filtering is done client-side to ensure both upcoming and past tabs
   // have access to all appointment data
@@ -739,21 +742,104 @@ export default function RemindersPage() {
     },
   });
 
-  // Create appointment mutation
+  // Create appointment mutation with optimistic updates
   const createAppointmentMutation = useMutation({
     mutationFn: async (appointmentData: any) => {
       const response = await apiRequest('POST', '/api/appointments', appointmentData);
       return response.json();
     },
-    onSuccess: (data) => {
+    onMutate: async (appointmentData: any) => {
+      // Cancel any outgoing refetches to avoid overwriting optimistic update
+      await queryClient.cancelQueries({ queryKey: ['/api/appointments', showArchived] });
+      await queryClient.cancelQueries({ queryKey: ['/api/appointments/upcoming'] });
+
+      // Snapshot previous values
+      const previousAppointments = queryClient.getQueryData<{ appointments: Appointment[] }>(['/api/appointments', showArchived]);
+      const previousUpcoming = queryClient.getQueryData<{ appointments: Appointment[] }>(['/api/appointments/upcoming']);
+
+      // Create optimistic appointment with temporary ID
+      const tempId = `temp-${Date.now()}`;
+      const selectedCustomer = customers.find(c => c.id === appointmentData.customerId);
+      const optimisticAppointment: Appointment = {
+        id: tempId,
+        customerId: appointmentData.customerId,
+        title: appointmentData.title,
+        description: appointmentData.description,
+        appointmentDate: new Date(appointmentData.appointmentDate),
+        duration: appointmentData.duration,
+        location: appointmentData.location,
+        serviceType: appointmentData.serviceType,
+        status: appointmentData.status || 'scheduled',
+        notes: appointmentData.notes,
+        reminderSent: false,
+        confirmationReceived: false,
+        customer: selectedCustomer,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      // Add to pending set for loading indicator
+      setPendingAppointmentIds(prev => new Set(prev).add(tempId));
+
+      // Optimistically update cache
+      queryClient.setQueryData<{ appointments: Appointment[] }>(
+        ['/api/appointments', showArchived],
+        (old) => ({
+          appointments: old?.appointments ? [optimisticAppointment, ...old.appointments] : [optimisticAppointment],
+        })
+      );
+      queryClient.setQueryData<{ appointments: Appointment[] }>(
+        ['/api/appointments/upcoming'],
+        (old) => ({
+          appointments: old?.appointments ? [optimisticAppointment, ...old.appointments] : [optimisticAppointment],
+        })
+      );
+
+      return { previousAppointments, previousUpcoming, tempId };
+    },
+    onSuccess: (data, _variables, context) => {
       toast({
         title: t('reminders.toasts.success'),
         description: t('reminders.toasts.appointmentCreated'),
       });
 
-      // Invalidate all appointment queries to ensure fresh data (single refresh)
-      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/appointments/upcoming'] });
+      // Remove temp ID from pending and add real ID briefly for smooth transition
+      if (context?.tempId) {
+        setPendingAppointmentIds(prev => {
+          const next = new Set(prev);
+          next.delete(context.tempId);
+          return next;
+        });
+      }
+
+      // Replace optimistic appointment with real data from server
+      if (data?.appointment) {
+        const realAppointment = data.appointment;
+        
+        // Update cache with real appointment data (replace temp with real)
+        queryClient.setQueryData<{ appointments: Appointment[] }>(
+          ['/api/appointments', showArchived],
+          (old) => {
+            if (!old?.appointments) return old;
+            return {
+              appointments: old.appointments.map(apt => 
+                apt.id === context?.tempId ? { ...realAppointment, customer: apt.customer } : apt
+              ),
+            };
+          }
+        );
+        queryClient.setQueryData<{ appointments: Appointment[] }>(
+          ['/api/appointments/upcoming'],
+          (old) => {
+            if (!old?.appointments) return old;
+            return {
+              appointments: old.appointments.map(apt => 
+                apt.id === context?.tempId ? { ...realAppointment, customer: apt.customer } : apt
+              ),
+            };
+          }
+        );
+      }
 
       // Schedule reminder if enabled
       if (newAppointmentReminderEnabled && data.appointment) {
@@ -792,7 +878,22 @@ export default function RemindersPage() {
       setNewAppointmentModalOpen(false);
       resetNewAppointmentData();
     },
-    onError: (error: any) => {
+    onError: (error: any, _variables, context) => {
+      // Rollback optimistic update on error
+      if (context?.previousAppointments) {
+        queryClient.setQueryData(['/api/appointments', showArchived], context.previousAppointments);
+      }
+      if (context?.previousUpcoming) {
+        queryClient.setQueryData(['/api/appointments/upcoming'], context.previousUpcoming);
+      }
+      // Remove temp ID from pending
+      if (context?.tempId) {
+        setPendingAppointmentIds(prev => {
+          const next = new Set(prev);
+          next.delete(context.tempId);
+          return next;
+        });
+      }
       toast({
         title: t('reminders.toasts.error'),
         description: error?.message || t('reminders.toasts.appointmentCreateError'),
@@ -2075,8 +2176,8 @@ export default function RemindersPage() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {(appointmentsFetching || searchQuery !== debouncedSearchQuery) ? (
-                                // Skeleton loading rows
+                              {(appointmentsLoading || (searchQuery !== debouncedSearchQuery && appointments.length === 0)) ? (
+                                // Skeleton loading rows - only show on initial load or empty search transition
                                 Array.from({ length: 5 }).map((_, index) => (
                                   <TableRow key={`skeleton-${index}`}>
                                     <TableCell><Skeleton className="h-4 w-4" /></TableCell>
@@ -2104,17 +2205,23 @@ export default function RemindersPage() {
                                   </TableRow>
                                 ))
                               ) : (
-                                appointments.map((appointment) => (
+                                appointments.map((appointment) => {
+                                  const isPending = pendingAppointmentIds.has(appointment.id);
+                                  return (
                                   <TableRow
                                     key={appointment.id}
-                                    onClick={() => handleViewAppointment(appointment)}
-                                    className="cursor-pointer"
+                                    onClick={() => !isPending && handleViewAppointment(appointment)}
+                                    className={`${isPending ? 'opacity-70 pointer-events-none' : 'cursor-pointer'} ${isPending ? 'animate-pulse bg-muted/30' : ''}`}
                                   >
                                     <TableCell onClick={(event) => event.stopPropagation()}>
-                                      <Checkbox
-                                        checked={selectedAppointments.includes(appointment.id)}
-                                        onCheckedChange={(checked) => handleSelectAppointment(appointment.id, checked as boolean)}
-                                      />
+                                      {isPending ? (
+                                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                      ) : (
+                                        <Checkbox
+                                          checked={selectedAppointments.includes(appointment.id)}
+                                          onCheckedChange={(checked) => handleSelectAppointment(appointment.id, checked as boolean)}
+                                        />
+                                      )}
                                     </TableCell>
                                     <TableCell>
                                       <div>
@@ -2143,9 +2250,16 @@ export default function RemindersPage() {
                                       </div>
                                     </TableCell>
                                     <TableCell>
-                                      <Badge className={getStatusColor(appointment.status)}>
-                                        {appointment.status.replace('_', ' ')}
-                                      </Badge>
+                                      {isPending ? (
+                                        <Badge className="bg-blue-100 text-blue-800">
+                                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                          Saving...
+                                        </Badge>
+                                      ) : (
+                                        <Badge className={getStatusColor(appointment.status)}>
+                                          {appointment.status.replace('_', ' ')}
+                                        </Badge>
+                                      )}
                                     </TableCell>
                                     <TableCell>
                                       <div className="flex items-center gap-2">
@@ -2233,7 +2347,7 @@ export default function RemindersPage() {
                                                   <Archive className="h-4 w-4 mr-2" />
                                                   Archive
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem className="text-red-600" onClick={() => handleCancelAppointment(appointment.id)}>
+                                                <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleCancelAppointment(appointment.id); }}>
                                                   <Trash2 className="h-4 w-4 mr-2" />
                                                   Delete
                                                 </DropdownMenuItem>
@@ -2241,11 +2355,11 @@ export default function RemindersPage() {
                                             )}
                                             {showArchived && (
                                               <>
-                                                <DropdownMenuItem onClick={() => handleUnarchiveAppointment(appointment.id)}>
+                                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleUnarchiveAppointment(appointment.id); }}>
                                                   <ArchiveRestore className="h-4 w-4 mr-2" />
                                                   Restore
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem className="text-red-600" onClick={() => handleCancelAppointment(appointment.id)}>
+                                                <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleCancelAppointment(appointment.id); }}>
                                                   <Trash2 className="h-4 w-4 mr-2" />
                                                   Delete Permanently
                                                 </DropdownMenuItem>
@@ -2256,7 +2370,8 @@ export default function RemindersPage() {
                                       </div>
                                     </TableCell>
                                   </TableRow>
-                                ))
+                                  );
+                                })
                               )}
                             </TableBody>
                           </Table>
@@ -2264,7 +2379,7 @@ export default function RemindersPage() {
 
                         {/* Mobile/Tablet Card View - visible only on mobile/tablet */}
                         <div className="lg:hidden space-y-4">
-                          {(appointmentsFetching || searchQuery !== debouncedSearchQuery) ? (
+                          {(appointmentsLoading || (searchQuery !== debouncedSearchQuery && appointments.length === 0)) ? (
                             // Skeleton loading cards
                             Array.from({ length: 3 }).map((_, index) => (
                               <Card key={`skeleton-card-${index}`} className="overflow-hidden">
@@ -2300,11 +2415,13 @@ export default function RemindersPage() {
                               </Card>
                             ))
                           ) : (
-                            appointments.map((appointment) => (
+                            appointments.map((appointment) => {
+                              const isPending = pendingAppointmentIds.has(appointment.id);
+                              return (
                               <Card
                                 key={appointment.id}
-                                className="overflow-hidden cursor-pointer"
-                                onClick={() => handleViewAppointment(appointment)}
+                                className={`overflow-hidden ${isPending ? 'opacity-70 pointer-events-none animate-pulse' : 'cursor-pointer'}`}
+                                onClick={() => !isPending && handleViewAppointment(appointment)}
                               >
                                 <CardContent className="p-4">
                                   <div className="space-y-3">
@@ -2312,11 +2429,15 @@ export default function RemindersPage() {
                                     <div className="flex items-start justify-between">
                                       <div className="flex items-start gap-3">
                                         <div onClick={(event) => event.stopPropagation()}>
-                                          <Checkbox
-                                            checked={selectedAppointments.includes(appointment.id)}
-                                            onCheckedChange={(checked) => handleSelectAppointment(appointment.id, checked as boolean)}
-                                            className="mt-1"
-                                          />
+                                          {isPending ? (
+                                            <Loader2 className="h-4 w-4 animate-spin text-primary mt-1" />
+                                          ) : (
+                                            <Checkbox
+                                              checked={selectedAppointments.includes(appointment.id)}
+                                              onCheckedChange={(checked) => handleSelectAppointment(appointment.id, checked as boolean)}
+                                              className="mt-1"
+                                            />
+                                          )}
                                         </div>
                                         <div className="flex-1">
                                           <h3 className="font-semibold text-base">{appointment.title}</h3>
@@ -2324,9 +2445,16 @@ export default function RemindersPage() {
                                           <p className="text-xs text-gray-500 dark:text-gray-500">{appointment.customer?.email}</p>
                                         </div>
                                       </div>
-                                      <Badge className={getStatusColor(appointment.status)}>
-                                        {appointment.status.replace('_', ' ')}
-                                      </Badge>
+                                      {isPending ? (
+                                        <Badge className="bg-blue-100 text-blue-800">
+                                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                          Saving...
+                                        </Badge>
+                                      ) : (
+                                        <Badge className={getStatusColor(appointment.status)}>
+                                          {appointment.status.replace('_', ' ')}
+                                        </Badge>
+                                      )}
                                     </div>
 
                                     {/* Appointment details */}
@@ -2436,7 +2564,7 @@ export default function RemindersPage() {
                                                 <Archive className="h-4 w-4 mr-2" />
                                                 Archive
                                               </DropdownMenuItem>
-                                              <DropdownMenuItem className="text-red-600" onClick={() => handleCancelAppointment(appointment.id)}>
+                                              <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleCancelAppointment(appointment.id); }}>
                                                 <Trash2 className="h-4 w-4 mr-2" />
                                                 Delete
                                               </DropdownMenuItem>
@@ -2444,11 +2572,11 @@ export default function RemindersPage() {
                                           )}
                                           {showArchived && (
                                             <>
-                                              <DropdownMenuItem onClick={() => handleUnarchiveAppointment(appointment.id)}>
+                                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleUnarchiveAppointment(appointment.id); }}>
                                                 <ArchiveRestore className="h-4 w-4 mr-2" />
                                                 Restore
                                               </DropdownMenuItem>
-                                              <DropdownMenuItem className="text-red-600" onClick={() => handleCancelAppointment(appointment.id)}>
+                                              <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleCancelAppointment(appointment.id); }}>
                                                 <Trash2 className="h-4 w-4 mr-2" />
                                                 Delete Permanently
                                               </DropdownMenuItem>
@@ -2460,7 +2588,8 @@ export default function RemindersPage() {
                                   </div>
                                 </CardContent>
                               </Card>
-                            ))
+                              );
+                            })
                           )}
                         </div>
                       </>

@@ -579,12 +579,25 @@ router.delete('/:id', requireRole(['Owner', 'Administrator', 'Manager']), async 
       return res.status(404).json({ error: 'Appointment not found' });
     }
 
-    // Delete appointment (this will cascade delete reminders)
+    // Cancel all pending Trigger.dev reminder tasks before deleting
+    console.log(`[Delete] Cancelling pending reminders for appointment ${id}`);
+    const cancelResult = await cancelPendingRemindersForAppointment(id);
+    if (cancelResult.cancelled > 0) {
+      console.log(`[Delete] Cancelled ${cancelResult.cancelled} pending reminder(s)`);
+    }
+    if (cancelResult.errors.length > 0) {
+      console.warn(`[Delete] Some reminders failed to cancel:`, cancelResult.errors);
+    }
+
+    // Delete appointment (this will cascade delete reminders from DB)
     await db
       .delete(appointments)
       .where(eq(appointments.id, id));
 
-    res.json({ message: 'Appointment deleted successfully' });
+    res.json({ 
+      message: 'Appointment deleted successfully',
+      remindersCancelled: cancelResult.cancelled
+    });
   } catch (error) {
     console.error('Failed to delete appointment:', error);
     res.status(500).json({ error: 'Failed to delete appointment' });
