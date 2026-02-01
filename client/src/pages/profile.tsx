@@ -80,20 +80,20 @@ const CheckoutForm = ({ planId, billingCycle }: CheckoutFormProps) => {
 
       if (error) {
         toast({
-          title: "Payment Failed",
+          title: t('profile.subscription.paymentFailed'),
           description: error.message,
           variant: "destructive",
         });
       } else {
         toast({
-          title: "Payment Successful",
-          description: "Welcome to your new subscription!",
+          title: t('profile.subscription.paymentSuccessful'),
+          description: t('profile.subscription.welcomeMessage'),
         });
       }
     } catch (error) {
       toast({
-        title: "Payment Error",
-        description: "An unexpected error occurred during payment.",
+        title: t('profile.subscription.paymentError'),
+        description: t('profile.subscription.paymentErrorDescription'),
         variant: "destructive",
       });
     } finally {
@@ -108,10 +108,10 @@ const CheckoutForm = ({ planId, billingCycle }: CheckoutFormProps) => {
         {isProcessing ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Processing...
+            {t('profile.subscription.processing')}
           </>
         ) : (
-          `Subscribe ${billingCycle === 'yearly' ? 'Yearly' : 'Monthly'}`
+          t(billingCycle === 'yearly' ? 'profile.subscription.subscribeYearly' : 'profile.subscription.subscribeMonthly')
         )}
       </Button>
     </form>
@@ -235,7 +235,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
                     </div>
                     {billingCycle === 'yearly' && plan.yearlyPrice && (
                       <div className="text-xs text-green-600 mt-1">
-                        {t('profile.subscription.savePerYear')} ${((parseFloat(plan.price) * 12) - parseFloat(plan.yearlyPrice)).toFixed(2)}/year
+                        {t('profile.subscription.savePerYear', { amount: ((parseFloat(plan.price) * 12) - parseFloat(plan.yearlyPrice)).toFixed(2) })}
                       </div>
                     )}
                   </div>
@@ -403,8 +403,8 @@ export default function ProfilePage() {
     },
     onError: (error: any) => {
       toast({
-        title: "Subscription Error",
-        description: error.message || "Failed to create subscription. Please try again.",
+        title: t('profile.subscription.subscriptionError'),
+        description: error.message || t('profile.subscription.subscriptionErrorDescription'),
         variant: "destructive",
       });
     }
@@ -421,16 +421,16 @@ export default function ProfilePage() {
     },
     onSuccess: () => {
       toast({
-        title: "Subscription Updated",
-        description: "Your subscription has been updated successfully!",
+        title: t('profile.subscription.subscriptionUpdated'),
+        description: t('profile.subscription.subscriptionUpdatedDescription'),
       });
       // Refetch subscription data
       queryClient.invalidateQueries({ queryKey: ['/api/subscription/my-subscription'] });
     },
     onError: (error: any) => {
       toast({
-        title: "Update Error",
-        description: error.message || "Failed to update subscription. Please try again.",
+        title: t('profile.subscription.updateError'),
+        description: error.message || t('profile.subscription.updateErrorDescription'),
         variant: "destructive",
       });
     }
@@ -1445,19 +1445,19 @@ export default function ProfilePage() {
                     /* Show plan selection for new users */
                     <div className="space-y-8">
                       <div className="text-center">
-                        <h3 className="text-2xl font-bold mb-4">Choose Your Plan</h3>
+                        <h3 className="text-2xl font-bold mb-4">{t('profile.subscription.chooseYourPlan')}</h3>
                         <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-                          Start with a 14-day free trial. No credit card required. Cancel anytime.
+                          {t('profile.subscription.trialDescription')}
                         </p>
                       </div>
 
                       <div className="flex justify-center">
                         <Tabs value={billingCycle} onValueChange={(value) => setBillingCycle(value as 'monthly' | 'yearly')}>
                           <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="monthly">Monthly</TabsTrigger>
+                            <TabsTrigger value="monthly">{t('profile.subscription.monthly')}</TabsTrigger>
                             <TabsTrigger value="yearly">
-                              Yearly
-                              <Badge variant="secondary" className="ml-2">Save 20%</Badge>
+                              {t('profile.subscription.yearly')}
+                              <Badge variant="secondary" className="ml-2">{t('profile.subscription.save20')}</Badge>
                             </TabsTrigger>
                           </TabsList>
                         </Tabs>
@@ -1470,7 +1470,7 @@ export default function ProfilePage() {
                               <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                                 <Badge className="bg-primary text-primary-foreground px-3 py-1">
                                   <Star className="w-3 h-3 mr-1" />
-                                  Most Popular
+                                  {t('profile.subscription.mostPopular')}
                                 </Badge>
                               </div>
                             )}
@@ -1484,11 +1484,11 @@ export default function ProfilePage() {
                                   ${billingCycle === 'yearly' ? plan.yearlyPrice : plan.price}
                                 </div>
                                 <div className="text-sm text-muted-foreground">
-                                  per {billingCycle === 'yearly' ? 'year' : 'month'}
+                                  {t(billingCycle === 'yearly' ? 'profile.subscription.perYear' : 'profile.subscription.perMonth')}
                                 </div>
                                 {billingCycle === 'yearly' && plan.yearlyPrice && (
                                   <div className="text-xs text-green-600 mt-1">
-                                    Save ${((parseFloat(plan.price) * 12) - parseFloat(plan.yearlyPrice)).toFixed(2)}/year
+                                    {t('profile.subscription.saveAmount', { amount: ((parseFloat(plan.price) * 12) - parseFloat(plan.yearlyPrice)).toFixed(2) })}
                                   </div>
                                 )}
                               </div>
@@ -1503,10 +1503,10 @@ export default function ProfilePage() {
                                 {createSubscriptionMutation.isPending ? (
                                   <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Setting up...
+                                    {t('profile.subscription.settingUp')}
                                   </>
                                 ) : (
-                                  `Start ${billingCycle === 'yearly' ? 'Yearly' : 'Monthly'} Plan`
+                                  t(billingCycle === 'yearly' ? 'profile.subscription.startYearlyPlan' : 'profile.subscription.startMonthlyPlan')
                                 )}
                               </Button>
 
@@ -1521,11 +1521,11 @@ export default function ProfilePage() {
 
                               <div className="mt-4 pt-4 border-t text-xs text-muted-foreground">
                                 <div className="space-y-1">
-                                  {plan.maxUsers && <div>Up to {plan.maxUsers} users</div>}
-                                  {plan.maxShops && <div>Up to {plan.maxShops} shops</div>}
-                                  {plan.maxProjects && <div>Up to {plan.maxProjects} projects</div>}
-                                  {plan.storageLimit && <div>{plan.storageLimit}GB storage</div>}
-                                  <div className="capitalize">{plan.supportLevel} support</div>
+                                  {plan.maxUsers && <div>{t('profile.subscription.upTo')} {plan.maxUsers} {t('profile.subscription.users')}</div>}
+                                  {plan.maxShops && <div>{t('profile.subscription.upTo')} {plan.maxShops} {t('profile.subscription.shops')}</div>}
+                                  {plan.maxProjects && <div>{t('profile.subscription.upTo')} {plan.maxProjects} {t('profile.subscription.projects')}</div>}
+                                  {plan.storageLimit && <div>{plan.storageLimit}GB {t('profile.subscription.storage')}</div>}
+                                  <div className="capitalize">{plan.supportLevel} {t('profile.subscription.support')}</div>
                                 </div>
                               </div>
                             </CardContent>
@@ -1534,7 +1534,7 @@ export default function ProfilePage() {
                       </div>
 
                       <div className="text-center text-sm text-muted-foreground">
-                        <p>Need help choosing? <a href="mailto:support@example.com" className="text-primary hover:underline">Contact our support team</a></p>
+                        <p>{t('profile.subscription.needHelpChoosing')} <a href="mailto:support@example.com" className="text-primary hover:underline">{t('profile.subscription.contactSupportTeam')}</a></p>
                       </div>
                     </div>
                   )}

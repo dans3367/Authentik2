@@ -109,6 +109,16 @@
       "updating": "Updating...",
       "saveChanges": "Save Changes"
     },
+    "avatar": {
+      "dropHere": "Drop here",
+      "change": "Change",
+      "saveAvatar": "Save Avatar",
+      "uploading": "Uploading...",
+      "changePhoto": "Change Photo",
+      "uploadPhoto": "Upload Photo",
+      "clickOrDrag": "Click or drag an image to upload",
+      "fileTypes": "JPEG, PNG or WebP • Max 5MB"
+    },
     "personalInfo": {
       "title": "Personal Information",
       "updateAvatar": "Click to update your profile picture",
