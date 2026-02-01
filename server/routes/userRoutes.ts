@@ -19,8 +19,9 @@ userRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
     const tenantId = req.user.tenantId;
 
     // Validate input
-    if (!firstName && !lastName && !email) {
-      return res.status(400).json({ message: 'At least one field (firstName, lastName, or email) is required' });
+    const hasValidField = (firstName?.trim()) || (lastName?.trim()) || (email?.trim());
+    if (!hasValidField) {
+      return res.status(400).json({ message: 'At least one field (firstName, lastName, or email) with a non-empty value is required' });
     }
 
     // Check if user exists

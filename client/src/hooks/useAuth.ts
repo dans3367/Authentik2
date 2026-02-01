@@ -172,10 +172,18 @@ export function useUpdateTheme() {
 }
 
 export function useUpdateMenuPreference() {
+  const [isPending, setIsPending] = useState(false);
+  
   return {
+    isPending,
     mutateAsync: async (data: { menuExpanded: boolean }) => {
-      console.log('Menu preference update requested:', data);
-      // TODO: Implement with better-auth
+      setIsPending(true);
+      try {
+        console.log('Menu preference update requested:', data);
+        // TODO: Implement with better-auth
+      } finally {
+        setIsPending(false);
+      }
     },
   };
 }

@@ -832,9 +832,16 @@ export default function ProfilePage() {
                           }));
 
                           // Update backend preference
-                          updateMenuPreferenceMutation.mutateAsync({ menuExpanded: checked });
+                          updateMenuPreferenceMutation.mutateAsync({ menuExpanded: checked })
+                            .catch(() => {
+                              // Revert localStorage on failure
+                              localStorage.setItem('menuExpanded', JSON.stringify(!checked));
+                              window.dispatchEvent(new CustomEvent('menuPreferenceChanged', {
+                                detail: { menuExpanded: !checked }
+                              }));
+                            });
                         }}
-                        disabled={false}
+                        disabled={updateMenuPreferenceMutation.isPending}
                         className="data-[state=checked]:bg-green-600"
                       />
                     </div>
