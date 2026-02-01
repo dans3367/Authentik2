@@ -100,6 +100,59 @@
       "subscription": "Subscription",
       "danger": "Danger"
     },
+    "subscription": {
+      "title": "Subscription Management",
+      "paymentFailed": "Payment failed",
+      "paymentSuccessful": "Payment successful",
+      "welcomeMessage": "Welcome to your new plan!",
+      "paymentError": "Payment error",
+      "paymentErrorDescription": "An unexpected error occurred during payment processing.",
+      "processing": "Processing...",
+      "subscribeYearly": "Subscribe Yearly",
+      "subscribeMonthly": "Subscribe Monthly",
+      "loading": "Loading subscription details...",
+      "loadError": "Failed to load subscription plans. Please try again.",
+      "retry": "Retry",
+      "completeSubscription": "Complete Your Subscription",
+      "perYear": "/year",
+      "perMonth": "/month",
+      "trialActive": "Trial Active",
+      "daysRemaining": "days remaining until",
+      "trialEnds": "Trial Ends",
+      "nextBilling": "Next Billing",
+      "availablePlans": "Available Plans",
+      "billingCycle": "Billing Cycle",
+      "monthly": "Monthly",
+      "yearly": "Yearly",
+      "save20": "Save 20%",
+      "mostPopular": "Most Popular",
+      "savePerYear": "Save ${{amount}} / year",
+      "saveAmount": "Save ${{amount}}",
+      "currentPlanButton": "Current Plan",
+      "upgrade": "Upgrade",
+      "downgrade": "Downgrade",
+      "upTo": "Up to",
+      "users": "users",
+      "shops": "shops",
+      "projects": "projects",
+      "storage": "storage",
+      "support": "support",
+      "needHelp": "Need help?",
+      "contactSupport": "Contact support",
+      "subscriptionError": "Subscription Error",
+      "subscriptionErrorDescription": "Failed to create subscription.",
+      "subscriptionUpdated": "Subscription Updated",
+      "subscriptionUpdatedDescription": "Your subscription has been successfully updated.",
+      "updateError": "Update Error",
+      "updateErrorDescription": "Failed to update subscription.",
+      "chooseYourPlan": "Choose Your Plan",
+      "trialDescription": "Start your 14-day free trial. No credit card required.",
+      "settingUp": "Setting up...",
+      "startYearlyPlan": "Start Yearly Plan",
+      "startMonthlyPlan": "Start Monthly Plan",
+      "needHelpChoosing": "Need help choosing?",
+      "contactSupportTeam": "Contact our support team"
+    },
     "profileTab": {
       "title": "Personal Information",
       "avatarHint": "Click to update your profile picture",
@@ -151,7 +204,7 @@
       "tipsDescription": "Follow these best practices to keep your account secure.",
       "currentPassword": "Current Password",
       "newPassword": "New Password",
-      "confirmNewPassword": "Confirm New Password",
+      "confirmPassword": "Confirm New Password",
       "passwordStrength": "Password strength",
       "changing": "Changing...",
       "changePassword": "Change Password",
@@ -165,13 +218,24 @@
       "title": "Two-Factor Authentication",
       "enabled": "Enabled",
       "disabled": "Disabled",
-      "enableDescription": "Add an extra layer of security to your account",
-      "disableDescription": "Your account is protected with two-factor authentication",
-      "setUp": "Set up 2FA",
+      "enabledDescription": "Your account is protected with two-factor authentication.",
+      "disabledDescription": "Add an extra layer of security to your account.",
+      "isEnabled": "Two-Factor Authentication is Enabled",
+      "isEnabledDescription": "Your account is securely protected with 2FA.",
+      "isDisabled": "Two-Factor Authentication is Disabled",
+      "setup": "Set up 2FA",
+      "setupDescription": "Protect your account by requiring an additional code when logging in.",
+      "setupButton": "Set up 2FA",
       "disable": "Disable 2FA",
+      "disableDescription": "Enter the verification code to confirm disabling 2FA.",
+      "disableButton": "Disable 2FA",
       "settingUp": "Setting up...",
       "enabling": "Enabling...",
-      "disabling": "Disabling..."
+      "disabling": "Disabling...",
+      "scanQR": "Scan QR Code",
+      "manualEntry": "Manual Entry",
+      "verificationCode": "Verification Code",
+      "enableButton": "Enable 2FA"
     },
     "securityTips": {
       "title": "Security Tips",
@@ -186,12 +250,15 @@
       "useAuthenticatorDescription": "Prefer app-based codes over SMS when possible for greater security.",
       "close": "Close"
     },
-    "dangerZone": {
+    "danger": {
       "title": "Danger Zone",
       "deleteAccount": "Delete Account",
       "deleteDescription": "Once you delete your account, there is no going back. This will permanently deactivate your account and remove all your data including your profile, settings, and all associated information.",
-      "deleteConfirmation": "Are you absolutely sure you want to delete your account? This action cannot be undone and will permanently remove all your data.",
-      "deleting": "Deleting..."
+      "confirmDescription": "Are you absolutely sure you want to delete your account? This action cannot be undone and will permanently remove all your data.",
+      "deleteButton": "Delete Account",
+      "deleting": "Deleting...",
+      "cancel": "Cancel",
+      "confirmDelete": "Delete Account"
     }
   },
   "reminders": {
@@ -201,7 +268,7 @@
     "subtitle": "Schedule appointments and keep your customers informed. Reduce no-shows with automated appointment confirmations.",
     "tabs": {
       "appointments": "Appointments",
-      "reminders": "Reminders", 
+      "reminders": "Reminders",
       "settings": "Settings"
     },
     "appointments": {
@@ -1238,19 +1305,58 @@
     "palette": {
       "header": "Form Components",
       "subheader": "Drag & drop to build your form",
-      "categories": { "basic": "Basic Inputs", "selection": "Selection" },
-      "text-input": { "label": "Text Input", "description": "Single line text field" },
-      "email-input": { "label": "Email Input", "description": "Email address field" },
-      "textarea": { "label": "Textarea", "description": "Multi-line text area" },
-      "number-input": { "label": "Number Input", "description": "Numeric field" },
-      "full-name": { "label": "Full Name", "description": "First and last name fields" },
-      "image": { "label": "Image", "description": "Square image display" },
-      "select": { "label": "Select Dropdown", "description": "Dropdown selection" },
-      "checkbox": { "label": "Checkbox", "description": "Multiple selection" },
-      "radio": { "label": "Radio Button", "description": "Single selection" },
-      "rate-scale": { "label": "Rate Scale", "description": "Rating scale 1-10" },
-      "boolean-switch": { "label": "Yes/No Switch", "description": "Toggle switch for binary choices" },
-      "datetime-picker": { "label": "Date & Time", "description": "Date, time, or datetime input" }
+      "categories": {
+        "basic": "Basic Inputs",
+        "selection": "Selection"
+      },
+      "text-input": {
+        "label": "Text Input",
+        "description": "Single line text field"
+      },
+      "email-input": {
+        "label": "Email Input",
+        "description": "Email address field"
+      },
+      "textarea": {
+        "label": "Textarea",
+        "description": "Multi-line text area"
+      },
+      "number-input": {
+        "label": "Number Input",
+        "description": "Numeric field"
+      },
+      "full-name": {
+        "label": "Full Name",
+        "description": "First and last name fields"
+      },
+      "image": {
+        "label": "Image",
+        "description": "Square image display"
+      },
+      "select": {
+        "label": "Select Dropdown",
+        "description": "Dropdown selection"
+      },
+      "checkbox": {
+        "label": "Checkbox",
+        "description": "Multiple selection"
+      },
+      "radio": {
+        "label": "Radio Button",
+        "description": "Single selection"
+      },
+      "rate-scale": {
+        "label": "Rate Scale",
+        "description": "Rating scale 1-10"
+      },
+      "boolean-switch": {
+        "label": "Yes/No Switch",
+        "description": "Toggle switch for binary choices"
+      },
+      "datetime-picker": {
+        "label": "Date & Time",
+        "description": "Date, time, or datetime input"
+      }
     },
     "proTipTitle": "Pro tip",
     "proTipDesktop": "Drag components for precise placement with blue line indicators",
@@ -1261,7 +1367,10 @@
       "previewShort": "Preview mode",
       "buildFull": "Build mode - drag or click to add",
       "buildShort": "Build mode",
-      "buttons": {"edit": "Edit", "preview": "Preview"},
+      "buttons": {
+        "edit": "Edit",
+        "preview": "Preview"
+      },
       "heroTitle": "Build Your Perfect Form",
       "heroSubtitleDesktop": "Start by dragging components from the sidebar, or click on any component to add it instantly.",
       "heroSubtitleMobile": "Tap components to add them to your form.",

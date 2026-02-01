@@ -14,20 +14,21 @@ import { useAuth, useUpdateTheme, useUpdateMenuPreference, useUpdateProfile, use
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { use2FA } from "@/hooks/use2FA";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { updateProfileSchema, changePasswordSchema } from "@shared/schema";
 import type { UpdateProfileData, ChangePasswordData, SubscriptionPlan, UserSubscriptionResponse } from "@shared/schema";
 import { calculatePasswordStrength, getPasswordStrengthText, getPasswordStrengthColor } from "@/lib/authUtils";
 import { AvatarUpload } from "@/components/AvatarUpload";
-import { 
-  User, 
-  Lock, 
-  Mail, 
-  Shield, 
-  ArrowLeft, 
-  Save, 
-  Trash2, 
-  Eye, 
-  EyeOff, 
+import {
+  User,
+  Lock,
+  Mail,
+  Shield,
+  ArrowLeft,
+  Save,
+  Trash2,
+  Eye,
+  EyeOff,
   Loader2,
   AlertTriangle,
   Smartphone,
@@ -38,7 +39,8 @@ import {
   CreditCard,
   Check,
   Star,
-  Languages
+  Languages,
+  LayoutDashboard
 } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -59,6 +61,7 @@ const CheckoutForm = ({ planId, billingCycle }: CheckoutFormProps) => {
   const stripe = useStripe();
   const elements = useElements();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -130,7 +133,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>(
     subscription?.isYearly ? 'yearly' : 'monthly'
   );
-  
+
   if (!subscription) return null;
 
   const currentPlan = subscription.plan;
@@ -138,7 +141,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
   const trialEndsAt = subscription.trialEnd ? new Date(subscription.trialEnd) : null;
   const currentPeriodEnd = new Date(subscription.currentPeriodEnd);
   const daysLeft = trialEndsAt ? Math.ceil((trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
-  
+
   if (!currentPlan) {
     return (
       <div className="text-center">
@@ -148,10 +151,10 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
   }
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     });
   };
 
@@ -173,7 +176,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
             </div>
           </div>
         </div>
-        
+
         {isTrialing && daysLeft && (
           <div className="bg-yellow-100 dark:bg-yellow-900/50 border border-yellow-300 dark:border-yellow-700 rounded-md p-3 mb-4">
             <p className="text-yellow-800 dark:text-yellow-200 text-sm">
@@ -181,7 +184,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
             </p>
           </div>
         )}
-        
+
         <div className="text-sm text-blue-600 dark:text-blue-400">
           {isTrialing ? t('profile.subscription.trialEnds') : t('profile.subscription.nextBilling')}: {formatDate(isTrialing && trialEndsAt ? trialEndsAt : currentPeriodEnd)}
         </div>
@@ -221,11 +224,11 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
                     </Badge>
                   </div>
                 )}
-                
+
                 <CardHeader className="text-center pb-4">
                   <CardTitle className="text-xl">{plan.displayName}</CardTitle>
                   <CardDescription className="text-sm">{plan.description}</CardDescription>
-                  
+
                   <div className="py-4">
                     <div className="text-3xl font-bold">
                       ${billingCycle === 'yearly' ? plan.yearlyPrice : plan.price}
@@ -240,7 +243,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
                     )}
                   </div>
                 </CardHeader>
-                
+
                 <CardContent className="space-y-4">
                   <Button
                     variant={isCurrent ? "outline" : "default"}
@@ -298,7 +301,7 @@ export default function ProfilePage() {
   const [, setLocation] = useLocation();
   const { user, isLoading: authLoading, isAuthenticated, isInitialized, refetch } = useReduxAuth();
   const { toast } = useToast();
-  
+
   // Debug logging
   console.log("🔍 [ProfilePage] User data:", {
     user,
@@ -311,7 +314,7 @@ export default function ProfilePage() {
     userFirstName: user?.firstName,
     userLastName: user?.lastName
   });
-  
+
   // All hooks must be called before any conditional returns
   const updateProfileMutation = useUpdateProfile();
   const changePasswordMutation = useChangePassword();
@@ -323,6 +326,11 @@ export default function ProfilePage() {
 
   // Language management
   const { currentLanguage, supportedLanguages, changeLanguage, isChanging, t } = useLanguage();
+
+  useSetBreadcrumbs([
+    { label: "Dashboard", href: "/", icon: LayoutDashboard },
+    { label: t('profile.title'), icon: User }
+  ]);
 
   // Get current 2FA status from the database
   const { twoFactorEnabled, loading: twoFALoading, check2FARequirement } = use2FA();
@@ -391,11 +399,7 @@ export default function ProfilePage() {
   // Create subscription mutation
   const createSubscriptionMutation = useMutation({
     mutationFn: async ({ planId, billingCycle }: { planId: string; billingCycle: 'monthly' | 'yearly' }) => {
-      return await apiRequest({
-        url: '/api/create-subscription',
-        method: 'POST',
-        body: { planId, billingCycle }
-      });
+      return await apiRequest('POST', '/api/create-subscription', { planId, billingCycle });
     },
     onSuccess: (data: any) => {
       setClientSecret(data.clientSecret);
@@ -413,11 +417,7 @@ export default function ProfilePage() {
   // Upgrade subscription mutation
   const upgradeSubscriptionMutation = useMutation({
     mutationFn: async ({ planId, billingCycle }: { planId: string; billingCycle: 'monthly' | 'yearly' }) => {
-      return await apiRequest({
-        url: '/api/upgrade-subscription',
-        method: 'POST',
-        body: { planId, billingCycle }
-      });
+      return await apiRequest('POST', '/api/upgrade-subscription', { planId, billingCycle });
     },
     onSuccess: () => {
       toast({
@@ -493,7 +493,7 @@ export default function ProfilePage() {
     if (user) {
       const firstName = user.firstName || (user.name ? user.name.split(' ')[0] : "");
       const lastName = user.lastName || (user.name ? user.name.split(' ').slice(1).join(' ') : "");
-      
+
       profileForm.reset({
         firstName,
         lastName,
@@ -578,17 +578,16 @@ export default function ProfilePage() {
     const strengthBars = Array.from({ length: 4 }, (_, index) => (
       <div
         key={index}
-        className={`h-1 w-1/4 rounded ${
-          index < passwordStrength
-            ? passwordStrength <= 1
-              ? "bg-red-400"
-              : passwordStrength <= 2
+        className={`h-1 w-1/4 rounded ${index < passwordStrength
+          ? passwordStrength <= 1
+            ? "bg-red-400"
+            : passwordStrength <= 2
               ? "bg-orange-400"
               : passwordStrength <= 3
-              ? "bg-yellow-400"
-              : "bg-green-400"
-            : "bg-gray-200"
-        }`}
+                ? "bg-yellow-400"
+                : "bg-green-400"
+          : "bg-gray-200"
+          }`}
       />
     ));
 
@@ -605,22 +604,18 @@ export default function ProfilePage() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
-      <div className="max-w-5xl mx-auto p-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
+      <div className="max-w-7xl mx-auto p-6 space-y-8">
         {/* Page Header */}
-        <div className="mb-8">
-          <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-500 dark:to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
-              <User className="text-white w-7 h-7" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-                {t('profile.title')}
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-1">
-                {t('profile.subtitle')}
-              </p>
-            </div>
+        {/* Page Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-50">
+              {t('profile.title')}
+            </h1>
+            <p className="text-gray-600 dark:text-gray-300">
+              {t('profile.subtitle')}
+            </p>
           </div>
         </div>
 
@@ -679,44 +674,26 @@ export default function ProfilePage() {
         </Dialog>
 
         <Tabs defaultValue="profile" className="space-y-8">
-          <TabsList className="grid w-full grid-cols-6 bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 p-1 h-auto">
-            <TabsTrigger value="profile" className="flex items-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-50 data-[state=active]:to-blue-100 data-[state=active]:dark:from-blue-900/30 data-[state=active]:dark:to-blue-800/30 data-[state=active]:text-blue-700 data-[state=active]:dark:text-blue-300 py-3">
-              <User className="w-4 h-4" />
-              <span className="hidden sm:inline">{t('profile.tabs.profile')}</span>
-            </TabsTrigger>
-            <TabsTrigger value="preferences" className="flex items-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-50 data-[state=active]:to-green-100 data-[state=active]:dark:from-green-900/30 data-[state=active]:dark:to-green-800/30 data-[state=active]:text-green-700 data-[state=active]:dark:text-green-300 py-3">
-              <Settings className="w-4 h-4" />
-              <span className="hidden sm:inline">{t('profile.tabs.preferences')}</span>
-            </TabsTrigger>
-            <TabsTrigger value="security" className="flex items-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-50 data-[state=active]:to-purple-100 data-[state=active]:dark:from-purple-900/30 data-[state=active]:dark:to-purple-800/30 data-[state=active]:text-purple-700 data-[state=active]:dark:text-purple-300 py-3">
-              <Shield className="w-4 h-4" />
-              <span className="hidden sm:inline">{t('profile.tabs.security')}</span>
-            </TabsTrigger>
-            <TabsTrigger value="2fa" className="flex items-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-50 data-[state=active]:to-orange-100 data-[state=active]:dark:from-orange-900/30 data-[state=active]:dark:to-orange-800/30 data-[state=active]:text-orange-700 data-[state=active]:dark:text-orange-300 py-3">
-              <Lock className="w-4 h-4" />
+          <TabsList className="grid w-full grid-cols-6 h-auto">
+            <TabsTrigger value="profile">{t('profile.tabs.profile')}</TabsTrigger>
+            <TabsTrigger value="preferences">{t('profile.tabs.preferences')}</TabsTrigger>
+            <TabsTrigger value="security">{t('profile.tabs.security')}</TabsTrigger>
+            <TabsTrigger value="2fa">
               <span className="hidden sm:inline">{t('profile.tabs.twoFactor')}</span>
+              <span className="sm:hidden">2FA</span>
             </TabsTrigger>
             {user?.role === 'Owner' && (
-              <TabsTrigger value="subscription" className="flex items-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-50 data-[state=active]:to-indigo-100 data-[state=active]:dark:from-indigo-900/30 data-[state=active]:dark:to-indigo-800/30 data-[state=active]:text-indigo-700 data-[state=active]:dark:text-indigo-300 py-3">
-                <CreditCard className="w-4 h-4" />
-                <span className="hidden sm:inline">{t('profile.tabs.subscription')}</span>
-              </TabsTrigger>
+              <TabsTrigger value="subscription">{t('profile.tabs.subscription')}</TabsTrigger>
             )}
-            <TabsTrigger value="danger" className="flex items-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-red-50 data-[state=active]:to-red-100 data-[state=active]:dark:from-red-900/30 data-[state=active]:dark:to-red-800/30 data-[state=active]:text-red-700 data-[state=active]:dark:text-red-300 py-3">
-              <AlertTriangle className="w-4 h-4" />
-              <span className="hidden sm:inline">{t('profile.tabs.danger')}</span>
-            </TabsTrigger>
+            <TabsTrigger value="danger" className="text-red-600">{t('profile.tabs.danger')}</TabsTrigger>
           </TabsList>
 
           {/* Profile Tab */}
           <TabsContent value="profile">
-            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-blue-200/50 dark:border-blue-700/30 shadow-lg">
+            <Card className="bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-3 text-gray-900 dark:text-gray-100">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 rounded-lg flex items-center justify-center">
-                    <User className="w-5 h-5 text-white" />
-                  </div>
-                  <span>{t('profile.profileTab.title')}</span>
+                <CardTitle className="text-xl font-semibold text-gray-900 dark:text-gray-50">
+                  {t('profile.profileTab.title')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -815,7 +792,7 @@ export default function ProfilePage() {
                         )}
                       </Button>
                     </div>
-                </form>
+                  </form>
                 </div>
               </CardContent>
             </Card>
@@ -823,13 +800,10 @@ export default function ProfilePage() {
 
           {/* Preferences Tab */}
           <TabsContent value="preferences">
-            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-green-200/50 dark:border-green-700/30 shadow-lg">
+            <Card className="bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-3 text-gray-900 dark:text-gray-100">
-                  <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 dark:from-green-400 dark:to-green-500 rounded-lg flex items-center justify-center">
-                    <Settings className="w-5 h-5 text-white" />
-                  </div>
-                  <span>{t('profile.preferences.title')}</span>
+                <CardTitle className="text-xl font-semibold text-gray-900 dark:text-gray-50">
+                  {t('profile.preferences.title')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -851,16 +825,16 @@ export default function ProfilePage() {
                         onCheckedChange={(checked) => {
                           // Update localStorage immediately for instant UI feedback
                           localStorage.setItem('menuExpanded', JSON.stringify(checked));
-                          
+
                           // Dispatch custom event for immediate UI update in same tab
-                          window.dispatchEvent(new CustomEvent('menuPreferenceChanged', { 
-                            detail: { menuExpanded: checked } 
+                          window.dispatchEvent(new CustomEvent('menuPreferenceChanged', {
+                            detail: { menuExpanded: checked }
                           }));
-                          
+
                           // Update backend preference
-                          updateMenuPreferenceMutation.mutate({ menuExpanded: checked });
+                          updateMenuPreferenceMutation.mutateAsync({ menuExpanded: checked });
                         }}
-                        disabled={updateMenuPreferenceMutation.isPending}
+                        disabled={false}
                         className="data-[state=checked]:bg-green-600"
                       />
                     </div>
@@ -879,8 +853,8 @@ export default function ProfilePage() {
                         </p>
                       </div>
                       <div className="min-w-[140px]">
-                        <Select 
-                          value={currentLanguage} 
+                        <Select
+                          value={currentLanguage}
                           onValueChange={changeLanguage}
                           disabled={isChanging}
                         >
@@ -910,9 +884,9 @@ export default function ProfilePage() {
                       <div className="space-y-2">
                         <div className="flex items-center space-x-3">
                           <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-green-600 dark:text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10"/>
-                            <line x1="2" y1="12" x2="22" y2="12"/>
-                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="2" y1="12" x2="22" y2="12" />
+                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
                           </svg>
                           <Label className="text-base font-medium text-gray-800 dark:text-gray-200">{t('profile.preferences.timezone.title')}</Label>
                         </div>
@@ -921,8 +895,8 @@ export default function ProfilePage() {
                         </p>
                       </div>
                       <div className="min-w-[200px]">
-                        <Select 
-                          value={selectedTimezone} 
+                        <Select
+                          value={selectedTimezone}
                           onValueChange={async (value) => {
                             const previousTimezone = selectedTimezone;
                             setSelectedTimezone(value);
@@ -974,7 +948,7 @@ export default function ProfilePage() {
           {/* Security Tab */}
           <TabsContent value="security">
             {/* Security Tips Widget */}
-            <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 mb-6">
+            <Card className="bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 mb-6 shadow-sm">
               {/* Mobile Header with Illustration */}
               <div className="flex justify-center p-4 pb-0 sm:hidden">
                 <div className="w-32 h-24 bg-gray-50 dark:bg-gray-700/50 rounded-2xl flex items-center justify-center relative overflow-hidden">
@@ -1001,7 +975,7 @@ export default function ProfilePage() {
                     <p className="text-gray-600 dark:text-gray-400 mb-6 text-sm">
                       {t('profile.security.tipsDescription')}
                     </p>
-                    
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6 sm:mb-8">
                       <div className="flex items-center space-x-3">
                         <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
@@ -1009,21 +983,21 @@ export default function ProfilePage() {
                         </div>
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('profile.security.tip1')}</span>
                       </div>
-                      
+
                       <div className="flex items-center space-x-3">
                         <div className="w-6 h-6 border-2 border-gray-300 dark:border-gray-600 rounded-full flex items-center justify-center flex-shrink-0">
                           <div className="w-2 h-2 bg-green-500 rounded-full opacity-60"></div>
                         </div>
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('profile.security.tip2')}</span>
                       </div>
-                      
+
                       <div className="flex items-center space-x-3">
                         <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
                           <Check className="w-4 h-4 text-white" />
                         </div>
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('profile.security.tip3')}</span>
                       </div>
-                      
+
                       <div className="flex items-center space-x-3">
                         <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
                           <Check className="w-4 h-4 text-white" />
@@ -1031,16 +1005,16 @@ export default function ProfilePage() {
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('profile.security.tip4')}</span>
                       </div>
                     </div>
-                    
-                    <Button 
-                      variant="link" 
+
+                    <Button
+                      variant="link"
                       className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 p-0 h-auto font-semibold underline"
                       onClick={() => setIsSecurityTipsOpen(true)}
                     >
                       {t('profile.security.reviewTips')}
                     </Button>
                   </div>
-                  
+
                   {/* Desktop Illustration (hidden on mobile) */}
                   <div className="hidden sm:flex sm:flex-shrink-0 sm:ml-8">
                     <div className="w-40 h-32 bg-gray-50 dark:bg-gray-700/50 rounded-2xl flex items-center justify-center relative overflow-hidden">
@@ -1061,13 +1035,10 @@ export default function ProfilePage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-purple-200/50 dark:border-purple-700/30 shadow-lg">
+            <Card className="bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-3 text-gray-900 dark:text-gray-100">
-                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 dark:from-purple-400 dark:to-purple-500 rounded-lg flex items-center justify-center">
-                    <Lock className="w-5 h-5 text-white" />
-                  </div>
-                  <span>{t('profile.security.title')}</span>
+                <CardTitle className="text-xl font-semibold text-gray-900 dark:text-gray-50">
+                  {t('profile.security.title')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -1185,13 +1156,10 @@ export default function ProfilePage() {
           </TabsContent>
 
           {/* Two-Factor Authentication Tab */}
-            <TabsContent value="2fa">
-            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-orange-200/50 dark:border-orange-700/30 shadow-lg">
+          <TabsContent value="2fa">
+            <Card className="bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-3 text-gray-900 dark:text-gray-100">
-                  <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 dark:from-orange-400 dark:to-orange-500 rounded-lg flex items-center justify-center">
-                    <Lock className="w-5 h-5 text-white" />
-                  </div>
+                <CardTitle className="flex items-center justify-between text-xl font-semibold text-gray-900 dark:text-gray-50">
                   <span>{t('profile.twoFactor.title')}</span>
                   {twoFactorEnabled && (
                     <div className="ml-auto flex items-center space-x-2">
@@ -1397,13 +1365,10 @@ export default function ProfilePage() {
           {/* Subscription Tab - Only for Owner */}
           {user?.role === 'Owner' && (
             <TabsContent value="subscription">
-              <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-indigo-200/50 dark:border-indigo-700/30 shadow-lg">
+              <Card className="bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 shadow-sm">
                 <CardHeader>
-                  <CardTitle className="flex items-center space-x-3 text-gray-900 dark:text-gray-100">
-                    <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-indigo-600 dark:from-indigo-400 dark:to-indigo-500 rounded-lg flex items-center justify-center">
-                      <CreditCard className="w-5 h-5 text-white" />
-                    </div>
-                    <span>Subscription Management</span>
+                  <CardTitle className="text-xl font-semibold text-gray-900 dark:text-gray-50">
+                    {t('profile.subscription.title')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -1411,24 +1376,24 @@ export default function ProfilePage() {
                   {subscriptionLoading || plansLoading ? (
                     <div className="flex items-center justify-center py-12">
                       <Loader2 className="h-8 w-8 animate-spin" />
-                      <span className="ml-4">Loading subscription details...</span>
+                      <span className="ml-4">{t('profile.subscription.loading')}</span>
                     </div>
                   ) : plansError ? (
                     <div className="text-center py-8">
                       <p className="text-red-600 dark:text-red-400 mb-4">
-                        Failed to load subscription plans. Please try again.
+                        {t('profile.subscription.loadError')}
                       </p>
                       <Button onClick={() => refetchPlans()} variant="outline">
-                        Retry
+                        {t('profile.subscription.retry')}
                       </Button>
                     </div>
                   ) : clientSecret && currentPlan ? (
                     /* Show checkout form if payment is in progress */
                     <div>
-                      <h3 className="text-lg font-semibold mb-4">Complete Your Subscription</h3>
+                      <h3 className="text-lg font-semibold mb-4">{t('profile.subscription.completeSubscription')}</h3>
                       <Elements stripe={stripePromise} options={{ clientSecret }}>
-                        <CheckoutForm 
-                          planId={currentPlan} 
+                        <CheckoutForm
+                          planId={currentPlan}
                           billingCycle={billingCycle}
                         />
                       </Elements>
@@ -1474,11 +1439,11 @@ export default function ProfilePage() {
                                 </Badge>
                               </div>
                             )}
-                            
+
                             <CardHeader className="text-center pb-4">
                               <CardTitle className="text-xl">{plan.displayName}</CardTitle>
                               <CardDescription className="text-sm">{plan.description}</CardDescription>
-                              
+
                               <div className="py-4">
                                 <div className="text-3xl font-bold">
                                   ${billingCycle === 'yearly' ? plan.yearlyPrice : plan.price}
@@ -1493,7 +1458,7 @@ export default function ProfilePage() {
                                 )}
                               </div>
                             </CardHeader>
-                            
+
                             <CardContent className="space-y-4">
                               <Button
                                 className="w-full"
@@ -1545,13 +1510,10 @@ export default function ProfilePage() {
 
           {/* Danger Zone Tab */}
           <TabsContent value="danger">
-            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-red-200/50 dark:border-red-700/30 shadow-lg">
+            <Card className="bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-3 text-gray-900 dark:text-gray-100">
-                  <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-red-600 dark:from-red-400 dark:to-red-500 rounded-lg flex items-center justify-center">
-                    <AlertTriangle className="w-5 h-5 text-white" />
-                  </div>
-                  <span>{t('profile.danger.title')}</span>
+                <CardTitle className="text-xl font-semibold text-gray-900 dark:text-gray-50">
+                  {t('profile.danger.title')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
