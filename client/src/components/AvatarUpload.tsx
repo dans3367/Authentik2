@@ -34,6 +34,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const [optimisticAvatarUrl, setOptimisticAvatarUrl] = useState<string | null>(null)
+  const [cacheBuster, setCacheBuster] = useState<number>(() => Date.now())
   const fileInputRef = useRef<HTMLInputElement>(null)
 
 
@@ -94,6 +95,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
         setPreviewUrl(null)
         // Set optimistic avatar URL for immediate UI update
         setOptimisticAvatarUrl(result.url)
+        setCacheBuster(Date.now())
         onAvatarUpdate?.(result.url)
         // Update Redux store
         dispatch(updateUser({ avatarUrl: result.url }))
@@ -205,9 +207,20 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
     if (previewUrl) return previewUrl
     // Use optimistic avatar URL if set (for immediate UI updates)
     if (optimisticAvatarUrl !== null) {
-      return optimisticAvatarUrl || getAvatarUrl({ email: userEmail })
+      const url = optimisticAvatarUrl || getAvatarUrl({ email: userEmail })
+      // Add cache buster for non-data URLs
+      if (url && !url.startsWith('data:')) {
+        return `${url}${url.includes('?') ? '&' : '?'}v=${cacheBuster}`
+      }
+      return url
     }
-    if (currentAvatarUrl) return currentAvatarUrl
+    if (currentAvatarUrl) {
+      // Add cache buster for non-data URLs
+      if (!currentAvatarUrl.startsWith('data:')) {
+        return `${currentAvatarUrl}${currentAvatarUrl.includes('?') ? '&' : '?'}v=${cacheBuster}`
+      }
+      return currentAvatarUrl
+    }
     return getAvatarUrl({ email: userEmail })
   }
 

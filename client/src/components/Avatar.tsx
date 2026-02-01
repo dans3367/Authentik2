@@ -34,7 +34,7 @@ export const Avatar: React.FC<AvatarProps> = ({
   }
 
   const [overrideUrl, setOverrideUrl] = useState<string | null>(null)
-  const [cacheBuster, setCacheBuster] = useState<number>(0)
+  const [cacheBuster, setCacheBuster] = useState<number>(() => Date.now())
 
   useEffect(() => {
     const handler = (e: any) => {
