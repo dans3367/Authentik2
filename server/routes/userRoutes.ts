@@ -55,9 +55,9 @@ userRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
       updatedAt: new Date(),
     };
 
-    if (firstName !== undefined) updateData.firstName = firstName;
-    if (lastName !== undefined) updateData.lastName = lastName;
-    if (email !== undefined) updateData.email = email;
+    if (firstName !== undefined && firstName.trim()) updateData.firstName = firstName.trim();
+    if (lastName !== undefined && lastName.trim()) updateData.lastName = lastName.trim();
+    if (email !== undefined && email.trim()) updateData.email = email.trim();
 
     // Also update the name field for compatibility
     if (firstName !== undefined || lastName !== undefined) {
