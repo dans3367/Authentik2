@@ -494,7 +494,9 @@ router.put('/:id/reschedule', async (req: Request, res: Response) => {
     }
 
     // Reject past dates
-    if (newScheduledTime <= new Date()) {
+    const now = new Date();
+    now.setSeconds(0, 0);
+    if (newScheduledTime <= now) {
       return res.status(400).json({ error: 'Reminder scheduled time must be in the future' });
     }
 
