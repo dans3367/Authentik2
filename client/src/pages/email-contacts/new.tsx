@@ -142,7 +142,7 @@ export default function NewEmailContact() {
 
       // Optimistically update the cache with the new contact
       const optimisticContact = {
-        id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Temporary ID
+        id: `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`, // Temporary ID
         email: newContact.email,
         firstName: newContact.firstName || null,
         lastName: newContact.lastName || null,
