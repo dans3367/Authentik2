@@ -4,6 +4,7 @@ import { sql, eq, and } from 'drizzle-orm';
 import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, eCardSettings, emailActivity, tenants, emailSends, emailContent, companies, unsubscribeTokens } from '@shared/schema';
 import { deleteImageFromR2 } from '../config/r2';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
+import { authenticateInternalService, InternalServiceRequest } from '../middleware/internal-service-auth';
 import { type ContactFilters, type BouncedEmailFilters } from '@shared/schema';
 import { sanitizeString, sanitizeEmail } from '../utils/sanitization';
 import { storage } from '../storage';
@@ -2180,6 +2181,168 @@ emailManagementRoutes.post("/internal/birthday-invitation", async (req: any, res
   } catch (error) {
     console.error('Send internal birthday invitation error:', error);
     res.status(500).json({ message: 'Failed to send birthday invitation' });
+  }
+});
+
+// Internal endpoint for Trigger.dev to log email activity
+// Secured with HMAC signature verification
+emailManagementRoutes.post("/internal/email-activity", authenticateInternalService, async (req: InternalServiceRequest, res) => {
+  console.log('📧 [Internal Email Activity] Received authenticated request:', {
+    service: req.internalService?.service,
+    tenantId: req.body.tenantId,
+    contactId: req.body.contactId,
+    activityType: req.body.activityType,
+    activityData: '[REDACTED - PII]',
+    occurredAt: req.body.occurredAt
+  });
+
+  try {
+    const { 
+      tenantId, 
+      contactId, 
+      activityType, 
+      activityData,
+      occurredAt,
+      webhookId
+    } = req.body;
+
+    // Validate required fields
+    if (!tenantId || !contactId || !activityType) {
+      return res.status(400).json({ 
+        error: 'tenantId, contactId, and activityType are required' 
+      });
+    }
+
+    // Validate webhookId for idempotency
+    if (!webhookId) {
+      return res.status(400).json({ 
+        error: 'webhookId is required for idempotency' 
+      });
+    }
+
+    // Validate activityType
+    const validActivityTypes = ['sent', 'delivered', 'opened', 'clicked', 'bounced', 'complained', 'unsubscribed'];
+    if (!validActivityTypes.includes(activityType)) {
+      return res.status(400).json({ 
+        error: `Invalid activityType. Must be one of: ${validActivityTypes.join(', ')}` 
+      });
+    }
+
+    // Verify contact exists
+    const existingContact = await db
+      .select({ id: emailContacts.id })
+      .from(emailContacts)
+      .where(and(
+        eq(emailContacts.id, contactId),
+        eq(emailContacts.tenantId, tenantId)
+      ))
+      .limit(1);
+
+    if (existingContact.length === 0) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
+    // Validate occurredAt if provided
+    let validatedOccurredAt = new Date();
+    if (occurredAt) {
+      const parsed = new Date(occurredAt);
+      if (isFinite(parsed.getTime())) {
+        validatedOccurredAt = parsed;
+      } else {
+        return res.status(400).json({ 
+          error: 'Invalid occurredAt format. Must be a valid date.' 
+        });
+      }
+    }
+
+    const txResult = await db.transaction(async (tx: any) => {
+      const insertedActivities = await tx
+        .insert(emailActivity)
+        .values({
+          tenantId,
+          contactId,
+          activityType,
+          activityData: activityData ? JSON.stringify(activityData) : null,
+          webhookId,
+          occurredAt: validatedOccurredAt,
+        })
+        .onConflictDoNothing({
+          target: [emailActivity.webhookId],
+        })
+        .returning();
+
+      if (insertedActivities.length > 0) {
+        const activity = insertedActivities[0];
+
+        // Update contact's lastActivity timestamp only when we actually inserted a new activity
+        await tx
+          .update(emailContacts)
+          .set({
+            lastActivity: new Date(),
+            updatedAt: new Date(),
+            // Increment emailsSent counter if this is a 'sent' activity
+            ...(activityType === 'sent'
+              ? { emailsSent: sql`coalesce(${emailContacts.emailsSent}, 0) + 1` }
+              : {}),
+          })
+          .where(
+            and(eq(emailContacts.id, contactId), eq(emailContacts.tenantId, tenantId))
+          );
+
+        return { inserted: true as const, activity };
+      }
+
+      // Conflict path: webhookId already exists
+      const existingActivities = await tx
+        .select()
+        .from(emailActivity)
+        .where(eq(emailActivity.webhookId, webhookId))
+        .limit(1);
+
+      if (existingActivities.length === 0) {
+        throw new Error('Email activity conflict detected but existing row could not be found');
+      }
+
+      const activity = existingActivities[0];
+
+      if (activity.contactId !== contactId) {
+        return { inserted: false as const, contactMismatch: true as const, activity };
+      }
+
+      return { inserted: false as const, activity };
+    });
+
+    if ('contactMismatch' in txResult && txResult.contactMismatch) {
+      console.warn(
+        `📧 [Internal Email Activity] webhookId ${webhookId} already used for different contact (existing ${txResult.activity.contactId}, incoming ${contactId})`
+      );
+      return res.status(409).json({
+        error: 'webhookId already used for a different contactId',
+        webhookId,
+      });
+    }
+
+    if (!txResult.inserted) {
+      console.log(
+        `📧 [Internal Email Activity] Found existing activity ${txResult.activity.id} for webhookId ${webhookId}`
+      );
+      return res.json({
+        activity: txResult.activity,
+        message: 'Email activity already exists (idempotent request)',
+      });
+    }
+
+    console.log(
+      `📧 [Internal Email Activity] Created activity ${txResult.activity.id} for contact ${contactId}`
+    );
+
+    res.json({
+      activity: txResult.activity,
+      message: 'Email activity logged successfully',
+    });
+  } catch (error) {
+    console.error('Failed to log email activity (internal):', error);
+    res.status(500).json({ error: 'Failed to log email activity' });
   }
 });
 

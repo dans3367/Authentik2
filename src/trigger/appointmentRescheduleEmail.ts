@@ -1,9 +1,86 @@
 import { task, logger } from "@trigger.dev/sdk/v3";
 import { Resend } from "resend";
 import { z } from "zod";
+import { createHmac } from "crypto";
 
 // Initialize Resend for email sending
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+/**
+ * Generate HMAC signature for internal service authentication
+ */
+function generateInternalSignature(payload: object, timestamp: number): string {
+    const secret = process.env.INTERNAL_SERVICE_SECRET;
+    if (!secret) {
+        throw new Error("INTERNAL_SERVICE_SECRET is not configured");
+    }
+    const signaturePayload = `${timestamp}.${JSON.stringify(payload)}`;
+    return createHmac("sha256", secret).update(signaturePayload).digest("hex");
+}
+
+/**
+ * Log email activity to the server via internal API
+ * Returns success status so callers can handle failures appropriately
+ */
+async function logEmailActivity(params: {
+    tenantId: string;
+    contactId: string;
+    activityType: string;
+    activityData: object;
+    webhookId: string;
+}): Promise<{ success: boolean; error?: string }> {
+    const apiUrl = process.env.API_URL || "http://localhost:3501";
+    const timestamp = Date.now();
+    const body = {
+        tenantId: params.tenantId,
+        contactId: params.contactId,
+        activityType: params.activityType,
+        activityData: params.activityData,
+        occurredAt: new Date().toISOString(),
+        webhookId: params.webhookId,
+    };
+
+    try {
+        const signature = generateInternalSignature(body, timestamp);
+        
+        const response = await fetch(`${apiUrl}/api/internal/email-activity`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-internal-service": "trigger.dev",
+                "x-internal-timestamp": timestamp.toString(),
+                "x-internal-signature": signature,
+            },
+            body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMessage = errorData.error || `HTTP ${response.status}`;
+            logger.error("Failed to log email activity", { 
+                status: response.status, 
+                error: errorMessage,
+                contactId: params.contactId,
+                activityType: params.activityType 
+            });
+            return { success: false, error: errorMessage };
+        }
+
+        logger.info("Email activity logged successfully", { 
+            contactId: params.contactId,
+            activityType: params.activityType 
+        });
+        return { success: true };
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        logger.error("Error logging email activity", { 
+            error: errorMessage,
+            contactId: params.contactId,
+            activityType: params.activityType 
+        });
+        return { success: false, error: errorMessage };
+    }
+}
 
 // Schema for reschedule email payload
 const rescheduleEmailPayloadSchema = z.object({
@@ -73,6 +150,61 @@ export const sendRescheduleEmailTask = task({
                 emailId: emailData?.id,
                 appointmentId: data.appointmentId,
             });
+
+            // Log email activity to customer's timeline with retry logic
+            const webhookId = `trigger-${data.customerId}-sent-${Date.now()}`;
+            let activityLogged = false;
+            let activityError: string | undefined;
+            
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                const result = await logEmailActivity({
+                    tenantId: data.tenantId,
+                    contactId: data.customerId,
+                    activityType: "sent",
+                    webhookId,
+                    activityData: {
+                        type: "reschedule-invitation",
+                        emailId: emailData?.id,
+                        appointmentId: data.appointmentId,
+                        appointmentTitle: data.appointmentTitle,
+                        appointmentDate: data.appointmentDate,
+                        appointmentTime: data.appointmentTime,
+                        originalStatus: data.status,
+                        subject,
+                        recipient: data.customerEmail,
+                        from: data.from || process.env.EMAIL_FROM || "admin@zendwise.com",
+                    },
+                });
+                
+                if (result.success) {
+                    activityLogged = true;
+                    break;
+                }
+                
+                activityError = result.error;
+                logger.warn(`Email activity logging attempt ${attempt} failed`, {
+                    error: activityError,
+                    contactId: data.customerId,
+                    appointmentId: data.appointmentId
+                });
+                
+                // Wait before retry (exponential backoff: 1s, 2s, 4s)
+                if (attempt < 3) {
+                    const delayMs = Math.pow(2, attempt - 1) * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delayMs));
+                }
+            }
+            
+            if (!activityLogged) {
+                logger.error("Failed to log email activity after 3 attempts", {
+                    error: activityError,
+                    contactId: data.customerId,
+                    appointmentId: data.appointmentId,
+                    emailId: emailData?.id
+                });
+                // Don't fail the entire task for activity logging issues, but log the failure clearly
+                // This could be extended to send alerts or create a retry queue in the future
+            }
 
             return {
                 success: true,

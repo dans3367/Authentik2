@@ -12,7 +12,7 @@ export const companyRoutes = Router();
 companyRoutes.get("/", authenticateToken, async (req: any, res) => {
   try {
     console.log(`🏢 [GET /api/company] Fetching company for user ${req.user.email}, tenantId: ${req.user.tenantId}`);
-    
+
     const company = await db.query.companies.findFirst({
       where: sql`${companies.tenantId} = ${req.user.tenantId}`,
     });
@@ -41,11 +41,15 @@ companyRoutes.get("/", authenticateToken, async (req: any, res) => {
 companyRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator"]), async (req: any, res) => {
   try {
     const validatedData = createCompanySchema.parse(req.body);
-    const { name, description, website } = validatedData;
+    const { name, description, website, address, companyType, companyEmail, phone } = validatedData;
 
     const sanitizedName = sanitizeString(name) ?? name.trim();
     const sanitizedDescription = description ? sanitizeString(description) : null;
     const sanitizedWebsite = website ? sanitizeString(website) : null;
+    const sanitizedAddress = address ? sanitizeString(address) : null;
+    const sanitizedCompanyType = companyType ? sanitizeString(companyType) : null;
+    const sanitizedCompanyEmail = companyEmail ? sanitizeString(companyEmail) : null;
+    const sanitizedPhone = phone ? sanitizeString(phone) : null;
 
     // Check if company name is already taken (tenant isolation not needed for global uniqueness)
     const existingCompany = await db.query.companies.findFirst({
@@ -61,6 +65,10 @@ companyRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator"
       name: sanitizedName,
       description: sanitizedDescription,
       website: sanitizedWebsite,
+      address: sanitizedAddress,
+      companyType: sanitizedCompanyType,
+      companyEmail: sanitizedCompanyEmail,
+      phone: sanitizedPhone,
       ownerId: req.user.id,
       createdAt: new Date(),
     }).returning();
@@ -76,7 +84,7 @@ companyRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator"
 companyRoutes.patch("/", authenticateToken, requireRole(["Owner", "Administrator"]), async (req: any, res) => {
   try {
     const validatedData = updateCompanySchema.parse(req.body);
-    const { name, description, website } = validatedData;
+    const { name, description, website, address, companyType, companyEmail, phone, isActive } = validatedData;
 
     const company = await db.query.companies.findFirst({
       where: sql`${companies.tenantId} = ${req.user.tenantId}`,
@@ -92,7 +100,7 @@ companyRoutes.patch("/", authenticateToken, requireRole(["Owner", "Administrator
 
     if (name !== undefined) {
       const sanitizedName = sanitizeString(name) ?? name.trim();
-      
+
       // Check if new name is already taken by another company
       const existingCompany = await db.query.companies.findFirst({
         where: sql`${companies.name} = ${sanitizedName} AND ${companies.tenantId} != ${req.user.tenantId}`,
@@ -111,6 +119,26 @@ companyRoutes.patch("/", authenticateToken, requireRole(["Owner", "Administrator
 
     if (website !== undefined) {
       updateData.website = website ? sanitizeString(website) : null;
+    }
+
+    if (address !== undefined) {
+      updateData.address = address ? sanitizeString(address) : null;
+    }
+
+    if (companyType !== undefined) {
+      updateData.companyType = companyType ? sanitizeString(companyType) : null;
+    }
+
+    if (companyEmail !== undefined) {
+      updateData.companyEmail = companyEmail ? sanitizeString(companyEmail) : null;
+    }
+
+    if (phone !== undefined) {
+      updateData.phone = phone ? sanitizeString(phone) : null;
+    }
+
+    if (isActive !== undefined) {
+      updateData.isActive = isActive;
     }
 
     // No 'industry' field in schema
@@ -321,9 +349,9 @@ companyRoutes.post("/complete-onboarding", authenticateToken, async (req: any, r
       validatedData = completeOnboardingSchema.parse(req.body);
     } catch (validationError: any) {
       console.error('❌ [Onboarding] Validation error:', validationError);
-      return res.status(400).json({ 
-        message: 'Validation failed', 
-        errors: validationError.errors || validationError.message 
+      return res.status(400).json({
+        message: 'Validation failed',
+        errors: validationError.errors || validationError.message
       });
     }
 
@@ -372,7 +400,7 @@ companyRoutes.post("/complete-onboarding", authenticateToken, async (req: any, r
     });
   } catch (error) {
     console.error('❌ [Onboarding] Unexpected error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Failed to complete onboarding',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
