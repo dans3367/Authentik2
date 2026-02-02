@@ -2202,13 +2202,21 @@ emailManagementRoutes.post("/internal/email-activity", authenticateInternalServi
       contactId, 
       activityType, 
       activityData,
-      occurredAt 
+      occurredAt,
+      webhookId
     } = req.body;
 
     // Validate required fields
     if (!tenantId || !contactId || !activityType) {
       return res.status(400).json({ 
         error: 'tenantId, contactId, and activityType are required' 
+      });
+    }
+
+    // Validate webhookId for idempotency
+    if (!webhookId) {
+      return res.status(400).json({ 
+        error: 'webhookId is required for idempotency' 
       });
     }
 
@@ -2247,12 +2255,31 @@ emailManagementRoutes.post("/internal/email-activity", authenticateInternalServi
       }
     }
 
+    // Check for existing activity with same webhookId (idempotency check)
+    const existingActivity = await db
+      .select()
+      .from(emailActivity)
+      .where(and(
+        eq(emailActivity.webhookId, webhookId),
+        eq(emailActivity.tenantId, tenantId)
+      ))
+      .limit(1);
+
+    if (existingActivity.length > 0) {
+      console.log(`📧 [Internal Email Activity] Found existing activity ${existingActivity[0].id} for webhookId ${webhookId}`);
+      return res.json({ 
+        activity: existingActivity[0],
+        message: 'Email activity already exists (idempotent request)' 
+      });
+    }
+
     // Create email activity record
     const [newActivity] = await db.insert(emailActivity).values({
       tenantId,
       contactId,
       activityType,
       activityData: activityData ? JSON.stringify(activityData) : null,
+      webhookId,
       occurredAt: validatedOccurredAt,
     }).returning();
 
@@ -2262,7 +2289,7 @@ emailManagementRoutes.post("/internal/email-activity", authenticateInternalServi
         lastActivity: new Date(),
         updatedAt: new Date(),
         // Increment emailsSent counter if this is a 'sent' activity
-        ...(activityType === 'sent' ? { emailsSent: sql`${emailContacts.emailsSent} + 1` } : {})
+        ...(activityType === 'sent' ? { emailsSent: sql`coalesce(${emailContacts.emailsSent}, 0) + 1` } : {})
       })
       .where(and(
         eq(emailContacts.id, contactId),

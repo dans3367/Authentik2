@@ -28,14 +28,16 @@ async function logEmailActivity(params: {
     activityType: string;
     activityData: object;
 }): Promise<{ success: boolean; error?: string }> {
-    const apiUrl = process.env.API_URL || "http://localhost:5002";
+    const apiUrl = process.env.API_URL || "http://localhost:3501";
     const timestamp = Date.now();
+    const webhookId = `trigger-${params.contactId}-${params.activityType}-${timestamp}`;
     const body = {
         tenantId: params.tenantId,
         contactId: params.contactId,
         activityType: params.activityType,
         activityData: params.activityData,
         occurredAt: new Date().toISOString(),
+        webhookId,
     };
 
     try {
