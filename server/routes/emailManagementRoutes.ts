@@ -2255,57 +2255,90 @@ emailManagementRoutes.post("/internal/email-activity", authenticateInternalServi
       }
     }
 
-    // Check for existing activity with same webhookId (idempotency check)
-    const existingActivity = await db
-      .select()
-      .from(emailActivity)
-      .where(and(
-        eq(emailActivity.webhookId, webhookId),
-        eq(emailActivity.tenantId, tenantId)
-      ))
-      .limit(1);
+    const txResult = await db.transaction(async (tx: any) => {
+      const insertedActivities = await tx
+        .insert(emailActivity)
+        .values({
+          tenantId,
+          contactId,
+          activityType,
+          activityData: activityData ? JSON.stringify(activityData) : null,
+          webhookId,
+          occurredAt: validatedOccurredAt,
+        })
+        .onConflictDoNothing({
+          target: [emailActivity.webhookId],
+        })
+        .returning();
 
-    if (existingActivity.length > 0) {
-      console.log(`📧 [Internal Email Activity] Found existing activity ${existingActivity[0].id} for webhookId ${webhookId}`);
-      return res.json({ 
-        activity: existingActivity[0],
-        message: 'Email activity already exists (idempotent request)' 
+      if (insertedActivities.length > 0) {
+        const activity = insertedActivities[0];
+
+        // Update contact's lastActivity timestamp only when we actually inserted a new activity
+        await tx
+          .update(emailContacts)
+          .set({
+            lastActivity: new Date(),
+            updatedAt: new Date(),
+            // Increment emailsSent counter if this is a 'sent' activity
+            ...(activityType === 'sent'
+              ? { emailsSent: sql`coalesce(${emailContacts.emailsSent}, 0) + 1` }
+              : {}),
+          })
+          .where(
+            and(eq(emailContacts.id, contactId), eq(emailContacts.tenantId, tenantId))
+          );
+
+        return { inserted: true as const, activity };
+      }
+
+      // Conflict path: webhookId already exists
+      const existingActivities = await tx
+        .select()
+        .from(emailActivity)
+        .where(eq(emailActivity.webhookId, webhookId))
+        .limit(1);
+
+      if (existingActivities.length === 0) {
+        throw new Error('Email activity conflict detected but existing row could not be found');
+      }
+
+      const activity = existingActivities[0];
+
+      if (activity.contactId !== contactId) {
+        return { inserted: false as const, contactMismatch: true as const, activity };
+      }
+
+      return { inserted: false as const, activity };
+    });
+
+    if ('contactMismatch' in txResult && txResult.contactMismatch) {
+      console.warn(
+        `📧 [Internal Email Activity] webhookId ${webhookId} already used for different contact (existing ${txResult.activity.contactId}, incoming ${contactId})`
+      );
+      return res.status(409).json({
+        error: 'webhookId already used for a different contactId',
+        webhookId,
       });
     }
 
-    // Create email activity record and update contact in a single transaction
-    const newActivity = await db.transaction(async (tx: any) => {
-      // Insert email activity record
-      const [activity] = await tx.insert(emailActivity).values({
-        tenantId,
-        contactId,
-        activityType,
-        activityData: activityData ? JSON.stringify(activityData) : null,
-        webhookId,
-        occurredAt: validatedOccurredAt,
-      }).returning();
+    if (!txResult.inserted) {
+      console.log(
+        `📧 [Internal Email Activity] Found existing activity ${txResult.activity.id} for webhookId ${webhookId}`
+      );
+      return res.json({
+        activity: txResult.activity,
+        message: 'Email activity already exists (idempotent request)',
+      });
+    }
 
-      // Update contact's lastActivity timestamp
-      await tx.update(emailContacts)
-        .set({ 
-          lastActivity: new Date(),
-          updatedAt: new Date(),
-          // Increment emailsSent counter if this is a 'sent' activity
-          ...(activityType === 'sent' ? { emailsSent: sql`coalesce(${emailContacts.emailsSent}, 0) + 1` } : {})
-        })
-        .where(and(
-          eq(emailContacts.id, contactId),
-          eq(emailContacts.tenantId, tenantId)
-        ));
+    console.log(
+      `📧 [Internal Email Activity] Created activity ${txResult.activity.id} for contact ${contactId}`
+    );
 
-      return activity;
-    });
-
-    console.log(`📧 [Internal Email Activity] Created activity ${newActivity.id} for contact ${contactId}`);
-    
-    res.json({ 
-      activity: newActivity,
-      message: 'Email activity logged successfully' 
+    res.json({
+      activity: txResult.activity,
+      message: 'Email activity logged successfully',
     });
   } catch (error) {
     console.error('Failed to log email activity (internal):', error);
