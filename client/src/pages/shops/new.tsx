@@ -18,8 +18,8 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { 
-  Store, 
+import {
+  Store,
   ArrowLeft,
   Save,
   MapPin,
@@ -84,6 +84,8 @@ export default function NewShopPage() {
       country: 'United States',
       operatingHours: JSON.stringify(DEFAULT_OPERATING_HOURS),
       tags: [],
+      managerId: undefined,
+      category: undefined,
     },
   });
 
@@ -121,7 +123,7 @@ export default function NewShopPage() {
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
   });
-  
+
   // Log error if any
   if (managersError) {
     console.error('❌ Error fetching managers:', managersError);
@@ -269,8 +271,8 @@ export default function NewShopPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="category">{t('shops.form.category')}</Label>
-                    <Select 
-                      value={watch('category')} 
+                    <Select
+                      value={watch('category')}
                       onValueChange={(value) => setValue('category', value)}
                     >
                       <SelectTrigger data-testid="select-category">
@@ -301,8 +303,8 @@ export default function NewShopPage() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="status">{t('shops.form.status')}</Label>
-                    <Select 
-                      value={watch('status')} 
+                    <Select
+                      value={watch('status')}
                       onValueChange={(value) => setValue('status', value as any)}
                     >
                       <SelectTrigger data-testid="select-status">
@@ -318,7 +320,7 @@ export default function NewShopPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="managerId">{t('shops.form.manager')}</Label>
-                    <Select 
+                    <Select
                       value={watch('managerId') || undefined}
                       onValueChange={(value) => setValue('managerId', value)}
                       disabled={managersLoading}
@@ -338,8 +340,8 @@ export default function NewShopPage() {
                         ) : managersData && managersData.length > 0 ? (
                           managersData.map(manager => (
                             <SelectItem key={manager.id} value={manager.id}>
-                              {manager.firstName || manager.lastName 
-                                ? `${manager.firstName || ''} ${manager.lastName || ''}`.trim() 
+                              {manager.firstName || manager.lastName
+                                ? `${manager.firstName || ''} ${manager.lastName || ''}`.trim()
                                 : 'No name'} ({manager.email})
                             </SelectItem>
                           ))
@@ -360,9 +362,9 @@ export default function NewShopPage() {
                         <p className="text-sm text-muted-foreground">
                           No managers found. Only users with "Manager" or "Owner" role can be assigned to shops.
                         </p>
-                        <Button 
-                          type="button" 
-                          variant="outline" 
+                        <Button
+                          type="button"
+                          variant="outline"
                           size="sm"
                           onClick={createTestManagers}
                           data-testid="button-create-test-managers"
@@ -518,8 +520,8 @@ export default function NewShopPage() {
                   {tags.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {tags.map(tag => (
-                        <Badge 
-                          key={tag} 
+                        <Badge
+                          key={tag}
                           variant="secondary"
                           className="cursor-pointer"
                           onClick={() => handleRemoveTag(tag)}
@@ -546,8 +548,8 @@ export default function NewShopPage() {
                 >
                   {t('common.cancel')}
                 </Button>
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   disabled={isSubmitting}
                   className="w-full sm:w-auto"
                   data-testid="button-submit"

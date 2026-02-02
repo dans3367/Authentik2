@@ -19,10 +19,10 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
       userEmail: req.user?.email,
       userRole: req.user?.role
     });
-    
+
     const { page = 1, limit = 50, search, status, managerId } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
-    
+
     console.log('🔍 [Shops API] Query parameters:', {
       page: Number(page),
       limit: Number(limit),
@@ -53,34 +53,95 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
     }
 
     console.log('🔄 [Shops API] Executing shops query...');
-    const shopsData = await db.select().from(shops)
+    const shopsData = await db.select({
+      id: shops.id,
+      name: shops.name,
+      description: shops.description,
+      address: shops.address,
+      city: shops.city,
+      state: shops.state,
+      zipCode: shops.zipCode,
+      country: shops.country,
+      phone: shops.phone,
+      email: shops.email,
+      website: shops.website,
+      logoUrl: shops.logoUrl,
+      managerId: shops.managerId,
+      operatingHours: shops.operatingHours,
+      status: shops.status,
+      category: shops.category,
+      tags: shops.tags,
+      socialMedia: shops.socialMedia,
+      settings: shops.settings,
+      isActive: shops.isActive,
+      tenantId: shops.tenantId,
+      createdAt: shops.createdAt,
+      updatedAt: shops.updatedAt,
+      managerFirstName: betterAuthUser.firstName,
+      managerLastName: betterAuthUser.lastName,
+      managerEmail: betterAuthUser.email,
+    }).from(shops)
+      .leftJoin(betterAuthUser, sql`${shops.managerId} = ${betterAuthUser.id}`)
       .where(whereClause)
       .orderBy(sql`${shops.createdAt} DESC`)
       .limit(Number(limit))
       .offset(offset);
-    
+
+    // Transform the data to include manager object
+    const shopsWithManager = shopsData.map((shop: any) => ({
+      id: shop.id,
+      name: shop.name,
+      description: shop.description,
+      address: shop.address,
+      city: shop.city,
+      state: shop.state,
+      zipCode: shop.zipCode,
+      country: shop.country,
+      phone: shop.phone,
+      email: shop.email,
+      website: shop.website,
+      logoUrl: shop.logoUrl,
+      managerId: shop.managerId,
+      operatingHours: shop.operatingHours,
+      status: shop.status,
+      category: shop.category,
+      tags: shop.tags,
+      socialMedia: shop.socialMedia,
+      settings: shop.settings,
+      isActive: shop.isActive,
+      tenantId: shop.tenantId,
+      createdAt: shop.createdAt,
+      updatedAt: shop.updatedAt,
+      manager: shop.managerId ? {
+        id: shop.managerId,
+        firstName: shop.managerFirstName,
+        lastName: shop.managerLastName,
+        email: shop.managerEmail,
+      } : null,
+    }));
+
     console.log('📊 [Shops API] Shops query result:', {
-      shopsFound: shopsData.length,
-      shopIds: shopsData.map(s => s.id),
-      shopNames: shopsData.map(s => s.name)
+      shopsFound: shopsWithManager.length,
+      shopIds: shopsWithManager.map((s: any) => s.id),
+      shopNames: shopsWithManager.map((s: any) => s.name)
     });
 
     console.log('🔢 [Shops API] Executing count query...');
     const [totalCountResult] = await db.select({
       count: sql<number>`count(*)`,
     }).from(shops).where(whereClause);
-    
+
     console.log('📈 [Shops API] Total count result:', totalCountResult.count);
 
     console.log('📋 [Shops API] Calculating limits and stats...');
     // Get shop limits and stats using proper storage method
     const limits = await storage.checkShopLimits(req.user.tenantId);
-    const stats = { totalShops: shopsData.length, activeShops: shopsData.filter(s => s.status === 'active').length, shopsByCategory: {} };
-    
+    const stats = { totalShops: shopsWithManager.length, activeShops: shopsWithManager.filter((s: any) => s.status === 'active').length, shopsByCategory: {} };
+
     console.log('📊 [Shops API] Calculated stats:', { limits, stats });
 
     const response = {
-      shops: shopsData,
+      shops: shopsWithManager,
       pagination: {
         page: Number(page),
         limit: Number(limit),
@@ -90,14 +151,14 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
       limits,
       stats,
     };
-    
+
     console.log('✅ [Shops API] Sending successful response:', {
       shopsCount: response.shops.length,
       pagination: response.pagination,
       hasLimits: !!response.limits,
       hasStats: !!response.stats
     });
-    
+
     res.json(response);
   } catch (error) {
     console.error('❌ [Shops API] Get shops error occurred:');
@@ -108,7 +169,7 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
       userId: req.user?.id,
       tenantId: req.user?.tenantId
     });
-    
+
     const errorResponse = {
       message: 'Failed to get shops',
       debug: {
@@ -118,7 +179,7 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
         timestamp: new Date().toISOString()
       }
     };
-    
+
     console.error('❌ [Shops API] Sending error response:', errorResponse);
     res.status(500).json(errorResponse);
   }
@@ -129,13 +190,52 @@ shopsRoutes.get("/:id", authenticateToken, async (req: any, res) => {
   try {
     const { id } = req.params;
 
-    const [shop] = await db.select().from(shops)
+    const [shopData] = await db.select({
+      id: shops.id,
+      name: shops.name,
+      description: shops.description,
+      address: shops.address,
+      city: shops.city,
+      state: shops.state,
+      zipCode: shops.zipCode,
+      country: shops.country,
+      phone: shops.phone,
+      email: shops.email,
+      website: shops.website,
+      logoUrl: shops.logoUrl,
+      managerId: shops.managerId,
+      operatingHours: shops.operatingHours,
+      status: shops.status,
+      category: shops.category,
+      tags: shops.tags,
+      socialMedia: shops.socialMedia,
+      settings: shops.settings,
+      isActive: shops.isActive,
+      tenantId: shops.tenantId,
+      createdAt: shops.createdAt,
+      updatedAt: shops.updatedAt,
+      managerFirstName: betterAuthUser.firstName,
+      managerLastName: betterAuthUser.lastName,
+      managerEmail: betterAuthUser.email,
+    }).from(shops)
+      .leftJoin(betterAuthUser, sql`${shops.managerId} = ${betterAuthUser.id}`)
       .where(sql`${shops.id} = ${id} AND ${shops.tenantId} = ${req.user.tenantId}`)
       .limit(1);
 
-    if (!shop) {
+    if (!shopData) {
       return res.status(404).json({ message: 'Shop not found' });
     }
+
+    // Transform to include manager object
+    const shop = {
+      ...shopData,
+      manager: shopData.managerId ? {
+        id: shopData.managerId,
+        firstName: shopData.managerFirstName,
+        lastName: shopData.managerLastName,
+        email: shopData.managerEmail,
+      } : null,
+    };
 
     res.json({ shop });
   } catch (error) {
@@ -161,7 +261,7 @@ shopsRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator", 
 
     // Validate required fields
     if (!sanitizedName || !sanitizedPhone || !sanitizedEmail) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Name, phone and email are required fields',
         missingFields: {
           name: !sanitizedName,
@@ -208,8 +308,11 @@ shopsRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator", 
 shopsRoutes.put("/:id", authenticateToken, requireRole(["Owner", "Administrator", "Manager"]), async (req: any, res) => {
   try {
     const { id } = req.params;
+    console.log('🔧 [Shops API] PUT request body:', JSON.stringify(req.body, null, 2));
     const validatedData = updateShopSchema.parse(req.body);
+    console.log('🔧 [Shops API] Validated update data:', JSON.stringify(validatedData, null, 2));
     const { name, description, address, city, state, zipCode, country, phone, email, website, managerId, operatingHours, status, category, tags, socialMedia, settings, isActive } = validatedData;
+    console.log('🔧 [Shops API] Destructured managerId:', managerId, 'type:', typeof managerId);
 
     // Check if shop exists and belongs to user's company
     const existingShop = await db.query.shops.findFirst({
@@ -245,20 +348,27 @@ shopsRoutes.put("/:id", authenticateToken, requireRole(["Owner", "Administrator"
     }
 
     if (managerId !== undefined) {
+      console.log('🔧 [Shops API] Processing managerId:', managerId, 'isEmpty:', !managerId || managerId.trim() === '');
       if (managerId && managerId.trim() !== '') {
         // Verify manager belongs to the same company
+        console.log('🔧 [Shops API] Looking up manager:', managerId, 'in tenant:', req.user.tenantId);
         const manager = await db.query.betterAuthUser.findFirst({
           where: sql`${betterAuthUser.id} = ${managerId} AND ${betterAuthUser.tenantId} = ${req.user.tenantId}`,
         });
+        console.log('🔧 [Shops API] Manager lookup result:', manager ? `Found: ${manager.email}` : 'NOT FOUND');
 
         if (!manager) {
           return res.status(400).json({ message: 'Manager not found or does not belong to your company' });
         }
         updateData.managerId = managerId;
+        console.log('🔧 [Shops API] Set updateData.managerId to:', updateData.managerId);
       } else {
         // Set to null for no manager or empty string
         updateData.managerId = null;
+        console.log('🔧 [Shops API] Set updateData.managerId to null');
       }
+    } else {
+      console.log('🔧 [Shops API] managerId is undefined, not updating');
     }
 
     if (status !== undefined) {

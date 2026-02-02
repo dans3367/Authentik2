@@ -18,8 +18,8 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  Store, 
+import {
+  Store,
   ArrowLeft,
   Save,
   MapPin,
@@ -79,6 +79,8 @@ export default function EditShopPage() {
       email: '',
       status: 'active',
       isActive: true,
+      managerId: null,
+      category: undefined,
     },
   });
 
@@ -93,7 +95,7 @@ export default function EditShopPage() {
   });
 
   // Fetch managers
-  const { data: managersData, isLoading: managersLoading } = useQuery<{ managers: Manager[] }>({
+  const { data: managersData, isLoading: managersLoading } = useQuery<Manager[]>({
     queryKey: ['/api/shops/managers/list'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/shops/managers/list');
@@ -143,27 +145,31 @@ export default function EditShopPage() {
         phone: shop.phone || '',
         email: shop.email || '',
         website: shop.website || '',
-        managerId: shop.managerId || undefined,
+        managerId: shop.managerId || null,
         operatingHours: shop.operatingHours || '',
         status: (shop.status as 'active' | 'inactive' | 'maintenance') || 'active',
         category: shop.category || '',
         tags: shop.tags || [],
         socialMedia: shop.socialMedia || '',
         settings: shop.settings || '',
-        isActive: shop.isActive !== undefined ? shop.isActive : true,
+        isActive: shop.isActive ?? true,
       });
       setTags(shop.tags || []);
     }
   }, [shopData, reset]);
 
   const onSubmit = (data: UpdateShopData) => {
-    // Prepare submit data
+    console.log('🔧 [Edit Shop] Form data before processing:', JSON.stringify(data, null, 2));
+    // Prepare submit data - ensure managerId is explicitly set (null or valid ID)
+    const managerId = (!data.managerId || data.managerId === 'no-manager' || data.managerId === '') ? null : data.managerId;
     const submitData = {
       ...data,
-      managerId: (!data.managerId || data.managerId === 'no-manager' || data.managerId === '') ? null : data.managerId,
+      managerId,
       tags: tags.length > 0 ? tags : undefined,
       isActive: data.isActive !== undefined ? data.isActive : true,
     };
+    console.log('🔧 [Edit Shop] Submit data after processing:', JSON.stringify(submitData, null, 2));
+    console.log('🔧 [Edit Shop] managerId being sent:', managerId);
 
     updateShopMutation.mutate(submitData);
   };
@@ -276,8 +282,8 @@ export default function EditShopPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="category">{t('shops.form.category')}</Label>
-                    <Select 
-                      value={watch('category')} 
+                    <Select
+                      value={watch('category')}
                       onValueChange={(value) => setValue('category', value)}
                     >
                       <SelectTrigger data-testid="select-category">
@@ -308,8 +314,8 @@ export default function EditShopPage() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="status">{t('shops.form.status')} *</Label>
-                    <Select 
-                      value={watch('status') || 'active'} 
+                    <Select
+                      value={watch('status') || 'active'}
                       onValueChange={(value) => setValue('status', value as 'active' | 'inactive' | 'maintenance')}
                     >
                       <SelectTrigger data-testid="select-status">
@@ -330,7 +336,7 @@ export default function EditShopPage() {
                     <Label htmlFor="managerId">{t('shops.form.manager')}</Label>
                     <Select
                       value={watch('managerId') || 'no-manager'}
-                      onValueChange={(value) => setValue('managerId', value === 'no-manager' ? undefined : value)}
+                      onValueChange={(value) => setValue('managerId', value === 'no-manager' ? null : value, { shouldDirty: true, shouldTouch: true })}
                       disabled={managersLoading}
                     >
                       <SelectTrigger data-testid="select-manager">
@@ -338,7 +344,7 @@ export default function EditShopPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="no-manager">{t('shops.form.noManager')}</SelectItem>
-                        {managersData?.managers?.map(manager => (
+                        {Array.isArray(managersData) && managersData.map(manager => (
                           <SelectItem key={manager.id} value={manager.id}>
                             {manager.firstName} {manager.lastName} ({manager.email})
                           </SelectItem>
@@ -492,8 +498,8 @@ export default function EditShopPage() {
                   {tags.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {tags.map(tag => (
-                        <Badge 
-                          key={tag} 
+                        <Badge
+                          key={tag}
                           variant="secondary"
                           className="cursor-pointer"
                           onClick={() => handleRemoveTag(tag)}
