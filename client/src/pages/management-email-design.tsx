@@ -80,6 +80,32 @@ const mockMasterDesign: MasterEmailDesign = {
 };
 
 /**
+ * Validates that a URL uses a safe scheme (http or https only).
+ * Rejects javascript:, data:, vbscript:, and other potentially dangerous schemes.
+ */
+function isSafeUrl(url: string | undefined): boolean {
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+
+  const trimmedUrl = url.trim();
+  if (!trimmedUrl) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(trimmedUrl);
+    // Only allow http and https protocols
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    // If URL parsing fails, check if it starts with a safe protocol
+    // This handles cases like "https://example.com" that might fail in edge cases
+    const lowerUrl = trimmedUrl.toLowerCase();
+    return lowerUrl.startsWith('http://') || lowerUrl.startsWith('https://');
+  }
+}
+
+/**
  * ColorPicker Component
  * A robust color picker that allows selection from presets or custom hex input.
  */
@@ -598,17 +624,17 @@ export default function ManagementEmailDesign() {
                   {/* FOOTER */}
                   <div className="bg-slate-100 p-8 text-center border-t border-slate-200 mt-auto">
                     <div className="flex justify-center gap-6 mb-6">
-                      {draft.socialLinks?.facebook && (
-                        <a href={draft.socialLinks.facebook} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-blue-600 transition-colors">Facebook</a>
+                      {isSafeUrl(draft.socialLinks?.facebook) && (
+                        <a href={draft.socialLinks!.facebook} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-blue-600 transition-colors">Facebook</a>
                       )}
-                      {draft.socialLinks?.twitter && (
-                        <a href={draft.socialLinks.twitter} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-sky-500 transition-colors">Twitter</a>
+                      {isSafeUrl(draft.socialLinks?.twitter) && (
+                        <a href={draft.socialLinks!.twitter} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-sky-500 transition-colors">Twitter</a>
                       )}
-                      {draft.socialLinks?.instagram && (
-                        <a href={draft.socialLinks.instagram} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-pink-600 transition-colors">Instagram</a>
+                      {isSafeUrl(draft.socialLinks?.instagram) && (
+                        <a href={draft.socialLinks!.instagram} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-pink-600 transition-colors">Instagram</a>
                       )}
-                      {draft.socialLinks?.linkedin && (
-                        <a href={draft.socialLinks.linkedin} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-blue-700 transition-colors">LinkedIn</a>
+                      {isSafeUrl(draft.socialLinks?.linkedin) && (
+                        <a href={draft.socialLinks!.linkedin} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-blue-700 transition-colors">LinkedIn</a>
                       )}
                     </div>
 
