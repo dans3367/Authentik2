@@ -31,7 +31,7 @@ import type { ShopWithManager } from "@shared/schema";
 
 export default function ShopDetailsPage() {
   const { id } = useParams();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [, navigate] = useLocation();
 
   // Fetch shop data
@@ -433,7 +433,7 @@ export default function ShopDetailsPage() {
                     <p className="font-mono text-sm text-gray-900 dark:text-gray-100 break-all">{shop.id}</p>
                   </div>
                   <div className="p-4 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Status</p>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">{t('shops.statusLabel')}</p>
                     <div className="flex items-center gap-2">
                       <Badge className={cn("flex items-center gap-1.5 px-2 py-0.5 border text-xs", statusConfig.className)}>
                         {statusConfig.icon}
@@ -445,14 +445,14 @@ export default function ShopDetailsPage() {
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">{t('shops.created')}</p>
                     <div className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100">
                       <Calendar className="h-4 w-4 text-gray-400" />
-                      {shop.createdAt && new Date(shop.createdAt).toLocaleDateString()} at {shop.createdAt && new Date(shop.createdAt).toLocaleTimeString()}
+                      {shop.createdAt && new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium' }).format(new Date(shop.createdAt))} {t('common.at')} {shop.createdAt && new Intl.DateTimeFormat(i18n.language, { timeStyle: 'short' }).format(new Date(shop.createdAt))}
                     </div>
                   </div>
                   <div className="p-4 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">{t('shops.lastUpdated')}</p>
                     <div className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100">
                       <Calendar className="h-4 w-4 text-gray-400" />
-                      {shop.updatedAt && new Date(shop.updatedAt).toLocaleDateString()} at {shop.updatedAt && new Date(shop.updatedAt).toLocaleTimeString()}
+                      {shop.updatedAt && new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium' }).format(new Date(shop.updatedAt))} {t('common.at')} {shop.updatedAt && new Intl.DateTimeFormat(i18n.language, { timeStyle: 'short' }).format(new Date(shop.updatedAt))}
                     </div>
                   </div>
                 </div>

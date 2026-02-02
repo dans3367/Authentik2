@@ -30,7 +30,8 @@
     "all": "All",
     "none": "None",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "at": "at"
   },
   "navigation": {
     "dashboard": "Dashboard",
@@ -1310,7 +1311,15 @@
     "activityTrackingDescription": "Activity tracking for this shop will be available soon. Check back later for updates.",
     "overview": "Overview",
     "details": "Details",
-    "activity": "Activity"
+    "activity": "Activity",
+    "operatingHoursTitle": "Operating Hours",
+    "operatingHoursDescription": "Set the operating hours for each day of the week",
+    "open": "Open",
+    "timeTo": "to",
+    "toggleDayAriaLabel": "Toggle {{day}} open/closed",
+    "openingTimeAriaLabel": "{{day}} opening time",
+    "closingTimeAriaLabel": "{{day}} closing time",
+    "statusLabel": "Status"
   },
   "toast": {
     "profileUpdated": "Profile updated successfully",

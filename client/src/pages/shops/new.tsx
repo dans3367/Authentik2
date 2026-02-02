@@ -64,6 +64,9 @@ const DEFAULT_OPERATING_HOURS: Record<string, { open: string; close: string } | 
   sunday: { closed: true as const },
 };
 
+// Fallback times used when reopening a day that is closed by default
+const FALLBACK_OPERATING_HOURS = { open: '09:00', close: '17:00' };
+
 export default function NewShopPage() {
   const { t } = useTranslation();
   const [, navigate] = useLocation();
@@ -71,12 +74,12 @@ export default function NewShopPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useReduxAuth();
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
-  
+
   // Operating hours state
   type DayHours = { open: string; close: string; closed?: boolean } | { closed: true };
   type OperatingHoursState = Record<string, DayHours>;
   const [operatingHours, setOperatingHours] = useState<OperatingHoursState>(DEFAULT_OPERATING_HOURS);
-  
+
   const DAYS_OF_WEEK = [
     { key: 'monday', label: 'Monday' },
     { key: 'tuesday', label: 'Tuesday' },
@@ -86,7 +89,7 @@ export default function NewShopPage() {
     { key: 'saturday', label: 'Saturday' },
     { key: 'sunday', label: 'Sunday' },
   ];
-  
+
   // Generate time options in 30-minute increments
   const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
     const hours24 = Math.floor(i / 2);
@@ -97,7 +100,7 @@ export default function NewShopPage() {
     const label = `${hours12}:${minutes} ${ampm}`;
     return { value, label };
   });
-  
+
   // Convert 24hr to 12hr display format
   const formatTime12hr = (time24: string) => {
     const [hours, minutes] = time24.split(':').map(Number);
@@ -105,21 +108,19 @@ export default function NewShopPage() {
     const ampm = hours < 12 ? 'AM' : 'PM';
     return `${hours12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
   };
-  
+
   const updateDayHours = useCallback((day: string, field: 'open' | 'close', value: string) => {
     setOperatingHours(prev => {
       const dayHours = prev[day];
       if ('closed' in dayHours && dayHours.closed === true) {
         const defaultDay = DEFAULT_OPERATING_HOURS[day];
-        // Preserve closed=true if the default for that day is closed
-        if ('closed' in defaultDay && defaultDay.closed === true) {
-          return { ...prev, [day]: { closed: true } };
-        }
-        // TypeScript knows defaultDay has open/close properties here
-        const { open: defaultOpen, close: defaultClose } = defaultDay as { open: string; close: string };
+        // Use fallback times if default is closed, otherwise use default times
+        const baseHours = ('closed' in defaultDay && defaultDay.closed === true)
+          ? FALLBACK_OPERATING_HOURS
+          : defaultDay as { open: string; close: string };
         return {
           ...prev,
-          [day]: { open: field === 'open' ? value : defaultOpen, close: field === 'close' ? value : defaultClose }
+          [day]: { open: field === 'open' ? value : baseHours.open, close: field === 'close' ? value : baseHours.close }
         };
       }
       return {
@@ -128,16 +129,16 @@ export default function NewShopPage() {
       };
     });
   }, []);
-  
+
   const toggleDayClosed = useCallback((day: string, closed: boolean) => {
     setOperatingHours(prev => {
       if (closed) {
         return { ...prev, [day]: { closed: true } };
       }
       const defaultDay = DEFAULT_OPERATING_HOURS[day];
-      // Preserve closed=true if the default for that day is closed
+      // Use fallback times if default is closed, otherwise use default times
       if ('closed' in defaultDay && defaultDay.closed === true) {
-        return { ...prev, [day]: { closed: true } };
+        return { ...prev, [day]: { open: FALLBACK_OPERATING_HOURS.open, close: FALLBACK_OPERATING_HOURS.close } };
       }
       // TypeScript knows defaultDay has open/close properties here
       const { open: defaultOpen, close: defaultClose } = defaultDay as { open: string; close: string };
@@ -572,16 +573,16 @@ export default function NewShopPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Clock className="h-5 w-5" />
-                  Operating Hours
+                  {t('shops.operatingHoursTitle')}
                 </CardTitle>
-                <CardDescription>Set the operating hours for each day of the week</CardDescription>
+                <CardDescription>{t('shops.operatingHoursDescription')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   {DAYS_OF_WEEK.map(({ key, label }) => {
                     const dayHours = operatingHours[key];
                     const isClosed = 'closed' in dayHours && dayHours.closed === true;
-                    
+
                     return (
                       <div key={key} className="flex items-center gap-4 py-2 border-b last:border-b-0">
                         <div className="w-28 font-medium text-sm">{label}</div>
@@ -590,10 +591,10 @@ export default function NewShopPage() {
                             checked={!isClosed}
                             onCheckedChange={(checked) => toggleDayClosed(key, !checked)}
                             data-testid={`switch-${key}`}
-                            aria-label={`Toggle ${label} open/closed`}
+                            aria-label={t('shops.toggleDayAriaLabel', { day: label })}
                           />
                           <span className="text-sm text-muted-foreground w-12">
-                            {isClosed ? 'Closed' : 'Open'}
+                            {isClosed ? t('shops.closed') : t('shops.open')}
                           </span>
                         </div>
                         {!isClosed && (
@@ -602,7 +603,7 @@ export default function NewShopPage() {
                               value={'open' in dayHours ? dayHours.open : '09:00'}
                               onValueChange={(value) => updateDayHours(key, 'open', value)}
                             >
-                              <SelectTrigger className="w-32" data-testid={`input-${key}-open`} aria-label={`Open time for ${label}`}>
+                              <SelectTrigger className="w-32" data-testid={`input-${key}-open`} aria-label={t('shops.openingTimeAriaLabel', { day: label })}>
                                 <SelectValue>
                                   {formatTime12hr('open' in dayHours ? dayHours.open : '09:00')}
                                 </SelectValue>
@@ -613,12 +614,12 @@ export default function NewShopPage() {
                                 ))}
                               </SelectContent>
                             </Select>
-                            <span className="text-muted-foreground">to</span>
+                            <span className="text-muted-foreground">{t('shops.timeTo')}</span>
                             <Select
                               value={'close' in dayHours ? dayHours.close : '18:00'}
                               onValueChange={(value) => updateDayHours(key, 'close', value)}
                             >
-                              <SelectTrigger className="w-32" data-testid={`input-${key}-close`} aria-label={`Close time for ${label}`}>
+                              <SelectTrigger className="w-32" data-testid={`input-${key}-close`} aria-label={t('shops.closingTimeAriaLabel', { day: label })}>
                                 <SelectValue>
                                   {formatTime12hr('close' in dayHours ? dayHours.close : '18:00')}
                                 </SelectValue>
