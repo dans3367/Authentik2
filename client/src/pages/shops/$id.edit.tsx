@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -18,8 +18,9 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  Store, 
+import { Switch } from "@/components/ui/switch";
+import {
+  Store,
   ArrowLeft,
   Save,
   MapPin,
@@ -47,11 +48,69 @@ interface Manager {
 const SHOP_CATEGORIES = [
   { value: 'retail', label: 'Retail Store' },
   { value: 'restaurant', label: 'Restaurant' },
+  { value: 'cafe', label: 'Café' },
+  { value: 'bar', label: 'Bar/Pub' },
+  { value: 'grocery', label: 'Grocery Store' },
+  { value: 'pharmacy', label: 'Pharmacy' },
+  { value: 'salon', label: 'Salon/Spa' },
+  { value: 'gym', label: 'Gym/Fitness' },
   { value: 'service', label: 'Service Center' },
+  { value: 'automotive', label: 'Automotive' },
+  { value: 'clinic', label: 'Medical Clinic' },
+  { value: 'dental', label: 'Dental Office' },
+  { value: 'veterinary', label: 'Veterinary' },
   { value: 'warehouse', label: 'Warehouse' },
   { value: 'office', label: 'Office' },
+  { value: 'showroom', label: 'Showroom' },
+  { value: 'bakery', label: 'Bakery' },
+  { value: 'hotel', label: 'Hotel/Lodging' },
+  { value: 'bank', label: 'Bank/Financial' },
+  { value: 'education', label: 'Education/Training' },
+  { value: 'entertainment', label: 'Entertainment' },
   { value: 'other', label: 'Other' },
 ];
+
+const DEFAULT_OPERATING_HOURS: Record<string, { open: string; close: string } | { closed: true }> = {
+  monday: { open: '09:00', close: '18:00' },
+  tuesday: { open: '09:00', close: '18:00' },
+  wednesday: { open: '09:00', close: '18:00' },
+  thursday: { open: '09:00', close: '18:00' },
+  friday: { open: '09:00', close: '18:00' },
+  saturday: { open: '10:00', close: '16:00' },
+  sunday: { closed: true as const },
+};
+
+// Fallback times used when reopening a day that is closed by default
+const FALLBACK_OPERATING_HOURS = { open: '09:00', close: '17:00' };
+
+const DAYS_OF_WEEK = [
+  { key: 'monday', label: 'Monday' },
+  { key: 'tuesday', label: 'Tuesday' },
+  { key: 'wednesday', label: 'Wednesday' },
+  { key: 'thursday', label: 'Thursday' },
+  { key: 'friday', label: 'Friday' },
+  { key: 'saturday', label: 'Saturday' },
+  { key: 'sunday', label: 'Sunday' },
+];
+
+// Generate time options in 30-minute increments
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const hours24 = Math.floor(i / 2);
+  const minutes = i % 2 === 0 ? '00' : '30';
+  const value = `${hours24.toString().padStart(2, '0')}:${minutes}`;
+  const hours12 = hours24 === 0 ? 12 : hours24 > 12 ? hours24 - 12 : hours24;
+  const ampm = hours24 < 12 ? 'AM' : 'PM';
+  const label = `${hours12}:${minutes} ${ampm}`;
+  return { value, label };
+});
+
+// Convert 24hr to 12hr display format
+const formatTime12hr = (time24: string) => {
+  const [hours, minutes] = time24.split(':').map(Number);
+  const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+  const ampm = hours < 12 ? 'AM' : 'PM';
+  return `${hours12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+};
 
 export default function EditShopPage() {
   const { t } = useTranslation();
@@ -61,6 +120,48 @@ export default function EditShopPage() {
   const queryClient = useQueryClient();
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
+
+  // Operating hours state
+  type DayHours = { open: string; close: string; closed?: boolean } | { closed: true };
+  type OperatingHoursState = Record<string, DayHours>;
+  const [operatingHours, setOperatingHours] = useState<OperatingHoursState>(DEFAULT_OPERATING_HOURS);
+
+  const updateDayHours = useCallback((day: string, field: 'open' | 'close', value: string) => {
+    setOperatingHours(prev => {
+      const dayHours = prev[day];
+      if ('closed' in dayHours && dayHours.closed === true) {
+        const defaultForDay = DEFAULT_OPERATING_HOURS[day];
+        // Use fallback times if default is closed, otherwise use default times
+        const baseHours = ('closed' in defaultForDay && defaultForDay.closed === true)
+          ? FALLBACK_OPERATING_HOURS
+          : defaultForDay as { open: string; close: string };
+        return {
+          ...prev,
+          [day]: { open: field === 'open' ? value : baseHours.open, close: field === 'close' ? value : baseHours.close }
+        };
+      }
+      return {
+        ...prev,
+        [day]: { ...dayHours, [field]: value }
+      };
+    });
+  }, []);
+
+  const toggleDayClosed = useCallback((day: string, closed: boolean) => {
+    setOperatingHours(prev => {
+      if (closed) {
+        return { ...prev, [day]: { closed: true } };
+      }
+      const defaultForDay = DEFAULT_OPERATING_HOURS[day];
+      // Use fallback times if default is closed, otherwise use default times
+      if ('closed' in defaultForDay && defaultForDay.closed === true) {
+        return { ...prev, [day]: { open: FALLBACK_OPERATING_HOURS.open, close: FALLBACK_OPERATING_HOURS.close } };
+      }
+      // TypeScript knows defaultForDay has open/close properties here
+      const { open: defaultOpen, close: defaultClose } = defaultForDay as { open: string; close: string };
+      return { ...prev, [day]: { open: defaultOpen, close: defaultClose } };
+    });
+  }, []);
 
   const {
     register,
@@ -79,6 +180,8 @@ export default function EditShopPage() {
       email: '',
       status: 'active',
       isActive: true,
+      managerId: null,
+      category: '',
     },
   });
 
@@ -93,7 +196,7 @@ export default function EditShopPage() {
   });
 
   // Fetch managers
-  const { data: managersData, isLoading: managersLoading } = useQuery<{ managers: Manager[] }>({
+  const { data: managersData, isLoading: managersLoading } = useQuery<Manager[]>({
     queryKey: ['/api/shops/managers/list'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/shops/managers/list');
@@ -143,25 +246,70 @@ export default function EditShopPage() {
         phone: shop.phone || '',
         email: shop.email || '',
         website: shop.website || '',
-        managerId: shop.managerId || undefined,
+        managerId: shop.managerId || null,
         operatingHours: shop.operatingHours || '',
         status: (shop.status as 'active' | 'inactive' | 'maintenance') || 'active',
         category: shop.category || '',
         tags: shop.tags || [],
         socialMedia: shop.socialMedia || '',
         settings: shop.settings || '',
-        isActive: shop.isActive !== undefined ? shop.isActive : true,
+        isActive: shop.isActive ?? true,
       });
       setTags(shop.tags || []);
+
+      // Parse and set operating hours
+      if (shop.operatingHours) {
+        try {
+          const parsed = JSON.parse(shop.operatingHours);
+          if (typeof parsed === 'object' && parsed !== null) {
+            // Normalize and merge with defaults
+            const normalizedHours = Object.keys(DEFAULT_OPERATING_HOURS).reduce((acc, day) => {
+              const defaultDay = DEFAULT_OPERATING_HOURS[day];
+              const parsedDay = parsed[day];
+
+              // If parsed data exists for this day, use it; otherwise use default
+              if (parsedDay && typeof parsedDay === 'object') {
+                // Handle array format by converting to expected object shape
+                if (Array.isArray(parsedDay)) {
+                  // If it's an array, assume [open, close] format or use defaults
+                  acc[day] = parsedDay.length >= 2
+                    ? { open: parsedDay[0], close: parsedDay[1] }
+                    : defaultDay;
+                } else if ('closed' in parsedDay && parsedDay.closed === true) {
+                  // Preserve closed state
+                  acc[day] = { closed: true };
+                } else if ('open' in parsedDay && 'close' in parsedDay) {
+                  // Use existing open/close values
+                  acc[day] = { open: parsedDay.open, close: parsedDay.close };
+                } else {
+                  // Fallback to default if structure is unexpected
+                  acc[day] = defaultDay;
+                }
+              } else {
+                // Use default for missing days
+                acc[day] = defaultDay;
+              }
+
+              return acc;
+            }, {} as typeof DEFAULT_OPERATING_HOURS);
+
+            setOperatingHours(normalizedHours);
+          }
+        } catch {
+          // Keep default operating hours if parsing fails
+        }
+      }
     }
   }, [shopData, reset]);
 
   const onSubmit = (data: UpdateShopData) => {
-    // Prepare submit data
+    // Prepare submit data - ensure managerId is explicitly set (null or valid ID)
+    const managerId = (!data.managerId || data.managerId === 'no-manager' || data.managerId === '') ? null : data.managerId;
     const submitData = {
       ...data,
-      managerId: (!data.managerId || data.managerId === 'no-manager' || data.managerId === '') ? null : data.managerId,
+      managerId,
       tags: tags.length > 0 ? tags : undefined,
+      operatingHours: JSON.stringify(operatingHours),
       isActive: data.isActive !== undefined ? data.isActive : true,
     };
 
@@ -276,9 +424,10 @@ export default function EditShopPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="category">{t('shops.form.category')}</Label>
-                    <Select 
-                      value={watch('category')} 
-                      onValueChange={(value) => setValue('category', value)}
+                    <Select
+                      key={`category-${watch('category')}`}
+                      value={watch('category') || ''}
+                      onValueChange={(value) => setValue('category', value, { shouldDirty: true })}
                     >
                       <SelectTrigger data-testid="select-category">
                         <SelectValue placeholder={t('shops.form.categoryPlaceholder')} />
@@ -308,8 +457,8 @@ export default function EditShopPage() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="status">{t('shops.form.status')} *</Label>
-                    <Select 
-                      value={watch('status') || 'active'} 
+                    <Select
+                      value={watch('status') || 'active'}
                       onValueChange={(value) => setValue('status', value as 'active' | 'inactive' | 'maintenance')}
                     >
                       <SelectTrigger data-testid="select-status">
@@ -329,8 +478,9 @@ export default function EditShopPage() {
                   <div className="space-y-2">
                     <Label htmlFor="managerId">{t('shops.form.manager')}</Label>
                     <Select
+                      key={`${managersLoading ? 'loading' : 'loaded'}-${watch('managerId')}`}
                       value={watch('managerId') || 'no-manager'}
-                      onValueChange={(value) => setValue('managerId', value === 'no-manager' ? undefined : value)}
+                      onValueChange={(value) => setValue('managerId', value === 'no-manager' ? null : value, { shouldDirty: true, shouldTouch: true })}
                       disabled={managersLoading}
                     >
                       <SelectTrigger data-testid="select-manager">
@@ -338,9 +488,11 @@ export default function EditShopPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="no-manager">{t('shops.form.noManager')}</SelectItem>
-                        {managersData?.managers?.map(manager => (
+                        {Array.isArray(managersData) && managersData.map(manager => (
                           <SelectItem key={manager.id} value={manager.id}>
-                            {manager.firstName} {manager.lastName} ({manager.email})
+                            {manager.firstName || manager.lastName
+                              ? `${manager.firstName || ''} ${manager.lastName || ''}`.trim()
+                              : t('users.table.noName')} ({manager.email})
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -468,6 +620,79 @@ export default function EditShopPage() {
               </CardContent>
             </Card>
 
+            {/* Operating Hours */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  {t('shops.operatingHoursTitle')}
+                </CardTitle>
+                <CardDescription>{t('shops.operatingHoursDescription')}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {DAYS_OF_WEEK.map(({ key, label }) => {
+                    const dayHours = operatingHours[key];
+                    const isClosed = dayHours && 'closed' in dayHours && dayHours.closed === true;
+
+                    return (
+                      <div key={key} className="flex items-center gap-4 py-2 border-b last:border-b-0">
+                        <div className="w-28 font-medium text-sm">{label}</div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            id={`${key}-switch`}
+                            checked={!isClosed}
+                            onCheckedChange={(checked) => toggleDayClosed(key, !checked)}
+                            data-testid={`switch-${key}`}
+                            aria-checked={!isClosed}
+                            aria-label={t('shops.toggleDayAriaLabel', { day: label })}
+                          />
+                          <span className="text-sm text-muted-foreground w-12">
+                            {isClosed ? t('shops.closed') : t('shops.open')}
+                          </span>
+                        </div>
+                        {!isClosed && dayHours && (
+                          <div className="flex items-center gap-2 flex-1">
+                            <Select
+                              value={'open' in dayHours ? dayHours.open : '09:00'}
+                              onValueChange={(value) => updateDayHours(key, 'open', value)}
+                            >
+                              <SelectTrigger className="w-32" data-testid={`input-${key}-open`} id={`${key}-open`} aria-label={t('shops.openingTimeAriaLabel', { day: label })}>
+                                <SelectValue>
+                                  {formatTime12hr('open' in dayHours ? dayHours.open : '09:00')}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {TIME_OPTIONS.map(({ value, label }) => (
+                                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <span className="text-muted-foreground">{t('shops.timeTo')}</span>
+                            <Select
+                              value={'close' in dayHours ? dayHours.close : '18:00'}
+                              onValueChange={(value) => updateDayHours(key, 'close', value)}
+                            >
+                              <SelectTrigger className="w-32" data-testid={`input-${key}-close`} id={`${key}-close`} aria-label={t('shops.closingTimeAriaLabel', { day: label })}>
+                                <SelectValue>
+                                  {formatTime12hr('close' in dayHours ? dayHours.close : '18:00')}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {TIME_OPTIONS.map(({ value, label }) => (
+                                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Tags */}
             <Card>
               <CardHeader>
@@ -492,8 +717,8 @@ export default function EditShopPage() {
                   {tags.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {tags.map(tag => (
-                        <Badge 
-                          key={tag} 
+                        <Badge
+                          key={tag}
                           variant="secondary"
                           className="cursor-pointer"
                           onClick={() => handleRemoveTag(tag)}

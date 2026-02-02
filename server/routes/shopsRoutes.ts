@@ -12,28 +12,10 @@ export const shopsRoutes = Router();
 // Get all shops for the company
 shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
   try {
-    console.log('🏪 [Shops API] GET /api/shops - Request received');
-    console.log('🔑 [Shops API] User info:', {
-      userId: req.user?.id,
-      tenantId: req.user?.tenantId,
-      userEmail: req.user?.email,
-      userRole: req.user?.role
-    });
-    
     const { page = 1, limit = 50, search, status, managerId } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
-    
-    console.log('🔍 [Shops API] Query parameters:', {
-      page: Number(page),
-      limit: Number(limit),
-      offset,
-      search,
-      status,
-      managerId
-    });
 
     let whereClause = sql`${shops.tenantId} = ${req.user.tenantId}`;
-    console.log('🎯 [Shops API] Base where clause for tenantId:', req.user.tenantId);
 
     if (search) {
       const sanitizedSearch = sanitizeString(search as string);
@@ -52,35 +34,64 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
       whereClause = sql`${whereClause} AND ${shops.managerId} = ${managerId}`;
     }
 
-    console.log('🔄 [Shops API] Executing shops query...');
-    const shopsData = await db.select().from(shops)
+    const shopsData = await db.select({
+      id: shops.id,
+      name: shops.name,
+      description: shops.description,
+      address: shops.address,
+      city: shops.city,
+      state: shops.state,
+      zipCode: shops.zipCode,
+      country: shops.country,
+      phone: shops.phone,
+      email: shops.email,
+      website: shops.website,
+      logoUrl: shops.logoUrl,
+      managerId: shops.managerId,
+      operatingHours: shops.operatingHours,
+      status: shops.status,
+      category: shops.category,
+      tags: shops.tags,
+      socialMedia: shops.socialMedia,
+      settings: shops.settings,
+      isActive: shops.isActive,
+      tenantId: shops.tenantId,
+      createdAt: shops.createdAt,
+      updatedAt: shops.updatedAt,
+      managerFirstName: betterAuthUser.firstName,
+      managerLastName: betterAuthUser.lastName,
+      managerEmail: betterAuthUser.email,
+    }).from(shops)
+      .leftJoin(betterAuthUser, sql`${shops.managerId} = ${betterAuthUser.id}`)
       .where(whereClause)
       .orderBy(sql`${shops.createdAt} DESC`)
       .limit(Number(limit))
       .offset(offset);
-    
-    console.log('📊 [Shops API] Shops query result:', {
-      shopsFound: shopsData.length,
-      shopIds: shopsData.map(s => s.id),
-      shopNames: shopsData.map(s => s.name)
+
+    // Transform the data to include manager object
+    const shopsWithManager = shopsData.map((shop: any) => {
+      const { managerFirstName, managerLastName, managerEmail, ...shopFields } = shop;
+      return {
+        ...shopFields,
+        manager: shopFields.managerId ? {
+          id: shopFields.managerId,
+          firstName: managerFirstName,
+          lastName: managerLastName,
+          email: managerEmail,
+        } : null,
+      };
     });
 
-    console.log('🔢 [Shops API] Executing count query...');
     const [totalCountResult] = await db.select({
       count: sql<number>`count(*)`,
     }).from(shops).where(whereClause);
-    
-    console.log('📈 [Shops API] Total count result:', totalCountResult.count);
 
-    console.log('📋 [Shops API] Calculating limits and stats...');
     // Get shop limits and stats using proper storage method
     const limits = await storage.checkShopLimits(req.user.tenantId);
-    const stats = { totalShops: shopsData.length, activeShops: shopsData.filter(s => s.status === 'active').length, shopsByCategory: {} };
-    
-    console.log('📊 [Shops API] Calculated stats:', { limits, stats });
+    const stats = { totalShops: totalCountResult.count, activeShops: shopsWithManager.filter((s: any) => s.status === 'active').length, shopsByCategory: {} };
 
     const response = {
-      shops: shopsData,
+      shops: shopsWithManager,
       pagination: {
         page: Number(page),
         limit: Number(limit),
@@ -90,14 +101,7 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
       limits,
       stats,
     };
-    
-    console.log('✅ [Shops API] Sending successful response:', {
-      shopsCount: response.shops.length,
-      pagination: response.pagination,
-      hasLimits: !!response.limits,
-      hasStats: !!response.stats
-    });
-    
+
     res.json(response);
   } catch (error) {
     console.error('❌ [Shops API] Get shops error occurred:');
@@ -108,7 +112,7 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
       userId: req.user?.id,
       tenantId: req.user?.tenantId
     });
-    
+
     const errorResponse = {
       message: 'Failed to get shops',
       debug: {
@@ -118,7 +122,7 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
         timestamp: new Date().toISOString()
       }
     };
-    
+
     console.error('❌ [Shops API] Sending error response:', errorResponse);
     res.status(500).json(errorResponse);
   }
@@ -129,13 +133,52 @@ shopsRoutes.get("/:id", authenticateToken, async (req: any, res) => {
   try {
     const { id } = req.params;
 
-    const [shop] = await db.select().from(shops)
+    const [shopData] = await db.select({
+      id: shops.id,
+      name: shops.name,
+      description: shops.description,
+      address: shops.address,
+      city: shops.city,
+      state: shops.state,
+      zipCode: shops.zipCode,
+      country: shops.country,
+      phone: shops.phone,
+      email: shops.email,
+      website: shops.website,
+      logoUrl: shops.logoUrl,
+      managerId: shops.managerId,
+      operatingHours: shops.operatingHours,
+      status: shops.status,
+      category: shops.category,
+      tags: shops.tags,
+      socialMedia: shops.socialMedia,
+      settings: shops.settings,
+      isActive: shops.isActive,
+      tenantId: shops.tenantId,
+      createdAt: shops.createdAt,
+      updatedAt: shops.updatedAt,
+      managerFirstName: betterAuthUser.firstName,
+      managerLastName: betterAuthUser.lastName,
+      managerEmail: betterAuthUser.email,
+    }).from(shops)
+      .leftJoin(betterAuthUser, sql`${shops.managerId} = ${betterAuthUser.id}`)
       .where(sql`${shops.id} = ${id} AND ${shops.tenantId} = ${req.user.tenantId}`)
       .limit(1);
 
-    if (!shop) {
+    if (!shopData) {
       return res.status(404).json({ message: 'Shop not found' });
     }
+
+    // Transform to include manager object
+    const shop = {
+      ...shopData,
+      manager: shopData.managerId ? {
+        id: shopData.managerId,
+        firstName: shopData.managerFirstName,
+        lastName: shopData.managerLastName,
+        email: shopData.managerEmail,
+      } : null,
+    };
 
     res.json({ shop });
   } catch (error) {
@@ -151,17 +194,26 @@ shopsRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator", 
     await storage.validateShopCreation(req.user.tenantId);
 
     const validatedData = createShopSchema.parse(req.body);
-    const { name, description, address, phone, email, managerId, status } = validatedData;
+    const { name, description, address, phone, email, managerId, status, category, city, state, zipCode, country, website, operatingHours, tags, socialMedia, settings } = validatedData;
 
     const sanitizedName = sanitizeString(name) || name;
     const sanitizedDescription = description ? sanitizeString(description) : null;
     const sanitizedAddress = address ? sanitizeString(address) : null;
     const sanitizedPhone = phone ? sanitizeString(phone) || phone : null;
     const sanitizedEmail = email ? sanitizeString(email) || email : null;
+    const sanitizedCategory = category ? sanitizeString(category) : null;
+    const sanitizedCity = city ? sanitizeString(city) : null;
+    const sanitizedState = state ? sanitizeString(state) : null;
+    const sanitizedZipCode = zipCode ? sanitizeString(zipCode) : null;
+    const sanitizedCountry = country ? sanitizeString(country) : 'United States';
+    const sanitizedWebsite = website ? sanitizeString(website) : null;
+    const sanitizedOperatingHours = operatingHours ? sanitizeString(operatingHours) : null;
+    const sanitizedSocialMedia = socialMedia ? sanitizeString(socialMedia) : null;
+    const sanitizedSettings = settings ? sanitizeString(settings) : null;
 
     // Validate required fields
     if (!sanitizedName || !sanitizedPhone || !sanitizedEmail) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Name, phone and email are required fields',
         missingFields: {
           name: !sanitizedName,
@@ -186,12 +238,21 @@ shopsRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator", 
       name: sanitizedName,
       description: sanitizedDescription,
       address: sanitizedAddress,
+      city: sanitizedCity,
+      state: sanitizedState,
+      zipCode: sanitizedZipCode,
+      country: sanitizedCountry,
       phone: sanitizedPhone,
       email: sanitizedEmail,
+      website: sanitizedWebsite,
       managerId: managerId || null,
+      operatingHours: sanitizedOperatingHours,
       status: status || 'active',
+      category: sanitizedCategory,
+      tags: tags || [],
+      socialMedia: sanitizedSocialMedia,
+      settings: sanitizedSettings,
       tenantId: req.user.tenantId,
-      country: 'United States',
     }).returning();
 
     res.status(201).json(newShop[0]);

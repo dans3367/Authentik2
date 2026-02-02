@@ -30,7 +30,8 @@
     "all": "Todos",
     "none": "Ninguno",
     "yes": "Sí",
-    "no": "No"
+    "no": "No",
+    "at": "a las"
   },
   "navigation": {
     "dashboard": "Panel de Control",
@@ -1089,7 +1090,47 @@
     },
     "loading": "Cargando tiendas...",
     "loadingShop": "Cargando detalles de la tienda...",
-    "loadingManagers": "Cargando gerentes..."
+    "loadingManagers": "Cargando gerentes...",
+    "uncategorized": "Sin categoría",
+    "notSpecified": "No especificado",
+    "closed": "Cerrado",
+    "shopNotFound": "Tienda no encontrada",
+    "shopNotFoundDescription": "La tienda que buscas no existe o ha sido eliminada.",
+    "locationInformation": "Información de Ubicación",
+    "locationInformationDescription": "Dirección física y detalles de contacto",
+    "address": "Dirección",
+    "noAddressSpecified": "No se especificó dirección",
+    "phone": "Teléfono",
+    "email": "Correo Electrónico",
+    "website": "Sitio Web",
+    "operatingInformation": "Información Operativa",
+    "operatingInformationDescription": "Horarios y detalles de gestión",
+    "operatingHours": "Horario de Atención",
+    "manager": "Gerente",
+    "noManagerAssigned": "Sin gerente asignado",
+    "description": "Descripción",
+    "tags": "Etiquetas",
+    "tagsDescription": "Categorías y etiquetas para esta tienda",
+    "shopDetails": "Detalles de la Tienda",
+    "shopDetailsDescription": "Información adicional y metadatos",
+    "shopId": "ID de Tienda",
+    "created": "Creado",
+    "lastUpdated": "Última Actualización",
+    "recentActivity": "Actividad Reciente",
+    "recentActivityDescription": "Actividad y cambios de la tienda",
+    "activityTracking": "Seguimiento de Actividad",
+    "activityTrackingDescription": "El seguimiento de actividad para esta tienda estará disponible pronto. Vuelve a consultar más tarde para ver actualizaciones.",
+    "overview": "Resumen",
+    "details": "Detalles",
+    "activity": "Actividad",
+    "operatingHoursTitle": "Horario de Operación",
+    "operatingHoursDescription": "Configura el horario de operación para cada día de la semana",
+    "open": "Abierto",
+    "timeTo": "a",
+    "toggleDayAriaLabel": "Alternar {{day}} abierto/cerrado",
+    "openingTimeAriaLabel": "Hora de apertura de {{day}}",
+    "closingTimeAriaLabel": "Hora de cierre de {{day}}",
+    "statusLabel": "Estado"
   },
   "profile": {
     "title": "Configuración de Cuenta",
@@ -1260,19 +1301,58 @@
     "palette": {
       "header": "Componentes del Formulario",
       "subheader": "Arrastra y suelta para construir tu formulario",
-      "categories": { "basic": "Entradas Básicas", "selection": "Selección" },
-      "text-input": { "label": "Campo de Texto", "description": "Campo de una sola línea" },
-      "email-input": { "label": "Campo de Email", "description": "Dirección de correo" },
-      "textarea": { "label": "Área de Texto", "description": "Texto de varias líneas" },
-      "number-input": { "label": "Campo Numérico", "description": "Campo numérico" },
-      "full-name": { "label": "Nombre Completo", "description": "Nombre y apellido" },
-      "image": { "label": "Imagen", "description": "Cuadro de imagen" },
-      "select": { "label": "Lista Desplegable", "description": "Selección desplegable" },
-      "checkbox": { "label": "Casilla", "description": "Selección múltiple" },
-      "radio": { "label": "Opción Única", "description": "Selección única" },
-      "rate-scale": { "label": "Escala de Calificación", "description": "Escala 1-10" },
-      "boolean-switch": { "label": "Interruptor Sí/No", "description": "Opción binaria" },
-      "datetime-picker": { "label": "Fecha y Hora", "description": "Entrada de fecha, hora o ambas" }
+      "categories": {
+        "basic": "Entradas Básicas",
+        "selection": "Selección"
+      },
+      "text-input": {
+        "label": "Campo de Texto",
+        "description": "Campo de una sola línea"
+      },
+      "email-input": {
+        "label": "Campo de Email",
+        "description": "Dirección de correo"
+      },
+      "textarea": {
+        "label": "Área de Texto",
+        "description": "Texto de varias líneas"
+      },
+      "number-input": {
+        "label": "Campo Numérico",
+        "description": "Campo numérico"
+      },
+      "full-name": {
+        "label": "Nombre Completo",
+        "description": "Nombre y apellido"
+      },
+      "image": {
+        "label": "Imagen",
+        "description": "Cuadro de imagen"
+      },
+      "select": {
+        "label": "Lista Desplegable",
+        "description": "Selección desplegable"
+      },
+      "checkbox": {
+        "label": "Casilla",
+        "description": "Selección múltiple"
+      },
+      "radio": {
+        "label": "Opción Única",
+        "description": "Selección única"
+      },
+      "rate-scale": {
+        "label": "Escala de Calificación",
+        "description": "Escala 1-10"
+      },
+      "boolean-switch": {
+        "label": "Interruptor Sí/No",
+        "description": "Opción binaria"
+      },
+      "datetime-picker": {
+        "label": "Fecha y Hora",
+        "description": "Entrada de fecha, hora o ambas"
+      }
     },
     "proTipTitle": "Consejo",
     "proTipDesktop": "Arrastra componentes para una colocación precisa con indicadores azules",
@@ -1283,7 +1363,10 @@
       "previewShort": "Modo de vista previa",
       "buildFull": "Modo de construcción - arrastra o haz clic para agregar",
       "buildShort": "Modo de construcción",
-      "buttons": {"edit": "Editar", "preview": "Vista previa"},
+      "buttons": {
+        "edit": "Editar",
+        "preview": "Vista previa"
+      },
       "heroTitle": "Construye Tu Formulario Perfecto",
       "heroSubtitleDesktop": "Comienza arrastrando componentes desde la barra lateral o haz clic en cualquiera para agregarlo al instante.",
       "heroSubtitleMobile": "Toca componentes para agregarlos al formulario.",

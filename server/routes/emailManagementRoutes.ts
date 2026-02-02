@@ -1057,7 +1057,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       const { scheduleEmailTask } = await import('../../src/trigger/email');
       const payload: Parameters<typeof scheduleEmailTask.trigger>[0] = {
         to: String(contact.email),
-        subject: sanitizeString(String(subject)),
+        subject: sanitizeString(String(subject)) || 'No Subject',
         html: String(html),
         scheduledFor: scheduleDate.toISOString(),
         metadata: {
