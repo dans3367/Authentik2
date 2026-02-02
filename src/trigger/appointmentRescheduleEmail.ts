@@ -1,9 +1,74 @@
 import { task, logger } from "@trigger.dev/sdk/v3";
 import { Resend } from "resend";
 import { z } from "zod";
+import { createHmac } from "crypto";
 
 // Initialize Resend for email sending
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+/**
+ * Generate HMAC signature for internal service authentication
+ */
+function generateInternalSignature(payload: object, timestamp: number): string {
+    const secret = process.env.INTERNAL_SERVICE_SECRET;
+    if (!secret) {
+        throw new Error("INTERNAL_SERVICE_SECRET is not configured");
+    }
+    const signaturePayload = `${timestamp}.${JSON.stringify(payload)}`;
+    return createHmac("sha256", secret).update(signaturePayload).digest("hex");
+}
+
+/**
+ * Log email activity to the server via internal API
+ */
+async function logEmailActivity(params: {
+    tenantId: string;
+    contactId: string;
+    activityType: string;
+    activityData: object;
+}): Promise<void> {
+    const apiUrl = process.env.API_URL || "http://localhost:5002";
+    const timestamp = Date.now();
+    const body = {
+        tenantId: params.tenantId,
+        contactId: params.contactId,
+        activityType: params.activityType,
+        activityData: params.activityData,
+        occurredAt: new Date().toISOString(),
+    };
+
+    try {
+        const signature = generateInternalSignature(body, timestamp);
+        
+        const response = await fetch(`${apiUrl}/api/email-contacts/internal/email-activity`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-internal-service": "trigger.dev",
+                "x-internal-timestamp": timestamp.toString(),
+                "x-internal-signature": signature,
+            },
+            body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            logger.warn("Failed to log email activity", { 
+                status: response.status, 
+                error: errorData 
+            });
+        } else {
+            logger.info("Email activity logged successfully", { 
+                contactId: params.contactId,
+                activityType: params.activityType 
+            });
+        }
+    } catch (error) {
+        logger.warn("Error logging email activity", { 
+            error: error instanceof Error ? error.message : "Unknown error" 
+        });
+    }
+}
 
 // Schema for reschedule email payload
 const rescheduleEmailPayloadSchema = z.object({
@@ -72,6 +137,25 @@ export const sendRescheduleEmailTask = task({
             logger.info("Reschedule email sent successfully", {
                 emailId: emailData?.id,
                 appointmentId: data.appointmentId,
+            });
+
+            // Log email activity to customer's timeline
+            await logEmailActivity({
+                tenantId: data.tenantId,
+                contactId: data.customerId,
+                activityType: "sent",
+                activityData: {
+                    type: "reschedule-invitation",
+                    emailId: emailData?.id,
+                    appointmentId: data.appointmentId,
+                    appointmentTitle: data.appointmentTitle,
+                    appointmentDate: data.appointmentDate,
+                    appointmentTime: data.appointmentTime,
+                    originalStatus: data.status,
+                    subject,
+                    recipient: data.customerEmail,
+                    from: data.from || process.env.EMAIL_FROM || "admin@zendwise.com",
+                },
             });
 
             return {

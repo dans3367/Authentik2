@@ -4,6 +4,7 @@ import { sql, eq, and } from 'drizzle-orm';
 import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, eCardSettings, emailActivity, tenants, emailSends, emailContent, companies, unsubscribeTokens } from '@shared/schema';
 import { deleteImageFromR2 } from '../config/r2';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
+import { authenticateInternalService, InternalServiceRequest } from '../middleware/internal-service-auth';
 import { type ContactFilters, type BouncedEmailFilters } from '@shared/schema';
 import { sanitizeString, sanitizeEmail } from '../utils/sanitization';
 import { storage } from '../storage';
@@ -2180,6 +2181,83 @@ emailManagementRoutes.post("/internal/birthday-invitation", async (req: any, res
   } catch (error) {
     console.error('Send internal birthday invitation error:', error);
     res.status(500).json({ message: 'Failed to send birthday invitation' });
+  }
+});
+
+// Internal endpoint for Trigger.dev to log email activity
+// Secured with HMAC signature verification
+emailManagementRoutes.post("/internal/email-activity", authenticateInternalService, async (req: InternalServiceRequest, res) => {
+  console.log('📧 [Internal Email Activity] Received authenticated request:', {
+    service: req.internalService?.service,
+    body: req.body,
+  });
+
+  try {
+    const { 
+      tenantId, 
+      contactId, 
+      activityType, 
+      activityData,
+      occurredAt 
+    } = req.body;
+
+    // Validate required fields
+    if (!tenantId || !contactId || !activityType) {
+      return res.status(400).json({ 
+        error: 'tenantId, contactId, and activityType are required' 
+      });
+    }
+
+    // Validate activityType
+    const validActivityTypes = ['sent', 'delivered', 'opened', 'clicked', 'bounced', 'complained', 'unsubscribed'];
+    if (!validActivityTypes.includes(activityType)) {
+      return res.status(400).json({ 
+        error: `Invalid activityType. Must be one of: ${validActivityTypes.join(', ')}` 
+      });
+    }
+
+    // Verify contact exists
+    const existingContact = await db
+      .select({ id: emailContacts.id })
+      .from(emailContacts)
+      .where(and(
+        eq(emailContacts.id, contactId),
+        eq(emailContacts.tenantId, tenantId)
+      ))
+      .limit(1);
+
+    if (existingContact.length === 0) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
+    // Create email activity record
+    const [newActivity] = await db.insert(emailActivity).values({
+      tenantId,
+      contactId,
+      activityType,
+      activityData: activityData ? JSON.stringify(activityData) : null,
+      occurredAt: occurredAt ? new Date(occurredAt) : new Date(),
+    }).returning();
+
+    // Update contact's lastActivity timestamp
+    await db.update(emailContacts)
+      .set({ 
+        lastActivity: new Date(),
+        updatedAt: new Date(),
+        // Increment emailsSent counter if this is a 'sent' activity
+        ...(activityType === 'sent' ? { emailsSent: sql`${emailContacts.emailsSent} + 1` } : {})
+      })
+      .where(eq(emailContacts.id, contactId));
+
+    console.log(`📧 [Internal Email Activity] Created activity ${newActivity.id} for contact ${contactId}`);
+    
+    res.json({ 
+      activity: newActivity,
+      message: 'Email activity logged successfully' 
+    });
+  } catch (error) {
+    console.error('Failed to log email activity (internal):', error);
+    res.status(500).json({ error: 'Failed to log email activity' });
   }
 });
 
