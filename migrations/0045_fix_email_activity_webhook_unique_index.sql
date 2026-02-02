@@ -21,6 +21,18 @@ BEGIN
     
     -- Drop the partial index if it exists (from earlier migration attempt)
     DROP INDEX IF EXISTS email_activity_webhook_id_tenant_id_unique;
+
+    -- Deduplicate existing data before creating the unique index
+    -- Keep only the record with the smallest ID for each (webhook_id, tenant_id) pair
+    -- We only care about pairs where webhook_id is NOT NULL since NULLs don't conflict in this index
+    DELETE FROM email_activity a 
+    USING email_activity b 
+    WHERE a.id > b.id 
+      AND a.webhook_id = b.webhook_id 
+      AND a.tenant_id = b.tenant_id
+      AND a.webhook_id IS NOT NULL;
+      
+    RAISE NOTICE 'Deduplicated email_activity table';
 END $$;
 
 -- Create the unique index (NOT a partial index) to work with Drizzle's onConflictDoNothing

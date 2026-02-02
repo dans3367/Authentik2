@@ -8,6 +8,18 @@ BEGIN
         SELECT 1 FROM pg_constraint 
         WHERE conname = 'email_activity_webhook_tenant_unique'
     ) THEN
+        -- Deduplicate existing data before adding the unique constraint
+        -- Keep only the record with the smallest ID for each (webhook_id, tenant_id) pair
+        -- We only care about pairs where webhook_id is NOT NULL since NULLs don't conflict in this constraint
+        DELETE FROM email_activity a 
+        USING email_activity b 
+        WHERE a.id > b.id 
+          AND a.webhook_id = b.webhook_id 
+          AND a.tenant_id = b.tenant_id
+          AND a.webhook_id IS NOT NULL;
+          
+        RAISE NOTICE 'Deduplicated email_activity table';
+
         -- Add unique constraint on webhookId and tenantId combination
         ALTER TABLE email_activity 
         ADD CONSTRAINT email_activity_webhook_tenant_unique 
