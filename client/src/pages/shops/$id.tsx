@@ -1,12 +1,14 @@
 import { useParams, useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Store, 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Store,
   ArrowLeft,
   Edit,
   MapPin,
@@ -19,13 +21,17 @@ import {
   Tag,
   Building,
   Activity,
-  Settings
+  CheckCircle,
+  XCircle,
+  AlertCircle
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { cn } from "@/lib/utils";
 import type { ShopWithManager } from "@shared/schema";
 
 export default function ShopDetailsPage() {
   const { id } = useParams();
+  const { t } = useTranslation();
   const [, navigate] = useLocation();
 
   // Fetch shop data
@@ -40,42 +46,60 @@ export default function ShopDetailsPage() {
 
   const shop = shopData?.shop;
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      active: { label: 'Active', variant: 'default' as const },
-      inactive: { label: 'Inactive', variant: 'secondary' as const },
-      maintenance: { label: 'Maintenance', variant: 'outline' as const },
-    };
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.active;
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+  const getStatusConfig = (status: string) => {
+    switch (status) {
+      case 'active':
+        return {
+          icon: <CheckCircle className="h-4 w-4" />,
+          label: 'Active',
+          className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800'
+        };
+      case 'inactive':
+        return {
+          icon: <XCircle className="h-4 w-4" />,
+          label: 'Inactive',
+          className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800'
+        };
+      case 'maintenance':
+        return {
+          icon: <AlertCircle className="h-4 w-4" />,
+          label: 'Maintenance',
+          className: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800'
+        };
+      default:
+        return {
+          icon: <CheckCircle className="h-4 w-4" />,
+          label: 'Active',
+          className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800'
+        };
+    }
   };
 
   const formatOperatingHours = (hours?: string) => {
-    if (!hours) return 'Not specified';
+    if (!hours) return <span className="text-gray-400 dark:text-gray-500">Not specified</span>;
     try {
       const parsed = JSON.parse(hours);
       if (typeof parsed === 'string') return parsed;
-      
+
       // Format complex operating hours
       const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
       return (
-        <div className="space-y-1">
+        <div className="space-y-2">
           {days.map(day => {
             const dayHours = parsed[day];
             if (!dayHours) return null;
             if (dayHours.closed) {
               return (
-                <div key={day} className="flex justify-between">
-                  <span className="capitalize font-medium">{day}:</span>
-                  <span className="text-muted-foreground">Closed</span>
+                <div key={day} className="flex justify-between text-sm">
+                  <span className="capitalize font-medium text-gray-700 dark:text-gray-300">{day}</span>
+                  <span className="text-gray-400 dark:text-gray-500">Closed</span>
                 </div>
               );
             }
             return (
-              <div key={day} className="flex justify-between">
-                <span className="capitalize font-medium">{day}:</span>
-                <span>{dayHours.open} - {dayHours.close}</span>
+              <div key={day} className="flex justify-between text-sm">
+                <span className="capitalize font-medium text-gray-700 dark:text-gray-300">{day}</span>
+                <span className="text-gray-600 dark:text-gray-400">{dayHours.open} - {dayHours.close}</span>
               </div>
             );
           })}
@@ -88,33 +112,51 @@ export default function ShopDetailsPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6">
-        <div className="space-y-6">
-          <Skeleton className="h-10 w-64" />
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-32" />
-              <Skeleton className="h-4 w-48" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-4 w-5/6" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-32" />
-              <Skeleton className="h-4 w-48" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-4 w-5/6" />
-            </CardContent>
-          </Card>
-        </div>
+      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Header Skeleton */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Skeleton className="w-10 h-10 rounded-lg" />
+              <div className="space-y-2">
+                <Skeleton className="h-8 w-48" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
+              <Skeleton className="h-8 w-20 rounded-full" />
+              <Skeleton className="h-10 w-28" />
+            </div>
+          </div>
+
+          {/* Tabs Skeleton */}
+          <Skeleton className="h-10 w-72" />
+
+          {/* Cards Skeleton */}
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+              <CardHeader>
+                <Skeleton className="h-6 w-40" />
+                <Skeleton className="h-4 w-56" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-5/6" />
+              </CardContent>
+            </Card>
+            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+              <CardHeader>
+                <Skeleton className="h-6 w-40" />
+                <Skeleton className="h-4 w-56" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-5/6" />
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     );
@@ -122,239 +164,321 @@ export default function ShopDetailsPage() {
 
   if (!shop) {
     return (
-      <div className="p-6">
-        <div className="space-y-6">
-          <div className="text-center py-8">
-          <Store className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-          <h2 className="text-2xl font-semibold mb-2">Shop not found</h2>
-          <p className="text-muted-foreground mb-4">The shop you're looking for doesn't exist.</p>
-          <Button onClick={() => navigate('/shops')}>
-            Back to Shops
-          </Button>
-          </div>
+      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+        <div className="max-w-7xl mx-auto">
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+            <CardContent className="flex flex-col items-center justify-center py-16">
+              <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
+                <Store className="h-8 w-8 text-gray-400" />
+              </div>
+              <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Shop not found</h2>
+              <p className="text-gray-500 dark:text-gray-400 mb-6">The shop you're looking for doesn't exist or has been removed.</p>
+              <Button
+                onClick={() => navigate('/shops')}
+                className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Shops
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
   }
 
+  const statusConfig = getStatusConfig(shop.status || 'active');
+  const location = [shop.city, shop.state, shop.country].filter(Boolean).join(', ');
+
   return (
-    <div className="p-6">
-      <div className="space-y-6">
+    <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate('/shops')}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-              {shop.category && (
-                <Building className="h-8 w-8 text-muted-foreground" />
-              )}
-              {shop.name}
-            </h1>
-            <p className="text-muted-foreground">{shop.category || 'Uncategorized'}</p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center space-x-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate('/shops')}
+              className="h-10 w-10 rounded-lg bg-white/70 dark:bg-gray-800/50 border border-gray-200/50 dark:border-gray-700/30 hover:bg-gray-100 dark:hover:bg-gray-700"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center space-x-3">
+              <Avatar className="h-12 w-12 ring-2 ring-gray-100 dark:ring-gray-700">
+                <AvatarImage src={shop.logoUrl ?? undefined} />
+                <AvatarFallback className="bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 text-blue-600 dark:text-blue-300">
+                  <Building className="h-5 w-5" />
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
+                  {shop.name}
+                </h1>
+                <p className="text-gray-600 dark:text-gray-400">{shop.category || 'Uncategorized'}</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Badge className={cn("flex items-center gap-1.5 px-3 py-1 border", statusConfig.className)}>
+              {statusConfig.icon}
+              {statusConfig.label}
+            </Badge>
+            <Link href={`/shops/${shop.id}/edit`}>
+              <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Shop
+              </Button>
+            </Link>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {getStatusBadge(shop.status || 'active')}
-          <Link href={`/shops/${shop.id}/edit`}>
-            <Button>
-              <Edit className="mr-2 h-4 w-4" />
-              Edit Shop
-            </Button>
-          </Link>
-        </div>
-      </div>
 
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="details">Details</TabsTrigger>
-          <TabsTrigger value="activity">Activity</TabsTrigger>
-        </TabsList>
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="activity">Activity</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
-          {/* Basic Information */}
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Location Information</CardTitle>
-                <CardDescription>Physical address and contact details</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                  <div>
-                    <p className="font-medium">Address</p>
-                    <p className="text-sm text-muted-foreground">
-                      {shop.address}<br />
-                      {shop.city}{shop.state ? `, ${shop.state}` : ''} {shop.zipCode}<br />
-                      {shop.country}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Phone className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">Phone</p>
-                    <p className="text-sm text-muted-foreground">{shop.phone}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Mail className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">Email</p>
-                    <p className="text-sm text-muted-foreground">{shop.email}</p>
-                  </div>
-                </div>
-
-                {shop.website && (
-                  <div className="flex items-start gap-3">
-                    <Globe className="h-5 w-5 text-muted-foreground" />
+          <TabsContent value="overview" className="space-y-6">
+            {/* Basic Information */}
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300">
+                <CardHeader>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                      <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    </div>
                     <div>
-                      <p className="font-medium">Website</p>
-                      <a 
-                        href={shop.website} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-sm text-primary hover:underline"
-                      >
-                        {shop.website.replace(/^https?:\/\//, '')}
-                      </a>
+                      <CardTitle className="text-lg">Location Information</CardTitle>
+                      <CardDescription>Physical address and contact details</CardDescription>
                     </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
+                    <MapPin className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-gray-100">Address</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {shop.address || 'No address specified'}<br />
+                        {shop.city && <>{shop.city}{shop.state ? `, ${shop.state}` : ''} {shop.zipCode}<br /></>}
+                        {shop.country}
+                      </p>
+                    </div>
+                  </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Operating Information</CardTitle>
-                <CardDescription>Hours and management details</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
-                  <div className="flex-1">
-                    <p className="font-medium mb-2">Operating Hours</p>
-                    <div className="text-sm text-muted-foreground">
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
+                    <Phone className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-gray-100">Phone</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{shop.phone || 'Not specified'}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
+                    <Mail className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-gray-100">Email</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{shop.email || 'Not specified'}</p>
+                    </div>
+                  </div>
+
+                  {shop.website && (
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
+                      <Globe className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-gray-100">Website</p>
+                        <a
+                          href={shop.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          {shop.website.replace(/^https?:\/\//, '')}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300">
+                <CardHeader>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                      <Clock className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">Operating Information</CardTitle>
+                      <CardDescription>Hours and management details</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="p-3 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Clock className="h-5 w-5 text-gray-400" />
+                      <p className="font-medium text-gray-900 dark:text-gray-100">Operating Hours</p>
+                    </div>
+                    <div className="pl-7">
                       {formatOperatingHours(shop.operatingHours)}
                     </div>
                   </div>
-                </div>
 
-                {shop.manager && (
-                  <div className="flex items-start gap-3">
-                    <User className="h-5 w-5 text-muted-foreground" />
+                  {shop.manager && (
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback className="bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900 dark:to-green-800 text-green-600 dark:text-green-300 text-sm">
+                          {shop.manager.firstName?.[0] || shop.manager.email[0].toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900 dark:text-gray-100">
+                          {shop.manager.firstName || shop.manager.lastName
+                            ? `${shop.manager.firstName || ''} ${shop.manager.lastName || ''}`.trim()
+                            : 'Manager'}
+                        </p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{shop.manager.email}</p>
+                        <Badge variant="outline" className="mt-2 text-xs">
+                          {shop.manager.role}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
+
+                  {!shop.manager && (
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
+                      <User className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-gray-100">Manager</p>
+                        <p className="text-sm text-gray-400 italic">No manager assigned</p>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Description */}
+            {shop.description && (
+              <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300">
+                <CardHeader>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                      <Store className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <CardTitle className="text-lg">Description</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-gray-600 dark:text-gray-400 leading-relaxed">{shop.description}</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Tags */}
+            {shop.tags && shop.tags.length > 0 && (
+              <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300">
+                <CardHeader>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 rounded-lg bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center">
+                      <Tag className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                    </div>
                     <div>
-                      <p className="font-medium">Manager</p>
-                      <p className="text-sm text-muted-foreground">
-                        {shop.manager.firstName} {shop.manager.lastName}
-                      </p>
-                      <p className="text-sm text-muted-foreground">{shop.manager.email}</p>
-                      <Badge variant="outline" className="mt-1">{shop.manager.role}</Badge>
+                      <CardTitle className="text-lg">Tags</CardTitle>
+                      <CardDescription>Categories and labels for this shop</CardDescription>
                     </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {shop.tags.map(tag => (
+                      <Badge key={tag} variant="secondary" className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                        <Tag className="mr-1.5 h-3 w-3" />
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
 
-          {/* Description */}
-          {shop.description && (
-            <Card>
+          <TabsContent value="details" className="space-y-6">
+            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300">
               <CardHeader>
-                <CardTitle>Description</CardTitle>
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                    <Building className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">Shop Details</CardTitle>
+                    <CardDescription>Additional information and metadata</CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">{shop.description}</p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="p-4 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Shop ID</p>
+                    <p className="font-mono text-sm text-gray-900 dark:text-gray-100 break-all">{shop.id}</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Status</p>
+                    <div className="flex items-center gap-2">
+                      <Badge className={cn("flex items-center gap-1.5 px-2 py-0.5 border text-xs", statusConfig.className)}>
+                        {statusConfig.icon}
+                        {statusConfig.label}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Created</p>
+                    <div className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100">
+                      <Calendar className="h-4 w-4 text-gray-400" />
+                      {new Date(shop.createdAt).toLocaleDateString()} at {new Date(shop.createdAt).toLocaleTimeString()}
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Last Updated</p>
+                    <div className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100">
+                      <Calendar className="h-4 w-4 text-gray-400" />
+                      {new Date(shop.updatedAt).toLocaleDateString()} at {new Date(shop.updatedAt).toLocaleTimeString()}
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
-          )}
+          </TabsContent>
 
-          {/* Tags */}
-          {shop.tags && shop.tags.length > 0 && (
-            <Card>
+          <TabsContent value="activity" className="space-y-6">
+            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
               <CardHeader>
-                <CardTitle>Tags</CardTitle>
-                <CardDescription>Categories and labels for this shop</CardDescription>
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-lg bg-pink-100 dark:bg-pink-900/30 flex items-center justify-center">
+                    <Activity className="h-4 w-4 text-pink-600 dark:text-pink-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">Recent Activity</CardTitle>
+                    <CardDescription>Shop activity and changes</CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {shop.tags.map(tag => (
-                    <Badge key={tag} variant="secondary">
-                      <Tag className="mr-1 h-3 w-3" />
-                      {tag}
-                    </Badge>
-                  ))}
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
+                    <Activity className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Activity Tracking</h3>
+                  <p className="text-gray-500 dark:text-gray-400 max-w-sm">
+                    Activity tracking for this shop will be available soon. Check back later for updates.
+                  </p>
                 </div>
               </CardContent>
             </Card>
-          )}
-        </TabsContent>
-
-        <TabsContent value="details" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Shop Details</CardTitle>
-              <CardDescription>Additional information and metadata</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <dl className="space-y-4">
-                <div>
-                  <dt className="font-medium text-muted-foreground">Shop ID</dt>
-                  <dd className="font-mono text-sm">{shop.id}</dd>
-                </div>
-                <div>
-                  <dt className="font-medium text-muted-foreground">Status</dt>
-                  <dd className="flex items-center gap-2">
-                    {getStatusBadge(shop.status || 'active')}
-                    <span className="text-sm text-muted-foreground">
-                      {shop.isActive ? 'Shop is active' : 'Shop is inactive'}
-                    </span>
-                  </dd>
-                </div>
-                <div>
-                  <dt className="font-medium text-muted-foreground">Created</dt>
-                  <dd className="text-sm">
-                    {new Date(shop.createdAt).toLocaleDateString()} at{' '}
-                    {new Date(shop.createdAt).toLocaleTimeString()}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="font-medium text-muted-foreground">Last Updated</dt>
-                  <dd className="text-sm">
-                    {new Date(shop.updatedAt).toLocaleDateString()} at{' '}
-                    {new Date(shop.updatedAt).toLocaleTimeString()}
-                  </dd>
-                </div>
-              </dl>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="activity" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Activity</CardTitle>
-              <CardDescription>Shop activity and changes</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-center py-8 text-muted-foreground">
-                <Activity className="mr-2 h-4 w-4" />
-                Activity tracking coming soon
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

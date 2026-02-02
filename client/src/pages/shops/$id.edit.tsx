@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import {
   Store,
   ArrowLeft,
@@ -53,6 +54,26 @@ const SHOP_CATEGORIES = [
   { value: 'other', label: 'Other' },
 ];
 
+const DEFAULT_OPERATING_HOURS: Record<string, { open: string; close: string } | { closed: true }> = {
+  monday: { open: '09:00', close: '18:00' },
+  tuesday: { open: '09:00', close: '18:00' },
+  wednesday: { open: '09:00', close: '18:00' },
+  thursday: { open: '09:00', close: '18:00' },
+  friday: { open: '09:00', close: '18:00' },
+  saturday: { open: '10:00', close: '16:00' },
+  sunday: { closed: true as const },
+};
+
+const DAYS_OF_WEEK = [
+  { key: 'monday', label: 'Monday' },
+  { key: 'tuesday', label: 'Tuesday' },
+  { key: 'wednesday', label: 'Wednesday' },
+  { key: 'thursday', label: 'Thursday' },
+  { key: 'friday', label: 'Friday' },
+  { key: 'saturday', label: 'Saturday' },
+  { key: 'sunday', label: 'Sunday' },
+];
+
 export default function EditShopPage() {
   const { t } = useTranslation();
   const { id } = useParams();
@@ -61,6 +82,36 @@ export default function EditShopPage() {
   const queryClient = useQueryClient();
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
+  
+  // Operating hours state
+  type DayHours = { open: string; close: string; closed?: boolean } | { closed: true };
+  type OperatingHoursState = Record<string, DayHours>;
+  const [operatingHours, setOperatingHours] = useState<OperatingHoursState>(DEFAULT_OPERATING_HOURS);
+  
+  const updateDayHours = useCallback((day: string, field: 'open' | 'close', value: string) => {
+    setOperatingHours(prev => {
+      const dayHours = prev[day];
+      if ('closed' in dayHours && dayHours.closed === true) {
+        return {
+          ...prev,
+          [day]: { open: field === 'open' ? value : '09:00', close: field === 'close' ? value : '18:00' }
+        };
+      }
+      return {
+        ...prev,
+        [day]: { ...dayHours, [field]: value }
+      };
+    });
+  }, []);
+  
+  const toggleDayClosed = useCallback((day: string, closed: boolean) => {
+    setOperatingHours(prev => {
+      if (closed) {
+        return { ...prev, [day]: { closed: true } };
+      }
+      return { ...prev, [day]: { open: '09:00', close: '18:00' } };
+    });
+  }, []);
 
   const {
     register,
@@ -155,6 +206,18 @@ export default function EditShopPage() {
         isActive: shop.isActive ?? true,
       });
       setTags(shop.tags || []);
+      
+      // Parse and set operating hours
+      if (shop.operatingHours) {
+        try {
+          const parsed = JSON.parse(shop.operatingHours);
+          if (typeof parsed === 'object' && parsed !== null) {
+            setOperatingHours(parsed);
+          }
+        } catch {
+          // Keep default operating hours if parsing fails
+        }
+      }
     }
   }, [shopData, reset]);
 
@@ -165,6 +228,7 @@ export default function EditShopPage() {
       ...data,
       managerId,
       tags: tags.length > 0 ? tags : undefined,
+      operatingHours: JSON.stringify(operatingHours),
       isActive: data.isActive !== undefined ? data.isActive : true,
     };
 
@@ -468,6 +532,60 @@ export default function EditShopPage() {
                   {errors.website && (
                     <p className="text-sm text-destructive">{errors.website.message}</p>
                   )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Operating Hours */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Operating Hours
+                </CardTitle>
+                <CardDescription>Set the operating hours for each day of the week</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {DAYS_OF_WEEK.map(({ key, label }) => {
+                    const dayHours = operatingHours[key];
+                    const isClosed = dayHours && 'closed' in dayHours && dayHours.closed === true;
+                    
+                    return (
+                      <div key={key} className="flex items-center gap-4 py-2 border-b last:border-b-0">
+                        <div className="w-28 font-medium text-sm">{label}</div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={!isClosed}
+                            onCheckedChange={(checked) => toggleDayClosed(key, !checked)}
+                            data-testid={`switch-${key}`}
+                          />
+                          <span className="text-sm text-muted-foreground w-12">
+                            {isClosed ? 'Closed' : 'Open'}
+                          </span>
+                        </div>
+                        {!isClosed && dayHours && (
+                          <div className="flex items-center gap-2 flex-1">
+                            <Input
+                              type="time"
+                              value={'open' in dayHours ? dayHours.open : '09:00'}
+                              onChange={(e) => updateDayHours(key, 'open', e.target.value)}
+                              className="w-32"
+                              data-testid={`input-${key}-open`}
+                            />
+                            <span className="text-muted-foreground">to</span>
+                            <Input
+                              type="time"
+                              value={'close' in dayHours ? dayHours.close : '18:00'}
+                              onChange={(e) => updateDayHours(key, 'close', e.target.value)}
+                              className="w-32"
+                              data-testid={`input-${key}-close`}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
