@@ -80,7 +80,7 @@ export default function EditShopPage() {
       status: 'active',
       isActive: true,
       managerId: null,
-      category: undefined,
+      category: '',
     },
   });
 
@@ -335,6 +335,7 @@ export default function EditShopPage() {
                   <div className="space-y-2">
                     <Label htmlFor="managerId">{t('shops.form.manager')}</Label>
                     <Select
+                      key={`${managersLoading ? 'loading' : 'loaded'}-${watch('managerId')}`}
                       value={watch('managerId') || 'no-manager'}
                       onValueChange={(value) => setValue('managerId', value === 'no-manager' ? null : value, { shouldDirty: true, shouldTouch: true })}
                       disabled={managersLoading}

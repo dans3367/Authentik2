@@ -198,7 +198,7 @@ function ShopCard({ shop, onToggleStatus, onDelete, t }: ShopCardProps) {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => onToggleStatus(shop.id, shop.status !== 'active')}
+                  onClick={() => onToggleStatus(shop.id, shop.status === 'active')}
                 >
                   <Power className="mr-2 h-4 w-4" />
                   {shop.status === 'active' ? t('shops.status.inactive') : t('shops.status.active')}

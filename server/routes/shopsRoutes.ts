@@ -88,37 +88,18 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
       .offset(offset);
 
     // Transform the data to include manager object
-    const shopsWithManager = shopsData.map((shop: any) => ({
-      id: shop.id,
-      name: shop.name,
-      description: shop.description,
-      address: shop.address,
-      city: shop.city,
-      state: shop.state,
-      zipCode: shop.zipCode,
-      country: shop.country,
-      phone: shop.phone,
-      email: shop.email,
-      website: shop.website,
-      logoUrl: shop.logoUrl,
-      managerId: shop.managerId,
-      operatingHours: shop.operatingHours,
-      status: shop.status,
-      category: shop.category,
-      tags: shop.tags,
-      socialMedia: shop.socialMedia,
-      settings: shop.settings,
-      isActive: shop.isActive,
-      tenantId: shop.tenantId,
-      createdAt: shop.createdAt,
-      updatedAt: shop.updatedAt,
-      manager: shop.managerId ? {
-        id: shop.managerId,
-        firstName: shop.managerFirstName,
-        lastName: shop.managerLastName,
-        email: shop.managerEmail,
-      } : null,
-    }));
+    const shopsWithManager = shopsData.map((shop: any) => {
+      const { managerFirstName, managerLastName, managerEmail, ...shopFields } = shop;
+      return {
+        ...shopFields,
+        manager: shopFields.managerId ? {
+          id: shopFields.managerId,
+          firstName: managerFirstName,
+          lastName: managerLastName,
+          email: managerEmail,
+        } : null,
+      };
+    });
 
     console.log('📊 [Shops API] Shops query result:', {
       shopsFound: shopsWithManager.length,
@@ -136,7 +117,7 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
     console.log('📋 [Shops API] Calculating limits and stats...');
     // Get shop limits and stats using proper storage method
     const limits = await storage.checkShopLimits(req.user.tenantId);
-    const stats = { totalShops: shopsWithManager.length, activeShops: shopsWithManager.filter((s: any) => s.status === 'active').length, shopsByCategory: {} };
+    const stats = { totalShops: totalCountResult.count, activeShops: shopsWithManager.filter((s: any) => s.status === 'active').length, shopsByCategory: {} };
 
     console.log('📊 [Shops API] Calculated stats:', { limits, stats });
 
