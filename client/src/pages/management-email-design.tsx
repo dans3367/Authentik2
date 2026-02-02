@@ -139,7 +139,7 @@ function ColorPicker({
             value={color}
             onChange={(e) => onChange(e.target.value)}
             disabled={disabled}
-            className="pl-9 font-mono uppercase"
+            className="pl-9 pr-12 font-mono uppercase"
             maxLength={7}
           />
           <div
@@ -151,7 +151,8 @@ function ColorPicker({
             value={color}
             onChange={(e) => onChange(e.target.value)}
             disabled={disabled}
-            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+            className="w-8 h-8 right-3 top-1/2 -translate-y-1/2 absolute rounded cursor-pointer border border-slate-200"
+            style={{ backgroundColor: color }}
           />
         </div>
       </div>
