@@ -123,44 +123,33 @@ subscriptionRoutes.post("/free-trial-signup", async (req: any, res) => {
 });
 
 // Get user's subscription
-subscriptionRoutes.get("/my-subscription", async (req: any, res) => {
+subscriptionRoutes.get("/my-subscription", authenticateToken, async (req: any, res) => {
   try {
-    console.log('🔍 [Subscription] Route handler entered - testing without auth');
-    console.log('🔍 [Subscription] db object keys:', Object.keys(db));
-    console.log('🔍 [Subscription] db.query exists:', !!db.query);
-    if (db.query) {
-      console.log('🔍 [Subscription] db.query keys:', Object.keys(db.query));
-      console.log('🔍 [Subscription] db.query.companies exists:', !!db.query.companies);
+    // Validate authentication
+    if (!req.user || !req.user.tenantId) {
+      return res.status(401).json({ message: 'Authentication required' });
     }
 
-    // For testing: use a hardcoded tenantId to bypass authentication issues
-    const testTenantId = '991c761b-bc2e-40c4-ac8e-aa9391f58eef'; // Example Corporation tenant
-
-    console.log('✅ [Subscription] Using test tenantId:', testTenantId);
-
-    console.log('🔍 [Subscription] About to query database...');
+    const tenantId = req.user.tenantId;
+    console.log('🔍 [Subscription] Fetching subscription for tenant:', tenantId);
 
     // Get company info (companies table has tenantId field)
     const company = await db.query.companies.findFirst({
-      where: eq(companies.tenantId, testTenantId),
+      where: eq(companies.tenantId, tenantId),
     });
 
-    console.log('🔍 [Subscription] Company query completed, result:', !!company, company?.name);
-
     if (!company) {
-      console.log('❌ [Subscription] No company found for tenantId:', testTenantId);
+      console.log('❌ [Subscription] No company found for tenantId:', tenantId);
       return res.status(404).json({ message: 'Company not found' });
     }
 
     // Get subscription separately by tenantId
     const subscription = await db.query.subscriptions.findFirst({
-      where: eq(subscriptions.tenantId, testTenantId),
+      where: eq(subscriptions.tenantId, tenantId),
       with: {
         plan: true,
       },
     });
-
-    console.log('🔍 [Subscription] Subscription query result:', !!subscription, subscription?.status);
 
     let subscriptionDetails = null;
 
@@ -168,7 +157,7 @@ subscriptionRoutes.get("/my-subscription", async (req: any, res) => {
       try {
         // Get subscription details from Stripe
         const stripeSubscription = await stripe.subscriptions.retrieve(subscription.stripeSubscriptionId);
-        
+
         subscriptionDetails = {
           id: stripeSubscription.id,
           status: stripeSubscription.status,
@@ -210,7 +199,6 @@ subscriptionRoutes.get("/my-subscription", async (req: any, res) => {
       } : null,
     };
 
-    console.log('✅ [Subscription] Successfully built response');
     res.json(response);
   } catch (error) {
     console.error('Get subscription error:', error);
@@ -539,7 +527,7 @@ subscriptionRoutes.post("/webhook", async (req: any, res) => {
 async function handleCheckoutSessionCompleted(session: any) {
   try {
     const { companyId, planId } = session.metadata;
-    
+
     if (!companyId || !planId) {
       console.error('Missing metadata in checkout session:', session.id);
       return;
@@ -634,7 +622,7 @@ async function handleSubscriptionDeleted(subscription: any) {
 async function handlePaymentSucceeded(invoice: any) {
   try {
     const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
-    
+
     const dbSubscription = await db.query.subscriptions.findFirst({
       where: sql`${db.subscriptions.stripeSubscriptionId} = ${subscription.id}`,
     });
@@ -660,7 +648,7 @@ async function handlePaymentSucceeded(invoice: any) {
 async function handlePaymentFailed(invoice: any) {
   try {
     const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
-    
+
     const dbSubscription = await db.query.subscriptions.findFirst({
       where: sql`${db.subscriptions.stripeSubscriptionId} = ${subscription.id}`,
     });
