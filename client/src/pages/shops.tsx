@@ -61,6 +61,12 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
@@ -99,36 +105,47 @@ function getShopCategoryIcon(category?: string) {
 }
 
 function getStatusBadge(status: string) {
-  switch (status) {
-    case 'active':
-      return (
-        <div className="flex items-center space-x-1.5">
-          <CheckCircle className="h-4 w-4 text-green-600" />
-          <span className="text-green-600 font-medium">Active</span>
-        </div>
-      );
-    case 'inactive':
-      return (
-        <div className="flex items-center space-x-1.5">
-          <XCircle className="h-4 w-4 text-red-600" />
-          <span className="text-red-600 font-medium">Inactive</span>
-        </div>
-      );
-    case 'maintenance':
-      return (
-        <div className="flex items-center space-x-1.5">
-          <AlertCircle className="h-4 w-4 text-orange-600" />
-          <span className="text-orange-600 font-medium">Maintenance</span>
-        </div>
-      );
-    default:
-      return (
-        <div className="flex items-center space-x-1.5">
-          <CheckCircle className="h-4 w-4 text-green-600" />
-          <span className="text-green-600 font-medium">Active</span>
-        </div>
-      );
-  }
+  const getStatusConfig = (status: string) => {
+    switch (status) {
+      case 'active':
+        return {
+          icon: <CheckCircle className="h-4 w-4 text-green-600" />,
+          label: 'Active',
+        };
+      case 'inactive':
+        return {
+          icon: <XCircle className="h-4 w-4 text-red-600" />,
+          label: 'Inactive',
+        };
+      case 'maintenance':
+        return {
+          icon: <AlertCircle className="h-4 w-4 text-orange-600" />,
+          label: 'Maintenance',
+        };
+      default:
+        return {
+          icon: <CheckCircle className="h-4 w-4 text-green-600" />,
+          label: 'Active',
+        };
+    }
+  };
+
+  const config = getStatusConfig(status);
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex items-center justify-center">
+            {config.icon}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{config.label}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 }
 
 // Shop Card Component for mobile/tablet view
@@ -584,10 +601,18 @@ export default function ShopsPage() {
         const createdAt = row.getValue("createdAt");
         if (!createdAt) return null;
         return (
-          <div className="flex items-center space-x-1.5 text-gray-500">
-            <Calendar className="h-4 w-4" />
-            <span>{format(new Date(createdAt as string), "MMM d, yyyy")}</span>
-          </div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center justify-center text-gray-500">
+                  <Calendar className="h-4 w-4" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{format(new Date(createdAt as string), "MMM d, yyyy")}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         );
       },
     },
