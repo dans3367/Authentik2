@@ -194,13 +194,22 @@ shopsRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator", 
     await storage.validateShopCreation(req.user.tenantId);
 
     const validatedData = createShopSchema.parse(req.body);
-    const { name, description, address, phone, email, managerId, status } = validatedData;
+    const { name, description, address, phone, email, managerId, status, category, city, state, zipCode, country, website, operatingHours, tags, socialMedia, settings } = validatedData;
 
     const sanitizedName = sanitizeString(name) || name;
     const sanitizedDescription = description ? sanitizeString(description) : null;
     const sanitizedAddress = address ? sanitizeString(address) : null;
     const sanitizedPhone = phone ? sanitizeString(phone) || phone : null;
     const sanitizedEmail = email ? sanitizeString(email) || email : null;
+    const sanitizedCategory = category ? sanitizeString(category) : null;
+    const sanitizedCity = city ? sanitizeString(city) : null;
+    const sanitizedState = state ? sanitizeString(state) : null;
+    const sanitizedZipCode = zipCode ? sanitizeString(zipCode) : null;
+    const sanitizedCountry = country ? sanitizeString(country) : 'United States';
+    const sanitizedWebsite = website ? sanitizeString(website) : null;
+    const sanitizedOperatingHours = operatingHours ? sanitizeString(operatingHours) : null;
+    const sanitizedSocialMedia = socialMedia ? sanitizeString(socialMedia) : null;
+    const sanitizedSettings = settings ? sanitizeString(settings) : null;
 
     // Validate required fields
     if (!sanitizedName || !sanitizedPhone || !sanitizedEmail) {
@@ -229,12 +238,21 @@ shopsRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator", 
       name: sanitizedName,
       description: sanitizedDescription,
       address: sanitizedAddress,
+      city: sanitizedCity,
+      state: sanitizedState,
+      zipCode: sanitizedZipCode,
+      country: sanitizedCountry,
       phone: sanitizedPhone,
       email: sanitizedEmail,
+      website: sanitizedWebsite,
       managerId: managerId || null,
+      operatingHours: sanitizedOperatingHours,
       status: status || 'active',
+      category: sanitizedCategory,
+      tags: tags || [],
+      socialMedia: sanitizedSocialMedia,
+      settings: sanitizedSettings,
       tenantId: req.user.tenantId,
-      country: 'United States',
     }).returning();
 
     res.status(201).json(newShop[0]);

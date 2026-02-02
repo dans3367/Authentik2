@@ -48,9 +48,25 @@ interface Manager {
 const SHOP_CATEGORIES = [
   { value: 'retail', label: 'Retail Store' },
   { value: 'restaurant', label: 'Restaurant' },
+  { value: 'cafe', label: 'Café' },
+  { value: 'bar', label: 'Bar/Pub' },
+  { value: 'grocery', label: 'Grocery Store' },
+  { value: 'pharmacy', label: 'Pharmacy' },
+  { value: 'salon', label: 'Salon/Spa' },
+  { value: 'gym', label: 'Gym/Fitness' },
   { value: 'service', label: 'Service Center' },
+  { value: 'automotive', label: 'Automotive' },
+  { value: 'clinic', label: 'Medical Clinic' },
+  { value: 'dental', label: 'Dental Office' },
+  { value: 'veterinary', label: 'Veterinary' },
   { value: 'warehouse', label: 'Warehouse' },
   { value: 'office', label: 'Office' },
+  { value: 'showroom', label: 'Showroom' },
+  { value: 'bakery', label: 'Bakery' },
+  { value: 'hotel', label: 'Hotel/Lodging' },
+  { value: 'bank', label: 'Bank/Financial' },
+  { value: 'education', label: 'Education/Training' },
+  { value: 'entertainment', label: 'Entertainment' },
   { value: 'other', label: 'Other' },
 ];
 
@@ -409,8 +425,9 @@ export default function EditShopPage() {
                   <div className="space-y-2">
                     <Label htmlFor="category">{t('shops.form.category')}</Label>
                     <Select
-                      value={watch('category')}
-                      onValueChange={(value) => setValue('category', value)}
+                      key={`category-${watch('category')}`}
+                      value={watch('category') || ''}
+                      onValueChange={(value) => setValue('category', value, { shouldDirty: true })}
                     >
                       <SelectTrigger data-testid="select-category">
                         <SelectValue placeholder={t('shops.form.categoryPlaceholder')} />
@@ -473,7 +490,9 @@ export default function EditShopPage() {
                         <SelectItem value="no-manager">{t('shops.form.noManager')}</SelectItem>
                         {Array.isArray(managersData) && managersData.map(manager => (
                           <SelectItem key={manager.id} value={manager.id}>
-                            {manager.firstName} {manager.lastName} ({manager.email})
+                            {manager.firstName || manager.lastName
+                              ? `${manager.firstName || ''} ${manager.lastName || ''}`.trim()
+                              : t('users.table.noName')} ({manager.email})
                           </SelectItem>
                         ))}
                       </SelectContent>
