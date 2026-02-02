@@ -27,23 +27,23 @@ async function logEmailActivity(params: {
     contactId: string;
     activityType: string;
     activityData: object;
+    webhookId: string;
 }): Promise<{ success: boolean; error?: string }> {
     const apiUrl = process.env.API_URL || "http://localhost:3501";
     const timestamp = Date.now();
-    const webhookId = `trigger-${params.contactId}-${params.activityType}-${timestamp}`;
     const body = {
         tenantId: params.tenantId,
         contactId: params.contactId,
         activityType: params.activityType,
         activityData: params.activityData,
         occurredAt: new Date().toISOString(),
-        webhookId,
+        webhookId: params.webhookId,
     };
 
     try {
         const signature = generateInternalSignature(body, timestamp);
         
-        const response = await fetch(`${apiUrl}/api/internal/email-activity`, {
+        const response = await fetch(`${apiUrl}/api/email-contacts/internal/email-activity`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -152,6 +152,7 @@ export const sendRescheduleEmailTask = task({
             });
 
             // Log email activity to customer's timeline with retry logic
+            const webhookId = `trigger-${data.customerId}-sent-${Date.now()}`;
             let activityLogged = false;
             let activityError: string | undefined;
             
@@ -160,6 +161,7 @@ export const sendRescheduleEmailTask = task({
                     tenantId: data.tenantId,
                     contactId: data.customerId,
                     activityType: "sent",
+                    webhookId,
                     activityData: {
                         type: "reschedule-invitation",
                         emailId: emailData?.id,

@@ -2273,28 +2273,33 @@ emailManagementRoutes.post("/internal/email-activity", authenticateInternalServi
       });
     }
 
-    // Create email activity record
-    const [newActivity] = await db.insert(emailActivity).values({
-      tenantId,
-      contactId,
-      activityType,
-      activityData: activityData ? JSON.stringify(activityData) : null,
-      webhookId,
-      occurredAt: validatedOccurredAt,
-    }).returning();
+    // Create email activity record and update contact in a single transaction
+    const [newActivity] = await db.transaction(async (tx: any) => {
+      // Insert email activity record
+      const [activity] = await tx.insert(emailActivity).values({
+        tenantId,
+        contactId,
+        activityType,
+        activityData: activityData ? JSON.stringify(activityData) : null,
+        webhookId,
+        occurredAt: validatedOccurredAt,
+      }).returning();
 
-    // Update contact's lastActivity timestamp
-    await db.update(emailContacts)
-      .set({ 
-        lastActivity: new Date(),
-        updatedAt: new Date(),
-        // Increment emailsSent counter if this is a 'sent' activity
-        ...(activityType === 'sent' ? { emailsSent: sql`coalesce(${emailContacts.emailsSent}, 0) + 1` } : {})
-      })
-      .where(and(
-        eq(emailContacts.id, contactId),
-        eq(emailContacts.tenantId, tenantId)
-      ));
+      // Update contact's lastActivity timestamp
+      await tx.update(emailContacts)
+        .set({ 
+          lastActivity: new Date(),
+          updatedAt: new Date(),
+          // Increment emailsSent counter if this is a 'sent' activity
+          ...(activityType === 'sent' ? { emailsSent: sql`coalesce(${emailContacts.emailsSent}, 0) + 1` } : {})
+        })
+        .where(and(
+          eq(emailContacts.id, contactId),
+          eq(emailContacts.tenantId, tenantId)
+        ));
+
+      return activity;
+    });
 
     console.log(`📧 [Internal Email Activity] Created activity ${newActivity.id} for contact ${contactId}`);
     

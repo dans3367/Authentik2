@@ -52,8 +52,15 @@ export default function CompanyPage() {
     queryKey: ["/api/company"],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/company");
+      if (!response.ok) {
+        // 404 means no company exists yet
+        if (response.status === 404) {
+          return null;
+        }
+        throw new Error('Failed to fetch company');
+      }
       const data = await response.json();
-      return data.company as CompanyWithOwner | null;
+      return data as CompanyWithOwner | null;
     },
   });
 
@@ -167,7 +174,7 @@ export default function CompanyPage() {
   const companyTypes = [
     "Corporation",
     "LLC",
-    "Partnership", 
+    "Partnership",
     "Sole Proprietorship",
     "Non-Profit",
     "Government",
@@ -235,7 +242,7 @@ export default function CompanyPage() {
                 {canEdit ? "Get started by adding your company details." : "Company information will be displayed here once it's added by an Owner or Administrator."}
               </p>
               {canEdit && (
-                <Button 
+                <Button
                   onClick={() => setIsEditing(true)}
                   className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
                 >
@@ -268,59 +275,107 @@ export default function CompanyPage() {
               </div>
             </div>
           </div>
-          
+
           <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
             <CardContent className="p-6">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem className="col-span-2">
-                        <FormLabel>Company Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter company name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="companyType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Company Type</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value || ""}>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2">
+                          <FormLabel>Company Name</FormLabel>
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select type" />
-                            </SelectTrigger>
+                            <Input placeholder="Enter company name" {...field} />
                           </FormControl>
-                          <SelectContent>
-                            {companyTypes.map((type) => (
-                              <SelectItem key={type} value={type}>
-                                {type}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="companyType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Company Type</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {companyTypes.map((type) => (
+                                <SelectItem key={type} value={type}>
+                                  {type}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="companyEmail"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Company Email</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="company@example.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Phone number" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="website"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Website</FormLabel>
+                          <FormControl>
+                            <Input type="url" placeholder="https://example.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
                   <FormField
                     control={form.control}
-                    name="companyEmail"
+                    name="address"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Company Email</FormLabel>
+                        <FormLabel>Address</FormLabel>
                         <FormControl>
-                          <Input type="email" placeholder="company@example.com" {...field} />
+                          <Textarea
+                            placeholder="Enter company address"
+                            className="resize-none"
+                            rows={3}
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -329,94 +384,46 @@ export default function CompanyPage() {
 
                   <FormField
                     control={form.control}
-                    name="phone"
+                    name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Phone</FormLabel>
+                        <FormLabel>Description</FormLabel>
                         <FormControl>
-                          <Input placeholder="Phone number" {...field} />
+                          <Textarea
+                            placeholder="Enter company description"
+                            className="resize-none"
+                            rows={4}
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="website"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Website</FormLabel>
-                        <FormControl>
-                          <Input type="url" placeholder="https://example.com" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Address</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="Enter company address" 
-                          className="resize-none" 
-                          rows={3}
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="Enter company description" 
-                          className="resize-none" 
-                          rows={4}
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="flex justify-end space-x-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleCancel}
-                  >
-                    <X className="mr-2 h-4 w-4" />
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={createCompanyMutation.isPending || updateCompanyMutation.isPending}
-                  >
-                    <Save className="mr-2 h-4 w-4" />
-                    {createCompanyMutation.isPending || updateCompanyMutation.isPending
-                      ? "Saving..."
-                      : "Save Company Information"}
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
+                  <div className="flex justify-end space-x-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleCancel}
+                    >
+                      <X className="mr-2 h-4 w-4" />
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={createCompanyMutation.isPending || updateCompanyMutation.isPending}
+                    >
+                      <Save className="mr-2 h-4 w-4" />
+                      {createCompanyMutation.isPending || updateCompanyMutation.isPending
+                        ? "Saving..."
+                        : "Save Company Information"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -430,7 +437,7 @@ export default function CompanyPage() {
   return (
     <div className="p-8 bg-gray-50 dark:bg-gray-900 min-h-screen">
       <div className="max-w-5xl mx-auto">
-        
+
         {/* Simple Header */}
         <div className="mb-12 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-200 dark:bg-gray-700 mb-6">
@@ -450,7 +457,7 @@ export default function CompanyPage() {
             </Badge>
           </div>
           {canEdit && (
-            <Button 
+            <Button
               onClick={handleEdit}
               variant="outline"
               className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -472,7 +479,7 @@ export default function CompanyPage() {
 
         {/* Simple Grid Layout */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          
+
           {/* Owner Card */}
           <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
             <CardHeader className="pb-4">
@@ -486,10 +493,10 @@ export default function CompanyPage() {
             <CardContent>
               <div className="space-y-2">
                 <div className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                  {company.owner.firstName} {company.owner.lastName}
+                  {company.owner?.firstName || 'Owner'} {company.owner?.lastName || ''}
                 </div>
                 <div className="text-gray-600 dark:text-gray-300">
-                  {company.owner.email}
+                  {company.owner?.email || user?.email || 'No email available'}
                 </div>
               </div>
             </CardContent>
@@ -509,28 +516,28 @@ export default function CompanyPage() {
               {company.companyEmail && (
                 <div>
                   <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Email</div>
-                  <a 
-                    href={`mailto:${company.companyEmail}`} 
+                  <a
+                    href={`mailto:${company.companyEmail}`}
                     className="text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                   >
                     {company.companyEmail}
                   </a>
                 </div>
               )}
-              
+
               {company.phone && (
                 <div>
                   <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Phone</div>
                   <div className="text-gray-900 dark:text-gray-100">{company.phone}</div>
                 </div>
               )}
-              
+
               {company.website && (
                 <div>
                   <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Website</div>
-                  <a 
-                    href={company.website} 
-                    target="_blank" 
+                  <a
+                    href={company.website}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate block"
                   >
@@ -581,20 +588,20 @@ export default function CompanyPage() {
               <div>
                 <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Created</div>
                 <div className="text-gray-900 dark:text-gray-100">
-                  {company.createdAt ? new Date(company.createdAt).toLocaleDateString('en-US', { 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
+                  {company.createdAt ? new Date(company.createdAt).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
                   }) : "Unknown"}
                 </div>
               </div>
               <div>
                 <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Last Updated</div>
                 <div className="text-gray-900 dark:text-gray-100">
-                  {company.updatedAt ? new Date(company.updatedAt).toLocaleDateString('en-US', { 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
+                  {company.updatedAt ? new Date(company.updatedAt).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
                   }) : "Unknown"}
                 </div>
               </div>
