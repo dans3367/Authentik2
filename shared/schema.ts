@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, decimal, integer, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, decimal, integer, uuid, uniqueIndex } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -217,7 +217,7 @@ export const tenantLimits = pgTable("tenant_limits", {
 export const emailSends = pgTable("email_sends", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-  
+
   // Email details
   recipientEmail: text("recipient_email").notNull(),
   recipientName: text("recipient_name"),
@@ -225,22 +225,22 @@ export const emailSends = pgTable("email_sends", {
   senderName: text("sender_name"),
   subject: text("subject").notNull(),
   emailType: text("email_type").notNull(), // 'birthday_card', 'test_card', 'promotional', 'newsletter', 'invitation', 'appointment_reminder'
-  
+
   // Provider details
   provider: text("provider").notNull(), // 'resend', 'sendgrid', 'mailgun'
   providerMessageId: text("provider_message_id"), // Provider's unique message ID (e.g., Resend email ID)
-  
+
   // Status tracking
   status: text("status").notNull().default('pending'), // 'pending', 'sent', 'delivered', 'bounced', 'failed'
   sendAttempts: integer("send_attempts").default(1),
   errorMessage: text("error_message"),
-  
+
   // Related records
   contactId: varchar("contact_id").references(() => emailContacts.id, { onDelete: 'set null' }),
   newsletterId: varchar("newsletter_id").references(() => newsletters.id, { onDelete: 'set null' }),
   campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'set null' }),
   promotionId: varchar("promotion_id").references(() => promotions.id, { onDelete: 'set null' }),
-  
+
   // Timestamps
   sentAt: timestamp("sent_at"),
   deliveredAt: timestamp("delivered_at"),
@@ -251,17 +251,17 @@ export const emailSends = pgTable("email_sends", {
 export const emailContent = pgTable("email_content", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   emailSendId: varchar("email_send_id").notNull().references(() => emailSends.id, { onDelete: 'cascade' }),
-  
+
   // Email content
   htmlContent: text("html_content"),
   textContent: text("text_content"),
-  
+
   // Provider response data
   providerResponse: text("provider_response"), // JSON response from provider
-  
+
   // Metadata
   metadata: text("metadata"), // JSON for additional custom data
-  
+
   // Timestamps
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -270,16 +270,16 @@ export const emailContent = pgTable("email_content", {
 export const emailEvents = pgTable("email_events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   emailSendId: varchar("email_send_id").notNull().references(() => emailSends.id, { onDelete: 'cascade' }),
-  
+
   // Event details
   eventType: text("event_type").notNull(), // 'sent', 'delivered', 'opened', 'clicked', 'bounced', 'complained', 'unsubscribed'
   eventData: text("event_data"), // JSON webhook payload or event data
-  
+
   // Event metadata
   userAgent: text("user_agent"),
   ipAddress: text("ip_address"),
   webhookId: text("webhook_id"), // Provider webhook event ID
-  
+
   // Timestamps
   occurredAt: timestamp("occurred_at").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -554,7 +554,13 @@ export const emailActivity = pgTable("email_activity", {
   webhookData: text("webhook_data"), // Full webhook payload for debugging
   occurredAt: timestamp("occurred_at").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  // Unique constraint on (webhookId, tenantId) for idempotent webhook processing
+  // Used by ON CONFLICT clause to prevent duplicate activity logging
+  // Note: PostgreSQL allows multiple NULL values in unique constraints
+  webhookIdTenantIdUnique: uniqueIndex("email_activity_webhook_id_tenant_id_unique")
+    .on(table.webhookId, table.tenantId),
+}));
 
 // Per-contact unsubscribe tokens (long-lived until used once)
 export const unsubscribeTokens = pgTable("unsubscribe_tokens", {
@@ -2222,35 +2228,35 @@ export const tenantRelationsUpdated = relations(tenants, ({ many }) => ({
 export const triggerTasks = pgTable("trigger_tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }),
-  
+
   // Task identification
   taskId: text("task_id").notNull(), // Trigger.dev task identifier e.g., 'send-appointment-reminder'
   runId: text("run_id"), // Trigger.dev run ID (starts with 'run_')
   idempotencyKey: text("idempotency_key").unique(), // Prevent duplicate triggers
-  
+
   // Task payload
   payload: text("payload").notNull(), // JSON payload sent to Trigger.dev
-  
+
   // Status tracking
   status: text("status").notNull().default('pending'), // pending, triggered, running, completed, failed, cancelled
-  
+
   // Retry tracking
   attemptCount: integer("attempt_count").default(0),
   maxAttempts: integer("max_attempts").default(3),
   lastAttemptAt: timestamp("last_attempt_at"),
-  
+
   // Scheduling
   scheduledFor: timestamp("scheduled_for"), // If task is scheduled for future execution
-  
+
   // Result tracking
   output: text("output"), // JSON output from task execution
   errorMessage: text("error_message"),
   errorCode: text("error_code"), // Error code if failed
-  
+
   // Related records (for easier querying)
   relatedType: text("related_type"), // 'appointment_reminder', 'newsletter', 'email', 'bulk_email'
   relatedId: varchar("related_id"), // ID of the related record
-  
+
   // Timestamps
   triggeredAt: timestamp("triggered_at"), // When task was triggered to Trigger.dev
   startedAt: timestamp("started_at"), // When task started executing

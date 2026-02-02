@@ -19,29 +19,323 @@
     {
       "idx": 2,
       "version": "7",
+      "when": 1759919161000,
+      "tag": "0001_fix_shop_relations",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1759919161000,
+      "tag": "001_make_location_fields_optional",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
       "when": 1768087119757,
       "tag": "0002_bitter_speedball",
       "breakpoints": true
     },
     {
-      "idx": 3,
+      "idx": 5,
+      "version": "7",
+      "when": 1759919161000,
+      "tag": "002_add_shop_limits_to_subscriptions",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
       "version": "7",
       "when": 1769583596032,
       "tag": "0003_add_user_timezone",
       "breakpoints": true
     },
     {
-      "idx": 4,
+      "idx": 7,
       "version": "7",
-      "when": 1769641603024,
-      "tag": "0004_chubby_ultron",
+      "when": 1759919161000,
+      "tag": "003_add_avatar_url_column",
       "breakpoints": true
     },
     {
-      "idx": 5,
+      "idx": 8,
+      "version": "7",
+      "when": 1759919161000,
+      "tag": "004_add_newsletter_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
       "version": "7",
       "when": 1769923555812,
       "tag": "0005_windy_rocket_racer",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1759919161000,
+      "tag": "005_add_newsletter_segmentation",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1770009834000,
+      "tag": "0006_confused_random",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1759919161000,
+      "tag": "006_add_bounced_emails_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1759919161000,
+      "tag": "007_add_better_auth_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1759919161000,
+      "tag": "008_add_default_tenant_to_better_auth_user",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1759919161000,
+      "tag": "009_enhance_shop_limits_system",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1759919161000,
+      "tag": "010_add_birthday_fields_to_email_contacts",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1759919161000,
+      "tag": "011_add_custom_theme_to_birthday_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1759919161000,
+      "tag": "011_add_promotions_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1759919161000,
+      "tag": "012_add_promotion_advanced_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1759919161000,
+      "tag": "013_add_appointments_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1769996864000,
+      "tag": "013_fix_appointment_reminders_constraint",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1769996864000,
+      "tag": "014_add_custom_reminder_time",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1759919161000,
+      "tag": "014_add_language_preference",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1759919161000,
+      "tag": "015_remove_send_days_before_from_birthday_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1759919161000,
+      "tag": "016_add_promotion_id_to_birthday_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1759919161000,
+      "tag": "017_add_birthday_unsubscribe_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1759919223000,
+      "tag": "018_add_split_promotional_email_to_birthday_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1759919223000,
+      "tag": "019_add_outgoing_emails_tracking",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1759919223000,
+      "tag": "020_add_email_content_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1759919223000,
+      "tag": "021_split_email_tracking_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1759919223000,
+      "tag": "022_migrate_outgoing_emails_data",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1761308859000,
+      "tag": "023_add_templates_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1761308859000,
+      "tag": "024_update_tenant_default",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1761308859000,
+      "tag": "025_add_onboarding_fields_to_companies",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1761308859000,
+      "tag": "026_add_segment_lists_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1769996864000,
+      "tag": "027_add_scheduled_emails_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1769996864000,
+      "tag": "028_add_appointment_notes",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1769996864000,
+      "tag": "0028_add_description_to_contact_tags",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1769996864000,
+      "tag": "029_add_appointment_archive_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1769996864000,
+      "tag": "030_add_address_phone_to_email_contacts",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1760678808000,
+      "tag": "0031_add_custom_cards",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1760735492000,
+      "tag": "0032_add_e_card_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1769996864000,
+      "tag": "0042_add_timezone_to_appointment_reminders",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1769996864000,
+      "tag": "0043_add_inngest_events_tracking",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1770003351000,
+      "tag": "0044_add_email_activity_webhook_unique_constraint",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1770009836000,
+      "tag": "0045_fix_email_activity_webhook_unique_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1759919161000,
+      "tag": "add-form-embeddable",
       "breakpoints": true
     }
   ]
