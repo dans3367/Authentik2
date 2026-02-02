@@ -43,7 +43,7 @@ async function logEmailActivity(params: {
     try {
         const signature = generateInternalSignature(body, timestamp);
         
-        const response = await fetch(`${apiUrl}/api/email-contacts/internal/email-activity`, {
+        const response = await fetch(`${apiUrl}/api/internal/email-activity`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

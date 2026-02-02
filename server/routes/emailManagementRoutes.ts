@@ -2274,7 +2274,7 @@ emailManagementRoutes.post("/internal/email-activity", authenticateInternalServi
     }
 
     // Create email activity record and update contact in a single transaction
-    const [newActivity] = await db.transaction(async (tx: any) => {
+    const newActivity = await db.transaction(async (tx: any) => {
       // Insert email activity record
       const [activity] = await tx.insert(emailActivity).values({
         tenantId,
