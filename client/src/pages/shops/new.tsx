@@ -63,6 +63,19 @@ const DEFAULT_OPERATING_HOURS = {
   sunday: { closed: true },
 };
 
+/**
+ * Render the "Create New Shop" page containing a validated form for creating shops.
+ *
+ * The component displays a multi-section form (basic details, location, contact, tags),
+ * fetches available managers for assignment, shows an authentication loading state,
+ * and redirects to the authentication page if the user is not authenticated.
+ *
+ * On submit it sends shop data to the API, shows success or error toasts, and navigates
+ * to the shops list on success. Tag additions/removals are managed locally and included
+ * in the submitted payload when present.
+ *
+ * @returns The JSX element for the new shop creation page.
+ */
 export default function NewShopPage() {
   const { t } = useTranslation();
   const [, navigate] = useLocation();

@@ -98,6 +98,12 @@ function getShopCategoryIcon(category?: string) {
   }
 }
 
+/**
+ * Render a compact status badge (icon + label) for a shop status.
+ *
+ * @param status - The status key to display; expected values include `"active"`, `"inactive"`, and `"maintenance"`.
+ * @returns A JSX element containing an icon and colored label corresponding to the provided status.
+ */
 function getStatusBadge(status: string) {
   switch (status) {
     case 'active':
@@ -139,6 +145,18 @@ interface ShopCardProps {
   t: (key: string) => string;
 }
 
+/**
+ * Render a compact card view for a shop including status, contact details, manager info, and action controls.
+ *
+ * Displays shop avatar, name, category badge, status bar/badge, manager, location, phone, email, creation date,
+ * and provides actions to view, edit, toggle status, and delete the shop via a dropdown and footer buttons.
+ *
+ * @param shop - The shop data to display
+ * @param onToggleStatus - Callback invoked with `(shopId, isActive)` to change the shop's active state
+ * @param onDelete - Callback invoked with `(shopId)` to request deletion of the shop
+ * @param t - Translation function for UI strings
+ * @returns A JSX element representing the shop card
+ */
 function ShopCard({ shop, onToggleStatus, onDelete, t }: ShopCardProps) {
   const location = [shop.city, shop.state, shop.country].filter(Boolean).join(', ');
 
@@ -288,6 +306,15 @@ function ShopCard({ shop, onToggleStatus, onDelete, t }: ShopCardProps) {
   );
 }
 
+/**
+ * Render the Shops management page with listing, filtering, stats, and shop actions.
+ *
+ * Provides a responsive UI for browsing and searching shops, filtering by status and category,
+ * viewing shop statistics and slot limits, and performing actions such as view, edit, toggle status,
+ * and delete. Includes dialogs for deletion confirmation and plan/limit upgrades.
+ *
+ * @returns The Shops page React element
+ */
 export default function ShopsPage() {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState("");

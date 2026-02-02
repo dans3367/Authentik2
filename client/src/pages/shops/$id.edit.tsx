@@ -53,6 +53,14 @@ const SHOP_CATEGORIES = [
   { value: 'other', label: 'Other' },
 ];
 
+/**
+ * Renders the "Edit Shop" page UI and manages form state, data fetching, tag management, and update submission for a shop.
+ *
+ * The component loads shop and manager data, populates and validates the edit form, allows adding/removing tags,
+ * and performs an update mutation that navigates back to the shops list on success.
+ *
+ * @returns The rendered Edit Shop page React element
+ */
 export default function EditShopPage() {
   const { t } = useTranslation();
   const { id } = useParams();
