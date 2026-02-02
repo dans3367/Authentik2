@@ -12,28 +12,10 @@ export const shopsRoutes = Router();
 // Get all shops for the company
 shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
   try {
-    console.log('🏪 [Shops API] GET /api/shops - Request received');
-    console.log('🔑 [Shops API] User info:', {
-      userId: req.user?.id,
-      tenantId: req.user?.tenantId,
-      userEmail: req.user?.email,
-      userRole: req.user?.role
-    });
-
     const { page = 1, limit = 50, search, status, managerId } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
-    console.log('🔍 [Shops API] Query parameters:', {
-      page: Number(page),
-      limit: Number(limit),
-      offset,
-      search,
-      status,
-      managerId
-    });
-
     let whereClause = sql`${shops.tenantId} = ${req.user.tenantId}`;
-    console.log('🎯 [Shops API] Base where clause for tenantId:', req.user.tenantId);
 
     if (search) {
       const sanitizedSearch = sanitizeString(search as string);
@@ -52,7 +34,6 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
       whereClause = sql`${whereClause} AND ${shops.managerId} = ${managerId}`;
     }
 
-    console.log('🔄 [Shops API] Executing shops query...');
     const shopsData = await db.select({
       id: shops.id,
       name: shops.name,
@@ -101,25 +82,13 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
       };
     });
 
-    console.log('📊 [Shops API] Shops query result:', {
-      shopsFound: shopsWithManager.length,
-      shopIds: shopsWithManager.map((s: any) => s.id),
-      shopNames: shopsWithManager.map((s: any) => s.name)
-    });
-
-    console.log('🔢 [Shops API] Executing count query...');
     const [totalCountResult] = await db.select({
       count: sql<number>`count(*)`,
     }).from(shops).where(whereClause);
 
-    console.log('📈 [Shops API] Total count result:', totalCountResult.count);
-
-    console.log('📋 [Shops API] Calculating limits and stats...');
     // Get shop limits and stats using proper storage method
     const limits = await storage.checkShopLimits(req.user.tenantId);
     const stats = { totalShops: totalCountResult.count, activeShops: shopsWithManager.filter((s: any) => s.status === 'active').length, shopsByCategory: {} };
-
-    console.log('📊 [Shops API] Calculated stats:', { limits, stats });
 
     const response = {
       shops: shopsWithManager,
@@ -132,13 +101,6 @@ shopsRoutes.get("/", authenticateToken, async (req: any, res) => {
       limits,
       stats,
     };
-
-    console.log('✅ [Shops API] Sending successful response:', {
-      shopsCount: response.shops.length,
-      pagination: response.pagination,
-      hasLimits: !!response.limits,
-      hasStats: !!response.stats
-    });
 
     res.json(response);
   } catch (error) {
@@ -289,11 +251,8 @@ shopsRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator", 
 shopsRoutes.put("/:id", authenticateToken, requireRole(["Owner", "Administrator", "Manager"]), async (req: any, res) => {
   try {
     const { id } = req.params;
-    console.log('🔧 [Shops API] PUT request body:', JSON.stringify(req.body, null, 2));
     const validatedData = updateShopSchema.parse(req.body);
-    console.log('🔧 [Shops API] Validated update data:', JSON.stringify(validatedData, null, 2));
     const { name, description, address, city, state, zipCode, country, phone, email, website, managerId, operatingHours, status, category, tags, socialMedia, settings, isActive } = validatedData;
-    console.log('🔧 [Shops API] Destructured managerId:', managerId, 'type:', typeof managerId);
 
     // Check if shop exists and belongs to user's company
     const existingShop = await db.query.shops.findFirst({
@@ -329,27 +288,20 @@ shopsRoutes.put("/:id", authenticateToken, requireRole(["Owner", "Administrator"
     }
 
     if (managerId !== undefined) {
-      console.log('🔧 [Shops API] Processing managerId:', managerId, 'isEmpty:', !managerId || managerId.trim() === '');
       if (managerId && managerId.trim() !== '') {
         // Verify manager belongs to the same company
-        console.log('🔧 [Shops API] Looking up manager:', managerId, 'in tenant:', req.user.tenantId);
         const manager = await db.query.betterAuthUser.findFirst({
           where: sql`${betterAuthUser.id} = ${managerId} AND ${betterAuthUser.tenantId} = ${req.user.tenantId}`,
         });
-        console.log('🔧 [Shops API] Manager lookup result:', manager ? `Found: ${manager.email}` : 'NOT FOUND');
 
         if (!manager) {
           return res.status(400).json({ message: 'Manager not found or does not belong to your company' });
         }
         updateData.managerId = managerId;
-        console.log('🔧 [Shops API] Set updateData.managerId to:', updateData.managerId);
       } else {
         // Set to null for no manager or empty string
         updateData.managerId = null;
-        console.log('🔧 [Shops API] Set updateData.managerId to null');
       }
-    } else {
-      console.log('🔧 [Shops API] managerId is undefined, not updating');
     }
 
     if (status !== undefined) {

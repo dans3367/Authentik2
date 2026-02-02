@@ -159,7 +159,6 @@ export default function EditShopPage() {
   }, [shopData, reset]);
 
   const onSubmit = (data: UpdateShopData) => {
-    console.log('🔧 [Edit Shop] Form data before processing:', JSON.stringify(data, null, 2));
     // Prepare submit data - ensure managerId is explicitly set (null or valid ID)
     const managerId = (!data.managerId || data.managerId === 'no-manager' || data.managerId === '') ? null : data.managerId;
     const submitData = {
@@ -168,8 +167,6 @@ export default function EditShopPage() {
       tags: tags.length > 0 ? tags : undefined,
       isActive: data.isActive !== undefined ? data.isActive : true,
     };
-    console.log('🔧 [Edit Shop] Submit data after processing:', JSON.stringify(submitData, null, 2));
-    console.log('🔧 [Edit Shop] managerId being sent:', managerId);
 
     updateShopMutation.mutate(submitData);
   };

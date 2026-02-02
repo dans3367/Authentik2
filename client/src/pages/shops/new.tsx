@@ -89,31 +89,20 @@ export default function NewShopPage() {
     },
   });
 
-  // Debug authentication state
-  console.log('🔍 [Shops/New] Auth state:', {
-    isAuthenticated,
-    authLoading,
-    hasUser: !!user,
-    userRole: user?.role
-  });
 
   // Fetch managers
   const { data: managersData, isLoading: managersLoading, error: managersError } = useQuery<Manager[]>({
     queryKey: ['/api/shops/managers/list'],
     queryFn: async () => {
-      console.log('🔍 Fetching managers list...');
       try {
         const response = await apiRequest('GET', '/api/shops/managers/list');
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('❌ Managers API error:', response.status, errorText);
           throw new Error(`Failed to fetch managers: ${response.status} ${errorText}`);
         }
         const data = await response.json();
-        console.log('🔍 Managers response:', data);
         return data;
       } catch (error) {
-        console.error('❌ Error in managers query:', error);
         throw error;
       }
     },
@@ -124,10 +113,6 @@ export default function NewShopPage() {
     gcTime: 10 * 60 * 1000, // 10 minutes
   });
 
-  // Log error if any
-  if (managersError) {
-    console.error('❌ Error fetching managers:', managersError);
-  }
 
   // Debug function to create test managers
   const createTestManagers = async () => {
@@ -135,18 +120,15 @@ export default function NewShopPage() {
       const response = await apiRequest('POST', '/api/dev/create-test-managers');
       if (response.ok) {
         const result = await response.json();
-        console.log('✅ Test managers created:', result);
         toast({
           title: "Test Managers Created",
           description: `Created: ${result.created.join(', ')}`,
         });
         // Refetch managers
         window.location.reload();
-      } else {
-        console.error('❌ Failed to create test managers');
       }
     } catch (error) {
-      console.error('❌ Error creating test managers:', error);
+      // Error creating test managers
     }
   };
 
