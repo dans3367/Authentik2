@@ -74,6 +74,25 @@ const DAYS_OF_WEEK = [
   { key: 'sunday', label: 'Sunday' },
 ];
 
+// Generate time options in 30-minute increments
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const hours24 = Math.floor(i / 2);
+  const minutes = i % 2 === 0 ? '00' : '30';
+  const value = `${hours24.toString().padStart(2, '0')}:${minutes}`;
+  const hours12 = hours24 === 0 ? 12 : hours24 > 12 ? hours24 - 12 : hours24;
+  const ampm = hours24 < 12 ? 'AM' : 'PM';
+  const label = `${hours12}:${minutes} ${ampm}`;
+  return { value, label };
+});
+
+// Convert 24hr to 12hr display format
+const formatTime12hr = (time24: string) => {
+  const [hours, minutes] = time24.split(':').map(Number);
+  const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+  const ampm = hours < 12 ? 'AM' : 'PM';
+  return `${hours12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+};
+
 export default function EditShopPage() {
   const { t } = useTranslation();
   const { id } = useParams();
@@ -92,9 +111,16 @@ export default function EditShopPage() {
     setOperatingHours(prev => {
       const dayHours = prev[day];
       if ('closed' in dayHours && dayHours.closed === true) {
+        const defaultForDay = DEFAULT_OPERATING_HOURS[day];
+        // Preserve closed=true if the default for that day is closed
+        if ('closed' in defaultForDay && defaultForDay.closed === true) {
+          return { ...prev, [day]: { closed: true } };
+        }
+        // TypeScript knows defaultForDay has open/close properties here
+        const { open: defaultOpen, close: defaultClose } = defaultForDay as { open: string; close: string };
         return {
           ...prev,
-          [day]: { open: field === 'open' ? value : '09:00', close: field === 'close' ? value : '18:00' }
+          [day]: { open: field === 'open' ? value : defaultOpen, close: field === 'close' ? value : defaultClose }
         };
       }
       return {
@@ -109,7 +135,14 @@ export default function EditShopPage() {
       if (closed) {
         return { ...prev, [day]: { closed: true } };
       }
-      return { ...prev, [day]: { open: '09:00', close: '18:00' } };
+      const defaultForDay = DEFAULT_OPERATING_HOURS[day];
+      // Preserve closed=true if the default for that day is closed
+      if ('closed' in defaultForDay && defaultForDay.closed === true) {
+        return { ...prev, [day]: { closed: true } };
+      }
+      // TypeScript knows defaultForDay has open/close properties here
+      const { open: defaultOpen, close: defaultClose } = defaultForDay as { open: string; close: string };
+      return { ...prev, [day]: { open: defaultOpen, close: defaultClose } };
     });
   }, []);
 
@@ -212,7 +245,38 @@ export default function EditShopPage() {
         try {
           const parsed = JSON.parse(shop.operatingHours);
           if (typeof parsed === 'object' && parsed !== null) {
-            setOperatingHours(parsed);
+            // Normalize and merge with defaults
+            const normalizedHours = Object.keys(DEFAULT_OPERATING_HOURS).reduce((acc, day) => {
+              const defaultDay = DEFAULT_OPERATING_HOURS[day];
+              const parsedDay = parsed[day];
+              
+              // If parsed data exists for this day, use it; otherwise use default
+              if (parsedDay && typeof parsedDay === 'object') {
+                // Handle array format by converting to expected object shape
+                if (Array.isArray(parsedDay)) {
+                  // If it's an array, assume [open, close] format or use defaults
+                  acc[day] = parsedDay.length >= 2 
+                    ? { open: parsedDay[0], close: parsedDay[1] }
+                    : defaultDay;
+                } else if ('closed' in parsedDay && parsedDay.closed === true) {
+                  // Preserve closed state
+                  acc[day] = { closed: true };
+                } else if ('open' in parsedDay && 'close' in parsedDay) {
+                  // Use existing open/close values
+                  acc[day] = { open: parsedDay.open, close: parsedDay.close };
+                } else {
+                  // Fallback to default if structure is unexpected
+                  acc[day] = defaultDay;
+                }
+              } else {
+                // Use default for missing days
+                acc[day] = defaultDay;
+              }
+              
+              return acc;
+            }, {} as typeof DEFAULT_OPERATING_HOURS);
+            
+            setOperatingHours(normalizedHours);
           }
         } catch {
           // Keep default operating hours if parsing fails
@@ -556,9 +620,12 @@ export default function EditShopPage() {
                         <div className="w-28 font-medium text-sm">{label}</div>
                         <div className="flex items-center gap-2">
                           <Switch
+                            id={`${key}-switch`}
                             checked={!isClosed}
                             onCheckedChange={(checked) => toggleDayClosed(key, !checked)}
                             data-testid={`switch-${key}`}
+                            aria-checked={!isClosed}
+                            aria-label={`${label} open/closed toggle`}
                           />
                           <span className="text-sm text-muted-foreground w-12">
                             {isClosed ? 'Closed' : 'Open'}
@@ -566,21 +633,37 @@ export default function EditShopPage() {
                         </div>
                         {!isClosed && dayHours && (
                           <div className="flex items-center gap-2 flex-1">
-                            <Input
-                              type="time"
+                            <Select
                               value={'open' in dayHours ? dayHours.open : '09:00'}
-                              onChange={(e) => updateDayHours(key, 'open', e.target.value)}
-                              className="w-32"
-                              data-testid={`input-${key}-open`}
-                            />
+                              onValueChange={(value) => updateDayHours(key, 'open', value)}
+                            >
+                              <SelectTrigger className="w-32" data-testid={`input-${key}-open`} id={`${key}-open`} aria-label={`${label} opening time`}>
+                                <SelectValue>
+                                  {formatTime12hr('open' in dayHours ? dayHours.open : '09:00')}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {TIME_OPTIONS.map(({ value, label }) => (
+                                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                             <span className="text-muted-foreground">to</span>
-                            <Input
-                              type="time"
+                            <Select
                               value={'close' in dayHours ? dayHours.close : '18:00'}
-                              onChange={(e) => updateDayHours(key, 'close', e.target.value)}
-                              className="w-32"
-                              data-testid={`input-${key}-close`}
-                            />
+                              onValueChange={(value) => updateDayHours(key, 'close', value)}
+                            >
+                              <SelectTrigger className="w-32" data-testid={`input-${key}-close`} id={`${key}-close`} aria-label={`${label} closing time`}>
+                                <SelectValue>
+                                  {formatTime12hr('close' in dayHours ? dayHours.close : '18:00')}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {TIME_OPTIONS.map(({ value, label }) => (
+                                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                         )}
                       </div>

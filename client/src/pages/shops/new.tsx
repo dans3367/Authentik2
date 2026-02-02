@@ -87,13 +87,39 @@ export default function NewShopPage() {
     { key: 'sunday', label: 'Sunday' },
   ];
   
+  // Generate time options in 30-minute increments
+  const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+    const hours24 = Math.floor(i / 2);
+    const minutes = i % 2 === 0 ? '00' : '30';
+    const value = `${hours24.toString().padStart(2, '0')}:${minutes}`;
+    const hours12 = hours24 === 0 ? 12 : hours24 > 12 ? hours24 - 12 : hours24;
+    const ampm = hours24 < 12 ? 'AM' : 'PM';
+    const label = `${hours12}:${minutes} ${ampm}`;
+    return { value, label };
+  });
+  
+  // Convert 24hr to 12hr display format
+  const formatTime12hr = (time24: string) => {
+    const [hours, minutes] = time24.split(':').map(Number);
+    const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+    const ampm = hours < 12 ? 'AM' : 'PM';
+    return `${hours12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+  };
+  
   const updateDayHours = useCallback((day: string, field: 'open' | 'close', value: string) => {
     setOperatingHours(prev => {
       const dayHours = prev[day];
       if ('closed' in dayHours && dayHours.closed === true) {
+        const defaultDay = DEFAULT_OPERATING_HOURS[day];
+        // Preserve closed=true if the default for that day is closed
+        if ('closed' in defaultDay && defaultDay.closed === true) {
+          return { ...prev, [day]: { closed: true } };
+        }
+        // TypeScript knows defaultDay has open/close properties here
+        const { open: defaultOpen, close: defaultClose } = defaultDay as { open: string; close: string };
         return {
           ...prev,
-          [day]: { open: field === 'open' ? value : '09:00', close: field === 'close' ? value : '18:00' }
+          [day]: { open: field === 'open' ? value : defaultOpen, close: field === 'close' ? value : defaultClose }
         };
       }
       return {
@@ -108,7 +134,14 @@ export default function NewShopPage() {
       if (closed) {
         return { ...prev, [day]: { closed: true } };
       }
-      return { ...prev, [day]: { open: '09:00', close: '18:00' } };
+      const defaultDay = DEFAULT_OPERATING_HOURS[day];
+      // Preserve closed=true if the default for that day is closed
+      if ('closed' in defaultDay && defaultDay.closed === true) {
+        return { ...prev, [day]: { closed: true } };
+      }
+      // TypeScript knows defaultDay has open/close properties here
+      const { open: defaultOpen, close: defaultClose } = defaultDay as { open: string; close: string };
+      return { ...prev, [day]: { open: defaultOpen, close: defaultClose } };
     });
   }, []);
 
@@ -167,9 +200,23 @@ export default function NewShopPage() {
         });
         // Refetch managers
         window.location.reload();
+      } else {
+        // Handle non-ok responses
+        const errorText = await response.text();
+        toast({
+          title: "Error Creating Test Managers",
+          description: `Failed to create test managers: ${response.status} ${errorText}`,
+          variant: "destructive",
+        });
       }
     } catch (error) {
-      // Error creating test managers
+      // Handle caught errors
+      console.error("Error creating test managers:", error);
+      toast({
+        title: "Error Creating Test Managers",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
     }
   };
 
@@ -543,6 +590,7 @@ export default function NewShopPage() {
                             checked={!isClosed}
                             onCheckedChange={(checked) => toggleDayClosed(key, !checked)}
                             data-testid={`switch-${key}`}
+                            aria-label={`Toggle ${label} open/closed`}
                           />
                           <span className="text-sm text-muted-foreground w-12">
                             {isClosed ? 'Closed' : 'Open'}
@@ -550,21 +598,37 @@ export default function NewShopPage() {
                         </div>
                         {!isClosed && (
                           <div className="flex items-center gap-2 flex-1">
-                            <Input
-                              type="time"
+                            <Select
                               value={'open' in dayHours ? dayHours.open : '09:00'}
-                              onChange={(e) => updateDayHours(key, 'open', e.target.value)}
-                              className="w-32"
-                              data-testid={`input-${key}-open`}
-                            />
+                              onValueChange={(value) => updateDayHours(key, 'open', value)}
+                            >
+                              <SelectTrigger className="w-32" data-testid={`input-${key}-open`} aria-label={`Open time for ${label}`}>
+                                <SelectValue>
+                                  {formatTime12hr('open' in dayHours ? dayHours.open : '09:00')}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {TIME_OPTIONS.map(({ value, label }) => (
+                                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                             <span className="text-muted-foreground">to</span>
-                            <Input
-                              type="time"
+                            <Select
                               value={'close' in dayHours ? dayHours.close : '18:00'}
-                              onChange={(e) => updateDayHours(key, 'close', e.target.value)}
-                              className="w-32"
-                              data-testid={`input-${key}-close`}
-                            />
+                              onValueChange={(value) => updateDayHours(key, 'close', value)}
+                            >
+                              <SelectTrigger className="w-32" data-testid={`input-${key}-close`} aria-label={`Close time for ${label}`}>
+                                <SelectValue>
+                                  {formatTime12hr('close' in dayHours ? dayHours.close : '18:00')}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {TIME_OPTIONS.map(({ value, label }) => (
+                                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                         )}
                       </div>

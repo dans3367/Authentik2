@@ -51,32 +51,40 @@ export default function ShopDetailsPage() {
       case 'active':
         return {
           icon: <CheckCircle className="h-4 w-4" />,
-          label: 'Active',
+          label: t('shops.status.active'),
           className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800'
         };
       case 'inactive':
         return {
           icon: <XCircle className="h-4 w-4" />,
-          label: 'Inactive',
+          label: t('shops.status.inactive'),
           className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800'
         };
       case 'maintenance':
         return {
           icon: <AlertCircle className="h-4 w-4" />,
-          label: 'Maintenance',
+          label: t('shops.status.maintenance'),
           className: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800'
         };
       default:
         return {
           icon: <CheckCircle className="h-4 w-4" />,
-          label: 'Active',
+          label: t('shops.status.active'),
           className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800'
         };
     }
   };
 
+  // Convert 24hr to 12hr display format
+  const formatTime12hr = (time24: string) => {
+    const [hours, minutes] = time24.split(':').map(Number);
+    const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+    const ampm = hours < 12 ? 'AM' : 'PM';
+    return `${hours12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+  };
+
   const formatOperatingHours = (hours?: string) => {
-    if (!hours) return <span className="text-gray-400 dark:text-gray-500">Not specified</span>;
+    if (!hours) return <span className="text-gray-400 dark:text-gray-500">{t('shops.notSpecified')}</span>;
     try {
       const parsed = JSON.parse(hours);
       if (typeof parsed === 'string') return parsed;
@@ -92,14 +100,14 @@ export default function ShopDetailsPage() {
               return (
                 <div key={day} className="flex justify-between text-sm">
                   <span className="capitalize font-medium text-gray-700 dark:text-gray-300">{day}</span>
-                  <span className="text-gray-400 dark:text-gray-500">Closed</span>
+                  <span className="text-gray-400 dark:text-gray-500">{t('shops.closed')}</span>
                 </div>
               );
             }
             return (
               <div key={day} className="flex justify-between text-sm">
                 <span className="capitalize font-medium text-gray-700 dark:text-gray-300">{day}</span>
-                <span className="text-gray-600 dark:text-gray-400">{dayHours.open} - {dayHours.close}</span>
+                <span className="text-gray-600 dark:text-gray-400">{formatTime12hr(dayHours.open)} - {formatTime12hr(dayHours.close)}</span>
               </div>
             );
           })}
@@ -171,14 +179,14 @@ export default function ShopDetailsPage() {
               <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
                 <Store className="h-8 w-8 text-gray-400" />
               </div>
-              <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Shop not found</h2>
-              <p className="text-gray-500 dark:text-gray-400 mb-6">The shop you're looking for doesn't exist or has been removed.</p>
+              <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">{t('shops.shopNotFound')}</h2>
+              <p className="text-gray-500 dark:text-gray-400 mb-6">{t('shops.shopNotFoundDescription')}</p>
               <Button
                 onClick={() => navigate('/shops')}
                 className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Shops
+                {t('shops.backToShops')}
               </Button>
             </CardContent>
           </Card>
@@ -215,7 +223,7 @@ export default function ShopDetailsPage() {
                 <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
                   {shop.name}
                 </h1>
-                <p className="text-gray-600 dark:text-gray-400">{shop.category || 'Uncategorized'}</p>
+                <p className="text-gray-600 dark:text-gray-400">{shop.category || t('shops.uncategorized')}</p>
               </div>
             </div>
           </div>
@@ -227,7 +235,7 @@ export default function ShopDetailsPage() {
             <Link href={`/shops/${shop.id}/edit`}>
               <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
                 <Edit className="mr-2 h-4 w-4" />
-                Edit Shop
+                {t('shops.editShop')}
               </Button>
             </Link>
           </div>
@@ -235,9 +243,9 @@ export default function ShopDetailsPage() {
 
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="activity">Activity</TabsTrigger>
+            <TabsTrigger value="overview">{t('shops.overview')}</TabsTrigger>
+            <TabsTrigger value="details">{t('shops.details')}</TabsTrigger>
+            <TabsTrigger value="activity">{t('shops.activity')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -250,8 +258,8 @@ export default function ShopDetailsPage() {
                       <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
-                      <CardTitle className="text-lg">Location Information</CardTitle>
-                      <CardDescription>Physical address and contact details</CardDescription>
+                      <CardTitle className="text-lg">{t('shops.locationInformation')}</CardTitle>
+                      <CardDescription>{t('shops.locationInformationDescription')}</CardDescription>
                     </div>
                   </div>
                 </CardHeader>
@@ -259,9 +267,9 @@ export default function ShopDetailsPage() {
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
                     <MapPin className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-gray-100">Address</p>
+                      <p className="font-medium text-gray-900 dark:text-gray-100">{t('shops.address')}</p>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {shop.address || 'No address specified'}<br />
+                        {shop.address || t('shops.noAddressSpecified')}<br />
                         {shop.city && <>{shop.city}{shop.state ? `, ${shop.state}` : ''} {shop.zipCode}<br /></>}
                         {shop.country}
                       </p>
@@ -271,16 +279,16 @@ export default function ShopDetailsPage() {
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
                     <Phone className="h-5 w-5 text-gray-400 flex-shrink-0" />
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-gray-100">Phone</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">{shop.phone || 'Not specified'}</p>
+                      <p className="font-medium text-gray-900 dark:text-gray-100">{t('shops.phone')}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{shop.phone || t('shops.notSpecified')}</p>
                     </div>
                   </div>
 
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
                     <Mail className="h-5 w-5 text-gray-400 flex-shrink-0" />
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-gray-100">Email</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">{shop.email || 'Not specified'}</p>
+                      <p className="font-medium text-gray-900 dark:text-gray-100">{t('shops.email')}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{shop.email || t('shops.notSpecified')}</p>
                     </div>
                   </div>
 
@@ -288,7 +296,7 @@ export default function ShopDetailsPage() {
                     <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
                       <Globe className="h-5 w-5 text-gray-400 flex-shrink-0" />
                       <div>
-                        <p className="font-medium text-gray-900 dark:text-gray-100">Website</p>
+                        <p className="font-medium text-gray-900 dark:text-gray-100">{t('shops.website')}</p>
                         <a
                           href={shop.website}
                           target="_blank"
@@ -310,8 +318,8 @@ export default function ShopDetailsPage() {
                       <Clock className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                     </div>
                     <div>
-                      <CardTitle className="text-lg">Operating Information</CardTitle>
-                      <CardDescription>Hours and management details</CardDescription>
+                      <CardTitle className="text-lg">{t('shops.operatingInformation')}</CardTitle>
+                      <CardDescription>{t('shops.operatingInformationDescription')}</CardDescription>
                     </div>
                   </div>
                 </CardHeader>
@@ -319,10 +327,10 @@ export default function ShopDetailsPage() {
                   <div className="p-3 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
                     <div className="flex items-center gap-2 mb-3">
                       <Clock className="h-5 w-5 text-gray-400" />
-                      <p className="font-medium text-gray-900 dark:text-gray-100">Operating Hours</p>
+                      <p className="font-medium text-gray-900 dark:text-gray-100">{t('shops.operatingHours')}</p>
                     </div>
                     <div className="pl-7">
-                      {formatOperatingHours(shop.operatingHours)}
+                      {formatOperatingHours(shop.operatingHours || undefined)}
                     </div>
                   </div>
 
@@ -337,7 +345,7 @@ export default function ShopDetailsPage() {
                         <p className="font-medium text-gray-900 dark:text-gray-100">
                           {shop.manager.firstName || shop.manager.lastName
                             ? `${shop.manager.firstName || ''} ${shop.manager.lastName || ''}`.trim()
-                            : 'Manager'}
+                            : t('shops.manager')}
                         </p>
                         <p className="text-sm text-gray-600 dark:text-gray-400">{shop.manager.email}</p>
                         <Badge variant="outline" className="mt-2 text-xs">
@@ -351,8 +359,8 @@ export default function ShopDetailsPage() {
                     <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
                       <User className="h-5 w-5 text-gray-400 flex-shrink-0" />
                       <div>
-                        <p className="font-medium text-gray-900 dark:text-gray-100">Manager</p>
-                        <p className="text-sm text-gray-400 italic">No manager assigned</p>
+                        <p className="font-medium text-gray-900 dark:text-gray-100">{t('shops.manager')}</p>
+                        <p className="text-sm text-gray-400 italic">{t('shops.noManagerAssigned')}</p>
                       </div>
                     </div>
                   )}
@@ -368,7 +376,7 @@ export default function ShopDetailsPage() {
                     <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
                       <Store className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                     </div>
-                    <CardTitle className="text-lg">Description</CardTitle>
+                    <CardTitle className="text-lg">{t('shops.description')}</CardTitle>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -386,8 +394,8 @@ export default function ShopDetailsPage() {
                       <Tag className="h-4 w-4 text-teal-600 dark:text-teal-400" />
                     </div>
                     <div>
-                      <CardTitle className="text-lg">Tags</CardTitle>
-                      <CardDescription>Categories and labels for this shop</CardDescription>
+                      <CardTitle className="text-lg">{t('shops.tags')}</CardTitle>
+                      <CardDescription>{t('shops.tagsDescription')}</CardDescription>
                     </div>
                   </div>
                 </CardHeader>
@@ -413,15 +421,15 @@ export default function ShopDetailsPage() {
                     <Building className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg">Shop Details</CardTitle>
-                    <CardDescription>Additional information and metadata</CardDescription>
+                    <CardTitle className="text-lg">{t('shops.shopDetails')}</CardTitle>
+                    <CardDescription>{t('shops.shopDetailsDescription')}</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="p-4 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Shop ID</p>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">{t('shops.shopId')}</p>
                     <p className="font-mono text-sm text-gray-900 dark:text-gray-100 break-all">{shop.id}</p>
                   </div>
                   <div className="p-4 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
@@ -434,17 +442,17 @@ export default function ShopDetailsPage() {
                     </div>
                   </div>
                   <div className="p-4 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Created</p>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">{t('shops.created')}</p>
                     <div className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100">
                       <Calendar className="h-4 w-4 text-gray-400" />
-                      {new Date(shop.createdAt).toLocaleDateString()} at {new Date(shop.createdAt).toLocaleTimeString()}
+                      {shop.createdAt && new Date(shop.createdAt).toLocaleDateString()} at {shop.createdAt && new Date(shop.createdAt).toLocaleTimeString()}
                     </div>
                   </div>
                   <div className="p-4 rounded-lg bg-gray-50/50 dark:bg-gray-900/30">
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Last Updated</p>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">{t('shops.lastUpdated')}</p>
                     <div className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100">
                       <Calendar className="h-4 w-4 text-gray-400" />
-                      {new Date(shop.updatedAt).toLocaleDateString()} at {new Date(shop.updatedAt).toLocaleTimeString()}
+                      {shop.updatedAt && new Date(shop.updatedAt).toLocaleDateString()} at {shop.updatedAt && new Date(shop.updatedAt).toLocaleTimeString()}
                     </div>
                   </div>
                 </div>
@@ -460,8 +468,8 @@ export default function ShopDetailsPage() {
                     <Activity className="h-4 w-4 text-pink-600 dark:text-pink-400" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg">Recent Activity</CardTitle>
-                    <CardDescription>Shop activity and changes</CardDescription>
+                    <CardTitle className="text-lg">{t('shops.recentActivity')}</CardTitle>
+                    <CardDescription>{t('shops.recentActivityDescription')}</CardDescription>
                   </div>
                 </div>
               </CardHeader>
@@ -470,9 +478,9 @@ export default function ShopDetailsPage() {
                   <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
                     <Activity className="h-8 w-8 text-gray-400" />
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Activity Tracking</h3>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">{t('shops.activityTracking')}</h3>
                   <p className="text-gray-500 dark:text-gray-400 max-w-sm">
-                    Activity tracking for this shop will be available soon. Check back later for updates.
+                    {t('shops.activityTrackingDescription')}
                   </p>
                 </div>
               </CardContent>
