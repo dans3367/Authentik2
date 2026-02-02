@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "email_activity_webhook_id_tenant_id_unique" ON "email_activity" USING btree ("webhook_id","tenant_id");

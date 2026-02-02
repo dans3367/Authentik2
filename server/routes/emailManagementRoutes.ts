@@ -2267,7 +2267,7 @@ emailManagementRoutes.post("/internal/email-activity", authenticateInternalServi
           occurredAt: validatedOccurredAt,
         })
         .onConflictDoNothing({
-          target: [emailActivity.webhookId],
+          target: [emailActivity.webhookId, emailActivity.tenantId],
         })
         .returning();
 
@@ -2296,7 +2296,7 @@ emailManagementRoutes.post("/internal/email-activity", authenticateInternalServi
       const existingActivities = await tx
         .select()
         .from(emailActivity)
-        .where(eq(emailActivity.webhookId, webhookId))
+        .where(and(eq(emailActivity.webhookId, webhookId), eq(emailActivity.tenantId, tenantId)))
         .limit(1);
 
       if (existingActivities.length === 0) {
