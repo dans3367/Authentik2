@@ -20,13 +20,14 @@ function generateInternalSignature(payload: object, timestamp: number): string {
 
 /**
  * Log email activity to the server via internal API
+ * Returns success status so callers can handle failures appropriately
  */
 async function logEmailActivity(params: {
     tenantId: string;
     contactId: string;
     activityType: string;
     activityData: object;
-}): Promise<void> {
+}): Promise<{ success: boolean; error?: string }> {
     const apiUrl = process.env.API_URL || "http://localhost:5002";
     const timestamp = Date.now();
     const body = {
@@ -40,7 +41,7 @@ async function logEmailActivity(params: {
     try {
         const signature = generateInternalSignature(body, timestamp);
         
-        const response = await fetch(`${apiUrl}/api/email-contacts/internal/email-activity`, {
+        const response = await fetch(`${apiUrl}/api/internal/email-activity`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -53,20 +54,29 @@ async function logEmailActivity(params: {
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            logger.warn("Failed to log email activity", { 
+            const errorMessage = errorData.error || `HTTP ${response.status}`;
+            logger.error("Failed to log email activity", { 
                 status: response.status, 
-                error: errorData 
-            });
-        } else {
-            logger.info("Email activity logged successfully", { 
+                error: errorMessage,
                 contactId: params.contactId,
                 activityType: params.activityType 
             });
+            return { success: false, error: errorMessage };
         }
-    } catch (error) {
-        logger.warn("Error logging email activity", { 
-            error: error instanceof Error ? error.message : "Unknown error" 
+
+        logger.info("Email activity logged successfully", { 
+            contactId: params.contactId,
+            activityType: params.activityType 
         });
+        return { success: true };
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        logger.error("Error logging email activity", { 
+            error: errorMessage,
+            contactId: params.contactId,
+            activityType: params.activityType 
+        });
+        return { success: false, error: errorMessage };
     }
 }
 
@@ -139,24 +149,58 @@ export const sendRescheduleEmailTask = task({
                 appointmentId: data.appointmentId,
             });
 
-            // Log email activity to customer's timeline
-            await logEmailActivity({
-                tenantId: data.tenantId,
-                contactId: data.customerId,
-                activityType: "sent",
-                activityData: {
-                    type: "reschedule-invitation",
-                    emailId: emailData?.id,
+            // Log email activity to customer's timeline with retry logic
+            let activityLogged = false;
+            let activityError: string | undefined;
+            
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                const result = await logEmailActivity({
+                    tenantId: data.tenantId,
+                    contactId: data.customerId,
+                    activityType: "sent",
+                    activityData: {
+                        type: "reschedule-invitation",
+                        emailId: emailData?.id,
+                        appointmentId: data.appointmentId,
+                        appointmentTitle: data.appointmentTitle,
+                        appointmentDate: data.appointmentDate,
+                        appointmentTime: data.appointmentTime,
+                        originalStatus: data.status,
+                        subject,
+                        recipient: data.customerEmail,
+                        from: data.from || process.env.EMAIL_FROM || "admin@zendwise.com",
+                    },
+                });
+                
+                if (result.success) {
+                    activityLogged = true;
+                    break;
+                }
+                
+                activityError = result.error;
+                logger.warn(`Email activity logging attempt ${attempt} failed`, {
+                    error: activityError,
+                    contactId: data.customerId,
+                    appointmentId: data.appointmentId
+                });
+                
+                // Wait before retry (exponential backoff: 1s, 2s, 4s)
+                if (attempt < 3) {
+                    const delayMs = Math.pow(2, attempt - 1) * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delayMs));
+                }
+            }
+            
+            if (!activityLogged) {
+                logger.error("Failed to log email activity after 3 attempts", {
+                    error: activityError,
+                    contactId: data.customerId,
                     appointmentId: data.appointmentId,
-                    appointmentTitle: data.appointmentTitle,
-                    appointmentDate: data.appointmentDate,
-                    appointmentTime: data.appointmentTime,
-                    originalStatus: data.status,
-                    subject,
-                    recipient: data.customerEmail,
-                    from: data.from || process.env.EMAIL_FROM || "admin@zendwise.com",
-                },
-            });
+                    emailId: emailData?.id
+                });
+                // Don't fail the entire task for activity logging issues, but log the failure clearly
+                // This could be extended to send alerts or create a retry queue in the future
+            }
 
             return {
                 success: true,

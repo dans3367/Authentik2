@@ -2189,7 +2189,11 @@ emailManagementRoutes.post("/internal/birthday-invitation", async (req: any, res
 emailManagementRoutes.post("/internal/email-activity", authenticateInternalService, async (req: InternalServiceRequest, res) => {
   console.log('📧 [Internal Email Activity] Received authenticated request:', {
     service: req.internalService?.service,
-    body: req.body,
+    tenantId: req.body.tenantId,
+    contactId: req.body.contactId,
+    activityType: req.body.activityType,
+    activityData: '[REDACTED - PII]',
+    occurredAt: req.body.occurredAt
   });
 
   try {
@@ -2230,13 +2234,26 @@ emailManagementRoutes.post("/internal/email-activity", authenticateInternalServi
       return res.status(404).json({ error: 'Contact not found' });
     }
 
+    // Validate occurredAt if provided
+    let validatedOccurredAt = new Date();
+    if (occurredAt) {
+      const parsed = new Date(occurredAt);
+      if (isFinite(parsed.getTime())) {
+        validatedOccurredAt = parsed;
+      } else {
+        return res.status(400).json({ 
+          error: 'Invalid occurredAt format. Must be a valid date.' 
+        });
+      }
+    }
+
     // Create email activity record
     const [newActivity] = await db.insert(emailActivity).values({
       tenantId,
       contactId,
       activityType,
       activityData: activityData ? JSON.stringify(activityData) : null,
-      occurredAt: occurredAt ? new Date(occurredAt) : new Date(),
+      occurredAt: validatedOccurredAt,
     }).returning();
 
     // Update contact's lastActivity timestamp
@@ -2247,7 +2264,10 @@ emailManagementRoutes.post("/internal/email-activity", authenticateInternalServi
         // Increment emailsSent counter if this is a 'sent' activity
         ...(activityType === 'sent' ? { emailsSent: sql`${emailContacts.emailsSent} + 1` } : {})
       })
-      .where(eq(emailContacts.id, contactId));
+      .where(and(
+        eq(emailContacts.id, contactId),
+        eq(emailContacts.tenantId, tenantId)
+      ));
 
     console.log(`📧 [Internal Email Activity] Created activity ${newActivity.id} for contact ${contactId}`);
     
