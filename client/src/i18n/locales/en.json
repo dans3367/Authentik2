@@ -1929,5 +1929,40 @@
         "updateError": "Failed to update email design"
       }
     }
+  },
+  "activityFeed": {
+    "unknownUser": "Unknown User",
+    "viewChanges": "View {{count}} change(s)",
+    "noActivity": "No Activity Yet",
+    "noActivityDescription": "Actions taken on this item will appear here as a timeline.",
+    "errorLoading": "Failed to load activity logs",
+    "loadMore": "Load more activity",
+    "types": {
+      "created": "Created",
+      "updated": "Updated",
+      "deleted": "Deleted",
+      "sent": "Sent",
+      "scheduled": "Scheduled",
+      "archived": "Archived",
+      "cancelled": "Cancelled"
+    },
+    "fields": {
+      "name": "Name",
+      "description": "Description",
+      "address": "Address",
+      "city": "City",
+      "state": "State",
+      "zipCode": "ZIP Code",
+      "country": "Country",
+      "phone": "Phone",
+      "email": "Email",
+      "website": "Website",
+      "operatingHours": "Operating Hours",
+      "status": "Status",
+      "category": "Category",
+      "managerId": "Manager",
+      "tags": "Tags",
+      "isActive": "Active"
+    }
   }
 }

@@ -28,6 +28,7 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import type { ShopWithManager } from "@shared/schema";
+import ActivityFeed from "@/components/activity/ActivityFeed";
 
 export default function ShopDetailsPage() {
   const { id } = useParams();
@@ -474,15 +475,7 @@ export default function ShopDetailsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
-                    <Activity className="h-8 w-8 text-gray-400" />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">{t('shops.activityTracking')}</h3>
-                  <p className="text-gray-500 dark:text-gray-400 max-w-sm">
-                    {t('shops.activityTrackingDescription')}
-                  </p>
-                </div>
+                <ActivityFeed entityType="shop" entityId={id!} limit={20} />
               </CardContent>
             </Card>
           </TabsContent>

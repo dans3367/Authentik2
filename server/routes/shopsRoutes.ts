@@ -6,6 +6,7 @@ import { authenticateToken, requireRole } from '../middleware/auth-middleware';
 import { createShopSchema, updateShopSchema, type ShopFilters } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 import { storage } from '../storage';
+import { logActivity, computeChanges, SHOP_TRACKED_FIELDS } from '../utils/activityLogger';
 
 export const shopsRoutes = Router();
 
@@ -255,6 +256,23 @@ shopsRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator", 
       tenantId: req.user.tenantId,
     }).returning();
 
+    // Log activity
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      entityType: 'shop',
+      entityId: newShop[0].id,
+      entityName: newShop[0].name,
+      activityType: 'created',
+      description: `Shop "${newShop[0].name}" was created`,
+      metadata: {
+        status: newShop[0].status,
+        category: newShop[0].category,
+        managerId: newShop[0].managerId,
+      },
+      req,
+    });
+
     res.status(201).json(newShop[0]);
   } catch (error) {
     console.error('Create shop error:', error);
@@ -375,6 +393,22 @@ shopsRoutes.put("/:id", authenticateToken, requireRole(["Owner", "Administrator"
       .where(sql`${shops.id} = ${id}`)
       .returning();
 
+    // Compute and log changes
+    const changes = computeChanges(existingShop, updatedShop[0], SHOP_TRACKED_FIELDS);
+    if (changes) {
+      await logActivity({
+        tenantId: req.user.tenantId,
+        userId: req.user.id,
+        entityType: 'shop',
+        entityId: id,
+        entityName: updatedShop[0].name,
+        activityType: 'updated',
+        description: `Shop "${updatedShop[0].name}" was updated`,
+        changes,
+        req,
+      });
+    }
+
     res.json(updatedShop[0]);
   } catch (error) {
     console.error('Update shop error:', error);
@@ -430,6 +464,25 @@ shopsRoutes.delete("/:id", authenticateToken, requireRole(["Owner", "Administrat
     // Delete shop
     await db.delete(shops)
       .where(sql`${shops.id} = ${id}`);
+
+    // Log activity
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      entityType: 'shop',
+      entityId: id,
+      entityName: existingShop.name,
+      activityType: 'deleted',
+      description: `Shop "${existingShop.name}" was deleted`,
+      metadata: {
+        deletedShopData: {
+          name: existingShop.name,
+          status: existingShop.status,
+          category: existingShop.category,
+        },
+      },
+      req,
+    });
 
     res.json({ message: 'Shop deleted successfully' });
   } catch (error) {
