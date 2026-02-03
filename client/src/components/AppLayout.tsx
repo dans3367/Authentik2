@@ -186,14 +186,15 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [companyData, setCompanyData] = useState<any>(null);
   
-  // Initialize sidebar open state
+  // Initialize sidebar open state from localStorage
   const [sidebarOpen, setSidebarOpen] = useState(() => {
-    // Only use localStorage as initial state if auth is not initialized yet
-    if (!isInitialized) {
-      const localPref = localStorage.getItem("menuExpanded");
-      if (localPref !== null) {
-        return JSON.parse(localPref);
+    try {
+      const stored = localStorage.getItem("menuExpanded");
+      if (stored !== null) {
+        return JSON.parse(stored);
       }
+    } catch (error) {
+      console.warn("Failed to read sidebar state from localStorage:", error);
     }
     // Default to expanded
     return true;
@@ -206,15 +207,19 @@ useEffect(() => {
     document.documentElement.lang = currentLanguage;
   }
 
-  // Only update sidebar state after auth is initialized
-  if (isInitialized && user) {
-      // Use backend preference as source of truth
+  // Only seed from backend if localStorage has no value set (first time user)
+  // localStorage is the source of truth for sidebar state persistence
+  if (isInitialized && user && user.menuExpanded !== undefined) {
+    const hasLocalStorage = localStorage.getItem("menuExpanded") !== null;
+    
+    // Only use backend preference if localStorage has never been set
+    if (!hasLocalStorage) {
       const backendOpen = user.menuExpanded !== false;
       setSidebarOpen(backendOpen);
-      // Sync localStorage with backend preference
-      localStorage.setItem("menuExpanded", JSON.stringify(user.menuExpanded ?? true));
+      localStorage.setItem("menuExpanded", JSON.stringify(backendOpen));
     }
-  }, [isInitialized, user, user?.menuExpanded, currentLanguage]);
+  }
+}, [isInitialized, user?.menuExpanded, currentLanguage]);
 
 
   // Check if company needs onboarding
