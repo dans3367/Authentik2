@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { DndContext, DragEndEvent, MouseSensor, TouchSensor, useSensor, useSensors, DragOverlay, DragStartEvent, pointerWithin, rectIntersection, closestCenter, CollisionDetection } from '@dnd-kit/core';
+import { DndContext, DragEndEvent, DragCancelEvent, MouseSensor, TouchSensor, useSensor, useSensors, DragOverlay, DragStartEvent, pointerWithin, rectIntersection, closestCenter, CollisionDetection } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { useFormBuilder } from '@/hooks/use-form-builder';
 import { ComponentPalette } from '@/components/form-builder/component-palette';
@@ -44,6 +44,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
   const [showMobileAdd, setShowMobileAdd] = useState(false);
   const [showMobileProperties, setShowMobileProperties] = useState(false);
   const [draggedType, setDraggedType] = useState<FormElementType | null>(null);
+  const [isDraggingElement, setIsDraggingElement] = useState(false);
 
 
   // Configure drag and drop sensors with better desktop support
@@ -55,20 +56,28 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
   });
   const sensors = useSensors(mouseSensor, touchSensor);
 
-  // Custom collision detection that allows vertical-only dragging
+  // Custom collision detection that allows dropping from sidelines
   const customCollisionDetection: CollisionDetection = (args) => {
-    const { droppableContainers, pointerCoordinates } = args;
+    const { droppableContainers, pointerCoordinates, active } = args;
     
     if (!pointerCoordinates) {
       return closestCenter(args);
     }
+    
+    // Check if we're dragging an existing element (reordering) or a new element from palette
+    const isDraggingExistingElement = !active.data.current?.isNew;
     
     // Filter to only insertion points
     const insertionPoints = droppableContainers.filter(
       (container) => container.data.current?.isInsertionPoint
     );
     
+    // Get the form canvas bounds to determine if we're in the general canvas area
+    const formCanvas = droppableContainers.find(c => c.id === 'form-canvas');
+    const canvasRect = formCanvas?.rect.current;
+    
     // If we have insertion points, find the closest one by Y position
+    // Allow drops from sidelines by using generous X tolerance
     if (insertionPoints.length > 0) {
       let closestInsertionPoint: typeof insertionPoints[0] | null = null;
       let closestDistance = Infinity;
@@ -76,18 +85,36 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
       for (const container of insertionPoints) {
         if (!container.rect.current) continue;
         
+        // Skip insertion points that reference the element being dragged
+        if (isDraggingExistingElement) {
+          const insertionElementId = container.data.current?.elementId;
+          if (insertionElementId === active.id) continue;
+        }
+        
         const rect = container.rect.current;
         const centerY = rect.top + rect.height / 2;
         const distanceY = Math.abs(pointerCoordinates.y - centerY);
         
-        // Use Y distance primarily for insertion points
-        if (distanceY < closestDistance) {
+        // Check if pointer is within extended horizontal bounds (400px on each side)
+        // This allows dropping from the sidelines
+        const extendedLeft = rect.left - 400;
+        const extendedRight = rect.right + 400;
+        const isWithinExtendedX = pointerCoordinates.x >= extendedLeft && pointerCoordinates.x <= extendedRight;
+        
+        // Also allow if within canvas bounds horizontally
+        const isWithinCanvas = canvasRect && 
+          pointerCoordinates.x >= canvasRect.left - 200 && 
+          pointerCoordinates.x <= canvasRect.right + 200;
+        
+        // Use Y distance primarily for insertion points, but only if within extended X bounds
+        if ((isWithinExtendedX || isWithinCanvas) && distanceY < closestDistance) {
           closestDistance = distanceY;
           closestInsertionPoint = container;
         }
       }
       
-      if (closestInsertionPoint && closestDistance < 100) {
+      // Increased threshold to 300px for more forgiving vertical detection
+      if (closestInsertionPoint && closestDistance < 300) {
         return [{ id: closestInsertionPoint.id, data: { droppableContainer: closestInsertionPoint } }];
       }
     }
@@ -166,6 +193,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
   // Drag handlers
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
+    setIsDraggingElement(true);
     if (active.data.current?.isNew) {
       const type = active.id.toString().replace('palette-', '') as FormElementType;
       setDraggedType(type);
@@ -175,6 +203,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setDraggedType(null);
+    setIsDraggingElement(false);
 
     if (!over) return;
 
@@ -212,15 +241,57 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
       }
     } else {
       // Handle reordering existing elements
-      if (active.id !== over.id) {
-        const oldIndex = elements.findIndex(el => el.id === active.id);
-        const newIndex = elements.findIndex(el => el.id === over.id);
+      const oldIndex = elements.findIndex(el => el.id === active.id);
+      if (oldIndex === -1) return;
+      
+      // Check if dropping on an insertion point
+      if (over.data.current?.isInsertionPoint) {
+        const { elementId, position } = over.data.current;
         
-        if (oldIndex !== -1 && newIndex !== -1) {
+        // Handle special drop zones
+        if (over.id === 'insert-first') {
+          if (oldIndex !== 0) {
+            moveElement(oldIndex, 0);
+          }
+          return;
+        }
+        
+        if (over.id === 'insert-end') {
+          const lastIndex = elements.length - 1;
+          if (oldIndex !== lastIndex) {
+            moveElement(oldIndex, lastIndex);
+          }
+          return;
+        }
+        
+        // Handle insertion between elements
+        const targetIndex = elements.findIndex(el => el.id === elementId);
+        if (targetIndex !== -1) {
+          let newIndex = position === 'top' ? targetIndex : targetIndex + 1;
+          // Adjust for the element being moved
+          if (oldIndex < newIndex) {
+            newIndex--;
+          }
+          if (oldIndex !== newIndex) {
+            moveElement(oldIndex, newIndex);
+          }
+        }
+        return;
+      }
+      
+      // Direct drop on another element (fallback)
+      if (active.id !== over.id) {
+        const newIndex = elements.findIndex(el => el.id === over.id);
+        if (newIndex !== -1) {
           moveElement(oldIndex, newIndex);
         }
       }
     }
+  };
+
+  const handleDragCancel = () => {
+    setDraggedType(null);
+    setIsDraggingElement(false);
   };
 
   const handleAddElement = (type: FormElementType) => {
@@ -243,6 +314,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
       collisionDetection={customCollisionDetection}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
       <div className="flex relative">
         {/* Left Sidebar - Component Palette */}
@@ -264,7 +336,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
             onUpdateFormTitle={updateFormTitle}
             onTogglePreview={togglePreview}
             onMobileEdit={handleMobileEdit}
-            isDragging={!!draggedType}
+            isDragging={isDraggingElement}
             onMoveElement={moveElement}
           />
         </div>
