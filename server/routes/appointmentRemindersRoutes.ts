@@ -295,26 +295,30 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     // Log activity for reminder creation
-    await logActivity({
-      tenantId,
-      userId: user.id,
-      entityType: 'appointment',
-      entityId: validatedData.appointmentId,
-      entityName: appointment.title,
-      activityType: isSendNow ? 'sent' : 'scheduled',
-      description: isSendNow 
-        ? `Sent reminder for appointment "${appointment.title}"` 
-        : `Scheduled reminder for appointment "${appointment.title}"`,
-      metadata: {
-        reminderId: newReminder[0].id,
-        reminderType: validatedData.reminderType,
-        reminderTiming: validatedData.reminderTiming,
-        scheduledFor: validatedData.scheduledFor,
-        customerEmail: appointment.customer?.email,
-        customerName,
-      },
-      req,
-    });
+    try {
+      await logActivity({
+        tenantId,
+        userId: user.id,
+        entityType: 'appointment',
+        entityId: validatedData.appointmentId,
+        entityName: appointment.title,
+        activityType: isSendNow ? 'sent' : 'scheduled',
+        description: isSendNow 
+          ? `Sent reminder for appointment "${appointment.title}"` 
+          : `Scheduled reminder for appointment "${appointment.title}"`,
+        metadata: {
+          reminderId: newReminder[0].id,
+          reminderType: validatedData.reminderType,
+          reminderTiming: validatedData.reminderTiming,
+          scheduledFor: validatedData.scheduledFor,
+          customerEmail: appointment.customer?.email,
+          customerName,
+        },
+        req,
+      });
+    } catch (error) {
+      console.error('[Activity Log] Failed to log reminder creation:', error);
+    }
 
     res.status(201).json({ 
       reminder: newReminder[0],

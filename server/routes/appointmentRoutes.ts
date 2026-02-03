@@ -333,23 +333,27 @@ router.post('/', async (req: Request, res: Response) => {
       ? `${appointmentCustomer.firstName || ''} ${appointmentCustomer.lastName || ''}`.trim() || appointmentCustomer.email
       : 'Unknown Customer';
     
-    await logActivity({
-      tenantId,
-      userId,
-      entityType: 'appointment',
-      entityId: newAppointment[0].id,
-      entityName: newAppointment[0].title,
-      activityType: 'created',
-      description: `Created appointment "${newAppointment[0].title}" for ${customerName}`,
-      metadata: {
-        customerId: newAppointment[0].customerId,
-        customerName,
-        appointmentDate: newAppointment[0].appointmentDate,
-        serviceType: newAppointment[0].serviceType,
-        location: newAppointment[0].location,
-      },
-      req,
-    });
+    try {
+      await logActivity({
+        tenantId,
+        userId,
+        entityType: 'appointment',
+        entityId: newAppointment[0].id,
+        entityName: newAppointment[0].title,
+        activityType: 'created',
+        description: `Created appointment "${newAppointment[0].title}" for ${customerName}`,
+        metadata: {
+          customerId: newAppointment[0].customerId,
+          customerName,
+          appointmentDate: newAppointment[0].appointmentDate,
+          serviceType: newAppointment[0].serviceType,
+          location: newAppointment[0].location,
+        },
+        req,
+      });
+    } catch (error) {
+      console.error('[Activity Log] Failed to log appointment creation:', error);
+    }
 
     res.status(201).json({
       appointment: { ...newAppointment[0], customer: appointmentCustomer },
@@ -427,7 +431,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       'serviceType', 'status', 'notes', 'customerId'
     ]);
 
-    if (changes) {
+    try {
       await logActivity({
         tenantId,
         userId: user.id,
@@ -436,13 +440,15 @@ router.put('/:id', async (req: Request, res: Response) => {
         entityName: updatedAppointment[0].title,
         activityType: 'updated',
         description: `Updated appointment "${updatedAppointment[0].title}"`,
-        changes,
+        changes: changes || undefined,
         metadata: {
           isDateChanged: isDateChanging,
           remindersCancelled,
         },
         req,
       });
+    } catch (error) {
+      console.error('[Activity Log] Failed to log appointment update:', error);
     }
 
     res.json({
@@ -533,7 +539,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
       'serviceType', 'status', 'notes', 'customerId'
     ]);
 
-    if (changes) {
+    try {
       await logActivity({
         tenantId,
         userId: user.id,
@@ -542,13 +548,15 @@ router.patch('/:id', async (req: Request, res: Response) => {
         entityName: updatedAppointment[0].title,
         activityType: 'updated',
         description: `Updated appointment "${updatedAppointment[0].title}"`,
-        changes,
+        changes: changes || undefined,
         metadata: {
           isDateChanged: isDateChanging,
           remindersCancelled,
         },
         req,
       });
+    } catch (error) {
+      console.error('[Activity Log] Failed to log appointment update:', error);
     }
 
     res.json({
@@ -593,30 +601,34 @@ router.delete('/:id', requireRole(['Owner', 'Administrator', 'Manager']), async 
       console.warn(`[Delete] Some reminders failed to cancel:`, cancelResult.errors);
     }
 
-    // Log activity for appointment deletion before deleting
-    const deletedAppointment = existingAppointment[0];
-    await logActivity({
-      tenantId,
-      userId: user.id,
-      entityType: 'appointment',
-      entityId: id,
-      entityName: deletedAppointment.title,
-      activityType: 'deleted',
-      description: `Deleted appointment "${deletedAppointment.title}"`,
-      metadata: {
-        customerId: deletedAppointment.customerId,
-        appointmentDate: deletedAppointment.appointmentDate,
-        serviceType: deletedAppointment.serviceType,
-        status: deletedAppointment.status,
-        remindersCancelled: cancelResult.cancelled,
-      },
-      req,
-    });
-
     // Delete appointment (this will cascade delete reminders from DB)
     await db
       .delete(appointments)
       .where(eq(appointments.id, id));
+
+    // Log activity for appointment deletion after deleting
+    const deletedAppointment = existingAppointment[0];
+    try {
+      await logActivity({
+        tenantId,
+        userId: user.id,
+        entityType: 'appointment',
+        entityId: id,
+        entityName: deletedAppointment.title,
+        activityType: 'deleted',
+        description: `Deleted appointment "${deletedAppointment.title}"`,
+        metadata: {
+          customerId: deletedAppointment.customerId,
+          appointmentDate: deletedAppointment.appointmentDate,
+          serviceType: deletedAppointment.serviceType,
+          status: deletedAppointment.status,
+          remindersCancelled: cancelResult.cancelled,
+        },
+        req,
+      });
+    } catch (error) {
+      console.error('[Activity Log] Failed to log appointment deletion:', error);
+    }
 
     res.json({ 
       message: 'Appointment deleted successfully',
