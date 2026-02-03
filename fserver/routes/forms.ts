@@ -20,8 +20,6 @@ router.get('/:id', async (req, res) => {
       return res.status(400).json({ error: 'Form ID is required' });
     }
 
-    console.log('Fetching form with ID:', formId);
-
     // Get form data, only if it's active
     const form = await db.select({
       id: forms.id,
@@ -33,8 +31,6 @@ router.get('/:id', async (req, res) => {
       .from(forms)
       .where(and(eq(forms.id, formId), eq(forms.isActive, true)))
       .limit(1);
-
-    console.log('Form query result:', form);
 
     if (form.length === 0) {
       return res.status(404).json({ error: 'Form not found or inactive' });
@@ -59,8 +55,7 @@ router.get('/:id', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching form:', error);
-    console.error('Full error details:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+    console.error('Error fetching form:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to fetch form' });
   }
 });
@@ -128,7 +123,7 @@ router.post('/:id/submit', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error submitting form response:', error);
+    console.error('Error submitting form response:', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ error: 'Failed to submit form response' });
   }
 });

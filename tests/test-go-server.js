@@ -1,11 +1,24 @@
-import { neon } from '@neondatabase/serverless';
+import postgres from 'postgres';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import fetch from 'node-fetch';
 
 dotenv.config();
 
-const sql = neon(process.env.DATABASE_URL);
+if (!process.env.DATABASE_URL) {
+  console.error('DATABASE_URL environment variable is not set');
+  process.exit(1);
+}
+
+const databaseUrl = process.env.DATABASE_URL;
+const requiresSSL = databaseUrl.includes('sslmode=require') || databaseUrl.includes('neon.tech');
+
+const sql = postgres(databaseUrl, {
+  ssl: requiresSSL ? 'require' : false,
+  max: 10,
+  idle_timeout: 20,
+  connect_timeout: 10,
+});
 
 async function testGoServerAuth() {
   try {
