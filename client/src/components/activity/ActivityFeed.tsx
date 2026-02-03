@@ -239,7 +239,6 @@ export default function ActivityFeed({ entityType, entityId, limit = 20, classNa
         setIsLoadingMore(true);
         const newOffset = offset + limit;
         setOffset(newOffset);
-        setIsLoadingMore(false);
     }, [offset, limit, hasMore, isLoadingMore]);
 
     // Update combinedLogs and hasMore when new data arrives
@@ -247,6 +246,7 @@ export default function ActivityFeed({ entityType, entityId, limit = 20, classNa
         if (data && offset > 0) {
             setCombinedLogs(prev => [...prev, ...data.logs]);
             setHasMore(data.pagination.hasMore);
+            setIsLoadingMore(false);
         }
     }, [data, offset]);
 

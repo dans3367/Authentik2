@@ -36,6 +36,23 @@ function validatePaginationParams(limit?: string | string[], offset?: string | s
     };
 }
 
+function safeJsonParse(value: unknown) {
+    if (value == null) {
+        return null;
+    }
+
+    if (typeof value !== "string") {
+        return value;
+    }
+
+    try {
+        return JSON.parse(value);
+    } catch (error) {
+        console.error("[ActivityLogs] Failed to parse JSON:", value.substring(0, 100));
+        return null;
+    }
+}
+
 /**
  * GET /api/activity-logs
  * Fetch activity logs with optional filtering by entity type, entity ID, activity type
@@ -117,8 +134,8 @@ activityRoutes.get("/", authenticateToken, async (req: any, res) => {
                 entityName: log.entityName,
                 activityType: log.activityType,
                 description: log.description,
-                changes: log.changes ? JSON.parse(log.changes) : null,
-                metadata: log.metadata ? JSON.parse(log.metadata) : null,
+                changes: safeJsonParse(log.changes),
+                metadata: safeJsonParse(log.metadata),
                 createdAt: log.createdAt,
                 user: {
                     id: log.userId,
@@ -222,8 +239,8 @@ activityRoutes.get("/entity/:entityType/:entityId", authenticateToken, async (re
                 entityName: log.entityName,
                 activityType: log.activityType,
                 description: log.description,
-                changes: log.changes ? JSON.parse(log.changes) : null,
-                metadata: log.metadata ? JSON.parse(log.metadata) : null,
+                changes: safeJsonParse(log.changes),
+                metadata: safeJsonParse(log.metadata),
                 createdAt: log.createdAt,
                 user: {
                     id: log.userId,
@@ -246,10 +263,10 @@ activityRoutes.get("/entity/:entityType/:entityId", authenticateToken, async (re
         res.json({
             logs: logsWithUser,
             pagination: {
-                limit: Number(limit),
-                offset: Number(offset),
+                limit: paginationParams.limit,
+                offset: paginationParams.offset,
                 total: countResult.count,
-                hasMore: Number(offset) + logs.length < countResult.count,
+                hasMore: paginationParams.offset + logs.length < countResult.count,
             },
         });
     } catch (error) {
