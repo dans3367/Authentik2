@@ -2484,3 +2484,67 @@ export interface TemplateFilters {
   favoritesOnly?: boolean;
   isActive?: boolean;
 }
+
+// Activity logs table for tracking all user actions
+export const activityLogs = pgTable("activity_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
+
+  // What entity was affected
+  entityType: text("entity_type").notNull(), // 'shop', 'user', 'appointment', 'email', 'contact', etc.
+  entityId: varchar("entity_id"), // ID of the affected entity
+  entityName: text("entity_name"), // Human-readable name (e.g., shop name)
+
+  // What happened
+  activityType: text("activity_type").notNull(), // 'created', 'updated', 'deleted', 'sent', 'scheduled', etc.
+  description: text("description"), // Human-readable description
+
+  // Change details
+  changes: text("changes"), // JSON: { field: { old: value, new: value } }
+  metadata: text("metadata"), // JSON: Additional context data
+
+  // Request context
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Activity log relations
+export const activityLogRelations = relations(activityLogs, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [activityLogs.tenantId],
+    references: [tenants.id],
+  }),
+  user: one(betterAuthUser, {
+    fields: [activityLogs.userId],
+    references: [betterAuthUser.id],
+  }),
+}));
+
+// Activity log types
+export type ActivityLog = typeof activityLogs.$inferSelect;
+export type InsertActivityLog = typeof activityLogs.$inferInsert;
+
+// Extended type with user details
+export interface ActivityLogWithUser extends ActivityLog {
+  user: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+    avatarUrl: string | null;
+  };
+}
+
+// Activity log query schema
+export const activityLogQuerySchema = z.object({
+  entityType: z.string().optional(),
+  entityId: z.string().optional(),
+  activityType: z.string().optional(),
+  limit: z.coerce.number().min(1).max(100).default(20),
+  offset: z.coerce.number().min(0).default(0),
+});
+
+export type ActivityLogQuery = z.infer<typeof activityLogQuerySchema>;

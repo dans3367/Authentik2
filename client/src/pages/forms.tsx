@@ -48,7 +48,7 @@ const getThemePreview = (themeId: string): string => {
     'brutalist': 'bg-gray-800 border-4 border-black',
     'pastel-dream': 'bg-gradient-to-br from-pink-200 via-purple-200 to-indigo-200'
   };
-  
+
   return themePreviewMap[themeId] || themePreviewMap['minimal'];
 };
 
@@ -164,6 +164,7 @@ export default function Forms2() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [previewForm, setPreviewForm] = useState<any>(null);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
 
   // Set breadcrumbs in header
   useSetBreadcrumbs([
@@ -173,6 +174,17 @@ export default function Forms2() {
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [qrForm, setQrForm] = useState<Form | null>(null);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+
+  // Handle refresh with timestamp update
+  const handleRefresh = () => {
+    refetch();
+    setLastRefreshedAt(new Date());
+  };
+
+  // Format time for display
+  const formatRefreshTime = (date: Date) => {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  };
 
   // Fetch forms data
   const { data: formsData, isLoading: formsLoading, error: formsError, refetch } = useQuery({
@@ -286,8 +298,8 @@ export default function Forms2() {
               </p>
             </div>
             <div className="flex space-x-3">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => refetch()}
                 disabled={formsLoading}
                 className="flex items-center"
@@ -325,8 +337,8 @@ export default function Forms2() {
               </p>
             </div>
             <div className="flex space-x-3">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => refetch()}
                 disabled={formsLoading}
                 className="flex items-center"
@@ -363,10 +375,15 @@ export default function Forms2() {
               Create and manage custom forms to collect information and responses
             </p>
           </div>
-          <div className="flex space-x-3">
-            <Button 
-              variant="outline" 
-              onClick={() => refetch()}
+          <div className="flex items-center gap-3">
+            {lastRefreshedAt && (
+              <span className="text-xs text-gray-500 dark:text-gray-400 mr-2">
+                Last refreshed at {formatRefreshTime(lastRefreshedAt)}
+              </span>
+            )}
+            <Button
+              variant="outline"
+              onClick={handleRefresh}
               disabled={formsLoading}
               className="flex items-center"
             >
@@ -447,7 +464,7 @@ export default function Forms2() {
                           </DropdownMenuItem>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <DropdownMenuItem 
+                              <DropdownMenuItem
                                 onSelect={(e) => e.preventDefault()}
                                 className="text-red-600 dark:text-red-400 cursor-pointer"
                               >
@@ -494,11 +511,10 @@ export default function Forms2() {
                       <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                         {themeData.name}
                       </span>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        form.isActive 
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
-                          : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                      }`}>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${form.isActive
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                        : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                        }`}>
                         {form.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </div>
@@ -509,7 +525,7 @@ export default function Forms2() {
                         {form.description}
                       </p>
                     )}
-                    
+
                     {/* Tags */}
                     {form.tags && form.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">
@@ -528,7 +544,7 @@ export default function Forms2() {
                         )}
                       </div>
                     )}
-                    
+
                     <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
                       <div className="flex items-center space-x-4">
                         <span className="flex items-center">
@@ -578,8 +594,8 @@ export default function Forms2() {
             </DialogTitle>
           </DialogHeader>
           {qrForm && (
-            <FormQRCode 
-              formId={qrForm.id} 
+            <FormQRCode
+              formId={qrForm.id}
               formTitle={qrForm.title}
             />
           )}
