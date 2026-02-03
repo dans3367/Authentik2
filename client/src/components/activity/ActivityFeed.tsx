@@ -225,6 +225,13 @@ export default function ActivityFeed({ entityType, entityId, limit = 20, classNa
 
     const { data, isLoading, error } = useEntityActivityLogs(entityType, entityId, { limit, offset });
 
+    React.useEffect(() => {
+        setOffset(0);
+        setCombinedLogs([]);
+        setHasMore(true);
+        setIsLoadingMore(false);
+    }, [entityType, entityId]);
+
     // Initialize combinedLogs with first page data
     React.useEffect(() => {
         if (data && offset === 0) {

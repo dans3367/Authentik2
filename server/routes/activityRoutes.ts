@@ -53,6 +53,77 @@ function safeJsonParse(value: unknown) {
     }
 }
 
+function getActivityLogSelectFields(req: any) {
+    return {
+        id: activityLogs.id,
+        tenantId: activityLogs.tenantId,
+        userId: activityLogs.userId,
+        entityType: activityLogs.entityType,
+        entityId: activityLogs.entityId,
+        entityName: activityLogs.entityName,
+        activityType: activityLogs.activityType,
+        description: activityLogs.description,
+        changes: activityLogs.changes,
+        metadata: activityLogs.metadata,
+        createdAt: activityLogs.createdAt,
+        // User fields
+        userFirstName: betterAuthUser.firstName,
+        userLastName: betterAuthUser.lastName,
+        userEmail: betterAuthUser.email,
+        userAvatarUrl: betterAuthUser.avatarUrl,
+        // PII fields only for admin
+        ...(isAdmin(req) ? {
+            ipAddress: activityLogs.ipAddress,
+            userAgent: activityLogs.userAgent,
+        } : {}),
+    };
+}
+
+function transformLogsWithUser(logs: any[], req: any) {
+    return logs.map((log: any) => {
+        const transformedLog: any = {
+            id: log.id,
+            tenantId: log.tenantId,
+            userId: log.userId,
+            entityType: log.entityType,
+            entityId: log.entityId,
+            entityName: log.entityName,
+            activityType: log.activityType,
+            description: log.description,
+            changes: safeJsonParse(log.changes),
+            metadata: safeJsonParse(log.metadata),
+            createdAt: log.createdAt,
+            user: {
+                id: log.userId,
+                firstName: log.userFirstName,
+                lastName: log.userLastName,
+                email: log.userEmail,
+                avatarUrl: log.userAvatarUrl,
+            },
+        };
+
+        // Only include PII fields for admin users
+        if (isAdmin(req)) {
+            transformedLog.ipAddress = log.ipAddress;
+            transformedLog.userAgent = log.userAgent;
+        }
+
+        return transformedLog;
+    });
+}
+
+function buildPaginationResponse(logs: any[], pagination: { limit: number; offset: number }, total: number, req: any) {
+    return {
+        logs: transformLogsWithUser(logs, req),
+        pagination: {
+            limit: pagination.limit,
+            offset: pagination.offset,
+            total,
+            hasMore: pagination.offset + logs.length < total,
+        },
+    };
+}
+
 /**
  * GET /api/activity-logs
  * Fetch activity logs with optional filtering by entity type, entity ID, activity type
@@ -86,29 +157,7 @@ activityRoutes.get("/", authenticateToken, async (req: any, res) => {
         }
 
         // Fetch logs with user details
-        const logs = await db.select({
-            id: activityLogs.id,
-            tenantId: activityLogs.tenantId,
-            userId: activityLogs.userId,
-            entityType: activityLogs.entityType,
-            entityId: activityLogs.entityId,
-            entityName: activityLogs.entityName,
-            activityType: activityLogs.activityType,
-            description: activityLogs.description,
-            changes: activityLogs.changes,
-            metadata: activityLogs.metadata,
-            createdAt: activityLogs.createdAt,
-            // User fields
-            userFirstName: betterAuthUser.firstName,
-            userLastName: betterAuthUser.lastName,
-            userEmail: betterAuthUser.email,
-            userAvatarUrl: betterAuthUser.avatarUrl,
-            // PII fields only for admin
-            ...(isAdmin(req) ? {
-                ipAddress: activityLogs.ipAddress,
-                userAgent: activityLogs.userAgent,
-            } : {}),
-        })
+        const logs = await db.select(getActivityLogSelectFields(req))
             .from(activityLogs)
             .leftJoin(betterAuthUser, sql`${activityLogs.userId} = ${betterAuthUser.id}`)
             .where(whereClause)
@@ -123,47 +172,7 @@ activityRoutes.get("/", authenticateToken, async (req: any, res) => {
             .from(activityLogs)
             .where(whereClause);
 
-        // Transform to include user object
-        const logsWithUser = logs.map((log: any) => {
-            const transformedLog: any = {
-                id: log.id,
-                tenantId: log.tenantId,
-                userId: log.userId,
-                entityType: log.entityType,
-                entityId: log.entityId,
-                entityName: log.entityName,
-                activityType: log.activityType,
-                description: log.description,
-                changes: safeJsonParse(log.changes),
-                metadata: safeJsonParse(log.metadata),
-                createdAt: log.createdAt,
-                user: {
-                    id: log.userId,
-                    firstName: log.userFirstName,
-                    lastName: log.userLastName,
-                    email: log.userEmail,
-                    avatarUrl: log.userAvatarUrl,
-                },
-            };
-            
-            // Only include PII fields for admin users
-            if (isAdmin(req)) {
-                transformedLog.ipAddress = log.ipAddress;
-                transformedLog.userAgent = log.userAgent;
-            }
-            
-            return transformedLog;
-        });
-
-        res.json({
-            logs: logsWithUser,
-            pagination: {
-                limit: paginationParams.limit,
-                offset: paginationParams.offset,
-                total: countResult.count,
-                hasMore: paginationParams.offset + logs.length < countResult.count,
-            },
-        });
+        res.json(buildPaginationResponse(logs, paginationParams, countResult.count, req));
     } catch (error) {
         console.error('Get activity logs error:', error);
         res.status(500).json({ message: 'Failed to get activity logs' });
@@ -187,29 +196,7 @@ activityRoutes.get("/entity/:entityType/:entityId", authenticateToken, async (re
             return res.status(400).json({ message: validationError instanceof Error ? validationError.message : 'Invalid pagination parameters' });
         }
 
-        const logs = await db.select({
-            id: activityLogs.id,
-            tenantId: activityLogs.tenantId,
-            userId: activityLogs.userId,
-            entityType: activityLogs.entityType,
-            entityId: activityLogs.entityId,
-            entityName: activityLogs.entityName,
-            activityType: activityLogs.activityType,
-            description: activityLogs.description,
-            changes: activityLogs.changes,
-            metadata: activityLogs.metadata,
-            createdAt: activityLogs.createdAt,
-            // User fields
-            userFirstName: betterAuthUser.firstName,
-            userLastName: betterAuthUser.lastName,
-            userEmail: betterAuthUser.email,
-            userAvatarUrl: betterAuthUser.avatarUrl,
-            // PII fields only for admin
-            ...(isAdmin(req) ? {
-                ipAddress: activityLogs.ipAddress,
-                userAgent: activityLogs.userAgent,
-            } : {}),
-        })
+        const logs = await db.select(getActivityLogSelectFields(req))
             .from(activityLogs)
             .leftJoin(betterAuthUser, sql`${activityLogs.userId} = ${betterAuthUser.id}`)
             .where(sql`${activityLogs.tenantId} = ${req.user.tenantId} 
@@ -228,47 +215,7 @@ activityRoutes.get("/entity/:entityType/:entityId", authenticateToken, async (re
                  AND ${activityLogs.entityType} = ${entityType} 
                  AND ${activityLogs.entityId} = ${entityId}`);
 
-        // Transform to include user object
-        const logsWithUser = logs.map((log: any) => {
-            const transformedLog: any = {
-                id: log.id,
-                tenantId: log.tenantId,
-                userId: log.userId,
-                entityType: log.entityType,
-                entityId: log.entityId,
-                entityName: log.entityName,
-                activityType: log.activityType,
-                description: log.description,
-                changes: safeJsonParse(log.changes),
-                metadata: safeJsonParse(log.metadata),
-                createdAt: log.createdAt,
-                user: {
-                    id: log.userId,
-                    firstName: log.userFirstName,
-                    lastName: log.userLastName,
-                    email: log.userEmail,
-                    avatarUrl: log.userAvatarUrl,
-                },
-            };
-            
-            // Only include PII fields for admin users
-            if (isAdmin(req)) {
-                transformedLog.ipAddress = log.ipAddress;
-                transformedLog.userAgent = log.userAgent;
-            }
-            
-            return transformedLog;
-        });
-
-        res.json({
-            logs: logsWithUser,
-            pagination: {
-                limit: paginationParams.limit,
-                offset: paginationParams.offset,
-                total: countResult.count,
-                hasMore: paginationParams.offset + logs.length < countResult.count,
-            },
-        });
+        res.json(buildPaginationResponse(logs, paginationParams, countResult.count, req));
     } catch (error) {
         console.error('Get entity activity logs error:', error);
         res.status(500).json({ message: 'Failed to get activity logs' });
