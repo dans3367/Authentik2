@@ -33,3 +33,6 @@ xxcardprocessor-go/cardprocessor
 # Examples
 #examples/*
 .trigger
+.kiro/steering/product.md
+.kiro/steering/structure.md
+.kiro/steering/tech.md

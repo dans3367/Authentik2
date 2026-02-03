@@ -440,6 +440,29 @@ shopsRoutes.patch("/:id/toggle-status", authenticateToken, requireRole(["Owner",
       .where(sql`${shops.id} = ${id}`)
       .returning();
 
+    // Log activity for status change
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      entityType: 'shop',
+      entityId: id,
+      entityName: updatedShop[0].name,
+      activityType: 'updated',
+      description: `Shop "${updatedShop[0].name}" status changed to ${newStatus}`,
+      changes: {
+        status: {
+          old: existingShop.status,
+          new: newStatus,
+        },
+      },
+      metadata: {
+        action: 'toggle_status',
+        previousStatus: existingShop.status,
+        newStatus: newStatus,
+      },
+      req,
+    });
+
     res.json(updatedShop[0]);
   } catch (error) {
     console.error('Toggle shop status error:', error);

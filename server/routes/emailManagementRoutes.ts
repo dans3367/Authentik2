@@ -11,6 +11,7 @@ import { storage } from '../storage';
 import jwt from 'jsonwebtoken';
 import { enhancedEmailService } from '../emailService';
 import crypto from 'crypto';
+import { logActivity, computeChanges } from '../utils/activityLogger';
 
 export const emailManagementRoutes = Router();
 
@@ -416,6 +417,25 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
       return contact;
     });
 
+    // Log activity
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      entityType: 'contact',
+      entityId: result.id,
+      entityName: `${result.firstName || ''} ${result.lastName || ''}`.trim() || result.email,
+      activityType: 'created',
+      description: `Contact "${result.email}" was created`,
+      metadata: {
+        email: result.email,
+        status: result.status,
+        consentGiven: result.consentGiven,
+        tagsCount: tags?.length || 0,
+        listsCount: lists?.length || 0,
+      },
+      req,
+    });
+
     res.status(201).json(result);
   } catch (error) {
     console.error('Create email contact error:', error);
@@ -509,6 +529,35 @@ emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenan
       .where(sql`${emailContacts.id} = ${id}`)
       .returning();
 
+    // Compute and log changes
+    const changes = computeChanges(contact, updatedContact[0], [
+      'email',
+      'firstName',
+      'lastName',
+      'status',
+      'birthday',
+      'address',
+      'city',
+      'state',
+      'zipCode',
+      'country',
+      'phoneNumber',
+    ]);
+
+    if (changes) {
+      await logActivity({
+        tenantId: req.user.tenantId,
+        userId: req.user.id,
+        entityType: 'contact',
+        entityId: id,
+        entityName: `${updatedContact[0].firstName || ''} ${updatedContact[0].lastName || ''}`.trim() || updatedContact[0].email,
+        activityType: 'updated',
+        description: `Contact "${updatedContact[0].email}" was updated`,
+        changes,
+        req,
+      });
+    }
+
     res.json(updatedContact[0]);
   } catch (error) {
     console.error('Update email contact error:', error);
@@ -532,6 +581,26 @@ emailManagementRoutes.delete("/email-contacts/:id", authenticateToken, requireTe
     // Delete contact (this will cascade to related records)
     await db.delete(emailContacts)
       .where(sql`${emailContacts.id} = ${id} AND ${emailContacts.tenantId} = ${req.user.tenantId}`);
+
+    // Log activity
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      entityType: 'contact',
+      entityId: id,
+      entityName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email,
+      activityType: 'deleted',
+      description: `Contact "${contact.email}" was deleted`,
+      metadata: {
+        deletedContactData: {
+          email: contact.email,
+          firstName: contact.firstName,
+          lastName: contact.lastName,
+          status: contact.status,
+        },
+      },
+      req,
+    });
 
     res.json({ message: 'Contact deleted successfully' });
   } catch (error) {
@@ -572,6 +641,21 @@ emailManagementRoutes.delete("/email-contacts", authenticateToken, requireTenant
     const deletedContacts = await db.delete(emailContacts)
       .where(sql`${emailContacts.id} IN (${sql.join(contactIdsArray, sql`, `)}) AND ${emailContacts.tenantId} = ${req.user.tenantId}`)
       .returning();
+
+    // Log activity for bulk delete
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      entityType: 'contact',
+      activityType: 'deleted',
+      description: `Bulk deleted ${deletedContacts.length} contacts`,
+      metadata: {
+        deletedCount: deletedContacts.length,
+        deletedContactIds: deletedContacts.map(c => c.id),
+        deletedEmails: deletedContacts.map(c => c.email),
+      },
+      req,
+    });
 
     res.json({
       message: `${deletedContacts.length} contacts deleted successfully`,
