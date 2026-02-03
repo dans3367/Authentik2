@@ -15,10 +15,12 @@ const formResponseSchema = z.object({
 router.get('/:id', async (req, res) => {
   try {
     const formId = req.params.id;
-    
+
     if (!formId) {
       return res.status(400).json({ error: 'Form ID is required' });
     }
+
+    console.log('Fetching form with ID:', formId);
 
     // Get form data, only if it's active
     const form = await db.select({
@@ -28,16 +30,18 @@ router.get('/:id', async (req, res) => {
       formData: forms.formData,
       theme: forms.theme
     })
-    .from(forms)
-    .where(and(eq(forms.id, formId), eq(forms.isActive, true)))
-    .limit(1);
+      .from(forms)
+      .where(and(eq(forms.id, formId), eq(forms.isActive, true)))
+      .limit(1);
+
+    console.log('Form query result:', form);
 
     if (form.length === 0) {
       return res.status(404).json({ error: 'Form not found or inactive' });
     }
 
     const formRecord = form[0];
-    
+
     // Parse the form data JSON
     let parsedFormData;
     try {
@@ -56,6 +60,7 @@ router.get('/:id', async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching form:', error);
+    console.error('Full error details:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     res.status(500).json({ error: 'Failed to fetch form' });
   }
 });
@@ -64,7 +69,7 @@ router.get('/:id', async (req, res) => {
 router.post('/:id/submit', async (req, res) => {
   try {
     const formId = req.params.id;
-    
+
     if (!formId) {
       return res.status(400).json({ error: 'Form ID is required' });
     }
@@ -72,22 +77,22 @@ router.post('/:id/submit', async (req, res) => {
     // Validate request body
     const validation = formResponseSchema.safeParse(req.body);
     if (!validation.success) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invalid request body',
-        details: validation.error.errors 
+        details: validation.error.errors
       });
     }
 
     const { responseData } = validation.data;
 
     // Verify the form exists and is active
-    const form = await db.select({ 
-      id: forms.id, 
-      tenantId: forms.tenantId 
+    const form = await db.select({
+      id: forms.id,
+      tenantId: forms.tenantId
     })
-    .from(forms)
-    .where(and(eq(forms.id, formId), eq(forms.isActive, true)))
-    .limit(1);
+      .from(forms)
+      .where(and(eq(forms.id, formId), eq(forms.isActive, true)))
+      .limit(1);
 
     if (form.length === 0) {
       return res.status(404).json({ error: 'Form not found or inactive' });
@@ -110,7 +115,7 @@ router.post('/:id/submit', async (req, res) => {
 
     // Update response count
     await db.update(forms)
-      .set({ 
+      .set({
         responseCount: sql`${forms.responseCount} + 1`,
         updatedAt: new Date()
       })
