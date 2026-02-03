@@ -22,9 +22,11 @@ function EndDropZone({ elementCount }: { elementCount: number }) {
     <div
       ref={setNodeRef}
       className={`relative transition-all duration-200 mt-2 ${
-        isOver ? 'h-20' : 'h-12'
+        isOver ? 'h-28' : 'h-20'
       }`}
     >
+      {/* Extended invisible hit area for sideline drops */}
+      <div className="absolute -inset-x-20 inset-y-0" />
       <div className="absolute inset-0 flex items-center justify-center">
         <div
           className={`w-full h-1 rounded-full transition-all duration-200 ${

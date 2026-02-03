@@ -23,19 +23,19 @@ export function DropInsertionIndicator({ id, position, elementId, isVisible }: D
     <div
       ref={setNodeRef}
       className={`relative transition-all duration-200 ${
-        isOver ? 'z-50 h-16' : 'z-10 h-8'
+        isOver ? 'z-50 h-24' : 'z-10 h-16'
       }`}
-      style={{ margin: position === 'top' ? '-12px 0 -12px 0' : '-12px 0 -12px 0' }}
+      style={{ margin: position === 'top' ? '-20px 0 -20px 0' : '-20px 0 -20px 0' }}
     >
-      {/* Large invisible hit area */}
-      <div className="absolute inset-0" />
+      {/* Large invisible hit area - extends beyond visual bounds for easier sideline drops */}
+      <div className="absolute -inset-x-20 inset-y-0" />
       
-      {/* Visual indicator line */}
+      {/* Visual indicator line - always visible during drag for better discoverability */}
       <div
         className={`absolute left-0 right-0 h-1 rounded-full transition-all duration-200 ${
           isOver 
-            ? 'bg-blue-500 shadow-lg shadow-blue-500/50 scale-y-100 opacity-100' 
-            : 'bg-blue-300/40 scale-y-50 opacity-0 group-hover:opacity-60'
+            ? 'bg-blue-500 shadow-lg shadow-blue-500/50 scale-y-150 opacity-100' 
+            : 'bg-blue-300/60 scale-y-100 opacity-40'
         }`}
         style={{
           top: '50%',
