@@ -13,7 +13,7 @@ const databaseUrl = process.env.DATABASE_URL;
 const requiresSSL = databaseUrl.includes('sslmode=require') || databaseUrl.includes('neon.tech');
 
 const sql = postgres(databaseUrl, {
-  ssl: requiresSSL ? 'require' : false,
+  ssl: requiresSSL ? { rejectUnauthorized: true } : false,
   max: 10,
   idle_timeout: 20,
   connect_timeout: 10,
