@@ -4,7 +4,7 @@
  * Displays a timeline of activity logs with user information, timestamps, and change details.
  */
 
-import React from "react";
+import React, { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { formatDistanceToNow } from "date-fns";
 import { useEntityActivityLogs } from "@/hooks/useActivityLogs";
@@ -69,7 +69,24 @@ function ActivityItem({ activity }: ActivityItemProps) {
     const { t, i18n } = useTranslation();
     const [isOpen, setIsOpen] = React.useState(false);
 
-    const hasChanges = activity.changes && Object.keys(activity.changes).length > 0;
+    // Parse activity.changes defensively - it might be a JSON string from the DB
+    const parsedChanges = React.useMemo(() => {
+        if (!activity.changes) return {};
+        
+        try {
+            if (typeof activity.changes === 'string') {
+                return JSON.parse(activity.changes);
+            } else if (typeof activity.changes === 'object') {
+                return activity.changes;
+            }
+        } catch (error) {
+            console.warn('Failed to parse activity.changes:', error);
+        }
+        
+        return {};
+    }, [activity.changes]);
+
+    const hasChanges = parsedChanges && Object.keys(parsedChanges).length > 0;
 
     const icon = activityIcons[activity.activityType] || <Activity className="h-4 w-4" />;
     const colorClass = activityColors[activity.activityType] || "bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400";
@@ -138,12 +155,12 @@ function ActivityItem({ activity }: ActivityItemProps) {
                                 ) : (
                                     <ChevronRight className="h-3 w-3 mr-1" />
                                 )}
-                                {t('activityFeed.viewChanges', { count: Object.keys(activity.changes!).length })}
+                                {t('activityFeed.viewChanges', { count: Object.keys(parsedChanges).length })}
                             </Button>
                         </CollapsibleTrigger>
                         <CollapsibleContent className="mt-2">
                             <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 space-y-2">
-                                {Object.entries(activity.changes!).map(([field, values]) => {
+                                {Object.entries(parsedChanges).map(([field, values]) => {
                                     const changeValues = values as unknown as { old: any; new: any };
                                     return (
                                         <div key={field} className="flex items-start gap-2 text-sm">
@@ -201,9 +218,39 @@ function ActivityFeedSkeleton() {
 
 export default function ActivityFeed({ entityType, entityId, limit = 20, className }: ActivityFeedProps) {
     const { t } = useTranslation();
-    const { data, isLoading, error } = useEntityActivityLogs(entityType, entityId, { limit });
+    const [offset, setOffset] = useState(0);
+    const [combinedLogs, setCombinedLogs] = useState<ActivityLogWithUser[]>([]);
+    const [hasMore, setHasMore] = useState(true);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-    if (isLoading) {
+    const { data, isLoading, error } = useEntityActivityLogs(entityType, entityId, { limit, offset });
+
+    // Initialize combinedLogs with first page data
+    React.useEffect(() => {
+        if (data && offset === 0) {
+            setCombinedLogs(data.logs);
+            setHasMore(data.pagination.hasMore);
+        }
+    }, [data, offset]);
+
+    const handleLoadMore = useCallback(async () => {
+        if (!hasMore || isLoadingMore) return;
+
+        setIsLoadingMore(true);
+        const newOffset = offset + limit;
+        setOffset(newOffset);
+        setIsLoadingMore(false);
+    }, [offset, limit, hasMore, isLoadingMore]);
+
+    // Update combinedLogs and hasMore when new data arrives
+    React.useEffect(() => {
+        if (data && offset > 0) {
+            setCombinedLogs(prev => [...prev, ...data.logs]);
+            setHasMore(data.pagination.hasMore);
+        }
+    }, [data, offset]);
+
+    if (isLoading && offset === 0) {
         return <ActivityFeedSkeleton />;
     }
 
@@ -216,7 +263,7 @@ export default function ActivityFeed({ entityType, entityId, limit = 20, classNa
         );
     }
 
-    if (!data?.logs.length) {
+    if (!combinedLogs.length) {
         return (
             <div className="flex flex-col items-center justify-center py-12 text-center">
                 <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
@@ -234,14 +281,20 @@ export default function ActivityFeed({ entityType, entityId, limit = 20, classNa
 
     return (
         <div className={cn("space-y-0", className)}>
-            {data.logs.map((activity) => (
+            {combinedLogs.map((activity) => (
                 <ActivityItem key={activity.id} activity={activity} />
             ))}
 
-            {data.pagination.hasMore && (
+            {hasMore && (
                 <div className="pt-4 text-center">
-                    <Button variant="ghost" size="sm" className="text-gray-500">
-                        {t('activityFeed.loadMore')}
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-gray-500"
+                        onClick={handleLoadMore}
+                        disabled={isLoadingMore}
+                    >
+                        {isLoadingMore ? t('activityFeed.loading') : t('activityFeed.loadMore')}
                     </Button>
                 </div>
             )}

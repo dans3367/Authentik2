@@ -84,7 +84,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/suppression", suppressionManagementRoutes);
   app.use("/api/templates", authenticateToken, requireTenant, templateRoutes);
   app.use("/api", segmentListRoutes);
-  app.use("/api/activity-logs", activityRoutes);
+  app.use("/api/activity-logs", authenticateToken, requireTenant, activityRoutes);
 
   // Newsletter stats endpoint
   app.get("/api/newsletter-stats", authenticateToken, requireTenant, async (req: any, res) => {

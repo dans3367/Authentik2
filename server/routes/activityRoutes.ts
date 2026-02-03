@@ -10,8 +10,31 @@ import { sql } from 'drizzle-orm';
 import { activityLogs, betterAuthUser } from '@shared/schema';
 import { authenticateToken } from '../middleware/auth-middleware';
 import { activityLogQuerySchema } from '@shared/schema';
+import { isAdmin } from '../utils/routeHelpers';
 
 export const activityRoutes = Router();
+
+/**
+ * Validates and clamps pagination parameters
+ */
+function validatePaginationParams(limit?: string | string[], offset?: string | string[], maxLimit: number = 100) {
+    const parsedLimit = parseInt(Array.isArray(limit) ? limit[0] : (limit || '20'), 10);
+    const parsedOffset = parseInt(Array.isArray(offset) ? offset[0] : (offset || '0'), 10);
+    
+    // Check if values are valid finite integers
+    if (!Number.isFinite(parsedLimit) || parsedLimit < 1 || parsedLimit > maxLimit) {
+        throw new Error(`Invalid limit: must be a positive integer <= ${maxLimit}`);
+    }
+    
+    if (!Number.isFinite(parsedOffset) || parsedOffset < 0) {
+        throw new Error('Invalid offset: must be a non-negative integer');
+    }
+    
+    return {
+        limit: parsedLimit,
+        offset: parsedOffset
+    };
+}
 
 /**
  * GET /api/activity-logs
@@ -20,7 +43,15 @@ export const activityRoutes = Router();
  */
 activityRoutes.get("/", authenticateToken, async (req: any, res) => {
     try {
-        const { entityType, entityId, activityType, limit = '20', offset = '0' } = req.query;
+        const { entityType, entityId, activityType, limit, offset } = req.query;
+        
+        // Validate pagination parameters
+        let paginationParams;
+        try {
+            paginationParams = validatePaginationParams(limit, offset);
+        } catch (validationError: unknown) {
+            return res.status(400).json({ message: validationError instanceof Error ? validationError.message : 'Invalid pagination parameters' });
+        }
 
         // Build where clause
         let whereClause = sql`${activityLogs.tenantId} = ${req.user.tenantId}`;
@@ -49,21 +80,24 @@ activityRoutes.get("/", authenticateToken, async (req: any, res) => {
             description: activityLogs.description,
             changes: activityLogs.changes,
             metadata: activityLogs.metadata,
-            ipAddress: activityLogs.ipAddress,
-            userAgent: activityLogs.userAgent,
             createdAt: activityLogs.createdAt,
             // User fields
             userFirstName: betterAuthUser.firstName,
             userLastName: betterAuthUser.lastName,
             userEmail: betterAuthUser.email,
             userAvatarUrl: betterAuthUser.avatarUrl,
+            // PII fields only for admin
+            ...(isAdmin(req) ? {
+                ipAddress: activityLogs.ipAddress,
+                userAgent: activityLogs.userAgent,
+            } : {}),
         })
             .from(activityLogs)
             .leftJoin(betterAuthUser, sql`${activityLogs.userId} = ${betterAuthUser.id}`)
             .where(whereClause)
             .orderBy(sql`${activityLogs.createdAt} DESC`)
-            .limit(Number(limit))
-            .offset(Number(offset));
+            .limit(paginationParams.limit)
+            .offset(paginationParams.offset);
 
         // Get total count for pagination
         const [countResult] = await db.select({
@@ -73,36 +107,44 @@ activityRoutes.get("/", authenticateToken, async (req: any, res) => {
             .where(whereClause);
 
         // Transform to include user object
-        const logsWithUser = logs.map((log: any) => ({
-            id: log.id,
-            tenantId: log.tenantId,
-            userId: log.userId,
-            entityType: log.entityType,
-            entityId: log.entityId,
-            entityName: log.entityName,
-            activityType: log.activityType,
-            description: log.description,
-            changes: log.changes ? JSON.parse(log.changes) : null,
-            metadata: log.metadata ? JSON.parse(log.metadata) : null,
-            ipAddress: log.ipAddress,
-            userAgent: log.userAgent,
-            createdAt: log.createdAt,
-            user: {
-                id: log.userId,
-                firstName: log.userFirstName,
-                lastName: log.userLastName,
-                email: log.userEmail,
-                avatarUrl: log.userAvatarUrl,
-            },
-        }));
+        const logsWithUser = logs.map((log: any) => {
+            const transformedLog: any = {
+                id: log.id,
+                tenantId: log.tenantId,
+                userId: log.userId,
+                entityType: log.entityType,
+                entityId: log.entityId,
+                entityName: log.entityName,
+                activityType: log.activityType,
+                description: log.description,
+                changes: log.changes ? JSON.parse(log.changes) : null,
+                metadata: log.metadata ? JSON.parse(log.metadata) : null,
+                createdAt: log.createdAt,
+                user: {
+                    id: log.userId,
+                    firstName: log.userFirstName,
+                    lastName: log.userLastName,
+                    email: log.userEmail,
+                    avatarUrl: log.userAvatarUrl,
+                },
+            };
+            
+            // Only include PII fields for admin users
+            if (isAdmin(req)) {
+                transformedLog.ipAddress = log.ipAddress;
+                transformedLog.userAgent = log.userAgent;
+            }
+            
+            return transformedLog;
+        });
 
         res.json({
             logs: logsWithUser,
             pagination: {
-                limit: Number(limit),
-                offset: Number(offset),
+                limit: paginationParams.limit,
+                offset: paginationParams.offset,
                 total: countResult.count,
-                hasMore: Number(offset) + logs.length < countResult.count,
+                hasMore: paginationParams.offset + logs.length < countResult.count,
             },
         });
     } catch (error) {
@@ -118,7 +160,15 @@ activityRoutes.get("/", authenticateToken, async (req: any, res) => {
 activityRoutes.get("/entity/:entityType/:entityId", authenticateToken, async (req: any, res) => {
     try {
         const { entityType, entityId } = req.params;
-        const { limit = '20', offset = '0' } = req.query;
+        const { limit, offset } = req.query;
+        
+        // Validate pagination parameters
+        let paginationParams;
+        try {
+            paginationParams = validatePaginationParams(limit, offset);
+        } catch (validationError: unknown) {
+            return res.status(400).json({ message: validationError instanceof Error ? validationError.message : 'Invalid pagination parameters' });
+        }
 
         const logs = await db.select({
             id: activityLogs.id,
@@ -131,14 +181,17 @@ activityRoutes.get("/entity/:entityType/:entityId", authenticateToken, async (re
             description: activityLogs.description,
             changes: activityLogs.changes,
             metadata: activityLogs.metadata,
-            ipAddress: activityLogs.ipAddress,
-            userAgent: activityLogs.userAgent,
             createdAt: activityLogs.createdAt,
             // User fields
             userFirstName: betterAuthUser.firstName,
             userLastName: betterAuthUser.lastName,
             userEmail: betterAuthUser.email,
             userAvatarUrl: betterAuthUser.avatarUrl,
+            // PII fields only for admin
+            ...(isAdmin(req) ? {
+                ipAddress: activityLogs.ipAddress,
+                userAgent: activityLogs.userAgent,
+            } : {}),
         })
             .from(activityLogs)
             .leftJoin(betterAuthUser, sql`${activityLogs.userId} = ${betterAuthUser.id}`)
@@ -146,8 +199,8 @@ activityRoutes.get("/entity/:entityType/:entityId", authenticateToken, async (re
                  AND ${activityLogs.entityType} = ${entityType} 
                  AND ${activityLogs.entityId} = ${entityId}`)
             .orderBy(sql`${activityLogs.createdAt} DESC`)
-            .limit(Number(limit))
-            .offset(Number(offset));
+            .limit(paginationParams.limit)
+            .offset(paginationParams.offset);
 
         // Get total count
         const [countResult] = await db.select({
@@ -159,28 +212,36 @@ activityRoutes.get("/entity/:entityType/:entityId", authenticateToken, async (re
                  AND ${activityLogs.entityId} = ${entityId}`);
 
         // Transform to include user object
-        const logsWithUser = logs.map((log: any) => ({
-            id: log.id,
-            tenantId: log.tenantId,
-            userId: log.userId,
-            entityType: log.entityType,
-            entityId: log.entityId,
-            entityName: log.entityName,
-            activityType: log.activityType,
-            description: log.description,
-            changes: log.changes ? JSON.parse(log.changes) : null,
-            metadata: log.metadata ? JSON.parse(log.metadata) : null,
-            ipAddress: log.ipAddress,
-            userAgent: log.userAgent,
-            createdAt: log.createdAt,
-            user: {
-                id: log.userId,
-                firstName: log.userFirstName,
-                lastName: log.userLastName,
-                email: log.userEmail,
-                avatarUrl: log.userAvatarUrl,
-            },
-        }));
+        const logsWithUser = logs.map((log: any) => {
+            const transformedLog: any = {
+                id: log.id,
+                tenantId: log.tenantId,
+                userId: log.userId,
+                entityType: log.entityType,
+                entityId: log.entityId,
+                entityName: log.entityName,
+                activityType: log.activityType,
+                description: log.description,
+                changes: log.changes ? JSON.parse(log.changes) : null,
+                metadata: log.metadata ? JSON.parse(log.metadata) : null,
+                createdAt: log.createdAt,
+                user: {
+                    id: log.userId,
+                    firstName: log.userFirstName,
+                    lastName: log.userLastName,
+                    email: log.userEmail,
+                    avatarUrl: log.userAvatarUrl,
+                },
+            };
+            
+            // Only include PII fields for admin users
+            if (isAdmin(req)) {
+                transformedLog.ipAddress = log.ipAddress;
+                transformedLog.userAgent = log.userAgent;
+            }
+            
+            return transformedLog;
+        });
 
         res.json({
             logs: logsWithUser,
