@@ -14,6 +14,7 @@ import {
 } from '@shared/schema';
 import { authenticateToken } from '../middleware/auth-middleware';
 import { requireRole } from '../middleware/auth-middleware';
+import { logActivity, computeChanges } from '../utils/activityLogger';
 import { v4 as uuidv4 } from 'uuid';
 import { cancelReminderRun, triggerRescheduleEmail } from '../lib/trigger';
 
@@ -327,6 +328,29 @@ router.post('/', async (req: Request, res: Response) => {
       appointmentCustomer = customerData[0] || null;
     }
 
+    // Log activity for appointment creation
+    const customerName = appointmentCustomer 
+      ? `${appointmentCustomer.firstName || ''} ${appointmentCustomer.lastName || ''}`.trim() || appointmentCustomer.email
+      : 'Unknown Customer';
+    
+    await logActivity({
+      tenantId,
+      userId,
+      entityType: 'appointment',
+      entityId: newAppointment[0].id,
+      entityName: newAppointment[0].title,
+      activityType: 'created',
+      description: `Created appointment "${newAppointment[0].title}" for ${customerName}`,
+      metadata: {
+        customerId: newAppointment[0].customerId,
+        customerName,
+        appointmentDate: newAppointment[0].appointmentDate,
+        serviceType: newAppointment[0].serviceType,
+        location: newAppointment[0].location,
+      },
+      req,
+    });
+
     res.status(201).json({
       appointment: { ...newAppointment[0], customer: appointmentCustomer },
       message: 'Appointment created successfully'
@@ -396,6 +420,30 @@ router.put('/:id', async (req: Request, res: Response) => {
       })
       .where(eq(appointments.id, id))
       .returning();
+
+    // Log activity for appointment update
+    const changes = computeChanges(existing, updatedAppointment[0], [
+      'title', 'description', 'appointmentDate', 'duration', 'location',
+      'serviceType', 'status', 'notes', 'customerId'
+    ]);
+
+    if (changes) {
+      await logActivity({
+        tenantId,
+        userId: user.id,
+        entityType: 'appointment',
+        entityId: id,
+        entityName: updatedAppointment[0].title,
+        activityType: 'updated',
+        description: `Updated appointment "${updatedAppointment[0].title}"`,
+        changes,
+        metadata: {
+          isDateChanged: isDateChanging,
+          remindersCancelled,
+        },
+        req,
+      });
+    }
 
     res.json({
       appointment: updatedAppointment[0],
@@ -479,6 +527,30 @@ router.patch('/:id', async (req: Request, res: Response) => {
       .where(eq(appointments.id, id))
       .returning();
 
+    // Log activity for appointment update
+    const changes = computeChanges(existing, updatedAppointment[0], [
+      'title', 'description', 'appointmentDate', 'duration', 'location',
+      'serviceType', 'status', 'notes', 'customerId'
+    ]);
+
+    if (changes) {
+      await logActivity({
+        tenantId,
+        userId: user.id,
+        entityType: 'appointment',
+        entityId: id,
+        entityName: updatedAppointment[0].title,
+        activityType: 'updated',
+        description: `Updated appointment "${updatedAppointment[0].title}"`,
+        changes,
+        metadata: {
+          isDateChanged: isDateChanging,
+          remindersCancelled,
+        },
+        req,
+      });
+    }
+
     res.json({
       appointment: updatedAppointment[0],
       message: 'Appointment updated successfully',
@@ -520,6 +592,26 @@ router.delete('/:id', requireRole(['Owner', 'Administrator', 'Manager']), async 
     if (cancelResult.errors.length > 0) {
       console.warn(`[Delete] Some reminders failed to cancel:`, cancelResult.errors);
     }
+
+    // Log activity for appointment deletion before deleting
+    const deletedAppointment = existingAppointment[0];
+    await logActivity({
+      tenantId,
+      userId: user.id,
+      entityType: 'appointment',
+      entityId: id,
+      entityName: deletedAppointment.title,
+      activityType: 'deleted',
+      description: `Deleted appointment "${deletedAppointment.title}"`,
+      metadata: {
+        customerId: deletedAppointment.customerId,
+        appointmentDate: deletedAppointment.appointmentDate,
+        serviceType: deletedAppointment.serviceType,
+        status: deletedAppointment.status,
+        remindersCancelled: cancelResult.cancelled,
+      },
+      req,
+    });
 
     // Delete appointment (this will cascade delete reminders from DB)
     await db

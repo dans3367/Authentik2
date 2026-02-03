@@ -53,7 +53,7 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-        
+
         {/* Add minimal spacer after the header section */}
         <div className="h-3"></div>
 
@@ -71,9 +71,14 @@ export default function Dashboard() {
         </div>
 
         {/* Upcoming Birthdays + Appointments */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl w-full">
-          <UpcomingBirthdaysCard />
-          <UpcomingAppointmentsCard />
+        {/* Upcoming Birthdays + Appointments */}
+        <div className="flex flex-col lg:flex-row gap-6 max-w-7xl w-full">
+          <div className="flex-[2]">
+            <UpcomingBirthdaysCard />
+          </div>
+          <div className="flex-[1]">
+            <UpcomingAppointmentsCard />
+          </div>
         </div>
       </div>
     </div>
