@@ -207,19 +207,37 @@ useEffect(() => {
     document.documentElement.lang = currentLanguage;
   }
 
-  // Only seed from backend if localStorage has no value set (first time user)
-  // localStorage is the source of truth for sidebar state persistence
-  if (isInitialized && user && user.menuExpanded !== undefined) {
-    const hasLocalStorage = localStorage.getItem("menuExpanded") !== null;
-    
-    // Only use backend preference if localStorage has never been set
-    if (!hasLocalStorage) {
-      const backendOpen = user.menuExpanded !== false;
-      setSidebarOpen(backendOpen);
-      localStorage.setItem("menuExpanded", JSON.stringify(backendOpen));
-    }
+  if (!isInitialized || !user || user.menuExpanded === undefined) {
+    return;
   }
-}, [isInitialized, user?.menuExpanded, currentLanguage]);
+
+  const storedValue = localStorage.getItem("menuExpanded");
+  if (storedValue === null) {
+    const backendOpen = user.menuExpanded !== false;
+    if (sidebarOpen !== backendOpen) {
+      setSidebarOpen(backendOpen);
+    }
+    localStorage.setItem("menuExpanded", JSON.stringify(backendOpen));
+    return;
+  }
+
+  let localOpen = sidebarOpen;
+  try {
+    localOpen = JSON.parse(storedValue);
+  } catch (error) {
+    console.warn("Failed to parse sidebar state from localStorage:", error);
+  }
+
+  const backendOpen = user.menuExpanded !== false;
+
+  if (localOpen !== sidebarOpen) {
+    setSidebarOpen(localOpen);
+  }
+
+  if (localOpen !== backendOpen) {
+    updateMenuPreferenceMutation.mutateAsync({ menuExpanded: localOpen });
+  }
+}, [isInitialized, user?.menuExpanded, currentLanguage, sidebarOpen, updateMenuPreferenceMutation]);
 
 
   // Check if company needs onboarding

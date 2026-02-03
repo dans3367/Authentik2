@@ -48,7 +48,9 @@ function safeJsonParse(value: unknown) {
     try {
         return JSON.parse(value);
     } catch (error) {
-        console.error("[ActivityLogs] Failed to parse JSON:", value.substring(0, 100));
+        console.error("[ActivityLogs] Failed to parse JSON payload", {
+            length: value.length,
+        });
         return null;
     }
 }

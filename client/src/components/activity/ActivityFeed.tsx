@@ -222,6 +222,7 @@ export default function ActivityFeed({ entityType, entityId, limit = 20, classNa
     const [combinedLogs, setCombinedLogs] = useState<ActivityLogWithUser[]>([]);
     const [hasMore, setHasMore] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [seenOffsets, setSeenOffsets] = useState<Set<number>>(new Set());
 
     const { data, isLoading, error } = useEntityActivityLogs(entityType, entityId, { limit, offset });
 
@@ -230,15 +231,17 @@ export default function ActivityFeed({ entityType, entityId, limit = 20, classNa
         setCombinedLogs([]);
         setHasMore(true);
         setIsLoadingMore(false);
-    }, [entityType, entityId]);
+        setSeenOffsets(new Set());
+    }, [entityType, entityId, limit]);
 
     // Initialize combinedLogs with first page data
     React.useEffect(() => {
-        if (data && offset === 0) {
+        if (data && offset === 0 && !seenOffsets.has(0)) {
             setCombinedLogs(data.logs);
             setHasMore(data.pagination.hasMore);
+            setSeenOffsets(prev => new Set(prev).add(0));
         }
-    }, [data, offset]);
+    }, [data, offset, seenOffsets]);
 
     const handleLoadMore = useCallback(async () => {
         if (!hasMore || isLoadingMore) return;
@@ -250,12 +253,13 @@ export default function ActivityFeed({ entityType, entityId, limit = 20, classNa
 
     // Update combinedLogs and hasMore when new data arrives
     React.useEffect(() => {
-        if (data && offset > 0) {
+        if (data && offset > 0 && !seenOffsets.has(offset)) {
             setCombinedLogs(prev => [...prev, ...data.logs]);
             setHasMore(data.pagination.hasMore);
             setIsLoadingMore(false);
+            setSeenOffsets(prev => new Set(prev).add(offset));
         }
-    }, [data, offset]);
+    }, [data, offset, seenOffsets]);
 
     if (isLoading && offset === 0) {
         return <ActivityFeedSkeleton />;
