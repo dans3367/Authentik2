@@ -54,12 +54,58 @@ type PromotionalEmailJobPayload = {
   manual?: boolean;
 };
 
-function enqueuePromotionalEmailJob(payload: PromotionalEmailJobPayload, delayMs: number): void {
-  setTimeout(() => {
-    void sendPromotionalEmailJob(payload).catch((err) => {
-      console.error('❌ [PromotionalEmailJob] Failed:', err);
+/**
+ * Enqueue a promotional email job using Trigger.dev for durable scheduling
+ * Replaces the volatile setTimeout approach with a persistent task
+ * Returns immediately without blocking the route handler
+ */
+async function enqueuePromotionalEmailJob(
+  payload: PromotionalEmailJobPayload, 
+  delayMs: number
+): Promise<{ success: boolean; runId?: string; error?: string }> {
+  try {
+    const { tasks } = await import('@trigger.dev/sdk/v3');
+    const { logTriggerTask } = await import('../lib/trigger');
+    const taskId = 'schedule-promotional-email';
+    
+    // Trigger the durable task with the payload and delay
+    const handle = await tasks.trigger(taskId, {
+      ...payload,
+      delayMs,
     });
-  }, delayMs);
+    
+    console.log(`✅ [PromotionalEmailJob] Scheduled via Trigger.dev (ID: ${handle.id}) with ${delayMs}ms delay for ${payload.recipientEmail}`);
+    
+    // Log to trigger_tasks table for tracking
+    await logTriggerTask({
+      taskId,
+      runId: handle.id,
+      payload: { ...payload, delayMs },
+      status: 'triggered',
+      tenantId: payload.tenantId,
+      relatedType: 'email',
+      relatedId: payload.contactId,
+    });
+    
+    return {
+      success: true,
+      runId: handle.id,
+    };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ [PromotionalEmailJob] Failed to schedule via Trigger.dev:', errorMessage);
+    
+    // Fallback to direct execution if Trigger.dev is unavailable
+    console.log('⚠️ [PromotionalEmailJob] Falling back to direct execution');
+    void sendPromotionalEmailJob(payload).catch((fallbackErr) => {
+      console.error('❌ [PromotionalEmailJob] Fallback execution failed:', fallbackErr);
+    });
+    
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
 }
 
 async function sendPromotionalEmailJob(payload: PromotionalEmailJobPayload): Promise<void> {
@@ -83,6 +129,75 @@ async function sendPromotionalEmailJob(payload: PromotionalEmailJobPayload): Pro
     }
   );
 
+  // Check if email send was successful
+  if (!promoResult.success) {
+    console.error(`❌ [PromotionalEmailJob] Failed to send promotional email:`, {
+      recipient: payload.recipientEmail,
+      contactId: payload.contactId,
+      tenantId: payload.tenantId,
+      error: promoResult.error,
+      providerId: promoResult.providerId,
+    });
+
+    // Log failed activity
+    try {
+      await db.insert(emailActivity).values({
+        tenantId: payload.tenantId,
+        contactId: payload.contactId,
+        activityType: 'failed',
+        activityData: JSON.stringify({
+          type: 'birthday-promotion',
+          manual: !!payload.manual,
+          split: true,
+          subject: `🎁 ${payload.promoSubject}`,
+          recipient: payload.recipientEmail,
+          from: 'admin@zendwise.work',
+          error: promoResult.error,
+          providerId: promoResult.providerId,
+        }),
+        occurredAt: new Date(),
+      });
+    } catch (logError) {
+      console.error(`⚠️ [PromotionalEmailJob] Failed to log failed email activity:`, logError);
+    }
+
+    // Log failed send to email_sends table
+    try {
+      const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
+      await db.insert(emailSends).values({
+        id: emailSendId,
+        tenantId: payload.tenantId,
+        recipientEmail: payload.recipientEmail,
+        recipientName: payload.recipientName,
+        senderEmail: 'admin@zendwise.work',
+        senderName: payload.senderName,
+        subject: `🎁 ${payload.promoSubject}`,
+        emailType: 'promotional',
+        provider: promoResult.providerId || 'resend',
+        providerMessageId: promoResult.messageId || null,
+        status: 'failed',
+        contactId: payload.contactId,
+        promotionId: payload.promotionId || null,
+        sentAt: null,
+      });
+    } catch (logError) {
+      console.error(`⚠️ [PromotionalEmailJob] Failed to log failed send to email_sends table:`, logError);
+    }
+
+    return;
+  }
+
+  // Email sent successfully - extract provider message ID safely
+  const providerMessageId = promoResult.messageId || null;
+
+  console.log(`✅ [PromotionalEmailJob] Successfully sent promotional email:`, {
+    recipient: payload.recipientEmail,
+    contactId: payload.contactId,
+    messageId: providerMessageId,
+    providerId: promoResult.providerId,
+  });
+
+  // Log successful activity
   try {
     await db.insert(emailActivity).values({
       tenantId: payload.tenantId,
@@ -95,6 +210,8 @@ async function sendPromotionalEmailJob(payload: PromotionalEmailJobPayload): Pro
         subject: `🎁 ${payload.promoSubject}`,
         recipient: payload.recipientEmail,
         from: 'admin@zendwise.work',
+        messageId: providerMessageId,
+        providerId: promoResult.providerId,
       }),
       occurredAt: new Date(),
     });
@@ -102,6 +219,7 @@ async function sendPromotionalEmailJob(payload: PromotionalEmailJobPayload): Pro
     console.error(`⚠️ [PromotionalEmailJob] Failed to log promotional email activity:`, logError);
   }
 
+  // Log successful send to email_sends and email_content tables
   try {
     const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
     await db.insert(emailSends).values({
@@ -112,9 +230,9 @@ async function sendPromotionalEmailJob(payload: PromotionalEmailJobPayload): Pro
       senderEmail: 'admin@zendwise.work',
       senderName: payload.senderName,
       subject: `🎁 ${payload.promoSubject}`,
-      emailType: 'birthday_promotion',
-      provider: 'resend',
-      providerMessageId: typeof promoResult === 'string' ? promoResult : promoResult.messageId,
+      emailType: 'promotional',
+      provider: promoResult.providerId || 'resend',
+      providerMessageId: providerMessageId,
       status: 'sent',
       contactId: payload.contactId,
       promotionId: payload.promotionId || null,
@@ -130,6 +248,8 @@ async function sendPromotionalEmailJob(payload: PromotionalEmailJobPayload): Pro
         manual: !!payload.manual,
         birthdayCard: false,
         promotional: true,
+        messageId: providerMessageId,
+        providerId: promoResult.providerId,
       }),
     });
   } catch (logError) {
@@ -547,11 +667,12 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
       userId: req.user.id,
       entityType: 'contact',
       entityId: result.id,
-      entityName: `${result.firstName || ''} ${result.lastName || ''}`.trim() || result.email,
+      entityName: `${result.firstName || ''} ${result.lastName || ''}`.trim() || '[Contact]',
       activityType: 'created',
-      description: `Contact "${result.email}" was created`,
+      description: `Contact was created`,
       metadata: {
-        email: result.email,
+        // PII redacted for GDPR/CCPA compliance
+        contactId: result.id,
         status: result.status,
         consentGiven: result.consentGiven,
         tagsCount: tags?.length || 0,
@@ -712,12 +833,13 @@ emailManagementRoutes.delete("/email-contacts/:id", authenticateToken, requireTe
       userId: req.user.id,
       entityType: 'contact',
       entityId: id,
-      entityName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email,
+      entityName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || '[Contact]',
       activityType: 'deleted',
-      description: `Contact "${contact.email}" was deleted`,
+      description: `Contact was deleted`,
       metadata: {
         deletedContactData: {
-          email: contact.email,
+          // PII redacted for GDPR/CCPA compliance
+          contactId: id,
           firstName: contact.firstName,
           lastName: contact.lastName,
           status: contact.status,
@@ -2686,6 +2808,69 @@ emailManagementRoutes.post("/internal/email-activity", authenticateInternalServi
   }
 });
 
+// Internal endpoint for Trigger.dev to send promotional emails
+// Secured with HMAC signature verification
+emailManagementRoutes.post("/internal/send-promotional-email", authenticateInternalService, async (req: InternalServiceRequest, res) => {
+  console.log('🎁 [Internal Promotional Email] Received authenticated request:', {
+    service: req.internalService?.service,
+    tenantId: req.body.tenantId,
+    contactId: req.body.contactId,
+    recipientEmail: req.body.recipientEmail,
+  });
+
+  try {
+    const {
+      tenantId,
+      contactId,
+      recipientEmail,
+      recipientName,
+      senderName,
+      promoSubject,
+      htmlPromo,
+      unsubscribeToken,
+      promotionId,
+      manual,
+    } = req.body;
+
+    // Validate required fields
+    if (!tenantId || !contactId || !recipientEmail || !recipientName || !senderName || !promoSubject || !htmlPromo) {
+      return res.status(400).json({
+        error: 'Missing required fields: tenantId, contactId, recipientEmail, recipientName, senderName, promoSubject, htmlPromo'
+      });
+    }
+
+    // Call the existing sendPromotionalEmailJob function
+    await sendPromotionalEmailJob({
+      tenantId,
+      contactId,
+      recipientEmail,
+      recipientName,
+      senderName,
+      promoSubject,
+      htmlPromo,
+      unsubscribeToken,
+      promotionId,
+      manual,
+    });
+
+    console.log(`✅ [Internal Promotional Email] Successfully sent promotional email for contact ${contactId}`);
+
+    res.json({
+      success: true,
+      message: 'Promotional email sent successfully',
+      contactId,
+      recipientEmail,
+    });
+  } catch (error) {
+    console.error('Failed to send promotional email (internal):', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to send promotional email',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 // Birthday unsubscribe page
 emailManagementRoutes.get("/api/unsubscribe/birthday", async (req: any, res) => {
   try {
@@ -3009,7 +3194,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           `;
 
           console.log(`⏳ [SPLIT FLOW] Queuing promotional email job (20s delay) for ${contact.email}`);
-          enqueuePromotionalEmailJob(
+          const queueResult = await enqueuePromotionalEmailJob(
             {
               tenantId,
               contactId: contact.id,
@@ -3024,6 +3209,12 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
             },
             20000
           );
+          
+          if (queueResult.success) {
+            console.log(`✅ [SPLIT FLOW] Promotional email queued successfully (runId: ${queueResult.runId})`);
+          } else {
+            console.warn(`⚠️ [SPLIT FLOW] Promotional email queue failed: ${queueResult.error}`);
+          }
 
           // Record both emails as success
           if (typeof birthdayResult === 'string' || (birthdayResult && birthdayResult.success)) {

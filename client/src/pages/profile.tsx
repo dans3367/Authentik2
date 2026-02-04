@@ -296,7 +296,11 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
 };
 
 export default function ProfilePage() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  
+  // Get tab from URL query parameter
+  const urlParams = new URLSearchParams(window.location.search);
+  const tabFromUrl = urlParams.get('tab') || 'profile';
   const { user, isLoading: authLoading, isAuthenticated, isInitialized, refetch } = useReduxAuth();
   const { toast } = useToast();
 
@@ -670,7 +674,7 @@ export default function ProfilePage() {
           </DialogContent>
         </Dialog>
 
-        <Tabs defaultValue="profile" className="space-y-8">
+        <Tabs defaultValue={tabFromUrl} className="space-y-8">
           <TabsList className="grid w-full grid-cols-6 h-auto">
             <TabsTrigger value="profile">{t('profile.tabs.profile')}</TabsTrigger>
             <TabsTrigger value="preferences">{t('profile.tabs.preferences')}</TabsTrigger>

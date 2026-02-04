@@ -41,6 +41,8 @@ import { signupRoutes } from "./routes/signupRoutes";
 import { tenantFixRoutes } from "./routes/tenantFixRoutes";
 import { segmentListRoutes } from "./routes/segmentListRoutes";
 import { activityRoutes } from "./routes/activityRoutes";
+import { accountUsageRoutes } from "./routes/accountUsageRoutes";
+import internalRoutes from "./routes/internalRoutes";
 
 // Import middleware
 import { authRateLimiter, apiRateLimiter, jwtTokenRateLimiter } from "./middleware/security";
@@ -58,6 +60,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // API Routes
   // Note: Auth routes handled by better-auth middleware
+  // Internal routes (authenticated via internal service middleware)
+  app.use("/api/internal", internalRoutes);
+  
   // Public routes (no authentication required)
   app.use("/api/appointments", appointmentConfirmationRoutes); // Public appointment confirmation/decline
 
@@ -85,6 +90,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/templates", authenticateToken, requireTenant, templateRoutes);
   app.use("/api", segmentListRoutes);
   app.use("/api/activity-logs", authenticateToken, requireTenant, activityRoutes);
+  app.use("/api/account-usage", accountUsageRoutes);
 
   // Newsletter stats endpoint
   app.get("/api/newsletter-stats", authenticateToken, requireTenant, async (req: any, res) => {
