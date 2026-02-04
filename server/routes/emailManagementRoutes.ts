@@ -2393,6 +2393,22 @@ emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken,
       return res.status(404).json({ message: 'Contact not found' });
     }
 
+    if (!contact.email) {
+      return res.status(400).json({ message: 'Contact email is missing' });
+    }
+
+    if (contact.status === 'unsubscribed' || contact.status === 'bounced') {
+      return res.status(400).json({ message: 'Contact is unsubscribed or bounced' });
+    }
+
+    const suppressed = await db.query.bouncedEmails.findFirst({
+      where: eq(bouncedEmails.email, String(contact.email).toLowerCase().trim()),
+    }).catch(() => null);
+
+    if (suppressed) {
+      return res.status(400).json({ message: 'Email is globally suppressed/bounced' });
+    }
+
     // Check if contact already has a birthday
     if (contact.birthday) {
       return res.status(400).json({ message: 'Contact already has a birthday set' });
