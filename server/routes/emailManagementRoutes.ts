@@ -496,7 +496,7 @@ emailManagementRoutes.get("/email-contacts/:id/stats", authenticateToken, requir
     const { id } = req.params;
 
     const contact = await db.query.emailContacts.findFirst({
-      where: sql`${emailContacts.id} = ${id}`,
+      where: sql`${emailContacts.id} = ${id} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!contact) {
@@ -706,7 +706,7 @@ emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenan
     const { email, firstName, lastName, status, birthday, address, city, state, zipCode, country, phoneNumber } = req.body;
 
     const contact = await db.query.emailContacts.findFirst({
-      where: sql`${emailContacts.id} = ${id}`,
+      where: sql`${emailContacts.id} = ${id} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!contact) {
@@ -782,7 +782,7 @@ emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenan
 
     const updatedContact = await db.update(emailContacts)
       .set(updateData)
-      .where(sql`${emailContacts.id} = ${id}`)
+      .where(sql`${emailContacts.id} = ${id} AND ${emailContacts.tenantId} = ${req.user.tenantId}`)
       .returning();
 
     // Compute and log changes
@@ -951,6 +951,7 @@ emailManagementRoutes.post("/email-lists", authenticateToken, requireTenant, asy
     const sanitizedDescription = description ? sanitizeString(description) : null;
 
     const newList = await db.insert(emailLists).values({
+      tenantId: req.user.tenantId,
       name: sanitizedName,
       description: sanitizedDescription,
       createdAt: new Date(),
@@ -971,7 +972,7 @@ emailManagementRoutes.put("/email-lists/:id", authenticateToken, requireTenant, 
     const { name, description } = req.body;
 
     const list = await db.query.emailLists.findFirst({
-      where: sql`${emailLists.id} = ${id}`,
+      where: sql`${emailLists.id} = ${id} AND ${emailLists.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!list) {
@@ -992,7 +993,7 @@ emailManagementRoutes.put("/email-lists/:id", authenticateToken, requireTenant, 
 
     const updatedList = await db.update(emailLists)
       .set(updateData)
-      .where(sql`${emailLists.id} = ${id}`)
+      .where(sql`${emailLists.id} = ${id} AND ${emailLists.tenantId} = ${req.user.tenantId}`)
       .returning();
 
     res.json(updatedList[0]);
@@ -1008,7 +1009,7 @@ emailManagementRoutes.delete("/email-lists/:id", authenticateToken, requireTenan
     const { id } = req.params;
 
     const list = await db.query.emailLists.findFirst({
-      where: sql`${emailLists.id} = ${id}`,
+      where: sql`${emailLists.id} = ${id} AND ${emailLists.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!list) {
@@ -1017,7 +1018,7 @@ emailManagementRoutes.delete("/email-lists/:id", authenticateToken, requireTenan
 
     // Delete list (this will cascade to contact-list relationships)
     await db.delete(emailLists)
-      .where(sql`${emailLists.id} = ${id}`);
+      .where(sql`${emailLists.id} = ${id} AND ${emailLists.tenantId} = ${req.user.tenantId}`);
 
     res.json({ message: 'List deleted successfully' });
   } catch (error) {
@@ -1178,6 +1179,7 @@ emailManagementRoutes.get("/bounced-emails/stats", authenticateToken, requireTen
 emailManagementRoutes.get("/contact-tags", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const tags = await db.query.contactTags.findMany({
+      where: sql`${contactTags.tenantId} = ${req.user.tenantId}`,
       orderBy: sql`${contactTags.name} ASC`,
       with: {
         assignments: true,
@@ -1234,7 +1236,7 @@ emailManagementRoutes.put("/contact-tags/:id", authenticateToken, requireTenant,
     const { name, color, description } = req.body;
 
     const tag = await db.query.contactTags.findFirst({
-      where: sql`${contactTags.id} = ${id}`,
+      where: sql`${contactTags.id} = ${id} AND ${contactTags.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!tag) {
@@ -1259,7 +1261,7 @@ emailManagementRoutes.put("/contact-tags/:id", authenticateToken, requireTenant,
 
     const updatedTag = await db.update(contactTags)
       .set(updateData)
-      .where(sql`${contactTags.id} = ${id}`)
+      .where(sql`${contactTags.id} = ${id} AND ${contactTags.tenantId} = ${req.user.tenantId}`)
       .returning();
 
     res.json(updatedTag[0]);
@@ -1275,7 +1277,7 @@ emailManagementRoutes.delete("/contact-tags/:id", authenticateToken, requireTena
     const { id } = req.params;
 
     const tag = await db.query.contactTags.findFirst({
-      where: sql`${contactTags.id} = ${id}`,
+      where: sql`${contactTags.id} = ${id} AND ${contactTags.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!tag) {
@@ -1284,7 +1286,7 @@ emailManagementRoutes.delete("/contact-tags/:id", authenticateToken, requireTena
 
     // Delete tag (this will cascade to contact-tag relationships)
     await db.delete(contactTags)
-      .where(sql`${contactTags.id} = ${id}`);
+      .where(sql`${contactTags.id} = ${id} AND ${contactTags.tenantId} = ${req.user.tenantId}`);
 
     res.json({ message: 'Tag deleted successfully' });
   } catch (error) {
@@ -1298,9 +1300,24 @@ emailManagementRoutes.post("/email-contacts/:contactId/lists/:listId", authentic
   try {
     const { contactId, listId } = req.params;
 
+    const [contact, list] = await Promise.all([
+      db.query.emailContacts.findFirst({
+        where: sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
+        columns: { id: true },
+      }),
+      db.query.emailLists.findFirst({
+        where: sql`${emailLists.id} = ${listId} AND ${emailLists.tenantId} = ${req.user.tenantId}`,
+        columns: { id: true },
+      }),
+    ]);
+
+    if (!contact || !list) {
+      return res.status(404).json({ message: 'Contact or list not found' });
+    }
+
     // Check if relationship already exists
     const existingRelationship = await db.query.contactListMemberships.findFirst({
-      where: sql`${contactListMemberships.contactId} = ${contactId} AND ${contactListMemberships.listId} = ${listId}`,
+      where: sql`${contactListMemberships.contactId} = ${contactId} AND ${contactListMemberships.listId} = ${listId} AND ${contactListMemberships.tenantId} = ${req.user.tenantId}`,
     });
 
     if (existingRelationship) {
@@ -1308,8 +1325,10 @@ emailManagementRoutes.post("/email-contacts/:contactId/lists/:listId", authentic
     }
 
     await db.insert(contactListMemberships).values({
+      tenantId: req.user.tenantId,
       contactId,
       listId,
+      addedAt: new Date(),
     });
 
     res.json({ message: 'Contact added to list successfully' });
@@ -1324,8 +1343,23 @@ emailManagementRoutes.delete("/email-contacts/:contactId/lists/:listId", authent
   try {
     const { contactId, listId } = req.params;
 
+    const [contact, list] = await Promise.all([
+      db.query.emailContacts.findFirst({
+        where: sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
+        columns: { id: true },
+      }),
+      db.query.emailLists.findFirst({
+        where: sql`${emailLists.id} = ${listId} AND ${emailLists.tenantId} = ${req.user.tenantId}`,
+        columns: { id: true },
+      }),
+    ]);
+
+    if (!contact || !list) {
+      return res.status(404).json({ message: 'Contact or list not found' });
+    }
+
     const deletedRelationship = await db.delete(contactListMemberships)
-      .where(sql`${contactListMemberships.contactId} = ${contactId} AND ${contactListMemberships.listId} = ${listId}`)
+      .where(sql`${contactListMemberships.contactId} = ${contactId} AND ${contactListMemberships.listId} = ${listId} AND ${contactListMemberships.tenantId} = ${req.user.tenantId}`)
       .returning();
 
     if (deletedRelationship.length === 0) {
@@ -1461,9 +1495,29 @@ emailManagementRoutes.post("/email-lists/:listId/contacts", authenticateToken, r
       return res.status(400).json({ message: 'Contact IDs array is required' });
     }
 
+    const list = await db.query.emailLists.findFirst({
+      where: sql`${emailLists.id} = ${listId} AND ${emailLists.tenantId} = ${req.user.tenantId}`,
+      columns: { id: true },
+    });
+
+    if (!list) {
+      return res.status(404).json({ message: 'List not found' });
+    }
+
+    const contacts = await db.query.emailContacts.findMany({
+      where: sql`${emailContacts.id} IN (${sql.join(contactIds, sql`, `)}) AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
+      columns: { id: true },
+    });
+
+    if (contacts.length !== contactIds.length) {
+      return res.status(404).json({ message: 'One or more contacts not found' });
+    }
+
     const relationships = contactIds.map(contactId => ({
+      tenantId: req.user.tenantId,
       contactId,
       listId,
+      addedAt: new Date(),
     }));
 
     await db.insert(contactListMemberships).values(relationships);
@@ -1480,9 +1534,24 @@ emailManagementRoutes.post("/email-contacts/:contactId/tags/:tagId", authenticat
   try {
     const { contactId, tagId } = req.params;
 
+    const [contact, tag] = await Promise.all([
+      db.query.emailContacts.findFirst({
+        where: sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
+        columns: { id: true },
+      }),
+      db.query.contactTags.findFirst({
+        where: sql`${contactTags.id} = ${tagId} AND ${contactTags.tenantId} = ${req.user.tenantId}`,
+        columns: { id: true },
+      }),
+    ]);
+
+    if (!contact || !tag) {
+      return res.status(404).json({ message: 'Contact or tag not found' });
+    }
+
     // Check if relationship already exists
     const existingRelationship = await db.query.contactTagAssignments.findFirst({
-      where: sql`${contactTagAssignments.contactId} = ${contactId} AND ${contactTagAssignments.tagId} = ${tagId}`,
+      where: sql`${contactTagAssignments.contactId} = ${contactId} AND ${contactTagAssignments.tagId} = ${tagId} AND ${contactTagAssignments.tenantId} = ${req.user.tenantId}`,
     });
 
     if (existingRelationship) {
@@ -1508,8 +1577,23 @@ emailManagementRoutes.delete("/email-contacts/:contactId/tags/:tagId", authentic
   try {
     const { contactId, tagId } = req.params;
 
+    const [contact, tag] = await Promise.all([
+      db.query.emailContacts.findFirst({
+        where: sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
+        columns: { id: true },
+      }),
+      db.query.contactTags.findFirst({
+        where: sql`${contactTags.id} = ${tagId} AND ${contactTags.tenantId} = ${req.user.tenantId}`,
+        columns: { id: true },
+      }),
+    ]);
+
+    if (!contact || !tag) {
+      return res.status(404).json({ message: 'Contact or tag not found' });
+    }
+
     const deletedRelationship = await db.delete(contactTagAssignments)
-      .where(sql`${contactTagAssignments.contactId} = ${contactId} AND ${contactTagAssignments.tagId} = ${tagId}`)
+      .where(sql`${contactTagAssignments.contactId} = ${contactId} AND ${contactTagAssignments.tagId} = ${tagId} AND ${contactTagAssignments.tenantId} = ${req.user.tenantId}`)
       .returning();
 
     if (deletedRelationship.length === 0) {
@@ -1531,6 +1615,24 @@ emailManagementRoutes.post("/contact-tags/:tagId/contacts", authenticateToken, r
 
     if (!Array.isArray(contactIds) || contactIds.length === 0) {
       return res.status(400).json({ message: 'Contact IDs array is required' });
+    }
+
+    const tag = await db.query.contactTags.findFirst({
+      where: sql`${contactTags.id} = ${tagId} AND ${contactTags.tenantId} = ${req.user.tenantId}`,
+      columns: { id: true },
+    });
+
+    if (!tag) {
+      return res.status(404).json({ message: 'Tag not found' });
+    }
+
+    const contacts = await db.query.emailContacts.findMany({
+      where: sql`${emailContacts.id} IN (${sql.join(contactIds, sql`, `)}) AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
+      columns: { id: true },
+    });
+
+    if (contacts.length !== contactIds.length) {
+      return res.status(404).json({ message: 'One or more contacts not found' });
     }
 
     const relationships = contactIds.map(contactId => ({

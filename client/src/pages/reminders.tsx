@@ -1526,9 +1526,9 @@ export default function RemindersPage() {
         </div>
 
         {/* Appointments Content */}
-        <div className="space-y-6">
+        <div className="flex flex-col gap-6">
           {/* Overview and Upcoming Side by Side */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 order-2">
             {/* Overview Stats */}
             <Card>
               <CardHeader>
@@ -1608,7 +1608,7 @@ export default function RemindersPage() {
           </div>
 
           {/* Appointments Table with Tabs */}
-          <Card>
+          <Card className="order-1">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
