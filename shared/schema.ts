@@ -1754,6 +1754,35 @@ export const eCardSettings = pgTable("e_card_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Master email design settings for tenant-wide email branding
+export const masterEmailDesign = pgTable("master_email_design", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().unique().references(() => tenants.id, { onDelete: 'cascade' }),
+  companyName: text("company_name").default(''),
+  logoUrl: text("logo_url"),
+  primaryColor: text("primary_color").default('#3B82F6'),
+  secondaryColor: text("secondary_color").default('#1E40AF'),
+  accentColor: text("accent_color").default('#10B981'),
+  fontFamily: text("font_family").default('Arial, sans-serif'),
+  headerText: text("header_text"),
+  footerText: text("footer_text"),
+  socialLinks: text("social_links"), // JSON: { facebook, twitter, instagram, linkedin }
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Master email design relations
+export const masterEmailDesignRelations = relations(masterEmailDesign, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [masterEmailDesign.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+// Master email design types
+export type MasterEmailDesign = typeof masterEmailDesign.$inferSelect;
+export type InsertMasterEmailDesign = typeof masterEmailDesign.$inferInsert;
+
 export const birthdayUnsubscribeTokens = pgTable("birthday_unsubscribe_tokens", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),

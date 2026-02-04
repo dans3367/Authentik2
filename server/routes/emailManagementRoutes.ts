@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, and } from 'drizzle-orm';
-import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, eCardSettings, emailActivity, tenants, emailSends, emailContent, companies, unsubscribeTokens } from '@shared/schema';
+import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, eCardSettings, emailActivity, tenants, emailSends, emailContent, companies, unsubscribeTokens, masterEmailDesign } from '@shared/schema';
 import { deleteImageFromR2 } from '../config/r2';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { authenticateInternalService, InternalServiceRequest } from '../middleware/internal-service-auth';
@@ -1970,6 +1970,119 @@ emailManagementRoutes.put("/e-card-settings", authenticateToken, requireTenant, 
   }
 });
 
+// Get master email design settings
+emailManagementRoutes.get("/master-email-design", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const design = await db.query.masterEmailDesign.findFirst({
+      where: sql`${masterEmailDesign.tenantId} = ${req.user.tenantId}`,
+    });
+
+    // Get company info for defaults
+    const company = await db.query.companies.findFirst({
+      where: sql`${companies.tenantId} = ${req.user.tenantId} AND ${companies.isActive} = true`,
+    });
+
+    // If no design exists, return default settings
+    if (!design) {
+      console.log('🎨 [Master Email Design GET] No design found, returning defaults');
+      const defaultDesign = {
+        id: '',
+        tenantId: req.user.tenantId,
+        companyName: company?.name || '',
+        logoUrl: company?.logoUrl || null,
+        primaryColor: '#3B82F6',
+        secondaryColor: '#1E40AF',
+        accentColor: '#10B981',
+        fontFamily: 'Arial, sans-serif',
+        headerText: null,
+        footerText: company?.name ? `© ${new Date().getFullYear()} ${company.name}. All rights reserved.` : null,
+        socialLinks: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      return res.json(defaultDesign);
+    }
+
+    console.log('🎨 [Master Email Design GET] Returning design:', { id: design.id });
+    res.json(design);
+  } catch (error) {
+    console.error('Get master email design error:', error);
+    res.status(500).json({ message: 'Failed to get master email design' });
+  }
+});
+
+// Update master email design settings
+emailManagementRoutes.put("/master-email-design", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const {
+      companyName,
+      logoUrl,
+      primaryColor,
+      secondaryColor,
+      accentColor,
+      fontFamily,
+      headerText,
+      footerText,
+      socialLinks,
+    } = req.body;
+
+    console.log('🎨 [Master Email Design PUT] Received:', { companyName, logoUrl, headerText, primaryColor, tenantId: req.user.tenantId });
+
+    // Check if design already exists
+    const existingDesign = await db.query.masterEmailDesign.findFirst({
+      where: sql`${masterEmailDesign.tenantId} = ${req.user.tenantId}`,
+    });
+
+    let updatedDesign;
+
+    // Prepare social links for storage
+    const socialLinksStr = socialLinks
+      ? (typeof socialLinks === 'string' ? socialLinks : JSON.stringify(socialLinks))
+      : null;
+
+    if (existingDesign) {
+      // Update existing design
+      updatedDesign = await db.update(masterEmailDesign)
+        .set({
+          companyName: companyName ?? existingDesign.companyName,
+          logoUrl: logoUrl !== undefined ? logoUrl : existingDesign.logoUrl,
+          primaryColor: primaryColor ?? existingDesign.primaryColor,
+          secondaryColor: secondaryColor ?? existingDesign.secondaryColor,
+          accentColor: accentColor ?? existingDesign.accentColor,
+          fontFamily: fontFamily ?? existingDesign.fontFamily,
+          headerText: headerText !== undefined ? headerText : existingDesign.headerText,
+          footerText: footerText !== undefined ? footerText : existingDesign.footerText,
+          socialLinks: socialLinksStr !== undefined ? socialLinksStr : existingDesign.socialLinks,
+          updatedAt: new Date(),
+        })
+        .where(sql`${masterEmailDesign.tenantId} = ${req.user.tenantId}`)
+        .returning();
+    } else {
+      // Create new design
+      updatedDesign = await db.insert(masterEmailDesign)
+        .values({
+          tenantId: req.user.tenantId,
+          companyName: companyName || '',
+          logoUrl: logoUrl || null,
+          primaryColor: primaryColor || '#3B82F6',
+          secondaryColor: secondaryColor || '#1E40AF',
+          accentColor: accentColor || '#10B981',
+          fontFamily: fontFamily || 'Arial, sans-serif',
+          headerText: headerText || null,
+          footerText: footerText || null,
+          socialLinks: socialLinksStr,
+        })
+        .returning();
+    }
+
+    console.log('🎨 [Master Email Design PUT] Updated design:', { id: updatedDesign[0]?.id });
+    res.json(updatedDesign[0]);
+  } catch (error) {
+    console.error('Update master email design error:', error);
+    res.status(500).json({ message: 'Failed to update master email design' });
+  }
+});
+
 // Send birthday invitation email to a contact
 emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken, requireTenant, async (req: any, res) => {
   try {
@@ -3345,6 +3458,25 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     });
     const companyName = (company?.name || '').trim();
 
+    // Get master email design settings
+    const emailDesign = await db.query.masterEmailDesign.findFirst({
+      where: sql`${masterEmailDesign.tenantId} = ${tenantId}`,
+    });
+    console.log('📧 [SendEmail] Master email design found:', emailDesign ? 'yes' : 'no (using defaults)', emailDesign ? { id: emailDesign.id, logoUrl: emailDesign.logoUrl, headerText: emailDesign.headerText, primaryColor: emailDesign.primaryColor } : {});
+
+    // Design settings with defaults
+    const design = {
+      primaryColor: emailDesign?.primaryColor || '#3B82F6',
+      secondaryColor: emailDesign?.secondaryColor || '#1E40AF',
+      accentColor: emailDesign?.accentColor || '#10B981',
+      fontFamily: emailDesign?.fontFamily || 'Arial, sans-serif',
+      logoUrl: emailDesign?.logoUrl || company?.logoUrl || null,
+      headerText: emailDesign?.headerText || null,
+      footerText: emailDesign?.footerText || (companyName ? `© ${new Date().getFullYear()} ${companyName}. All rights reserved.` : ''),
+      socialLinks: emailDesign?.socialLinks ? JSON.parse(emailDesign.socialLinks) : null,
+      displayCompanyName: emailDesign?.companyName || companyName,
+    };
+
     // Generate or reuse unsubscribe token
     let unsub = await db.query.unsubscribeTokens.findFirst({
       where: and(eq(unsubscribeTokens.tenantId, tenantId), eq(unsubscribeTokens.contactId, contact.id), sql`${unsubscribeTokens.usedAt} IS NULL`),
@@ -3356,19 +3488,42 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     }
     const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(unsub.token)}`;
 
-    // Format content as HTML
+    // Build social links HTML if available
+    let socialLinksHtml = '';
+    if (design.socialLinks) {
+      const links = [];
+      if (design.socialLinks.facebook) links.push(`<a href="${design.socialLinks.facebook}" style="color: ${design.primaryColor}; text-decoration: none; margin: 0 8px;">Facebook</a>`);
+      if (design.socialLinks.twitter) links.push(`<a href="${design.socialLinks.twitter}" style="color: ${design.primaryColor}; text-decoration: none; margin: 0 8px;">Twitter</a>`);
+      if (design.socialLinks.instagram) links.push(`<a href="${design.socialLinks.instagram}" style="color: ${design.primaryColor}; text-decoration: none; margin: 0 8px;">Instagram</a>`);
+      if (design.socialLinks.linkedin) links.push(`<a href="${design.socialLinks.linkedin}" style="color: ${design.primaryColor}; text-decoration: none; margin: 0 8px;">LinkedIn</a>`);
+      if (links.length > 0) {
+        socialLinksHtml = `<p style="margin: 12px 0 0; font-size: 0.75rem;">${links.join(' | ')}</p>`;
+      }
+    }
+
+    // Format content as HTML using master email design
     const htmlContent = `
       <html>
-        <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: #f7fafc;">
+        <body style="font-family: ${design.fontFamily}; margin: 0; padding: 20px; background-color: #f7fafc;">
           <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            ${design.logoUrl ? `
+            <div style="padding: 20px 30px; text-align: center; border-bottom: 1px solid #e2e8f0;">
+              <img src="${design.logoUrl}" alt="${design.displayCompanyName}" style="max-height: 60px; max-width: 200px;" />
+            </div>
+            ` : ''}
+            ${design.headerText ? `
+            <div style="padding: 20px 30px; background: linear-gradient(135deg, ${design.primaryColor} 0%, ${design.secondaryColor} 100%); text-align: center;">
+              <h1 style="margin: 0; color: white; font-size: 1.25rem; font-weight: 600;">${design.headerText}</h1>
+            </div>
+            ` : ''}
             <div style="padding: 30px;">
               <div style="font-size: 1rem; line-height: 1.6; color: #2d3748; white-space: pre-wrap;">${content.replace(/\n/g, '<br>')}</div>
             </div>
             <div style="padding: 20px 30px; background-color: #f7fafc; border-top: 1px solid #e2e8f0; text-align: center;">
-              <p style="margin: 0; font-size: 0.875rem; color: #718096;">
-                ${companyName ? `Sent from ${companyName}` : ''}
-              </p>
-              <p style="margin: 8px 0 0; font-size: 0.75rem; color: #94a3b8;">
+              ${design.displayCompanyName ? `<p style="margin: 0; font-size: 0.875rem; color: #718096;">Sent from ${design.displayCompanyName}</p>` : ''}
+              ${design.footerText ? `<p style="margin: 8px 0 0; font-size: 0.75rem; color: #94a3b8;">${design.footerText}</p>` : ''}
+              ${socialLinksHtml}
+              <p style="margin: 12px 0 0; font-size: 0.75rem; color: #94a3b8;">
                 <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
               </p>
             </div>
@@ -3377,12 +3532,14 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       </html>
     `;
 
-    // Send email
-    const result = await enhancedEmailService.sendCustomEmail(
-      contact.email,
-      subject,
-      htmlContent,
-      {
+    // Send email via Trigger.dev queue
+    let result: { success: boolean; runId?: string; error?: string };
+    try {
+      const { sendEmailTask } = await import('../../src/trigger/email');
+      const handle = await sendEmailTask.trigger({
+        to: contact.email,
+        subject: subject,
+        html: htmlContent,
         text: `${content}\n\nUnsubscribe: ${unsubscribeUrl}`,
         headers: {
           'List-Unsubscribe': `<${unsubscribeUrl}>`,
@@ -3394,8 +3551,16 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
           tenantId: tenantId,
           sentBy: req.user.id
         }
-      }
-    );
+      });
+      console.log(`📧 [SendEmail] Triggered send-email task, runId: ${handle.id}`);
+      result = { success: true, runId: handle.id };
+    } catch (triggerError: any) {
+      console.error('[SendEmail] Failed to trigger email task:', triggerError);
+      return res.status(503).json({
+        success: false,
+        message: 'Email server is not available. Please try again later.'
+      });
+    }
 
     // Log email activity
     await db.insert(emailActivity).values({
