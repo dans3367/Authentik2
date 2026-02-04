@@ -60,22 +60,22 @@ type PromotionalEmailJobPayload = {
  * Returns immediately without blocking the route handler
  */
 async function enqueuePromotionalEmailJob(
-  payload: PromotionalEmailJobPayload, 
+  payload: PromotionalEmailJobPayload,
   delayMs: number
 ): Promise<{ success: boolean; runId?: string; error?: string }> {
   try {
     const { tasks } = await import('@trigger.dev/sdk/v3');
     const { logTriggerTask } = await import('../lib/trigger');
     const taskId = 'schedule-promotional-email';
-    
+
     // Trigger the durable task with the payload and delay
     const handle = await tasks.trigger(taskId, {
       ...payload,
       delayMs,
     });
-    
+
     console.log(`✅ [PromotionalEmailJob] Scheduled via Trigger.dev (ID: ${handle.id}) with ${delayMs}ms delay for ${payload.recipientEmail}`);
-    
+
     // Log to trigger_tasks table for tracking
     await logTriggerTask({
       taskId,
@@ -86,7 +86,7 @@ async function enqueuePromotionalEmailJob(
       relatedType: 'email',
       relatedId: payload.contactId,
     });
-    
+
     return {
       success: true,
       runId: handle.id,
@@ -94,13 +94,13 @@ async function enqueuePromotionalEmailJob(
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('❌ [PromotionalEmailJob] Failed to schedule via Trigger.dev:', errorMessage);
-    
+
     // Fallback to direct execution if Trigger.dev is unavailable
     console.log('⚠️ [PromotionalEmailJob] Falling back to direct execution');
     void sendPromotionalEmailJob(payload).catch((fallbackErr) => {
       console.error('❌ [PromotionalEmailJob] Fallback execution failed:', fallbackErr);
     });
-    
+
     return {
       success: false,
       error: errorMessage,
@@ -2863,7 +2863,7 @@ emailManagementRoutes.post("/internal/send-promotional-email", authenticateInter
     });
   } catch (error) {
     console.error('Failed to send promotional email (internal):', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Failed to send promotional email',
       message: error instanceof Error ? error.message : 'Unknown error',
@@ -3209,7 +3209,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
             },
             20000
           );
-          
+
           if (queueResult.success) {
             console.log(`✅ [SPLIT FLOW] Promotional email queued successfully (runId: ${queueResult.runId})`);
           } else {
@@ -3928,19 +3928,18 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
         emailType: 'individual',
         provider: 'resend', // Or 'trigger.dev'
         providerMessageId: result?.runId,
-        status: 'sent',
+        status: 'queued',
         contactId: contact.id,
         promotionId: null,
-        sentAt: new Date(),
+        sentAt: null, // Not sent yet
       });
     } catch (logError) {
       console.error(`⚠️ [SendEmail] Failed to log to email_sends table:`, logError);
     }
 
-    // Update contact stats
+    // Update contact stats - Do not increment emailsSent here (webhook will do it)
     await db.update(emailContacts)
       .set({
-        emailsSent: sql`${emailContacts.emailsSent} + 1`,
         lastActivity: new Date(),
         updatedAt: new Date()
       })
