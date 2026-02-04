@@ -205,15 +205,15 @@ formsRoutes.get("/:id/responses", authenticateToken, async (req: any, res) => {
     }
 
     const responses = await db.query.formResponses.findMany({
-      where: sql`${db.formResponses.formId} = ${id}`,
-      orderBy: sql`${db.formResponses.submittedAt} DESC`,
+      where: sql`${formResponses.formId} = ${id}`,
+      orderBy: sql`${formResponses.submittedAt} DESC`,
       limit: Number(limit),
       offset,
     });
 
     const totalCount = await db.select({
       count: sql<number>`count(*)`,
-    }).from(db.formResponses).where(sql`${db.formResponses.formId} = ${id}`);
+    }).from(formResponses).where(sql`${formResponses.formId} = ${id}`);
 
     res.json({
       responses,
@@ -249,7 +249,7 @@ formsRoutes.get("/:id/stats", authenticateToken, async (req: any, res) => {
       responsesToday: sql<number>`count(*) filter (where submitted_at >= current_date)`,
       responsesThisWeek: sql<number>`count(*) filter (where submitted_at >= current_date - interval '7 days')`,
       responsesThisMonth: sql<number>`count(*) filter (where submitted_at >= current_date - interval '30 days')`,
-    }).from(db.formResponses).where(sql`${db.formResponses.formId} = ${id}`);
+    }).from(formResponses).where(sql`${formResponses.formId} = ${id}`);
 
     res.json(stats[0]);
   } catch (error) {

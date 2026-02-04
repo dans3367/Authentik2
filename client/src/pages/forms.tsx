@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, Calendar, User, MoreVertical, Eye, Edit, Trash2, RefreshCw, QrCode, LayoutDashboard } from 'lucide-react';
+import { Plus, Loader2, Calendar, User, MoreVertical, Eye, Edit, Trash2, RefreshCw, QrCode, LayoutDashboard, FileText } from 'lucide-react';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSetBreadcrumbs } from '@/contexts/PageTitleContext';
 import { FormPreviewModal } from '@/components/form-preview-modal';
 import { FormQRCode } from '@/components/form-builder/form-qr-code';
+import { FormResponses } from '@/components/form-builder/form-responses';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Form {
@@ -174,6 +175,8 @@ export default function Forms2() {
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [qrForm, setQrForm] = useState<Form | null>(null);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+  const [responsesForm, setResponsesForm] = useState<Form | null>(null);
+  const [isResponsesModalOpen, setIsResponsesModalOpen] = useState(false);
 
   // Handle refresh with timestamp update
   const handleRefresh = () => {
@@ -256,6 +259,20 @@ export default function Forms2() {
     if (form) {
       setQrForm(form);
       setIsQRModalOpen(true);
+    } else {
+      toast({
+        title: "Error",
+        description: "Form not found",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleViewResponses = (formId: string) => {
+    const form = forms.find(f => f.id === formId);
+    if (form) {
+      setResponsesForm(form);
+      setIsResponsesModalOpen(true);
     } else {
       toast({
         title: "Error",
@@ -458,6 +475,10 @@ export default function Forms2() {
                             <QrCode className="mr-2 h-4 w-4" />
                             QR
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewResponses(form.id)}>
+                            <FileText className="mr-2 h-4 w-4" />
+                            Responses ({form.responseCount})
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleEditForm(form.id)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
@@ -601,6 +622,19 @@ export default function Forms2() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Form Responses Modal */}
+      {responsesForm && (
+        <FormResponses
+          formId={responsesForm.id}
+          formTitle={responsesForm.title}
+          isOpen={isResponsesModalOpen}
+          onClose={() => {
+            setIsResponsesModalOpen(false);
+            setResponsesForm(null);
+          }}
+        />
+      )}
     </div>
   );
 }

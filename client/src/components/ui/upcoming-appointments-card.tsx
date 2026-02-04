@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { CalendarClock, ChevronRight, Calendar, Clock, MapPin, User, Mail, Timer, Plus } from "lucide-react";
+import { CalendarClock, ChevronRight, Calendar, Clock, MapPin, User, Mail, Timer } from "lucide-react";
 import { useLocation } from "wouter";
 
 interface AppointmentCustomer {
@@ -176,12 +176,20 @@ export function UpcomingAppointmentsCard() {
 
                   {/* Details */}
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-base font-bold text-gray-900 dark:text-white truncate group-hover:text-blue-600 transition-colors mb-1">
-                      {appointment.title}
-                    </h3>
-                    <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                      <Clock className="h-3.5 w-3.5 mr-1.5" />
+                    <div className="flex items-start justify-between gap-3 mb-1">
+                      <h3 className="text-base font-bold text-gray-900 dark:text-white truncate group-hover:text-blue-600 transition-colors">
+                        {appointment.title}
+                      </h3>
+                      <Badge className={`${getStatusColor(appointment.status)} text-xs px-2 py-0.5 rounded-full capitalize whitespace-nowrap`}>
+                        {appointment.status.replace('_', ' ')}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 truncate">
+                      <Clock className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
                       {formatTime(appointment.appointmentDate)}
+                      <span className="mx-2 flex-shrink-0">•</span>
+                      <User className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+                      <span className="truncate">{getCustomerName(appointment.customer)}</span>
                     </div>
                   </div>
                 </div>
