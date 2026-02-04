@@ -294,7 +294,6 @@ export const requestBdayEmailTask = task({
           if (secret) {
             const body = {
               emailTrackingId: parsed.data.emailTrackingId,
-              providerMessageId: `exception:${parsed.data.emailTrackingId}`,
               status: 'failed',
             };
             const timestamp = Date.now();
