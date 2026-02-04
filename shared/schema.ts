@@ -173,6 +173,7 @@ export const subscriptionPlans = pgTable("subscription_plans", {
   isPopular: boolean("is_popular").default(false),
   isActive: boolean("is_active").default(true),
   sortOrder: integer("sort_order").default(0),
+  monthlyEmailLimit: integer("monthly_email_limit").default(200), // Default to 200 checks/emails if not specified
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -204,6 +205,7 @@ export const tenantLimits = pgTable("tenant_limits", {
   maxShops: integer("max_shops"), // NULL means use subscription plan limit
   maxUsers: integer("max_users"), // NULL means use subscription plan limit
   maxStorageGb: integer("max_storage_gb"), // NULL means use subscription plan limit
+  monthlyEmailLimit: integer("monthly_email_limit"), // NULL means use subscription plan limit
   customLimits: text("custom_limits").default('{}'), // JSON for future extensibility
   overrideReason: text("override_reason"), // Why this tenant has custom limits
   createdBy: varchar("created_by").references(() => betterAuthUser.id, { onDelete: 'set null' }),

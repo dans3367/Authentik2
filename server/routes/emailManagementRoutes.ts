@@ -2805,6 +2805,9 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
       });
     }
 
+    // Check email sending limits
+    await storage.validateEmailSending(tenantId, contactIds.length);
+
     console.log(`🎂 [ManualBirthdayCard] Sending birthday cards to ${contactIds.length} contact(s)`);
 
     // Get birthday settings for this tenant with promotion data
@@ -3498,12 +3501,14 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     // Validate input
     if (!subject || !content) {
       return res.status(400).json({
-        success: false,
-        message: "Subject and content are required"
+        message: 'Subject and content are required'
       });
     }
 
-    // Get contact details
+    // Check email sending limits
+    await storage.validateEmailSending(tenantId, 1);
+
+    // Get contact
     const contact = await db.query.emailContacts.findFirst({
       where: and(
         eq(emailContacts.id, id),
@@ -3717,6 +3722,29 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       }),
       occurredAt: new Date(),
     });
+
+    // Log to email_sends table for limit tracking
+    try {
+      const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
+      await db.insert(emailSends).values({
+        id: emailSendId,
+        tenantId: tenantId,
+        recipientEmail: contact.email,
+        recipientName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email,
+        senderEmail: 'admin@zendwise.work', // Default sender or configured one
+        senderName: design.displayCompanyName || 'Manager',
+        subject: subject,
+        emailType: 'individual',
+        provider: 'resend', // Or 'trigger.dev'
+        providerMessageId: result?.runId,
+        status: 'sent',
+        contactId: contact.id,
+        promotionId: null,
+        sentAt: new Date(),
+      });
+    } catch (logError) {
+      console.error(`⚠️ [SendEmail] Failed to log to email_sends table:`, logError);
+    }
 
     // Update contact stats
     await db.update(emailContacts)

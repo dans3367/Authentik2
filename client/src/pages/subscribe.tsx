@@ -101,7 +101,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>(
     subscription?.isYearly ? 'yearly' : 'monthly'
   );
-  
+
   if (!subscription) return null;
 
   const currentPlan = subscription.plan;
@@ -109,7 +109,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
   const trialEndsAt = subscription.trialEnd ? new Date(subscription.trialEnd) : null;
   const currentPeriodEnd = new Date(subscription.currentPeriodEnd);
   const daysLeft = trialEndsAt ? Math.ceil((trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
-  
+
   // Handle case where plan might not be loaded
   if (!currentPlan) {
     return (
@@ -122,10 +122,10 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
   }
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     });
   };
 
@@ -171,7 +171,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
                   </div>
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-primary/10 rounded-lg">
                   <Calendar className="h-5 w-5 text-primary" />
@@ -215,7 +215,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
                   <div>
                     <h4 className="font-semibold text-orange-800 dark:text-orange-200">Free Trial Active</h4>
                     <p className="text-sm text-orange-700 dark:text-orange-300 mt-1">
-                      Your free trial ends on {formatDate(trialEndsAt!)}. 
+                      Your free trial ends on {formatDate(trialEndsAt!)}.
                       Your subscription will automatically start after the trial period.
                     </p>
                   </div>
@@ -249,7 +249,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
             {plans.map((plan) => {
               const isCurrent = plan.id === currentPlan.id;
               const isUpgrade = parseFloat(plan.price) > parseFloat(currentPlan.price);
-              
+
               return (
                 <Card key={plan.id} className={`relative ${plan.isPopular ? 'border-primary shadow-lg' : ''} ${isCurrent ? 'bg-primary/10 border-primary border-2' : ''}`}>
                   {plan.isPopular && !isCurrent && (
@@ -260,7 +260,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
                       </Badge>
                     </div>
                   )}
-                  
+
                   {isCurrent && (
                     <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 z-10">
                       <Badge className="bg-green-600 text-white px-4 py-1">
@@ -269,11 +269,11 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
                       </Badge>
                     </div>
                   )}
-                  
+
                   <CardHeader className="text-center pb-4">
                     <CardTitle className="text-xl">{plan.displayName}</CardTitle>
                     <CardDescription className="text-sm">{plan.description}</CardDescription>
-                    
+
                     <div className="py-4">
                       <div className="text-3xl font-bold">
                         ${billingCycle === 'yearly' ? plan.yearlyPrice : plan.price}
@@ -290,8 +290,8 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
                   </CardHeader>
 
                   <CardContent className="pt-0">
-                    <Button 
-                      className="w-full mb-4" 
+                    <Button
+                      className="w-full mb-4"
                       variant={isCurrent ? "outline" : isUpgrade ? "default" : "ghost"}
                       onClick={() => !isCurrent && onUpgrade(plan.id, billingCycle)}
                       disabled={isCurrent || isUpgrading}
@@ -325,6 +325,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
                         {plan.maxShops && <div>Up to {plan.maxShops} shops</div>}
                         {plan.maxProjects && <div>Up to {plan.maxProjects} projects</div>}
                         {plan.storageLimit && <div>{plan.storageLimit}GB storage</div>}
+                        {plan.monthlyEmailLimit && <div>{plan.monthlyEmailLimit} emails/month</div>}
                         <div className="capitalize">{plan.supportLevel} support</div>
                       </div>
                     </div>
@@ -372,7 +373,7 @@ export default function Subscribe() {
           throw new Error(`Failed to fetch subscription plans: ${response.statusText}`);
         }
         const data = await response.json();
-        
+
         // If we get an empty array on first load, it might be initialization race condition
         // Retry once after a short delay
         if (Array.isArray(data) && data.length === 0) {
@@ -383,7 +384,7 @@ export default function Subscribe() {
             return retryData;
           }
         }
-        
+
         return data;
       } catch (error) {
         throw error;
@@ -408,12 +409,12 @@ export default function Subscribe() {
           title: "Free Trial Started!",
           description: "Your 14-day free trial has begun. Welcome!",
         });
-        
+
         // Redirect to dashboard for trial users
         setLocation('/dashboard');
         return;
       }
-      
+
       // If payment is required, set client secret for Stripe checkout
       if (data.clientSecret) {
         setClientSecret(data.clientSecret);
@@ -439,7 +440,7 @@ export default function Subscribe() {
         title: "Plan Updated!",
         description: "Your subscription has been successfully updated.",
       });
-      
+
       // Refresh subscription data
       window.location.reload();
     },
@@ -460,8 +461,8 @@ export default function Subscribe() {
   const handleStartFreeTrial = (planId: string) => {
     // Start free trial for current user
     setCurrentPlan(planId);
-    createSubscriptionMutation.mutate({ 
-      planId, 
+    createSubscriptionMutation.mutate({
+      planId,
       billingCycle
     });
   };
@@ -471,13 +472,13 @@ export default function Subscribe() {
   };
 
   // Redirect unauthenticated users immediately
-  if (hasInitialized && !isAuthenticated) {
+  if (isInitialized && !isAuthenticated) {
     setLocation('/auth');
     return null;
   }
 
   // Show loading while authentication is being determined
-  if (!hasInitialized || authLoading) {
+  if (!isInitialized || authLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -489,7 +490,7 @@ export default function Subscribe() {
   }
 
   // Check if user has Owner role - only Owners can access subscription management
-  if (reduxUser && reduxUser.role !== "Owner") {
+  if (user && user.role !== "Owner") {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center max-w-md mx-auto">
@@ -498,10 +499,10 @@ export default function Subscribe() {
           </div>
           <h1 className="text-2xl font-bold mb-4">Access Restricted</h1>
           <p className="text-muted-foreground mb-6">
-            Only organization owners can access subscription management. 
+            Only organization owners can access subscription management.
             Please contact your organization owner to manage subscription plans.
           </p>
-          <Button 
+          <Button
             onClick={() => setLocation('/dashboard')}
             variant="outline"
           >
@@ -560,7 +561,7 @@ export default function Subscribe() {
   // If we have a client secret, show the payment form  
   if (clientSecret && currentPlan) {
     const selectedPlanData = plans?.find(p => p.id === currentPlan);
-    
+
     return (
       <div className="container mx-auto px-4 py-8 max-w-md">
         <div className="text-center mb-8">
@@ -584,7 +585,7 @@ export default function Subscribe() {
   // If user has an existing subscription, show subscription management
   if (userSubscription?.subscription && plans) {
     return (
-      <SubscriptionManagement 
+      <SubscriptionManagement
         subscription={userSubscription.subscription}
         plans={plans}
         onUpgrade={handleUpgrade}
@@ -626,11 +627,11 @@ export default function Subscribe() {
                 </Badge>
               </div>
             )}
-            
+
             <CardHeader className="text-center pb-4">
               <CardTitle className="text-2xl">{plan.displayName}</CardTitle>
               <CardDescription className="text-sm">{plan.description}</CardDescription>
-              
+
               <div className="py-4">
                 <div className="text-4xl font-bold">
                   ${billingCycle === 'yearly' ? plan.yearlyPrice : plan.price}
@@ -647,8 +648,8 @@ export default function Subscribe() {
             </CardHeader>
 
             <CardContent className="pt-0">
-              <Button 
-                className="w-full mb-6" 
+              <Button
+                className="w-full mb-6"
                 variant={plan.isPopular ? "default" : "outline"}
                 onClick={() => handleStartFreeTrial(plan.id)}
                 disabled={createSubscriptionMutation.isPending}
@@ -678,6 +679,7 @@ export default function Subscribe() {
                   {plan.maxShops && <div>Up to {plan.maxShops} shops</div>}
                   {plan.maxProjects && <div>Up to {plan.maxProjects} projects</div>}
                   {plan.storageLimit && <div>{plan.storageLimit}GB storage</div>}
+                  {plan.monthlyEmailLimit && <div>{plan.monthlyEmailLimit} emails/month</div>}
                   <div className="capitalize">{plan.supportLevel} support</div>
                 </div>
               </div>
