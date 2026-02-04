@@ -11,7 +11,7 @@ import { storage } from '../storage';
 import jwt from 'jsonwebtoken';
 import { enhancedEmailService } from '../emailService';
 import crypto from 'crypto';
-import { logActivity, computeChanges } from '../utils/activityLogger';
+import { logActivity, computeChanges, allowedActivityTypes } from '../utils/activityLogger';
 
 function isValidHttpUrl(url: string): boolean {
   try {
@@ -2550,12 +2550,33 @@ emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken,
       : '[redacted]';
     console.log('🔗 [Birthday Invitation] Generated profile update link:', { baseUrl, path: '/update-profile', token: maskedToken });
 
+    const emailTrackingId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
+    const recipientName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email;
+    const subject = `🎂 Help us celebrate your special day!`;
+
+    await db.insert(emailSends).values({
+      id: emailTrackingId,
+      tenantId: req.user.tenantId,
+      recipientEmail: contact.email,
+      recipientName,
+      senderEmail: 'admin@zendwise.com',
+      senderName: tenant.name,
+      subject,
+      emailType: 'invitation',
+      provider: 'resend',
+      providerMessageId: null,
+      status: 'pending',
+      contactId: contact.id,
+      sentAt: null,
+    });
+
     // Trigger the birthday request email via Trigger.dev
     const { triggerRequestBdayEmail } = await import('../lib/trigger');
 
     const result = await triggerRequestBdayEmail({
       tenantId: req.user.tenantId,
       contactId: contact.id,
+      emailTrackingId,
       contactEmail: contact.email,
       contactFirstName: contact.firstName,
       contactLastName: contact.lastName,
@@ -2800,10 +2821,9 @@ emailManagementRoutes.post("/internal/email-activity", authenticateInternalServi
     }
 
     // Validate activityType
-    const validActivityTypes = ['sent', 'delivered', 'opened', 'clicked', 'bounced', 'complained', 'unsubscribed'];
-    if (!validActivityTypes.includes(activityType)) {
+    if (!allowedActivityTypes.includes(activityType)) {
       return res.status(400).json({
-        error: `Invalid activityType. Must be one of: ${validActivityTypes.join(', ')}`
+        error: `Invalid activityType. Must be one of: ${allowedActivityTypes.join(', ')}`
       });
     }
 
@@ -3999,6 +4019,26 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     // Send email via Trigger.dev queue
     // Generate a unique ID to track this email send - will be stored in email_sends and passed to Trigger task
     const emailTrackingId = crypto.randomUUID();
+    // Log email activity (queued) first so we can update it to sent/failed later
+    let emailActivityId: string | null = null;
+    try {
+      const [insertedActivity] = await db.insert(emailActivity).values({
+        contactId: contact.id,
+        tenantId: tenantId,
+        activityType: 'queued',
+        activityData: JSON.stringify({
+          source: 'individual_send_queued',
+          sentBy: req.user.id,
+          emailSubject: subject,
+        }),
+        occurredAt: new Date(),
+      }).returning();
+      emailActivityId = insertedActivity.id;
+      console.log(`📝 [SendEmail] Logged email activity for ${contact.email}, id: ${emailActivityId}`);
+    } catch (activityLogError) {
+      console.error(`⚠️ [SendEmail] Failed to log email activity:`, activityLogError);
+    }
+
     let result: { success: boolean; runId?: string; error?: string };
     try {
       const { sendEmailTask } = await import('../../src/trigger/email');
@@ -4016,37 +4056,41 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
           contactId: contact.id,
           tenantId: tenantId,
           sentBy: req.user.id,
-          emailTrackingId: emailTrackingId // Pass tracking ID so task can update email_sends with actual Resend ID
+          emailTrackingId: emailTrackingId, // Pass tracking ID so task can update email_sends with actual Resend ID
+          emailActivityId: emailActivityId, // Pass activity ID so task can update email_activity to sent/failed
         }
       });
       console.log(`📧 [SendEmail] Triggered send-email task, runId: ${handle.id}, trackingId: ${emailTrackingId}`);
       result = { success: true, runId: handle.id };
+
+      // At minimum, update the activity so it doesn't remain stuck as queued
+      if (emailActivityId) {
+        try {
+          await db.update(emailActivity)
+            .set({ activityType: 'sent' })
+            .where(and(eq(emailActivity.id, emailActivityId), eq(emailActivity.tenantId, tenantId)));
+        } catch (activityUpdateError) {
+          console.error(`⚠️ [SendEmail] Failed to update email activity status:`, activityUpdateError);
+        }
+      }
     } catch (triggerError: any) {
       console.error('[SendEmail] Failed to trigger email task:', triggerError);
+
+      // Ensure activity isn't left stuck as queued
+      if (emailActivityId) {
+        try {
+          await db.update(emailActivity)
+            .set({ activityType: 'failed' })
+            .where(and(eq(emailActivity.id, emailActivityId), eq(emailActivity.tenantId, tenantId)));
+        } catch (activityUpdateError) {
+          console.error(`⚠️ [SendEmail] Failed to update email activity status:`, activityUpdateError);
+        }
+      }
+
       return res.status(503).json({
         success: false,
         message: 'Email server is not available. Please try again later.'
       });
-    }
-
-    // Log email activity
-    let emailActivityId: string | null = null;
-    try {
-      const [insertedActivity] = await db.insert(emailActivity).values({
-        contactId: contact.id,
-        tenantId: tenantId,
-        activityType: 'queued',
-        activityData: JSON.stringify({
-          source: 'individual_send_queued',
-          sentBy: req.user.id,
-          emailSubject: subject
-        }),
-        occurredAt: new Date(),
-      }).returning();
-      emailActivityId = insertedActivity.id;
-      console.log(`📝 [SendEmail] Logged email activity for ${contact.email}, id: ${emailActivityId}`);
-    } catch (activityLogError) {
-      console.error(`⚠️ [SendEmail] Failed to log email activity:`, activityLogError);
     }
 
     // Log to activity_logs table for user activity tracking

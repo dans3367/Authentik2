@@ -212,18 +212,19 @@ router.post(
   authenticateInternalService,
   async (req: InternalServiceRequest, res) => {
     try {
-      const { emailTrackingId, providerMessageId, status } = req.body;
+      const { emailTrackingId, providerMessageId, status, emailActivityId } = req.body;
 
       const allowedStatuses = [
         'pending',
-        'queued',
         'sent',
         'delivered',
         'bounced',
         'failed',
       ];
 
-      if (status !== undefined && (!status || !allowedStatuses.includes(status))) {
+      const normalizedStatus = status === 'queued' ? 'pending' : status;
+
+      if (normalizedStatus !== undefined && (!normalizedStatus || !allowedStatuses.includes(normalizedStatus))) {
         return res.status(400).json({
           success: false,
           error: 'Invalid status value',
@@ -231,7 +232,7 @@ router.post(
         });
       }
 
-      const validatedStatus = status || 'sent';
+      const validatedStatus = normalizedStatus || 'sent';
 
       if (!emailTrackingId || !providerMessageId) {
         return res.status(400).json({
@@ -261,6 +262,20 @@ router.post(
         .where(eq(emailSends.id, emailTrackingId))
         .returning();
 
+      // Optionally update the related email_activity row (queued -> sent/failed)
+      if (emailActivityId && (validatedStatus === 'sent' || validatedStatus === 'failed')) {
+        try {
+          await db.update(emailActivity)
+            .set({
+              activityType: validatedStatus,
+            })
+            .where(eq(emailActivity.id, emailActivityId));
+          console.log(`✅ [Internal API] Updated email_activity ${emailActivityId} to ${validatedStatus}`);
+        } catch (activityUpdateError) {
+          console.warn(`⚠️ [Internal API] Failed to update email_activity ${emailActivityId}:`, activityUpdateError);
+        }
+      }
+
       if (result.length === 0) {
         console.warn(`⚠️ [Internal API] No email_sends record found for tracking ID ${emailTrackingId}`);
         return res.status(404).json({
@@ -275,6 +290,7 @@ router.post(
         success: true,
         emailSendId: result[0].id,
         providerMessageId,
+        emailActivityId: emailActivityId || null,
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

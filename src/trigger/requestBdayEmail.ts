@@ -1,6 +1,7 @@
 import { task, logger } from "@trigger.dev/sdk/v3";
 import { Resend } from "resend";
 import { z } from "zod";
+import { createHmac } from "crypto";
 
 // Initialize Resend for email sending
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -28,6 +29,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const requestBdayEmailPayloadSchema = z.object({
   tenantId: z.string(),
   contactId: z.string(),
+  emailTrackingId: z.string(),
   contactEmail: z.string().email(),
   contactFirstName: z.string().nullable().optional(),
   contactLastName: z.string().nullable().optional(),
@@ -70,12 +72,97 @@ export const requestBdayEmailTask = task({
     try {
       const data = requestBdayEmailPayloadSchema.parse(payload);
 
+      const apiUrl = process.env.API_URL || 'http://localhost:5000';
+      const secret = process.env.INTERNAL_SERVICE_SECRET;
+
+      const signInternal = (body: object): { timestamp: number; signature: string } => {
+        if (!secret) {
+          throw new Error('INTERNAL_SERVICE_SECRET is not configured');
+        }
+        const timestamp = Date.now();
+        const signaturePayload = `${timestamp}.${JSON.stringify(body)}`;
+        const signature = createHmac('sha256', secret).update(signaturePayload).digest('hex');
+        return { timestamp, signature };
+      };
+
+      const updateEmailSendStatus = async (update: { providerMessageId: string; status: 'sent' | 'failed' }) => {
+        if (!secret) {
+          logger.warn('INTERNAL_SERVICE_SECRET not configured, skipping email_sends reconciliation');
+          return;
+        }
+
+        const body = {
+          emailTrackingId: data.emailTrackingId,
+          providerMessageId: update.providerMessageId,
+          status: update.status,
+        };
+
+        const { timestamp, signature } = signInternal(body);
+        const response = await fetch(`${apiUrl}/api/internal/update-email-send`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-internal-service': 'trigger.dev',
+            'x-internal-timestamp': timestamp.toString(),
+            'x-internal-signature': signature,
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+          logger.warn('Failed to update email send status', {
+            status: response.status,
+            emailTrackingId: data.emailTrackingId,
+          });
+        }
+      };
+
+      const logEmailFailureActivity = async (errorMessage: string) => {
+        if (!secret) {
+          logger.warn('INTERNAL_SERVICE_SECRET not configured, skipping failure activity logging');
+          return;
+        }
+
+        const webhookId = `trigger-bday-invite-failed-${data.emailTrackingId}`;
+        const body = {
+          tenantId: data.tenantId,
+          contactId: data.contactId,
+          activityType: 'failed',
+          activityData: {
+            type: 'birthday_invitation',
+            emailTrackingId: data.emailTrackingId,
+            error: errorMessage,
+          },
+          occurredAt: new Date().toISOString(),
+          webhookId,
+        };
+
+        const { timestamp, signature } = signInternal(body);
+        const response = await fetch(`${apiUrl}/api/internal/email-activity`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-internal-service': 'trigger.dev',
+            'x-internal-timestamp': timestamp.toString(),
+            'x-internal-signature': signature,
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+          logger.warn('Failed to log email failure activity', {
+            status: response.status,
+            emailTrackingId: data.emailTrackingId,
+          });
+        }
+      };
+
       const rawContactName = data.contactFirstName
         ? `${data.contactFirstName}${data.contactLastName ? ` ${data.contactLastName}` : ""}`
         : "Valued Customer";
       const contactName = escapeHtml(rawContactName);
       const tenantName = escapeHtml(data.tenantName || "The Team");
-      const profileUpdateUrlHref = escapeHtml(encodeURI(data.profileUpdateUrl));
+      const profileUpdateUrlHref = escapeHtml(data.profileUpdateUrl);
       const profileUpdateUrlText = escapeHtml(data.profileUpdateUrl);
 
       const subject = `🎂 Help us celebrate your special day!`;
@@ -158,6 +245,13 @@ export const requestBdayEmailTask = task({
 
       if (error) {
         logger.error("Failed to send birthday request email", { error });
+
+        await updateEmailSendStatus({
+          providerMessageId: `resend_error:${data.emailTrackingId}`,
+          status: 'failed',
+        });
+        await logEmailFailureActivity(error.message);
+
         return {
           success: false,
           contactId: data.contactId,
@@ -173,6 +267,13 @@ export const requestBdayEmailTask = task({
         contactEmail: data.contactEmail,
       });
 
+      if (emailData?.id) {
+        await updateEmailSendStatus({
+          providerMessageId: emailData.id,
+          status: 'sent',
+        });
+      }
+
       return {
         success: true,
         emailId: emailData?.id,
@@ -184,6 +285,64 @@ export const requestBdayEmailTask = task({
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
       logger.error("Exception sending birthday request email", { error: errorMessage });
+
+      try {
+        const parsed = requestBdayEmailPayloadSchema.safeParse(payload);
+        if (parsed.success) {
+          const apiUrl = process.env.API_URL || 'http://localhost:5000';
+          const secret = process.env.INTERNAL_SERVICE_SECRET;
+          if (secret) {
+            const body = {
+              emailTrackingId: parsed.data.emailTrackingId,
+              providerMessageId: `exception:${parsed.data.emailTrackingId}`,
+              status: 'failed',
+            };
+            const timestamp = Date.now();
+            const signaturePayload = `${timestamp}.${JSON.stringify(body)}`;
+            const signature = createHmac('sha256', secret).update(signaturePayload).digest('hex');
+            await fetch(`${apiUrl}/api/internal/update-email-send`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-internal-service': 'trigger.dev',
+                'x-internal-timestamp': timestamp.toString(),
+                'x-internal-signature': signature,
+              },
+              body: JSON.stringify(body),
+            }).catch(() => undefined);
+
+            const webhookId = `trigger-bday-invite-failed-${parsed.data.emailTrackingId}`;
+            const activityBody = {
+              tenantId: parsed.data.tenantId,
+              contactId: parsed.data.contactId,
+              activityType: 'failed',
+              activityData: {
+                type: 'birthday_invitation',
+                emailTrackingId: parsed.data.emailTrackingId,
+                error: errorMessage,
+              },
+              occurredAt: new Date().toISOString(),
+              webhookId,
+            };
+            const activityTimestamp = Date.now();
+            const activitySigPayload = `${activityTimestamp}.${JSON.stringify(activityBody)}`;
+            const activitySignature = createHmac('sha256', secret).update(activitySigPayload).digest('hex');
+            await fetch(`${apiUrl}/api/internal/email-activity`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-internal-service': 'trigger.dev',
+                'x-internal-timestamp': activityTimestamp.toString(),
+                'x-internal-signature': activitySignature,
+              },
+              body: JSON.stringify(activityBody),
+            }).catch(() => undefined);
+          }
+        }
+      } catch {
+        // ignore reconciliation errors
+      }
+
       return {
         success: false,
         contactId: payload?.contactId,
