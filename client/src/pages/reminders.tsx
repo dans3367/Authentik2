@@ -435,7 +435,7 @@ export default function RemindersPage() {
   useEffect(() => {
     cleanupOldQueryCache();
   }, []);
-
+  const [reminderValidationError, setReminderValidationError] = useState<string | null>(null);
   // Fetch appointments - no date filtering on server
   // All date filtering is done client-side to ensure both upcoming and past tabs
   // have access to all appointment data
@@ -744,7 +744,7 @@ export default function RemindersPage() {
 
       if (data?.appointment) {
         queryClient.setQueryData(
-          ['/api/appointments', searchQuery, statusFilter],
+          ['/api/appointments'],
           (old: { appointments: Appointment[] } | undefined) => {
             if (!old?.appointments) return old;
             return {
@@ -1063,16 +1063,24 @@ export default function RemindersPage() {
   };
 
   const openScheduleReminder = (appointmentId: string) => {
-    const apt = appointments.find(a => a.id === appointmentId);
+    const apt = allAppointments.find(a => a.id === appointmentId);
     const baseDate = apt ? new Date(apt.appointmentDate) : new Date();
     const defaultScheduled = new Date(baseDate.getTime() - 1 * 60 * 60 * 1000); // default 1h before
     setScheduleAppointmentId(appointmentId);
     setScheduleData({ reminderType: 'email', reminderTiming: '1h', scheduledFor: defaultScheduled, timezone: userTimezone, content: '' });
     setScheduleReminderModalOpen(true);
+
+    // Force validation check - try appointment.customer first, then fallback to customers array
+    const customerEmail = apt?.customer?.email || customers.find(c => c.id === apt?.customerId)?.email;
+    if (customerEmail) {
+      validateEmailReminder(customerEmail).then(setReminderValidationError);
+    } else {
+      setReminderValidationError(null);
+    }
   };
 
   const computeScheduledFor = (timing: '5m' | '30m' | '1h' | '5h' | '10h' | 'custom', customMinutesBefore?: number): Date => {
-    const apt = appointments.find(a => a.id === scheduleAppointmentId);
+    const apt = allAppointments.find(a => a.id === scheduleAppointmentId);
     const baseDate = apt ? new Date(apt.appointmentDate) : new Date();
     switch (timing) {
       case '5m':
@@ -1161,7 +1169,7 @@ export default function RemindersPage() {
     setEditAppointmentErrors({});
   };
 
-  const handleUpdateAppointment = () => {
+  const handleUpdateAppointment = async () => {
     if (!editingAppointment) return;
 
     const errors: typeof editAppointmentErrors = {};
@@ -1209,6 +1217,22 @@ export default function RemindersPage() {
     }
 
     setEditAppointmentErrors({});
+
+    // Validate email reminder suppression
+    if (editAppointmentReminderEnabled && editAppointmentReminderData.reminderType === 'email') {
+      const customer = customers.find(c => c.id === editingAppointment.customerId) || editingAppointment.customer;
+      if (customer?.email) {
+        const errorMessage = await validateEmailReminder(customer.email);
+        if (errorMessage) {
+          toast({
+            title: t('reminders.toasts.validationError'),
+            description: errorMessage,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+    }
 
     // Set status to 'scheduled' if reminder is enabled
     const appointmentStatus = editingAppointment.status;
@@ -1272,7 +1296,28 @@ export default function RemindersPage() {
     }
   };
 
-  const handleCreateAppointment = () => {
+  const validateEmailReminder = async (email: string): Promise<string | null> => {
+    // Check local status first if customer exists in the list
+    const customer = customers.find(c => c.email === email);
+    if (customer && (customer.status === 'unsubscribed' || customer.status === 'bounced')) {
+      return `Cannot schedule email reminder: Customer is ${customer.status}`;
+    }
+
+    try {
+      const response = await apiRequest('GET', `/api/suppression/check/${encodeURIComponent(email)}`);
+      const data = await response.json();
+
+      if (data.isSuppressed) {
+        return `Cannot schedule email reminder: Address is in global do-not-contact list (${data.suppressionDetails?.reason || 'Suppressed'})`;
+      }
+      return null;
+    } catch (error) {
+      console.error("Failed to validate email suppression", error);
+      return null;
+    }
+  };
+
+  const handleCreateAppointment = async () => {
     const errors: typeof newAppointmentErrors = {};
 
     if (!newAppointmentData.customerId) {
@@ -1338,6 +1383,25 @@ export default function RemindersPage() {
     }
 
     setNewAppointmentErrors({});
+
+    // Validate email reminder suppression
+    if (newAppointmentReminderEnabled && newAppointmentReminderData.reminderType === 'email') {
+      const selectedCustomer = customers.find(c => c.id === newAppointmentData.customerId);
+      if (selectedCustomer) {
+        const errorMessage = await validateEmailReminder(selectedCustomer.email);
+        if (errorMessage) {
+          setNewAppointmentErrors(prev => ({ ...prev, reminderType: true }));
+          // We can also show toast here if we want, or rely on the UI in the modal if it was open.
+          // Since this is the final "Create" action, a toast is appropriate.
+          toast({
+            title: t('reminders.toasts.validationError'),
+            description: errorMessage,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+    }
 
     // Check if appointment date is in the past
     const appointmentDate = new Date(newAppointmentData.appointmentDate);
@@ -1669,9 +1733,19 @@ export default function RemindersPage() {
                           <Label className={newAppointmentErrors.customerId ? "text-red-500" : ""}>
                             {t('reminders.appointments.customer')} <span className="text-red-500">*</span>
                           </Label>
-                          <Select value={newAppointmentData.customerId} onValueChange={(value) => {
+                          <Select value={newAppointmentData.customerId} onValueChange={async (value) => {
                             setNewAppointmentData(prev => ({ ...prev, customerId: value }));
                             setNewAppointmentErrors(prev => ({ ...prev, customerId: false }));
+
+                            // Force validation check when customer is selected and reminder is enabled with email type
+                            if (newAppointmentReminderEnabled && newAppointmentReminderData.reminderType === 'email') {
+                              const customer = customers.find(c => c.id === value);
+                              if (customer?.email) {
+                                validateEmailReminder(customer.email).then(setReminderValidationError);
+                              } else {
+                                setReminderValidationError(null);
+                              }
+                            }
                           }}>
                             <SelectTrigger className={`focus-visible:ring-0 focus:ring-0 ${newAppointmentErrors.customerId ? 'border-red-500' : ''}`}>
                               <SelectValue placeholder={t('reminders.appointments.selectCustomer')} />
@@ -1797,7 +1871,25 @@ export default function RemindersPage() {
                       <Dialog open={newAppointmentReminderModalOpen} onOpenChange={(open) => {
                         setNewAppointmentReminderModalOpen(open);
                         if (!open) {
-                          setNewAppointmentReminderEnabled(false);
+                          // Keep enabled state true so we don't lose context, unless user explicitly cancels
+                          // But here we are just closing the modal.
+                          // If they closed via 'x' or outside click, maybe we should keep it enabled? 
+                          // Or assume they are done configuring? 
+                          // The previous logic disabled it on close, which implies "Cancel".
+                          // Let's stick to previous behavior but ensure we clear error state
+                          setReminderValidationError(null);
+                        } else {
+                          // Force validation check when opening - always check for email type
+                          if (newAppointmentData.customerId && newAppointmentReminderData.reminderType === 'email') {
+                            const customer = customers.find(c => c.id === newAppointmentData.customerId);
+                            if (customer?.email) {
+                              validateEmailReminder(customer.email).then(setReminderValidationError);
+                            } else {
+                              setReminderValidationError(null);
+                            }
+                          } else {
+                            setReminderValidationError(null);
+                          }
                         }
                       }}>
                         <DialogContent className="max-w-lg">
@@ -1809,11 +1901,31 @@ export default function RemindersPage() {
                           </DialogHeader>
 
                           <div className="space-y-4">
+
                             <div>
                               <Label>{t('reminders.scheduleReminder.reminderType')}</Label>
                               <Select
-                                value={newAppointmentReminderData.reminderType}
-                                onValueChange={(value: 'email' | 'sms' | 'push') => setNewAppointmentReminderData(prev => ({ ...prev, reminderType: value }))}
+                                value={
+                                  newAppointmentReminderData.reminderType
+                                }
+                                onValueChange={(
+                                  value: "email" | "sms" | "push"
+                                ) => {
+                                  setNewAppointmentReminderData((prev) => ({
+                                    ...prev,
+                                    reminderType: value,
+                                  }));
+
+                                  // Re-validate when switching type
+                                  if (value === 'email' && newAppointmentData.customerId) {
+                                    const customer = customers.find(c => c.id === newAppointmentData.customerId);
+                                    if (customer?.email) {
+                                      validateEmailReminder(customer.email).then(setReminderValidationError);
+                                    }
+                                  } else {
+                                    setReminderValidationError(null);
+                                  }
+                                }}
                               >
                                 <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
                                   <SelectValue />
@@ -1920,6 +2032,12 @@ export default function RemindersPage() {
                                 className="focus-visible:ring-0"
                               />
                             </div>
+                            {reminderValidationError && newAppointmentReminderData.reminderType === 'email' && (
+                              <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
+                                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                                <span>{reminderValidationError}</span>
+                              </div>
+                            )}
                           </div>
 
                           <div className="flex justify-end gap-2 pt-4">
@@ -1929,7 +2047,7 @@ export default function RemindersPage() {
                             }}>
                               {t('reminders.appointments.cancel')}
                             </Button>
-                            <Button onClick={() => setNewAppointmentReminderModalOpen(false)}>
+                            <Button onClick={() => setNewAppointmentReminderModalOpen(false)} disabled={!!reminderValidationError && newAppointmentReminderData.reminderType === 'email'}>
                               {t('common.save')}
                             </Button>
                           </div>
@@ -3079,7 +3197,21 @@ export default function RemindersPage() {
         </div>
 
         {/* Schedule Reminder Modal */}
-        <Dialog open={scheduleReminderModalOpen} onOpenChange={setScheduleReminderModalOpen}>
+        <Dialog open={scheduleReminderModalOpen} onOpenChange={(open) => {
+          setScheduleReminderModalOpen(open);
+          if (!open) {
+            setReminderValidationError(null);
+          } else {
+            // Force validation check on open - try appointment.customer first, then fallback to customers array
+            const appointment = allAppointments.find(a => a.id === scheduleAppointmentId);
+            const customerEmail = appointment?.customer?.email || customers.find(c => c.id === appointment?.customerId)?.email;
+            if (customerEmail && scheduleData.reminderType === 'email') {
+              validateEmailReminder(customerEmail).then(setReminderValidationError);
+            } else if (scheduleData.reminderType === 'email') {
+              setReminderValidationError(null);
+            }
+          }
+        }}>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>{t('reminders.scheduleReminder.title')}</DialogTitle>
@@ -3088,9 +3220,24 @@ export default function RemindersPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
+
               <div>
                 <Label>{t('reminders.scheduleReminder.reminderType')}</Label>
-                <Select value={scheduleData.reminderType} onValueChange={(v) => setScheduleData(prev => ({ ...prev, reminderType: v as any }))}>
+                <Select value={scheduleData.reminderType} onValueChange={(v) => {
+                  const newType = v as "email" | "sms" | "push";
+                  setScheduleData(prev => ({ ...prev, reminderType: newType }));
+
+                  if (newType === 'email') {
+                    // Force validation check - try appointment.customer first, then fallback to customers array
+                    const appointment = allAppointments.find(a => a.id === scheduleAppointmentId);
+                    const customerEmail = appointment?.customer?.email || customers.find(c => c.id === appointment?.customerId)?.email;
+                    if (customerEmail) {
+                      validateEmailReminder(customerEmail).then(setReminderValidationError);
+                    }
+                  } else {
+                    setReminderValidationError(null);
+                  }
+                }}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -3196,10 +3343,19 @@ export default function RemindersPage() {
                   onChange={(e) => setScheduleData(prev => ({ ...prev, content: e.target.value }))}
                 />
               </div>
+              {reminderValidationError && scheduleData.reminderType === 'email' && (
+                <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>{reminderValidationError}</span>
+                </div>
+              )}
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setScheduleReminderModalOpen(false)}>{t('reminders.scheduleReminder.cancel')}</Button>
+                <Button variant="outline" onClick={() => {
+                  setScheduleReminderModalOpen(false);
+                  setReminderValidationError(null);
+                }}>{t('reminders.scheduleReminder.cancel')}</Button>
                 <Button
-                  onClick={() => {
+                  onClick={async () => {
                     if (scheduleData.scheduledFor < new Date()) {
                       toast({
                         title: t('reminders.toasts.validationError'),
@@ -3208,9 +3364,23 @@ export default function RemindersPage() {
                       });
                       return;
                     }
+
+                    if (scheduleData.reminderType === 'email') {
+                      // Double check validation before sending - try appointment.customer first, then fallback to customers array
+                      const appointment = allAppointments.find(a => a.id === scheduleAppointmentId);
+                      const customerEmail = appointment?.customer?.email || customers.find(c => c.id === appointment?.customerId)?.email;
+                      if (customerEmail) {
+                        const errorMessage = await validateEmailReminder(customerEmail);
+                        if (errorMessage) {
+                          setReminderValidationError(errorMessage);
+                          return;
+                        }
+                      }
+                    }
+
                     createScheduledReminderMutation.mutate({ appointmentId: scheduleAppointmentId, data: scheduleData });
                   }}
-                  disabled={createScheduledReminderMutation.isPending || !scheduleAppointmentId}
+                  disabled={createScheduledReminderMutation.isPending || !scheduleAppointmentId || (!!reminderValidationError && scheduleData.reminderType === 'email')}
                 >
                   {createScheduledReminderMutation.isPending ? t('reminders.scheduleReminder.scheduling') : t('reminders.scheduleReminder.schedule')}
                 </Button>
@@ -3372,6 +3542,14 @@ export default function RemindersPage() {
                   setEditAppointmentReminderModalOpen(open);
                   if (!open) {
                     setEditAppointmentReminderEnabled(false);
+                    setReminderValidationError(null);
+                  } else {
+                    if (editAppointmentReminderData.reminderType === 'email') {
+                      const customer = customers.find(c => c.id === editingAppointment.customerId) || editingAppointment.customer;
+                      if (customer?.email) {
+                        validateEmailReminder(customer.email).then(setReminderValidationError);
+                      }
+                    }
                   }
                 }}>
                   <DialogContent className="max-w-lg">
@@ -3383,11 +3561,22 @@ export default function RemindersPage() {
                     </DialogHeader>
 
                     <div className="space-y-4">
+
                       <div>
                         <Label>{t('reminders.scheduleReminder.reminderType')}</Label>
                         <Select
                           value={editAppointmentReminderData.reminderType}
-                          onValueChange={(value: 'email' | 'sms' | 'push') => setEditAppointmentReminderData(prev => ({ ...prev, reminderType: value }))}
+                          onValueChange={(value: 'email' | 'sms' | 'push') => {
+                            setEditAppointmentReminderData(prev => ({ ...prev, reminderType: value }));
+                            if (value === 'email') {
+                              const customer = customers.find(c => c.id === editingAppointment.customerId) || editingAppointment.customer;
+                              if (customer?.email) {
+                                validateEmailReminder(customer.email).then(setReminderValidationError);
+                              }
+                            } else {
+                              setReminderValidationError(null);
+                            }
+                          }}
                         >
                           <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
                             <SelectValue />
@@ -3493,6 +3682,12 @@ export default function RemindersPage() {
                           className="focus-visible:ring-0"
                         />
                       </div>
+                      {reminderValidationError && editAppointmentReminderData.reminderType === 'email' && (
+                        <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
+                          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                          <span>{reminderValidationError}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex justify-end gap-2 pt-4">
@@ -3502,7 +3697,7 @@ export default function RemindersPage() {
                       }}>
                         {t('reminders.appointments.cancel')}
                       </Button>
-                      <Button onClick={() => setEditAppointmentReminderModalOpen(false)}>
+                      <Button onClick={() => setEditAppointmentReminderModalOpen(false)} disabled={!!reminderValidationError && editAppointmentReminderData.reminderType === 'email'}>
                         {t('common.save')}
                       </Button>
                     </div>

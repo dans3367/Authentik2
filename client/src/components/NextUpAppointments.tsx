@@ -131,10 +131,21 @@ export function NextUpAppointments({ appointments, onViewDetails }: NextUpAppoin
               <Card key={apt.id} className="bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-4 space-y-3">
                   <div className="flex justify-between items-start">
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-200">
-                      Upcoming
-                    </Badge>
-                    <Badge variant="outline" className="text-xs font-mono">
+                    <div className="flex gap-2 flex-wrap">
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-200">
+                        Upcoming
+                      </Badge>
+                      {apt.status === 'confirmed' ? (
+                        <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200 border-green-200">
+                          Confirmed
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-200">
+                          Unconfirmed
+                        </Badge>
+                      )}
+                    </div>
+                    <Badge variant="outline" className="text-xs font-mono whitespace-nowrap ml-2">
                       {countdown}
                     </Badge>
                   </div>
