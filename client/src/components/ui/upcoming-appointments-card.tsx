@@ -159,10 +159,18 @@ export function UpcomingAppointmentsCard() {
           <div className="space-y-6">
             <div className="space-y-6">
               {upcomingAppointments.map((appointment) => (
-                <div
+                <button
                   key={appointment.id}
-                  className="flex items-center gap-4 cursor-pointer group"
+                  type="button"
+                  className="flex items-center gap-4 cursor-pointer group w-full text-left"
+                  aria-label={`View appointment: ${appointment.title}`}
                   onClick={() => handleViewAppointment(appointment)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleViewAppointment(appointment);
+                    }
+                  }}
                 >
                   {/* Date Box */}
                   <div className="flex flex-col items-center justify-center w-16 h-16 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-600 group-hover:border-blue-200 transition-colors">
@@ -192,7 +200,7 @@ export function UpcomingAppointmentsCard() {
                       <span className="truncate">{getCustomerName(appointment.customer)}</span>
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>

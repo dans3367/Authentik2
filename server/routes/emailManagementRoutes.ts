@@ -13,6 +13,34 @@ import { enhancedEmailService } from '../emailService';
 import crypto from 'crypto';
 import { logActivity, computeChanges } from '../utils/activityLogger';
 
+function isValidHttpUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function escapeHtml(str: string): string {
+  return str.replace(/[&<>"']/g, (c: string) => {
+    switch (c) {
+      case '&':
+        return '&amp;';
+      case '<':
+        return '&lt;';
+      case '>':
+        return '&gt;';
+      case '"':
+        return '&quot;';
+      case "'":
+        return '&#39;';
+      default:
+        return c;
+    }
+  });
+}
+
 export const emailManagementRoutes = Router();
 
 // Get email contacts
@@ -651,8 +679,8 @@ emailManagementRoutes.delete("/email-contacts", authenticateToken, requireTenant
       description: `Bulk deleted ${deletedContacts.length} contacts`,
       metadata: {
         deletedCount: deletedContacts.length,
-        deletedContactIds: deletedContacts.map(c => c.id),
-        deletedEmails: deletedContacts.map(c => c.email),
+        deletedContactIds: deletedContacts.map((c: any) => c.id),
+        deletedEmails: deletedContacts.map((c: any) => c.email),
       },
       req,
     });
@@ -1893,15 +1921,15 @@ emailManagementRoutes.put("/e-card-settings", authenticateToken, requireTenant, 
       where: sql`${eCardSettings.tenantId} = ${req.user.tenantId}`,
     });
 
-    const oldImageUrl = existingSettings?.customThemeData 
+    const oldImageUrl = existingSettings?.customThemeData
       ? (() => {
-          try {
-            const data = JSON.parse(existingSettings.customThemeData);
-            return data?.imageUrl || null;
-          } catch {
-            return null;
-          }
-        })()
+        try {
+          const data = JSON.parse(existingSettings.customThemeData);
+          return data?.imageUrl || null;
+        } catch {
+          return null;
+        }
+      })()
       : null;
 
     let updatedSettings;
@@ -2394,10 +2422,10 @@ emailManagementRoutes.post("/internal/email-activity", authenticateInternalServi
   });
 
   try {
-    const { 
-      tenantId, 
-      contactId, 
-      activityType, 
+    const {
+      tenantId,
+      contactId,
+      activityType,
       activityData,
       occurredAt,
       webhookId
@@ -2405,23 +2433,23 @@ emailManagementRoutes.post("/internal/email-activity", authenticateInternalServi
 
     // Validate required fields
     if (!tenantId || !contactId || !activityType) {
-      return res.status(400).json({ 
-        error: 'tenantId, contactId, and activityType are required' 
+      return res.status(400).json({
+        error: 'tenantId, contactId, and activityType are required'
       });
     }
 
     // Validate webhookId for idempotency
     if (!webhookId) {
-      return res.status(400).json({ 
-        error: 'webhookId is required for idempotency' 
+      return res.status(400).json({
+        error: 'webhookId is required for idempotency'
       });
     }
 
     // Validate activityType
     const validActivityTypes = ['sent', 'delivered', 'opened', 'clicked', 'bounced', 'complained', 'unsubscribed'];
     if (!validActivityTypes.includes(activityType)) {
-      return res.status(400).json({ 
-        error: `Invalid activityType. Must be one of: ${validActivityTypes.join(', ')}` 
+      return res.status(400).json({
+        error: `Invalid activityType. Must be one of: ${validActivityTypes.join(', ')}`
       });
     }
 
@@ -2446,8 +2474,8 @@ emailManagementRoutes.post("/internal/email-activity", authenticateInternalServi
       if (isFinite(parsed.getTime())) {
         validatedOccurredAt = parsed;
       } else {
-        return res.status(400).json({ 
-          error: 'Invalid occurredAt format. Must be a valid date.' 
+        return res.status(400).json({
+          error: 'Invalid occurredAt format. Must be a valid date.'
         });
       }
     }
@@ -2755,12 +2783,12 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
         // --- SPLIT EMAIL LOGIC PATCH ---
         // Check if split promotional email is enabled
         const shouldSplitEmail = settings.splitPromotionalEmail && settings.promotion;
-        
+
         console.log(`📧 [ManualBirthdayCard] Split email enabled: ${settings.splitPromotionalEmail}, Has promotion: ${!!settings.promotion}`);
-        
+
         if (shouldSplitEmail) {
           console.log(`✅ [SPLIT FLOW] Sending birthday and promo as SEPARATE emails to ${contact.email}`);
-          
+
           // Send birthday card WITHOUT promotion
           const htmlBirthday = renderBirthdayTemplate(settings.emailTemplate as any, {
             recipientName,
@@ -2791,7 +2819,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           );
 
           console.log(`✅ [SPLIT FLOW] Birthday card sent to ${contact.email}`);
-          
+
           // Log birthday card to database
           try {
             await db.insert(emailActivity).values({
@@ -2805,7 +2833,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           } catch (logError) {
             console.error(`⚠️ [SPLIT FLOW] Failed to log birthday card activity:`, logError);
           }
-          
+
           // Log to email_sends table
           try {
             const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
@@ -2825,7 +2853,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               promotionId: null,
               sentAt: new Date(),
             });
-            
+
             // Also store the content
             await db.insert(emailContent).values({
               emailSendId: emailSendId,
@@ -2842,7 +2870,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           } catch (logError) {
             console.error(`⚠️ [EmailSends] Failed to log to email_sends table:`, logError);
           }
-          
+
           // Wait 20 seconds before sending promotional email
           console.log(`⏳ [SPLIT FLOW] Waiting 20 seconds before sending promo...`);
           await new Promise(resolve => setTimeout(resolve, 20000));
@@ -2884,7 +2912,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           );
 
           console.log(`✅ [SPLIT FLOW] Promotional email sent to ${contact.email}`);
-          
+
           // Log promotional email to database
           try {
             await db.insert(emailActivity).values({
@@ -2898,7 +2926,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           } catch (logError) {
             console.error(`⚠️ [SPLIT FLOW] Failed to log promotional email activity:`, logError);
           }
-          
+
           // Log to email_sends table
           try {
             const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
@@ -2918,7 +2946,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               promotionId: settings.promotion?.id || null,
               sentAt: new Date(),
             });
-            
+
             // Also store the content
             await db.insert(emailContent).values({
               emailSendId: emailSendId,
@@ -2953,7 +2981,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               error: birthdayResult.error || 'Unknown error',
             });
           }
-          
+
           continue; // Skip to next contact
         }
         // --- END SPLIT EMAIL LOGIC ---
@@ -3006,7 +3034,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           } catch (logError) {
             console.error(`⚠️ [ManualBirthdayCard] Failed to log queued birthday card activity:`, logError);
           }
-          
+
           // Log to email_sends table
           try {
             const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
@@ -3026,7 +3054,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               promotionId: null,
               sentAt: new Date(),
             });
-            
+
             // Also store the content
             await db.insert(emailContent).values({
               emailSendId: emailSendId,
@@ -3043,7 +3071,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           } catch (logError) {
             console.error(`⚠️ [EmailSends] Failed to log to email_sends table:`, logError);
           }
-          
+
           console.log(`✅ [ManualBirthdayCard] Birthday card queued for ${contact.email}: ${result}`);
           results.push({
             contactId: contact.id,
@@ -3053,7 +3081,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           });
         } else if (result.success) {
           console.log(`✅ [ManualBirthdayCard] Birthday card sent to ${contact.email}`);
-          
+
           // Log to database
           try {
             await db.insert(emailActivity).values({
@@ -3067,7 +3095,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           } catch (logError) {
             console.error(`⚠️ [ManualBirthdayCard] Failed to log birthday card activity:`, logError);
           }
-          
+
           // Log to email_sends table
           try {
             const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
@@ -3087,7 +3115,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               promotionId: settings.promotion?.id || null,
               sentAt: new Date(),
             });
-            
+
             // Also store the content
             await db.insert(emailContent).values({
               emailSendId: emailSendId,
@@ -3473,9 +3501,25 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       logoUrl: emailDesign?.logoUrl || company?.logoUrl || null,
       headerText: emailDesign?.headerText || null,
       footerText: emailDesign?.footerText || (companyName ? `© ${new Date().getFullYear()} ${companyName}. All rights reserved.` : ''),
-      socialLinks: emailDesign?.socialLinks ? JSON.parse(emailDesign.socialLinks) : null,
+      socialLinks: null as null | {
+        facebook?: string;
+        twitter?: string;
+        instagram?: string;
+        linkedin?: string;
+      },
       displayCompanyName: emailDesign?.companyName || companyName,
     };
+
+    if (emailDesign?.socialLinks) {
+      try {
+        const parsed = JSON.parse(emailDesign.socialLinks);
+        if (parsed && typeof parsed === 'object') {
+          design.socialLinks = parsed;
+        }
+      } catch (e) {
+        console.error('[SendEmail] Failed to parse socialLinks:', e);
+      }
+    }
 
     // Generate or reuse unsubscribe token
     let unsub = await db.query.unsubscribeTokens.findFirst({
@@ -3492,41 +3536,82 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     let socialLinksHtml = '';
     if (design.socialLinks) {
       const links = [];
-      if (design.socialLinks.facebook) links.push(`<a href="${design.socialLinks.facebook}" style="color: ${design.primaryColor}; text-decoration: none; margin: 0 8px;">Facebook</a>`);
-      if (design.socialLinks.twitter) links.push(`<a href="${design.socialLinks.twitter}" style="color: ${design.primaryColor}; text-decoration: none; margin: 0 8px;">Twitter</a>`);
-      if (design.socialLinks.instagram) links.push(`<a href="${design.socialLinks.instagram}" style="color: ${design.primaryColor}; text-decoration: none; margin: 0 8px;">Instagram</a>`);
-      if (design.socialLinks.linkedin) links.push(`<a href="${design.socialLinks.linkedin}" style="color: ${design.primaryColor}; text-decoration: none; margin: 0 8px;">LinkedIn</a>`);
+      // Use gray color for social links to match management preview style
+      const linkStyle = "color: #64748b; text-decoration: none; margin: 0 10px; font-weight: 500;";
+
+      if (design.socialLinks.facebook && isValidHttpUrl(design.socialLinks.facebook)) {
+        links.push(`<a href="${escapeHtml(design.socialLinks.facebook)}" style="${linkStyle}">Facebook</a>`);
+      }
+      if (design.socialLinks.twitter && isValidHttpUrl(design.socialLinks.twitter)) {
+        links.push(`<a href="${escapeHtml(design.socialLinks.twitter)}" style="${linkStyle}">Twitter</a>`);
+      }
+      if (design.socialLinks.instagram && isValidHttpUrl(design.socialLinks.instagram)) {
+        links.push(`<a href="${escapeHtml(design.socialLinks.instagram)}" style="${linkStyle}">Instagram</a>`);
+      }
+      if (design.socialLinks.linkedin && isValidHttpUrl(design.socialLinks.linkedin)) {
+        links.push(`<a href="${escapeHtml(design.socialLinks.linkedin)}" style="${linkStyle}">LinkedIn</a>`);
+      }
+
       if (links.length > 0) {
-        socialLinksHtml = `<p style="margin: 12px 0 0; font-size: 0.75rem;">${links.join(' | ')}</p>`;
+        socialLinksHtml = `<div style="margin-bottom: 24px;">${links.join(' | ')}</div>`;
       }
     }
 
     // Format content as HTML using master email design
     const htmlContent = `
+      <!DOCTYPE html>
       <html>
-        <body style="font-family: ${design.fontFamily}; margin: 0; padding: 20px; background-color: #f7fafc;">
-          <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-            ${design.logoUrl ? `
-            <div style="padding: 20px 30px; text-align: center; border-bottom: 1px solid #e2e8f0;">
-              <img src="${design.logoUrl}" alt="${design.displayCompanyName}" style="max-height: 60px; max-width: 200px;" />
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: ${design.fontFamily}; margin: 0; padding: 0; background-color: #f7fafc; -webkit-font-smoothing: antialiased;">
+          <div style="max-width: 600px; margin: 20px auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
+            
+            <!-- Hero Header -->
+            <div style="padding: 40px 32px; text-align: center; background-color: ${design.primaryColor}; color: #ffffff;">
+              ${design.logoUrl ? `
+                <img src="${design.logoUrl}" alt="${design.displayCompanyName}" style="height: 48px; width: auto; margin-bottom: 20px; object-fit: contain;" />
+              ` : `
+                <div style="height: 48px; width: 48px; background-color: rgba(255,255,255,0.2); border-radius: 50%; margin: 0 auto 16px auto; line-height: 48px; font-size: 20px; font-weight: bold; color: #ffffff; text-align: center;">
+                  ${(design.displayCompanyName || 'C').charAt(0)}
+                </div>
+              `}
+              <h1 style="margin: 0 0 10px 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em; color: #ffffff;">
+                ${design.displayCompanyName}
+              </h1>
+              ${design.headerText ? `
+                <p style="margin: 0 auto; font-size: 16px; opacity: 0.95; max-width: 400px; line-height: 1.5; color: #ffffff;">
+                  ${design.headerText}
+                </p>
+              ` : ''}
             </div>
-            ` : ''}
-            ${design.headerText ? `
-            <div style="padding: 20px 30px; background: linear-gradient(135deg, ${design.primaryColor} 0%, ${design.secondaryColor} 100%); text-align: center;">
-              <h1 style="margin: 0; color: white; font-size: 1.25rem; font-weight: 600;">${design.headerText}</h1>
+
+            <!-- Body Content -->
+            <div style="padding: 32px 32px 40px 32px;">
+              <div style="font-size: 16px; line-height: 1.625; color: #334155;">
+                ${content.replace(/\n/g, '<br>')}
+              </div>
             </div>
-            ` : ''}
-            <div style="padding: 30px;">
-              <div style="font-size: 1rem; line-height: 1.6; color: #2d3748; white-space: pre-wrap;">${content.replace(/\n/g, '<br>')}</div>
-            </div>
-            <div style="padding: 20px 30px; background-color: #f7fafc; border-top: 1px solid #e2e8f0; text-align: center;">
-              ${design.displayCompanyName ? `<p style="margin: 0; font-size: 0.875rem; color: #718096;">Sent from ${design.displayCompanyName}</p>` : ''}
-              ${design.footerText ? `<p style="margin: 8px 0 0; font-size: 0.75rem; color: #94a3b8;">${design.footerText}</p>` : ''}
+
+            <!-- Footer -->
+            <div style="background-color: #f8fafc; padding: 32px; text-align: center; border-top: 1px solid #e2e8f0; color: #64748b;">
+              
               ${socialLinksHtml}
-              <p style="margin: 12px 0 0; font-size: 0.75rem; color: #94a3b8;">
-                <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
-              </p>
+              
+              ${design.footerText ? `
+                <p style="margin: 0 0 16px 0; font-size: 12px; line-height: 1.5; color: #64748b;">${design.footerText}</p>
+              ` : ''}
+              
+              <div style="font-size: 12px; line-height: 1.5; color: #94a3b8;">
+                <p style="margin: 0;">
+                  Sent via ${design.displayCompanyName}
+                  <br>
+                  <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
+                </p>
+              </div>
             </div>
+            
           </div>
         </body>
       </html>
