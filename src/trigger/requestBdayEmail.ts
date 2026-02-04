@@ -5,6 +5,25 @@ import { z } from "zod";
 // Initialize Resend for email sending
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+ function escapeHtml(str: string): string {
+   return str.replace(/[&<>"']/g, (char) => {
+     switch (char) {
+       case "&":
+         return "&amp;";
+       case "<":
+         return "&lt;";
+       case ">":
+         return "&gt;";
+       case '"':
+         return "&quot;";
+       case "'":
+         return "&#39;";
+       default:
+         return char;
+     }
+   });
+ }
+
 // Schema for birthday request email payload
 const requestBdayEmailPayloadSchema = z.object({
   tenantId: z.string(),
@@ -33,15 +52,20 @@ export const requestBdayEmailTask = task({
     factor: 2,
   },
   run: async (payload: RequestBdayEmailPayload) => {
-    const data = requestBdayEmailPayloadSchema.parse(payload);
+    try {
+      const data = requestBdayEmailPayloadSchema.parse(payload);
 
-    const contactName = data.contactFirstName 
-      ? `${data.contactFirstName}${data.contactLastName ? ` ${data.contactLastName}` : ''}` 
-      : 'Valued Customer';
+      const rawContactName = data.contactFirstName
+        ? `${data.contactFirstName}${data.contactLastName ? ` ${data.contactLastName}` : ""}`
+        : "Valued Customer";
+      const contactName = escapeHtml(rawContactName);
+      const tenantName = escapeHtml(data.tenantName || "The Team");
+      const profileUpdateUrlHref = escapeHtml(encodeURI(data.profileUpdateUrl));
+      const profileUpdateUrlText = escapeHtml(data.profileUpdateUrl);
 
-    const subject = `🎂 Help us celebrate your special day!`;
+      const subject = `🎂 Help us celebrate your special day!`;
 
-    const htmlContent = `
+      const htmlContent = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -68,7 +92,7 @@ export const requestBdayEmailTask = task({
           </ul>
           
           <div style="text-align: center; margin: 25px 0;">
-            <a href="${data.profileUpdateUrl}" 
+            <a href="${profileUpdateUrlHref}" 
                style="background: linear-gradient(135deg, #e91e63, #f06292); 
                       color: white; 
                       padding: 12px 30px; 
@@ -86,26 +110,25 @@ export const requestBdayEmailTask = task({
           <div style="margin-top: 20px; padding: 15px; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px;">
             <p style="margin: 0 0 10px 0; font-size: 13px; color: #666; font-weight: bold;">If the button above doesn't work, copy and paste this link into your browser:</p>
             <p style="margin: 0; word-break: break-all;">
-              <a href="${data.profileUpdateUrl}" style="color: #e91e63; text-decoration: none; font-size: 12px;">${data.profileUpdateUrl}</a>
+              <a href="${profileUpdateUrlHref}" style="color: #e91e63; text-decoration: none; font-size: 12px;">${profileUpdateUrlText}</a>
             </p>
           </div>
         </div>
         
         <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #888; text-align: center;">
-          <p style="margin: 0;">Best regards,<br>${data.tenantName || 'The Team'}</p>
+          <p style="margin: 0;">Best regards,<br>${tenantName}</p>
           <p style="margin: 10px 0 0 0;">This invitation was sent because you're a valued customer. If you'd prefer not to receive birthday-related communications, you can simply ignore this email.</p>
         </div>
       </body>
       </html>
     `;
 
-    logger.info("Sending birthday request email", {
-      contactId: data.contactId,
-      contactEmail: data.contactEmail,
-      tenantId: data.tenantId,
-    });
+      logger.info("Sending birthday request email", {
+        contactId: data.contactId,
+        contactEmail: data.contactEmail,
+        tenantId: data.tenantId,
+      });
 
-    try {
       const { data: emailData, error } = await resend.emails.send({
         from: data.fromEmail || process.env.EMAIL_FROM || "noreply@zendwise.com",
         to: data.contactEmail,
@@ -148,9 +171,9 @@ export const requestBdayEmailTask = task({
       logger.error("Exception sending birthday request email", { error: errorMessage });
       return {
         success: false,
-        contactId: data.contactId,
-        contactEmail: data.contactEmail,
-        tenantId: data.tenantId,
+        contactId: payload.contactId,
+        contactEmail: payload.contactEmail,
+        tenantId: payload.tenantId,
         error: errorMessage,
       };
     }

@@ -511,14 +511,22 @@ export async function triggerRequestBdayEmail(payload: RequestBdayEmailPayload):
     console.error(`🎂 [Trigger.dev] Failed to trigger ${taskId}:`, errorMessage);
 
     // Log failed attempt
-    await logTriggerTask({
-      taskId,
-      payload,
-      status: 'failed',
-      tenantId: payload.tenantId,
-      relatedType: 'email',
-      relatedId: payload.contactId,
-    });
+    try {
+      await logTriggerTask({
+        taskId,
+        payload,
+        status: 'failed',
+        tenantId: payload.tenantId,
+        relatedType: 'email',
+        relatedId: payload.contactId,
+      });
+    } catch (logError) {
+      const logErrorMessage = logError instanceof Error ? logError.message : "Unknown error";
+      console.error(
+        `🎂 [Trigger.dev] Failed to log failed attempt for ${taskId} (original error: ${errorMessage}):`,
+        logErrorMessage
+      );
+    }
 
     return {
       success: false,

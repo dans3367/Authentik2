@@ -2448,6 +2448,22 @@ emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken,
     });
 
     if (result.success) {
+      try {
+        await db.insert(emailActivity).values({
+          contactId: contact.id,
+          tenantId: req.user.tenantId,
+          activityType: 'sent',
+          activityData: JSON.stringify({
+            type: 'birthday_invitation',
+            runId: result.runId,
+            source: 'manual_birthday_invitation',
+          }),
+          occurredAt: new Date(),
+        });
+      } catch (logError) {
+        console.error('⚠️ [Birthday Invitation] Failed to log email activity:', logError);
+      }
+
       res.json({
         message: 'Birthday invitation queued successfully',
         runId: result.runId,
@@ -3902,9 +3918,9 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       const [insertedActivity] = await db.insert(emailActivity).values({
         contactId: contact.id,
         tenantId: tenantId,
-        activityType: 'sent',
+        activityType: 'queued',
         activityData: JSON.stringify({
-          source: 'individual_send',
+          source: 'individual_send_queued',
           sentBy: req.user.id,
           emailSubject: subject
         }),
