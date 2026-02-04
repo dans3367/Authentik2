@@ -214,6 +214,25 @@ router.post(
     try {
       const { emailTrackingId, providerMessageId, status } = req.body;
 
+      const allowedStatuses = [
+        'pending',
+        'queued',
+        'sent',
+        'delivered',
+        'bounced',
+        'failed',
+      ];
+
+      if (status !== undefined && (!status || !allowedStatuses.includes(status))) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid status value',
+          allowedStatuses,
+        });
+      }
+
+      const validatedStatus = status || 'sent';
+
       if (!emailTrackingId || !providerMessageId) {
         return res.status(400).json({
           success: false,
@@ -225,13 +244,20 @@ router.post(
 
       // Find and update the email_sends record by the email tracking ID
       const { eq } = await import('drizzle-orm');
+      const now = new Date();
+
+      const updatePayload: Record<string, unknown> = {
+        providerMessageId: providerMessageId,
+        status: validatedStatus,
+        updatedAt: now,
+      };
+
+      if (validatedStatus === 'sent') {
+        updatePayload.sentAt = now;
+      }
+
       const result = await db.update(emailSends)
-        .set({
-          providerMessageId: providerMessageId,
-          status: status || 'sent',
-          sentAt: new Date(),
-          updatedAt: new Date(),
-        })
+        .set(updatePayload)
         .where(eq(emailSends.id, emailTrackingId))
         .returning();
 

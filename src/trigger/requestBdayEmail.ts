@@ -32,7 +32,22 @@ const requestBdayEmailPayloadSchema = z.object({
   contactFirstName: z.string().nullable().optional(),
   contactLastName: z.string().nullable().optional(),
   tenantName: z.string().nullable().optional(),
-  profileUpdateUrl: z.string().url(),
+  profileUpdateUrl: z
+    .string()
+    .url()
+    .refine(
+      (val) => {
+        try {
+          const protocol = new URL(val).protocol;
+          return protocol === "http:" || protocol === "https:";
+        } catch {
+          return false;
+        }
+      },
+      {
+        message: "profileUpdateUrl must be a valid http(s) URL",
+      }
+    ),
   fromEmail: z.string().optional(),
 });
 
@@ -171,9 +186,9 @@ export const requestBdayEmailTask = task({
       logger.error("Exception sending birthday request email", { error: errorMessage });
       return {
         success: false,
-        contactId: payload.contactId,
-        contactEmail: payload.contactEmail,
-        tenantId: payload.tenantId,
+        contactId: payload?.contactId,
+        contactEmail: payload?.contactEmail,
+        tenantId: payload?.tenantId,
         error: errorMessage,
       };
     }

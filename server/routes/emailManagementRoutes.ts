@@ -41,6 +41,17 @@ function escapeHtml(str: string): string {
   });
 }
 
+function maskEmail(email: string): string {
+  const trimmed = String(email || '').trim();
+  const atIndex = trimmed.indexOf('@');
+  if (atIndex <= 0 || atIndex === trimmed.length - 1) {
+    return '***';
+  }
+  const local = trimmed.slice(0, atIndex);
+  const domain = trimmed.slice(atIndex + 1);
+  return `${local[0]}***@${domain}`;
+}
+
 type PromotionalEmailJobPayload = {
   tenantId: string;
   contactId: string;
@@ -74,7 +85,7 @@ async function enqueuePromotionalEmailJob(
       delayMs,
     });
 
-    console.log(`✅ [PromotionalEmailJob] Scheduled via Trigger.dev (ID: ${handle.id}) with ${delayMs}ms delay for ${payload.recipientEmail}`);
+    console.log(`✅ [PromotionalEmailJob] Scheduled via Trigger.dev (ID: ${handle.id}) with ${delayMs}ms delay for ${maskEmail(payload.recipientEmail)}`);
 
     // Log to trigger_tasks table for tracking
     await logTriggerTask({
@@ -1351,7 +1362,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       return res.status(404).json({ message: 'Contact not found' });
     }
 
-    console.log(`📅 [ScheduleEmail] Found contact: ${contact.email}, status: ${contact.status}`);
+    console.log(`📅 [ScheduleEmail] Found contact: ${maskEmail(String(contact.email))}, status: ${contact.status}`);
 
     if (!contact.email) {
       console.log(`📅 [ScheduleEmail] Contact ${id} has no email address`);
@@ -1360,7 +1371,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
 
     // Validate contact is active and not globally suppressed
     if (contact.status === 'unsubscribed' || contact.status === 'bounced') {
-      console.log(`📅 [ScheduleEmail] Contact ${contact.email} is ${contact.status}, cannot send email`);
+      console.log(`📅 [ScheduleEmail] Contact ${maskEmail(String(contact.email))} is ${contact.status}, cannot send email`);
       return res.status(400).json({ message: 'Contact is unsubscribed or bounced' });
     }
 
@@ -1369,7 +1380,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
     }).catch(() => null);
 
     if (suppressed) {
-      console.log(`📅 [ScheduleEmail] Contact ${contact.email} is globally suppressed/bounced`);
+      console.log(`📅 [ScheduleEmail] Contact ${maskEmail(String(contact.email))} is globally suppressed/bounced`);
       return res.status(400).json({ message: 'Email is globally suppressed/bounced' });
     }
 
@@ -1393,7 +1404,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
 
     // Schedule via Trigger.dev
     try {
-      console.log(`📅 [ScheduleEmail] Scheduling email to ${contact.email} for ${scheduleDate.toISOString()}, subject: "${subject}"`);
+      console.log(`📅 [ScheduleEmail] Scheduling email to ${maskEmail(String(contact.email))} for ${scheduleDate.toISOString()}, subject: "${subject}"`);
       const { scheduleEmailTask } = await import('../../src/trigger/email');
       const payload: Parameters<typeof scheduleEmailTask.trigger>[0] = {
         to: String(contact.email),
@@ -1409,7 +1420,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       };
       if (text) payload.text = String(text);
       const handle = await scheduleEmailTask.trigger(payload);
-      console.log(`✅ [ScheduleEmail] Email scheduled successfully for ${contact.email}, runId: ${handle.id}`);
+      console.log(`✅ [ScheduleEmail] Email scheduled successfully for ${maskEmail(String(contact.email))}, runId: ${handle.id}`);
 
       // Log scheduled activity
       try {
@@ -1431,7 +1442,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
 
       return res.status(201).json({ message: 'Email scheduled via Trigger.dev', runId: handle.id, contactId: id, scheduleAt: scheduleDate.toISOString() });
     } catch (importError) {
-      console.error(`❌ [ScheduleEmail] Failed to schedule email for ${contact.email}:`, importError);
+      console.error(`❌ [ScheduleEmail] Failed to schedule email for ${maskEmail(String(contact.email))}:`, importError);
       return res.status(503).json({ message: 'Email scheduling service unavailable' });
     }
   } catch (error) {
@@ -2430,8 +2441,12 @@ emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken,
       { expiresIn: '30d' }
     );
 
-    const profileUpdateUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/update-profile?token=${profileUpdateToken}`;
-    console.log('🔗 [Birthday Invitation] Generated URL:', profileUpdateUrl, '| BASE_URL env:', process.env.BASE_URL);
+    const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+    const profileUpdateUrl = `${baseUrl}/update-profile?token=${profileUpdateToken}`;
+    const maskedToken = profileUpdateToken.length > 8
+      ? `${profileUpdateToken.slice(0, 4)}...${profileUpdateToken.slice(-4)}`
+      : '[redacted]';
+    console.log('🔗 [Birthday Invitation] Generated profile update link:', { baseUrl, path: '/update-profile', token: maskedToken });
 
     // Trigger the birthday request email via Trigger.dev
     const { triggerRequestBdayEmail } = await import('../lib/trigger');
@@ -3718,11 +3733,11 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       });
     }
 
-    console.log(`📧 [SendEmail] Found contact: ${contact.email}, status: ${contact.status}`);
+    console.log(`📧 [SendEmail] Found contact: ${maskEmail(String(contact.email))}, status: ${contact.status}`);
 
     // Check if contact can receive emails
     if (contact.status === 'unsubscribed') {
-      console.log(`📧 [SendEmail] Contact ${contact.email} is unsubscribed, cannot send email`);
+      console.log(`📧 [SendEmail] Contact ${maskEmail(String(contact.email))} is unsubscribed, cannot send email`);
       return res.status(400).json({
         success: false,
         message: "Cannot send email to unsubscribed contact"
@@ -3730,7 +3745,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     }
 
     if (contact.status === 'bounced') {
-      console.log(`📧 [SendEmail] Contact ${contact.email} is bounced, cannot send email`);
+      console.log(`📧 [SendEmail] Contact ${maskEmail(String(contact.email))} is bounced, cannot send email`);
       return res.status(400).json({
         success: false,
         message: "Cannot send email to bounced contact"
@@ -3970,7 +3985,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
         emailType: 'individual',
         provider: 'resend',
         providerMessageId: null, // Will be updated by Trigger task with actual Resend email ID
-        status: 'queued',
+        status: 'pending',
         contactId: contact.id,
         promotionId: null,
         sentAt: null, // Not sent yet
