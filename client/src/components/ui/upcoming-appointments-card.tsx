@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { CalendarClock, ChevronRight, Calendar, Clock, MapPin, User, Mail, Timer } from "lucide-react";
+import { CalendarClock, Calendar, Clock, MapPin, User, Mail, Timer } from "lucide-react";
 import { useLocation } from "wouter";
 
 interface AppointmentCustomer {

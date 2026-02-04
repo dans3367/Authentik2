@@ -41,6 +41,102 @@ function escapeHtml(str: string): string {
   });
 }
 
+type PromotionalEmailJobPayload = {
+  tenantId: string;
+  contactId: string;
+  recipientEmail: string;
+  recipientName: string;
+  senderName: string;
+  promoSubject: string;
+  htmlPromo: string;
+  unsubscribeToken?: string;
+  promotionId?: string | null;
+  manual?: boolean;
+};
+
+function enqueuePromotionalEmailJob(payload: PromotionalEmailJobPayload, delayMs: number): void {
+  setTimeout(() => {
+    void sendPromotionalEmailJob(payload).catch((err) => {
+      console.error('❌ [PromotionalEmailJob] Failed:', err);
+    });
+  }, delayMs);
+}
+
+async function sendPromotionalEmailJob(payload: PromotionalEmailJobPayload): Promise<void> {
+  const { enhancedEmailService } = await import('../emailService');
+
+  const promoResult = await enhancedEmailService.sendCustomEmail(
+    payload.recipientEmail,
+    `🎁 ${payload.promoSubject}`,
+    payload.htmlPromo,
+    {
+      text: payload.htmlPromo.replace(/<[^>]*>/g, ''),
+      from: 'admin@zendwise.work',
+      metadata: {
+        type: 'birthday-promotion',
+        contactId: payload.contactId,
+        tenantId: payload.tenantId,
+        manual: !!payload.manual,
+        tags: ['birthday', ...(payload.manual ? ['manual'] : []), 'promotion', `tenant-${payload.tenantId}`],
+        unsubscribeToken: payload.unsubscribeToken || 'none',
+      },
+    }
+  );
+
+  try {
+    await db.insert(emailActivity).values({
+      tenantId: payload.tenantId,
+      contactId: payload.contactId,
+      activityType: 'sent',
+      activityData: JSON.stringify({
+        type: 'birthday-promotion',
+        manual: !!payload.manual,
+        split: true,
+        subject: `🎁 ${payload.promoSubject}`,
+        recipient: payload.recipientEmail,
+        from: 'admin@zendwise.work',
+      }),
+      occurredAt: new Date(),
+    });
+  } catch (logError) {
+    console.error(`⚠️ [PromotionalEmailJob] Failed to log promotional email activity:`, logError);
+  }
+
+  try {
+    const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
+    await db.insert(emailSends).values({
+      id: emailSendId,
+      tenantId: payload.tenantId,
+      recipientEmail: payload.recipientEmail,
+      recipientName: payload.recipientName,
+      senderEmail: 'admin@zendwise.work',
+      senderName: payload.senderName,
+      subject: `🎁 ${payload.promoSubject}`,
+      emailType: 'birthday_promotion',
+      provider: 'resend',
+      providerMessageId: typeof promoResult === 'string' ? promoResult : promoResult.messageId,
+      status: 'sent',
+      contactId: payload.contactId,
+      promotionId: payload.promotionId || null,
+      sentAt: new Date(),
+    });
+
+    await db.insert(emailContent).values({
+      emailSendId: emailSendId,
+      htmlContent: payload.htmlPromo,
+      textContent: payload.htmlPromo.replace(/<[^>]*>/g, ''),
+      metadata: JSON.stringify({
+        split: true,
+        manual: !!payload.manual,
+        birthdayCard: false,
+        promotional: true,
+      }),
+    });
+  } catch (logError) {
+    console.error(`⚠️ [PromotionalEmailJob] Failed to log to email_sends/email_content table:`, logError);
+  }
+}
+
 export const emailManagementRoutes = Router();
 
 // Get email contacts
@@ -680,7 +776,6 @@ emailManagementRoutes.delete("/email-contacts", authenticateToken, requireTenant
       metadata: {
         deletedCount: deletedContacts.length,
         deletedContactIds: deletedContacts.map((c: any) => c.id),
-        deletedEmails: deletedContacts.map((c: any) => c.email),
       },
       req,
     });
@@ -2063,26 +2158,46 @@ emailManagementRoutes.put("/master-email-design", authenticateToken, requireTena
 
     let updatedDesign;
 
-    // Prepare social links for storage
-    const socialLinksStr = socialLinks
-      ? (typeof socialLinks === 'string' ? socialLinks : JSON.stringify(socialLinks))
-      : null;
+    const hasSocialLinks = Object.prototype.hasOwnProperty.call(req.body, 'socialLinks');
+    let socialLinksStr: string | null | undefined;
+
+    if (hasSocialLinks) {
+      if (socialLinks === null) {
+        socialLinksStr = null;
+      } else if (typeof socialLinks === 'string') {
+        try {
+          JSON.parse(socialLinks);
+        } catch (e) {
+          return res.status(400).json({ message: 'Invalid socialLinks JSON' });
+        }
+        socialLinksStr = socialLinks;
+      } else if (typeof socialLinks === 'object') {
+        socialLinksStr = JSON.stringify(socialLinks);
+      } else {
+        return res.status(400).json({ message: 'Invalid socialLinks type' });
+      }
+    }
 
     if (existingDesign) {
       // Update existing design
+      const updateSet: Record<string, unknown> = {
+        companyName: companyName ?? existingDesign.companyName,
+        logoUrl: logoUrl !== undefined ? logoUrl : existingDesign.logoUrl,
+        primaryColor: primaryColor ?? existingDesign.primaryColor,
+        secondaryColor: secondaryColor ?? existingDesign.secondaryColor,
+        accentColor: accentColor ?? existingDesign.accentColor,
+        fontFamily: fontFamily ?? existingDesign.fontFamily,
+        headerText: headerText !== undefined ? headerText : existingDesign.headerText,
+        footerText: footerText !== undefined ? footerText : existingDesign.footerText,
+        updatedAt: new Date(),
+      };
+
+      if (hasSocialLinks) {
+        updateSet.socialLinks = socialLinksStr;
+      }
+
       updatedDesign = await db.update(masterEmailDesign)
-        .set({
-          companyName: companyName ?? existingDesign.companyName,
-          logoUrl: logoUrl !== undefined ? logoUrl : existingDesign.logoUrl,
-          primaryColor: primaryColor ?? existingDesign.primaryColor,
-          secondaryColor: secondaryColor ?? existingDesign.secondaryColor,
-          accentColor: accentColor ?? existingDesign.accentColor,
-          fontFamily: fontFamily ?? existingDesign.fontFamily,
-          headerText: headerText !== undefined ? headerText : existingDesign.headerText,
-          footerText: footerText !== undefined ? footerText : existingDesign.footerText,
-          socialLinks: socialLinksStr !== undefined ? socialLinksStr : existingDesign.socialLinks,
-          updatedAt: new Date(),
-        })
+        .set(updateSet)
         .where(sql`${masterEmailDesign.tenantId} = ${req.user.tenantId}`)
         .returning();
     } else {
@@ -2098,7 +2213,7 @@ emailManagementRoutes.put("/master-email-design", authenticateToken, requireTena
           fontFamily: fontFamily || 'Arial, sans-serif',
           headerText: headerText || null,
           footerText: footerText || null,
-          socialLinks: socialLinksStr,
+          socialLinks: hasSocialLinks ? socialLinksStr : null,
         })
         .returning();
     }
@@ -2872,10 +2987,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           }
 
           // Wait 20 seconds before sending promotional email
-          console.log(`⏳ [SPLIT FLOW] Waiting 20 seconds before sending promo...`);
-          await new Promise(resolve => setTimeout(resolve, 20000));
-
-          // Send promotional email separately
+          // Send promotional email separately (queued)
           const promoSubject = settings.promotion.title || 'Special Birthday Offer!';
           const htmlPromo = `
             <html>
@@ -2893,76 +3005,22 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
             </html>
           `;
 
-          const promoResult = await enhancedEmailService.sendCustomEmail(
-            contact.email,
-            `🎁 ${promoSubject}`,
-            htmlPromo,
+          console.log(`⏳ [SPLIT FLOW] Queuing promotional email job (20s delay) for ${contact.email}`);
+          enqueuePromotionalEmailJob(
             {
-              text: htmlPromo.replace(/<[^>]*>/g, ''),
-              from: 'admin@zendwise.work',
-              metadata: {
-                type: 'birthday-promotion',
-                contactId: contact.id,
-                tenantId: tenantId,
-                manual: true,
-                tags: ['birthday', 'manual', 'promotion', `tenant-${tenantId}`],
-                unsubscribeToken: unsubscribeToken || 'none',
-              },
-            }
-          );
-
-          console.log(`✅ [SPLIT FLOW] Promotional email sent to ${contact.email}`);
-
-          // Log promotional email to database
-          try {
-            await db.insert(emailActivity).values({
-              tenantId: tenantId,
+              tenantId,
               contactId: contact.id,
-              activityType: 'sent',
-              activityData: JSON.stringify({ type: 'birthday-promotion', manual: true, split: true, subject: `🎁 ${promoSubject}`, recipient: contact.email, from: 'admin@zendwise.work' }),
-              occurredAt: new Date(),
-            });
-            console.log(`📝 [SPLIT FLOW] Logged promotional email activity for ${contact.email}`);
-          } catch (logError) {
-            console.error(`⚠️ [SPLIT FLOW] Failed to log promotional email activity:`, logError);
-          }
-
-          // Log to email_sends table
-          try {
-            const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
-            await db.insert(emailSends).values({
-              id: emailSendId,
-              tenantId: tenantId,
               recipientEmail: contact.email,
-              recipientName: recipientName,
-              senderEmail: 'admin@zendwise.work',
+              recipientName,
               senderName: resolvedSenderName,
-              subject: `🎁 ${settings.promotion?.title || 'Special Birthday Offer!'}`,
-              emailType: 'birthday_promotion',
-              provider: 'resend',
-              providerMessageId: typeof promoResult === 'string' ? promoResult : promoResult.messageId,
-              status: 'sent',
-              contactId: contact.id,
+              promoSubject,
+              htmlPromo,
+              unsubscribeToken,
               promotionId: settings.promotion?.id || null,
-              sentAt: new Date(),
-            });
-
-            // Also store the content
-            await db.insert(emailContent).values({
-              emailSendId: emailSendId,
-              htmlContent: htmlPromo,
-              textContent: htmlPromo.replace(/<[^>]*>/g, ''),
-              metadata: JSON.stringify({
-                split: true,
-                manual: true,
-                birthdayCard: false,
-                promotional: true
-              })
-            });
-            console.log(`📧 [EmailSends] Logged promotional email to email_sends for ${contact.email}`);
-          } catch (logError) {
-            console.error(`⚠️ [EmailSends] Failed to log to email_sends table:`, logError);
-          }
+              manual: true,
+            },
+            20000
+          );
 
           // Record both emails as success
           if (typeof birthdayResult === 'string' || (birthdayResult && birthdayResult.success)) {
@@ -2971,7 +3029,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               email: contact.email,
               success: true,
               messageId: typeof birthdayResult === 'string' ? birthdayResult : birthdayResult.messageId,
-              note: 'Split email: Birthday and promotion sent separately',
+              note: 'Split email: Birthday sent, promotion queued',
             });
           } else {
             results.push({
