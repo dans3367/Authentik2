@@ -1333,8 +1333,12 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
   try {
     const { id } = req.params;
     const { subject, html, text, scheduleAt } = req.body || {};
+    const tenantId = req.user.tenantId;
+
+    console.log(`📅 [ScheduleEmail] Starting email schedule request for contact ${id}, tenant ${tenantId}`);
 
     if (!subject || !html || !scheduleAt) {
+      console.log(`📅 [ScheduleEmail] Validation failed: missing required fields`);
       return res.status(400).json({ message: 'subject, html and scheduleAt are required' });
     }
 
@@ -1343,15 +1347,20 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
     });
 
     if (!contact) {
+      console.log(`📅 [ScheduleEmail] Contact ${id} not found`);
       return res.status(404).json({ message: 'Contact not found' });
     }
 
+    console.log(`📅 [ScheduleEmail] Found contact: ${contact.email}, status: ${contact.status}`);
+
     if (!contact.email) {
+      console.log(`📅 [ScheduleEmail] Contact ${id} has no email address`);
       return res.status(400).json({ message: 'Contact email is missing' });
     }
 
     // Validate contact is active and not globally suppressed
     if (contact.status === 'unsubscribed' || contact.status === 'bounced') {
+      console.log(`📅 [ScheduleEmail] Contact ${contact.email} is ${contact.status}, cannot send email`);
       return res.status(400).json({ message: 'Contact is unsubscribed or bounced' });
     }
 
@@ -1360,6 +1369,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
     }).catch(() => null);
 
     if (suppressed) {
+      console.log(`📅 [ScheduleEmail] Contact ${contact.email} is globally suppressed/bounced`);
       return res.status(400).json({ message: 'Email is globally suppressed/bounced' });
     }
 
@@ -1383,6 +1393,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
 
     // Schedule via Trigger.dev
     try {
+      console.log(`📅 [ScheduleEmail] Scheduling email to ${contact.email} for ${scheduleDate.toISOString()}, subject: "${subject}"`);
       const { scheduleEmailTask } = await import('../../src/trigger/email');
       const payload: Parameters<typeof scheduleEmailTask.trigger>[0] = {
         to: String(contact.email),
@@ -1398,13 +1409,33 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       };
       if (text) payload.text = String(text);
       const handle = await scheduleEmailTask.trigger(payload);
+      console.log(`✅ [ScheduleEmail] Email scheduled successfully for ${contact.email}, runId: ${handle.id}`);
+
+      // Log scheduled activity
+      try {
+        await db.insert(emailActivity).values({
+          tenantId: req.user.tenantId,
+          contactId: id,
+          activityType: 'scheduled',
+          activityData: JSON.stringify({
+            subject: sanitizeString(String(subject)) || 'No Subject',
+            scheduledFor: scheduleDate.toISOString(),
+            scheduledBy: req.user.id,
+            runId: handle.id
+          }),
+          occurredAt: new Date(),
+        });
+      } catch (logError) {
+        console.error(`⚠️ [ScheduleEmail] Failed to log scheduled activity:`, logError);
+      }
+
       return res.status(201).json({ message: 'Email scheduled via Trigger.dev', runId: handle.id, contactId: id, scheduleAt: scheduleDate.toISOString() });
     } catch (importError) {
-      console.error('Failed to import or trigger email task:', importError);
+      console.error(`❌ [ScheduleEmail] Failed to schedule email for ${contact.email}:`, importError);
       return res.status(503).json({ message: 'Email scheduling service unavailable' });
     }
   } catch (error) {
-    console.error('Schedule single contact email error:', error);
+    console.error('❌ [ScheduleEmail] Schedule single contact email error:', error);
     res.status(500).json({ message: 'Failed to schedule email' });
   }
 });
@@ -2348,7 +2379,7 @@ emailManagementRoutes.put("/master-email-design", authenticateToken, requireTena
   }
 });
 
-// Send birthday invitation email to a contact
+// Send birthday invitation email to a contact via Trigger.dev
 emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { contactId } = req.params;
@@ -2386,91 +2417,28 @@ emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken,
     const profileUpdateUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/update-profile?token=${profileUpdateToken}`;
     console.log('🔗 [Birthday Invitation] Generated URL:', profileUpdateUrl, '| BASE_URL env:', process.env.BASE_URL);
 
-    // Create email content
-    const contactName = contact.firstName ? `${contact.firstName}${contact.lastName ? ` ${contact.lastName}` : ''}` : 'Valued Customer';
-    const subject = `🎂 Help us celebrate your special day!`;
+    // Trigger the birthday request email via Trigger.dev
+    const { triggerRequestBdayEmail } = await import('../lib/trigger');
 
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <title>Birthday Information Request</title>
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #e91e63; margin: 0;">🎂 Birthday Celebration!</h1>
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 25px; border-radius: 8px; margin-bottom: 20px;">
-          <p style="margin: 0 0 15px 0; font-size: 16px;">Hi ${contactName},</p>
-          
-          <p style="margin: 0 0 15px 0;">We'd love to make your birthday extra special! To ensure you don't miss out on exclusive birthday promotions, special offers, and personalized birthday surprises, we'd like to add your birthday to our records.</p>
-          
-          <p style="margin: 0 0 20px 0;">By sharing your birthday with us, you'll receive:</p>
-          
-          <ul style="margin: 0 0 20px 20px; padding: 0;">
-            <li>🎁 Exclusive birthday discounts and offers</li>
-            <li>🎉 Special birthday promotions</li>
-            <li>📧 Personalized birthday messages</li>
-            <li>🌟 Early access to birthday-themed content</li>
-          </ul>
-          
-          <div style="text-align: center; margin: 25px 0;">
-            <a href="${profileUpdateUrl}" 
-               style="background: linear-gradient(135deg, #e91e63, #f06292); 
-                      color: white; 
-                      padding: 12px 30px; 
-                      text-decoration: none; 
-                      border-radius: 25px; 
-                      font-weight: bold; 
-                      display: inline-block; 
-                      box-shadow: 0 4px 8px rgba(233, 30, 99, 0.3);">
-              🎂 Add My Birthday
-            </a>
-          </div>
-          
-          <p style="margin: 15px 0 0 0; font-size: 14px; color: #666;">This link will expire in 30 days. Your privacy is important to us - we'll only use your birthday to send you special offers and birthday wishes.</p>
-          
-          <div style="margin-top: 20px; padding: 15px; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px;">
-            <p style="margin: 0 0 10px 0; font-size: 13px; color: #666; font-weight: bold;">If the button above doesn't work, copy and paste this link into your browser:</p>
-            <p style="margin: 0; word-break: break-all;">
-              <a href="${profileUpdateUrl}" style="color: #e91e63; text-decoration: none; font-size: 12px;">${profileUpdateUrl}</a>
-            </p>
-          </div>
-        </div>
-        
-        <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #888; text-align: center;">
-          <p style="margin: 0;">Best regards,<br>${tenant.name || 'The Team'}</p>
-          <p style="margin: 10px 0 0 0;">This invitation was sent because you're a valued customer. If you'd prefer not to receive birthday-related communications, you can simply ignore this email.</p>
-        </div>
-      </body>
-      </html>
-    `;
+    const result = await triggerRequestBdayEmail({
+      tenantId: req.user.tenantId,
+      contactId: contact.id,
+      contactEmail: contact.email,
+      contactFirstName: contact.firstName,
+      contactLastName: contact.lastName,
+      tenantName: tenant.name,
+      profileUpdateUrl,
+      fromEmail: 'admin@zendwise.com',
+    });
 
-    // Send the email using the email service
-    const { enhancedEmailService } = await import('../emailService');
-
-    const result = await enhancedEmailService.sendCustomEmail(
-      contact.email,
-      subject,
-      htmlContent,
-      {
-        metadata: {
-          type: 'birthday_invitation',
-          contactId: contact.id,
-          tenantId: req.user.tenantId
-        }
-      }
-    );
-
-    if (typeof result === 'object' && 'success' in result && result.success) {
+    if (result.success) {
       res.json({
-        message: 'Birthday invitation sent successfully',
-        messageId: result.messageId
+        message: 'Birthday invitation queued successfully',
+        runId: result.runId,
+        taskLogId: result.taskLogId,
       });
     } else {
-      throw new Error('Failed to send email');
+      throw new Error(result.error || 'Failed to queue birthday invitation email');
     }
 
   } catch (error) {
@@ -3689,8 +3657,11 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     const { subject, content } = req.body;
     const tenantId = req.user.tenantId;
 
+    console.log(`📧 [SendEmail] Starting individual email send for contact ${id}, tenant ${tenantId}`);
+
     // Validate input
     if (!subject || !content) {
+      console.log(`📧 [SendEmail] Validation failed: missing subject or content`);
       return res.status(400).json({
         message: 'Subject and content are required'
       });
@@ -3708,14 +3679,18 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     });
 
     if (!contact) {
+      console.log(`📧 [SendEmail] Contact ${id} not found`);
       return res.status(404).json({
         success: false,
         message: "Contact not found"
       });
     }
 
+    console.log(`📧 [SendEmail] Found contact: ${contact.email}, status: ${contact.status}`);
+
     // Check if contact can receive emails
     if (contact.status === 'unsubscribed') {
+      console.log(`📧 [SendEmail] Contact ${contact.email} is unsubscribed, cannot send email`);
       return res.status(400).json({
         success: false,
         message: "Cannot send email to unsubscribed contact"
@@ -3723,6 +3698,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     }
 
     if (contact.status === 'bounced') {
+      console.log(`📧 [SendEmail] Contact ${contact.email} is bounced, cannot send email`);
       return res.status(400).json({
         success: false,
         message: "Cannot send email to bounced contact"
@@ -3902,17 +3878,22 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     }
 
     // Log email activity
-    await db.insert(emailActivity).values({
-      contactId: contact.id,
-      tenantId: tenantId,
-      activityType: 'sent',
-      activityData: JSON.stringify({
-        source: 'individual_send',
-        sentBy: req.user.id,
-        emailSubject: subject
-      }),
-      occurredAt: new Date(),
-    });
+    try {
+      await db.insert(emailActivity).values({
+        contactId: contact.id,
+        tenantId: tenantId,
+        activityType: 'sent',
+        activityData: JSON.stringify({
+          source: 'individual_send',
+          sentBy: req.user.id,
+          emailSubject: subject
+        }),
+        occurredAt: new Date(),
+      });
+      console.log(`📝 [SendEmail] Logged email activity for ${contact.email}`);
+    } catch (activityLogError) {
+      console.error(`⚠️ [SendEmail] Failed to log email activity:`, activityLogError);
+    }
 
     // Log to email_sends table for limit tracking
     try {
@@ -3933,6 +3914,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
         promotionId: null,
         sentAt: null, // Not sent yet
       });
+      console.log(`📧 [SendEmail] Logged to email_sends table for ${contact.email}`);
     } catch (logError) {
       console.error(`⚠️ [SendEmail] Failed to log to email_sends table:`, logError);
     }
@@ -3945,13 +3927,15 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       })
       .where(eq(emailContacts.id, contact.id));
 
+    console.log(`✅ [SendEmail] Email queued successfully for ${contact.email}, subject: "${subject}", runId: ${result?.runId}`);
+
     res.json({
       success: true,
       message: "Email sent successfully",
       result
     });
   } catch (error: any) {
-    console.error('[EmailManagementRoutes] Send individual email error:', error);
+    console.error(`❌ [SendEmail] Send individual email error:`, error);
     res.status(500).json({
       success: false,
       message: error.message || "Failed to send email"

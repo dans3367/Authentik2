@@ -5,6 +5,7 @@ import { triggerTasks, type TriggerTaskStatus, type TriggerTaskRelatedType } fro
 import { eq } from 'drizzle-orm';
 import type { sendReminderTask, scheduleReminderTask, sendBulkRemindersTask, ReminderPayload } from "../../src/trigger/reminders";
 import type { sendRescheduleEmailTask, RescheduleEmailPayload } from "../../src/trigger/appointmentRescheduleEmail";
+import type { requestBdayEmailTask, RequestBdayEmailPayload } from "../../src/trigger/requestBdayEmail";
 
 /**
  * Log a task to the trigger_tasks table for local tracking
@@ -462,6 +463,61 @@ export async function triggerRescheduleEmail(payload: RescheduleEmailPayload): P
       tenantId: payload.tenantId,
       relatedType: 'email',
       relatedId: payload.appointmentId,
+    });
+
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+}
+
+/**
+ * Trigger a birthday request email via Trigger.dev
+ * Sends an email asking the customer to provide their birthday
+ */
+export async function triggerRequestBdayEmail(payload: RequestBdayEmailPayload): Promise<{
+  success: boolean;
+  runId?: string;
+  taskLogId?: string;
+  error?: string;
+}> {
+  const taskId = "request-bday-email";
+  let taskLogId: string | null = null;
+
+  try {
+    const handle = await tasks.trigger<typeof requestBdayEmailTask>(taskId, payload);
+
+    console.log(`🎂 [Trigger.dev] Triggered ${taskId}, runId: ${handle.id}`);
+
+    // Log to trigger_tasks table
+    taskLogId = await logTriggerTask({
+      taskId,
+      runId: handle.id,
+      payload,
+      status: 'triggered',
+      tenantId: payload.tenantId,
+      relatedType: 'email',
+      relatedId: payload.contactId,
+    });
+
+    return {
+      success: true,
+      runId: handle.id,
+      taskLogId: taskLogId || undefined,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error(`🎂 [Trigger.dev] Failed to trigger ${taskId}:`, errorMessage);
+
+    // Log failed attempt
+    await logTriggerTask({
+      taskId,
+      payload,
+      status: 'failed',
+      tenantId: payload.tenantId,
+      relatedType: 'email',
+      relatedId: payload.contactId,
     });
 
     return {
