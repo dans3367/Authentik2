@@ -3566,7 +3566,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
         </head>
         <body style="font-family: ${design.fontFamily}; margin: 0; padding: 0; background-color: #f7fafc; -webkit-font-smoothing: antialiased;">
-          <div style="max-width: 600px; margin: 20px auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
+          <div style="max-width: 600px; margin: 0 auto; background: white;">
             
             <!-- Hero Header -->
             <div style="padding: 40px 32px; text-align: center; background-color: ${design.primaryColor}; color: #ffffff;">
