@@ -20,15 +20,16 @@ import {
   newsletterTaskStatus,
   campaigns,
   emailActivity,
+  emailSends,
   bouncedEmails,
-  type User, 
-  type InsertUser, 
-  type UserFilters, 
-  type CreateUserData, 
-  type UpdateUserData, 
-  type SubscriptionPlan, 
-  type InsertSubscriptionPlan, 
-  type Subscription, 
+  type User,
+  type InsertUser,
+  type UserFilters,
+  type CreateUserData,
+  type UpdateUserData,
+  type SubscriptionPlan,
+  type InsertSubscriptionPlan,
+  type Subscription,
   type InsertSubscription,
   type Tenant,
   type InsertTenant,
@@ -111,22 +112,22 @@ export interface IStorage {
   getTenantBySlug(slug: string): Promise<Tenant | undefined>;
   createTenant(tenant: CreateTenantData): Promise<Tenant>;
   updateTenant(id: string, updates: UpdateTenantData): Promise<Tenant | undefined>;
-  
+
   // Owner and tenant creation
   createOwnerAndTenant(ownerData: RegisterOwnerData): Promise<{ owner: User; tenant: Tenant }>;
-  
+
   // Tenant owner management
   getTenantOwner(tenantId: string): Promise<User | undefined>;
-  
+
   // Cross-tenant user lookup
   findUserByEmailAcrossTenants(email: string): Promise<(User & { tenant: { id: string; name: string; slug: string } }) | undefined>;
-  
+
   // User management
   getUser(id: string, tenantId: string): Promise<User | undefined>;
   getUserByEmail(email: string, tenantId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<User>, tenantId: string): Promise<User | undefined>;
-  
+
   // Admin user management
   getAllUsers(tenantId: string, filters?: UserFilters): Promise<User[]>;
   getUserStats(tenantId: string): Promise<{ totalUsers: number; activeUsers: number; usersByRole: Record<string, number> }>;
@@ -135,13 +136,13 @@ export interface IStorage {
   deleteUser(id: string, tenantId: string): Promise<void>;
   toggleUserStatus(id: string, isActive: boolean, tenantId: string): Promise<User | undefined>;
   getManagerUsers(tenantId: string): Promise<User[]>;
-  
+
   // Email verification
   setEmailVerificationToken(userId: string, tenantId: string, token: string, expiresAt: Date): Promise<void>;
   getUserByEmailVerificationToken(token: string, tenantId?: string): Promise<User | undefined>;
   verifyUserEmail(userId: string, tenantId: string): Promise<void>;
   updateLastVerificationEmailSent(userId: string, tenantId: string): Promise<void>;
-  
+
   // Form management
   createForm(formData: CreateFormData, userId: string, tenantId: string): Promise<Form>;
   getForm(id: string, tenantId: string): Promise<Form | undefined>;
@@ -150,24 +151,24 @@ export interface IStorage {
   getTenantForms(tenantId: string): Promise<FormWithDetails[]>;
   updateForm(id: string, updates: UpdateFormData, tenantId: string): Promise<Form | undefined>;
   deleteForm(id: string, tenantId: string): Promise<void>;
-  
+
   // Form response management
   submitFormResponse(responseData: SubmitFormResponseData, tenantId: string): Promise<FormResponse>;
   getFormResponses(formId: string, tenantId: string): Promise<FormResponse[]>;
   getFormResponseCount(formId: string, tenantId: string): Promise<number>;
-  
+
   // Subscription plan management
   getSubscriptionPlans(): Promise<SubscriptionPlan[]>;
   getSubscriptionPlan(id: string): Promise<SubscriptionPlan | undefined>;
   createSubscriptionPlan(plan: InsertSubscriptionPlan): Promise<SubscriptionPlan>;
-  
+
   // Subscription management
   createSubscription(subscription: InsertSubscription): Promise<Subscription>;
   getSubscription(id: string, tenantId?: string): Promise<Subscription | undefined>;
   getUserSubscription(userId: string, tenantId: string): Promise<Subscription | undefined>;
   updateSubscription(id: string, updates: Partial<Subscription>, tenantId?: string): Promise<Subscription | undefined>;
   updateUserStripeInfo(userId: string, stripeCustomerId: string, stripeSubscriptionId: string, tenantId: string): Promise<void>;
-  
+
   // Tenant subscription and limits
   getTenantSubscription(tenantId: string): Promise<(Subscription & { plan: SubscriptionPlan }) | undefined>;
   checkUserLimits(tenantId: string): Promise<{ canAddUser: boolean; currentUsers: number; maxUsers: number | null; planName: string }>;
@@ -181,7 +182,11 @@ export interface IStorage {
   deleteTenantLimits(tenantId: string): Promise<void>;
   getCurrentShopCount(tenantId: string): Promise<number>;
   getShopLimitEvents(tenantId: string, filters?: ShopLimitFilters): Promise<ShopLimitEvent[]>;
-  
+
+  // Email limits
+  checkEmailLimits(tenantId: string): Promise<{ canSend: boolean; currentUsage: number; monthlyLimit: number | null; planName: string; remaining: number | null }>;
+  validateEmailSending(tenantId: string, count?: number): Promise<void>;
+
   // Shop management
   getShop(id: string, tenantId: string): Promise<Shop | undefined>;
   getShopWithManager(id: string, tenantId: string): Promise<ShopWithManager | undefined>;
@@ -191,7 +196,7 @@ export interface IStorage {
   updateShop(id: string, updates: UpdateShopData, tenantId: string): Promise<Shop | undefined>;
   deleteShop(id: string, tenantId: string): Promise<void>;
   toggleShopStatus(id: string, isActive: boolean, tenantId: string): Promise<Shop | undefined>;
-  
+
   // Email contact management
   getEmailContact(id: string, tenantId: string): Promise<EmailContact | undefined>;
   getEmailContactWithDetails(id: string, tenantId: string): Promise<EmailContactWithDetails | undefined>;
@@ -200,33 +205,33 @@ export interface IStorage {
   updateEmailContact(id: string, updates: UpdateEmailContactData, tenantId: string): Promise<EmailContact | undefined>;
   deleteEmailContact(id: string, tenantId: string): Promise<void>;
   bulkDeleteEmailContacts(ids: string[], tenantId: string): Promise<void>;
-  
+
   // Email list management
   getEmailList(id: string, tenantId: string): Promise<EmailList | undefined>;
   getAllEmailLists(tenantId: string): Promise<EmailListWithCount[]>;
   createEmailList(list: CreateEmailListData, tenantId: string): Promise<EmailList>;
   updateEmailList(id: string, name: string, description: string | undefined, tenantId: string): Promise<EmailList | undefined>;
   deleteEmailList(id: string, tenantId: string): Promise<void>;
-  
+
   // Contact tag management
   getContactTag(id: string, tenantId: string): Promise<ContactTag | undefined>;
   getAllContactTags(tenantId: string): Promise<ContactTag[]>;
   createContactTag(tag: CreateContactTagData, tenantId: string): Promise<ContactTag>;
   updateContactTag(id: string, name: string, color: string, tenantId: string): Promise<ContactTag | undefined>;
   deleteContactTag(id: string, tenantId: string): Promise<void>;
-  
+
   // Contact list membership
   addContactToList(contactId: string, listId: string, tenantId: string): Promise<void>;
   removeContactFromList(contactId: string, listId: string, tenantId: string): Promise<void>;
   getContactLists(contactId: string, tenantId: string): Promise<EmailList[]>;
   bulkAddContactsToList(contactIds: string[], listId: string, tenantId: string): Promise<void>;
-  
+
   // Contact tag assignment
   addTagToContact(contactId: string, tagId: string, tenantId: string): Promise<void>;
   removeTagFromContact(contactId: string, tagId: string, tenantId: string): Promise<void>;
   getContactTags(contactId: string, tenantId: string): Promise<ContactTag[]>;
   bulkAddTagToContacts(contactIds: string[], tagId: string, tenantId: string): Promise<void>;
-  
+
   // Statistics
   getEmailContactStats(tenantId: string): Promise<{
     totalContacts: number;
@@ -238,7 +243,7 @@ export interface IStorage {
     averageEngagementRate: number;
   }>;
   getShopStats(tenantId: string): Promise<{ totalShops: number; activeShops: number; shopsByCategory: Record<string, number> }>;
-  
+
   // Newsletter management
   getNewsletter(id: string, tenantId: string): Promise<Newsletter | undefined>;
   getNewsletterById(id: string): Promise<Newsletter | undefined>;
@@ -254,14 +259,14 @@ export interface IStorage {
     scheduledNewsletters: number;
     sentNewsletters: number;
   }>;
-  
+
   // Newsletter task status
   getNewsletterTaskStatuses(newsletterId: string, tenantId: string): Promise<NewsletterTaskStatus[]>;
   createNewsletterTaskStatus(newsletterId: string, taskData: CreateNewsletterTaskStatusData, tenantId: string): Promise<NewsletterTaskStatus>;
   updateNewsletterTaskStatus(id: string, updates: UpdateNewsletterTaskStatusData, tenantId: string): Promise<NewsletterTaskStatus | undefined>;
   deleteNewsletterTaskStatus(id: string, tenantId: string): Promise<void>;
   initializeNewsletterTasks(newsletterId: string, tenantId: string): Promise<NewsletterTaskStatus[]>;
-  
+
   // Campaign management
   getCampaign(id: string, tenantId: string): Promise<Campaign | undefined>;
   getAllCampaigns(tenantId: string): Promise<Campaign[]>;
@@ -274,7 +279,7 @@ export interface IStorage {
     draftCampaigns: number;
     completedCampaigns: number;
   }>;
-  
+
   // Email activity tracking
   createEmailActivity(activityData: CreateEmailActivityData, tenantId: string): Promise<EmailActivity>;
   getEmailActivity(id: string, tenantId: string): Promise<EmailActivity | undefined>;
@@ -282,7 +287,7 @@ export interface IStorage {
   getActivityByWebhookId(webhookId: string, tenantId: string): Promise<EmailActivity | undefined>;
   hasContactOpenedNewsletter(contactId: string, newsletterId: string, tenantId: string): Promise<boolean>;
   findEmailContactByEmail(email: string): Promise<{ contact: EmailContact; tenantId: string } | undefined>;
-  
+
   // Bounced email management
   addBouncedEmail(bouncedEmailData: CreateBouncedEmailData): Promise<BouncedEmail>;
   updateBouncedEmail(email: string, updates: UpdateBouncedEmailData): Promise<BouncedEmail | undefined>;
@@ -292,7 +297,7 @@ export interface IStorage {
   removeBouncedEmail(email: string): Promise<void>;
   getBouncedEmailAddresses(): Promise<string[]>;
   incrementBounceCount(email: string, lastBouncedAt: Date, bounceReason?: string): Promise<BouncedEmail | undefined>;
-  
+
   // Promotion management
   getPromotion(id: string, tenantId: string): Promise<Promotion | undefined>;
   getAllPromotions(tenantId: string): Promise<Promotion[]>;
@@ -340,7 +345,7 @@ export class DatabaseStorage implements IStorage {
 
   // Owner and tenant creation
   async createOwnerAndTenant(ownerData: RegisterOwnerData): Promise<{ owner: User; tenant: Tenant }> {
-    return await db.transaction(async (tx) => {
+    return await db.transaction(async (tx: any) => {
       // Create the tenant first
       const [tenant] = await tx.insert(tenants).values({
         name: ownerData.organizationName,
@@ -350,8 +355,8 @@ export class DatabaseStorage implements IStorage {
       }).returning();
 
       // Create the owner user
-      const name = ownerData.firstName && ownerData.lastName 
-        ? `${ownerData.firstName} ${ownerData.lastName}` 
+      const name = ownerData.firstName && ownerData.lastName
+        ? `${ownerData.firstName} ${ownerData.lastName}`
         : ownerData.firstName || ownerData.lastName || ownerData.email;
 
       const [owner] = await tx.insert(betterAuthUser).values({
@@ -426,9 +431,9 @@ export class DatabaseStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     // Construct name from firstName and lastName if not provided
-    const name = insertUser.name || 
-      (insertUser.firstName && insertUser.lastName 
-        ? `${insertUser.firstName} ${insertUser.lastName}` 
+    const name = insertUser.name ||
+      (insertUser.firstName && insertUser.lastName
+        ? `${insertUser.firstName} ${insertUser.lastName}`
         : insertUser.firstName || insertUser.lastName || insertUser.email);
 
     const [user] = await db
@@ -474,13 +479,13 @@ export class DatabaseStorage implements IStorage {
     }
 
     const whereClause = and(...conditions);
-    
+
     const result = await db
       .select()
       .from(betterAuthUser)
       .where(whereClause)
       .orderBy(desc(betterAuthUser.createdAt));
-    
+
     return result;
   }
 
@@ -491,9 +496,9 @@ export class DatabaseStorage implements IStorage {
 
     const totalUsers = totalUsersResult[0]?.count || 0;
     const activeUsers = activeUsersResult[0]?.count || 0;
-    
+
     const usersByRole: Record<string, number> = {};
-    usersByRoleResult.forEach(row => {
+    usersByRoleResult.forEach((row: any) => {
       if (row.role) {
         usersByRole[row.role] = row.count;
       }
@@ -508,19 +513,19 @@ export class DatabaseStorage implements IStorage {
 
   async createUserAsAdmin(userData: CreateUserData, tenantId: string): Promise<User> {
     // Construct name from firstName and lastName
-    const name = userData.firstName && userData.lastName 
-      ? `${userData.firstName} ${userData.lastName}` 
+    const name = userData.firstName && userData.lastName
+      ? `${userData.firstName} ${userData.lastName}`
       : userData.firstName || userData.lastName || userData.email;
 
     const [user] = await db.insert(betterAuthUser).values({
-       ...userData,
-       name,
-       tenantId,
-       id: crypto.randomUUID(),
-       emailVerified: userData.emailVerified ?? true,
-       createdAt: new Date(),
-       updatedAt: new Date(),
-     }).returning();
+      ...userData,
+      name,
+      tenantId,
+      id: crypto.randomUUID(),
+      emailVerified: userData.emailVerified ?? true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
     return user;
   }
 
@@ -569,7 +574,7 @@ export class DatabaseStorage implements IStorage {
   // Email verification methods
   async setEmailVerificationToken(userId: string, tenantId: string, token: string, expiresAt: Date): Promise<void> {
     await db.update(betterAuthUser)
-      .set({ 
+      .set({
         emailVerificationToken: token,
         emailVerificationExpires: expiresAt,
         lastVerificationEmailSent: new Date(),
@@ -580,7 +585,7 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByEmailVerificationToken(token: string, tenantId?: string): Promise<User | undefined> {
     const user = await db.query.betterAuthUser.findFirst({
-      where: tenantId ? 
+      where: tenantId ?
         and(eq(betterAuthUser.emailVerificationToken, token), eq(betterAuthUser.tenantId, tenantId)) :
         eq(betterAuthUser.emailVerificationToken, token)
     });
@@ -589,7 +594,7 @@ export class DatabaseStorage implements IStorage {
 
   async verifyUserEmail(userId: string, tenantId: string): Promise<void> {
     await db.update(betterAuthUser)
-      .set({ 
+      .set({
         emailVerified: true,
         emailVerificationToken: null,
         emailVerificationExpires: null,
@@ -600,7 +605,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateLastVerificationEmailSent(userId: string, tenantId: string): Promise<void> {
     await db.update(betterAuthUser)
-      .set({ 
+      .set({
         lastVerificationEmailSent: new Date(),
         updatedAt: new Date()
       })
@@ -624,12 +629,12 @@ export class DatabaseStorage implements IStorage {
       .select({ count: count() })
       .from(betterAuthUser)
       .where(eq(betterAuthUser.tenantId, tenantId));
-    
+
     const currentUsers = userCountResult[0]?.count || 0;
 
     // Get tenant's subscription and plan limits
     const subscription = await this.getTenantSubscription(tenantId);
-    
+
     if (!subscription) {
       // No subscription found - use basic plan limits as default
       const basicPlan = await db
@@ -637,9 +642,9 @@ export class DatabaseStorage implements IStorage {
         .from(subscriptionPlans)
         .where(eq(subscriptionPlans.name, 'Basic'))
         .limit(1);
-      
+
       const maxUsers = basicPlan[0]?.maxUsers || 5; // Default to 5 users for basic plan
-      
+
       return {
         canAddUser: currentUsers < maxUsers,
         currentUsers,
@@ -650,7 +655,7 @@ export class DatabaseStorage implements IStorage {
 
     const maxUsers = subscription.plan.maxUsers;
     const planName = subscription.plan.name;
-    
+
     return {
       canAddUser: maxUsers === null || currentUsers < maxUsers,
       currentUsers,
@@ -661,7 +666,7 @@ export class DatabaseStorage implements IStorage {
 
   async validateUserCreation(tenantId: string): Promise<void> {
     const limits = await this.checkUserLimits(tenantId);
-    
+
     if (!limits.canAddUser) {
       throw new Error(`User limit reached. Current plan (${limits.planName}) allows ${limits.maxUsers} users, and you currently have ${limits.currentUsers} users.`);
     }
@@ -794,7 +799,7 @@ export class DatabaseStorage implements IStorage {
   async checkShopLimits(tenantId: string): Promise<{ canAddShop: boolean; currentShops: number; maxShops: number | null; planName: string; isCustomLimit?: boolean; customLimitReason?: string; expiresAt?: Date }> {
     const shopsResult = await db.select({ count: count() }).from(shops).where(eq(shops.tenantId, tenantId));
     const currentShops = shopsResult[0]?.count || 0;
-    
+
     // Check for active custom tenant limits first
     const customLimit = await db.query.tenantLimits.findFirst({
       where: and(
@@ -811,7 +816,7 @@ export class DatabaseStorage implements IStorage {
         }
       }
     });
-    
+
     if (customLimit && customLimit.maxShops !== null) {
       return {
         canAddShop: currentShops < customLimit.maxShops,
@@ -823,20 +828,20 @@ export class DatabaseStorage implements IStorage {
         expiresAt: customLimit.expiresAt || undefined
       };
     }
-    
+
     // Fall back to subscription plan limits
     const subscription = await this.getTenantSubscription(tenantId);
-    
+
     if (!subscription) {
-      return { 
-        canAddShop: currentShops < 5, 
-        currentShops, 
-        maxShops: 5, 
+      return {
+        canAddShop: currentShops < 5,
+        currentShops,
+        maxShops: 5,
         planName: 'Default (Basic)',
         isCustomLimit: false
       };
     }
-    
+
     const maxShops = subscription.plan.maxShops;
     return {
       canAddShop: maxShops === null || currentShops < maxShops,
@@ -856,6 +861,86 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  // Email limits checking
+  async checkEmailLimits(tenantId: string): Promise<{ canSend: boolean; currentUsage: number; monthlyLimit: number | null; planName: string; remaining: number | null }> {
+    // 1. Get stats
+    const subscription = await this.getTenantSubscription(tenantId);
+
+    // Determine the start of the current period
+    let periodStart = new Date();
+    periodStart.setDate(1); // Default to start of current month
+    periodStart.setHours(0, 0, 0, 0);
+
+    if (subscription && subscription.currentPeriodStart) {
+      // Use subscription period if available
+      periodStart = new Date(subscription.currentPeriodStart);
+    }
+
+    // Count emails sent in this period
+    const usageResult = await db.select({ count: count() })
+      .from(emailSends)
+      .where(and(
+        eq(emailSends.tenantId, tenantId),
+        gte(emailSends.createdAt, periodStart)
+      ));
+
+    const currentUsage = usageResult[0]?.count || 0;
+
+    // 2. Determine limits
+    // Check for custom tenant limits first
+    const customLimit = await db.query.tenantLimits.findFirst({
+      where: and(
+        eq(tenantLimits.tenantId, tenantId),
+        eq(tenantLimits.isActive, true),
+        or(
+          isNull(tenantLimits.expiresAt),
+          gt(tenantLimits.expiresAt, new Date())
+        )
+      )
+    });
+
+    let monthlyLimit: number | null = 200; // Default fallback
+    let planName = 'Basic (Default)';
+
+    if (customLimit && customLimit.monthlyEmailLimit !== null && customLimit.monthlyEmailLimit !== undefined) {
+      monthlyLimit = customLimit.monthlyEmailLimit;
+      planName = 'Custom Limit';
+    } else if (subscription) {
+      monthlyLimit = subscription.plan.monthlyEmailLimit;
+      planName = subscription.plan.displayName;
+    } else {
+      // No subscription and no custom limit -> check if there's a Basic plan in DB to get official limit
+      const basicPlan = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.name, 'Basic')).limit(1);
+      if (basicPlan.length > 0) {
+        monthlyLimit = basicPlan[0].monthlyEmailLimit;
+        planName = basicPlan[0].displayName;
+      }
+    }
+
+    // 3. Compare
+    // If limit is null, it means unlimited (though our schema default is 200, so likely not null unless explicitly set to null for "unlimited")
+    // For now assuming null = unlimited
+
+    const canSend = monthlyLimit === null || currentUsage < monthlyLimit;
+    const remaining = monthlyLimit === null ? null : Math.max(0, monthlyLimit - currentUsage);
+
+    return {
+      canSend,
+      currentUsage,
+      monthlyLimit,
+      planName,
+      remaining
+    };
+  }
+
+  async validateEmailSending(tenantId: string, count: number = 1): Promise<void> {
+    const limits = await this.checkEmailLimits(tenantId);
+
+    if (limits.monthlyLimit !== null && (limits.currentUsage + count) > limits.monthlyLimit) {
+      throw new Error(`Email sending limit reached. Your plan (${limits.planName}) allows ${limits.monthlyLimit} emails per month. You have sent ${limits.currentUsage} so far.`);
+    }
+  }
+
   // Log shop limit events for audit and analytics
   async logShopLimitEvent(tenantId: string, eventType: ShopLimitEventType, shopCount: number, limitValue?: number, metadata?: Record<string, any>): Promise<void> {
     try {
@@ -866,7 +951,7 @@ export class DatabaseStorage implements IStorage {
           eq(tenantLimits.isActive, true)
         )
       });
-      
+
       await db.insert(shopLimitEvents).values({
         tenantId,
         eventType,
@@ -889,7 +974,7 @@ export class DatabaseStorage implements IStorage {
       tenantId,
       createdBy,
     }).returning();
-    
+
     // Log the limit change event
     if (limitsData.maxShops !== undefined) {
       const currentShops = await this.getCurrentShopCount(tenantId);
@@ -898,7 +983,7 @@ export class DatabaseStorage implements IStorage {
         createdBy
       });
     }
-    
+
     return tenantLimit;
   }
 
@@ -907,14 +992,14 @@ export class DatabaseStorage implements IStorage {
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(tenantLimits.tenantId, tenantId))
       .returning();
-    
+
     // Log the limit change event
     if (updated && updates.maxShops !== undefined) {
       const currentShops = await this.getCurrentShopCount(tenantId);
       const eventType = updates.maxShops > (updated.maxShops || 0) ? 'limit_increased' : 'limit_decreased';
       await this.logShopLimitEvent(tenantId, eventType, currentShops, updates.maxShops);
     }
-    
+
     return updated;
   }
 
@@ -950,19 +1035,19 @@ export class DatabaseStorage implements IStorage {
   // Get shop limit events for analytics
   async getShopLimitEvents(tenantId: string, filters?: ShopLimitFilters): Promise<ShopLimitEvent[]> {
     const conditions = [eq(shopLimitEvents.tenantId, tenantId)];
-    
+
     if (filters?.eventType) {
       conditions.push(eq(shopLimitEvents.eventType, filters.eventType));
     }
-    
+
     if (filters?.fromDate) {
       conditions.push(gte(shopLimitEvents.createdAt, filters.fromDate));
     }
-    
+
     if (filters?.toDate) {
       conditions.push(lte(shopLimitEvents.createdAt, filters.toDate));
     }
-    
+
     return await db.select().from(shopLimitEvents)
       .where(and(...conditions))
       .orderBy(desc(shopLimitEvents.createdAt));
@@ -1003,7 +1088,7 @@ export class DatabaseStorage implements IStorage {
       tenantId,
       updatedAt: new Date(),
     }).returning();
-    
+
     // Log shop creation event
     const currentShops = await this.getCurrentShopCount(tenantId);
     const limits = await this.checkShopLimits(tenantId);
@@ -1011,7 +1096,7 @@ export class DatabaseStorage implements IStorage {
       shopId: shop.id,
       shopName: shop.name
     });
-    
+
     return shop;
   }
 
@@ -1183,12 +1268,12 @@ export class DatabaseStorage implements IStorage {
       createdAt: emailLists.createdAt,
       updatedAt: emailLists.updatedAt,
     })
-    .from(contactListMemberships)
-    .innerJoin(emailLists, eq(contactListMemberships.listId, emailLists.id))
-    .where(and(
-      eq(contactListMemberships.contactId, contactId),
-      eq(contactListMemberships.tenantId, tenantId)
-    ));
+      .from(contactListMemberships)
+      .innerJoin(emailLists, eq(contactListMemberships.listId, emailLists.id))
+      .where(and(
+        eq(contactListMemberships.contactId, contactId),
+        eq(contactListMemberships.tenantId, tenantId)
+      ));
     return result;
   }
 
@@ -1223,12 +1308,12 @@ export class DatabaseStorage implements IStorage {
       color: contactTags.color,
       createdAt: contactTags.createdAt,
     })
-    .from(contactTagAssignments)
-    .innerJoin(contactTags, eq(contactTagAssignments.tagId, contactTags.id))
-    .where(and(
-      eq(contactTagAssignments.contactId, contactId),
-      eq(contactTagAssignments.tenantId, tenantId)
-    ));
+      .from(contactTagAssignments)
+      .innerJoin(contactTags, eq(contactTagAssignments.tagId, contactTags.id))
+      .where(and(
+        eq(contactTagAssignments.contactId, contactId),
+        eq(contactTagAssignments.tenantId, tenantId)
+      ));
     return result;
   }
 
@@ -1250,7 +1335,7 @@ export class DatabaseStorage implements IStorage {
     const [totalResult] = await db.select({ count: count() }).from(emailContacts).where(eq(emailContacts.tenantId, tenantId));
     const [activeResult] = await db.select({ count: count() }).from(emailContacts).where(and(eq(emailContacts.tenantId, tenantId), eq(emailContacts.status, 'active')));
     const [listsResult] = await db.select({ count: count() }).from(emailLists).where(eq(emailLists.tenantId, tenantId));
-    
+
     return {
       totalContacts: totalResult.count,
       activeContacts: activeResult.count,
@@ -1265,7 +1350,7 @@ export class DatabaseStorage implements IStorage {
   async getShopStats(tenantId: string): Promise<{ totalShops: number; activeShops: number; shopsByCategory: Record<string, number> }> {
     const [totalResult] = await db.select({ count: count() }).from(shops).where(eq(shops.tenantId, tenantId));
     const [activeResult] = await db.select({ count: count() }).from(shops).where(and(eq(shops.tenantId, tenantId), eq(shops.isActive, true)));
-    
+
     return {
       totalShops: totalResult.count,
       activeShops: activeResult.count,
@@ -1380,7 +1465,7 @@ export class DatabaseStorage implements IStorage {
       { taskType: 'sending' as const, taskName: 'Email Delivery', status: 'pending' as const, progress: 0 },
       { taskType: 'analytics' as const, taskName: 'Analytics Collection', status: 'pending' as const, progress: 0 },
     ];
-    
+
     const tasks: NewsletterTaskStatus[] = [];
     for (const task of defaultTasks) {
       const [createdTask] = await db.insert(newsletterTaskStatus).values({
@@ -1418,10 +1503,10 @@ export class DatabaseStorage implements IStorage {
 
   async updateCampaign(id: string, updates: UpdateCampaignData, tenantId: string): Promise<Campaign | undefined> {
     const [campaign] = await db.update(campaigns)
-      .set({ 
-        ...updates, 
+      .set({
+        ...updates,
         budget: updates.budget?.toString(),
-        updatedAt: new Date() 
+        updatedAt: new Date()
       })
       .where(and(eq(campaigns.id, id), eq(campaigns.tenantId, tenantId)))
       .returning();
@@ -1467,11 +1552,11 @@ export class DatabaseStorage implements IStorage {
     const conditions = [eq(emailActivity.contactId, contactId), eq(emailActivity.tenantId, tenantId)];
     if (fromDate) conditions.push(gte(emailActivity.occurredAt, fromDate));
     if (toDate) conditions.push(lte(emailActivity.occurredAt, toDate));
-    
+
     let query = db.select().from(emailActivity)
       .where(and(...conditions))
       .orderBy(desc(emailActivity.occurredAt));
-    
+
     if (limit) {
       return await query.limit(limit);
     }
@@ -1500,7 +1585,7 @@ export class DatabaseStorage implements IStorage {
     const [result] = await db.select().from(emailContacts)
       .where(eq(emailContacts.email, email.toLowerCase().trim()))
       .limit(1);
-    
+
     if (!result) return undefined;
     return { contact: result, tenantId: result.tenantId };
   }
@@ -1543,7 +1628,7 @@ export class DatabaseStorage implements IStorage {
     if (filters?.search) conditions.push(ilike(bouncedEmails.email, `%${filters.search}%`));
     if (filters?.bounceType && filters.bounceType !== 'all') conditions.push(eq(bouncedEmails.bounceType, filters.bounceType));
     if (filters?.isActive !== undefined) conditions.push(eq(bouncedEmails.isActive, filters.isActive));
-    
+
     return await db.select().from(bouncedEmails)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(bouncedEmails.lastBouncedAt));
@@ -1557,7 +1642,7 @@ export class DatabaseStorage implements IStorage {
   async getBouncedEmailAddresses(): Promise<string[]> {
     const results = await db.select({ email: bouncedEmails.email }).from(bouncedEmails)
       .where(eq(bouncedEmails.isActive, true));
-    return results.map(result => result.email);
+    return results.map((result: any) => result.email);
   }
 
   async incrementBounceCount(email: string, lastBouncedAt: Date, bounceReason?: string): Promise<BouncedEmail | undefined> {
@@ -1581,7 +1666,7 @@ export class DatabaseStorage implements IStorage {
         eq(promotions.id, id),
         eq(promotions.tenantId, tenantId)
       ));
-    
+
     // Parse promotional codes from JSON
     if (promotion && promotion.promotionalCodes) {
       try {
@@ -1590,7 +1675,7 @@ export class DatabaseStorage implements IStorage {
         (promotion as any).promotionalCodes = [];
       }
     }
-    
+
     return promotion;
   }
 
@@ -1599,9 +1684,9 @@ export class DatabaseStorage implements IStorage {
       .from(promotions)
       .where(eq(promotions.tenantId, tenantId))
       .orderBy(desc(promotions.createdAt));
-    
+
     // Parse promotional codes from JSON for each promotion
-    return result.map(promotion => {
+    return result.map((promotion: any) => {
       if (promotion.promotionalCodes) {
         try {
           (promotion as any).promotionalCodes = JSON.parse(promotion.promotionalCodes);
@@ -1622,7 +1707,7 @@ export class DatabaseStorage implements IStorage {
         promotionalCodes: promotion.promotionalCodes ? JSON.stringify(promotion.promotionalCodes) : null,
       })
       .returning();
-    
+
     // Parse promotional codes back to array for return
     if (created.promotionalCodes) {
       try {
@@ -1631,7 +1716,7 @@ export class DatabaseStorage implements IStorage {
         (created as any).promotionalCodes = [];
       }
     }
-    
+
     return created;
   }
 
@@ -1640,12 +1725,12 @@ export class DatabaseStorage implements IStorage {
       ...updates,
       updatedAt: new Date(),
     };
-    
+
     // Handle promotional codes JSON serialization
     if (updates.promotionalCodes !== undefined) {
       (updateData as any).promotionalCodes = updates.promotionalCodes ? JSON.stringify(updates.promotionalCodes) : null;
     }
-    
+
     const [updated] = await db.update(promotions)
       .set(updateData)
       .where(and(
@@ -1653,7 +1738,7 @@ export class DatabaseStorage implements IStorage {
         eq(promotions.tenantId, tenantId)
       ))
       .returning();
-    
+
     // Parse promotional codes back to array for return
     if (updated && updated.promotionalCodes) {
       try {
@@ -1662,7 +1747,7 @@ export class DatabaseStorage implements IStorage {
         (updated as any).promotionalCodes = [];
       }
     }
-    
+
     return updated;
   }
 
@@ -1686,8 +1771,8 @@ export class DatabaseStorage implements IStorage {
       monthlyUsage: sql<number>`SUM(CASE WHEN ${promotions.createdAt} >= NOW() - INTERVAL '30 days' THEN ${promotions.usageCount} ELSE 0 END)`,
       totalReach: sql<number>`SUM(${promotions.usageCount})`,
     })
-    .from(promotions)
-    .where(eq(promotions.tenantId, tenantId));
+      .from(promotions)
+      .where(eq(promotions.tenantId, tenantId));
 
     return {
       totalPromotions: stats.totalPromotions || 0,

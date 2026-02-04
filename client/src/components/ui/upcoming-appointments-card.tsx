@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { CalendarClock, ChevronRight, Calendar, Clock, MapPin, User, Mail, Timer, X } from "lucide-react";
+import { CalendarClock, Calendar, Clock, MapPin, User, Mail, Timer } from "lucide-react";
 import { useLocation } from "wouter";
 
 interface AppointmentCustomer {
@@ -86,10 +86,16 @@ export function UpcomingAppointmentsCard() {
     }
   };
 
-  const formatDateTime = (date: Date) => {
+  const getMonthName = (date: Date) => {
+    return new Intl.DateTimeFormat("en-US", { month: "short" }).format(new Date(date)).toUpperCase();
+  };
+
+  const getDayNumber = (date: Date) => {
+    return new Intl.DateTimeFormat("en-US", { day: "2-digit" }).format(new Date(date));
+  };
+
+  const formatTime = (date: Date) => {
     return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
       hour: "numeric",
       minute: "2-digit",
       hour12: true,
@@ -115,11 +121,11 @@ export function UpcomingAppointmentsCard() {
 
   if (isLoading) {
     return (
-      <Card className="bg-white dark:bg-gray-800 rounded-xl h-full">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-            <CalendarClock className="h-5 w-5" />
-            Upcoming Appointments
+      <Card className="bg-white dark:bg-gray-800 rounded-xl h-full shadow-sm border border-gray-100 dark:border-gray-700">
+        <CardHeader className="pb-4 border-b border-gray-100 dark:border-gray-700">
+          <CardTitle className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
+            <Calendar className="h-6 w-6 text-blue-500" />
+            Upcoming Schedule
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -132,80 +138,82 @@ export function UpcomingAppointmentsCard() {
   }
 
   return (
-    <Card className="bg-white dark:bg-gray-800 rounded-xl h-full">
-      <CardHeader className="pb-4">
+    <Card className="bg-white dark:bg-gray-800 rounded-xl h-full shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+      <CardHeader className="pb-4 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-            <CalendarClock className="h-5 w-5" />
-            Upcoming Appointments
+          <CardTitle className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
+            <Calendar className="h-6 w-6 text-blue-500" />
+            Upcoming Schedule
           </CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setLocation("/reminders")}
-            className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-          >
-            View All
-            <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-6">
         {upcomingAppointments.length === 0 ? (
           <div className="text-center py-8">
-            <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-              No appointments in the next 7 days
+            <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              No appointments scheduled for the next 7 days
             </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setLocation("/reminders")}
-              className="text-xs"
-            >
-              Schedule an Appointment
-            </Button>
           </div>
         ) : (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 mb-3">
-              <span>{upcomingAppointments.length} upcoming</span>
-              <span>Next 7 days</span>
-            </div>
-            <div className="space-y-3">
+          <div className="space-y-6">
+            <div className="space-y-6">
               {upcomingAppointments.map((appointment) => (
-                <div
+                <button
                   key={appointment.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  type="button"
+                  className="flex items-center gap-4 cursor-pointer group w-full text-left"
+                  aria-label={`View appointment: ${appointment.title}`}
                   onClick={() => handleViewAppointment(appointment)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleViewAppointment(appointment);
+                    }
+                  }}
                 >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                      {appointment.title}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                      {getCustomerName(appointment.customer)} • {formatDateTime(appointment.appointmentDate)}
-                    </p>
+                  {/* Date Box */}
+                  <div className="flex flex-col items-center justify-center w-16 h-16 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-600 group-hover:border-blue-200 transition-colors">
+                    <span className="text-[10px] font-bold text-red-500 uppercase tracking-wide leading-none mb-1">
+                      {getMonthName(appointment.appointmentDate)}
+                    </span>
+                    <span className="text-2xl font-bold text-gray-900 dark:text-white leading-none">
+                      {getDayNumber(appointment.appointmentDate)}
+                    </span>
                   </div>
-                  <Badge
-                    className={`${getStatusColor(appointment.status)} text-[10px] px-1.5 py-0 h-5 whitespace-nowrap ml-3`}
-                    variant="outline"
-                  >
-                    {appointment.status}
-                  </Badge>
-                </div>
+
+                  {/* Details */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-3 mb-1">
+                      <h3 className="text-base font-bold text-gray-900 dark:text-white truncate group-hover:text-blue-600 transition-colors">
+                        {appointment.title}
+                      </h3>
+                      <Badge className={`${getStatusColor(appointment.status)} text-xs px-2 py-0.5 rounded-full capitalize whitespace-nowrap`}>
+                        {appointment.status.replace('_', ' ')}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 truncate">
+                      <Clock className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+                      {formatTime(appointment.appointmentDate)}
+                      <span className="mx-2 flex-shrink-0">•</span>
+                      <User className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+                      <span className="truncate">{getCustomerName(appointment.customer)}</span>
+                    </div>
+                  </div>
+                </button>
               ))}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setLocation("/reminders")}
-              className="w-full mt-4"
-            >
-              Manage Appointments
-            </Button>
           </div>
         )}
+
+        <Button
+          variant="ghost"
+          className="w-full mt-8 border-2 border-dashed border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 py-6 h-auto text-base font-medium rounded-xl"
+          onClick={() => setLocation("/reminders")}
+        >
+          <CalendarClock className="h-5 w-5 mr-2" />
+          Schedule New Appointment
+        </Button>
       </CardContent>
 
       {/* Appointment Details Sheet */}
@@ -302,8 +310,8 @@ export function UpcomingAppointmentsCard() {
 
                 {/* Actions */}
                 <div className="flex gap-2 pt-4 border-t">
-                  <Button 
-                    className="flex-1" 
+                  <Button
+                    className="flex-1"
                     onClick={() => {
                       setDetailsOpen(false);
                       setLocation("/reminders");
@@ -311,7 +319,7 @@ export function UpcomingAppointmentsCard() {
                   >
                     View Full Details
                   </Button>
-                  <Button 
+                  <Button
                     variant="outline"
                     onClick={() => setDetailsOpen(false)}
                   >

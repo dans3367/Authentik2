@@ -22,12 +22,14 @@ const defaultPlans = [
       'Up to 10 users',
       'Basic email support',
       '10GB storage',
-      'Standard analytics'
+      'Standard analytics',
+      '200 emails/month'
     ],
     maxUsers: 10,
     maxProjects: null,
     maxShops: 5, // Basic plan: 5 shops
     storageLimit: 10,
+    monthlyEmailLimit: 200,
     supportLevel: 'email',
     trialDays: 14,
     isPopular: false,
@@ -48,12 +50,14 @@ const defaultPlans = [
       'Priority email support',
       '50GB storage',
       'Advanced analytics',
-      'Custom branding'
+      'Custom branding',
+      '500 emails/month'
     ],
     maxUsers: 25,
     maxProjects: null,
     maxShops: 10, // Mid tier: 10 shops
     storageLimit: 50,
+    monthlyEmailLimit: 500,
     supportLevel: 'priority',
     trialDays: 14,
     isPopular: true,
@@ -75,12 +79,14 @@ const defaultPlans = [
       '200GB storage',
       'Premium analytics',
       'Custom integrations',
-      'White-label options'
+      'White-label options',
+      '1000 emails/month'
     ],
     maxUsers: null, // Unlimited
     maxProjects: null,
     maxShops: 20, // Advanced: 20 shops
     storageLimit: 200,
+    monthlyEmailLimit: 1000,
     supportLevel: 'dedicated',
     trialDays: 14,
     isPopular: false,
@@ -92,7 +98,7 @@ const defaultPlans = [
 async function setupSubscriptionPlans() {
   try {
     console.log('Setting up subscription plans...');
-    
+
     // Test database connection first
     console.log('Testing database connection...');
     try {
@@ -101,23 +107,23 @@ async function setupSubscriptionPlans() {
     } catch (dbError) {
       console.log('Database connection failed, but continuing with plan setup...');
       console.log('Plans will be created when database is available.');
-      
+
       // Generate SQL for manual execution
       console.log('\n=== SQL to create subscription plans manually ===');
       for (const plan of defaultPlans) {
         const features = plan.features.map(f => `"${f}"`).join(', ');
-        console.log(`INSERT INTO subscription_plans (name, display_name, description, price, yearly_price, stripe_price_id, stripe_yearly_price_id, features, max_users, max_projects, max_shops, storage_limit, support_level, trial_days, is_popular, is_active, sort_order) VALUES ('${plan.name}', '${plan.displayName}', '${plan.description}', ${plan.price}, ${plan.yearlyPrice}, '${plan.stripePriceId}', '${plan.stripeYearlyPriceId}', ARRAY[${features}], ${plan.maxUsers || 'NULL'}, ${plan.maxProjects || 'NULL'}, ${plan.maxShops}, ${plan.storageLimit}, '${plan.supportLevel}', ${plan.trialDays}, ${plan.isPopular}, ${plan.isActive}, ${plan.sortOrder}) ON CONFLICT (name) DO UPDATE SET display_name = EXCLUDED.display_name, description = EXCLUDED.description, max_shops = EXCLUDED.max_shops;`);
+        console.log(`INSERT INTO subscription_plans (name, display_name, description, price, yearly_price, stripe_price_id, stripe_yearly_price_id, features, max_users, max_projects, max_shops, storage_limit, monthly_email_limit, support_level, trial_days, is_popular, is_active, sort_order) VALUES ('${plan.name}', '${plan.displayName}', '${plan.description}', ${plan.price}, ${plan.yearlyPrice}, '${plan.stripePriceId}', '${plan.stripeYearlyPriceId}', ARRAY[${features}], ${plan.maxUsers || 'NULL'}, ${plan.maxProjects || 'NULL'}, ${plan.maxShops}, ${plan.storageLimit}, ${plan.monthlyEmailLimit}, '${plan.supportLevel}', ${plan.trialDays}, ${plan.isPopular}, ${plan.isActive}, ${plan.sortOrder}) ON CONFLICT (name) DO UPDATE SET display_name = EXCLUDED.display_name, description = EXCLUDED.description, max_shops = EXCLUDED.max_shops, monthly_email_limit = EXCLUDED.monthly_email_limit;`);
       }
       console.log('=== End SQL ===\n');
       return;
     }
-    
+
     for (const plan of defaultPlans) {
       // Check if plan already exists
       const existingPlan = await db.query.subscriptionPlans.findFirst({
         where: eq(subscriptionPlans.name, plan.name)
       });
-      
+
       if (existingPlan) {
         console.log(`Plan '${plan.name}' already exists, updating...`);
         // Update existing plan
@@ -132,6 +138,7 @@ async function setupSubscriptionPlans() {
             maxProjects: plan.maxProjects,
             maxShops: plan.maxShops,
             storageLimit: plan.storageLimit,
+            monthlyEmailLimit: plan.monthlyEmailLimit,
             supportLevel: plan.supportLevel,
             trialDays: plan.trialDays,
             isPopular: plan.isPopular,
@@ -146,19 +153,19 @@ async function setupSubscriptionPlans() {
         await db.insert(subscriptionPlans).values(plan);
       }
     }
-    
+
     console.log('Subscription plans setup completed successfully!');
-    
+
     // Display the created plans
     const allPlans = await db.query.subscriptionPlans.findMany({
-      orderBy: (plans, { asc }) => [asc(plans.sortOrder)]
+      orderBy: (plans: any, { asc }: { asc: any }) => [asc(plans.sortOrder)]
     });
-    
+
     console.log('\nCurrent subscription plans:');
-    allPlans.forEach(plan => {
+    allPlans.forEach((plan: any) => {
       console.log(`- ${plan.displayName}: ${plan.maxShops} shops, $${plan.price}/month`);
     });
-    
+
   } catch (error) {
     console.error('Error setting up subscription plans:', error);
     if (error instanceof Error) {

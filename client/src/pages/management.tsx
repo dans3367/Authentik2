@@ -7,6 +7,7 @@ import UsersPage from "@/pages/users";
 import ShopsPage from "@/pages/shops";
 import ManagementTags from "@/pages/management-tags";
 import ManagementEmailDesign from "@/pages/management-email-design";
+import { AccountUsageCard } from "@/components/ui/account-usage-card";
 
 export default function ManagementPage() {
   const { t } = useTranslation();
@@ -28,14 +29,19 @@ export default function ManagementPage() {
             </p>
           </div>
         </div>
-        <Tabs defaultValue="users" className="w-full">
+        
+        <Tabs defaultValue="account-usage" className="w-full">
           <TabsList>
+            <TabsTrigger value="account-usage">{t('management.tabs.accountUsage', 'Account Usage')}</TabsTrigger>
             <TabsTrigger value="users">{t('management.tabs.users')}</TabsTrigger>
             <TabsTrigger value="shops">{t('management.tabs.shops')}</TabsTrigger>
             <TabsTrigger value="tags">{t('management.tabs.tags')}</TabsTrigger>
             <TabsTrigger value="email-design">{t('management.tabs.emailDesign')}</TabsTrigger>
           </TabsList>
           <div className="mt-6">
+            <TabsContent value="account-usage">
+              <AccountUsageCard />
+            </TabsContent>
             <TabsContent value="users">
               <UsersPage />
             </TabsContent>

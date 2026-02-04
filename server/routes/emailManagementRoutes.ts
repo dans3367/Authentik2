@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, and } from 'drizzle-orm';
-import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, eCardSettings, emailActivity, tenants, emailSends, emailContent, companies, unsubscribeTokens } from '@shared/schema';
+import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, eCardSettings, emailActivity, tenants, emailSends, emailContent, companies, unsubscribeTokens, masterEmailDesign } from '@shared/schema';
 import { deleteImageFromR2 } from '../config/r2';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { authenticateInternalService, InternalServiceRequest } from '../middleware/internal-service-auth';
@@ -12,6 +12,250 @@ import jwt from 'jsonwebtoken';
 import { enhancedEmailService } from '../emailService';
 import crypto from 'crypto';
 import { logActivity, computeChanges } from '../utils/activityLogger';
+
+function isValidHttpUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function escapeHtml(str: string): string {
+  return str.replace(/[&<>"']/g, (c: string) => {
+    switch (c) {
+      case '&':
+        return '&amp;';
+      case '<':
+        return '&lt;';
+      case '>':
+        return '&gt;';
+      case '"':
+        return '&quot;';
+      case "'":
+        return '&#39;';
+      default:
+        return c;
+    }
+  });
+}
+
+type PromotionalEmailJobPayload = {
+  tenantId: string;
+  contactId: string;
+  recipientEmail: string;
+  recipientName: string;
+  senderName: string;
+  promoSubject: string;
+  htmlPromo: string;
+  unsubscribeToken?: string;
+  promotionId?: string | null;
+  manual?: boolean;
+};
+
+/**
+ * Enqueue a promotional email job using Trigger.dev for durable scheduling
+ * Replaces the volatile setTimeout approach with a persistent task
+ * Returns immediately without blocking the route handler
+ */
+async function enqueuePromotionalEmailJob(
+  payload: PromotionalEmailJobPayload,
+  delayMs: number
+): Promise<{ success: boolean; runId?: string; error?: string }> {
+  try {
+    const { tasks } = await import('@trigger.dev/sdk/v3');
+    const { logTriggerTask } = await import('../lib/trigger');
+    const taskId = 'schedule-promotional-email';
+
+    // Trigger the durable task with the payload and delay
+    const handle = await tasks.trigger(taskId, {
+      ...payload,
+      delayMs,
+    });
+
+    console.log(`✅ [PromotionalEmailJob] Scheduled via Trigger.dev (ID: ${handle.id}) with ${delayMs}ms delay for ${payload.recipientEmail}`);
+
+    // Log to trigger_tasks table for tracking
+    await logTriggerTask({
+      taskId,
+      runId: handle.id,
+      payload: { ...payload, delayMs },
+      status: 'triggered',
+      tenantId: payload.tenantId,
+      relatedType: 'email',
+      relatedId: payload.contactId,
+    });
+
+    return {
+      success: true,
+      runId: handle.id,
+    };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ [PromotionalEmailJob] Failed to schedule via Trigger.dev:', errorMessage);
+
+    // Fallback to direct execution if Trigger.dev is unavailable
+    console.log('⚠️ [PromotionalEmailJob] Falling back to direct execution');
+    void sendPromotionalEmailJob(payload).catch((fallbackErr) => {
+      console.error('❌ [PromotionalEmailJob] Fallback execution failed:', fallbackErr);
+    });
+
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+}
+
+async function sendPromotionalEmailJob(payload: PromotionalEmailJobPayload): Promise<void> {
+  const { enhancedEmailService } = await import('../emailService');
+
+  const promoResult = await enhancedEmailService.sendCustomEmail(
+    payload.recipientEmail,
+    `🎁 ${payload.promoSubject}`,
+    payload.htmlPromo,
+    {
+      text: payload.htmlPromo.replace(/<[^>]*>/g, ''),
+      from: 'admin@zendwise.work',
+      metadata: {
+        type: 'birthday-promotion',
+        contactId: payload.contactId,
+        tenantId: payload.tenantId,
+        manual: !!payload.manual,
+        tags: ['birthday', ...(payload.manual ? ['manual'] : []), 'promotion', `tenant-${payload.tenantId}`],
+        unsubscribeToken: payload.unsubscribeToken || 'none',
+      },
+    }
+  );
+
+  // Check if email send was successful
+  if (!promoResult.success) {
+    console.error(`❌ [PromotionalEmailJob] Failed to send promotional email:`, {
+      recipient: payload.recipientEmail,
+      contactId: payload.contactId,
+      tenantId: payload.tenantId,
+      error: promoResult.error,
+      providerId: promoResult.providerId,
+    });
+
+    // Log failed activity
+    try {
+      await db.insert(emailActivity).values({
+        tenantId: payload.tenantId,
+        contactId: payload.contactId,
+        activityType: 'failed',
+        activityData: JSON.stringify({
+          type: 'birthday-promotion',
+          manual: !!payload.manual,
+          split: true,
+          subject: `🎁 ${payload.promoSubject}`,
+          recipient: payload.recipientEmail,
+          from: 'admin@zendwise.work',
+          error: promoResult.error,
+          providerId: promoResult.providerId,
+        }),
+        occurredAt: new Date(),
+      });
+    } catch (logError) {
+      console.error(`⚠️ [PromotionalEmailJob] Failed to log failed email activity:`, logError);
+    }
+
+    // Log failed send to email_sends table
+    try {
+      const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
+      await db.insert(emailSends).values({
+        id: emailSendId,
+        tenantId: payload.tenantId,
+        recipientEmail: payload.recipientEmail,
+        recipientName: payload.recipientName,
+        senderEmail: 'admin@zendwise.work',
+        senderName: payload.senderName,
+        subject: `🎁 ${payload.promoSubject}`,
+        emailType: 'promotional',
+        provider: promoResult.providerId || 'resend',
+        providerMessageId: promoResult.messageId || null,
+        status: 'failed',
+        contactId: payload.contactId,
+        promotionId: payload.promotionId || null,
+        sentAt: null,
+      });
+    } catch (logError) {
+      console.error(`⚠️ [PromotionalEmailJob] Failed to log failed send to email_sends table:`, logError);
+    }
+
+    return;
+  }
+
+  // Email sent successfully - extract provider message ID safely
+  const providerMessageId = promoResult.messageId || null;
+
+  console.log(`✅ [PromotionalEmailJob] Successfully sent promotional email:`, {
+    recipient: payload.recipientEmail,
+    contactId: payload.contactId,
+    messageId: providerMessageId,
+    providerId: promoResult.providerId,
+  });
+
+  // Log successful activity
+  try {
+    await db.insert(emailActivity).values({
+      tenantId: payload.tenantId,
+      contactId: payload.contactId,
+      activityType: 'sent',
+      activityData: JSON.stringify({
+        type: 'birthday-promotion',
+        manual: !!payload.manual,
+        split: true,
+        subject: `🎁 ${payload.promoSubject}`,
+        recipient: payload.recipientEmail,
+        from: 'admin@zendwise.work',
+        messageId: providerMessageId,
+        providerId: promoResult.providerId,
+      }),
+      occurredAt: new Date(),
+    });
+  } catch (logError) {
+    console.error(`⚠️ [PromotionalEmailJob] Failed to log promotional email activity:`, logError);
+  }
+
+  // Log successful send to email_sends and email_content tables
+  try {
+    const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
+    await db.insert(emailSends).values({
+      id: emailSendId,
+      tenantId: payload.tenantId,
+      recipientEmail: payload.recipientEmail,
+      recipientName: payload.recipientName,
+      senderEmail: 'admin@zendwise.work',
+      senderName: payload.senderName,
+      subject: `🎁 ${payload.promoSubject}`,
+      emailType: 'promotional',
+      provider: promoResult.providerId || 'resend',
+      providerMessageId: providerMessageId,
+      status: 'sent',
+      contactId: payload.contactId,
+      promotionId: payload.promotionId || null,
+      sentAt: new Date(),
+    });
+
+    await db.insert(emailContent).values({
+      emailSendId: emailSendId,
+      htmlContent: payload.htmlPromo,
+      textContent: payload.htmlPromo.replace(/<[^>]*>/g, ''),
+      metadata: JSON.stringify({
+        split: true,
+        manual: !!payload.manual,
+        birthdayCard: false,
+        promotional: true,
+        messageId: providerMessageId,
+        providerId: promoResult.providerId,
+      }),
+    });
+  } catch (logError) {
+    console.error(`⚠️ [PromotionalEmailJob] Failed to log to email_sends/email_content table:`, logError);
+  }
+}
 
 export const emailManagementRoutes = Router();
 
@@ -423,11 +667,12 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
       userId: req.user.id,
       entityType: 'contact',
       entityId: result.id,
-      entityName: `${result.firstName || ''} ${result.lastName || ''}`.trim() || result.email,
+      entityName: `${result.firstName || ''} ${result.lastName || ''}`.trim() || '[Contact]',
       activityType: 'created',
-      description: `Contact "${result.email}" was created`,
+      description: `Contact was created`,
       metadata: {
-        email: result.email,
+        // PII redacted for GDPR/CCPA compliance
+        contactId: result.id,
         status: result.status,
         consentGiven: result.consentGiven,
         tagsCount: tags?.length || 0,
@@ -588,12 +833,13 @@ emailManagementRoutes.delete("/email-contacts/:id", authenticateToken, requireTe
       userId: req.user.id,
       entityType: 'contact',
       entityId: id,
-      entityName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email,
+      entityName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || '[Contact]',
       activityType: 'deleted',
-      description: `Contact "${contact.email}" was deleted`,
+      description: `Contact was deleted`,
       metadata: {
         deletedContactData: {
-          email: contact.email,
+          // PII redacted for GDPR/CCPA compliance
+          contactId: id,
           firstName: contact.firstName,
           lastName: contact.lastName,
           status: contact.status,
@@ -651,8 +897,7 @@ emailManagementRoutes.delete("/email-contacts", authenticateToken, requireTenant
       description: `Bulk deleted ${deletedContacts.length} contacts`,
       metadata: {
         deletedCount: deletedContacts.length,
-        deletedContactIds: deletedContacts.map(c => c.id),
-        deletedEmails: deletedContacts.map(c => c.email),
+        deletedContactIds: deletedContacts.map((c: any) => c.id),
       },
       req,
     });
@@ -1893,15 +2138,15 @@ emailManagementRoutes.put("/e-card-settings", authenticateToken, requireTenant, 
       where: sql`${eCardSettings.tenantId} = ${req.user.tenantId}`,
     });
 
-    const oldImageUrl = existingSettings?.customThemeData 
+    const oldImageUrl = existingSettings?.customThemeData
       ? (() => {
-          try {
-            const data = JSON.parse(existingSettings.customThemeData);
-            return data?.imageUrl || null;
-          } catch {
-            return null;
-          }
-        })()
+        try {
+          const data = JSON.parse(existingSettings.customThemeData);
+          return data?.imageUrl || null;
+        } catch {
+          return null;
+        }
+      })()
       : null;
 
     let updatedSettings;
@@ -1967,6 +2212,139 @@ emailManagementRoutes.put("/e-card-settings", authenticateToken, requireTenant, 
   } catch (error) {
     console.error('Update e-card settings error:', error);
     res.status(500).json({ message: 'Failed to update e-card settings' });
+  }
+});
+
+// Get master email design settings
+emailManagementRoutes.get("/master-email-design", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const design = await db.query.masterEmailDesign.findFirst({
+      where: sql`${masterEmailDesign.tenantId} = ${req.user.tenantId}`,
+    });
+
+    // Get company info for defaults
+    const company = await db.query.companies.findFirst({
+      where: sql`${companies.tenantId} = ${req.user.tenantId} AND ${companies.isActive} = true`,
+    });
+
+    // If no design exists, return default settings
+    if (!design) {
+      console.log('🎨 [Master Email Design GET] No design found, returning defaults');
+      const defaultDesign = {
+        id: '',
+        tenantId: req.user.tenantId,
+        companyName: company?.name || '',
+        logoUrl: company?.logoUrl || null,
+        primaryColor: '#3B82F6',
+        secondaryColor: '#1E40AF',
+        accentColor: '#10B981',
+        fontFamily: 'Arial, sans-serif',
+        headerText: null,
+        footerText: company?.name ? `© ${new Date().getFullYear()} ${company.name}. All rights reserved.` : null,
+        socialLinks: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      return res.json(defaultDesign);
+    }
+
+    console.log('🎨 [Master Email Design GET] Returning design:', { id: design.id });
+    res.json(design);
+  } catch (error) {
+    console.error('Get master email design error:', error);
+    res.status(500).json({ message: 'Failed to get master email design' });
+  }
+});
+
+// Update master email design settings
+emailManagementRoutes.put("/master-email-design", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const {
+      companyName,
+      logoUrl,
+      primaryColor,
+      secondaryColor,
+      accentColor,
+      fontFamily,
+      headerText,
+      footerText,
+      socialLinks,
+    } = req.body;
+
+    console.log('🎨 [Master Email Design PUT] Received:', { companyName, logoUrl, headerText, primaryColor, tenantId: req.user.tenantId });
+
+    // Check if design already exists
+    const existingDesign = await db.query.masterEmailDesign.findFirst({
+      where: sql`${masterEmailDesign.tenantId} = ${req.user.tenantId}`,
+    });
+
+    let updatedDesign;
+
+    const hasSocialLinks = Object.prototype.hasOwnProperty.call(req.body, 'socialLinks');
+    let socialLinksStr: string | null | undefined;
+
+    if (hasSocialLinks) {
+      if (socialLinks === null) {
+        socialLinksStr = null;
+      } else if (typeof socialLinks === 'string') {
+        try {
+          JSON.parse(socialLinks);
+        } catch (e) {
+          return res.status(400).json({ message: 'Invalid socialLinks JSON' });
+        }
+        socialLinksStr = socialLinks;
+      } else if (typeof socialLinks === 'object') {
+        socialLinksStr = JSON.stringify(socialLinks);
+      } else {
+        return res.status(400).json({ message: 'Invalid socialLinks type' });
+      }
+    }
+
+    if (existingDesign) {
+      // Update existing design
+      const updateSet: Record<string, unknown> = {
+        companyName: companyName ?? existingDesign.companyName,
+        logoUrl: logoUrl !== undefined ? logoUrl : existingDesign.logoUrl,
+        primaryColor: primaryColor ?? existingDesign.primaryColor,
+        secondaryColor: secondaryColor ?? existingDesign.secondaryColor,
+        accentColor: accentColor ?? existingDesign.accentColor,
+        fontFamily: fontFamily ?? existingDesign.fontFamily,
+        headerText: headerText !== undefined ? headerText : existingDesign.headerText,
+        footerText: footerText !== undefined ? footerText : existingDesign.footerText,
+        updatedAt: new Date(),
+      };
+
+      if (hasSocialLinks) {
+        updateSet.socialLinks = socialLinksStr;
+      }
+
+      updatedDesign = await db.update(masterEmailDesign)
+        .set(updateSet)
+        .where(sql`${masterEmailDesign.tenantId} = ${req.user.tenantId}`)
+        .returning();
+    } else {
+      // Create new design
+      updatedDesign = await db.insert(masterEmailDesign)
+        .values({
+          tenantId: req.user.tenantId,
+          companyName: companyName || '',
+          logoUrl: logoUrl || null,
+          primaryColor: primaryColor || '#3B82F6',
+          secondaryColor: secondaryColor || '#1E40AF',
+          accentColor: accentColor || '#10B981',
+          fontFamily: fontFamily || 'Arial, sans-serif',
+          headerText: headerText || null,
+          footerText: footerText || null,
+          socialLinks: hasSocialLinks ? socialLinksStr : null,
+        })
+        .returning();
+    }
+
+    console.log('🎨 [Master Email Design PUT] Updated design:', { id: updatedDesign[0]?.id });
+    res.json(updatedDesign[0]);
+  } catch (error) {
+    console.error('Update master email design error:', error);
+    res.status(500).json({ message: 'Failed to update master email design' });
   }
 });
 
@@ -2281,10 +2659,10 @@ emailManagementRoutes.post("/internal/email-activity", authenticateInternalServi
   });
 
   try {
-    const { 
-      tenantId, 
-      contactId, 
-      activityType, 
+    const {
+      tenantId,
+      contactId,
+      activityType,
       activityData,
       occurredAt,
       webhookId
@@ -2292,23 +2670,23 @@ emailManagementRoutes.post("/internal/email-activity", authenticateInternalServi
 
     // Validate required fields
     if (!tenantId || !contactId || !activityType) {
-      return res.status(400).json({ 
-        error: 'tenantId, contactId, and activityType are required' 
+      return res.status(400).json({
+        error: 'tenantId, contactId, and activityType are required'
       });
     }
 
     // Validate webhookId for idempotency
     if (!webhookId) {
-      return res.status(400).json({ 
-        error: 'webhookId is required for idempotency' 
+      return res.status(400).json({
+        error: 'webhookId is required for idempotency'
       });
     }
 
     // Validate activityType
     const validActivityTypes = ['sent', 'delivered', 'opened', 'clicked', 'bounced', 'complained', 'unsubscribed'];
     if (!validActivityTypes.includes(activityType)) {
-      return res.status(400).json({ 
-        error: `Invalid activityType. Must be one of: ${validActivityTypes.join(', ')}` 
+      return res.status(400).json({
+        error: `Invalid activityType. Must be one of: ${validActivityTypes.join(', ')}`
       });
     }
 
@@ -2333,8 +2711,8 @@ emailManagementRoutes.post("/internal/email-activity", authenticateInternalServi
       if (isFinite(parsed.getTime())) {
         validatedOccurredAt = parsed;
       } else {
-        return res.status(400).json({ 
-          error: 'Invalid occurredAt format. Must be a valid date.' 
+        return res.status(400).json({
+          error: 'Invalid occurredAt format. Must be a valid date.'
         });
       }
     }
@@ -2427,6 +2805,69 @@ emailManagementRoutes.post("/internal/email-activity", authenticateInternalServi
   } catch (error) {
     console.error('Failed to log email activity (internal):', error);
     res.status(500).json({ error: 'Failed to log email activity' });
+  }
+});
+
+// Internal endpoint for Trigger.dev to send promotional emails
+// Secured with HMAC signature verification
+emailManagementRoutes.post("/internal/send-promotional-email", authenticateInternalService, async (req: InternalServiceRequest, res) => {
+  console.log('🎁 [Internal Promotional Email] Received authenticated request:', {
+    service: req.internalService?.service,
+    tenantId: req.body.tenantId,
+    contactId: req.body.contactId,
+    recipientEmail: req.body.recipientEmail,
+  });
+
+  try {
+    const {
+      tenantId,
+      contactId,
+      recipientEmail,
+      recipientName,
+      senderName,
+      promoSubject,
+      htmlPromo,
+      unsubscribeToken,
+      promotionId,
+      manual,
+    } = req.body;
+
+    // Validate required fields
+    if (!tenantId || !contactId || !recipientEmail || !recipientName || !senderName || !promoSubject || !htmlPromo) {
+      return res.status(400).json({
+        error: 'Missing required fields: tenantId, contactId, recipientEmail, recipientName, senderName, promoSubject, htmlPromo'
+      });
+    }
+
+    // Call the existing sendPromotionalEmailJob function
+    await sendPromotionalEmailJob({
+      tenantId,
+      contactId,
+      recipientEmail,
+      recipientName,
+      senderName,
+      promoSubject,
+      htmlPromo,
+      unsubscribeToken,
+      promotionId,
+      manual,
+    });
+
+    console.log(`✅ [Internal Promotional Email] Successfully sent promotional email for contact ${contactId}`);
+
+    res.json({
+      success: true,
+      message: 'Promotional email sent successfully',
+      contactId,
+      recipientEmail,
+    });
+  } catch (error) {
+    console.error('Failed to send promotional email (internal):', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to send promotional email',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
   }
 });
 
@@ -2549,6 +2990,9 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
       });
     }
 
+    // Check email sending limits
+    await storage.validateEmailSending(tenantId, contactIds.length);
+
     console.log(`🎂 [ManualBirthdayCard] Sending birthday cards to ${contactIds.length} contact(s)`);
 
     // Get birthday settings for this tenant with promotion data
@@ -2642,12 +3086,12 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
         // --- SPLIT EMAIL LOGIC PATCH ---
         // Check if split promotional email is enabled
         const shouldSplitEmail = settings.splitPromotionalEmail && settings.promotion;
-        
+
         console.log(`📧 [ManualBirthdayCard] Split email enabled: ${settings.splitPromotionalEmail}, Has promotion: ${!!settings.promotion}`);
-        
+
         if (shouldSplitEmail) {
           console.log(`✅ [SPLIT FLOW] Sending birthday and promo as SEPARATE emails to ${contact.email}`);
-          
+
           // Send birthday card WITHOUT promotion
           const htmlBirthday = renderBirthdayTemplate(settings.emailTemplate as any, {
             recipientName,
@@ -2678,7 +3122,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           );
 
           console.log(`✅ [SPLIT FLOW] Birthday card sent to ${contact.email}`);
-          
+
           // Log birthday card to database
           try {
             await db.insert(emailActivity).values({
@@ -2692,7 +3136,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           } catch (logError) {
             console.error(`⚠️ [SPLIT FLOW] Failed to log birthday card activity:`, logError);
           }
-          
+
           // Log to email_sends table
           try {
             const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
@@ -2712,7 +3156,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               promotionId: null,
               sentAt: new Date(),
             });
-            
+
             // Also store the content
             await db.insert(emailContent).values({
               emailSendId: emailSendId,
@@ -2729,12 +3173,9 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           } catch (logError) {
             console.error(`⚠️ [EmailSends] Failed to log to email_sends table:`, logError);
           }
-          
-          // Wait 20 seconds before sending promotional email
-          console.log(`⏳ [SPLIT FLOW] Waiting 20 seconds before sending promo...`);
-          await new Promise(resolve => setTimeout(resolve, 20000));
 
-          // Send promotional email separately
+          // Wait 20 seconds before sending promotional email
+          // Send promotional email separately (queued)
           const promoSubject = settings.promotion.title || 'Special Birthday Offer!';
           const htmlPromo = `
             <html>
@@ -2752,75 +3193,27 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
             </html>
           `;
 
-          const promoResult = await enhancedEmailService.sendCustomEmail(
-            contact.email,
-            `🎁 ${promoSubject}`,
-            htmlPromo,
+          console.log(`⏳ [SPLIT FLOW] Queuing promotional email job (20s delay) for ${contact.email}`);
+          const queueResult = await enqueuePromotionalEmailJob(
             {
-              text: htmlPromo.replace(/<[^>]*>/g, ''),
-              from: 'admin@zendwise.work',
-              metadata: {
-                type: 'birthday-promotion',
-                contactId: contact.id,
-                tenantId: tenantId,
-                manual: true,
-                tags: ['birthday', 'manual', 'promotion', `tenant-${tenantId}`],
-                unsubscribeToken: unsubscribeToken || 'none',
-              },
-            }
+              tenantId,
+              contactId: contact.id,
+              recipientEmail: contact.email,
+              recipientName,
+              senderName: resolvedSenderName,
+              promoSubject,
+              htmlPromo,
+              unsubscribeToken,
+              promotionId: settings.promotion?.id || null,
+              manual: true,
+            },
+            20000
           );
 
-          console.log(`✅ [SPLIT FLOW] Promotional email sent to ${contact.email}`);
-          
-          // Log promotional email to database
-          try {
-            await db.insert(emailActivity).values({
-              tenantId: tenantId,
-              contactId: contact.id,
-              activityType: 'sent',
-              activityData: JSON.stringify({ type: 'birthday-promotion', manual: true, split: true, subject: `🎁 ${promoSubject}`, recipient: contact.email, from: 'admin@zendwise.work' }),
-              occurredAt: new Date(),
-            });
-            console.log(`📝 [SPLIT FLOW] Logged promotional email activity for ${contact.email}`);
-          } catch (logError) {
-            console.error(`⚠️ [SPLIT FLOW] Failed to log promotional email activity:`, logError);
-          }
-          
-          // Log to email_sends table
-          try {
-            const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
-            await db.insert(emailSends).values({
-              id: emailSendId,
-              tenantId: tenantId,
-              recipientEmail: contact.email,
-              recipientName: recipientName,
-              senderEmail: 'admin@zendwise.work',
-              senderName: resolvedSenderName,
-              subject: `🎁 ${settings.promotion?.title || 'Special Birthday Offer!'}`,
-              emailType: 'birthday_promotion',
-              provider: 'resend',
-              providerMessageId: typeof promoResult === 'string' ? promoResult : promoResult.messageId,
-              status: 'sent',
-              contactId: contact.id,
-              promotionId: settings.promotion?.id || null,
-              sentAt: new Date(),
-            });
-            
-            // Also store the content
-            await db.insert(emailContent).values({
-              emailSendId: emailSendId,
-              htmlContent: htmlPromo,
-              textContent: htmlPromo.replace(/<[^>]*>/g, ''),
-              metadata: JSON.stringify({
-                split: true,
-                manual: true,
-                birthdayCard: false,
-                promotional: true
-              })
-            });
-            console.log(`📧 [EmailSends] Logged promotional email to email_sends for ${contact.email}`);
-          } catch (logError) {
-            console.error(`⚠️ [EmailSends] Failed to log to email_sends table:`, logError);
+          if (queueResult.success) {
+            console.log(`✅ [SPLIT FLOW] Promotional email queued successfully (runId: ${queueResult.runId})`);
+          } else {
+            console.warn(`⚠️ [SPLIT FLOW] Promotional email queue failed: ${queueResult.error}`);
           }
 
           // Record both emails as success
@@ -2830,7 +3223,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               email: contact.email,
               success: true,
               messageId: typeof birthdayResult === 'string' ? birthdayResult : birthdayResult.messageId,
-              note: 'Split email: Birthday and promotion sent separately',
+              note: 'Split email: Birthday sent, promotion queued',
             });
           } else {
             results.push({
@@ -2840,7 +3233,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               error: birthdayResult.error || 'Unknown error',
             });
           }
-          
+
           continue; // Skip to next contact
         }
         // --- END SPLIT EMAIL LOGIC ---
@@ -2893,7 +3286,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           } catch (logError) {
             console.error(`⚠️ [ManualBirthdayCard] Failed to log queued birthday card activity:`, logError);
           }
-          
+
           // Log to email_sends table
           try {
             const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
@@ -2913,7 +3306,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               promotionId: null,
               sentAt: new Date(),
             });
-            
+
             // Also store the content
             await db.insert(emailContent).values({
               emailSendId: emailSendId,
@@ -2930,7 +3323,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           } catch (logError) {
             console.error(`⚠️ [EmailSends] Failed to log to email_sends table:`, logError);
           }
-          
+
           console.log(`✅ [ManualBirthdayCard] Birthday card queued for ${contact.email}: ${result}`);
           results.push({
             contactId: contact.id,
@@ -2940,7 +3333,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           });
         } else if (result.success) {
           console.log(`✅ [ManualBirthdayCard] Birthday card sent to ${contact.email}`);
-          
+
           // Log to database
           try {
             await db.insert(emailActivity).values({
@@ -2954,7 +3347,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           } catch (logError) {
             console.error(`⚠️ [ManualBirthdayCard] Failed to log birthday card activity:`, logError);
           }
-          
+
           // Log to email_sends table
           try {
             const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
@@ -2974,7 +3367,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               promotionId: settings.promotion?.id || null,
               sentAt: new Date(),
             });
-            
+
             // Also store the content
             await db.insert(emailContent).values({
               emailSendId: emailSendId,
@@ -3299,12 +3692,14 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     // Validate input
     if (!subject || !content) {
       return res.status(400).json({
-        success: false,
-        message: "Subject and content are required"
+        message: 'Subject and content are required'
       });
     }
 
-    // Get contact details
+    // Check email sending limits
+    await storage.validateEmailSending(tenantId, 1);
+
+    // Get contact
     const contact = await db.query.emailContacts.findFirst({
       where: and(
         eq(emailContacts.id, id),
@@ -3345,6 +3740,41 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     });
     const companyName = (company?.name || '').trim();
 
+    // Get master email design settings
+    const emailDesign = await db.query.masterEmailDesign.findFirst({
+      where: sql`${masterEmailDesign.tenantId} = ${tenantId}`,
+    });
+    console.log('📧 [SendEmail] Master email design found:', emailDesign ? 'yes' : 'no (using defaults)', emailDesign ? { id: emailDesign.id, logoUrl: emailDesign.logoUrl, headerText: emailDesign.headerText, primaryColor: emailDesign.primaryColor } : {});
+
+    // Design settings with defaults
+    const design = {
+      primaryColor: emailDesign?.primaryColor || '#3B82F6',
+      secondaryColor: emailDesign?.secondaryColor || '#1E40AF',
+      accentColor: emailDesign?.accentColor || '#10B981',
+      fontFamily: emailDesign?.fontFamily || 'Arial, sans-serif',
+      logoUrl: emailDesign?.logoUrl || company?.logoUrl || null,
+      headerText: emailDesign?.headerText || null,
+      footerText: emailDesign?.footerText || (companyName ? `© ${new Date().getFullYear()} ${companyName}. All rights reserved.` : ''),
+      socialLinks: null as null | {
+        facebook?: string;
+        twitter?: string;
+        instagram?: string;
+        linkedin?: string;
+      },
+      displayCompanyName: emailDesign?.companyName || companyName,
+    };
+
+    if (emailDesign?.socialLinks) {
+      try {
+        const parsed = JSON.parse(emailDesign.socialLinks);
+        if (parsed && typeof parsed === 'object') {
+          design.socialLinks = parsed;
+        }
+      } catch (e) {
+        console.error('[SendEmail] Failed to parse socialLinks:', e);
+      }
+    }
+
     // Generate or reuse unsubscribe token
     let unsub = await db.query.unsubscribeTokens.findFirst({
       where: and(eq(unsubscribeTokens.tenantId, tenantId), eq(unsubscribeTokens.contactId, contact.id), sql`${unsubscribeTokens.usedAt} IS NULL`),
@@ -3356,33 +3786,99 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     }
     const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(unsub.token)}`;
 
-    // Format content as HTML
+    // Build social links HTML if available
+    let socialLinksHtml = '';
+    if (design.socialLinks) {
+      const links = [];
+      // Use gray color for social links to match management preview style
+      const linkStyle = "color: #64748b; text-decoration: none; margin: 0 10px; font-weight: 500;";
+
+      if (design.socialLinks.facebook && isValidHttpUrl(design.socialLinks.facebook)) {
+        links.push(`<a href="${escapeHtml(design.socialLinks.facebook)}" style="${linkStyle}">Facebook</a>`);
+      }
+      if (design.socialLinks.twitter && isValidHttpUrl(design.socialLinks.twitter)) {
+        links.push(`<a href="${escapeHtml(design.socialLinks.twitter)}" style="${linkStyle}">Twitter</a>`);
+      }
+      if (design.socialLinks.instagram && isValidHttpUrl(design.socialLinks.instagram)) {
+        links.push(`<a href="${escapeHtml(design.socialLinks.instagram)}" style="${linkStyle}">Instagram</a>`);
+      }
+      if (design.socialLinks.linkedin && isValidHttpUrl(design.socialLinks.linkedin)) {
+        links.push(`<a href="${escapeHtml(design.socialLinks.linkedin)}" style="${linkStyle}">LinkedIn</a>`);
+      }
+
+      if (links.length > 0) {
+        socialLinksHtml = `<div style="margin-bottom: 24px;">${links.join(' | ')}</div>`;
+      }
+    }
+
+    // Format content as HTML using master email design
     const htmlContent = `
+      <!DOCTYPE html>
       <html>
-        <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: #f7fafc;">
-          <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-            <div style="padding: 30px;">
-              <div style="font-size: 1rem; line-height: 1.6; color: #2d3748; white-space: pre-wrap;">${content.replace(/\n/g, '<br>')}</div>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: ${design.fontFamily}; margin: 0; padding: 0; background-color: #f7fafc; -webkit-font-smoothing: antialiased;">
+          <div style="max-width: 600px; margin: 0 auto; background: white;">
+            
+            <!-- Hero Header -->
+            <div style="padding: 40px 32px; text-align: center; background-color: ${design.primaryColor}; color: #ffffff;">
+              ${design.logoUrl ? `
+                <img src="${design.logoUrl}" alt="${design.displayCompanyName}" style="height: 48px; width: auto; margin-bottom: 20px; object-fit: contain;" />
+              ` : `
+                <div style="height: 48px; width: 48px; background-color: rgba(255,255,255,0.2); border-radius: 50%; margin: 0 auto 16px auto; line-height: 48px; font-size: 20px; font-weight: bold; color: #ffffff; text-align: center;">
+                  ${(design.displayCompanyName || 'C').charAt(0)}
+                </div>
+              `}
+              <h1 style="margin: 0 0 10px 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em; color: #ffffff;">
+                ${design.displayCompanyName}
+              </h1>
+              ${design.headerText ? `
+                <p style="margin: 0 auto; font-size: 16px; opacity: 0.95; max-width: 400px; line-height: 1.5; color: #ffffff;">
+                  ${design.headerText}
+                </p>
+              ` : ''}
             </div>
-            <div style="padding: 20px 30px; background-color: #f7fafc; border-top: 1px solid #e2e8f0; text-align: center;">
-              <p style="margin: 0; font-size: 0.875rem; color: #718096;">
-                ${companyName ? `Sent from ${companyName}` : ''}
-              </p>
-              <p style="margin: 8px 0 0; font-size: 0.75rem; color: #94a3b8;">
-                <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
-              </p>
+
+            <!-- Body Content -->
+            <div style="padding: 32px 32px 40px 32px;">
+              <div style="font-size: 16px; line-height: 1.625; color: #334155;">
+                ${content.replace(/\n/g, '<br>')}
+              </div>
             </div>
+
+            <!-- Footer -->
+            <div style="background-color: #f8fafc; padding: 32px; text-align: center; border-top: 1px solid #e2e8f0; color: #64748b;">
+              
+              ${socialLinksHtml}
+              
+              ${design.footerText ? `
+                <p style="margin: 0 0 16px 0; font-size: 12px; line-height: 1.5; color: #64748b;">${design.footerText}</p>
+              ` : ''}
+              
+              <div style="font-size: 12px; line-height: 1.5; color: #94a3b8;">
+                <p style="margin: 0;">
+                  Sent via ${design.displayCompanyName}
+                  <br>
+                  <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
+                </p>
+              </div>
+            </div>
+            
           </div>
         </body>
       </html>
     `;
 
-    // Send email
-    const result = await enhancedEmailService.sendCustomEmail(
-      contact.email,
-      subject,
-      htmlContent,
-      {
+    // Send email via Trigger.dev queue
+    let result: { success: boolean; runId?: string; error?: string };
+    try {
+      const { sendEmailTask } = await import('../../src/trigger/email');
+      const handle = await sendEmailTask.trigger({
+        to: contact.email,
+        subject: subject,
+        html: htmlContent,
         text: `${content}\n\nUnsubscribe: ${unsubscribeUrl}`,
         headers: {
           'List-Unsubscribe': `<${unsubscribeUrl}>`,
@@ -3394,8 +3890,16 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
           tenantId: tenantId,
           sentBy: req.user.id
         }
-      }
-    );
+      });
+      console.log(`📧 [SendEmail] Triggered send-email task, runId: ${handle.id}`);
+      result = { success: true, runId: handle.id };
+    } catch (triggerError: any) {
+      console.error('[SendEmail] Failed to trigger email task:', triggerError);
+      return res.status(503).json({
+        success: false,
+        message: 'Email server is not available. Please try again later.'
+      });
+    }
 
     // Log email activity
     await db.insert(emailActivity).values({
@@ -3410,10 +3914,32 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       occurredAt: new Date(),
     });
 
-    // Update contact stats
+    // Log to email_sends table for limit tracking
+    try {
+      const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
+      await db.insert(emailSends).values({
+        id: emailSendId,
+        tenantId: tenantId,
+        recipientEmail: contact.email,
+        recipientName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email,
+        senderEmail: 'admin@zendwise.work', // Default sender or configured one
+        senderName: design.displayCompanyName || 'Manager',
+        subject: subject,
+        emailType: 'individual',
+        provider: 'resend', // Or 'trigger.dev'
+        providerMessageId: result?.runId,
+        status: 'queued',
+        contactId: contact.id,
+        promotionId: null,
+        sentAt: null, // Not sent yet
+      });
+    } catch (logError) {
+      console.error(`⚠️ [SendEmail] Failed to log to email_sends table:`, logError);
+    }
+
+    // Update contact stats - Do not increment emailsSent here (webhook will do it)
     await db.update(emailContacts)
       .set({
-        emailsSent: sql`${emailContacts.emailsSent} + 1`,
         lastActivity: new Date(),
         updatedAt: new Date()
       })

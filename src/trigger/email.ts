@@ -239,3 +239,119 @@ export const scheduleEmailTask = task({
     throw new Error(`Email send failed: ${result.error}`);
   },
 });
+
+// Schema for promotional email payload
+const promotionalEmailPayloadSchema = z.object({
+  tenantId: z.string(),
+  contactId: z.string(),
+  recipientEmail: z.string().email(),
+  recipientName: z.string(),
+  senderName: z.string(),
+  promoSubject: z.string(),
+  htmlPromo: z.string(),
+  unsubscribeToken: z.string().optional(),
+  promotionId: z.string().nullable().optional(),
+  manual: z.boolean().optional(),
+  delayMs: z.number().optional(),
+});
+
+export type PromotionalEmailPayload = z.infer<typeof promotionalEmailPayloadSchema>;
+
+/**
+ * Schedule a promotional email with a delay
+ * Uses wait.for to pause execution, then calls back to the server's internal API
+ * to execute the email send with proper database logging
+ */
+export const schedulePromotionalEmailTask = task({
+  id: "schedule-promotional-email",
+  maxDuration: 300, // 5 minutes max
+  retry: {
+    maxAttempts: 3,
+    minTimeoutInMs: 1000,
+    maxTimeoutInMs: 10000,
+    factor: 2,
+  },
+  run: async (payload: PromotionalEmailPayload) => {
+    const data = promotionalEmailPayloadSchema.parse(payload);
+
+    logger.info("Scheduling promotional email", {
+      contactId: data.contactId,
+      recipientEmail: data.recipientEmail,
+      delayMs: data.delayMs || 0,
+    });
+
+    // Wait for the specified delay
+    if (data.delayMs && data.delayMs > 0) {
+      await wait.for({ milliseconds: data.delayMs });
+      logger.info("Delay completed, sending promotional email via internal API");
+    }
+
+    // Call the internal API endpoint to execute the email send with database logging
+    const apiUrl = process.env.API_URL || 'http://localhost:5000';
+    const secret = process.env.INTERNAL_SERVICE_SECRET;
+
+    if (!secret) {
+      logger.error('INTERNAL_SERVICE_SECRET not configured');
+      throw new Error('INTERNAL_SERVICE_SECRET not configured');
+    }
+
+    const timestamp = Date.now();
+    const body = {
+      tenantId: data.tenantId,
+      contactId: data.contactId,
+      recipientEmail: data.recipientEmail,
+      recipientName: data.recipientName,
+      senderName: data.senderName,
+      promoSubject: data.promoSubject,
+      htmlPromo: data.htmlPromo,
+      unsubscribeToken: data.unsubscribeToken,
+      promotionId: data.promotionId,
+      manual: data.manual,
+    };
+
+    const { createHmac } = await import('crypto');
+    const signaturePayload = `${timestamp}.${JSON.stringify(body)}`;
+    const signature = createHmac('sha256', secret).update(signaturePayload).digest('hex');
+
+    try {
+      const response = await fetch(`${apiUrl}/api/internal/send-promotional-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-service': 'trigger.dev',
+          'x-internal-timestamp': timestamp.toString(),
+          'x-internal-signature': signature,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        logger.error(`Failed to send promotional email via internal API: ${response.status}`, {
+          error: errorText,
+        });
+        throw new Error(`Internal API error: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      logger.info("Promotional email sent successfully via internal API", {
+        contactId: data.contactId,
+        recipientEmail: data.recipientEmail,
+      });
+
+      return {
+        success: true,
+        contactId: data.contactId,
+        recipientEmail: data.recipientEmail,
+        tenantId: data.tenantId,
+        promotionId: data.promotionId,
+        sentAt: new Date().toISOString(),
+        ...result,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      logger.error("Exception sending promotional email", { error: errorMessage });
+      throw new Error(`Failed to send promotional email: ${errorMessage}`);
+    }
+  },
+});

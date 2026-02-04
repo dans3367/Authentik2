@@ -173,6 +173,7 @@ export const subscriptionPlans = pgTable("subscription_plans", {
   isPopular: boolean("is_popular").default(false),
   isActive: boolean("is_active").default(true),
   sortOrder: integer("sort_order").default(0),
+  monthlyEmailLimit: integer("monthly_email_limit").default(200), // Default to 200 checks/emails if not specified
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -204,6 +205,7 @@ export const tenantLimits = pgTable("tenant_limits", {
   maxShops: integer("max_shops"), // NULL means use subscription plan limit
   maxUsers: integer("max_users"), // NULL means use subscription plan limit
   maxStorageGb: integer("max_storage_gb"), // NULL means use subscription plan limit
+  monthlyEmailLimit: integer("monthly_email_limit"), // NULL means use subscription plan limit
   customLimits: text("custom_limits").default('{}'), // JSON for future extensibility
   overrideReason: text("override_reason"), // Why this tenant has custom limits
   createdBy: varchar("created_by").references(() => betterAuthUser.id, { onDelete: 'set null' }),
@@ -1753,6 +1755,35 @@ export const eCardSettings = pgTable("e_card_settings", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Master email design settings for tenant-wide email branding
+export const masterEmailDesign = pgTable("master_email_design", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().unique().references(() => tenants.id, { onDelete: 'cascade' }),
+  companyName: text("company_name").default(''),
+  logoUrl: text("logo_url"),
+  primaryColor: text("primary_color").default('#3B82F6'),
+  secondaryColor: text("secondary_color").default('#1E40AF'),
+  accentColor: text("accent_color").default('#10B981'),
+  fontFamily: text("font_family").default('Arial, sans-serif'),
+  headerText: text("header_text"),
+  footerText: text("footer_text"),
+  socialLinks: text("social_links"), // JSON: { facebook, twitter, instagram, linkedin }
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Master email design relations
+export const masterEmailDesignRelations = relations(masterEmailDesign, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [masterEmailDesign.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+// Master email design types
+export type MasterEmailDesign = typeof masterEmailDesign.$inferSelect;
+export type InsertMasterEmailDesign = typeof masterEmailDesign.$inferInsert;
 
 export const birthdayUnsubscribeTokens = pgTable("birthday_unsubscribe_tokens", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

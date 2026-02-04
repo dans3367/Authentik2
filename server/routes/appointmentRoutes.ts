@@ -14,6 +14,7 @@ import {
 } from '@shared/schema';
 import { authenticateToken } from '../middleware/auth-middleware';
 import { requireRole } from '../middleware/auth-middleware';
+import { logActivity, computeChanges } from '../utils/activityLogger';
 import { v4 as uuidv4 } from 'uuid';
 import { cancelReminderRun, triggerRescheduleEmail } from '../lib/trigger';
 
@@ -327,6 +328,33 @@ router.post('/', async (req: Request, res: Response) => {
       appointmentCustomer = customerData[0] || null;
     }
 
+    // Log activity for appointment creation
+    const customerName = appointmentCustomer 
+      ? `${appointmentCustomer.firstName || ''} ${appointmentCustomer.lastName || ''}`.trim() || appointmentCustomer.email
+      : 'Unknown Customer';
+    
+    try {
+      await logActivity({
+        tenantId,
+        userId,
+        entityType: 'appointment',
+        entityId: newAppointment[0].id,
+        entityName: newAppointment[0].title,
+        activityType: 'created',
+        description: `Created appointment "${newAppointment[0].title}" for ${customerName}`,
+        metadata: {
+          customerId: newAppointment[0].customerId,
+          customerName,
+          appointmentDate: newAppointment[0].appointmentDate,
+          serviceType: newAppointment[0].serviceType,
+          location: newAppointment[0].location,
+        },
+        req,
+      });
+    } catch (error) {
+      console.error('[Activity Log] Failed to log appointment creation:', error);
+    }
+
     res.status(201).json({
       appointment: { ...newAppointment[0], customer: appointmentCustomer },
       message: 'Appointment created successfully'
@@ -396,6 +424,32 @@ router.put('/:id', async (req: Request, res: Response) => {
       })
       .where(eq(appointments.id, id))
       .returning();
+
+    // Log activity for appointment update
+    const changes = computeChanges(existing, updatedAppointment[0], [
+      'title', 'description', 'appointmentDate', 'duration', 'location',
+      'serviceType', 'status', 'notes', 'customerId'
+    ]);
+
+    try {
+      await logActivity({
+        tenantId,
+        userId: user.id,
+        entityType: 'appointment',
+        entityId: id,
+        entityName: updatedAppointment[0].title,
+        activityType: 'updated',
+        description: `Updated appointment "${updatedAppointment[0].title}"`,
+        changes: changes || undefined,
+        metadata: {
+          isDateChanged: isDateChanging,
+          remindersCancelled,
+        },
+        req,
+      });
+    } catch (error) {
+      console.error('[Activity Log] Failed to log appointment update:', error);
+    }
 
     res.json({
       appointment: updatedAppointment[0],
@@ -479,6 +533,32 @@ router.patch('/:id', async (req: Request, res: Response) => {
       .where(eq(appointments.id, id))
       .returning();
 
+    // Log activity for appointment update
+    const changes = computeChanges(existing, updatedAppointment[0], [
+      'title', 'description', 'appointmentDate', 'duration', 'location',
+      'serviceType', 'status', 'notes', 'customerId'
+    ]);
+
+    try {
+      await logActivity({
+        tenantId,
+        userId: user.id,
+        entityType: 'appointment',
+        entityId: id,
+        entityName: updatedAppointment[0].title,
+        activityType: 'updated',
+        description: `Updated appointment "${updatedAppointment[0].title}"`,
+        changes: changes || undefined,
+        metadata: {
+          isDateChanged: isDateChanging,
+          remindersCancelled,
+        },
+        req,
+      });
+    } catch (error) {
+      console.error('[Activity Log] Failed to log appointment update:', error);
+    }
+
     res.json({
       appointment: updatedAppointment[0],
       message: 'Appointment updated successfully',
@@ -525,6 +605,30 @@ router.delete('/:id', requireRole(['Owner', 'Administrator', 'Manager']), async 
     await db
       .delete(appointments)
       .where(eq(appointments.id, id));
+
+    // Log activity for appointment deletion after deleting
+    const deletedAppointment = existingAppointment[0];
+    try {
+      await logActivity({
+        tenantId,
+        userId: user.id,
+        entityType: 'appointment',
+        entityId: id,
+        entityName: deletedAppointment.title,
+        activityType: 'deleted',
+        description: `Deleted appointment "${deletedAppointment.title}"`,
+        metadata: {
+          customerId: deletedAppointment.customerId,
+          appointmentDate: deletedAppointment.appointmentDate,
+          serviceType: deletedAppointment.serviceType,
+          status: deletedAppointment.status,
+          remindersCancelled: cancelResult.cancelled,
+        },
+        req,
+      });
+    } catch (error) {
+      console.error('[Activity Log] Failed to log appointment deletion:', error);
+    }
 
     res.json({ 
       message: 'Appointment deleted successfully',

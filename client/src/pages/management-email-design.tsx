@@ -189,8 +189,13 @@ export default function ManagementEmailDesign() {
   const { data: masterDesign, isLoading } = useQuery({
     queryKey: ["/api/master-email-design"],
     queryFn: async () => {
-      // In a real app, this would fetch from API
-      return mockMasterDesign;
+      const response = await fetch('/api/master-email-design', {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch email design');
+      }
+      return response.json();
     },
   });
 
@@ -223,9 +228,19 @@ export default function ManagementEmailDesign() {
 
   const updateMutation = useMutation({
     mutationFn: async (designData: Partial<MasterEmailDesign>) => {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-      return { success: true, design: designData };
+      const response = await fetch('/api/master-email-design', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(designData),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to update email design');
+      }
+      return response.json();
     },
     onSuccess: async () => {
       setHasChanges(false);

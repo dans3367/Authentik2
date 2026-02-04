@@ -10,6 +10,7 @@ import {
 } from '@shared/schema';
 import { authenticateToken } from '../middleware/auth-middleware';
 import { authenticateInternalService, InternalServiceRequest } from '../middleware/internal-service-auth';
+import { logActivity } from '../utils/activityLogger';
 import { triggerSendReminder, triggerScheduleReminder, cancelReminderRun } from '../lib/trigger';
 import type { ReminderPayload } from '../../src/trigger/reminders';
 
@@ -291,6 +292,32 @@ router.post('/', async (req: Request, res: Response) => {
           })
           .where(eq(appointmentReminders.id, newReminder[0].id));
       }
+    }
+
+    // Log activity for reminder creation
+    try {
+      await logActivity({
+        tenantId,
+        userId: user.id,
+        entityType: 'appointment',
+        entityId: validatedData.appointmentId,
+        entityName: appointment.title,
+        activityType: isSendNow ? 'sent' : 'scheduled',
+        description: isSendNow 
+          ? `Sent reminder for appointment "${appointment.title}"` 
+          : `Scheduled reminder for appointment "${appointment.title}"`,
+        metadata: {
+          reminderId: newReminder[0].id,
+          reminderType: validatedData.reminderType,
+          reminderTiming: validatedData.reminderTiming,
+          scheduledFor: validatedData.scheduledFor,
+          customerEmail: appointment.customer?.email,
+          customerName,
+        },
+        req,
+      });
+    } catch (error) {
+      console.error('[Activity Log] Failed to log reminder creation:', error);
     }
 
     res.status(201).json({ 

@@ -42,10 +42,11 @@ export default function EmailActivityTimelineModal({
     enabled: open && !contactId && !!contactEmail,
   });
 
-  const contact = contactData?.contacts?.[0];
-  const resolvedContactId = contact?.id;
-  const isLookingUpContact = isContactLoading;
-  const displayName = contact ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email : contactEmail;
+  // Use the directly passed contactId if available, otherwise use the one from the lookup
+  const contact = contactData;
+  const resolvedContactId = contactId || contact?.id;
+  const isLookingUpContact = !contactId && isContactLoading;
+  const displayName = contactName || (contact ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email : contactEmail);
 
   const handleOpenModal = () => {
     setOpen(true);
@@ -86,7 +87,7 @@ export default function EmailActivityTimelineModal({
           </DialogDescription>
         </DialogHeader>
         
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-y-auto">
           {isLookingUpContact ? (
             <div className="space-y-4 p-3 sm:p-6">
               <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
@@ -96,7 +97,7 @@ export default function EmailActivityTimelineModal({
               <Skeleton className="h-24 sm:h-32 w-full" />
               <Skeleton className="h-24 sm:h-32 w-full" />
             </div>
-          ) : contactError || (!resolvedContactId && contactEmail) ? (
+          ) : contactError || (!resolvedContactId && !contactId && contactEmail) ? (
             <div className="flex flex-col items-center justify-center py-8 sm:py-12 text-center px-4">
               <AlertCircle className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground mb-4" />
               <h3 className="text-base sm:text-lg font-medium text-foreground mb-2">
