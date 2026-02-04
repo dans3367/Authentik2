@@ -77,6 +77,7 @@ import ContactViewDrawer from "@/components/ContactViewDrawer";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { NextUpAppointments } from "@/components/NextUpAppointments";
 
 // Types based on our schema
 interface Customer {
@@ -324,19 +325,19 @@ export default function RemindersPage() {
       toast({ title: t('reminders.toasts.success'), description: t('reminders.toasts.reminderScheduled') });
       setScheduleReminderModalOpen(false);
       setScheduleAppointmentId("");
-      
+
       // Refetch reminders with error handling
       try {
         await refetchReminders();
       } catch (error) {
         console.error('Failed to refetch reminders:', error);
       }
-      
+
       // Invalidate appointments queries to refresh the list with updated reminder status
-      queryClient.invalidateQueries({ 
-        predicate: (query) => query.queryKey[0] === '/api/appointments' 
+      queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey[0] === '/api/appointments'
       });
-      
+
       // Remove from pending reminders set (this will always execute even if refetch fails)
       if (isMountedRef.current) {
         setPendingReminderAppointmentIds(prev => {
@@ -355,7 +356,7 @@ export default function RemindersPage() {
           return next;
         });
       }
-      
+
       toast({ title: t('reminders.toasts.error'), description: error?.message || t('reminders.toasts.reminderScheduleError'), variant: 'destructive' });
     }
   });
@@ -414,15 +415,15 @@ export default function RemindersPage() {
   const cleanupOldQueryCache = () => {
     const queryCache = queryClient.getQueryCache();
     const allQueries = queryCache.getAll();
-    
+
     // Remove any queries that might have old showArchived parameter
     allQueries.forEach(query => {
       const queryKey = query.queryKey;
       if (
-        Array.isArray(queryKey) && 
-        queryKey[0] === '/api/appointments' && 
+        Array.isArray(queryKey) &&
+        queryKey[0] === '/api/appointments' &&
         (queryKey.some(key => typeof key === 'object' && key && 'showArchived' in key) ||
-         queryKey.some(key => typeof key === 'string' && key.includes('showArchived')))
+          queryKey.some(key => typeof key === 'string' && key.includes('showArchived')))
       ) {
         queryCache.remove(query);
         console.log('Cleaned up old query with showArchived parameter:', queryKey);
@@ -756,8 +757,8 @@ export default function RemindersPage() {
         );
       }
 
-      queryClient.invalidateQueries({ 
-        predicate: (query) => query.queryKey[0] === '/api/appointments' 
+      queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey[0] === '/api/appointments'
       });
       refetchAppointments();
       setEditAppointmentModalOpen(false);
@@ -801,7 +802,7 @@ export default function RemindersPage() {
     },
     onMutate: async (params: { appointmentData: any; createReminder: boolean; reminderSettings: any }) => {
       const { appointmentData } = params;
-      
+
       // Validate customer exists before proceeding with optimistic update
       const selectedCustomer = customers.find(c => c.id === appointmentData.customerId);
       if (!selectedCustomer) {
@@ -868,14 +869,14 @@ export default function RemindersPage() {
       // Replace optimistic appointment with real data from server
       if (data?.appointment) {
         const realAppointment = data.appointment;
-        
+
         // Update cache with real appointment data (replace temp with real)
         queryClient.setQueryData<{ appointments: Appointment[] }>(
           ['/api/appointments'],
           (old) => {
             if (!old?.appointments) return old;
             return {
-              appointments: old.appointments.map(apt => 
+              appointments: old.appointments.map(apt =>
                 apt.id === context?.tempId ? { ...realAppointment, customer: realAppointment.customer || apt.customer } : apt
               ),
             };
@@ -883,8 +884,8 @@ export default function RemindersPage() {
         );
       } else {
         // Fallback: invalidate to get fresh data if server response format is unexpected
-        queryClient.invalidateQueries({ 
-          predicate: (query) => query.queryKey[0] === '/api/appointments' 
+        queryClient.invalidateQueries({
+          predicate: (query) => query.queryKey[0] === '/api/appointments'
         });
       }
 
@@ -937,11 +938,11 @@ export default function RemindersPage() {
           return next;
         });
       }
-      
+
       // Provide specific error messages for different types of failures
       let errorMessage = error?.message || t('reminders.toasts.appointmentCreateError');
       let errorDescription = '';
-      
+
       if (errorMessage.includes('Customer not found') || errorMessage.includes('Selected customer not found')) {
         errorDescription = 'Please select a valid customer from the list and try again.';
       } else if (errorMessage.includes('does not belong to your organization')) {
@@ -951,7 +952,7 @@ export default function RemindersPage() {
       } else {
         errorDescription = errorMessage;
       }
-      
+
       toast({
         title: t('reminders.toasts.error'),
         description: errorDescription,
@@ -1025,8 +1026,8 @@ export default function RemindersPage() {
         description: 'Appointment confirmed successfully',
       });
       refetchAppointments();
-      queryClient.invalidateQueries({ 
-        predicate: (query) => query.queryKey[0] === '/api/appointments' 
+      queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey[0] === '/api/appointments'
       });
     },
     onError: (error: any) => {
@@ -1349,14 +1350,14 @@ export default function RemindersPage() {
     // Capture reminder settings before resetting form
     const shouldCreateReminder = newAppointmentReminderEnabled;
     const reminderSettings = { ...newAppointmentReminderData };
-    
+
     // Pass reminder data with mutation
     createAppointmentMutation.mutate({
       appointmentData: newAppointmentData,
       createReminder: shouldCreateReminder,
       reminderSettings: reminderSettings
     });
-    
+
     // Close modal and reset form after mutation is initiated
     setNewAppointmentModalOpen(false);
     resetNewAppointmentData();
@@ -1364,18 +1365,18 @@ export default function RemindersPage() {
 
   const confirmPastDateAppointment = () => {
     setPastDateConfirmModalOpen(false);
-    
+
     // Capture reminder settings before resetting form
     const shouldCreateReminder = newAppointmentReminderEnabled;
     const reminderSettings = { ...newAppointmentReminderData };
-    
+
     // Pass reminder data with mutation
     createAppointmentMutation.mutate({
       appointmentData: newAppointmentData,
       createReminder: shouldCreateReminder,
       reminderSettings: reminderSettings
     });
-    
+
     // Close modal and reset form after mutation is initiated
     setNewAppointmentModalOpen(false);
     resetNewAppointmentData();
@@ -1527,6 +1528,12 @@ export default function RemindersPage() {
 
         {/* Appointments Content */}
         <div className="flex flex-col gap-6">
+          {/* Next Up Section */}
+          <NextUpAppointments
+            appointments={allAppointments}
+            onViewDetails={handleViewAppointment}
+          />
+
           {/* Overview and Upcoming Side by Side */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 order-2">
             {/* Overview Stats */}
@@ -1623,8 +1630,8 @@ export default function RemindersPage() {
                     onClick={async () => {
                       // Invalidate queries to trigger refetch
                       await Promise.all([
-                        queryClient.invalidateQueries({ 
-                          predicate: (query) => query.queryKey[0] === '/api/appointments' 
+                        queryClient.invalidateQueries({
+                          predicate: (query) => query.queryKey[0] === '/api/appointments'
                         }),
                         queryClient.invalidateQueries({ queryKey: ['/api/appointment-reminders'] })
                       ]);
@@ -1936,7 +1943,7 @@ export default function RemindersPage() {
                   <TabsList>
                     <TabsTrigger value="upcoming" className="flex items-center gap-2">
                       <Calendar className="h-4 w-4" />
-                      Upcoming
+                      Scheduled
                     </TabsTrigger>
                     <TabsTrigger value="past" className="flex items-center gap-2">
                       <Clock className="h-4 w-4" />
@@ -2235,153 +2242,153 @@ export default function RemindersPage() {
                                 appointments.map((appointment) => {
                                   const isPending = pendingAppointmentIds.has(appointment.id);
                                   return (
-                                  <TableRow
-                                    key={appointment.id}
-                                    onClick={() => !isPending && handleViewAppointment(appointment)}
-                                    className={`${isPending ? 'opacity-70 pointer-events-none' : 'cursor-pointer'} ${isPending ? 'animate-pulse bg-muted/30' : ''}`}
-                                  >
-                                    <TableCell onClick={(event) => event.stopPropagation()}>
-                                      {isPending ? (
-                                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                                      ) : (
-                                        <Checkbox
-                                          checked={selectedAppointments.includes(appointment.id)}
-                                          onCheckedChange={(checked) => handleSelectAppointment(appointment.id, checked as boolean)}
-                                        />
-                                      )}
-                                    </TableCell>
-                                    <TableCell>
-                                      <div>
-                                        <p className="font-medium">{getCustomerName(appointment.customer)}</p>
-                                        <p className="text-sm text-gray-500">{appointment.customer?.email}</p>
-                                      </div>
-                                    </TableCell>
-                                    <TableCell>
-                                      <div>
-                                        <p className="font-medium">{appointment.title}</p>
-                                        {appointment.location && (
-                                          <p className="text-sm text-gray-500 flex items-center gap-1">
-                                            <MapPin className="h-3 w-3" />
-                                            {appointment.location}
-                                          </p>
+                                    <TableRow
+                                      key={appointment.id}
+                                      onClick={() => !isPending && handleViewAppointment(appointment)}
+                                      className={`${isPending ? 'opacity-70 pointer-events-none' : 'cursor-pointer'} ${isPending ? 'animate-pulse bg-muted/30' : ''}`}
+                                    >
+                                      <TableCell onClick={(event) => event.stopPropagation()}>
+                                        {isPending ? (
+                                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                        ) : (
+                                          <Checkbox
+                                            checked={selectedAppointments.includes(appointment.id)}
+                                            onCheckedChange={(checked) => handleSelectAppointment(appointment.id, checked as boolean)}
+                                          />
                                         )}
-                                      </div>
-                                    </TableCell>
-                                    <TableCell>
-                                      <div>
-                                        <p className="font-medium">{formatDateTime(appointment.appointmentDate)}</p>
-                                        <p className="text-sm text-gray-500 flex items-center gap-1">
-                                          <Timer className="h-3 w-3" />
-                                          {appointment.duration} {t('reminders.appointments.minutes')}
-                                        </p>
-                                      </div>
-                                    </TableCell>
-                                    <TableCell>
-                                      {isPending ? (
-                                        <Badge className="bg-blue-100 text-blue-800">
-                                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                                          Saving...
-                                        </Badge>
-                                      ) : (
-                                        <Badge className={getStatusColor(appointment.status)}>
-                                          {appointment.status.replace('_', ' ')}
-                                        </Badge>
-                                      )}
-                                    </TableCell>
-                                    <TableCell>
-                                      <div className="flex items-center gap-2">
-                                        {(isPending || pendingReminderAppointmentIds.has(appointment.id)) ? (
-                                          <div className="flex items-center gap-1 text-blue-600">
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                            <span className="text-sm">Loading...</span>
-                                          </div>
-                                        ) : (() => {
-                                          // Check reminder records for this appointment
-                                          const appointmentReminders = reminders.filter(r => r.appointmentId === appointment.id);
-                                          const hasSentReminder = appointmentReminders.some(r => r.status === 'sent') || appointment.reminderSent;
-                                          const hasPendingReminder = appointmentReminders.some(r => r.status === 'pending');
+                                      </TableCell>
+                                      <TableCell>
+                                        <div>
+                                          <p className="font-medium">{getCustomerName(appointment.customer)}</p>
+                                          <p className="text-sm text-gray-500">{appointment.customer?.email}</p>
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <div>
+                                          <p className="font-medium">{appointment.title}</p>
+                                          {appointment.location && (
+                                            <p className="text-sm text-gray-500 flex items-center gap-1">
+                                              <MapPin className="h-3 w-3" />
+                                              {appointment.location}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <div>
+                                          <p className="font-medium">{formatDateTime(appointment.appointmentDate)}</p>
+                                          <p className="text-sm text-gray-500 flex items-center gap-1">
+                                            <Timer className="h-3 w-3" />
+                                            {appointment.duration} {t('reminders.appointments.minutes')}
+                                          </p>
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>
+                                        {isPending ? (
+                                          <Badge className="bg-blue-100 text-blue-800">
+                                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                            Saving...
+                                          </Badge>
+                                        ) : (
+                                          <Badge className={getStatusColor(appointment.status)}>
+                                            {appointment.status.replace('_', ' ')}
+                                          </Badge>
+                                        )}
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="flex items-center gap-2">
+                                          {(isPending || pendingReminderAppointmentIds.has(appointment.id)) ? (
+                                            <div className="flex items-center gap-1 text-blue-600">
+                                              <Loader2 className="h-4 w-4 animate-spin" />
+                                              <span className="text-sm">Loading...</span>
+                                            </div>
+                                          ) : (() => {
+                                            // Check reminder records for this appointment
+                                            const appointmentReminders = reminders.filter(r => r.appointmentId === appointment.id);
+                                            const hasSentReminder = appointmentReminders.some(r => r.status === 'sent') || appointment.reminderSent;
+                                            const hasPendingReminder = appointmentReminders.some(r => r.status === 'pending');
 
-                                          if (hasSentReminder) {
-                                            return (
-                                              <div className="flex items-center gap-1 text-green-600">
-                                                <CheckCircle className="h-4 w-4" />
-                                                <span className="text-sm">{t('reminders.reminderHistory.sent')}</span>
-                                              </div>
-                                            );
-                                          } else if (hasPendingReminder) {
-                                            return (
-                                              <div className="flex items-center gap-1 text-blue-600">
-                                                <Clock className="h-4 w-4" />
-                                                <span className="text-sm">Scheduled</span>
-                                              </div>
-                                            );
-                                          } else {
-                                            return (
-                                              <div className="flex items-center gap-1 text-gray-400">
-                                                <Clock className="h-4 w-4" />
-                                                <span className="text-sm">{t('reminders.reminderHistory.notSet')}</span>
-                                              </div>
-                                            );
-                                          }
-                                        })()}
-                                      </div>
-                                    </TableCell>
-                                    <TableCell>
-                                      <div className="flex items-center gap-1">
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            handleEditAppointment(appointment);
-                                          }}
-                                        >
-                                          <Edit className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            handleViewAppointment(appointment);
-                                          }}
-                                        >
-                                          <Eye className="h-4 w-4" />
-                                        </Button>
-                                        <DropdownMenu>
-                                          <DropdownMenuTrigger asChild>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={(event) => event.stopPropagation()}
-                                            >
-                                              <MoreVertical className="h-4 w-4" />
-                                            </Button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent>
-                                            <DropdownMenuItem onClick={() => confirmAppointmentMutation.mutate(appointment.id)}>
-                                              <CheckCircle className="h-4 w-4 mr-2" />
-                                              Confirm Appointment
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={() => sendReminderMutation.mutate({ appointmentIds: [appointment.id] })}>
-                                              <Send className="h-4 w-4 mr-2" />
-                                              {t('reminders.actions.sendReminder')}
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => openScheduleReminder(appointment.id)}>
-                                              <Clock className="h-4 w-4 mr-2" />
-                                              {t('reminders.actions.scheduleReminder')}
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleCancelAppointment(appointment.id); }}>
-                                              <Trash2 className="h-4 w-4 mr-2" />
-                                              Delete
-                                            </DropdownMenuItem>
-                                          </DropdownMenuContent>
-                                        </DropdownMenu>
-                                      </div>
-                                    </TableCell>
-                                  </TableRow>
+                                            if (hasSentReminder) {
+                                              return (
+                                                <div className="flex items-center gap-1 text-green-600">
+                                                  <CheckCircle className="h-4 w-4" />
+                                                  <span className="text-sm">{t('reminders.reminderHistory.sent')}</span>
+                                                </div>
+                                              );
+                                            } else if (hasPendingReminder) {
+                                              return (
+                                                <div className="flex items-center gap-1 text-blue-600">
+                                                  <Clock className="h-4 w-4" />
+                                                  <span className="text-sm">Scheduled</span>
+                                                </div>
+                                              );
+                                            } else {
+                                              return (
+                                                <div className="flex items-center gap-1 text-gray-400">
+                                                  <Clock className="h-4 w-4" />
+                                                  <span className="text-sm">{t('reminders.reminderHistory.notSet')}</span>
+                                                </div>
+                                              );
+                                            }
+                                          })()}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="flex items-center gap-1">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              handleEditAppointment(appointment);
+                                            }}
+                                          >
+                                            <Edit className="h-4 w-4" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              handleViewAppointment(appointment);
+                                            }}
+                                          >
+                                            <Eye className="h-4 w-4" />
+                                          </Button>
+                                          <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={(event) => event.stopPropagation()}
+                                              >
+                                                <MoreVertical className="h-4 w-4" />
+                                              </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent>
+                                              <DropdownMenuItem onClick={() => confirmAppointmentMutation.mutate(appointment.id)}>
+                                                <CheckCircle className="h-4 w-4 mr-2" />
+                                                Confirm Appointment
+                                              </DropdownMenuItem>
+                                              <DropdownMenuSeparator />
+                                              <DropdownMenuItem onClick={() => sendReminderMutation.mutate({ appointmentIds: [appointment.id] })}>
+                                                <Send className="h-4 w-4 mr-2" />
+                                                {t('reminders.actions.sendReminder')}
+                                              </DropdownMenuItem>
+                                              <DropdownMenuItem onClick={() => openScheduleReminder(appointment.id)}>
+                                                <Clock className="h-4 w-4 mr-2" />
+                                                {t('reminders.actions.scheduleReminder')}
+                                              </DropdownMenuItem>
+                                              <DropdownMenuSeparator />
+                                              <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleCancelAppointment(appointment.id); }}>
+                                                <Trash2 className="h-4 w-4 mr-2" />
+                                                Delete
+                                              </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                          </DropdownMenu>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
                                   );
                                 })
                               )}
@@ -2430,161 +2437,161 @@ export default function RemindersPage() {
                             appointments.map((appointment) => {
                               const isPending = pendingAppointmentIds.has(appointment.id);
                               return (
-                              <Card
-                                key={appointment.id}
-                                className={`overflow-hidden ${isPending ? 'opacity-70 pointer-events-none animate-pulse' : 'cursor-pointer'}`}
-                                onClick={() => !isPending && handleViewAppointment(appointment)}
-                              >
-                                <CardContent className="p-4">
-                                  <div className="space-y-3">
-                                    {/* Header with checkbox and status */}
-                                    <div className="flex items-start justify-between">
-                                      <div className="flex items-start gap-3">
-                                        <div onClick={(event) => event.stopPropagation()}>
-                                          {isPending ? (
-                                            <Loader2 className="h-4 w-4 animate-spin text-primary mt-1" />
-                                          ) : (
-                                            <Checkbox
-                                              checked={selectedAppointments.includes(appointment.id)}
-                                              onCheckedChange={(checked) => handleSelectAppointment(appointment.id, checked as boolean)}
-                                              className="mt-1"
-                                            />
-                                          )}
-                                        </div>
-                                        <div className="flex-1">
-                                          <h3 className="font-semibold text-base">{appointment.title}</h3>
-                                          <p className="text-sm text-gray-600 dark:text-gray-400">{getCustomerName(appointment.customer)}</p>
-                                          <p className="text-xs text-gray-500 dark:text-gray-500">{appointment.customer?.email}</p>
-                                        </div>
-                                      </div>
-                                      {isPending ? (
-                                        <Badge className="bg-blue-100 text-blue-800">
-                                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                                          Saving...
-                                        </Badge>
-                                      ) : (
-                                        <Badge className={getStatusColor(appointment.status)}>
-                                          {appointment.status.replace('_', ' ')}
-                                        </Badge>
-                                      )}
-                                    </div>
-
-                                    {/* Appointment details */}
-                                    <div className="space-y-2 text-sm">
-                                      <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                                        <Calendar className="h-4 w-4 text-gray-500" />
-                                        <span>{formatDateTime(appointment.appointmentDate)}</span>
-                                      </div>
-                                      <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                                        <Timer className="h-4 w-4 text-gray-500" />
-                                        <span>{appointment.duration} {t('reminders.appointments.minutes')}</span>
-                                      </div>
-                                      {appointment.location && (
-                                        <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                                          <MapPin className="h-4 w-4 text-gray-500" />
-                                          <span>{appointment.location}</span>
-                                        </div>
-                                      )}
-
-                                      {/* Reminder status */}
-                                      <div className="flex items-center gap-2">
-                                        {(isPending || pendingReminderAppointmentIds.has(appointment.id)) ? (
-                                          <div className="flex items-center gap-1 text-blue-600">
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                            <span className="text-sm">Loading...</span>
+                                <Card
+                                  key={appointment.id}
+                                  className={`overflow-hidden ${isPending ? 'opacity-70 pointer-events-none animate-pulse' : 'cursor-pointer'}`}
+                                  onClick={() => !isPending && handleViewAppointment(appointment)}
+                                >
+                                  <CardContent className="p-4">
+                                    <div className="space-y-3">
+                                      {/* Header with checkbox and status */}
+                                      <div className="flex items-start justify-between">
+                                        <div className="flex items-start gap-3">
+                                          <div onClick={(event) => event.stopPropagation()}>
+                                            {isPending ? (
+                                              <Loader2 className="h-4 w-4 animate-spin text-primary mt-1" />
+                                            ) : (
+                                              <Checkbox
+                                                checked={selectedAppointments.includes(appointment.id)}
+                                                onCheckedChange={(checked) => handleSelectAppointment(appointment.id, checked as boolean)}
+                                                className="mt-1"
+                                              />
+                                            )}
                                           </div>
-                                        ) : (() => {
-                                          const appointmentReminders = reminders.filter(r => r.appointmentId === appointment.id);
-                                          const hasSentReminder = appointmentReminders.some(r => r.status === 'sent') || appointment.reminderSent;
-                                          const hasPendingReminder = appointmentReminders.some(r => r.status === 'pending');
+                                          <div className="flex-1">
+                                            <h3 className="font-semibold text-base">{appointment.title}</h3>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400">{getCustomerName(appointment.customer)}</p>
+                                            <p className="text-xs text-gray-500 dark:text-gray-500">{appointment.customer?.email}</p>
+                                          </div>
+                                        </div>
+                                        {isPending ? (
+                                          <Badge className="bg-blue-100 text-blue-800">
+                                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                            Saving...
+                                          </Badge>
+                                        ) : (
+                                          <Badge className={getStatusColor(appointment.status)}>
+                                            {appointment.status.replace('_', ' ')}
+                                          </Badge>
+                                        )}
+                                      </div>
 
-                                          if (hasSentReminder) {
-                                            return (
-                                              <div className="flex items-center gap-1 text-green-600">
-                                                <CheckCircle className="h-4 w-4" />
-                                                <span className="text-sm">{t('reminders.reminderHistory.sent')}</span>
-                                              </div>
-                                            );
-                                          } else if (hasPendingReminder) {
-                                            return (
-                                              <div className="flex items-center gap-1 text-blue-600">
-                                                <Clock className="h-4 w-4" />
-                                                <span className="text-sm">Scheduled</span>
-                                              </div>
-                                            );
-                                          } else {
-                                            return (
-                                              <div className="flex items-center gap-1 text-gray-400">
-                                                <Clock className="h-4 w-4" />
-                                                <span className="text-sm">{t('reminders.reminderHistory.notSet')}</span>
-                                              </div>
-                                            );
-                                          }
-                                        })()}
+                                      {/* Appointment details */}
+                                      <div className="space-y-2 text-sm">
+                                        <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                                          <Calendar className="h-4 w-4 text-gray-500" />
+                                          <span>{formatDateTime(appointment.appointmentDate)}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                                          <Timer className="h-4 w-4 text-gray-500" />
+                                          <span>{appointment.duration} {t('reminders.appointments.minutes')}</span>
+                                        </div>
+                                        {appointment.location && (
+                                          <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                                            <MapPin className="h-4 w-4 text-gray-500" />
+                                            <span>{appointment.location}</span>
+                                          </div>
+                                        )}
+
+                                        {/* Reminder status */}
+                                        <div className="flex items-center gap-2">
+                                          {(isPending || pendingReminderAppointmentIds.has(appointment.id)) ? (
+                                            <div className="flex items-center gap-1 text-blue-600">
+                                              <Loader2 className="h-4 w-4 animate-spin" />
+                                              <span className="text-sm">Loading...</span>
+                                            </div>
+                                          ) : (() => {
+                                            const appointmentReminders = reminders.filter(r => r.appointmentId === appointment.id);
+                                            const hasSentReminder = appointmentReminders.some(r => r.status === 'sent') || appointment.reminderSent;
+                                            const hasPendingReminder = appointmentReminders.some(r => r.status === 'pending');
+
+                                            if (hasSentReminder) {
+                                              return (
+                                                <div className="flex items-center gap-1 text-green-600">
+                                                  <CheckCircle className="h-4 w-4" />
+                                                  <span className="text-sm">{t('reminders.reminderHistory.sent')}</span>
+                                                </div>
+                                              );
+                                            } else if (hasPendingReminder) {
+                                              return (
+                                                <div className="flex items-center gap-1 text-blue-600">
+                                                  <Clock className="h-4 w-4" />
+                                                  <span className="text-sm">Scheduled</span>
+                                                </div>
+                                              );
+                                            } else {
+                                              return (
+                                                <div className="flex items-center gap-1 text-gray-400">
+                                                  <Clock className="h-4 w-4" />
+                                                  <span className="text-sm">{t('reminders.reminderHistory.notSet')}</span>
+                                                </div>
+                                              );
+                                            }
+                                          })()}
+                                        </div>
+                                      </div>
+
+                                      {/* Actions */}
+                                      <div className="flex items-center gap-2 pt-2 border-t">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            handleEditAppointment(appointment);
+                                          }}
+                                          className="flex-1"
+                                        >
+                                          <Edit className="h-4 w-4 mr-2" />
+                                          Edit
+                                        </Button>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            handleViewAppointment(appointment);
+                                          }}
+                                          className="flex-1"
+                                        >
+                                          <Eye className="h-4 w-4 mr-2" />
+                                          View
+                                        </Button>
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={(event) => event.stopPropagation()}
+                                            >
+                                              <MoreVertical className="h-4 w-4" />
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={() => confirmAppointmentMutation.mutate(appointment.id)}>
+                                              <CheckCircle className="h-4 w-4 mr-2" />
+                                              Confirm Appointment
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={() => sendReminderMutation.mutate({ appointmentIds: [appointment.id] })}>
+                                              <Send className="h-4 w-4 mr-2" />
+                                              {t('reminders.actions.sendReminder')}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => openScheduleReminder(appointment.id)}>
+                                              <Clock className="h-4 w-4 mr-2" />
+                                              {t('reminders.actions.scheduleReminder')}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleCancelAppointment(appointment.id); }}>
+                                              <Trash2 className="h-4 w-4 mr-2" />
+                                              Delete
+                                            </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
                                       </div>
                                     </div>
-
-                                    {/* Actions */}
-                                    <div className="flex items-center gap-2 pt-2 border-t">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          handleEditAppointment(appointment);
-                                        }}
-                                        className="flex-1"
-                                      >
-                                        <Edit className="h-4 w-4 mr-2" />
-                                        Edit
-                                      </Button>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          handleViewAppointment(appointment);
-                                        }}
-                                        className="flex-1"
-                                      >
-                                        <Eye className="h-4 w-4 mr-2" />
-                                        View
-                                      </Button>
-                                      <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={(event) => event.stopPropagation()}
-                                          >
-                                            <MoreVertical className="h-4 w-4" />
-                                          </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                          <DropdownMenuItem onClick={() => confirmAppointmentMutation.mutate(appointment.id)}>
-                                            <CheckCircle className="h-4 w-4 mr-2" />
-                                            Confirm Appointment
-                                          </DropdownMenuItem>
-                                          <DropdownMenuSeparator />
-                                          <DropdownMenuItem onClick={() => sendReminderMutation.mutate({ appointmentIds: [appointment.id] })}>
-                                            <Send className="h-4 w-4 mr-2" />
-                                            {t('reminders.actions.sendReminder')}
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem onClick={() => openScheduleReminder(appointment.id)}>
-                                            <Clock className="h-4 w-4 mr-2" />
-                                            {t('reminders.actions.scheduleReminder')}
-                                          </DropdownMenuItem>
-                                          <DropdownMenuSeparator />
-                                          <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleCancelAppointment(appointment.id); }}>
-                                            <Trash2 className="h-4 w-4 mr-2" />
-                                            Delete
-                                          </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
-                                    </div>
-                                  </div>
-                                </CardContent>
-                              </Card>
+                                  </CardContent>
+                                </Card>
                               );
                             })
                           )}
@@ -4242,3 +4249,4 @@ export default function RemindersPage() {
     </div>
   );
 }
+

@@ -31,6 +31,8 @@ export const allowedActivityTypes = [
     'complained',
     'unsubscribed',
     'scheduled',
+    'queued',
+    'failed',
 ] as const;
 
 /**

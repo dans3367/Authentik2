@@ -234,24 +234,36 @@ router.post(
 
       const validatedStatus = normalizedStatus || 'sent';
 
-      if (!emailTrackingId || !providerMessageId) {
+      if (!emailTrackingId) {
         return res.status(400).json({
           success: false,
-          error: 'Missing required fields: emailTrackingId and providerMessageId',
+          error: 'Missing required field: emailTrackingId',
         });
       }
 
-      console.log(`📧 [Internal API] Updating email_sends record for tracking ID ${emailTrackingId} with provider ID ${providerMessageId}`);
+      // Only require providerMessageId for non-failed statuses
+      if (validatedStatus !== 'failed' && !providerMessageId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required field: providerMessageId is required for non-failed statuses',
+        });
+      }
+
+      console.log(`📧 [Internal API] Updating email_sends record for tracking ID ${emailTrackingId} with status ${validatedStatus}${providerMessageId ? ` and provider ID ${providerMessageId}` : ''}`);
 
       // Find and update the email_sends record by the email tracking ID
       const { eq } = await import('drizzle-orm');
       const now = new Date();
 
       const updatePayload: Record<string, unknown> = {
-        providerMessageId: providerMessageId,
         status: validatedStatus,
         updatedAt: now,
       };
+
+      // Only include providerMessageId in updatePayload when a real value is provided
+      if (providerMessageId) {
+        updatePayload.providerMessageId = providerMessageId;
+      }
 
       if (validatedStatus === 'sent') {
         updatePayload.sentAt = now;
@@ -284,7 +296,7 @@ router.post(
         });
       }
 
-      console.log(`✅ [Internal API] Updated email_sends record ${result[0].id} with provider ID ${providerMessageId}`);
+      console.log(`✅ [Internal API] Updated email_sends record ${result[0].id} with status ${validatedStatus}${providerMessageId ? ` and provider ID ${providerMessageId}` : ''}`);
 
       return res.json({
         success: true,
