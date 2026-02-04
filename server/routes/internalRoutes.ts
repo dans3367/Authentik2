@@ -203,4 +203,116 @@ router.post(
   }
 );
 
+/**
+ * Internal endpoint for updating email_sends record with actual provider message ID
+ * Called by Trigger.dev tasks after successfully sending an email
+ */
+router.post(
+  '/update-email-send',
+  authenticateInternalService,
+  async (req: InternalServiceRequest, res) => {
+    try {
+      const { emailTrackingId, providerMessageId, status, emailActivityId } = req.body;
+
+      const allowedStatuses = [
+        'pending',
+        'sent',
+        'delivered',
+        'bounced',
+        'failed',
+      ];
+
+      const normalizedStatus = status === 'queued' ? 'pending' : status;
+
+      if (normalizedStatus !== undefined && (!normalizedStatus || !allowedStatuses.includes(normalizedStatus))) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid status value',
+          allowedStatuses,
+        });
+      }
+
+      const validatedStatus = normalizedStatus || 'sent';
+
+      if (!emailTrackingId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required field: emailTrackingId',
+        });
+      }
+
+      // Only require providerMessageId for non-failed statuses
+      if (validatedStatus !== 'failed' && !providerMessageId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required field: providerMessageId is required for non-failed statuses',
+        });
+      }
+
+      console.log(`📧 [Internal API] Updating email_sends record for tracking ID ${emailTrackingId} with status ${validatedStatus}${providerMessageId ? ` and provider ID ${providerMessageId}` : ''}`);
+
+      // Find and update the email_sends record by the email tracking ID
+      const { eq } = await import('drizzle-orm');
+      const now = new Date();
+
+      const updatePayload: Record<string, unknown> = {
+        status: validatedStatus,
+        updatedAt: now,
+      };
+
+      // Only include providerMessageId in updatePayload when a real value is provided
+      if (providerMessageId) {
+        updatePayload.providerMessageId = providerMessageId;
+      }
+
+      if (validatedStatus === 'sent') {
+        updatePayload.sentAt = now;
+      }
+
+      const result = await db.update(emailSends)
+        .set(updatePayload)
+        .where(eq(emailSends.id, emailTrackingId))
+        .returning();
+
+      if (result.length === 0) {
+        console.warn(`⚠️ [Internal API] No email_sends record found for tracking ID ${emailTrackingId}`);
+        return res.status(404).json({
+          success: false,
+          error: 'Email send record not found',
+        });
+      }
+
+      // Optionally update the related email_activity row (queued -> sent/failed)
+      if (emailActivityId && (validatedStatus === 'sent' || validatedStatus === 'failed')) {
+        try {
+          await db.update(emailActivity)
+            .set({
+              activityType: validatedStatus,
+            })
+            .where(eq(emailActivity.id, emailActivityId));
+          console.log(`✅ [Internal API] Updated email_activity ${emailActivityId} to ${validatedStatus}`);
+        } catch (activityUpdateError) {
+          console.warn(`⚠️ [Internal API] Failed to update email_activity ${emailActivityId}:`, activityUpdateError);
+        }
+      }
+
+      console.log(`✅ [Internal API] Updated email_sends record ${result[0].id} with status ${validatedStatus}${providerMessageId ? ` and provider ID ${providerMessageId}` : ''}`);
+
+      return res.json({
+        success: true,
+        emailSendId: result[0].id,
+        providerMessageId,
+        emailActivityId: emailActivityId || null,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ [Internal API] Error updating email_sends:', errorMessage);
+      return res.status(500).json({
+        success: false,
+        error: errorMessage,
+      });
+    }
+  }
+);
+
 export default router;

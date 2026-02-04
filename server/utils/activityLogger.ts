@@ -22,6 +22,19 @@ export interface LogActivityParams {
     req?: Request; // For IP/User-Agent extraction
 }
 
+export const allowedActivityTypes = [
+    'sent',
+    'delivered',
+    'opened',
+    'clicked',
+    'bounced',
+    'complained',
+    'unsubscribed',
+    'scheduled',
+    'queued',
+    'failed',
+] as const;
+
 /**
  * Logs an activity to the activity_logs table
  */

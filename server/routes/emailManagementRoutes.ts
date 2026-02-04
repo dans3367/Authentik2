@@ -11,7 +11,7 @@ import { storage } from '../storage';
 import jwt from 'jsonwebtoken';
 import { enhancedEmailService } from '../emailService';
 import crypto from 'crypto';
-import { logActivity, computeChanges } from '../utils/activityLogger';
+import { logActivity, computeChanges, allowedActivityTypes } from '../utils/activityLogger';
 
 function isValidHttpUrl(url: string): boolean {
   try {
@@ -39,6 +39,17 @@ function escapeHtml(str: string): string {
         return c;
     }
   });
+}
+
+function maskEmail(email: string): string {
+  const trimmed = String(email || '').trim();
+  const atIndex = trimmed.indexOf('@');
+  if (atIndex <= 0 || atIndex === trimmed.length - 1) {
+    return '***';
+  }
+  const local = trimmed.slice(0, atIndex);
+  const domain = trimmed.slice(atIndex + 1);
+  return `${local[0]}***@${domain}`;
 }
 
 type PromotionalEmailJobPayload = {
@@ -74,7 +85,7 @@ async function enqueuePromotionalEmailJob(
       delayMs,
     });
 
-    console.log(`✅ [PromotionalEmailJob] Scheduled via Trigger.dev (ID: ${handle.id}) with ${delayMs}ms delay for ${payload.recipientEmail}`);
+    console.log(`✅ [PromotionalEmailJob] Scheduled via Trigger.dev (ID: ${handle.id}) with ${delayMs}ms delay for ${maskEmail(payload.recipientEmail)}`);
 
     // Log to trigger_tasks table for tracking
     await logTriggerTask({
@@ -485,7 +496,7 @@ emailManagementRoutes.get("/email-contacts/:id/stats", authenticateToken, requir
     const { id } = req.params;
 
     const contact = await db.query.emailContacts.findFirst({
-      where: sql`${emailContacts.id} = ${id}`,
+      where: sql`${emailContacts.id} = ${id} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!contact) {
@@ -695,7 +706,7 @@ emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenan
     const { email, firstName, lastName, status, birthday, address, city, state, zipCode, country, phoneNumber } = req.body;
 
     const contact = await db.query.emailContacts.findFirst({
-      where: sql`${emailContacts.id} = ${id}`,
+      where: sql`${emailContacts.id} = ${id} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!contact) {
@@ -771,7 +782,7 @@ emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenan
 
     const updatedContact = await db.update(emailContacts)
       .set(updateData)
-      .where(sql`${emailContacts.id} = ${id}`)
+      .where(sql`${emailContacts.id} = ${id} AND ${emailContacts.tenantId} = ${req.user.tenantId}`)
       .returning();
 
     // Compute and log changes
@@ -940,6 +951,7 @@ emailManagementRoutes.post("/email-lists", authenticateToken, requireTenant, asy
     const sanitizedDescription = description ? sanitizeString(description) : null;
 
     const newList = await db.insert(emailLists).values({
+      tenantId: req.user.tenantId,
       name: sanitizedName,
       description: sanitizedDescription,
       createdAt: new Date(),
@@ -960,7 +972,7 @@ emailManagementRoutes.put("/email-lists/:id", authenticateToken, requireTenant, 
     const { name, description } = req.body;
 
     const list = await db.query.emailLists.findFirst({
-      where: sql`${emailLists.id} = ${id}`,
+      where: sql`${emailLists.id} = ${id} AND ${emailLists.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!list) {
@@ -981,7 +993,7 @@ emailManagementRoutes.put("/email-lists/:id", authenticateToken, requireTenant, 
 
     const updatedList = await db.update(emailLists)
       .set(updateData)
-      .where(sql`${emailLists.id} = ${id}`)
+      .where(sql`${emailLists.id} = ${id} AND ${emailLists.tenantId} = ${req.user.tenantId}`)
       .returning();
 
     res.json(updatedList[0]);
@@ -997,7 +1009,7 @@ emailManagementRoutes.delete("/email-lists/:id", authenticateToken, requireTenan
     const { id } = req.params;
 
     const list = await db.query.emailLists.findFirst({
-      where: sql`${emailLists.id} = ${id}`,
+      where: sql`${emailLists.id} = ${id} AND ${emailLists.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!list) {
@@ -1006,7 +1018,7 @@ emailManagementRoutes.delete("/email-lists/:id", authenticateToken, requireTenan
 
     // Delete list (this will cascade to contact-list relationships)
     await db.delete(emailLists)
-      .where(sql`${emailLists.id} = ${id}`);
+      .where(sql`${emailLists.id} = ${id} AND ${emailLists.tenantId} = ${req.user.tenantId}`);
 
     res.json({ message: 'List deleted successfully' });
   } catch (error) {
@@ -1167,6 +1179,7 @@ emailManagementRoutes.get("/bounced-emails/stats", authenticateToken, requireTen
 emailManagementRoutes.get("/contact-tags", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const tags = await db.query.contactTags.findMany({
+      where: sql`${contactTags.tenantId} = ${req.user.tenantId}`,
       orderBy: sql`${contactTags.name} ASC`,
       with: {
         assignments: true,
@@ -1223,7 +1236,7 @@ emailManagementRoutes.put("/contact-tags/:id", authenticateToken, requireTenant,
     const { name, color, description } = req.body;
 
     const tag = await db.query.contactTags.findFirst({
-      where: sql`${contactTags.id} = ${id}`,
+      where: sql`${contactTags.id} = ${id} AND ${contactTags.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!tag) {
@@ -1248,7 +1261,7 @@ emailManagementRoutes.put("/contact-tags/:id", authenticateToken, requireTenant,
 
     const updatedTag = await db.update(contactTags)
       .set(updateData)
-      .where(sql`${contactTags.id} = ${id}`)
+      .where(sql`${contactTags.id} = ${id} AND ${contactTags.tenantId} = ${req.user.tenantId}`)
       .returning();
 
     res.json(updatedTag[0]);
@@ -1264,7 +1277,7 @@ emailManagementRoutes.delete("/contact-tags/:id", authenticateToken, requireTena
     const { id } = req.params;
 
     const tag = await db.query.contactTags.findFirst({
-      where: sql`${contactTags.id} = ${id}`,
+      where: sql`${contactTags.id} = ${id} AND ${contactTags.tenantId} = ${req.user.tenantId}`,
     });
 
     if (!tag) {
@@ -1273,7 +1286,7 @@ emailManagementRoutes.delete("/contact-tags/:id", authenticateToken, requireTena
 
     // Delete tag (this will cascade to contact-tag relationships)
     await db.delete(contactTags)
-      .where(sql`${contactTags.id} = ${id}`);
+      .where(sql`${contactTags.id} = ${id} AND ${contactTags.tenantId} = ${req.user.tenantId}`);
 
     res.json({ message: 'Tag deleted successfully' });
   } catch (error) {
@@ -1287,9 +1300,24 @@ emailManagementRoutes.post("/email-contacts/:contactId/lists/:listId", authentic
   try {
     const { contactId, listId } = req.params;
 
+    const [contact, list] = await Promise.all([
+      db.query.emailContacts.findFirst({
+        where: sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
+        columns: { id: true },
+      }),
+      db.query.emailLists.findFirst({
+        where: sql`${emailLists.id} = ${listId} AND ${emailLists.tenantId} = ${req.user.tenantId}`,
+        columns: { id: true },
+      }),
+    ]);
+
+    if (!contact || !list) {
+      return res.status(404).json({ message: 'Contact or list not found' });
+    }
+
     // Check if relationship already exists
     const existingRelationship = await db.query.contactListMemberships.findFirst({
-      where: sql`${contactListMemberships.contactId} = ${contactId} AND ${contactListMemberships.listId} = ${listId}`,
+      where: sql`${contactListMemberships.contactId} = ${contactId} AND ${contactListMemberships.listId} = ${listId} AND ${contactListMemberships.tenantId} = ${req.user.tenantId}`,
     });
 
     if (existingRelationship) {
@@ -1297,8 +1325,10 @@ emailManagementRoutes.post("/email-contacts/:contactId/lists/:listId", authentic
     }
 
     await db.insert(contactListMemberships).values({
+      tenantId: req.user.tenantId,
       contactId,
       listId,
+      addedAt: new Date(),
     });
 
     res.json({ message: 'Contact added to list successfully' });
@@ -1313,8 +1343,23 @@ emailManagementRoutes.delete("/email-contacts/:contactId/lists/:listId", authent
   try {
     const { contactId, listId } = req.params;
 
+    const [contact, list] = await Promise.all([
+      db.query.emailContacts.findFirst({
+        where: sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
+        columns: { id: true },
+      }),
+      db.query.emailLists.findFirst({
+        where: sql`${emailLists.id} = ${listId} AND ${emailLists.tenantId} = ${req.user.tenantId}`,
+        columns: { id: true },
+      }),
+    ]);
+
+    if (!contact || !list) {
+      return res.status(404).json({ message: 'Contact or list not found' });
+    }
+
     const deletedRelationship = await db.delete(contactListMemberships)
-      .where(sql`${contactListMemberships.contactId} = ${contactId} AND ${contactListMemberships.listId} = ${listId}`)
+      .where(sql`${contactListMemberships.contactId} = ${contactId} AND ${contactListMemberships.listId} = ${listId} AND ${contactListMemberships.tenantId} = ${req.user.tenantId}`)
       .returning();
 
     if (deletedRelationship.length === 0) {
@@ -1333,8 +1378,12 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
   try {
     const { id } = req.params;
     const { subject, html, text, scheduleAt } = req.body || {};
+    const tenantId = req.user.tenantId;
+
+    console.log(`📅 [ScheduleEmail] Starting email schedule request for contact ${id}, tenant ${tenantId}`);
 
     if (!subject || !html || !scheduleAt) {
+      console.log(`📅 [ScheduleEmail] Validation failed: missing required fields`);
       return res.status(400).json({ message: 'subject, html and scheduleAt are required' });
     }
 
@@ -1343,15 +1392,20 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
     });
 
     if (!contact) {
+      console.log(`📅 [ScheduleEmail] Contact ${id} not found`);
       return res.status(404).json({ message: 'Contact not found' });
     }
 
+    console.log(`📅 [ScheduleEmail] Found contact: ${maskEmail(String(contact.email))}, status: ${contact.status}`);
+
     if (!contact.email) {
+      console.log(`📅 [ScheduleEmail] Contact ${id} has no email address`);
       return res.status(400).json({ message: 'Contact email is missing' });
     }
 
     // Validate contact is active and not globally suppressed
     if (contact.status === 'unsubscribed' || contact.status === 'bounced') {
+      console.log(`📅 [ScheduleEmail] Contact ${maskEmail(String(contact.email))} is ${contact.status}, cannot send email`);
       return res.status(400).json({ message: 'Contact is unsubscribed or bounced' });
     }
 
@@ -1360,6 +1414,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
     }).catch(() => null);
 
     if (suppressed) {
+      console.log(`📅 [ScheduleEmail] Contact ${maskEmail(String(contact.email))} is globally suppressed/bounced`);
       return res.status(400).json({ message: 'Email is globally suppressed/bounced' });
     }
 
@@ -1383,6 +1438,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
 
     // Schedule via Trigger.dev
     try {
+      console.log(`📅 [ScheduleEmail] Scheduling email to ${maskEmail(String(contact.email))} for ${scheduleDate.toISOString()}, subject: "${subject}"`);
       const { scheduleEmailTask } = await import('../../src/trigger/email');
       const payload: Parameters<typeof scheduleEmailTask.trigger>[0] = {
         to: String(contact.email),
@@ -1398,13 +1454,33 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       };
       if (text) payload.text = String(text);
       const handle = await scheduleEmailTask.trigger(payload);
+      console.log(`✅ [ScheduleEmail] Email scheduled successfully for ${maskEmail(String(contact.email))}, runId: ${handle.id}`);
+
+      // Log scheduled activity
+      try {
+        await db.insert(emailActivity).values({
+          tenantId: req.user.tenantId,
+          contactId: id,
+          activityType: 'scheduled',
+          activityData: JSON.stringify({
+            subject: sanitizeString(String(subject)) || 'No Subject',
+            scheduledFor: scheduleDate.toISOString(),
+            scheduledBy: req.user.id,
+            runId: handle.id
+          }),
+          occurredAt: new Date(),
+        });
+      } catch (logError) {
+        console.error(`⚠️ [ScheduleEmail] Failed to log scheduled activity:`, logError);
+      }
+
       return res.status(201).json({ message: 'Email scheduled via Trigger.dev', runId: handle.id, contactId: id, scheduleAt: scheduleDate.toISOString() });
     } catch (importError) {
-      console.error('Failed to import or trigger email task:', importError);
+      console.error(`❌ [ScheduleEmail] Failed to schedule email for ${maskEmail(String(contact.email))}:`, importError);
       return res.status(503).json({ message: 'Email scheduling service unavailable' });
     }
   } catch (error) {
-    console.error('Schedule single contact email error:', error);
+    console.error('❌ [ScheduleEmail] Schedule single contact email error:', error);
     res.status(500).json({ message: 'Failed to schedule email' });
   }
 });
@@ -1419,9 +1495,29 @@ emailManagementRoutes.post("/email-lists/:listId/contacts", authenticateToken, r
       return res.status(400).json({ message: 'Contact IDs array is required' });
     }
 
+    const list = await db.query.emailLists.findFirst({
+      where: sql`${emailLists.id} = ${listId} AND ${emailLists.tenantId} = ${req.user.tenantId}`,
+      columns: { id: true },
+    });
+
+    if (!list) {
+      return res.status(404).json({ message: 'List not found' });
+    }
+
+    const contacts = await db.query.emailContacts.findMany({
+      where: sql`${emailContacts.id} IN (${sql.join(contactIds, sql`, `)}) AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
+      columns: { id: true },
+    });
+
+    if (contacts.length !== contactIds.length) {
+      return res.status(404).json({ message: 'One or more contacts not found' });
+    }
+
     const relationships = contactIds.map(contactId => ({
+      tenantId: req.user.tenantId,
       contactId,
       listId,
+      addedAt: new Date(),
     }));
 
     await db.insert(contactListMemberships).values(relationships);
@@ -1438,9 +1534,24 @@ emailManagementRoutes.post("/email-contacts/:contactId/tags/:tagId", authenticat
   try {
     const { contactId, tagId } = req.params;
 
+    const [contact, tag] = await Promise.all([
+      db.query.emailContacts.findFirst({
+        where: sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
+        columns: { id: true },
+      }),
+      db.query.contactTags.findFirst({
+        where: sql`${contactTags.id} = ${tagId} AND ${contactTags.tenantId} = ${req.user.tenantId}`,
+        columns: { id: true },
+      }),
+    ]);
+
+    if (!contact || !tag) {
+      return res.status(404).json({ message: 'Contact or tag not found' });
+    }
+
     // Check if relationship already exists
     const existingRelationship = await db.query.contactTagAssignments.findFirst({
-      where: sql`${contactTagAssignments.contactId} = ${contactId} AND ${contactTagAssignments.tagId} = ${tagId}`,
+      where: sql`${contactTagAssignments.contactId} = ${contactId} AND ${contactTagAssignments.tagId} = ${tagId} AND ${contactTagAssignments.tenantId} = ${req.user.tenantId}`,
     });
 
     if (existingRelationship) {
@@ -1466,8 +1577,23 @@ emailManagementRoutes.delete("/email-contacts/:contactId/tags/:tagId", authentic
   try {
     const { contactId, tagId } = req.params;
 
+    const [contact, tag] = await Promise.all([
+      db.query.emailContacts.findFirst({
+        where: sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
+        columns: { id: true },
+      }),
+      db.query.contactTags.findFirst({
+        where: sql`${contactTags.id} = ${tagId} AND ${contactTags.tenantId} = ${req.user.tenantId}`,
+        columns: { id: true },
+      }),
+    ]);
+
+    if (!contact || !tag) {
+      return res.status(404).json({ message: 'Contact or tag not found' });
+    }
+
     const deletedRelationship = await db.delete(contactTagAssignments)
-      .where(sql`${contactTagAssignments.contactId} = ${contactId} AND ${contactTagAssignments.tagId} = ${tagId}`)
+      .where(sql`${contactTagAssignments.contactId} = ${contactId} AND ${contactTagAssignments.tagId} = ${tagId} AND ${contactTagAssignments.tenantId} = ${req.user.tenantId}`)
       .returning();
 
     if (deletedRelationship.length === 0) {
@@ -1489,6 +1615,24 @@ emailManagementRoutes.post("/contact-tags/:tagId/contacts", authenticateToken, r
 
     if (!Array.isArray(contactIds) || contactIds.length === 0) {
       return res.status(400).json({ message: 'Contact IDs array is required' });
+    }
+
+    const tag = await db.query.contactTags.findFirst({
+      where: sql`${contactTags.id} = ${tagId} AND ${contactTags.tenantId} = ${req.user.tenantId}`,
+      columns: { id: true },
+    });
+
+    if (!tag) {
+      return res.status(404).json({ message: 'Tag not found' });
+    }
+
+    const contacts = await db.query.emailContacts.findMany({
+      where: sql`${emailContacts.id} IN (${sql.join(contactIds, sql`, `)}) AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
+      columns: { id: true },
+    });
+
+    if (contacts.length !== contactIds.length) {
+      return res.status(404).json({ message: 'One or more contacts not found' });
     }
 
     const relationships = contactIds.map(contactId => ({
@@ -2348,7 +2492,7 @@ emailManagementRoutes.put("/master-email-design", authenticateToken, requireTena
   }
 });
 
-// Send birthday invitation email to a contact
+// Send birthday invitation email to a contact via Trigger.dev
 emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { contactId } = req.params;
@@ -2360,6 +2504,22 @@ emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken,
 
     if (!contact) {
       return res.status(404).json({ message: 'Contact not found' });
+    }
+
+    if (!contact.email) {
+      return res.status(400).json({ message: 'Contact email is missing' });
+    }
+
+    if (contact.status === 'unsubscribed' || contact.status === 'bounced') {
+      return res.status(400).json({ message: 'Contact is unsubscribed or bounced' });
+    }
+
+    const suppressed = await db.query.bouncedEmails.findFirst({
+      where: eq(bouncedEmails.email, String(contact.email).toLowerCase().trim()),
+    }).catch(() => null);
+
+    if (suppressed) {
+      return res.status(400).json({ message: 'Email is globally suppressed/bounced' });
     }
 
     // Check if contact already has a birthday
@@ -2383,94 +2543,72 @@ emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken,
       { expiresIn: '30d' }
     );
 
-    const profileUpdateUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/update-profile?token=${profileUpdateToken}`;
-    console.log('🔗 [Birthday Invitation] Generated URL:', profileUpdateUrl, '| BASE_URL env:', process.env.BASE_URL);
+    const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+    const profileUpdateUrl = `${baseUrl}/update-profile?token=${profileUpdateToken}`;
+    const maskedToken = profileUpdateToken.length > 8
+      ? `${profileUpdateToken.slice(0, 4)}...${profileUpdateToken.slice(-4)}`
+      : '[redacted]';
+    console.log('🔗 [Birthday Invitation] Generated profile update link:', { baseUrl, path: '/update-profile', token: maskedToken });
 
-    // Create email content
-    const contactName = contact.firstName ? `${contact.firstName}${contact.lastName ? ` ${contact.lastName}` : ''}` : 'Valued Customer';
+    const emailTrackingId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
+    const recipientName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email;
     const subject = `🎂 Help us celebrate your special day!`;
 
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <title>Birthday Information Request</title>
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #e91e63; margin: 0;">🎂 Birthday Celebration!</h1>
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 25px; border-radius: 8px; margin-bottom: 20px;">
-          <p style="margin: 0 0 15px 0; font-size: 16px;">Hi ${contactName},</p>
-          
-          <p style="margin: 0 0 15px 0;">We'd love to make your birthday extra special! To ensure you don't miss out on exclusive birthday promotions, special offers, and personalized birthday surprises, we'd like to add your birthday to our records.</p>
-          
-          <p style="margin: 0 0 20px 0;">By sharing your birthday with us, you'll receive:</p>
-          
-          <ul style="margin: 0 0 20px 20px; padding: 0;">
-            <li>🎁 Exclusive birthday discounts and offers</li>
-            <li>🎉 Special birthday promotions</li>
-            <li>📧 Personalized birthday messages</li>
-            <li>🌟 Early access to birthday-themed content</li>
-          </ul>
-          
-          <div style="text-align: center; margin: 25px 0;">
-            <a href="${profileUpdateUrl}" 
-               style="background: linear-gradient(135deg, #e91e63, #f06292); 
-                      color: white; 
-                      padding: 12px 30px; 
-                      text-decoration: none; 
-                      border-radius: 25px; 
-                      font-weight: bold; 
-                      display: inline-block; 
-                      box-shadow: 0 4px 8px rgba(233, 30, 99, 0.3);">
-              🎂 Add My Birthday
-            </a>
-          </div>
-          
-          <p style="margin: 15px 0 0 0; font-size: 14px; color: #666;">This link will expire in 30 days. Your privacy is important to us - we'll only use your birthday to send you special offers and birthday wishes.</p>
-          
-          <div style="margin-top: 20px; padding: 15px; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px;">
-            <p style="margin: 0 0 10px 0; font-size: 13px; color: #666; font-weight: bold;">If the button above doesn't work, copy and paste this link into your browser:</p>
-            <p style="margin: 0; word-break: break-all;">
-              <a href="${profileUpdateUrl}" style="color: #e91e63; text-decoration: none; font-size: 12px;">${profileUpdateUrl}</a>
-            </p>
-          </div>
-        </div>
-        
-        <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #888; text-align: center;">
-          <p style="margin: 0;">Best regards,<br>${tenant.name || 'The Team'}</p>
-          <p style="margin: 10px 0 0 0;">This invitation was sent because you're a valued customer. If you'd prefer not to receive birthday-related communications, you can simply ignore this email.</p>
-        </div>
-      </body>
-      </html>
-    `;
-
-    // Send the email using the email service
-    const { enhancedEmailService } = await import('../emailService');
-
-    const result = await enhancedEmailService.sendCustomEmail(
-      contact.email,
+    await db.insert(emailSends).values({
+      id: emailTrackingId,
+      tenantId: req.user.tenantId,
+      recipientEmail: contact.email,
+      recipientName,
+      senderEmail: 'admin@zendwise.com',
+      senderName: tenant.name,
       subject,
-      htmlContent,
-      {
-        metadata: {
-          type: 'birthday_invitation',
-          contactId: contact.id,
-          tenantId: req.user.tenantId
-        }
-      }
-    );
+      emailType: 'invitation',
+      provider: 'resend',
+      providerMessageId: null,
+      status: 'pending',
+      contactId: contact.id,
+      sentAt: null,
+    });
 
-    if (typeof result === 'object' && 'success' in result && result.success) {
+    // Trigger the birthday request email via Trigger.dev
+    const { triggerRequestBdayEmail } = await import('../lib/trigger');
+
+    const result = await triggerRequestBdayEmail({
+      tenantId: req.user.tenantId,
+      contactId: contact.id,
+      emailTrackingId,
+      contactEmail: contact.email,
+      contactFirstName: contact.firstName,
+      contactLastName: contact.lastName,
+      tenantName: tenant.name,
+      profileUpdateUrl,
+      fromEmail: 'admin@zendwise.com',
+    });
+
+    if (result.success) {
+      try {
+        await db.insert(emailActivity).values({
+          contactId: contact.id,
+          tenantId: req.user.tenantId,
+          activityType: 'sent',
+          activityData: JSON.stringify({
+            type: 'birthday_invitation',
+            runId: result.runId,
+            source: 'manual_birthday_invitation',
+          }),
+          occurredAt: new Date(),
+        });
+      } catch (logError) {
+        console.error('⚠️ [Birthday Invitation] Failed to log email activity:', logError);
+      }
+
       res.json({
-        message: 'Birthday invitation sent successfully',
-        messageId: result.messageId
+        message: 'Birthday invitation queued successfully',
+        runId: result.runId,
+        taskLogId: result.taskLogId,
       });
     } else {
-      throw new Error('Failed to send email');
+      throw new Error(result.error || 'Failed to queue birthday invitation email');
     }
 
   } catch (error) {
@@ -2683,10 +2821,9 @@ emailManagementRoutes.post("/internal/email-activity", authenticateInternalServi
     }
 
     // Validate activityType
-    const validActivityTypes = ['sent', 'delivered', 'opened', 'clicked', 'bounced', 'complained', 'unsubscribed'];
-    if (!validActivityTypes.includes(activityType)) {
+    if (!allowedActivityTypes.includes(activityType)) {
       return res.status(400).json({
-        error: `Invalid activityType. Must be one of: ${validActivityTypes.join(', ')}`
+        error: `Invalid activityType. Must be one of: ${allowedActivityTypes.join(', ')}`
       });
     }
 
@@ -3689,8 +3826,11 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     const { subject, content } = req.body;
     const tenantId = req.user.tenantId;
 
+    console.log(`📧 [SendEmail] Starting individual email send for contact ${id}, tenant ${tenantId}`);
+
     // Validate input
     if (!subject || !content) {
+      console.log(`📧 [SendEmail] Validation failed: missing subject or content`);
       return res.status(400).json({
         message: 'Subject and content are required'
       });
@@ -3708,14 +3848,18 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     });
 
     if (!contact) {
+      console.log(`📧 [SendEmail] Contact ${id} not found`);
       return res.status(404).json({
         success: false,
         message: "Contact not found"
       });
     }
 
+    console.log(`📧 [SendEmail] Found contact: ${maskEmail(String(contact.email))}, status: ${contact.status}`);
+
     // Check if contact can receive emails
     if (contact.status === 'unsubscribed') {
+      console.log(`📧 [SendEmail] Contact ${maskEmail(String(contact.email))} is unsubscribed, cannot send email`);
       return res.status(400).json({
         success: false,
         message: "Cannot send email to unsubscribed contact"
@@ -3723,6 +3867,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     }
 
     if (contact.status === 'bounced') {
+      console.log(`📧 [SendEmail] Contact ${maskEmail(String(contact.email))} is bounced, cannot send email`);
       return res.status(400).json({
         success: false,
         message: "Cannot send email to bounced contact"
@@ -3872,6 +4017,28 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     `;
 
     // Send email via Trigger.dev queue
+    // Generate a unique ID to track this email send - will be stored in email_sends and passed to Trigger task
+    const emailTrackingId = crypto.randomUUID();
+    // Log email activity (queued) first so we can update it to sent/failed later
+    let emailActivityId: string | null = null;
+    try {
+      const [insertedActivity] = await db.insert(emailActivity).values({
+        contactId: contact.id,
+        tenantId: tenantId,
+        activityType: 'queued',
+        activityData: JSON.stringify({
+          source: 'individual_send_queued',
+          sentBy: req.user.id,
+          emailSubject: subject,
+        }),
+        occurredAt: new Date(),
+      }).returning();
+      emailActivityId = insertedActivity.id;
+      console.log(`📝 [SendEmail] Logged email activity for ${contact.email}, id: ${emailActivityId}`);
+    } catch (activityLogError) {
+      console.error(`⚠️ [SendEmail] Failed to log email activity:`, activityLogError);
+    }
+
     let result: { success: boolean; runId?: string; error?: string };
     try {
       const { sendEmailTask } = await import('../../src/trigger/email');
@@ -3888,37 +4055,63 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
           type: 'individual_contact_email',
           contactId: contact.id,
           tenantId: tenantId,
-          sentBy: req.user.id
+          sentBy: req.user.id,
+          emailTrackingId: emailTrackingId, // Pass tracking ID so task can update email_sends with actual Resend ID
+          emailActivityId: emailActivityId, // Pass activity ID so task can update email_activity to sent/failed
         }
       });
-      console.log(`📧 [SendEmail] Triggered send-email task, runId: ${handle.id}`);
+      console.log(`📧 [SendEmail] Triggered send-email task, runId: ${handle.id}, trackingId: ${emailTrackingId}`);
       result = { success: true, runId: handle.id };
+
     } catch (triggerError: any) {
       console.error('[SendEmail] Failed to trigger email task:', triggerError);
+
+      // Ensure activity isn't left stuck as queued
+      if (emailActivityId) {
+        try {
+          await db.update(emailActivity)
+            .set({ activityType: 'failed' })
+            .where(and(eq(emailActivity.id, emailActivityId), eq(emailActivity.tenantId, tenantId)));
+        } catch (activityUpdateError) {
+          console.error(`⚠️ [SendEmail] Failed to update email activity status:`, activityUpdateError);
+        }
+      }
+
       return res.status(503).json({
         success: false,
         message: 'Email server is not available. Please try again later.'
       });
     }
 
-    // Log email activity
-    await db.insert(emailActivity).values({
-      contactId: contact.id,
-      tenantId: tenantId,
-      activityType: 'sent',
-      activityData: JSON.stringify({
-        source: 'individual_send',
-        sentBy: req.user.id,
-        emailSubject: subject
-      }),
-      occurredAt: new Date(),
-    });
-
-    // Log to email_sends table for limit tracking
+    // Log to activity_logs table for user activity tracking
     try {
-      const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
+      await logActivity({
+        tenantId: tenantId,
+        userId: req.user.id,
+        entityType: 'email',
+        entityId: emailActivityId || undefined,
+        entityName: `Email to ${contact.email}`,
+        activityType: 'sent',
+        description: `Sent direct email "${subject}" to ${contact.firstName || ''} ${contact.lastName || ''} (${contact.email})`.trim(),
+        metadata: {
+          emailActivityId: emailActivityId,
+          contactId: contact.id,
+          contactEmail: contact.email,
+          emailSubject: subject,
+          triggerRunId: result?.runId
+        },
+        req
+      });
+      console.log(`📝 [SendEmail] Logged to activity_logs for user ${req.user.id}`);
+    } catch (activityLogError) {
+      console.error(`⚠️ [SendEmail] Failed to log to activity_logs:`, activityLogError);
+    }
+
+    // Log to email_sends table for limit tracking - use emailTrackingId as the record ID
+    // so the Trigger task can update it with the actual Resend email ID after sending
+    try {
       await db.insert(emailSends).values({
-        id: emailSendId,
+        id: emailTrackingId,
         tenantId: tenantId,
         recipientEmail: contact.email,
         recipientName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email,
@@ -3926,13 +4119,14 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
         senderName: design.displayCompanyName || 'Manager',
         subject: subject,
         emailType: 'individual',
-        provider: 'resend', // Or 'trigger.dev'
-        providerMessageId: result?.runId,
-        status: 'queued',
+        provider: 'resend',
+        providerMessageId: null, // Will be updated by Trigger task with actual Resend email ID
+        status: 'pending',
         contactId: contact.id,
         promotionId: null,
         sentAt: null, // Not sent yet
       });
+      console.log(`📧 [SendEmail] Logged to email_sends table for ${contact.email}, trackingId: ${emailTrackingId}`);
     } catch (logError) {
       console.error(`⚠️ [SendEmail] Failed to log to email_sends table:`, logError);
     }
@@ -3945,13 +4139,15 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       })
       .where(eq(emailContacts.id, contact.id));
 
+    console.log(`✅ [SendEmail] Email queued successfully for ${contact.email}, subject: "${subject}", runId: ${result?.runId}`);
+
     res.json({
       success: true,
       message: "Email sent successfully",
       result
     });
   } catch (error: any) {
-    console.error('[EmailManagementRoutes] Send individual email error:', error);
+    console.error(`❌ [SendEmail] Send individual email error:`, error);
     res.status(500).json({
       success: false,
       message: error.message || "Failed to send email"

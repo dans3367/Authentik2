@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ContactSearch } from "@/components/ContactSearch";
 import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
+import SendEmailModal from "@/components/SendEmailModal";
 import { AddContactDialog } from "@/components/AddContactDialog";
 import ContactViewDrawer from "@/components/ContactViewDrawer";
 import {
@@ -651,10 +652,29 @@ export default function EmailContacts() {
                                   <Edit className="w-4 h-4 mr-2" />
                                   {t('emailContacts.actions.editContact')}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                  <Mail className="w-4 h-4 mr-2" />
-                                  {t('emailContacts.actions.sendEmail')}
-                                </DropdownMenuItem>
+                                <SendEmailModal
+                                  contactId={contact.id}
+                                  contactEmail={contact.email}
+                                  contactName={`${contact.firstName || ''} ${contact.lastName || ''}`.trim() || undefined}
+                                  disabled={contact.status === "unsubscribed" || contact.status === "bounced"}
+                                  disabledReason={
+                                    contact.status === "unsubscribed"
+                                      ? "This contact has unsubscribed from emails."
+                                      : contact.status === "bounced"
+                                        ? "This email address is marked as bounced."
+                                        : undefined
+                                  }
+                                  onEmailSent={() => {
+                                    queryClient.invalidateQueries({ queryKey: ['/api/email-contacts'] });
+                                    queryClient.invalidateQueries({ queryKey: ['/api/email-contacts-stats'] });
+                                  }}
+                                  trigger={
+                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                      <Mail className="w-4 h-4 mr-2" />
+                                      {t('emailContacts.actions.sendEmail')}
+                                    </DropdownMenuItem>
+                                  }
+                                />
                                 <EmailActivityTimelineModal
                                   contactId={contact.id}
                                   contactEmail={contact.email}
@@ -780,10 +800,29 @@ export default function EmailContacts() {
                                   <Edit className="w-4 h-4 mr-2" />
                                   {t('emailContacts.actions.editContact')}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                  <Mail className="w-4 h-4 mr-2" />
-                                  {t('emailContacts.actions.sendEmail')}
-                                </DropdownMenuItem>
+                                <SendEmailModal
+                                  contactId={contact.id}
+                                  contactEmail={contact.email}
+                                  contactName={`${contact.firstName || ''} ${contact.lastName || ''}`.trim() || undefined}
+                                  disabled={contact.status === "unsubscribed" || contact.status === "bounced"}
+                                  disabledReason={
+                                    contact.status === "unsubscribed"
+                                      ? "This contact has unsubscribed from emails."
+                                      : contact.status === "bounced"
+                                        ? "This email address is marked as bounced."
+                                        : undefined
+                                  }
+                                  onEmailSent={() => {
+                                    queryClient.invalidateQueries({ queryKey: ['/api/email-contacts'] });
+                                    queryClient.invalidateQueries({ queryKey: ['/api/email-contacts-stats'] });
+                                  }}
+                                  trigger={
+                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                      <Mail className="w-4 h-4 mr-2" />
+                                      {t('emailContacts.actions.sendEmail')}
+                                    </DropdownMenuItem>
+                                  }
+                                />
                                 <EmailActivityTimelineModal
                                   contactId={contact.id}
                                   contactEmail={contact.email}

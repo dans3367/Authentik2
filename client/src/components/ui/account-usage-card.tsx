@@ -180,79 +180,29 @@ export function AccountUsageCard() {
         </p>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-6 md:grid-cols-2">
-          <div className="space-y-4">
-            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              {t('management.accountUsage.limitedResources', 'Limited Resources')}
-            </h4>
-            <UsageMetric
-              icon={<Mail className="h-4 w-4" />}
-              label={t('management.accountUsage.emailsSent', 'Emails Sent')}
-              current={usage.emails.current}
-              limit={usage.emails.limit}
-              periodLabel={usage.emails.periodLabel}
-            />
-            <UsageMetric
-              icon={<Store className="h-4 w-4" />}
-              label={t('management.accountUsage.shops', 'Shops')}
-              current={usage.shops.current}
-              limit={usage.shops.limit}
-            />
-            <UsageMetric
-              icon={<Users className="h-4 w-4" />}
-              label={t('management.accountUsage.teamMembers', 'Team Members')}
-              current={usage.users.current}
-              limit={usage.users.limit}
-            />
-          </div>
-          
-          <div className="space-y-4">
-            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              {t('management.accountUsage.resourceCounts', 'Resource Counts')}
-            </h4>
-            <UsageMetric
-              icon={<Contact className="h-4 w-4" />}
-              label={t('management.accountUsage.contacts', 'Contacts')}
-              current={usage.contacts.current}
-              limit={usage.contacts.limit}
-            />
-            <UsageMetric
-              icon={<ListChecks className="h-4 w-4" />}
-              label={t('management.accountUsage.lists', 'Lists')}
-              current={usage.lists.current}
-              limit={usage.lists.limit}
-            />
-            <UsageMetric
-              icon={<FileText className="h-4 w-4" />}
-              label={t('management.accountUsage.forms', 'Forms')}
-              current={usage.forms.current}
-              limit={usage.forms.limit}
-            />
-            <UsageMetric
-              icon={<Newspaper className="h-4 w-4" />}
-              label={t('management.accountUsage.newsletters', 'Newsletters')}
-              current={usage.newsletters.current}
-              limit={usage.newsletters.limit}
-            />
-            <UsageMetric
-              icon={<Megaphone className="h-4 w-4" />}
-              label={t('management.accountUsage.campaigns', 'Campaigns')}
-              current={usage.campaigns.current}
-              limit={usage.campaigns.limit}
-            />
-            <UsageMetric
-              icon={<Calendar className="h-4 w-4" />}
-              label={t('management.accountUsage.appointments', 'Appointments')}
-              current={usage.appointments.current}
-              limit={usage.appointments.limit}
-            />
-            <UsageMetric
-              icon={<Tag className="h-4 w-4" />}
-              label={t('management.accountUsage.tags', 'Tags')}
-              current={usage.tags.current}
-              limit={usage.tags.limit}
-            />
-          </div>
+        <div className="space-y-4">
+          <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+            {t('management.accountUsage.limitedResources', 'Limited Resources')}
+          </h4>
+          <UsageMetric
+            icon={<Mail className="h-4 w-4" />}
+            label={t('management.accountUsage.emailsSent', 'Emails Sent')}
+            current={usage.emails.current}
+            limit={usage.emails.limit}
+            periodLabel={usage.emails.periodLabel}
+          />
+          <UsageMetric
+            icon={<Store className="h-4 w-4" />}
+            label={t('management.accountUsage.shops', 'Shops')}
+            current={usage.shops.current}
+            limit={usage.shops.limit}
+          />
+          <UsageMetric
+            icon={<Users className="h-4 w-4" />}
+            label={t('management.accountUsage.teamMembers', 'Team Members')}
+            current={usage.users.current}
+            limit={usage.users.limit}
+          />
         </div>
 
         {/* Upgrade CTA */}
@@ -264,6 +214,109 @@ export function AccountUsageCard() {
               <ArrowUpRight className="h-4 w-4" />
             </Link>
           </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function ResourceUsageCard() {
+  const { t } = useTranslation();
+
+  const { data, isLoading, error } = useQuery<AccountUsageData>({
+    queryKey: ["/api/account-usage"],
+    refetchInterval: 60000,
+  });
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('management.resourceUsage.title', 'Resource Usage')}</CardTitle>
+          <CardDescription>{t('management.resourceUsage.subtitle', 'Your current resource counts and limits')}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-2 w-full" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('management.resourceUsage.title', 'Resource Usage')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-2 text-destructive">
+            <AlertCircle className="h-4 w-4" />
+            <span>{t('management.resourceUsage.error', 'Failed to load usage data')}</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const { usage } = data;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('management.resourceUsage.title', 'Resource Usage')}</CardTitle>
+        <CardDescription>
+          {t('management.resourceUsage.subtitle', 'Your current resource counts and limits')}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <UsageMetric
+            icon={<Contact className="h-4 w-4" />}
+            label={t('management.accountUsage.contacts', 'Contacts')}
+            current={usage.contacts.current}
+            limit={usage.contacts.limit}
+          />
+          <UsageMetric
+            icon={<ListChecks className="h-4 w-4" />}
+            label={t('management.accountUsage.lists', 'Lists')}
+            current={usage.lists.current}
+            limit={usage.lists.limit}
+          />
+          <UsageMetric
+            icon={<FileText className="h-4 w-4" />}
+            label={t('management.accountUsage.forms', 'Forms')}
+            current={usage.forms.current}
+            limit={usage.forms.limit}
+          />
+          <UsageMetric
+            icon={<Newspaper className="h-4 w-4" />}
+            label={t('management.accountUsage.newsletters', 'Newsletters')}
+            current={usage.newsletters.current}
+            limit={usage.newsletters.limit}
+          />
+          <UsageMetric
+            icon={<Megaphone className="h-4 w-4" />}
+            label={t('management.accountUsage.campaigns', 'Campaigns')}
+            current={usage.campaigns.current}
+            limit={usage.campaigns.limit}
+          />
+          <UsageMetric
+            icon={<Calendar className="h-4 w-4" />}
+            label={t('management.accountUsage.appointments', 'Appointments')}
+            current={usage.appointments.current}
+            limit={usage.appointments.limit}
+          />
+          <UsageMetric
+            icon={<Tag className="h-4 w-4" />}
+            label={t('management.accountUsage.tags', 'Tags')}
+            current={usage.tags.current}
+            limit={usage.tags.limit}
+          />
         </div>
       </CardContent>
     </Card>

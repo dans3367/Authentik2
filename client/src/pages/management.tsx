@@ -7,7 +7,7 @@ import UsersPage from "@/pages/users";
 import ShopsPage from "@/pages/shops";
 import ManagementTags from "@/pages/management-tags";
 import ManagementEmailDesign from "@/pages/management-email-design";
-import { AccountUsageCard } from "@/components/ui/account-usage-card";
+import { AccountUsageCard, ResourceUsageCard } from "@/components/ui/account-usage-card";
 
 export default function ManagementPage() {
   const { t } = useTranslation();
@@ -40,7 +40,10 @@ export default function ManagementPage() {
           </TabsList>
           <div className="mt-6">
             <TabsContent value="account-usage">
-              <AccountUsageCard />
+              <div className="grid gap-6 lg:grid-cols-2">
+                <AccountUsageCard />
+                <ResourceUsageCard />
+              </div>
             </TabsContent>
             <TabsContent value="users">
               <UsersPage />

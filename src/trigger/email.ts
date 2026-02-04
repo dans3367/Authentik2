@@ -68,6 +68,52 @@ export const sendEmailTask = task({
       subject: data.subject,
     });
 
+    const apiUrl = process.env.API_URL || 'http://localhost:5000';
+    const secret = process.env.INTERNAL_SERVICE_SECRET;
+
+    async function updateEmailSendStatus(update: { emailTrackingId: string; providerMessageId?: string; status: 'sent' | 'failed'; emailActivityId?: unknown }) {
+      if (!secret) {
+        return;
+      }
+
+      const { createHmac } = await import('crypto');
+      const timestamp = Date.now();
+      const body: {
+        emailTrackingId: string;
+        providerMessageId?: string;
+        status: 'sent' | 'failed';
+        emailActivityId?: unknown;
+      } = {
+        emailTrackingId: update.emailTrackingId,
+        status: update.status,
+        emailActivityId: update.emailActivityId,
+      };
+
+      if (update.providerMessageId) {
+        body.providerMessageId = update.providerMessageId;
+      }
+      const signaturePayload = `${timestamp}.${JSON.stringify(body)}`;
+      const signature = createHmac('sha256', secret).update(signaturePayload).digest('hex');
+
+      const response = await fetch(`${apiUrl}/api/internal/update-email-send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-service': 'trigger.dev',
+          'x-internal-timestamp': timestamp.toString(),
+          'x-internal-signature': signature,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        logger.warn("Failed to update email send status", {
+          status: response.status,
+          emailTrackingId: update.emailTrackingId,
+        });
+      }
+    }
+
     try {
       const { data: emailData, error } = await resend.emails.send({
         from: data.from || process.env.EMAIL_FROM || "admin@zendwise.com",
@@ -85,6 +131,22 @@ export const sendEmailTask = task({
 
       if (error) {
         logger.error("Failed to send email", { error });
+
+        // If available, mark both email_sends and email_activity as failed
+        if (data.metadata?.emailTrackingId) {
+          try {
+            await updateEmailSendStatus({
+              emailTrackingId: String(data.metadata.emailTrackingId),
+              status: 'failed',
+              emailActivityId: data.metadata?.emailActivityId,
+            });
+          } catch (updateError) {
+            logger.warn("Error updating failed email status", {
+              error: updateError instanceof Error ? updateError.message : 'Unknown error',
+            });
+          }
+        }
+
         return {
           success: false,
           to: recipients,
@@ -98,6 +160,28 @@ export const sendEmailTask = task({
         to: recipients,
       });
 
+      // If metadata contains emailTrackingId, update the email_sends record with actual Resend email ID
+      if (data.metadata?.emailTrackingId && emailData?.id) {
+        try {
+          if (secret) {
+            await updateEmailSendStatus({
+              emailTrackingId: String(data.metadata.emailTrackingId),
+              providerMessageId: String(emailData.id),
+              status: 'sent',
+              emailActivityId: data.metadata?.emailActivityId,
+            });
+            logger.info("Updated email_sends record with Resend email ID", {
+              emailTrackingId: data.metadata.emailTrackingId,
+              resendEmailId: emailData.id,
+            });
+          }
+        } catch (updateError) {
+          logger.warn("Error updating email_sends record", {
+            error: updateError instanceof Error ? updateError.message : 'Unknown error',
+          });
+        }
+      }
+
       return {
         success: true,
         emailId: emailData?.id,
@@ -108,6 +192,23 @@ export const sendEmailTask = task({
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
       logger.error("Exception sending email", { error: errorMessage });
+
+      // If available, mark both email_sends and email_activity as failed
+      if (data.metadata?.emailTrackingId) {
+        try {
+          await updateEmailSendStatus({
+            emailTrackingId: String(data.metadata.emailTrackingId),
+            providerMessageId: String(data.metadata.emailTrackingId),
+            status: 'failed',
+            emailActivityId: data.metadata?.emailActivityId,
+          });
+        } catch (updateError) {
+          logger.warn("Error updating failed email status", {
+            error: updateError instanceof Error ? updateError.message : 'Unknown error',
+          });
+        }
+      }
+
       return {
         success: false,
         to: recipients,
@@ -282,7 +383,7 @@ export const schedulePromotionalEmailTask = task({
 
     // Wait for the specified delay
     if (data.delayMs && data.delayMs > 0) {
-      await wait.for({ milliseconds: data.delayMs });
+      await wait.for({ seconds: data.delayMs / 1000 });
       logger.info("Delay completed, sending promotional email via internal API");
     }
 
