@@ -1409,8 +1409,9 @@ export default function RemindersPage() {
   };
 
   const handleSelectAll = (checked: boolean) => {
+    const visibleAppointmentIds = appointments.map(apt => apt.id);
     if (checked) {
-      setSelectedAppointments(allAppointments.map(apt => apt.id));
+      setSelectedAppointments(visibleAppointmentIds);
     } else {
       setSelectedAppointments([]);
     }
@@ -1491,10 +1492,12 @@ export default function RemindersPage() {
   };
 
   // Check if all appointments are selected
-  const isAllSelected = allAppointments.length > 0 && selectedAppointments.length === allAppointments.length;
+  const isAllSelected = appointments.length > 0
+    && selectedAppointments.length === appointments.length
+    && appointments.every(apt => selectedAppointments.includes(apt.id));
 
   // Check if some appointments are selected (for indeterminate state)
-  const isSomeSelected = selectedAppointments.length > 0 && selectedAppointments.length < allAppointments.length;
+  const isSomeSelected = selectedAppointments.length > 0 && !isAllSelected;
 
   // Get upcoming appointments (next 7 days) - always use non-archived data
   const upcomingAppointments = upcomingAppointmentsForSidebar.filter(apt => {

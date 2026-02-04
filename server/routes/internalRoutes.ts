@@ -274,6 +274,14 @@ router.post(
         .where(eq(emailSends.id, emailTrackingId))
         .returning();
 
+      if (result.length === 0) {
+        console.warn(`⚠️ [Internal API] No email_sends record found for tracking ID ${emailTrackingId}`);
+        return res.status(404).json({
+          success: false,
+          error: 'Email send record not found',
+        });
+      }
+
       // Optionally update the related email_activity row (queued -> sent/failed)
       if (emailActivityId && (validatedStatus === 'sent' || validatedStatus === 'failed')) {
         try {
@@ -286,14 +294,6 @@ router.post(
         } catch (activityUpdateError) {
           console.warn(`⚠️ [Internal API] Failed to update email_activity ${emailActivityId}:`, activityUpdateError);
         }
-      }
-
-      if (result.length === 0) {
-        console.warn(`⚠️ [Internal API] No email_sends record found for tracking ID ${emailTrackingId}`);
-        return res.status(404).json({
-          success: false,
-          error: 'Email send record not found',
-        });
       }
 
       console.log(`✅ [Internal API] Updated email_sends record ${result[0].id} with status ${validatedStatus}${providerMessageId ? ` and provider ID ${providerMessageId}` : ''}`);

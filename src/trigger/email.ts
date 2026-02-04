@@ -71,19 +71,27 @@ export const sendEmailTask = task({
     const apiUrl = process.env.API_URL || 'http://localhost:5000';
     const secret = process.env.INTERNAL_SERVICE_SECRET;
 
-    async function updateEmailSendStatus(update: { emailTrackingId: string; providerMessageId: string; status: 'sent' | 'failed'; emailActivityId?: unknown }) {
+    async function updateEmailSendStatus(update: { emailTrackingId: string; providerMessageId?: string; status: 'sent' | 'failed'; emailActivityId?: unknown }) {
       if (!secret) {
         return;
       }
 
       const { createHmac } = await import('crypto');
       const timestamp = Date.now();
-      const body = {
+      const body: {
+        emailTrackingId: string;
+        providerMessageId?: string;
+        status: 'sent' | 'failed';
+        emailActivityId?: unknown;
+      } = {
         emailTrackingId: update.emailTrackingId,
-        providerMessageId: update.providerMessageId,
         status: update.status,
         emailActivityId: update.emailActivityId,
       };
+
+      if (update.providerMessageId) {
+        body.providerMessageId = update.providerMessageId;
+      }
       const signaturePayload = `${timestamp}.${JSON.stringify(body)}`;
       const signature = createHmac('sha256', secret).update(signaturePayload).digest('hex');
 
@@ -129,7 +137,6 @@ export const sendEmailTask = task({
           try {
             await updateEmailSendStatus({
               emailTrackingId: String(data.metadata.emailTrackingId),
-              providerMessageId: String(data.metadata.emailTrackingId),
               status: 'failed',
               emailActivityId: data.metadata?.emailActivityId,
             });

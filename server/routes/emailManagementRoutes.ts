@@ -4063,16 +4063,6 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       console.log(`📧 [SendEmail] Triggered send-email task, runId: ${handle.id}, trackingId: ${emailTrackingId}`);
       result = { success: true, runId: handle.id };
 
-      // At minimum, update the activity so it doesn't remain stuck as queued
-      if (emailActivityId) {
-        try {
-          await db.update(emailActivity)
-            .set({ activityType: 'sent' })
-            .where(and(eq(emailActivity.id, emailActivityId), eq(emailActivity.tenantId, tenantId)));
-        } catch (activityUpdateError) {
-          console.error(`⚠️ [SendEmail] Failed to update email activity status:`, activityUpdateError);
-        }
-      }
     } catch (triggerError: any) {
       console.error('[SendEmail] Failed to trigger email task:', triggerError);
 
