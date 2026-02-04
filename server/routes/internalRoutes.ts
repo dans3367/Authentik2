@@ -203,4 +203,62 @@ router.post(
   }
 );
 
+/**
+ * Internal endpoint for updating email_sends record with actual provider message ID
+ * Called by Trigger.dev tasks after successfully sending an email
+ */
+router.post(
+  '/update-email-send',
+  authenticateInternalService,
+  async (req: InternalServiceRequest, res) => {
+    try {
+      const { emailTrackingId, providerMessageId, status } = req.body;
+
+      if (!emailTrackingId || !providerMessageId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required fields: emailTrackingId and providerMessageId',
+        });
+      }
+
+      console.log(`📧 [Internal API] Updating email_sends record for tracking ID ${emailTrackingId} with provider ID ${providerMessageId}`);
+
+      // Find and update the email_sends record by the email tracking ID
+      const { eq } = await import('drizzle-orm');
+      const result = await db.update(emailSends)
+        .set({
+          providerMessageId: providerMessageId,
+          status: status || 'sent',
+          sentAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(emailSends.id, emailTrackingId))
+        .returning();
+
+      if (result.length === 0) {
+        console.warn(`⚠️ [Internal API] No email_sends record found for tracking ID ${emailTrackingId}`);
+        return res.status(404).json({
+          success: false,
+          error: 'Email send record not found',
+        });
+      }
+
+      console.log(`✅ [Internal API] Updated email_sends record ${result[0].id} with provider ID ${providerMessageId}`);
+
+      return res.json({
+        success: true,
+        emailSendId: result[0].id,
+        providerMessageId,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ [Internal API] Error updating email_sends:', errorMessage);
+      return res.status(500).json({
+        success: false,
+        error: errorMessage,
+      });
+    }
+  }
+);
+
 export default router;

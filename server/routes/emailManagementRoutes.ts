@@ -3864,6 +3864,8 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     `;
 
     // Send email via Trigger.dev queue
+    // Generate a unique ID to track this email send - will be stored in email_sends and passed to Trigger task
+    const emailTrackingId = crypto.randomUUID();
     let result: { success: boolean; runId?: string; error?: string };
     try {
       const { sendEmailTask } = await import('../../src/trigger/email');
@@ -3880,10 +3882,11 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
           type: 'individual_contact_email',
           contactId: contact.id,
           tenantId: tenantId,
-          sentBy: req.user.id
+          sentBy: req.user.id,
+          emailTrackingId: emailTrackingId // Pass tracking ID so task can update email_sends with actual Resend ID
         }
       });
-      console.log(`📧 [SendEmail] Triggered send-email task, runId: ${handle.id}`);
+      console.log(`📧 [SendEmail] Triggered send-email task, runId: ${handle.id}, trackingId: ${emailTrackingId}`);
       result = { success: true, runId: handle.id };
     } catch (triggerError: any) {
       console.error('[SendEmail] Failed to trigger email task:', triggerError);
@@ -3894,8 +3897,9 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     }
 
     // Log email activity
+    let emailActivityId: string | null = null;
     try {
-      await db.insert(emailActivity).values({
+      const [insertedActivity] = await db.insert(emailActivity).values({
         contactId: contact.id,
         tenantId: tenantId,
         activityType: 'sent',
@@ -3905,17 +3909,42 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
           emailSubject: subject
         }),
         occurredAt: new Date(),
-      });
-      console.log(`📝 [SendEmail] Logged email activity for ${contact.email}`);
+      }).returning();
+      emailActivityId = insertedActivity.id;
+      console.log(`📝 [SendEmail] Logged email activity for ${contact.email}, id: ${emailActivityId}`);
     } catch (activityLogError) {
       console.error(`⚠️ [SendEmail] Failed to log email activity:`, activityLogError);
     }
 
-    // Log to email_sends table for limit tracking
+    // Log to activity_logs table for user activity tracking
     try {
-      const emailSendId = crypto.randomUUID ? crypto.randomUUID() : require("crypto").randomUUID();
+      await logActivity({
+        tenantId: tenantId,
+        userId: req.user.id,
+        entityType: 'email',
+        entityId: emailActivityId || undefined,
+        entityName: `Email to ${contact.email}`,
+        activityType: 'sent',
+        description: `Sent direct email "${subject}" to ${contact.firstName || ''} ${contact.lastName || ''} (${contact.email})`.trim(),
+        metadata: {
+          emailActivityId: emailActivityId,
+          contactId: contact.id,
+          contactEmail: contact.email,
+          emailSubject: subject,
+          triggerRunId: result?.runId
+        },
+        req
+      });
+      console.log(`📝 [SendEmail] Logged to activity_logs for user ${req.user.id}`);
+    } catch (activityLogError) {
+      console.error(`⚠️ [SendEmail] Failed to log to activity_logs:`, activityLogError);
+    }
+
+    // Log to email_sends table for limit tracking - use emailTrackingId as the record ID
+    // so the Trigger task can update it with the actual Resend email ID after sending
+    try {
       await db.insert(emailSends).values({
-        id: emailSendId,
+        id: emailTrackingId,
         tenantId: tenantId,
         recipientEmail: contact.email,
         recipientName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email,
@@ -3923,14 +3952,14 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
         senderName: design.displayCompanyName || 'Manager',
         subject: subject,
         emailType: 'individual',
-        provider: 'resend', // Or 'trigger.dev'
-        providerMessageId: result?.runId,
+        provider: 'resend',
+        providerMessageId: null, // Will be updated by Trigger task with actual Resend email ID
         status: 'queued',
         contactId: contact.id,
         promotionId: null,
         sentAt: null, // Not sent yet
       });
-      console.log(`📧 [SendEmail] Logged to email_sends table for ${contact.email}`);
+      console.log(`📧 [SendEmail] Logged to email_sends table for ${contact.email}, trackingId: ${emailTrackingId}`);
     } catch (logError) {
       console.error(`⚠️ [SendEmail] Failed to log to email_sends table:`, logError);
     }
