@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { emailActivity, emailSends, emailContent } from '@shared/schema';
+import { emailActivity, emailSends, emailContent, emailContacts } from '@shared/schema';
 import { authenticateInternalService, InternalServiceRequest } from '../middleware/internal-service-auth';
 import crypto from 'crypto';
+import { sql } from 'drizzle-orm';
 
 const router = Router();
 
@@ -293,6 +294,22 @@ router.post(
           console.log(`✅ [Internal API] Updated email_activity ${emailActivityId} to ${validatedStatus}`);
         } catch (activityUpdateError) {
           console.warn(`⚠️ [Internal API] Failed to update email_activity ${emailActivityId}:`, activityUpdateError);
+        }
+      }
+
+      // Increment emailsSent counter on the contact when status is 'sent'
+      if (validatedStatus === 'sent' && result[0].contactId) {
+        try {
+          await db.update(emailContacts)
+            .set({
+              emailsSent: sql`COALESCE(${emailContacts.emailsSent}, 0) + 1`,
+              lastActivity: now,
+              updatedAt: now,
+            })
+            .where(eq(emailContacts.id, result[0].contactId));
+          console.log(`✅ [Internal API] Incremented emailsSent for contact ${result[0].contactId}`);
+        } catch (metricsUpdateError) {
+          console.warn(`⚠️ [Internal API] Failed to update contact emailsSent:`, metricsUpdateError);
         }
       }
 

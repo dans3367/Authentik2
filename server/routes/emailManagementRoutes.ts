@@ -4131,9 +4131,10 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       console.error(`⚠️ [SendEmail] Failed to log to email_sends table:`, logError);
     }
 
-    // Update contact stats - Do not increment emailsSent here (webhook will do it)
+    // Update contact stats - increment emailsSent for direct emails
     await db.update(emailContacts)
       .set({
+        emailsSent: sql`COALESCE(${emailContacts.emailsSent}, 0) + 1`,
         lastActivity: new Date(),
         updatedAt: new Date()
       })
