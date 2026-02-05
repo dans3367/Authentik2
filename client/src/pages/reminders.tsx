@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { isPast } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
 import { useTranslation } from 'react-i18next';
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
@@ -79,7 +78,22 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NextUpAppointments } from "@/components/NextUpAppointments";
 
-// Types based on our schema
+// Import extracted utilities
+import {
+  getCustomerName,
+  getCustomerNameForSort,
+  getStatusColor,
+  formatDateTime,
+  toLocalDateString,
+  toLocalTimeString,
+  mergeDateAndTime,
+  TIMEZONE_OPTIONS,
+} from "@/utils/appointment-utils";
+
+// Import extracted components
+import { DeleteConfirmDialog, AppointmentStats } from "@/components/appointments";
+
+// Types based on our schema (local definitions to match API response)
 interface Customer {
   id: string;
   email: string;
@@ -127,6 +141,7 @@ interface AppointmentReminder {
   status: 'pending' | 'sent' | 'failed' | 'cancelled';
   content?: string;
   errorMessage?: string;
+  timezone?: string;
 }
 
 interface AppointmentNote {
@@ -146,7 +161,6 @@ interface AppointmentNote {
 
 export default function RemindersPage() {
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
   const { t } = useTranslation();
   const { user } = useReduxAuth();
   const userTimezone = user?.timezone || 'America/Chicago';
@@ -487,12 +501,6 @@ export default function RemindersPage() {
 
   const allAppointments: Appointment[] = appointmentsData?.appointments || [];
   const upcomingAppointmentsForSidebar: Appointment[] = upcomingAppointmentsData?.appointments || [];
-
-  // Helper to get customer name for sorting
-  const getCustomerNameForSort = (customer: Customer | undefined): string => {
-    if (!customer) return '';
-    return `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customer.email;
-  };
 
   // Split appointments into upcoming and past based on current time
   const now = new Date();
@@ -1498,72 +1506,6 @@ export default function RemindersPage() {
     }
   };
 
-  const getCustomerName = (customer?: Customer) => {
-    if (!customer) return 'Unknown Customer';
-    if (customer.firstName && customer.lastName) {
-      return `${customer.firstName} ${customer.lastName}`;
-    } else if (customer.firstName) {
-      return customer.firstName;
-    } else if (customer.lastName) {
-      return customer.lastName;
-    }
-    return customer.email;
-  };
-
-  const getStatusColor = (status: Appointment['status']) => {
-    switch (status) {
-      case 'scheduled': return 'bg-blue-100 text-blue-800';
-      case 'confirmed': return 'bg-green-100 text-green-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      case 'completed': return 'bg-gray-100 text-gray-800';
-      case 'no_show': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const formatDateTime = (date: Date) => {
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    }).format(new Date(date));
-  };
-
-  const toLocalDateTimeString = (date: Date) => {
-    const d = new Date(date);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const hours = String(d.getHours()).padStart(2, '0');
-    const minutes = String(d.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-  };
-
-  const toLocalDateString = (date: Date) => {
-    const d = new Date(date);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  const toLocalTimeString = (date: Date) => {
-    const d = new Date(date);
-    const hours = String(d.getHours()).padStart(2, '0');
-    const minutes = String(d.getMinutes()).padStart(2, '0');
-    return `${hours}:${minutes}`;
-  };
-
-  const mergeDateAndTime = (current: Date, nextDate?: string, nextTime?: string) => {
-    const datePart = nextDate ?? toLocalDateString(current);
-    const timePart = nextTime ?? toLocalTimeString(current);
-    const merged = new Date(`${datePart}T${timePart}`);
-    // Return current date if the merged result is invalid (e.g., partial time input)
-    return isNaN(merged.getTime()) ? current : merged;
-  };
-
   // Check if all appointments are selected
   const isAllSelected = appointments.length > 0
     && selectedAppointments.length === appointments.length
@@ -1611,83 +1553,12 @@ export default function RemindersPage() {
           />
 
           {/* Overview and Upcoming Side by Side */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 order-2">
-            {/* Overview Stats */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  {t('reminders.overview.title')}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">{t('reminders.overview.total')}</span>
-                  <Badge variant="outline">{allAppointments.length}</Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">{t('reminders.overview.upcoming')}</span>
-                  <Badge variant="outline">{upcomingAppointments.length}</Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">{t('reminders.overview.confirmed')}</span>
-                  <Badge variant="outline">
-                    {allAppointments.filter(apt => apt.status === 'confirmed').length}
-                  </Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">{t('reminders.overview.remindersSent')}</span>
-                  <Badge variant="outline">
-                    {allAppointments.filter(apt => apt.reminderSent).length}
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Upcoming Appointments */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  {t('reminders.overview.upcomingThisWeek')}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {upcomingAppointments.length === 0 ? (
-                  <div className="text-center py-4">
-                    <Calendar className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600">
-                      {t('reminders.appointments.noUpcoming')}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    {upcomingAppointments.map((appointment) => (
-                      <div
-                        key={appointment.id}
-                        className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="text-left min-w-0 flex-1 mr-3">
-                          <button
-                            type="button"
-                            onClick={() => handleViewAppointment(appointment)}
-                            className="text-sm font-medium text-left hover:underline focus:outline-none focus:ring-2 focus:ring-primary/50 rounded block w-full truncate"
-                          >
-                            {appointment.title}
-                          </button>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {getCustomerName(appointment.customer)} • {formatDateTime(appointment.appointmentDate)}
-                          </p>
-                        </div>
-                        <Badge className={`${getStatusColor(appointment.status)} text-[10px] px-1.5 py-0 h-5 whitespace-nowrap`} variant="outline">
-                          {appointment.status}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+          <div className="order-2">
+            <AppointmentStats
+              allAppointments={allAppointments}
+              upcomingAppointments={upcomingAppointments}
+              onViewAppointment={handleViewAppointment}
+            />
           </div>
 
           {/* Appointments Table with Tabs */}
@@ -3777,42 +3648,13 @@ export default function RemindersPage() {
         </Dialog>
 
         {/* Delete Appointment Confirmation Modal */}
-        <Dialog open={cancelConfirmModalOpen} onOpenChange={setCancelConfirmModalOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-red-600">
-                <AlertTriangle className="h-5 w-5" />
-                Delete Appointment
-              </DialogTitle>
-              <DialogDescription>
-                Are you sure you want to delete this appointment? This action cannot be undone.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                <p className="font-medium">{appointments.find(apt => apt.id === cancelAppointmentId)?.title}</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {getCustomerName(appointments.find(apt => apt.id === cancelAppointmentId)?.customer)}
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-500">
-                  {cancelAppointmentId && formatDateTime(appointments.find(apt => apt.id === cancelAppointmentId)?.appointmentDate || new Date())}
-                </p>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setCancelConfirmModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={confirmCancelAppointment}
-                  disabled={cancelAppointmentMutation.isPending}
-                >
-                  {cancelAppointmentMutation.isPending ? 'Deleting...' : 'Delete'}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <DeleteConfirmDialog
+          open={cancelConfirmModalOpen}
+          onOpenChange={setCancelConfirmModalOpen}
+          appointment={appointments.find(apt => apt.id === cancelAppointmentId) || null}
+          onConfirm={confirmCancelAppointment}
+          isDeleting={cancelAppointmentMutation.isPending}
+        />
 
         {/* Past Date Confirmation Modal */}
         <Dialog open={pastDateConfirmModalOpen} onOpenChange={setPastDateConfirmModalOpen}>
