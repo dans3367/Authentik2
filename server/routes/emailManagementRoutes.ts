@@ -4019,25 +4019,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     // Send email via Trigger.dev queue
     // Generate a unique ID to track this email send - will be stored in email_sends and passed to Trigger task
     const emailTrackingId = crypto.randomUUID();
-    // Log email activity (queued) first so we can update it to sent/failed later
     let emailActivityId: string | null = null;
-    try {
-      const [insertedActivity] = await db.insert(emailActivity).values({
-        contactId: contact.id,
-        tenantId: tenantId,
-        activityType: 'queued',
-        activityData: JSON.stringify({
-          source: 'individual_send_queued',
-          sentBy: req.user.id,
-          emailSubject: subject,
-        }),
-        occurredAt: new Date(),
-      }).returning();
-      emailActivityId = insertedActivity.id;
-      console.log(`📝 [SendEmail] Logged email activity for ${contact.email}, id: ${emailActivityId}`);
-    } catch (activityLogError) {
-      console.error(`⚠️ [SendEmail] Failed to log email activity:`, activityLogError);
-    }
 
     let result: { success: boolean; runId?: string; error?: string };
     try {
@@ -4057,25 +4039,35 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
           tenantId: tenantId,
           sentBy: req.user.id,
           emailTrackingId: emailTrackingId, // Pass tracking ID so task can update email_sends with actual Resend ID
-          emailActivityId: emailActivityId, // Pass activity ID so task can update email_activity to sent/failed
         }
       });
       console.log(`📧 [SendEmail] Triggered send-email task, runId: ${handle.id}, trackingId: ${emailTrackingId}`);
       result = { success: true, runId: handle.id };
 
+      // Log email activity as 'sent' now that the task system accepted it
+      try {
+        const [insertedActivity] = await db.insert(emailActivity).values({
+          contactId: contact.id,
+          tenantId: tenantId,
+          activityType: 'sent',
+          activityData: JSON.stringify({
+            source: 'individual_send',
+            sentBy: req.user.id,
+            subject: subject,
+            recipient: contact.email,
+            recipientName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || undefined,
+            from: design.displayCompanyName || 'Manager',
+          }),
+          occurredAt: new Date(),
+        }).returning();
+        emailActivityId = insertedActivity.id;
+        console.log(`📝 [SendEmail] Logged email activity as sent for ${contact.email}, id: ${emailActivityId}`);
+      } catch (activityLogError) {
+        console.error(`⚠️ [SendEmail] Failed to log email activity:`, activityLogError);
+      }
+
     } catch (triggerError: any) {
       console.error('[SendEmail] Failed to trigger email task:', triggerError);
-
-      // Ensure activity isn't left stuck as queued
-      if (emailActivityId) {
-        try {
-          await db.update(emailActivity)
-            .set({ activityType: 'failed' })
-            .where(and(eq(emailActivity.id, emailActivityId), eq(emailActivity.tenantId, tenantId)));
-        } catch (activityUpdateError) {
-          console.error(`⚠️ [SendEmail] Failed to update email activity status:`, activityUpdateError);
-        }
-      }
 
       return res.status(503).json({
         success: false,

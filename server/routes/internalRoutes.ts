@@ -213,7 +213,7 @@ router.post(
   authenticateInternalService,
   async (req: InternalServiceRequest, res) => {
     try {
-      const { emailTrackingId, providerMessageId, status, emailActivityId } = req.body;
+      const { emailTrackingId, providerMessageId, status } = req.body;
 
       const allowedStatuses = [
         'pending',
@@ -223,9 +223,7 @@ router.post(
         'failed',
       ];
 
-      const normalizedStatus = status === 'queued' ? 'pending' : status;
-
-      if (normalizedStatus !== undefined && (!normalizedStatus || !allowedStatuses.includes(normalizedStatus))) {
+      if (status !== undefined && (!status || !allowedStatuses.includes(status))) {
         return res.status(400).json({
           success: false,
           error: 'Invalid status value',
@@ -233,7 +231,7 @@ router.post(
         });
       }
 
-      const validatedStatus = normalizedStatus || 'sent';
+      const validatedStatus = status || 'sent';
 
       if (!emailTrackingId) {
         return res.status(400).json({
@@ -283,20 +281,6 @@ router.post(
         });
       }
 
-      // Optionally update the related email_activity row (queued -> sent/failed)
-      if (emailActivityId && (validatedStatus === 'sent' || validatedStatus === 'failed')) {
-        try {
-          await db.update(emailActivity)
-            .set({
-              activityType: validatedStatus,
-            })
-            .where(eq(emailActivity.id, emailActivityId));
-          console.log(`✅ [Internal API] Updated email_activity ${emailActivityId} to ${validatedStatus}`);
-        } catch (activityUpdateError) {
-          console.warn(`⚠️ [Internal API] Failed to update email_activity ${emailActivityId}:`, activityUpdateError);
-        }
-      }
-
       // Increment emailsSent counter on the contact when status is 'sent'
       if (validatedStatus === 'sent' && result[0].contactId) {
         try {
@@ -319,7 +303,7 @@ router.post(
         success: true,
         emailSendId: result[0].id,
         providerMessageId,
-        emailActivityId: emailActivityId || null,
+        status: validatedStatus,
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
