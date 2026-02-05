@@ -10,22 +10,22 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { 
-  Calendar, 
-  Timer, 
-  MapPin, 
-  Clock, 
-  CheckCircle, 
-  Edit, 
-  Eye, 
-  MoreVertical, 
-  Send, 
+import {
+  Calendar,
+  Timer,
+  MapPin,
+  Clock,
+  CheckCircle,
+  Edit,
+  Eye,
+  MoreVertical,
+  Send,
   Trash2,
-  Loader2 
+  Loader2
 } from "lucide-react";
-import { 
-  getCustomerName, 
-  getStatusColor, 
+import {
+  getCustomerName,
+  getStatusColor,
   formatDateTime,
   hasAppointmentSentReminder,
   hasAppointmentPendingReminder,
@@ -188,25 +188,25 @@ export function AppointmentCard({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={onConfirm}>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onConfirm(); }}>
                   <CheckCircle className="h-4 w-4 mr-2" />
                   Confirm Appointment
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onSendReminder}>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSendReminder(); }}>
                   <Send className="h-4 w-4 mr-2" />
                   {t('reminders.actions.sendReminder')}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={onScheduleReminder}>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onScheduleReminder(); }}>
                   <Clock className="h-4 w-4 mr-2" />
                   {t('reminders.actions.scheduleReminder')}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  className="text-red-600" 
-                  onClick={(e) => { 
-                    e.stopPropagation(); 
-                    onDelete(); 
+                <DropdownMenuItem
+                  className="text-red-600"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete();
                   }}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />

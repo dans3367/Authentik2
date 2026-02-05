@@ -414,6 +414,7 @@ router.post('/send', async (req: Request, res: Response) => {
           email: emailContacts.email,
           firstName: emailContacts.firstName,
           lastName: emailContacts.lastName,
+          status: emailContacts.status,
         }
       })
       .from(appointments)
@@ -440,15 +441,13 @@ router.post('/send', async (req: Request, res: Response) => {
         // For email reminders, check if the recipient is suppressed
         if (reminderType === 'email' && appointment.customer?.email) {
           // Check local customer status first
-          if (appointment.customer && ('status' in appointment.customer)) {
-            const customerStatus = (appointment.customer as any).status;
-            if (customerStatus === 'unsubscribed' || customerStatus === 'bounced') {
-              errors.push({
-                appointmentId: appointment.id,
-                error: `Customer is ${customerStatus}`
-              });
-              continue;
-            }
+          const customerStatus = appointment.customer?.status;
+          if (customerStatus === 'unsubscribed' || customerStatus === 'bounced') {
+            errors.push({
+              appointmentId: appointment.id,
+              error: `Customer is ${customerStatus}`
+            });
+            continue;
           }
 
           // Check global suppression list

@@ -189,7 +189,7 @@ export function calculatePagination(
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = Math.min(startIndex + pageSize, totalItems);
   const currentItems = endIndex - startIndex;
-  
+
   return {
     totalPages,
     startIndex,
@@ -211,11 +211,12 @@ export function sortAppointments(
   return [...appointments].sort((a, b) => {
     let comparison = 0;
     switch (column) {
-      case 'customer':
+      case 'customer': {
         const nameA = getCustomerNameForSort(a.customer);
         const nameB = getCustomerNameForSort(b.customer);
         comparison = nameA.localeCompare(nameB);
         break;
+      }
       case 'title':
         comparison = (a.title || '').localeCompare(b.title || '');
         break;
@@ -236,7 +237,7 @@ export function filterAppointmentsBySearch(
   searchQuery: string
 ): AppointmentWithCustomer[] {
   if (!searchQuery) return appointments;
-  
+
   const searchLower = searchQuery.toLowerCase();
   return appointments.filter(appointment => {
     const customerName = getCustomerNameForSort(appointment.customer).toLowerCase();
@@ -290,19 +291,19 @@ export function filterAppointments(
   filters: AppointmentFilters
 ): AppointmentWithCustomer[] {
   let filtered = appointments;
-  
+
   if (filters.status && filters.status !== 'all') {
     filtered = filterAppointmentsByStatus(filtered, filters.status);
   }
-  
+
   if (filters.dateFrom || filters.dateTo) {
     filtered = filterAppointmentsByDateRange(filtered, filters.dateFrom, filters.dateTo);
   }
-  
+
   if (filters.searchQuery) {
     filtered = filterAppointmentsBySearch(filtered, filters.searchQuery);
   }
-  
+
   return filtered;
 }
 

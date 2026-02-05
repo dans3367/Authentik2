@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from 'react-i18next';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -43,7 +43,7 @@ export function ReminderScheduleDialog({
 }: ReminderScheduleDialogProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
-  
+
   const [scheduleData, setScheduleData] = useState<ScheduleReminderData>({
     reminderType: 'email',
     reminderTiming: '1h',
@@ -51,7 +51,7 @@ export function ReminderScheduleDialog({
     timezone: userTimezone,
     content: ''
   });
-  
+
   const [reminderValidationError, setReminderValidationError] = useState<string | null>(null);
 
   // Update defaults when appointment or timezone changes
@@ -69,6 +69,15 @@ export function ReminderScheduleDialog({
     }
   }, [appointment, userTimezone]);
 
+  const runEmailValidation = useCallback(async (email?: string | null) => {
+    if (!email) {
+      setReminderValidationError(null);
+      return;
+    }
+    const errorMessage = await validateEmailReminder(email);
+    setReminderValidationError(errorMessage);
+  }, [validateEmailReminder]);
+
   // Validate email when dialog opens
   useEffect(() => {
     if (open && appointment && scheduleData.reminderType === 'email') {
@@ -79,20 +88,11 @@ export function ReminderScheduleDialog({
     } else if (!open) {
       setReminderValidationError(null);
     }
-  }, [open, appointment, scheduleData.reminderType]);
-
-  const runEmailValidation = async (email?: string | null) => {
-    if (!email) {
-      setReminderValidationError(null);
-      return;
-    }
-    const errorMessage = await validateEmailReminder(email);
-    setReminderValidationError(errorMessage);
-  };
+  }, [open, appointment, scheduleData.reminderType, customers, runEmailValidation]);
 
   const handleTimingChange = (timing: '5m' | '30m' | '1h' | '5h' | '10h' | 'custom') => {
     if (!appointment) return;
-    
+
     const appointmentDate = new Date(appointment.appointmentDate);
     setScheduleData(prev => ({
       ...prev,
@@ -104,7 +104,7 @@ export function ReminderScheduleDialog({
 
   const handleCustomMinutesChange = (minutes: number) => {
     if (!appointment) return;
-    
+
     const appointmentDate = new Date(appointment.appointmentDate);
     if (!isNaN(minutes) && minutes > 0 && minutes <= 10080) {
       setScheduleData(prev => ({
@@ -165,8 +165,8 @@ export function ReminderScheduleDialog({
         <div className="space-y-4">
           <div>
             <Label>{t('reminders.scheduleReminder.reminderType')}</Label>
-            <Select 
-              value={scheduleData.reminderType} 
+            <Select
+              value={scheduleData.reminderType}
               onValueChange={(v) => {
                 const newType = v as "email" | "sms" | "push";
                 setScheduleData(prev => ({ ...prev, reminderType: newType }));
@@ -229,8 +229,8 @@ export function ReminderScheduleDialog({
 
           <div>
             <Label>Timezone</Label>
-            <Select 
-              value={scheduleData.timezone} 
+            <Select
+              value={scheduleData.timezone}
               onValueChange={(v) => setScheduleData(prev => ({ ...prev, timezone: v }))}
             >
               <SelectTrigger>
@@ -264,8 +264,8 @@ export function ReminderScheduleDialog({
           )}
 
           <div className="flex justify-end gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 onOpenChange(false);
                 setReminderValidationError(null);
