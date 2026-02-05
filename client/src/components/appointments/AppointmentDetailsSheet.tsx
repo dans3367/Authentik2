@@ -82,9 +82,17 @@ export function AppointmentDetailsSheet({
   isDeletingNote,
 }: AppointmentDetailsSheetProps) {
   const { t } = useTranslation();
+  import { useEffect, useState } from "react";
+
   const [activeTab, setActiveTab] = useState<"details" | "notes">("details");
   const [showExpandedCustomerInfo, setShowExpandedCustomerInfo] = useState(false);
 
+  useEffect(() => {
+    if (open) {
+      setActiveTab("details");
+      setShowExpandedCustomerInfo(false);
+    }
+  }, [open, appointment?.id]);
   if (!appointment) return null;
 
   const appointmentReminders = reminders.filter(r => r.appointmentId === appointment.id);

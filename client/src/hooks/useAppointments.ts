@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import type { 
-  Appointment, 
-  AppointmentReminder, 
-  AppointmentWithCustomer, 
-  Customer 
+import type {
+  Appointment,
+  AppointmentReminder,
+  AppointmentWithCustomer,
+  Customer
 } from "@/utils/appointment-utils";
 
 // Re-export types for convenience
@@ -16,8 +16,8 @@ export interface AppointmentNote {
   appointmentId: string;
   userId: string;
   content: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
   user?: {
     id: string;
     name: string;
