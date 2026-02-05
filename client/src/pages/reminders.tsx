@@ -88,61 +88,17 @@ import {
   toLocalTimeString,
   mergeDateAndTime,
   TIMEZONE_OPTIONS,
+  type Appointment,
+  type AppointmentWithCustomer,
+  type Customer,
+  type AppointmentReminder,
 } from "@/utils/appointment-utils";
 
 // Import extracted components
 import { DeleteConfirmDialog, AppointmentStats } from "@/components/appointments";
 
 // Types based on our schema (local definitions to match API response)
-interface Customer {
-  id: string;
-  email: string;
-  firstName: string | null;
-  lastName: string | null;
-  status: "active" | "unsubscribed" | "bounced" | "pending";
-  address?: string | null;
-  city?: string | null;
-  state?: string | null;
-  zipCode?: string | null;
-  country?: string | null;
-  phoneNumber?: string | null;
-}
 
-interface Appointment {
-  id: string;
-  customerId: string;
-  title: string;
-  description?: string;
-  appointmentDate: Date;
-  duration: number;
-  location?: string;
-  serviceType?: string;
-  status: 'scheduled' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
-  notes?: string;
-  reminderSent: boolean;
-  reminderSentAt?: Date;
-  confirmationReceived: boolean;
-  confirmationReceivedAt?: Date;
-  confirmationToken?: string;
-  reminderSettings?: string;
-  customer?: Customer;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface AppointmentReminder {
-  id: string;
-  appointmentId: string;
-  reminderType: 'email' | 'sms' | 'push';
-  reminderTiming: '5m' | '30m' | '1h' | '5h' | '10h' | 'custom';
-  customMinutesBefore?: number;
-  scheduledFor: Date;
-  sentAt?: Date;
-  status: 'pending' | 'sent' | 'failed' | 'cancelled';
-  content?: string;
-  errorMessage?: string;
-  timezone?: string;
-}
 
 interface AppointmentNote {
   id: string;
@@ -227,9 +183,9 @@ export default function RemindersPage() {
 
   const [editAppointmentModalOpen, setEditAppointmentModalOpen] = useState(false);
   const [editAppointmentReminderModalOpen, setEditAppointmentReminderModalOpen] = useState(false);
-  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
+  const [editingAppointment, setEditingAppointment] = useState<AppointmentWithCustomer | null>(null);
   const [viewAppointmentPanelOpen, setViewAppointmentPanelOpen] = useState(false);
-  const [viewingAppointment, setViewingAppointment] = useState<Appointment | null>(null);
+  const [viewingAppointment, setViewingAppointment] = useState<AppointmentWithCustomer | null>(null);
   const [viewAppointmentTab, setViewAppointmentTab] = useState<"details" | "notes">("details");
   const [showExpandedCustomerInfo, setShowExpandedCustomerInfo] = useState(false);
   const [customerProfilePanelOpen, setCustomerProfilePanelOpen] = useState(false);
@@ -459,7 +415,7 @@ export default function RemindersPage() {
     isLoading: appointmentsLoading,
     isFetching: appointmentsFetching,
     refetch: refetchAppointments
-  } = useQuery<{ appointments: Appointment[] }>({
+  } = useQuery<{ appointments: AppointmentWithCustomer[] }>({
     queryKey: ['/api/appointments'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/appointments');
@@ -499,8 +455,8 @@ export default function RemindersPage() {
     refetchOnWindowFocus: false,
   });
 
-  const allAppointments: Appointment[] = appointmentsData?.appointments || [];
-  const upcomingAppointmentsForSidebar: Appointment[] = upcomingAppointmentsData?.appointments || [];
+  const allAppointments: AppointmentWithCustomer[] = appointmentsData?.appointments || [];
+  const upcomingAppointmentsForSidebar: AppointmentWithCustomer[] = upcomingAppointmentsData?.appointments || [];
 
   // Split appointments into upcoming and past based on current time
   const now = new Date();
@@ -754,7 +710,7 @@ export default function RemindersPage() {
       if (data?.appointment) {
         queryClient.setQueryData(
           ['/api/appointments'],
-          (old: { appointments: Appointment[] } | undefined) => {
+          (old: { appointments: AppointmentWithCustomer[] } | undefined) => {
             if (!old?.appointments) return old;
             return {
               ...old,
@@ -827,7 +783,7 @@ export default function RemindersPage() {
 
       // Create optimistic appointment with temporary ID
       const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-      const optimisticAppointment: Appointment = {
+      const optimisticAppointment: AppointmentWithCustomer = {
         id: tempId,
         customerId: appointmentData.customerId,
         title: appointmentData.title,
@@ -851,7 +807,7 @@ export default function RemindersPage() {
       }
 
       // Optimistically update cache
-      queryClient.setQueryData<{ appointments: Appointment[] }>(
+      queryClient.setQueryData<{ appointments: AppointmentWithCustomer[] }>(
         ['/api/appointments'],
         (old) => ({
           appointments: old?.appointments ? [optimisticAppointment, ...old.appointments] : [optimisticAppointment],
@@ -880,7 +836,7 @@ export default function RemindersPage() {
         const realAppointment = data.appointment;
 
         // Update cache with real appointment data (replace temp with real)
-        queryClient.setQueryData<{ appointments: Appointment[] }>(
+        queryClient.setQueryData<{ appointments: AppointmentWithCustomer[] }>(
           ['/api/appointments'],
           (old) => {
             if (!old?.appointments) return old;
@@ -1108,7 +1064,7 @@ export default function RemindersPage() {
     }
   };
 
-  const handleViewAppointment = (appointment: Appointment) => {
+  const handleViewAppointment = (appointment: AppointmentWithCustomer) => {
     setViewingAppointment(appointment);
     setViewAppointmentPanelOpen(true);
     setViewAppointmentTab("details");
@@ -1142,7 +1098,7 @@ export default function RemindersPage() {
     );
   };
 
-  const handleEditAppointment = (appointment: Appointment) => {
+  const handleEditAppointment = (appointment: AppointmentWithCustomer) => {
     setEditingAppointment(appointment);
     setEditAppointmentModalOpen(true);
 
@@ -4000,11 +3956,11 @@ export default function RemindersPage() {
                           <div className="space-y-1.5 text-xs">
                             <div className="flex justify-between items-center">
                               <span className="text-muted-foreground">{t('reminders.details.created')}</span>
-                              <span className="text-foreground">{formatDateTime(viewingAppointment.createdAt)}</span>
+                              <span className="text-foreground">{viewingAppointment.createdAt ? formatDateTime(viewingAppointment.createdAt) : 'N/A'}</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-muted-foreground">{t('reminders.details.lastUpdated')}</span>
-                              <span className="text-foreground">{formatDateTime(viewingAppointment.updatedAt)}</span>
+                              <span className="text-foreground">{viewingAppointment.updatedAt ? formatDateTime(viewingAppointment.updatedAt) : 'N/A'}</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-muted-foreground">{t('reminders.details.appointmentId')}</span>

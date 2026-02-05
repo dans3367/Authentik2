@@ -253,6 +253,36 @@ export function AppointmentDetailsSheet({
                   </div>
                 </div>
 
+                {/* Confirmation Status */}
+                <div className="space-y-3 pt-4 border-t">
+                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    {t('reminders.details.confirmationStatus')}
+                  </h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-foreground">{t('reminders.details.confirmed')}</p>
+                      {appointment.confirmationReceived ? (
+                        <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                          <CheckCircle className="h-3 w-3" />
+                          {t('common.yes')}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <XCircle className="h-3 w-3" />
+                          {t('common.no')}
+                        </span>
+                      )}
+                    </div>
+                    {appointment.confirmationReceivedAt && (
+                      <div className="flex items-center justify-between py-1">
+                        <p className="text-xs text-muted-foreground">{t('reminders.details.confirmedAt')}</p>
+                        <p className="text-xs text-foreground">{formatDateTime(appointment.confirmationReceivedAt)}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Reminder Status */}
                 <div className="space-y-3 pt-4 border-t">
                   <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
@@ -322,36 +352,6 @@ export function AppointmentDetailsSheet({
                       <div className="py-4 text-center">
                         <BellOff className="h-5 w-5 mx-auto text-muted-foreground/40 mb-1" />
                         <p className="text-xs text-muted-foreground">No reminders configured</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Confirmation Status */}
-                <div className="space-y-3 pt-4 border-t">
-                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-                    <CheckCircle className="h-3.5 w-3.5" />
-                    {t('reminders.details.confirmationStatus')}
-                  </h3>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-foreground">{t('reminders.details.confirmed')}</p>
-                      {appointment.confirmationReceived ? (
-                        <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                          <CheckCircle className="h-3 w-3" />
-                          {t('common.yes')}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <XCircle className="h-3 w-3" />
-                          {t('common.no')}
-                        </span>
-                      )}
-                    </div>
-                    {appointment.confirmationReceivedAt && (
-                      <div className="flex items-center justify-between py-1">
-                        <p className="text-xs text-muted-foreground">{t('reminders.details.confirmedAt')}</p>
-                        <p className="text-xs text-foreground">{formatDateTime(appointment.confirmationReceivedAt)}</p>
                       </div>
                     )}
                   </div>
