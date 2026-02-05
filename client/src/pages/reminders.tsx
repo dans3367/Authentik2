@@ -436,6 +436,7 @@ export default function RemindersPage() {
     cleanupOldQueryCache();
   }, []);
   const [reminderValidationError, setReminderValidationError] = useState<string | null>(null);
+  const reminderValidationSeq = useRef(0);
   // Fetch appointments - no date filtering on server
   // All date filtering is done client-side to ensure both upcoming and past tabs
   // have access to all appointment data
@@ -1072,11 +1073,7 @@ export default function RemindersPage() {
 
     // Force validation check - try appointment.customer first, then fallback to customers array
     const customerEmail = apt?.customer?.email || customers.find(c => c.id === apt?.customerId)?.email;
-    if (customerEmail) {
-      validateEmailReminder(customerEmail).then(setReminderValidationError);
-    } else {
-      setReminderValidationError(null);
-    }
+    runEmailValidation(customerEmail);
   };
 
   const computeScheduledFor = (timing: '5m' | '30m' | '1h' | '5h' | '10h' | 'custom', customMinutesBefore?: number): Date => {
@@ -1316,6 +1313,18 @@ export default function RemindersPage() {
       return null;
     }
   };
+
+  async function runEmailValidation(email?: string | null) {
+    const seq = ++reminderValidationSeq.current;
+    if (!email) {
+      setReminderValidationError(null);
+      return;
+    }
+    const errorMessage = await validateEmailReminder(email);
+    if (seq === reminderValidationSeq.current) {
+      setReminderValidationError(errorMessage);
+    }
+  }
 
   const handleCreateAppointment = async () => {
     const errors: typeof newAppointmentErrors = {};
@@ -1740,11 +1749,7 @@ export default function RemindersPage() {
                             // Force validation check when customer is selected and reminder is enabled with email type
                             if (newAppointmentReminderEnabled && newAppointmentReminderData.reminderType === 'email') {
                               const customer = customers.find(c => c.id === value);
-                              if (customer?.email) {
-                                validateEmailReminder(customer.email).then(setReminderValidationError);
-                              } else {
-                                setReminderValidationError(null);
-                              }
+                              runEmailValidation(customer?.email);
                             }
                           }}>
                             <SelectTrigger className={`focus-visible:ring-0 focus:ring-0 ${newAppointmentErrors.customerId ? 'border-red-500' : ''}`}>
@@ -1882,13 +1887,9 @@ export default function RemindersPage() {
                           // Force validation check when opening - always check for email type
                           if (newAppointmentData.customerId && newAppointmentReminderData.reminderType === 'email') {
                             const customer = customers.find(c => c.id === newAppointmentData.customerId);
-                            if (customer?.email) {
-                              validateEmailReminder(customer.email).then(setReminderValidationError);
-                            } else {
-                              setReminderValidationError(null);
-                            }
+                            runEmailValidation(customer?.email);
                           } else {
-                            setReminderValidationError(null);
+                            runEmailValidation(null);
                           }
                         }
                       }}>
@@ -1900,157 +1901,230 @@ export default function RemindersPage() {
                             </DialogDescription>
                           </DialogHeader>
 
-                          <div className="space-y-4">
+                          {(() => {
+                            // Check if selected customer is unsubscribed/bounced for email reminders
+                            const selectedCustomer = customers.find(c => c.id === newAppointmentData.customerId);
+                            const isCustomerBlocked = selectedCustomer &&
+                              newAppointmentReminderData.reminderType === 'email' &&
+                              (selectedCustomer.status === 'unsubscribed' || selectedCustomer.status === 'bounced');
 
-                            <div>
-                              <Label>{t('reminders.scheduleReminder.reminderType')}</Label>
-                              <Select
-                                value={
-                                  newAppointmentReminderData.reminderType
-                                }
-                                onValueChange={(
-                                  value: "email" | "sms" | "push"
-                                ) => {
-                                  setNewAppointmentReminderData((prev) => ({
-                                    ...prev,
-                                    reminderType: value,
-                                  }));
+                            if (isCustomerBlocked) {
+                              return (
+                                <>
+                                  <div className="space-y-4">
+                                    <div>
+                                      <Label>{t('reminders.scheduleReminder.reminderType')}</Label>
+                                      <Select
+                                        value={newAppointmentReminderData.reminderType}
+                                        onValueChange={(value: "email" | "sms" | "push") => {
+                                          setNewAppointmentReminderData((prev) => ({
+                                            ...prev,
+                                            reminderType: value,
+                                          }));
+                                          if (value === 'email' && newAppointmentData.customerId) {
+                                            const customer = customers.find(c => c.id === newAppointmentData.customerId);
+                                            runEmailValidation(customer?.email);
+                                          } else {
+                                            runEmailValidation(null);
+                                          }
+                                        }}
+                                      >
+                                        <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="email">{t('reminders.scheduleReminder.email')}</SelectItem>
+                                          <SelectItem value="sms" disabled>{t('reminders.scheduleReminder.sms')}</SelectItem>
+                                          <SelectItem value="push" disabled>{t('reminders.scheduleReminder.push')}</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
 
-                                  // Re-validate when switching type
-                                  if (value === 'email' && newAppointmentData.customerId) {
-                                    const customer = customers.find(c => c.id === newAppointmentData.customerId);
-                                    if (customer?.email) {
-                                      validateEmailReminder(customer.email).then(setReminderValidationError);
-                                    }
-                                  } else {
-                                    setReminderValidationError(null);
-                                  }
-                                }}
-                              >
-                                <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="email">{t('reminders.scheduleReminder.email')}</SelectItem>
-                                  <SelectItem value="sms" disabled>{t('reminders.scheduleReminder.sms')}</SelectItem>
-                                  <SelectItem value="push" disabled>{t('reminders.scheduleReminder.push')}</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
+                                    <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                                      <div className="flex items-start gap-3">
+                                        <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-500 mt-0.5 shrink-0" />
+                                        <div className="space-y-1">
+                                          <p className="font-medium text-amber-800 dark:text-amber-400">
+                                            Email Reminders Unavailable
+                                          </p>
+                                          <p className="text-sm text-amber-700 dark:text-amber-500">
+                                            This customer has {selectedCustomer.status === 'unsubscribed' ? 'unsubscribed from emails' : 'a bounced email address'}.
+                                            Email reminders cannot be sent to this address.
+                                          </p>
+                                          <p className="text-xs text-amber-600 dark:text-amber-600 mt-2">
+                                            To enable email reminders, the customer must re-subscribe or update their email address.
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
 
-                            <div>
-                              <Label>{t('reminders.scheduleReminder.timing')}</Label>
-                              <Select
-                                value={newAppointmentReminderData.reminderTiming}
-                                onValueChange={(value: 'now' | '5m' | '30m' | '1h' | '5h' | '10h' | 'custom') => setNewAppointmentReminderData(prev => ({ ...prev, reminderTiming: value }))}
-                              >
-                                <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="now">{t('reminders.scheduleReminder.sendNow')}</SelectItem>
-                                  <SelectItem value="5m">{t('reminders.scheduleReminder.5mBefore')}</SelectItem>
-                                  <SelectItem value="30m">{t('reminders.scheduleReminder.30mBefore')}</SelectItem>
-                                  <SelectItem value="1h">{t('reminders.scheduleReminder.1hBefore')}</SelectItem>
-                                  <SelectItem value="5h">{t('reminders.scheduleReminder.5hBefore')}</SelectItem>
-                                  <SelectItem value="10h">{t('reminders.scheduleReminder.10hBefore')}</SelectItem>
-                                  <SelectItem value="custom">{t('reminders.scheduleReminder.customTime')}</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
+                                  <div className="flex justify-end gap-2 pt-4">
+                                    <Button variant="outline" onClick={() => {
+                                      setNewAppointmentReminderModalOpen(false);
+                                      setNewAppointmentReminderEnabled(false);
+                                    }}>
+                                      {t('reminders.appointments.cancel')}
+                                    </Button>
+                                  </div>
+                                </>
+                              );
+                            }
 
-                            {newAppointmentReminderData.reminderTiming === 'custom' && (
-                              <div>
-                                <Label className={newAppointmentErrors.customMinutesBefore ? "text-red-500" : ""}>
-                                  {t('reminders.scheduleReminder.customMinutesLabel')} <span className="text-red-500">*</span>
-                                </Label>
-                                <Input
-                                  type="number"
-                                  min="1"
-                                  max="10080"
-                                  placeholder={t('reminders.scheduleReminder.customMinutesPlaceholder')}
-                                  value={newAppointmentReminderData.customMinutesBefore || ''}
-                                  onChange={(e) => {
-                                    setNewAppointmentReminderData(prev => ({
-                                      ...prev,
-                                      customMinutesBefore: e.target.value ? parseInt(e.target.value) : undefined
-                                    }));
-                                    setNewAppointmentErrors(prev => ({ ...prev, customMinutesBefore: false }));
-                                  }}
-                                  className={`focus-visible:ring-0 ${newAppointmentErrors.customMinutesBefore ? 'border-red-500' : ''}`}
-                                />
-                                <p className="text-xs text-gray-500 mt-1">{t('reminders.scheduleReminder.customMinutesHelp')}</p>
-                              </div>
-                            )}
+                            return (
+                              <>
+                                <div className="space-y-4">
 
-                            <div>
-                              <Label>Timezone</Label>
-                              <Select
-                                value={newAppointmentReminderData.timezone}
-                                onValueChange={(value) => setNewAppointmentReminderData(prev => ({ ...prev, timezone: value }))}
-                              >
-                                <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
-                                  <SelectValue placeholder="Select timezone" />
-                                </SelectTrigger>
-                                <SelectContent className="max-h-[300px]">
-                                  <SelectItem value="America/New_York">🇺🇸 Eastern Time (ET)</SelectItem>
-                                  <SelectItem value="America/Chicago">🇺🇸 Central Time (CT)</SelectItem>
-                                  <SelectItem value="America/Denver">🇺🇸 Mountain Time (MT)</SelectItem>
-                                  <SelectItem value="America/Los_Angeles">🇺🇸 Pacific Time (PT)</SelectItem>
-                                  <SelectItem value="America/Anchorage">🇺🇸 Alaska Time (AKT)</SelectItem>
-                                  <SelectItem value="Pacific/Honolulu">🇺🇸 Hawaii Time (HT)</SelectItem>
-                                  <SelectItem value="America/Phoenix">🇺🇸 Arizona (MST)</SelectItem>
-                                  <SelectItem value="America/Toronto">🇨🇦 Toronto (ET)</SelectItem>
-                                  <SelectItem value="America/Vancouver">🇨🇦 Vancouver (PT)</SelectItem>
-                                  <SelectItem value="America/Mexico_City">🇲🇽 Mexico City (CST)</SelectItem>
-                                  <SelectItem value="Europe/London">🇬🇧 London (GMT/BST)</SelectItem>
-                                  <SelectItem value="Europe/Paris">🇫🇷 Paris (CET)</SelectItem>
-                                  <SelectItem value="Europe/Berlin">🇩🇪 Berlin (CET)</SelectItem>
-                                  <SelectItem value="Europe/Madrid">🇪🇸 Madrid (CET)</SelectItem>
-                                  <SelectItem value="Asia/Tokyo">🇯🇵 Tokyo (JST)</SelectItem>
-                                  <SelectItem value="Asia/Shanghai">🇨🇳 Shanghai (CST)</SelectItem>
-                                  <SelectItem value="Asia/Singapore">🇸🇬 Singapore (SGT)</SelectItem>
-                                  <SelectItem value="Asia/Dubai">🇦🇪 Dubai (GST)</SelectItem>
-                                  <SelectItem value="Australia/Sydney">🇦🇺 Sydney (AEST)</SelectItem>
-                                  <SelectItem value="Australia/Perth">🇦🇺 Perth (AWST)</SelectItem>
-                                  <SelectItem value="Pacific/Auckland">🇳🇿 Auckland (NZST)</SelectItem>
-                                  <SelectItem value="UTC">🌐 UTC</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <p className="text-xs text-gray-500 mt-1">
-                                The reminder will be sent at the scheduled time in this timezone
-                              </p>
-                            </div>
+                                  <div>
+                                    <Label>{t('reminders.scheduleReminder.reminderType')}</Label>
+                                    <Select
+                                      value={
+                                        newAppointmentReminderData.reminderType
+                                      }
+                                      onValueChange={(
+                                        value: "email" | "sms" | "push"
+                                      ) => {
+                                        setNewAppointmentReminderData((prev) => ({
+                                          ...prev,
+                                          reminderType: value,
+                                        }));
 
-                            <div>
-                              <Label>{t('reminders.scheduleReminder.message')}</Label>
-                              <Textarea
-                                placeholder={t('reminders.scheduleReminder.messagePlaceholder')}
-                                value={newAppointmentReminderData.content}
-                                onChange={(e) => setNewAppointmentReminderData(prev => ({ ...prev, content: e.target.value }))}
-                                rows={4}
-                                className="focus-visible:ring-0"
-                              />
-                            </div>
-                            {reminderValidationError && newAppointmentReminderData.reminderType === 'email' && (
-                              <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
-                                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-                                <span>{reminderValidationError}</span>
-                              </div>
-                            )}
-                          </div>
+                                        // Re-validate when switching type
+                                        if (value === 'email' && newAppointmentData.customerId) {
+                                          const customer = customers.find(c => c.id === newAppointmentData.customerId);
+                                          runEmailValidation(customer?.email);
+                                        } else {
+                                          runEmailValidation(null);
+                                        }
+                                      }}
+                                    >
+                                      <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="email">{t('reminders.scheduleReminder.email')}</SelectItem>
+                                        <SelectItem value="sms" disabled>{t('reminders.scheduleReminder.sms')}</SelectItem>
+                                        <SelectItem value="push" disabled>{t('reminders.scheduleReminder.push')}</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
 
-                          <div className="flex justify-end gap-2 pt-4">
-                            <Button variant="outline" onClick={() => {
-                              setNewAppointmentReminderModalOpen(false);
-                              setNewAppointmentReminderEnabled(false);
-                            }}>
-                              {t('reminders.appointments.cancel')}
-                            </Button>
-                            <Button onClick={() => setNewAppointmentReminderModalOpen(false)} disabled={!!reminderValidationError && newAppointmentReminderData.reminderType === 'email'}>
-                              {t('common.save')}
-                            </Button>
-                          </div>
+                                  <div>
+                                    <Label>{t('reminders.scheduleReminder.timing')}</Label>
+                                    <Select
+                                      value={newAppointmentReminderData.reminderTiming}
+                                      onValueChange={(value: 'now' | '5m' | '30m' | '1h' | '5h' | '10h' | 'custom') => setNewAppointmentReminderData(prev => ({ ...prev, reminderTiming: value }))}
+                                    >
+                                      <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="now">{t('reminders.scheduleReminder.sendNow')}</SelectItem>
+                                        <SelectItem value="5m">{t('reminders.scheduleReminder.5mBefore')}</SelectItem>
+                                        <SelectItem value="30m">{t('reminders.scheduleReminder.30mBefore')}</SelectItem>
+                                        <SelectItem value="1h">{t('reminders.scheduleReminder.1hBefore')}</SelectItem>
+                                        <SelectItem value="5h">{t('reminders.scheduleReminder.5hBefore')}</SelectItem>
+                                        <SelectItem value="10h">{t('reminders.scheduleReminder.10hBefore')}</SelectItem>
+                                        <SelectItem value="custom">{t('reminders.scheduleReminder.customTime')}</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+
+                                  {newAppointmentReminderData.reminderTiming === 'custom' && (
+                                    <div>
+                                      <Label className={newAppointmentErrors.customMinutesBefore ? "text-red-500" : ""}>
+                                        {t('reminders.scheduleReminder.customMinutesLabel')} <span className="text-red-500">*</span>
+                                      </Label>
+                                      <Input
+                                        type="number"
+                                        min="1"
+                                        max="10080"
+                                        placeholder={t('reminders.scheduleReminder.customMinutesPlaceholder')}
+                                        value={newAppointmentReminderData.customMinutesBefore || ''}
+                                        onChange={(e) => {
+                                          setNewAppointmentReminderData(prev => ({
+                                            ...prev,
+                                            customMinutesBefore: e.target.value ? parseInt(e.target.value) : undefined
+                                          }));
+                                          setNewAppointmentErrors(prev => ({ ...prev, customMinutesBefore: false }));
+                                        }}
+                                        className={`focus-visible:ring-0 ${newAppointmentErrors.customMinutesBefore ? 'border-red-500' : ''}`}
+                                      />
+                                      <p className="text-xs text-gray-500 mt-1">{t('reminders.scheduleReminder.customMinutesHelp')}</p>
+                                    </div>
+                                  )}
+
+                                  <div>
+                                    <Label>Timezone</Label>
+                                    <Select
+                                      value={newAppointmentReminderData.timezone}
+                                      onValueChange={(value) => setNewAppointmentReminderData(prev => ({ ...prev, timezone: value }))}
+                                    >
+                                      <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
+                                        <SelectValue placeholder="Select timezone" />
+                                      </SelectTrigger>
+                                      <SelectContent className="max-h-[300px]">
+                                        <SelectItem value="America/New_York">🇺🇸 Eastern Time (ET)</SelectItem>
+                                        <SelectItem value="America/Chicago">🇺🇸 Central Time (CT)</SelectItem>
+                                        <SelectItem value="America/Denver">🇺🇸 Mountain Time (MT)</SelectItem>
+                                        <SelectItem value="America/Los_Angeles">🇺🇸 Pacific Time (PT)</SelectItem>
+                                        <SelectItem value="America/Anchorage">🇺🇸 Alaska Time (AKT)</SelectItem>
+                                        <SelectItem value="Pacific/Honolulu">🇺🇸 Hawaii Time (HT)</SelectItem>
+                                        <SelectItem value="America/Phoenix">🇺🇸 Arizona (MST)</SelectItem>
+                                        <SelectItem value="America/Toronto">🇨🇦 Toronto (ET)</SelectItem>
+                                        <SelectItem value="America/Vancouver">🇨🇦 Vancouver (PT)</SelectItem>
+                                        <SelectItem value="America/Mexico_City">🇲🇽 Mexico City (CST)</SelectItem>
+                                        <SelectItem value="Europe/London">🇬🇧 London (GMT/BST)</SelectItem>
+                                        <SelectItem value="Europe/Paris">🇫🇷 Paris (CET)</SelectItem>
+                                        <SelectItem value="Europe/Berlin">🇩🇪 Berlin (CET)</SelectItem>
+                                        <SelectItem value="Europe/Madrid">🇪🇸 Madrid (CET)</SelectItem>
+                                        <SelectItem value="Asia/Tokyo">🇯🇵 Tokyo (JST)</SelectItem>
+                                        <SelectItem value="Asia/Shanghai">🇨🇳 Shanghai (CST)</SelectItem>
+                                        <SelectItem value="Asia/Singapore">🇸🇬 Singapore (SGT)</SelectItem>
+                                        <SelectItem value="Asia/Dubai">🇦🇪 Dubai (GST)</SelectItem>
+                                        <SelectItem value="Australia/Sydney">🇦🇺 Sydney (AEST)</SelectItem>
+                                        <SelectItem value="Australia/Perth">🇦🇺 Perth (AWST)</SelectItem>
+                                        <SelectItem value="Pacific/Auckland">🇳🇿 Auckland (NZST)</SelectItem>
+                                        <SelectItem value="UTC">🌐 UTC</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      The reminder will be sent at the scheduled time in this timezone
+                                    </p>
+                                  </div>
+
+                                  <div>
+                                    <Label>{t('reminders.scheduleReminder.message')}</Label>
+                                    <Textarea
+                                      placeholder={t('reminders.scheduleReminder.messagePlaceholder')}
+                                      value={newAppointmentReminderData.content}
+                                      onChange={(e) => setNewAppointmentReminderData(prev => ({ ...prev, content: e.target.value }))}
+                                      rows={4}
+                                      className="focus-visible:ring-0"
+                                    />
+                                  </div>
+                                  {reminderValidationError && newAppointmentReminderData.reminderType === 'email' && (
+                                    <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
+                                      <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                                      <span>{reminderValidationError}</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex justify-end gap-2 pt-4">
+                                  <Button variant="outline" onClick={() => {
+                                    setNewAppointmentReminderModalOpen(false);
+                                    setNewAppointmentReminderEnabled(false);
+                                  }}>
+                                    {t('reminders.appointments.cancel')}
+                                  </Button>
+                                  <Button onClick={() => setNewAppointmentReminderModalOpen(false)} disabled={!!reminderValidationError && newAppointmentReminderData.reminderType === 'email'}>
+                                    {t('common.save')}
+                                  </Button>
+                                </div>
+                              </>
+                            );
+                          })()}
                         </DialogContent>
                       </Dialog>
                     </DialogContent>
@@ -3206,9 +3280,9 @@ export default function RemindersPage() {
             const appointment = allAppointments.find(a => a.id === scheduleAppointmentId);
             const customerEmail = appointment?.customer?.email || customers.find(c => c.id === appointment?.customerId)?.email;
             if (customerEmail && scheduleData.reminderType === 'email') {
-              validateEmailReminder(customerEmail).then(setReminderValidationError);
+              runEmailValidation(customerEmail);
             } else if (scheduleData.reminderType === 'email') {
-              setReminderValidationError(null);
+              runEmailValidation(null);
             }
           }
         }}>
@@ -3231,11 +3305,9 @@ export default function RemindersPage() {
                     // Force validation check - try appointment.customer first, then fallback to customers array
                     const appointment = allAppointments.find(a => a.id === scheduleAppointmentId);
                     const customerEmail = appointment?.customer?.email || customers.find(c => c.id === appointment?.customerId)?.email;
-                    if (customerEmail) {
-                      validateEmailReminder(customerEmail).then(setReminderValidationError);
-                    }
+                    runEmailValidation(customerEmail);
                   } else {
-                    setReminderValidationError(null);
+                    runEmailValidation(null);
                   }
                 }}>
                   <SelectTrigger>
@@ -3546,9 +3618,7 @@ export default function RemindersPage() {
                   } else {
                     if (editAppointmentReminderData.reminderType === 'email') {
                       const customer = customers.find(c => c.id === editingAppointment.customerId) || editingAppointment.customer;
-                      if (customer?.email) {
-                        validateEmailReminder(customer.email).then(setReminderValidationError);
-                      }
+                      runEmailValidation(customer?.email);
                     }
                   }
                 }}>
@@ -3570,11 +3640,9 @@ export default function RemindersPage() {
                             setEditAppointmentReminderData(prev => ({ ...prev, reminderType: value }));
                             if (value === 'email') {
                               const customer = customers.find(c => c.id === editingAppointment.customerId) || editingAppointment.customer;
-                              if (customer?.email) {
-                                validateEmailReminder(customer.email).then(setReminderValidationError);
-                              }
+                              runEmailValidation(customer?.email);
                             } else {
-                              setReminderValidationError(null);
+                              runEmailValidation(null);
                             }
                           }}
                         >
