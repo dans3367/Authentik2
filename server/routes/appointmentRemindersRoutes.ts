@@ -2,10 +2,11 @@ import { Router, Request, Response } from 'express';
 import { and, eq, desc, gte, lte, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db';
-import { 
-  appointmentReminders, 
+import {
+  appointmentReminders,
   appointments,
   emailContacts,
+  bouncedEmails,
   createAppointmentReminderSchema,
 } from '@shared/schema';
 import { authenticateToken } from '../middleware/auth-middleware';
@@ -16,6 +17,27 @@ import type { ReminderPayload } from '../../src/trigger/reminders';
 
 const router = Router();
 
+// Helper function to check if an email is suppressed
+const checkEmailSuppression = async (email: string): Promise<{ isSuppressed: boolean; reason?: string }> => {
+  const emailLower = email.toLowerCase().trim();
+
+  const suppression = await db.query.bouncedEmails.findFirst({
+    where: and(
+      eq(bouncedEmails.email, emailLower),
+      eq(bouncedEmails.isActive, true)
+    ),
+  });
+
+  if (suppression) {
+    return {
+      isSuppressed: true,
+      reason: suppression.reason || suppression.bounceType || 'Email is suppressed'
+    };
+  }
+
+  return { isSuppressed: false };
+};
+
 // Internal endpoint for Trigger.dev webhook to update reminder status
 // Secured with HMAC signature verification
 router.put('/internal/:id/status', authenticateInternalService, async (req: InternalServiceRequest, res: Response) => {
@@ -24,7 +46,7 @@ router.put('/internal/:id/status', authenticateInternalService, async (req: Inte
     service: req.internalService?.service,
     body: req.body,
   });
-  
+
   try {
     const { id } = req.params;
     const { status, errorMessage } = req.body;
@@ -57,9 +79,9 @@ router.put('/internal/:id/status', authenticateInternalService, async (req: Inte
       .returning();
 
     console.log(`📧 [Internal] Reminder ${id} status updated to: ${status}`);
-    res.json({ 
+    res.json({
       reminder: updatedReminder[0],
-      message: 'Reminder status updated successfully' 
+      message: 'Reminder status updated successfully'
     });
   } catch (error) {
     console.error('Failed to update reminder status (internal):', error);
@@ -133,9 +155,9 @@ router.get('/', async (req: Request, res: Response) => {
       .where(and(...conditions))
       .orderBy(desc(appointmentReminders.scheduledFor));
 
-    res.json({ 
+    res.json({
       reminders: remindersList,
-      total: remindersList.length 
+      total: remindersList.length
     });
   } catch (error) {
     console.error('Failed to fetch reminders:', error);
@@ -182,6 +204,33 @@ router.post('/', async (req: Request, res: Response) => {
     const appointment = appointmentWithCustomer[0];
     const isSendNow = validatedData.reminderTiming === 'now';
 
+    // For email reminders, check if the recipient is suppressed
+    if (validatedData.reminderType === 'email' && appointment.customer?.email) {
+      // Check local customer status
+      const customerRecord = await db.query.emailContacts.findFirst({
+        where: and(
+          eq(emailContacts.id, appointment.customerId),
+          eq(emailContacts.tenantId, tenantId)
+        ),
+      });
+
+      if (customerRecord && (customerRecord.status === 'unsubscribed' || customerRecord.status === 'bounced')) {
+        return res.status(400).json({
+          error: `Cannot schedule email reminder: Customer is ${customerRecord.status}`,
+          code: 'EMAIL_SUPPRESSED'
+        });
+      }
+
+      // Check global suppression list
+      const suppressionCheck = await checkEmailSuppression(appointment.customer.email);
+      if (suppressionCheck.isSuppressed) {
+        return res.status(400).json({
+          error: `Cannot schedule email reminder: ${suppressionCheck.reason}`,
+          code: 'EMAIL_SUPPRESSED'
+        });
+      }
+    }
+
     // Create reminder
     const reminderData: any = {
       tenantId,
@@ -208,7 +257,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     // Prepare common payload data for Trigger.dev
     const appointmentDate = new Date(appointment.appointmentDate);
-    const customerName = appointment.customer?.firstName 
+    const customerName = appointment.customer?.firstName
       ? `${appointment.customer.firstName} ${appointment.customer.lastName || ''}`.trim()
       : 'Valued Customer';
 
@@ -269,12 +318,12 @@ router.post('/', async (req: Request, res: Response) => {
           // Store the Trigger.dev run ID for potential cancellation later (using inngestEventId field for backwards compatibility)
           await db
             .update(appointmentReminders)
-            .set({ 
+            .set({
               inngestEventId: result.runId || null,
-              updatedAt: new Date() 
+              updatedAt: new Date()
             })
             .where(eq(appointmentReminders.id, newReminder[0].id));
-          
+
           if (isSendNow) {
             console.log(`📧 Immediate reminder triggered for appointment ${appointment.id} to ${appointment.customer.email}, runId: ${result.runId}`);
           } else {
@@ -286,9 +335,9 @@ router.post('/', async (req: Request, res: Response) => {
         // Update reminder status to failed
         await db
           .update(appointmentReminders)
-          .set({ 
-            status: 'failed', 
-            errorMessage: triggerError instanceof Error ? triggerError.message : 'Unknown error' 
+          .set({
+            status: 'failed',
+            errorMessage: triggerError instanceof Error ? triggerError.message : 'Unknown error'
           })
           .where(eq(appointmentReminders.id, newReminder[0].id));
       }
@@ -303,8 +352,8 @@ router.post('/', async (req: Request, res: Response) => {
         entityId: validatedData.appointmentId,
         entityName: appointment.title,
         activityType: isSendNow ? 'sent' : 'scheduled',
-        description: isSendNow 
-          ? `Sent reminder for appointment "${appointment.title}"` 
+        description: isSendNow
+          ? `Sent reminder for appointment "${appointment.title}"`
           : `Scheduled reminder for appointment "${appointment.title}"`,
         metadata: {
           reminderId: newReminder[0].id,
@@ -320,15 +369,15 @@ router.post('/', async (req: Request, res: Response) => {
       console.error('[Activity Log] Failed to log reminder creation:', error);
     }
 
-    res.status(201).json({ 
+    res.status(201).json({
       reminder: newReminder[0],
-      message: isSendNow ? 'Reminder sent immediately' : 'Reminder scheduled successfully' 
+      message: isSendNow ? 'Reminder sent immediately' : 'Reminder scheduled successfully'
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ 
-        error: 'Validation failed', 
-        details: error.errors 
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: error.errors
       });
     }
     console.error('Failed to create reminder:', error);
@@ -365,6 +414,7 @@ router.post('/send', async (req: Request, res: Response) => {
           email: emailContacts.email,
           firstName: emailContacts.firstName,
           lastName: emailContacts.lastName,
+          status: emailContacts.status,
         }
       })
       .from(appointments)
@@ -384,9 +434,32 @@ router.post('/send', async (req: Request, res: Response) => {
     for (const appointment of appointmentsList) {
       try {
         // Generate reminder content
-        const customerName = appointment.customer?.firstName 
+        const customerName = appointment.customer?.firstName
           ? `${appointment.customer.firstName} ${appointment.customer?.lastName || ''}`.trim()
           : appointment.customer?.email || 'Valued Customer';
+
+        // For email reminders, check if the recipient is suppressed
+        if (reminderType === 'email' && appointment.customer?.email) {
+          // Check local customer status first
+          const customerStatus = appointment.customer?.status;
+          if (customerStatus === 'unsubscribed' || customerStatus === 'bounced') {
+            errors.push({
+              appointmentId: appointment.id,
+              error: `Customer is ${customerStatus}`
+            });
+            continue;
+          }
+
+          // Check global suppression list
+          const suppressionCheck = await checkEmailSuppression(appointment.customer.email);
+          if (suppressionCheck.isSuppressed) {
+            errors.push({
+              appointmentId: appointment.id,
+              error: `Email suppressed: ${suppressionCheck.reason}`
+            });
+            continue;
+          }
+        }
 
         const appointmentDateTime = new Date(appointment.appointmentDate).toLocaleDateString('en-US', {
           weekday: 'long',
@@ -417,30 +490,19 @@ Your Team`;
 
         // Calculate when to send the reminder based on reminder timing
         const appointmentTime = new Date(appointment.appointmentDate);
-        let reminderTime: Date;
-        
+
         // Default to 1 hour before if no specific timing provided
-        const reminderTiming: '5m' | '30m' | '1h' | '5h' | '10h' = '1h'; // This could be made configurable
-        
-        switch (reminderTiming) {
-          case '5m':
-            reminderTime = new Date(appointmentTime.getTime() - (5 * 60 * 1000));
-            break;
-          case '30m':
-            reminderTime = new Date(appointmentTime.getTime() - (30 * 60 * 1000));
-            break;
-          case '1h':
-            reminderTime = new Date(appointmentTime.getTime() - (1 * 60 * 60 * 1000));
-            break;
-          case '5h':
-            reminderTime = new Date(appointmentTime.getTime() - (5 * 60 * 60 * 1000));
-            break;
-          case '10h':
-            reminderTime = new Date(appointmentTime.getTime() - (10 * 60 * 60 * 1000));
-            break;
-          default:
-            reminderTime = new Date(appointmentTime.getTime() - (1 * 60 * 60 * 1000)); // Default to 1 hour
-        }
+        // TODO: This could be made configurable per appointment or tenant setting
+        const reminderTiming = '1h' as const;
+        const timingMinutes: Record<typeof reminderTiming | '5m' | '30m' | '5h' | '10h', number> = {
+          '5m': 5,
+          '30m': 30,
+          '1h': 60,
+          '5h': 300,
+          '10h': 600,
+        };
+        const minutesBefore = timingMinutes[reminderTiming] || 60;
+        const reminderTime = new Date(appointmentTime.getTime() - (minutesBefore * 60 * 1000));
 
         // Create reminder record
         const newReminder = await db
@@ -545,9 +607,9 @@ router.put('/:id/reschedule', async (req: Request, res: Response) => {
 
     // Only allow rescheduling pending reminders
     if (reminder.status !== 'pending') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Can only reschedule pending reminders',
-        currentStatus: reminder.status 
+        currentStatus: reminder.status
       });
     }
 
@@ -598,7 +660,7 @@ router.put('/:id/reschedule', async (req: Request, res: Response) => {
     let newRunId: string | null = null;
     if (appointment.customer?.email) {
       const appointmentDate = new Date(appointment.appointmentDate);
-      const customerName = appointment.customer?.firstName 
+      const customerName = appointment.customer?.firstName
         ? `${appointment.customer.firstName} ${appointment.customer.lastName || ''}`.trim()
         : 'Valued Customer';
 
@@ -633,7 +695,7 @@ router.put('/:id/reschedule', async (req: Request, res: Response) => {
       try {
         console.log(`🔄 [Reschedule] Creating new Trigger.dev run for ${newScheduledTime.toISOString()}`);
         const result = await triggerScheduleReminder(triggerPayload);
-        
+
         if (result.success) {
           newRunId = result.runId || null;
           console.log(`🔄 [Reschedule] New run created: ${newRunId}`);
@@ -659,7 +721,7 @@ router.put('/:id/reschedule', async (req: Request, res: Response) => {
 
     console.log(`🔄 [Reschedule] Reminder ${id} rescheduled from ${reminder.scheduledFor} to ${newScheduledTime.toISOString()}`);
 
-    res.json({ 
+    res.json({
       reminder: updatedReminder[0],
       message: 'Reminder rescheduled successfully',
       oldRunCancelled,
@@ -676,11 +738,11 @@ router.put('/:id/status', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status, errorMessage } = req.body;
-    
+
     // Check for internal service call (from Trigger.dev or legacy Inngest)
     const internalHeader = req.headers['x-internal-service'];
     const isInternalService = internalHeader === 'trigger' || internalHeader === 'trigger.dev' || internalHeader === 'inngest';
-    
+
     if (!['pending', 'sent', 'failed', 'cancelled'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
@@ -741,7 +803,7 @@ router.put('/:id/status', async (req: Request, res: Response) => {
       .where(eq(appointmentReminders.id, id))
       .returning();
 
-    res.json({ 
+    res.json({
       reminder: updatedReminder[0],
       message: 'Reminder status updated successfully',
       triggerCancelled,

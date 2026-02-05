@@ -12,46 +12,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// Compatible interface with the one in reminders.tsx
-interface Customer {
-  id: string;
-  email: string;
-  firstName: string | null;
-  lastName: string | null;
-  status: "active" | "unsubscribed" | "bounced" | "pending";
-  address?: string | null;
-  city?: string | null;
-  state?: string | null;
-  zipCode?: string | null;
-  country?: string | null;
-  phoneNumber?: string | null;
-}
-
-interface Appointment {
-  id: string;
-  customerId: string;
-  title: string;
-  description?: string;
-  appointmentDate: Date;
-  duration: number;
-  location?: string;
-  serviceType?: string;
-  status: 'scheduled' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
-  notes?: string;
-  reminderSent: boolean;
-  reminderSentAt?: Date;
-  confirmationReceived: boolean;
-  confirmationReceivedAt?: Date;
-  confirmationToken?: string;
-  reminderSettings?: string;
-  customer?: Customer;
-  createdAt: Date;
-  updatedAt: Date;
-}
+import { AppointmentWithCustomer, getCustomerName as getCustomerNameUtils } from "@/utils/appointment-utils";
 
 interface NextUpAppointmentsProps {
-  appointments: Appointment[];
-  onViewDetails: (appointment: Appointment) => void;
+  appointments: AppointmentWithCustomer[];
+  onViewDetails: (appointment: AppointmentWithCustomer) => void;
 }
 
 export function NextUpAppointments({ appointments, onViewDetails }: NextUpAppointmentsProps) {
@@ -84,17 +49,7 @@ export function NextUpAppointments({ appointments, onViewDetails }: NextUpAppoin
 
   if (nextUp.length === 0) return null;
 
-  const getCustomerName = (customer?: Customer) => {
-    if (!customer) return 'Unknown Customer';
-    if (customer.firstName && customer.lastName) {
-      return `${customer.firstName} ${customer.lastName}`;
-    } else if (customer.firstName) {
-      return customer.firstName;
-    } else if (customer.lastName) {
-      return customer.lastName;
-    }
-    return customer.email;
-  };
+
 
   return (
     <Card className="mb-6 border-l-4 border-l-blue-500 bg-blue-50/10 dark:bg-blue-900/10">
@@ -131,10 +86,21 @@ export function NextUpAppointments({ appointments, onViewDetails }: NextUpAppoin
               <Card key={apt.id} className="bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-4 space-y-3">
                   <div className="flex justify-between items-start">
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-200">
-                      Upcoming
-                    </Badge>
-                    <Badge variant="outline" className="text-xs font-mono">
+                    <div className="flex gap-2 flex-wrap">
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-200">
+                        Upcoming
+                      </Badge>
+                      {apt.status === 'confirmed' ? (
+                        <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200 border-green-200">
+                          Confirmed
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-200">
+                          Unconfirmed
+                        </Badge>
+                      )}
+                    </div>
+                    <Badge variant="outline" className="text-xs font-mono whitespace-nowrap ml-2">
                       {countdown}
                     </Badge>
                   </div>
@@ -153,7 +119,7 @@ export function NextUpAppointments({ appointments, onViewDetails }: NextUpAppoin
                   <div className="space-y-1.5 text-sm text-gray-600 dark:text-gray-300">
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4 text-gray-400" />
-                      <span className="truncate">{getCustomerName(apt.customer)}</span>
+                      <span className="truncate">{getCustomerNameUtils(apt.customer)}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-gray-400" />
