@@ -153,23 +153,22 @@ export function AppointmentFormDialog({
         newErrors.customerId = true;
       }
     }
-  }
 
-  if (Object.keys(newErrors).length > 0) {
-    setErrors(newErrors);
-    return;
-  }
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
 
-  setErrors({});
-  onSubmit(appointmentData, reminderEnabled, reminderData);
-};
+    setErrors({});
+    onSubmit(appointmentData, reminderEnabled, reminderData);
+    };
 
-const selectedCustomer = customers.find(c => c.id === appointmentData.customerId);
-const isCustomerBlocked = selectedCustomer &&
-  reminderData.reminderType === 'email' &&
-  (selectedCustomer.status === 'unsubscribed' || selectedCustomer.status === 'bounced');
+  const selectedCustomer = customers.find(c => c.id === appointmentData.customerId);
+  const isCustomerBlocked = selectedCustomer &&
+    reminderData.reminderType === 'email' &&
+    (selectedCustomer.status === 'unsubscribed' || selectedCustomer.status === 'bounced');
 
-return (
+  return (
   <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogTrigger asChild>
       <Button>

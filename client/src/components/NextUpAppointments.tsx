@@ -52,17 +52,19 @@ export function NextUpAppointments({ appointments, onViewDetails }: NextUpAppoin
 
 
   return (
-    <Card className="mb-6 border-l-4 border-l-blue-500 bg-blue-50/10 dark:bg-blue-900/10">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
+    <Card className="mb-6 border-l-4 border-l-blue-500 bg-blue-50/10 dark:bg-blue-900/10 shadow-sm hover:shadow-md transition-shadow">
+      <CardHeader className="pb-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-2 text-lg">
-            <Timer className="h-5 w-5 text-blue-500" />
+            <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+              <Timer className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            </div>
             Next Up ({hoursRange}h)
           </CardTitle>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden sm:inline-block">Time Range:</span>
             <Select value={hoursRange.toString()} onValueChange={(val) => setHoursRange(parseInt(val))}>
-              <SelectTrigger className="w-[110px] h-8 bg-background">
+              <SelectTrigger className="w-[110px] h-8 bg-background hover:bg-muted/50 transition-colors">
                 <SelectValue placeholder="Range" />
               </SelectTrigger>
               <SelectContent>
@@ -83,56 +85,62 @@ export function NextUpAppointments({ appointments, onViewDetails }: NextUpAppoin
             const countdown = formatDistanceToNow(aptDate, { addSuffix: true });
 
             return (
-              <Card key={apt.id} className="bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-shadow">
+              <Card key={apt.id} className="bg-white dark:bg-gray-800 shadow-sm hover:shadow-lg transition-all duration-200 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600">
                 <CardContent className="p-4 space-y-3">
-                  <div className="flex justify-between items-start">
+                  <div className="flex justify-between items-start gap-2">
                     <div className="flex gap-2 flex-wrap">
-                      <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-200">
+                      <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors">
                         Upcoming
                       </Badge>
                       {apt.status === 'confirmed' ? (
-                        <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200 border-green-200">
+                        <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800 transition-colors">
                           Confirmed
                         </Badge>
                       ) : (
-                        <Badge variant="secondary" className="bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-200">
+                        <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors">
                           Unconfirmed
                         </Badge>
                       )}
                     </div>
-                    <Badge variant="outline" className="text-xs font-mono whitespace-nowrap ml-2">
+                    <Badge variant="outline" className="text-xs font-mono whitespace-nowrap ml-2 bg-gray-50 dark:bg-gray-900/50">
                       {countdown}
                     </Badge>
                   </div>
 
                   <div>
-                    <h4 className="font-semibold text-gray-900 dark:text-gray-100 truncate" title={apt.title}>
+                    <h4 className="font-semibold text-base text-gray-900 dark:text-gray-100 truncate" title={apt.title}>
                       {apt.title}
                     </h4>
                     {apt.serviceType && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      <p className="text-xs text-muted-foreground mt-1">
                         {apt.serviceType}
                       </p>
                     )}
                   </div>
 
-                  <div className="space-y-1.5 text-sm text-gray-600 dark:text-gray-300">
+                  <div className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
                     <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-gray-400" />
+                      <div className="p-1 rounded bg-gray-100 dark:bg-gray-800">
+                        <User className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+                      </div>
                       <span className="truncate">{getCustomerNameUtils(apt.customer)}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-gray-400" />
+                      <div className="p-1 rounded bg-gray-100 dark:bg-gray-800">
+                        <Calendar className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+                      </div>
                       <span>{format(aptDate, 'MMM d, yyyy')}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-gray-400" />
+                      <div className="p-1 rounded bg-gray-100 dark:bg-gray-800">
+                        <Clock className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+                      </div>
                       <span>{format(aptDate, 'h:mm a')} ({apt.duration} min)</span>
                     </div>
                   </div>
 
                   <Button
-                    className="w-full mt-2"
+                    className="w-full mt-2 hover:bg-primary/90 transition-colors"
                     variant="outline"
                     size="sm"
                     onClick={() => onViewDetails(apt)}
