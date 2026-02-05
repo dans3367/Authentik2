@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { isPast } from "date-fns";
 import { useTranslation } from 'react-i18next';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -82,7 +82,6 @@ export function AppointmentDetailsSheet({
   isDeletingNote,
 }: AppointmentDetailsSheetProps) {
   const { t } = useTranslation();
-  import { useEffect, useState } from "react";
 
   const [activeTab, setActiveTab] = useState<"details" | "notes">("details");
   const [showExpandedCustomerInfo, setShowExpandedCustomerInfo] = useState(false);
