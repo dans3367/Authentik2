@@ -321,29 +321,7 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
         prefMarketing: true,
         prefCustomerEngagement: true,
         prefNewsletters: true,
-        prefSurveysForms: true,
-      },
-    });
-
-    if (!contact) {
-      return res.status(400).type('text/html').send('<html><body><h1>Contact not found</h1><p>This unsubscribe link is no longer valid.</p></body></html>');
-    }
-
-    // Mask email for display
-    const emailParts = contact.email.split('@');
-    const maskedEmail = emailParts.length === 2 && emailParts[0].length > 0
-      ? emailParts[0].substring(0, 2) + '***@' + emailParts[1]
-      : '***';
-    const displayName = contact.firstName || maskedEmail;
-
-    // Map emailType query param to a human-readable label for the highlight
-    const typeLabels: Record<string, string> = {
-      marketing: 'Marketing',
-      customer_engagement: 'Customer Engagement',
-      newsletters: 'Newsletters',
-      surveys_forms: 'Surveys & Forms',
-    };
-    const highlightLabel = typeLabels[emailType] || '';
+      }
 
     return res.status(200).type('text/html').send(`<!DOCTYPE html>
 <html lang="en">
@@ -351,72 +329,7 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Email Preferences</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    :root {
-      --background: 210 40% 98%;
-      --foreground: 222.2 84% 4.9%;
-      --card: 0 0% 100%;
-      --card-foreground: 222.2 84% 4.9%;
-      --popover: 0 0% 100%;
-      --popover-foreground: 222.2 84% 4.9%;
-      --primary: 222.2 47.4% 11.2%;
-      --primary-foreground: 210 40% 98%;
-      --secondary: 210 40% 96.1%;
-      --secondary-foreground: 222.2 47.4% 11.2%;
-      --muted: 210 40% 96.1%;
-      --muted-foreground: 215.4 16.3% 46.9%;
-      --accent: 210 40% 96.1%;
-      --accent-foreground: 222.2 47.4% 11.2%;
-      --destructive: 0 84.2% 60.2%;
-      --destructive-foreground: 210 40% 98%;
-      --border: 214.3 31.8% 91.4%;
-      --input: 214.3 31.8% 91.4%;
-      --ring: 222.2 84% 4.9%;
-      --radius: 0.5rem;
-    }
-    body {
-      font-family: 'Inter', sans-serif;
-    }
-    /* Custom Switch Implementation mimicking Radix UI */
-    .switch-root {
-      width: 42px;
-      height: 25px;
-      background-color: #e2e8f0;
-      border-radius: 9999px;
-      position: relative;
-      background-color: hsl(210, 40%, 96.1%); /* secondary */
-      border: 1px solid transparent;
-      transition: background-color 0.15s ease-in-out;
-      cursor: pointer;
-    }
-    .switch-root[data-state="checked"] {
-      background-color: hsl(222.2, 47.4%, 11.2%); /* primary */
-    }
-    .switch-thumb {
-      display: block;
-      width: 21px;
-      height: 21px;
-      background-color: white;
-      border-radius: 9999px;
-      box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.06);
-      transition: transform 0.15s cubic-bezier(0.19, 1, 0.22, 1);
-      transform: translateX(2px);
-      pointer-events: none;
-      margin-top: 1px;
-    }
-    .switch-root[data-state="checked"] .switch-thumb {
-      transform: translateX(19px);
-    }
-    /* Checkbox hidden input */
-    .switch-input {
-      position: absolute;
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-  </style>
+  <link href="/email-preferences.min.css" rel="stylesheet">
 </head>
 <body class="bg-slate-50 min-h-screen flex items-center justify-center p-4 text-slate-950">
   <div class="bg-white w-full max-w-[480px] rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -649,8 +562,8 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
   </script>
 </body>
 </html>`);
-  } catch (error) {
-    console.error('[EmailRoutes] Unsubscribe page failed:', error);
-    return res.status(500).type('text/html').send('<html><body><h1>Error</h1><p>Failed to load preferences. Please try again later.</p></body></html>');
-  }
-});
+    } catch (error) {
+      console.error('[EmailRoutes] Unsubscribe page failed:', error);
+      return res.status(500).type('text/html').send('<html><body><h1>Error</h1><p>Failed to load preferences. Please try again later.</p></body></html>');
+    }
+  });
