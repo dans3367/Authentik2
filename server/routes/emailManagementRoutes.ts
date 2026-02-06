@@ -1433,6 +1433,128 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       return res.status(400).json({ message: 'scheduleAt must be at least 30 seconds in the future' });
     }
 
+    // Get company info for footer label (no fallback if missing)
+    const company = await db.query.companies.findFirst({
+      where: eq(companies.tenantId, tenantId),
+    });
+    const companyName = (company?.name || '').trim();
+
+    // Get master email design settings
+    const emailDesign = await db.query.masterEmailDesign.findFirst({
+      where: sql`${masterEmailDesign.tenantId} = ${tenantId}`,
+    });
+    console.log('📅 [ScheduleEmail] Master email design found:', emailDesign ? 'yes' : 'no (using defaults)');
+
+    // Design settings with defaults
+    const design = {
+      primaryColor: emailDesign?.primaryColor || '#3B82F6',
+      secondaryColor: emailDesign?.secondaryColor || '#1E40AF',
+      accentColor: emailDesign?.accentColor || '#10B981',
+      fontFamily: emailDesign?.fontFamily || 'Arial, sans-serif',
+      logoUrl: emailDesign?.logoUrl || company?.logoUrl || null,
+      headerText: emailDesign?.headerText || null,
+      footerText: emailDesign?.footerText || (companyName ? `© ${new Date().getFullYear()} ${companyName}. All rights reserved.` : ''),
+      socialLinks: null as null | {
+        facebook?: string;
+        twitter?: string;
+        instagram?: string;
+        linkedin?: string;
+      },
+      displayCompanyName: emailDesign?.companyName || companyName,
+    };
+
+    if (emailDesign?.socialLinks) {
+      try {
+        const parsed = JSON.parse(emailDesign.socialLinks);
+        if (parsed && typeof parsed === 'object') {
+          design.socialLinks = parsed;
+        }
+      } catch (e) {
+        console.error('[ScheduleEmail] Failed to parse socialLinks:', e);
+      }
+    }
+
+    // Build social links HTML if available
+    let socialLinksHtml = '';
+    if (design.socialLinks) {
+      const links = [];
+      const linkStyle = "color: #64748b; text-decoration: none; margin: 0 10px; font-weight: 500;";
+
+      if (design.socialLinks.facebook && isValidHttpUrl(design.socialLinks.facebook)) {
+        links.push(`<a href="${escapeHtml(design.socialLinks.facebook)}" style="${linkStyle}">Facebook</a>`);
+      }
+      if (design.socialLinks.twitter && isValidHttpUrl(design.socialLinks.twitter)) {
+        links.push(`<a href="${escapeHtml(design.socialLinks.twitter)}" style="${linkStyle}">Twitter</a>`);
+      }
+      if (design.socialLinks.instagram && isValidHttpUrl(design.socialLinks.instagram)) {
+        links.push(`<a href="${escapeHtml(design.socialLinks.instagram)}" style="${linkStyle}">Instagram</a>`);
+      }
+      if (design.socialLinks.linkedin && isValidHttpUrl(design.socialLinks.linkedin)) {
+        links.push(`<a href="${escapeHtml(design.socialLinks.linkedin)}" style="${linkStyle}">LinkedIn</a>`);
+      }
+
+      if (links.length > 0) {
+        socialLinksHtml = `<div style="margin-bottom: 24px;">${links.join(' | ')}</div>`;
+      }
+    }
+
+    // Format content as HTML using master email design (same as send-email route)
+    const themedHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: ${design.fontFamily}; margin: 0; padding: 0; background-color: #f7fafc; -webkit-font-smoothing: antialiased;">
+          <div style="max-width: 600px; margin: 0 auto; background: white;">
+            
+            <!-- Hero Header -->
+            <div style="padding: 40px 32px; text-align: center; background-color: ${design.primaryColor}; color: #ffffff;">
+              ${design.logoUrl ? `
+                <img src="${design.logoUrl}" alt="${design.displayCompanyName}" style="height: 48px; width: auto; margin-bottom: 20px; object-fit: contain;" />
+              ` : `
+                <div style="height: 48px; width: 48px; background-color: rgba(255,255,255,0.2); border-radius: 50%; margin: 0 auto 16px auto; line-height: 48px; font-size: 20px; font-weight: bold; color: #ffffff; text-align: center;">
+                  ${(design.displayCompanyName || 'C').charAt(0)}
+                </div>
+              `}
+              <h1 style="margin: 0 0 10px 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em; color: #ffffff;">
+                ${design.displayCompanyName}
+              </h1>
+              ${design.headerText ? `
+                <p style="margin: 0 auto; font-size: 16px; opacity: 0.95; max-width: 400px; line-height: 1.5; color: #ffffff;">
+                  ${design.headerText}
+                </p>
+              ` : ''}
+            </div>
+
+            <!-- Body Content -->
+            <div style="padding: 64px 48px; min-height: 200px;">
+              <div style="font-size: 16px; line-height: 1.625; color: #334155;">
+                ${html}
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="background-color: #f8fafc; padding: 32px; text-align: center; border-top: 1px solid #e2e8f0; color: #64748b;">
+              
+              ${socialLinksHtml}
+              
+              ${design.footerText ? `
+                <p style="margin: 0 0 16px 0; font-size: 12px; line-height: 1.5; color: #64748b;">${design.footerText}</p>
+              ` : ''}
+              
+              <div style="font-size: 12px; line-height: 1.5; color: #94a3b8;">
+                <p style="margin: 0;">
+                  Sent via ${design.displayCompanyName}
+                </p>
+              </div>
+            </div>
+            
+          </div>
+        </body>
+      </html>`;
+
     // Schedule via Trigger.dev
     try {
       console.log(`📅 [ScheduleEmail] Scheduling email to ${maskEmail(String(contact.email))} for ${scheduleDate.toISOString()}, subject: "${subject}"`);
@@ -1440,7 +1562,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       const payload: Parameters<typeof scheduleEmailTask.trigger>[0] = {
         to: String(contact.email),
         subject: sanitizeString(String(subject)) || 'No Subject',
-        html: String(html),
+        html: themedHtml,
         scheduledFor: scheduleDate.toISOString(),
         metadata: {
           type: 'b2c',
@@ -3973,7 +4095,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
             </div>
 
             <!-- Body Content -->
-            <div style="padding: 32px 32px 40px 32px;">
+            <div style="padding: 64px 48px; min-height: 200px;">
               <div style="font-size: 16px; line-height: 1.625; color: #334155;">
                 ${content.replace(/\n/g, '<br>')}
               </div>
