@@ -12,6 +12,78 @@ import jwt from 'jsonwebtoken';
 import { enhancedEmailService } from '../emailService';
 import crypto from 'crypto';
 import { logActivity, computeChanges, allowedActivityTypes } from '../utils/activityLogger';
+import xss, { escapeAttrValue } from 'xss';
+
+// Sanitize HTML content for emails - allows safe formatting tags, strips scripts and event handlers
+function sanitizeEmailHtml(html: string): string {
+  return xss(html, {
+    whiteList: {
+      // Text formatting
+      p: ['style', 'class'],
+      br: [],
+      strong: ['style'],
+      b: ['style'],
+      em: ['style'],
+      i: ['style'],
+      u: ['style'],
+      s: ['style'],
+      strike: ['style'],
+      // Headings
+      h1: ['style', 'class'],
+      h2: ['style', 'class'],
+      h3: ['style', 'class'],
+      h4: ['style', 'class'],
+      h5: ['style', 'class'],
+      h6: ['style', 'class'],
+      // Links and images
+      a: ['href', 'title', 'target', 'style', 'class'],
+      img: ['src', 'alt', 'title', 'width', 'height', 'style', 'class'],
+      // Lists
+      ul: ['style', 'class'],
+      ol: ['style', 'class'],
+      li: ['style', 'class'],
+      // Layout
+      div: ['style', 'class'],
+      span: ['style', 'class'],
+      blockquote: ['style', 'class'],
+      pre: ['style', 'class'],
+      code: ['style', 'class'],
+      // Tables (common in emails)
+      table: ['style', 'class', 'width', 'border', 'cellpadding', 'cellspacing'],
+      thead: ['style', 'class'],
+      tbody: ['style', 'class'],
+      tr: ['style', 'class'],
+      th: ['style', 'class', 'colspan', 'rowspan', 'width'],
+      td: ['style', 'class', 'colspan', 'rowspan', 'width', 'valign', 'align'],
+      // Misc
+      hr: ['style'],
+      center: ['style'],
+    },
+    stripIgnoreTag: true,
+    stripIgnoreTagBody: ['script', 'style', 'noscript', 'iframe', 'object', 'embed'],
+    onTagAttr: (tag, name, value) => {
+      // Allow data URIs for images only (base64 encoded images)
+      if (tag === 'img' && name === 'src') {
+        if (value.startsWith('data:image/') || value.startsWith('http://') || value.startsWith('https://')) {
+          return `${name}="${xss.escapeAttrValue(value)}"`;
+        }
+        return ''; // Strip invalid src
+      }
+      // Validate href attributes to prevent javascript: URLs
+      if (name === 'href') {
+        const lowerValue = value.toLowerCase().trim();
+        if (lowerValue.startsWith('javascript:') || lowerValue.startsWith('vbscript:') || lowerValue.startsWith('data:')) {
+          return ''; // Strip dangerous href
+        }
+      }
+      // Strip event handlers (onclick, onerror, etc.)
+      if (name.startsWith('on')) {
+        return '';
+      }
+      return undefined; // Use default processing
+    },
+  });
+}
 
 function isValidHttpUrl(url: string): boolean {
   try {
