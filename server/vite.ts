@@ -39,7 +39,13 @@ export async function setupVite(app: Express, server: Server) {
   app.use(vite.middlewares);
   
   // Serve server/public directory in development for CSS files
-  app.use(express.static(path.resolve(__dirname, "public")));
+  app.use(express.static(path.resolve(__dirname, "public"), {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.css')) {
+        res.setHeader('Content-Type', 'text/css');
+      }
+    }
+  }));
   
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
@@ -81,7 +87,13 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.css')) {
+        res.setHeader('Content-Type', 'text/css');
+      }
+    }
+  }));
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (req, res, next) => {

@@ -300,16 +300,16 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
   try {
     const token = (req.query.token as string) || '';
     const emailType = (req.query.type as string) || '';
-    
+
     // Map email types to human-readable labels
     const emailTypeLabels: Record<string, string> = {
       'marketing': 'Marketing',
-      'customer_engagement': 'Customer Engagement', 
+      'customer_engagement': 'Customer Engagement',
       'newsletters': 'Newsletters',
       'surveys_forms': 'Surveys & Forms'
     };
     const highlightLabel = emailTypeLabels[emailType] || '';
-    
+
     if (!token) {
       return res.status(400).type('text/html').send('<html><body><h1>Invalid request</h1><p>Missing token.</p></body></html>');
     }
@@ -577,7 +577,14 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: TOKEN, preferences: prefs }),
-      }).then(function(r) { return r.json(); }).then(function(data) {
+      }).then(function(r) {
+        if (r.ok) {
+          return r.json();
+        }
+        return r.text().then(function(text) {
+          throw new Error(text || r.status + ' ' + r.statusText);
+        });
+      }).then(function(data) {
         if (data.success) {
           document.getElementById('formContent').classList.add('hidden');
           const headerP = document.querySelector('.p-6.pb-2 p');
@@ -590,8 +597,8 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
           showError(data.error || 'Failed to save preferences.');
           resetBtn(btn, originalText);
         }
-      }).catch(function() {
-        showError('Network error. Please try again.');
+      }).catch(function(err) {
+        showError(err.message || 'Network error. Please try again.');
         resetBtn(btn, originalText);
       });
     });
@@ -610,7 +617,14 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: TOKEN, unsubscribeAll: true }),
-      }).then(function(r) { return r.json(); }).then(function(data) {
+      }).then(function(r) {
+        if (r.ok) {
+          return r.json();
+        }
+        return r.text().then(function(text) {
+          throw new Error(text || r.status + ' ' + r.statusText);
+        });
+      }).then(function(data) {
         if (data.success) {
           document.getElementById('formContent').classList.add('hidden');
           const headerP = document.querySelector('.p-6.pb-2 p');
@@ -622,8 +636,8 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
           showError(data.error || 'Failed to unsubscribe.');
           resetBtn(btn, originalText);
         }
-      }).catch(function() {
-        showError('Network error. Please try again.');
+      }).catch(function(err) {
+        showError(err.message || 'Network error. Please try again.');
         resetBtn(btn, originalText);
       });
     });
@@ -641,8 +655,8 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
   </script>
 </body>
 </html>`);
-    } catch (error) {
-      console.error('[EmailRoutes] Unsubscribe page failed:', error);
-      return res.status(500).type('text/html').send('<html><body><h1>Error</h1><p>Failed to load preferences. Please try again later.</p></body></html>');
-    }
-  });
+  } catch (error) {
+    console.error('[EmailRoutes] Unsubscribe page failed:', error);
+    return res.status(500).type('text/html').send('<html><body><h1>Error</h1><p>Failed to load preferences. Please try again later.</p></body></html>');
+  }
+});

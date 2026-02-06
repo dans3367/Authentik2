@@ -181,6 +181,9 @@
         <div>
             <button id="tryAgainBtn" class="btn btn-primary">{{.TemplateText.TryAgainButton}}</button>
             <button id="closeWindowBtn" class="btn">{{.TemplateText.CloseWindowButton}}</button>
+            <p id="close-fallback" style="display: none; margin-top: 12px; font-size: 14px; color: #718096;">
+                Unable to close the tab automatically. Please close it manually.
+            </p>
         </div>
 
         <div class="footer">
@@ -193,6 +196,13 @@
         });
         document.getElementById('closeWindowBtn').addEventListener('click', function () {
             window.close();
+            // Fallback if window doesn't close (e.g. script didn't open it)
+            setTimeout(function () {
+                if (!window.closed) {
+                    var fallback = document.getElementById('close-fallback');
+                    if (fallback) fallback.style.display = 'block';
+                }
+            }, 100);
         });
     </script>
 </body>
