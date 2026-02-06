@@ -124,16 +124,16 @@ start_service() {
 rm -f /tmp/authentik_pids.txt
 
 # Define services and their ports
-declare -A SERVICES=(
-    ["Main Server"]="5002"
-    ["Webhook Server"]="3505"
-)
+# Define services and their ports
+SERVICE_NAMES=("Main Server" "Webhook Server")
+SERVICE_PORTS=("5002" "3505")
 
 print_status "Checking and cleaning up ports for all services..."
 
 # Check and kill processes on all required ports
-for service in "${!SERVICES[@]}"; do
-    port="${SERVICES[$service]}"
+for ((i=0; i<${#SERVICE_NAMES[@]}; i++)); do
+    service="${SERVICE_NAMES[$i]}"
+    port="${SERVICE_PORTS[$i]}"
     if check_port $port; then
         kill_port_process $port "$service"
     else
