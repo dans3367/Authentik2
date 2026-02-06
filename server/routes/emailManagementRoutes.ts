@@ -1408,9 +1408,21 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       return res.status(400).json({ message: 'Contact email is missing' });
     }
 
-    // Log warning for unsubscribed/bounced contacts but allow scheduling
+    // Block scheduling for unsubscribed/bounced contacts unless override flags are provided
+    const { allowUnsubscribed, isTransactional } = req.body || {};
     if (contact.status === 'unsubscribed' || contact.status === 'bounced') {
-      console.log(`⚠️ [ScheduleEmail] Contact ${maskEmail(String(contact.email))} is ${contact.status} - scheduling anyway per user request`);
+      if (allowUnsubscribed === true || isTransactional === true) {
+        // Audit log the override usage
+        console.log(`🔓 [ScheduleEmail] Override used for ${contact.status} contact ${maskEmail(String(contact.email))} - allowUnsubscribed: ${allowUnsubscribed}, isTransactional: ${isTransactional}, userId: ${req.user.id}, tenantId: ${tenantId}, timestamp: ${new Date().toISOString()}`);
+      } else {
+        console.log(`🚫 [ScheduleEmail] Blocked scheduling to ${contact.status} contact ${maskEmail(String(contact.email))} - no override flag provided`);
+        return res.status(403).json({
+          success: false,
+          message: `Cannot schedule email to ${contact.status} contact. Use allowUnsubscribed or isTransactional flag to override.`,
+          contactStatus: contact.status,
+          email: maskEmail(String(contact.email)),
+        });
+      }
     }
 
     // Ensure unsubscribe token exists (long-lived until used)
@@ -3852,13 +3864,21 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
 
     console.log(`📧 [SendEmail] Found contact: ${maskEmail(String(contact.email))}, status: ${contact.status}`);
 
-    // Log warning for unsubscribed/bounced contacts but allow sending
-    if (contact.status === 'unsubscribed') {
-      console.log(`⚠️ [SendEmail] Contact ${maskEmail(String(contact.email))} is unsubscribed - sending anyway per user request`);
-    }
-
-    if (contact.status === 'bounced') {
-      console.log(`⚠️ [SendEmail] Contact ${maskEmail(String(contact.email))} is bounced - sending anyway per user request`);
+    // Block sending for unsubscribed/bounced contacts unless override flags are provided
+    const { allowUnsubscribed, isTransactional } = req.body || {};
+    if (contact.status === 'unsubscribed' || contact.status === 'bounced') {
+      if (allowUnsubscribed === true || isTransactional === true) {
+        // Audit log the override usage
+        console.log(`🔓 [SendEmail] Override used for ${contact.status} contact ${maskEmail(String(contact.email))} - allowUnsubscribed: ${allowUnsubscribed}, isTransactional: ${isTransactional}, userId: ${req.user.id}, tenantId: ${tenantId}, timestamp: ${new Date().toISOString()}`);
+      } else {
+        console.log(`🚫 [SendEmail] Blocked sending to ${contact.status} contact ${maskEmail(String(contact.email))} - no override flag provided`);
+        return res.status(403).json({
+          success: false,
+          message: `Cannot send email to ${contact.status} contact. Use allowUnsubscribed or isTransactional flag to override.`,
+          contactStatus: contact.status,
+          email: maskEmail(String(contact.email)),
+        });
+      }
     }
 
     // Get tenant info for from email

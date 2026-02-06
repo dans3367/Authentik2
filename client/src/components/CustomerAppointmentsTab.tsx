@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { isPast } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -161,6 +161,14 @@ export default function CustomerAppointmentsTab({
                 new Date(b.appointmentDate).getTime() -
                 new Date(a.appointmentDate).getTime()
         );
+
+    // Reset pastPage if it becomes out-of-range when pastAppointments shrinks/changes
+    useEffect(() => {
+        const maxPage = Math.ceil(pastAppointments.length / PAST_PER_PAGE) || 1;
+        if (pastPage > maxPage) {
+            setPastPage(maxPage);
+        }
+    }, [pastAppointments.length, pastPage]);
 
     const getStatusBadge = (status: Appointment["status"]) => {
         const statusConfig = {

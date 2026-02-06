@@ -71,8 +71,16 @@ export function AppointmentStats({
               {upcomingAppointments.slice(0, 5).map((appointment) => (
                 <div
                   key={appointment.id}
-                  className="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  role="button"
+                  tabIndex={0}
+                  className="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                   onClick={() => onViewAppointment(appointment)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onViewAppointment(appointment);
+                    }
+                  }}
                 >
                   <div>
                     <p className="font-medium">{appointment.title}</p>

@@ -11,7 +11,7 @@ emailRoutes.get('/status', async (req, res) => {
   try {
     const status = enhancedEmailService.getStatus();
     const healthCheck = await enhancedEmailService.healthCheck();
-    
+
     res.json({
       status: 'operational',
       timestamp: new Date().toISOString(),
@@ -142,8 +142,11 @@ emailRoutes.post('/unsubscribe/preferences', async (req, res) => {
       // Determine if all non-transactional categories are opted out
       const contact = await db.query.emailContacts.findFirst({
         where: and(eq(emailContacts.id, tokenRow.contactId), eq(emailContacts.tenantId, tokenRow.tenantId)),
-        columns: { prefMarketing: true, prefCustomerEngagement: true, prefNewsletters: true, prefSurveysForms: true },
+        columns: { status: true, prefMarketing: true, prefCustomerEngagement: true, prefNewsletters: true, prefSurveysForms: true },
       });
+      if (!contact) {
+        return res.status(404).json({ success: false, error: 'Contact not found' });
+      }
 
       // Merge current prefs with updates to check final state
       const finalPrefs = {
@@ -158,7 +161,7 @@ emailRoutes.post('/unsubscribe/preferences', async (req, res) => {
         updateData.status = 'unsubscribed';
       } else {
         // Re-activate if they were previously fully unsubscribed but now opted back in
-        updateData.status = 'active';
+        updateData.status = contact.status === 'bounced' ? 'bounced' : 'active';
       }
 
       await db.update(emailContacts)
@@ -174,32 +177,35 @@ emailRoutes.post('/unsubscribe/preferences', async (req, res) => {
           occurredAt: now,
         });
       }
+      occurredAt: now,
+        });
+      }
     }
 
-    return res.json({ success: true });
+return res.json({ success: true });
   } catch (error) {
-    console.error('[EmailRoutes] Save preferences failed:', error);
-    return res.status(500).json({ success: false, error: 'Failed to save preferences' });
-  }
+  console.error('[EmailRoutes] Save preferences failed:', error);
+  return res.status(500).json({ success: false, error: 'Failed to save preferences' });
+}
 });
 
 
 // Send custom email endpoint (for testing)
 emailRoutes.post('/send', async (req, res) => {
   try {
-    const { 
-      to, 
-      subject, 
-      html, 
-      text, 
-      preferredProvider, 
-      useQueue, 
-      metadata, 
+    const {
+      to,
+      subject,
+      html,
+      text,
+      preferredProvider,
+      useQueue,
+      metadata,
       fromEmail,
       tenantId,
-      tenantName 
+      tenantName
     } = req.body;
-    
+
     if (!to || !subject || !html) {
       return res.status(400).json({
         status: 'error',
@@ -207,7 +213,7 @@ emailRoutes.post('/send', async (req, res) => {
         timestamp: new Date().toISOString()
       });
     }
-    
+
     const result = await enhancedEmailService.sendCustomEmail(
       to,
       subject,
@@ -225,7 +231,7 @@ emailRoutes.post('/send', async (req, res) => {
         }
       }
     );
-    
+
     res.json({
       status: 'success',
       result,
@@ -247,7 +253,7 @@ emailRoutes.get('/health', async (req, res) => {
   try {
     const health = await enhancedEmailService.healthCheck();
     const isHealthy = health.healthy;
-    
+
     res.status(isHealthy ? 200 : 503).json({
       status: isHealthy ? 'healthy' : 'unhealthy',
       providers: health.providers,
@@ -267,7 +273,7 @@ emailRoutes.get('/health', async (req, res) => {
 emailRoutes.get('/providers', async (req, res) => {
   try {
     const status = enhancedEmailService.getStatus();
-    
+
     res.json({
       providers: status.providers,
       summary: status,

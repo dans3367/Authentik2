@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, decimal, integer, uuid, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, decimal, integer, uuid, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -2523,10 +2523,13 @@ export interface TemplateFilters {
 }
 
 // Activity logs table for tracking all user actions
+// GDPR/Compliance Note: ip_address and user_agent are personal data (Recital 30).
+// These fields MUST be anonymized or deleted after the retention period (default: 12 months).
+// Use the scheduled anonymization job to enforce this policy.
 export const activityLogs = pgTable("activity_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-  userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").references(() => betterAuthUser.id, { onDelete: 'set null' }),
 
   // What entity was affected
   entityType: text("entity_type").notNull(), // 'shop', 'user', 'appointment', 'email', 'contact', etc.
@@ -2541,12 +2544,18 @@ export const activityLogs = pgTable("activity_logs", {
   changes: text("changes"), // JSON: { field: { old: value, new: value } }
   metadata: text("metadata"), // JSON: Additional context data
 
-  // Request context
+  // Request context (GDPR: anonymize after 12 months)
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
 
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  tenantIdIdx: index("activity_logs_tenant_id_idx").on(table.tenantId),
+  userIdIdx: index("activity_logs_user_id_idx").on(table.userId),
+  createdAtIdx: index("activity_logs_created_at_idx").on(table.createdAt),
+  entityTypeIdx: index("activity_logs_entity_type_idx").on(table.entityType),
+  tenantCreatedAtIdx: index("activity_logs_tenant_created_at_idx").on(table.tenantId, table.createdAt),
+}));
 
 // Activity log relations
 export const activityLogRelations = relations(activityLogs, ({ one }) => ({
