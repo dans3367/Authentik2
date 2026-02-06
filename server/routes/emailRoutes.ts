@@ -351,54 +351,8 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Email Preferences</title>
-  <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Inter', 'sans-serif'],
-          },
-          colors: {
-            border: "hsl(var(--border))",
-            input: "hsl(var(--input))",
-            ring: "hsl(var(--ring))",
-            background: "hsl(var(--background))",
-            foreground: "hsl(var(--foreground))",
-            primary: {
-              DEFAULT: "hsl(var(--primary))",
-              foreground: "hsl(var(--primary-foreground))",
-            },
-            secondary: {
-              DEFAULT: "hsl(var(--secondary))",
-              foreground: "hsl(var(--secondary-foreground))",
-            },
-            destructive: {
-              DEFAULT: "hsl(var(--destructive))",
-              foreground: "hsl(var(--destructive-foreground))",
-            },
-            muted: {
-              DEFAULT: "hsl(var(--muted))",
-              foreground: "hsl(var(--muted-foreground))",
-            },
-            accent: {
-              DEFAULT: "hsl(var(--accent))",
-              foreground: "hsl(var(--accent-foreground))",
-            },
-            popover: {
-              DEFAULT: "hsl(var(--popover))",
-              foreground: "hsl(var(--popover-foreground))",
-            },
-            card: {
-              DEFAULT: "hsl(var(--card))",
-              foreground: "hsl(var(--card-foreground))",
-            },
-          },
-        }
-      }
-    }
-  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
     :root {
       --background: 210 40% 98%;
@@ -583,7 +537,7 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
 
         <div class="mt-8 space-y-4">
           <button id="saveBtn" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-slate-900 text-slate-50 hover:bg-slate-900/90 h-10 px-4 py-2 w-full">
-            Save Permissions
+            Save Preferences
           </button>
           
           <button id="unsubAllBtn" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 text-red-500 hover:text-red-700 hover:bg-red-50 h-9 px-4 py-2 w-full">
@@ -633,10 +587,12 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
       }).then(function(r) { return r.json(); }).then(function(data) {
         if (data.success) {
           document.getElementById('formContent').classList.add('hidden');
-          document.querySelector('.header p')?.remove(); // Hide subtitle
+          const headerP = document.querySelector('.header p');
+          if (headerP) headerP.remove();
           document.getElementById('successMsg').classList.remove('hidden');
           // Update header title to be more generic after save
-          document.querySelector('h1').textContent = 'Preferences Updated';
+          const h1 = document.querySelector('h1');
+          if (h1) h1.textContent = 'Preferences Updated';
         } else {
           showError(data.error || 'Failed to save preferences.');
           resetBtn(btn, originalText);
@@ -664,9 +620,11 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
       }).then(function(r) { return r.json(); }).then(function(data) {
         if (data.success) {
           document.getElementById('formContent').classList.add('hidden');
-          document.querySelector('.header p')?.remove();
+          const headerP = document.querySelector('.header p');
+          if (headerP) headerP.remove();
           document.getElementById('unsubMsg').classList.remove('hidden');
-          document.querySelector('h1').textContent = 'Unsubscribed';
+          const h1 = document.querySelector('h1');
+          if (h1) h1.textContent = 'Unsubscribed';
         } else {
           showError(data.error || 'Failed to unsubscribe.');
           resetBtn(btn, originalText);
