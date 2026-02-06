@@ -2690,7 +2690,7 @@ export default function RemindersPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                        disabled={currentPage === totalPages}
+                        disabled={currentPage >= totalPages || totalPages === 0}
                       >
                         Next
                       </Button>
@@ -2698,7 +2698,7 @@ export default function RemindersPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => setCurrentPage(totalPages)}
-                        disabled={currentPage === totalPages}
+                        disabled={currentPage >= totalPages || totalPages === 0}
                       >
                         Last
                       </Button>

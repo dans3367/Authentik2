@@ -84,9 +84,14 @@ async function anonymizeActivityLogs(retentionMonths: number, dryRun: boolean) {
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
 const retentionArg = args.find(a => a.startsWith('--retention-months='));
-const retentionMonths = retentionArg
-  ? parseInt(retentionArg.split('=')[1], 10)
+const parsedRetention = retentionArg
+  ? Number(retentionArg.split('=')[1])
   : DEFAULT_RETENTION_MONTHS;
+if (!Number.isFinite(parsedRetention) || parsedRetention < 0) {
+  console.error('Invalid --retention-months value. Expected a non-negative number.');
+  process.exit(1);
+}
+const retentionMonths = Math.floor(parsedRetention);
 
 anonymizeActivityLogs(retentionMonths, dryRun)
   .then(() => process.exit(0))

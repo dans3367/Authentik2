@@ -179,11 +179,11 @@ emailRoutes.post('/unsubscribe/preferences', async (req, res) => {
       }
     }
 
-return res.json({ success: true });
+    return res.json({ success: true });
   } catch (error) {
-  console.error('[EmailRoutes] Save preferences failed:', error);
-  return res.status(500).json({ success: false, error: 'Failed to save preferences' });
-}
+    console.error('[EmailRoutes] Save preferences failed:', error);
+    return res.status(500).json({ success: false, error: 'Failed to save preferences' });
+  }
 });
 
 
@@ -323,7 +323,9 @@ emailRoutes.get('/unsubscribe', async (req, res) => {
 
     // Mask email for display
     const emailParts = contact.email.split('@');
-    const maskedEmail = emailParts[0].substring(0, 2) + '***@' + emailParts[1];
+    const maskedEmail = emailParts.length === 2 && emailParts[0].length > 0
+      ? emailParts[0].substring(0, 2) + '***@' + emailParts[1]
+      : '***';
     const displayName = contact.firstName || maskedEmail;
 
     // Map emailType query param to a human-readable label for the highlight
@@ -447,9 +449,9 @@ emailRoutes.get('/unsubscribe', async (req, res) => {
           <button class="btn btn-danger" id="unsubAllBtn" onclick="unsubscribeAll()">Unsubscribe from All</button>
         </div>
       </div>
-    </div>
-  </div>
   <script>
+    var TOKEN = ${JSON.stringify(token)};
+    function savePreferences() {
     var TOKEN = '${token}';
     function savePreferences() {
       var btn = document.getElementById('saveBtn');
