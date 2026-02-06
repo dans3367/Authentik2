@@ -32,19 +32,19 @@ export function AppointmentStats({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">{t('reminders.overview.total')}</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">{t('reminders.overview.total')}</span>
             <Badge variant="outline">{allAppointments.length}</Badge>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">{t('reminders.overview.upcoming')}</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">{t('reminders.overview.upcoming')}</span>
             <Badge variant="outline">{upcomingAppointments.length}</Badge>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">{t('reminders.overview.confirmed')}</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">{t('reminders.overview.confirmed')}</span>
             <Badge variant="outline">{confirmedCount}</Badge>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">{t('reminders.overview.remindersSent')}</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">{t('reminders.overview.remindersSent')}</span>
             <Badge variant="outline">{remindersSentCount}</Badge>
           </div>
         </CardContent>
@@ -60,32 +60,35 @@ export function AppointmentStats({
         </CardHeader>
         <CardContent>
           {upcomingAppointments.length === 0 ? (
-            <div className="text-center py-4">
-              <Calendar className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm text-gray-600">
+            <div className="text-center py-8">
+              <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 {t('reminders.appointments.noUpcoming')}
               </p>
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-3">
               {upcomingAppointments.slice(0, 5).map((appointment) => (
                 <div
                   key={appointment.id}
-                  className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 hover:bg-muted/50 transition-colors"
+                  role="button"
+                  tabIndex={0}
+                  className="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onClick={() => onViewAppointment(appointment)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onViewAppointment(appointment);
+                    }
+                  }}
                 >
-                  <div className="text-left min-w-0 flex-1 mr-3">
-                    <button
-                      type="button"
-                      onClick={() => onViewAppointment(appointment)}
-                      className="text-sm font-medium text-left hover:underline focus:outline-none focus:ring-2 focus:ring-primary/50 rounded block w-full truncate"
-                    >
-                      {appointment.title}
-                    </button>
-                    <p className="text-xs text-muted-foreground truncate">
+                  <div>
+                    <p className="font-medium">{appointment.title}</p>
+                    <p className="text-xs text-gray-500">
                       {getCustomerName(appointment.customer)} • {formatDateTime(appointment.appointmentDate)}
                     </p>
                   </div>
-                  <Badge className={`${getStatusColor(appointment.status)} text-[10px] px-1.5 py-0 h-5 whitespace-nowrap`} variant="outline">
+                  <Badge className={getStatusColor(appointment.status)}>
                     {appointment.status}
                   </Badge>
                 </div>

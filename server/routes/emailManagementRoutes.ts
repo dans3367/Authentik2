@@ -12,6 +12,78 @@ import jwt from 'jsonwebtoken';
 import { enhancedEmailService } from '../emailService';
 import crypto from 'crypto';
 import { logActivity, computeChanges, allowedActivityTypes } from '../utils/activityLogger';
+import xss from 'xss';
+
+// Sanitize HTML content for emails - allows safe formatting tags, strips scripts and event handlers
+function sanitizeEmailHtml(html: string): string {
+  return xss(html, {
+    whiteList: {
+      // Text formatting
+      p: ['style', 'class'],
+      br: [],
+      strong: ['style'],
+      b: ['style'],
+      em: ['style'],
+      i: ['style'],
+      u: ['style'],
+      s: ['style'],
+      strike: ['style'],
+      // Headings
+      h1: ['style', 'class'],
+      h2: ['style', 'class'],
+      h3: ['style', 'class'],
+      h4: ['style', 'class'],
+      h5: ['style', 'class'],
+      h6: ['style', 'class'],
+      // Links and images
+      a: ['href', 'title', 'target', 'style', 'class'],
+      img: ['src', 'alt', 'title', 'width', 'height', 'style', 'class'],
+      // Lists
+      ul: ['style', 'class'],
+      ol: ['style', 'class'],
+      li: ['style', 'class'],
+      // Layout
+      div: ['style', 'class'],
+      span: ['style', 'class'],
+      blockquote: ['style', 'class'],
+      pre: ['style', 'class'],
+      code: ['style', 'class'],
+      // Tables (common in emails)
+      table: ['style', 'class', 'width', 'border', 'cellpadding', 'cellspacing'],
+      thead: ['style', 'class'],
+      tbody: ['style', 'class'],
+      tr: ['style', 'class'],
+      th: ['style', 'class', 'colspan', 'rowspan', 'width'],
+      td: ['style', 'class', 'colspan', 'rowspan', 'width', 'valign', 'align'],
+      // Misc
+      hr: ['style'],
+      center: ['style'],
+    },
+    stripIgnoreTag: true,
+    stripIgnoreTagBody: ['script', 'style', 'noscript', 'iframe', 'object', 'embed'],
+    onTagAttr: (tag, name, value) => {
+      // Allow data URIs for images only (base64 encoded images)
+      if (tag === 'img' && name === 'src') {
+        if (value.startsWith('data:image/') || value.startsWith('http://') || value.startsWith('https://')) {
+          return `${name}="${(xss as any).escapeAttrValue(value)}"`;
+        }
+        return ''; // Strip invalid src
+      }
+      // Validate href attributes to prevent javascript: URLs
+      if (name === 'href') {
+        const lowerValue = value.toLowerCase().trim();
+        if (lowerValue.startsWith('javascript:') || lowerValue.startsWith('vbscript:') || lowerValue.startsWith('data:')) {
+          return ''; // Strip dangerous href
+        }
+      }
+      // Strip event handlers (onclick, onerror, etc.)
+      if (name.startsWith('on')) {
+        return '';
+      }
+      return undefined; // Use default processing
+    },
+  });
+}
 
 function isValidHttpUrl(url: string): boolean {
   try {
@@ -39,6 +111,32 @@ function escapeHtml(str: string): string {
         return c;
     }
   });
+}
+
+function sanitizeFontFamily(fontFamily: string | undefined | null): string {
+  if (!fontFamily) return 'Arial, sans-serif';
+
+  // Strict allowlist of safe font stacks
+  // This prevents CSS injection by rejecting any input containing dangerous characters
+  // (quotes, semicolons, parentheses, URL-like patterns) that wouldn't match these exact strings.
+  const allowedFonts = [
+    'Arial, Helvetica, sans-serif',
+    'Georgia, serif',
+    'Tahoma, Geneva, sans-serif',
+    'Verdana, Geneva, sans-serif',
+    'Times New Roman, Times, serif',
+    'Courier New, Courier, monospace',
+    'Trebuchet MS, Helvetica, sans-serif',
+    'Impact, Charcoal, sans-serif',
+    'Lucida Console, Monaco, monospace'
+  ];
+
+  const normalized = fontFamily.trim();
+
+  // Case-insensitive match against allowlist
+  const match = allowedFonts.find(f => f.toLowerCase() === normalized.toLowerCase());
+
+  return match || 'Arial, sans-serif';
 }
 
 function maskEmail(email: string): string {
@@ -451,6 +549,10 @@ emailManagementRoutes.get("/email-contacts/:id", authenticateToken, requireTenan
         consentIpAddress: true,
         consentUserAgent: true,
         addedByUserId: true,
+        prefMarketing: true,
+        prefCustomerEngagement: true,
+        prefNewsletters: true,
+        prefSurveysForms: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -1403,29 +1505,36 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       return res.status(400).json({ message: 'Contact email is missing' });
     }
 
-    // Validate contact is active and not globally suppressed
-    if (contact.status === 'unsubscribed' || contact.status === 'bounced') {
-      console.log(`📅 [ScheduleEmail] Contact ${maskEmail(String(contact.email))} is ${contact.status}, cannot send email`);
-      return res.status(400).json({ message: 'Contact is unsubscribed or bounced' });
-    }
+    // Block scheduling for unsubscribed/bounced contacts unless override flags are provided
+    const { allowUnsubscribed, isTransactional } = req.body || {};
+    const isUnsubscribedOrBounced = contact.status === 'unsubscribed' || contact.status === 'bounced';
 
-    const suppressed = await db.query.bouncedEmails.findFirst({
-      where: eq(bouncedEmails.email, String(contact.email).toLowerCase().trim()),
-    }).catch(() => null);
+    if (isUnsubscribedOrBounced) {
+      // SECURITY: Only allow Administrators and Owners to override unsubscribe protection
+      const isAdminOrOwner = ['Administrator', 'Owner'].includes(req.user.role || '');
+      const userAttemptedOverride = allowUnsubscribed === true || isTransactional === true;
+      const canOverride = isAdminOrOwner && userAttemptedOverride;
 
-    if (suppressed) {
-      console.log(`📅 [ScheduleEmail] Contact ${maskEmail(String(contact.email))} is globally suppressed/bounced`);
-      return res.status(400).json({ message: 'Email is globally suppressed/bounced' });
-    }
+      if (canOverride) {
+        // Audit log the override usage
+        console.log(`🔓 [ScheduleEmail] Override used for ${contact.status} contact ${maskEmail(String(contact.email))} - allowUnsubscribed: ${allowUnsubscribed}, isTransactional: ${isTransactional}, userId: ${req.user.id}, role: ${req.user.role}, tenantId: ${tenantId}, timestamp: ${new Date().toISOString()}`);
+      } else {
+        console.log(`🚫 [ScheduleEmail] Blocked scheduling to ${contact.status} contact ${maskEmail(String(contact.email))} - override denied or not provided`);
 
-    // Ensure unsubscribe token exists (long-lived until used)
-    let unsub = await db.query.unsubscribeTokens.findFirst({
-      where: and(eq(unsubscribeTokens.tenantId, req.user.tenantId), eq(unsubscribeTokens.contactId, id), sql`${unsubscribeTokens.usedAt} IS NULL`),
-    });
-    if (!unsub) {
-      const token = crypto.randomBytes(24).toString('base64url');
-      const created = await db.insert(unsubscribeTokens).values({ tenantId: req.user.tenantId, contactId: id, token }).returning();
-      unsub = created[0];
+        let errorMessage = `Cannot schedule email to ${contact.status} contact.`;
+        if (userAttemptedOverride && !isAdminOrOwner) {
+          errorMessage += " Insufficient permissions to override unsubscribe protection.";
+        } else {
+          errorMessage += " Use allowUnsubscribed or isTransactional flag to override (Requires Administrator role).";
+        }
+
+        return res.status(403).json({
+          success: false,
+          message: errorMessage,
+          contactStatus: contact.status,
+          email: maskEmail(String(contact.email)),
+        });
+      }
     }
 
     const scheduleDate = new Date(scheduleAt);
@@ -1436,6 +1545,135 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       return res.status(400).json({ message: 'scheduleAt must be at least 30 seconds in the future' });
     }
 
+    // Get company info for footer label (no fallback if missing)
+    const company = await db.query.companies.findFirst({
+      where: eq(companies.tenantId, tenantId),
+    });
+    const companyName = (company?.name || '').trim();
+
+    // Get master email design settings
+    const emailDesign = await db.query.masterEmailDesign.findFirst({
+      where: sql`${masterEmailDesign.tenantId} = ${tenantId}`,
+    });
+    console.log('📅 [ScheduleEmail] Master email design found:', emailDesign ? 'yes' : 'no (using defaults)');
+
+    // Design settings with defaults
+    const design = {
+      primaryColor: emailDesign?.primaryColor || '#3B82F6',
+      secondaryColor: emailDesign?.secondaryColor || '#1E40AF',
+      accentColor: emailDesign?.accentColor || '#10B981',
+      fontFamily: sanitizeFontFamily(emailDesign?.fontFamily),
+      logoUrl: emailDesign?.logoUrl || company?.logoUrl || null,
+      headerText: emailDesign?.headerText || null,
+      footerText: emailDesign?.footerText || (companyName ? `© ${new Date().getFullYear()} ${companyName}. All rights reserved.` : ''),
+      socialLinks: null as null | {
+        facebook?: string;
+        twitter?: string;
+        instagram?: string;
+        linkedin?: string;
+      },
+      displayCompanyName: emailDesign?.companyName || companyName,
+    };
+
+    if (emailDesign?.socialLinks) {
+      try {
+        const parsed = JSON.parse(emailDesign.socialLinks);
+        if (parsed && typeof parsed === 'object') {
+          design.socialLinks = parsed;
+        }
+      } catch (e) {
+        console.error('[ScheduleEmail] Failed to parse socialLinks:', e);
+      }
+    }
+
+    // Build social links HTML if available
+    let socialLinksHtml = '';
+    if (design.socialLinks) {
+      const links = [];
+      const linkStyle = "color: #64748b; text-decoration: none; margin: 0 10px; font-weight: 500;";
+
+      if (design.socialLinks.facebook && isValidHttpUrl(design.socialLinks.facebook)) {
+        links.push(`<a href="${escapeHtml(design.socialLinks.facebook)}" style="${linkStyle}">Facebook</a>`);
+      }
+      if (design.socialLinks.twitter && isValidHttpUrl(design.socialLinks.twitter)) {
+        links.push(`<a href="${escapeHtml(design.socialLinks.twitter)}" style="${linkStyle}">Twitter</a>`);
+      }
+      if (design.socialLinks.instagram && isValidHttpUrl(design.socialLinks.instagram)) {
+        links.push(`<a href="${escapeHtml(design.socialLinks.instagram)}" style="${linkStyle}">Instagram</a>`);
+      }
+      if (design.socialLinks.linkedin && isValidHttpUrl(design.socialLinks.linkedin)) {
+        links.push(`<a href="${escapeHtml(design.socialLinks.linkedin)}" style="${linkStyle}">LinkedIn</a>`);
+      }
+
+      if (links.length > 0) {
+        socialLinksHtml = `<div style="margin-bottom: 24px;">${links.join(' | ')}</div>`;
+      }
+    }
+
+    // Format content as HTML using master email design (same as send-email route)
+    // Sanitize user-provided HTML content to prevent XSS
+    const sanitizedHtml = sanitizeEmailHtml(html);
+    // Escape text fields to prevent XSS in display names and text content
+    const safeDisplayCompanyName = escapeHtml(design.displayCompanyName || '');
+    const safeHeaderText = design.headerText ? escapeHtml(design.headerText) : null;
+    const safeFooterText = design.footerText ? escapeHtml(design.footerText) : null;
+
+    const themedHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: ${design.fontFamily}; margin: 0; padding: 0; background-color: #f7fafc; -webkit-font-smoothing: antialiased;">
+          <div style="max-width: 600px; margin: 0 auto; background: white;">
+            
+            <!-- Hero Header -->
+            <div style="padding: 40px 32px; text-align: center; background-color: ${design.primaryColor}; color: #ffffff;">
+              ${design.logoUrl ? `
+                <img src="${escapeHtml(design.logoUrl)}" alt="${safeDisplayCompanyName}" style="height: 48px; width: auto; margin-bottom: 20px; object-fit: contain;" />
+              ` : `
+                <div style="height: 48px; width: 48px; background-color: rgba(255,255,255,0.2); border-radius: 50%; margin: 0 auto 16px auto; line-height: 48px; font-size: 20px; font-weight: bold; color: #ffffff; text-align: center;">
+                  ${escapeHtml((design.displayCompanyName || 'C').charAt(0))}
+                </div>
+              `}
+              <h1 style="margin: 0 0 10px 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em; color: #ffffff;">
+                ${safeDisplayCompanyName}
+              </h1>
+              ${safeHeaderText ? `
+                <p style="margin: 0 auto; font-size: 16px; opacity: 0.95; max-width: 400px; line-height: 1.5; color: #ffffff;">
+                  ${safeHeaderText}
+                </p>
+              ` : ''}
+            </div>
+
+            <!-- Body Content -->
+            <div style="padding: 64px 48px; min-height: 200px;">
+              <div style="font-size: 16px; line-height: 1.625; color: #334155;">
+                ${sanitizedHtml}
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="background-color: #f8fafc; padding: 32px; text-align: center; border-top: 1px solid #e2e8f0; color: #64748b;">
+              
+              ${socialLinksHtml}
+              
+              ${safeFooterText ? `
+                <p style="margin: 0 0 16px 0; font-size: 12px; line-height: 1.5; color: #64748b;">${safeFooterText}</p>
+              ` : ''}
+              
+              <div style="font-size: 12px; line-height: 1.5; color: #94a3b8;">
+                <p style="margin: 0;">
+                  Sent via ${safeDisplayCompanyName}
+                </p>
+              </div>
+            </div>
+            
+          </div>
+        </body>
+      </html>`;
+
     // Schedule via Trigger.dev
     try {
       console.log(`📅 [ScheduleEmail] Scheduling email to ${maskEmail(String(contact.email))} for ${scheduleDate.toISOString()}, subject: "${subject}"`);
@@ -1443,7 +1681,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       const payload: Parameters<typeof scheduleEmailTask.trigger>[0] = {
         to: String(contact.email),
         subject: sanitizeString(String(subject)) || 'No Subject',
-        html: String(html),
+        html: themedHtml,
         scheduledFor: scheduleDate.toISOString(),
         metadata: {
           type: 'b2c',
@@ -3857,21 +4095,36 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
 
     console.log(`📧 [SendEmail] Found contact: ${maskEmail(String(contact.email))}, status: ${contact.status}`);
 
-    // Check if contact can receive emails
-    if (contact.status === 'unsubscribed') {
-      console.log(`📧 [SendEmail] Contact ${maskEmail(String(contact.email))} is unsubscribed, cannot send email`);
-      return res.status(400).json({
-        success: false,
-        message: "Cannot send email to unsubscribed contact"
-      });
-    }
+    // Block sending for unsubscribed/bounced contacts unless override flags are provided
+    const { allowUnsubscribed, isTransactional } = req.body || {};
+    const isUnsubscribedOrBounced = contact.status === 'unsubscribed' || contact.status === 'bounced';
 
-    if (contact.status === 'bounced') {
-      console.log(`📧 [SendEmail] Contact ${maskEmail(String(contact.email))} is bounced, cannot send email`);
-      return res.status(400).json({
-        success: false,
-        message: "Cannot send email to bounced contact"
-      });
+    if (isUnsubscribedOrBounced) {
+      // SECURITY: Only allow Administrators and Owners to override unsubscribe protection
+      const isAdminOrOwner = ['Administrator', 'Owner'].includes(req.user.role || '');
+      const userAttemptedOverride = allowUnsubscribed === true || isTransactional === true;
+      const canOverride = isAdminOrOwner && userAttemptedOverride;
+
+      if (canOverride) {
+        // Audit log the override usage
+        console.log(`🔓 [SendEmail] Override used for ${contact.status} contact ${maskEmail(String(contact.email))} - allowUnsubscribed: ${allowUnsubscribed}, isTransactional: ${isTransactional}, userId: ${req.user.id}, role: ${req.user.role}, tenantId: ${tenantId}, timestamp: ${new Date().toISOString()}`);
+      } else {
+        console.log(`🚫 [SendEmail] Blocked sending to ${contact.status} contact ${maskEmail(String(contact.email))} - override denied or not provided`);
+
+        let errorMessage = `Cannot send email to ${contact.status} contact.`;
+        if (userAttemptedOverride && !isAdminOrOwner) {
+          errorMessage += " Insufficient permissions to override unsubscribe protection.";
+        } else {
+          errorMessage += " Use allowUnsubscribed or isTransactional flag to override (Requires Administrator role).";
+        }
+
+        return res.status(403).json({
+          success: false,
+          message: errorMessage,
+          contactStatus: contact.status,
+          email: maskEmail(String(contact.email)),
+        });
+      }
     }
 
     // Get tenant info for from email
@@ -3896,7 +4149,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       primaryColor: emailDesign?.primaryColor || '#3B82F6',
       secondaryColor: emailDesign?.secondaryColor || '#1E40AF',
       accentColor: emailDesign?.accentColor || '#10B981',
-      fontFamily: emailDesign?.fontFamily || 'Arial, sans-serif',
+      fontFamily: sanitizeFontFamily(emailDesign?.fontFamily),
       logoUrl: emailDesign?.logoUrl || company?.logoUrl || null,
       headerText: emailDesign?.headerText || null,
       footerText: emailDesign?.footerText || (companyName ? `© ${new Date().getFullYear()} ${companyName}. All rights reserved.` : ''),
@@ -3919,17 +4172,6 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
         console.error('[SendEmail] Failed to parse socialLinks:', e);
       }
     }
-
-    // Generate or reuse unsubscribe token
-    let unsub = await db.query.unsubscribeTokens.findFirst({
-      where: and(eq(unsubscribeTokens.tenantId, tenantId), eq(unsubscribeTokens.contactId, contact.id), sql`${unsubscribeTokens.usedAt} IS NULL`),
-    });
-    if (!unsub) {
-      const token = crypto.randomBytes(24).toString('base64url');
-      const created = await db.insert(unsubscribeTokens).values({ tenantId, contactId: contact.id, token }).returning();
-      unsub = created[0];
-    }
-    const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(unsub.token)}`;
 
     // Build social links HTML if available
     let socialLinksHtml = '';
@@ -3987,9 +4229,9 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
             </div>
 
             <!-- Body Content -->
-            <div style="padding: 32px 32px 40px 32px;">
+            <div style="padding: 64px 48px; min-height: 200px;">
               <div style="font-size: 16px; line-height: 1.625; color: #334155;">
-                ${content.replace(/\n/g, '<br>')}
+                ${sanitizeEmailHtml(content.replace(/\n/g, '<br>'))}
               </div>
             </div>
 
@@ -4005,8 +4247,6 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
               <div style="font-size: 12px; line-height: 1.5; color: #94a3b8;">
                 <p style="margin: 0;">
                   Sent via ${design.displayCompanyName}
-                  <br>
-                  <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
                 </p>
               </div>
             </div>
@@ -4019,25 +4259,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     // Send email via Trigger.dev queue
     // Generate a unique ID to track this email send - will be stored in email_sends and passed to Trigger task
     const emailTrackingId = crypto.randomUUID();
-    // Log email activity (queued) first so we can update it to sent/failed later
     let emailActivityId: string | null = null;
-    try {
-      const [insertedActivity] = await db.insert(emailActivity).values({
-        contactId: contact.id,
-        tenantId: tenantId,
-        activityType: 'queued',
-        activityData: JSON.stringify({
-          source: 'individual_send_queued',
-          sentBy: req.user.id,
-          emailSubject: subject,
-        }),
-        occurredAt: new Date(),
-      }).returning();
-      emailActivityId = insertedActivity.id;
-      console.log(`📝 [SendEmail] Logged email activity for ${contact.email}, id: ${emailActivityId}`);
-    } catch (activityLogError) {
-      console.error(`⚠️ [SendEmail] Failed to log email activity:`, activityLogError);
-    }
 
     let result: { success: boolean; runId?: string; error?: string };
     try {
@@ -4046,36 +4268,42 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
         to: contact.email,
         subject: subject,
         html: htmlContent,
-        text: `${content}\n\nUnsubscribe: ${unsubscribeUrl}`,
-        headers: {
-          'List-Unsubscribe': `<${unsubscribeUrl}>`,
-          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
-        },
+        text: content,
         metadata: {
           type: 'individual_contact_email',
           contactId: contact.id,
           tenantId: tenantId,
           sentBy: req.user.id,
           emailTrackingId: emailTrackingId, // Pass tracking ID so task can update email_sends with actual Resend ID
-          emailActivityId: emailActivityId, // Pass activity ID so task can update email_activity to sent/failed
         }
       });
       console.log(`📧 [SendEmail] Triggered send-email task, runId: ${handle.id}, trackingId: ${emailTrackingId}`);
       result = { success: true, runId: handle.id };
 
+      // Log email activity as 'sent' now that the task system accepted it
+      try {
+        const [insertedActivity] = await db.insert(emailActivity).values({
+          contactId: contact.id,
+          tenantId: tenantId,
+          activityType: 'sent',
+          activityData: JSON.stringify({
+            source: 'individual_send',
+            sentBy: req.user.id,
+            subject: subject,
+            recipient: contact.email,
+            recipientName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || undefined,
+            from: design.displayCompanyName || 'Manager',
+          }),
+          occurredAt: new Date(),
+        }).returning();
+        emailActivityId = insertedActivity.id;
+        console.log(`📝 [SendEmail] Logged email activity as sent for ${contact.email}, id: ${emailActivityId}`);
+      } catch (activityLogError) {
+        console.error(`⚠️ [SendEmail] Failed to log email activity:`, activityLogError);
+      }
+
     } catch (triggerError: any) {
       console.error('[SendEmail] Failed to trigger email task:', triggerError);
-
-      // Ensure activity isn't left stuck as queued
-      if (emailActivityId) {
-        try {
-          await db.update(emailActivity)
-            .set({ activityType: 'failed' })
-            .where(and(eq(emailActivity.id, emailActivityId), eq(emailActivity.tenantId, tenantId)));
-        } catch (activityUpdateError) {
-          console.error(`⚠️ [SendEmail] Failed to update email activity status:`, activityUpdateError);
-        }
-      }
 
       return res.status(503).json({
         success: false,
@@ -4131,7 +4359,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       console.error(`⚠️ [SendEmail] Failed to log to email_sends table:`, logError);
     }
 
-    // Update contact stats - Do not increment emailsSent here (webhook will do it)
+    // Update contact stats - update lastActivity (emailsSent increment is handled by internal callback)
     await db.update(emailContacts)
       .set({
         lastActivity: new Date(),

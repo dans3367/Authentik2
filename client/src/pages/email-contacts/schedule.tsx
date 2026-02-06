@@ -43,7 +43,18 @@ export default function ScheduleContactEmailPage() {
     },
   });
 
-  const isSuppressed = contact?.status === "unsubscribed" || contact?.status === "bounced" || !!bouncedCheck?.isBounced;
+  const isUnsubscribed = contact?.status === "unsubscribed" || contact?.status === "bounced" || !!bouncedCheck?.isBounced;
+
+  const isBounced = contact?.status === "bounced" || !!bouncedCheck?.isBounced;
+  let suppressedTitle = "Suppressed Contact";
+
+  if (isBounced) {
+    suppressedTitle = "Suppressed Contact (bounced)";
+  } else if (contact?.status === "unsubscribed") {
+    suppressedTitle = "Suppressed Contact (unsubscribed)";
+  } else if (contact?.suppressionReason) {
+    suppressedTitle = `Suppressed Contact (${contact.suppressionReason})`;
+  }
 
   const scheduleMutation = useMutation({
     mutationFn: async () => {
@@ -60,13 +71,9 @@ export default function ScheduleContactEmailPage() {
     },
   });
 
-  const scheduleDisabledReason = (() => {
-    if (contact?.status === "unsubscribed") return "This contact has unsubscribed from emails.";
-    if (contact?.status === "bounced" || !!bouncedCheck?.isBounced) return "This address is bounced or globally suppressed.";
-    return undefined;
-  })();
+  const scheduleWarningMessage = "This customer has unsubscribed from the mailing list. Please do not send marketing or promotional emails to this contact. You may still send direct or scheduled messages if needed.";
 
-  const canSubmit = !!subject && !!content && !!date && !!id && !isSuppressed;
+  const canSubmit = !!subject && !!content && !!date && !!id;
 
   const handleTemplateSelect = (template: { subject: string; content: string }) => {
     setSubject(template.subject);
@@ -123,11 +130,11 @@ export default function ScheduleContactEmailPage() {
           </div>
         </div>
 
-        {isSuppressed && (
+        {isUnsubscribed && (
           <Alert className="border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-200">
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle className="text-sm font-medium">Sending disabled</AlertTitle>
-            <AlertDescription className="text-sm">{scheduleDisabledReason}</AlertDescription>
+            <AlertTitle className="text-sm font-medium">{suppressedTitle}</AlertTitle>
+            <AlertDescription className="text-sm">{scheduleWarningMessage}</AlertDescription>
           </Alert>
         )}
 
@@ -150,27 +157,27 @@ export default function ScheduleContactEmailPage() {
             </div>
             <div>
               <Label>Subject</Label>
-              <Input 
-                value={subject} 
-                onChange={(e) => setSubject(e.target.value)} 
-                placeholder="Subject..." 
-                className="mt-2" 
+              <Input
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="Subject..."
+                className="mt-2"
                 disabled={isUsingTemplate}
               />
             </div>
             <div>
               <Label>Content</Label>
               {isUsingTemplate ? (
-                <div 
+                <div
                   className="mt-2 min-h-[220px] p-3 rounded-md border border-input bg-gray-50 dark:bg-gray-900 text-sm overflow-auto"
                   dangerouslySetInnerHTML={{ __html: content }}
                 />
               ) : (
-                <Textarea 
-                  value={content} 
-                  onChange={(e) => setContent(e.target.value)} 
-                  placeholder="Write your email..." 
-                  className="mt-2 min-h-[220px]" 
+                <Textarea
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="Write your email..."
+                  className="mt-2 min-h-[220px]"
                 />
               )}
             </div>

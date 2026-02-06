@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { isPast } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -44,6 +44,7 @@ import {
     Bell,
     FileText,
     ChevronRight,
+    ChevronLeft,
     Mail,
     Send,
 } from "lucide-react";
@@ -79,6 +80,8 @@ export default function CustomerAppointmentsTab({
     const [detailsPanelOpen, setDetailsPanelOpen] = useState(false);
     const [rescheduleEmailDialogOpen, setRescheduleEmailDialogOpen] = useState(false);
     const [pendingStatusChange, setPendingStatusChange] = useState<Appointment["status"] | null>(null);
+    const [pastPage, setPastPage] = useState(1);
+    const PAST_PER_PAGE = 10;
 
     // Fetch appointments for this customer
     const {
@@ -158,6 +161,14 @@ export default function CustomerAppointmentsTab({
                 new Date(b.appointmentDate).getTime() -
                 new Date(a.appointmentDate).getTime()
         );
+
+    // Reset pastPage if it becomes out-of-range when pastAppointments shrinks/changes
+    useEffect(() => {
+        const maxPage = Math.ceil(pastAppointments.length / PAST_PER_PAGE) || 1;
+        if (pastPage > maxPage) {
+            setPastPage(maxPage);
+        }
+    }, [pastAppointments.length, pastPage]);
 
     const getStatusBadge = (status: Appointment["status"]) => {
         const statusConfig = {
@@ -431,14 +442,48 @@ export default function CustomerAppointmentsTab({
                     </CardHeader>
                     <CardContent>
                         {pastAppointments.length > 0 ? (
-                            <div className="space-y-3">
-                                {pastAppointments.map((appointment) => (
-                                    <AppointmentCard
-                                        key={appointment.id}
-                                        appointment={appointment}
-                                    />
-                                ))}
-                            </div>
+                            <>
+                                <div className="space-y-3">
+                                    {pastAppointments
+                                        .slice((pastPage - 1) * PAST_PER_PAGE, pastPage * PAST_PER_PAGE)
+                                        .map((appointment) => (
+                                            <AppointmentCard
+                                                key={appointment.id}
+                                                appointment={appointment}
+                                            />
+                                        ))}
+                                </div>
+                                {pastAppointments.length > PAST_PER_PAGE && (
+                                    <div className="flex items-center justify-between pt-4 mt-4 border-t">
+                                        <span className="text-xs text-muted-foreground">
+                                            Showing {(pastPage - 1) * PAST_PER_PAGE + 1}–{Math.min(pastPage * PAST_PER_PAGE, pastAppointments.length)} of {pastAppointments.length}
+                                        </span>
+                                        <div className="flex items-center gap-1">
+                                            <Button
+                                                variant="outline"
+                                                size="icon"
+                                                className="h-7 w-7"
+                                                onClick={() => setPastPage((p) => Math.max(1, p - 1))}
+                                                disabled={pastPage === 1}
+                                            >
+                                                <ChevronLeft className="h-4 w-4" />
+                                            </Button>
+                                            <span className="text-xs px-2">
+                                                {pastPage} / {Math.ceil(pastAppointments.length / PAST_PER_PAGE)}
+                                            </span>
+                                            <Button
+                                                variant="outline"
+                                                size="icon"
+                                                className="h-7 w-7"
+                                                onClick={() => setPastPage((p) => Math.min(Math.ceil(pastAppointments.length / PAST_PER_PAGE), p + 1))}
+                                                disabled={pastPage >= Math.ceil(pastAppointments.length / PAST_PER_PAGE)}
+                                            >
+                                                <ChevronRight className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
                         ) : (
                             <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
                                 No past appointments

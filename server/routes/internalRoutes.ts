@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { emailActivity, emailSends, emailContent } from '@shared/schema';
+import { emailActivity, emailSends, emailContent, emailContacts } from '@shared/schema';
 import { authenticateInternalService, InternalServiceRequest } from '../middleware/internal-service-auth';
 import crypto from 'crypto';
+import { sql, eq } from 'drizzle-orm';
 
 const router = Router();
 
@@ -212,7 +213,12 @@ router.post(
   authenticateInternalService,
   async (req: InternalServiceRequest, res) => {
     try {
-      const { emailTrackingId, providerMessageId, status, emailActivityId } = req.body;
+      let { emailTrackingId, providerMessageId, status } = req.body;
+
+      // Normalize 'queued' to 'pending' to support external callers (e.g. Trigger.dev)
+      if (status === 'queued') {
+        status = 'pending';
+      }
 
       const allowedStatuses = [
         'pending',
@@ -222,9 +228,7 @@ router.post(
         'failed',
       ];
 
-      const normalizedStatus = status === 'queued' ? 'pending' : status;
-
-      if (normalizedStatus !== undefined && (!normalizedStatus || !allowedStatuses.includes(normalizedStatus))) {
+      if (status !== undefined && (!status || !allowedStatuses.includes(status))) {
         return res.status(400).json({
           success: false,
           error: 'Invalid status value',
@@ -232,7 +236,7 @@ router.post(
         });
       }
 
-      const validatedStatus = normalizedStatus || 'sent';
+      const validatedStatus = status || 'sent';
 
       if (!emailTrackingId) {
         return res.status(400).json({
@@ -252,7 +256,6 @@ router.post(
       console.log(`📧 [Internal API] Updating email_sends record for tracking ID ${emailTrackingId} with status ${validatedStatus}${providerMessageId ? ` and provider ID ${providerMessageId}` : ''}`);
 
       // Find and update the email_sends record by the email tracking ID
-      const { eq } = await import('drizzle-orm');
       const now = new Date();
 
       const updatePayload: Record<string, unknown> = {
@@ -282,17 +285,19 @@ router.post(
         });
       }
 
-      // Optionally update the related email_activity row (queued -> sent/failed)
-      if (emailActivityId && (validatedStatus === 'sent' || validatedStatus === 'failed')) {
+      // Increment emailsSent counter on the contact when status is 'sent'
+      if (validatedStatus === 'sent' && result[0].contactId) {
         try {
-          await db.update(emailActivity)
+          await db.update(emailContacts)
             .set({
-              activityType: validatedStatus,
+              emailsSent: sql`COALESCE(${emailContacts.emailsSent}, 0) + 1`,
+              lastActivity: now,
+              updatedAt: now,
             })
-            .where(eq(emailActivity.id, emailActivityId));
-          console.log(`✅ [Internal API] Updated email_activity ${emailActivityId} to ${validatedStatus}`);
-        } catch (activityUpdateError) {
-          console.warn(`⚠️ [Internal API] Failed to update email_activity ${emailActivityId}:`, activityUpdateError);
+            .where(eq(emailContacts.id, result[0].contactId));
+          console.log(`✅ [Internal API] Incremented emailsSent for contact ${result[0].contactId}`);
+        } catch (metricsUpdateError) {
+          console.warn(`⚠️ [Internal API] Failed to update contact emailsSent:`, metricsUpdateError);
         }
       }
 
@@ -302,7 +307,7 @@ router.post(
         success: true,
         emailSendId: result[0].id,
         providerMessageId,
-        emailActivityId: emailActivityId || null,
+        status: validatedStatus,
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

@@ -11,7 +11,7 @@ import type { Request } from 'express';
 
 export interface LogActivityParams {
     tenantId: string;
-    userId: string;
+    userId?: string | null;
     entityType: 'shop' | 'user' | 'appointment' | 'email' | 'contact' | 'newsletter' | 'campaign' | 'tag' | string;
     entityId?: string;
     entityName?: string;
@@ -45,7 +45,7 @@ export async function logActivity(params: LogActivityParams): Promise<void> {
 
         await db.insert(activityLogs).values({
             tenantId: params.tenantId,
-            userId: params.userId,
+            userId: params.userId || null,
             entityType: params.entityType,
             entityId: params.entityId || null,
             entityName: params.entityName || null,

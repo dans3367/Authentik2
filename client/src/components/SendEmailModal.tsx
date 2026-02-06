@@ -48,10 +48,6 @@ export default function SendEmailModal({
         `/api/email-contacts/${contactId}/send-email`,
         data
       );
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to send email");
-      }
       return response.json();
     },
     onSuccess: () => {
@@ -65,9 +61,24 @@ export default function SendEmailModal({
       onEmailSent?.();
     },
     onError: (error: any) => {
+      // apiRequest throws "STATUS: JSON_BODY" — extract the message from the JSON portion
+      let errorMessage = "Failed to send email";
+      try {
+        const rawMessage = error.message || "";
+        const jsonStart = rawMessage.indexOf("{");
+        if (jsonStart !== -1) {
+          const parsed = JSON.parse(rawMessage.substring(jsonStart));
+          errorMessage = parsed.message || errorMessage;
+        } else {
+          errorMessage = rawMessage || errorMessage;
+        }
+      } catch {
+        errorMessage = error.message || errorMessage;
+      }
+
       toast({
-        title: "Error",
-        description: error.message || "Failed to send email",
+        title: "Failed to Send Email",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -98,14 +109,6 @@ export default function SendEmailModal({
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
-    if (disabled && nextOpen) {
-      toast({
-        title: "Sending disabled",
-        description: disabledReason || "You cannot send an email to this contact.",
-        variant: "destructive",
-      });
-      return;
-    }
     setOpen(nextOpen);
   };
 

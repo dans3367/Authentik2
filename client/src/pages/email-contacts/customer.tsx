@@ -210,16 +210,13 @@ export default function CustomerViewPage() {
     queryClient.invalidateQueries({ queryKey: ['/api/email-contacts', id, 'stats'] });
   };
 
+  // Guard against unsubscribed/bounced contacts to prevent server 403s
   const isSendEmailDisabled = contact ? (contact.status === 'unsubscribed' || contact.status === 'bounced' || !!bouncedCheck?.isBounced) : false;
-  const sendEmailDisabledReason = contact ? (() => {
-    if (contact.status === 'unsubscribed') {
-      return 'This contact has unsubscribed from emails.';
-    }
-    if (contact.status === 'bounced' || !!bouncedCheck?.isBounced) {
-      return 'This email address is marked as bounced or globally suppressed.';
-    }
-    return undefined;
-  })() : undefined;
+  const sendEmailDisabledReason = isSendEmailDisabled
+    ? (contact?.status === 'bounced' || !!bouncedCheck?.isBounced
+      ? "Cannot send email to a bounced contact."
+      : "Cannot send email to an unsubscribed contact.")
+    : undefined;
 
   if (isLoading) {
     return (
@@ -341,20 +338,25 @@ export default function CustomerViewPage() {
         </Button>
       </div>
 
-      {/* Sending Disabled Alert */}
+      {/* Unsubscribed/Bounced Contact Warning */}
       {(() => {
-        const isSuppressed = contact.status === 'unsubscribed' || contact.status === 'bounced' || !!bouncedCheck?.isBounced;
-        const dateRaw = bouncedCheck?.bouncedEmail?.lastBouncedAt || bouncedCheck?.bouncedEmail?.firstBouncedAt || bouncedCheck?.bouncedEmail?.bouncedAt;
-        const dateText = dateRaw ? formatDateShort(dateRaw as any) : null;
-        if (!isSuppressed) return null;
+        const isBounced = contact.status === 'bounced' || !!bouncedCheck?.isBounced;
+        const isUnsubscribed = contact.status === 'unsubscribed';
+
+        if (!isBounced && !isUnsubscribed) return null;
+
+        const suppressionReason = isBounced ? 'bounced' : 'unsubscribed';
+
         return (
           <Alert className="border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-200 [&>svg]:text-yellow-600 dark:[&>svg]:text-yellow-400">
             <AlertTriangleIcon className="h-4 w-4 mt-0.5 flex-shrink-0" />
-            <AlertTitle className="text-sm font-medium">Sending disabled</AlertTitle>
+            <AlertTitle className="text-sm font-medium">
+              {suppressionReason === 'bounced' ? "Bounced Contact" : "Unsubscribed Contact"}
+            </AlertTitle>
             <AlertDescription className="text-yellow-700 dark:text-yellow-300 text-sm leading-relaxed">
-              {dateText
-                ? `We are unable to send to this address because it is marked as bounced or is on a global do-not-contact list as of ${dateText}. If you believe this is an error, please contact our support team.`
-                : `We are unable to send to this address because it is marked as bounced or is on a global do-not-contact list. If you believe this is an error, please contact our support team.`}
+              {suppressionReason === 'bounced'
+                ? "This contact's email address has bounced. Future emails may not be delivered."
+                : "This customer has unsubscribed from the mailing list. Please do not send marketing or promotional emails to this contact. You may still send direct or scheduled messages if needed."}
             </AlertDescription>
           </Alert>
         );
@@ -648,7 +650,7 @@ export default function CustomerViewPage() {
 
           {/* Email Activity Timeline */}
           <div>
-            <EmailActivityTimeline contactId={contact.id} />
+            <EmailActivityTimeline contactId={contact.id} pageSize={10} />
           </div>
 
           {/* Quick Actions */}

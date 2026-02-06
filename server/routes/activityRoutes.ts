@@ -95,12 +95,18 @@ function transformLogsWithUser(logs: any[], req: any) {
             changes: safeJsonParse(log.changes),
             metadata: safeJsonParse(log.metadata),
             createdAt: log.createdAt,
-            user: {
+            user: log.userId ? {
                 id: log.userId,
                 firstName: log.userFirstName,
                 lastName: log.userLastName,
                 email: log.userEmail,
                 avatarUrl: log.userAvatarUrl,
+            } : {
+                id: null,
+                firstName: 'Deleted',
+                lastName: 'User',
+                email: null,
+                avatarUrl: null,
             },
         };
 

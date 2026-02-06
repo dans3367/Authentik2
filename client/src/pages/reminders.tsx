@@ -1482,22 +1482,26 @@ export default function RemindersPage() {
     <div className="min-h-screen">
       <div className="mx-auto max-w-7xl p-6 space-y-8">
         {/* Page Header with Title */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{t('reminders.pageTitle')}</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
-              {t('reminders.pageSubtitle')}
-            </p>
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
+                {t('reminders.pageTitle')}
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400">
+                {t('reminders.pageSubtitle')}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 rounded-lg hover:bg-muted/50 transition-colors shadow-sm"
+              aria-label="Settings"
+              onClick={() => setSettingsModalOpen(true)}
+            >
+              <Settings className="h-5 w-5" />
+            </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 rounded-full"
-            aria-label="Settings"
-            onClick={() => setSettingsModalOpen(true)}
-          >
-            <Settings className="h-5 w-5" />
-          </Button>
         </div>
 
         {/* Appointments Content */}
@@ -1518,14 +1522,16 @@ export default function RemindersPage() {
           </div>
 
           {/* Appointments Table with Tabs */}
-          <Card className="order-1">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
+          <Card className="order-1 shadow-sm">
+            <CardHeader className="border-b">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-900/20">
+                    <Calendar className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                  </div>
                   Appointments
                 </CardTitle>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Button
                     variant="outline"
                     size="icon"
@@ -1542,17 +1548,18 @@ export default function RemindersPage() {
                       toast({ title: t('reminders.toasts.success'), description: 'Appointments refreshed' });
                     }}
                     title="Refresh appointments"
+                    className="hover:bg-muted/50 transition-colors"
                   >
                     <RefreshCw className={`h-4 w-4 ${appointmentsFetching ? 'animate-spin' : ''}`} />
                   </Button>
                   {lastRefreshedAt && (
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-xs text-muted-foreground hidden md:inline-block">
                       Last refreshed: {lastRefreshedAt.toLocaleTimeString()}
                     </span>
                   )}
                   <Dialog open={newAppointmentModalOpen} onOpenChange={setNewAppointmentModalOpen}>
                     <DialogTrigger asChild>
-                      <Button>
+                      <Button className="shadow-sm hover:shadow-md transition-all">
                         <CalendarPlus className="h-4 w-4 mr-2" />
                         {t('reminders.appointments.newAppointment')}
                       </Button>
@@ -1564,7 +1571,7 @@ export default function RemindersPage() {
                           {t('reminders.appointments.scheduleDescription')}
                         </DialogDescription>
                       </DialogHeader>
-                      <div className="space-y-4 overflow-y-auto flex-1">
+                      <div className="space-y-6 overflow-y-auto flex-1">
                         <div>
                           <Label className={newAppointmentErrors.customerId ? "text-red-500" : ""}>
                             {t('reminders.appointments.customer')} <span className="text-red-500">*</span>
@@ -1636,7 +1643,7 @@ export default function RemindersPage() {
                           <Input
                             type="number"
                             value={newAppointmentData.duration}
-                            onChange={(e) => setNewAppointmentData(prev => ({ ...prev, duration: parseInt(e.target.value) }))}
+                            onChange={(e) => setNewAppointmentData(prev => ({ ...prev, duration: parseInt(e.target.value, 10) || prev.duration }))}
                             min="15"
                             step="15"
                             className="focus-visible:ring-0"
@@ -1959,637 +1966,447 @@ export default function RemindersPage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-0">
-              <Tabs value={appointmentsTab} onValueChange={(v) => setAppointmentsTab(v as "upcoming" | "past")} className="w-full">
-                <div className="flex items-center justify-between p-4 border-b">
-                  <TabsList>
-                    <TabsTrigger value="upcoming" className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      Scheduled
-                    </TabsTrigger>
-                    <TabsTrigger value="past" className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      Past
-                    </TabsTrigger>
-                  </TabsList>
+
+            <Tabs value={appointmentsTab} onValueChange={(v) => setAppointmentsTab(v as "upcoming" | "past")} className="w-full">
+              <div className="flex items-center justify-between p-4 border-b bg-muted/30">
+                <TabsList className="bg-background">
+                  <TabsTrigger value="upcoming" className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Scheduled
+                  </TabsTrigger>
+                  <TabsTrigger value="past" className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Past
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+
+              <TabsContent value="upcoming" className="mt-0">
+                {/* Search and Filter Controls */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-4 lg:p-6 border-b bg-gray-50 dark:bg-gray-900/50">
+                  <div className="relative flex-1 max-w-sm">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder={t('reminders.appointments.searchPlaceholder')}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10 pr-10 focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery("")}
+                        className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                        aria-label="Clear search"
+                      >
+                        <XCircle className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-full sm:w-48 focus-visible:ring-2 focus-visible:ring-ring">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t('reminders.appointments.allStatuses')}</SelectItem>
+                      <SelectItem value="scheduled">{t('reminders.appointments.scheduled')}</SelectItem>
+                      <SelectItem value="confirmed">{t('reminders.appointments.confirmed')}</SelectItem>
+                      <SelectItem value="cancelled">{t('reminders.appointments.cancelled')}</SelectItem>
+                      <SelectItem value="completed">{t('reminders.appointments.completed')}</SelectItem>
+                      <SelectItem value="no_show">{t('reminders.appointments.noShow')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {/* Date Range Filter */}
+                  <Popover open={dateFilterOpen} onOpenChange={setDateFilterOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={`flex items-center gap-2 ${(dateFrom || dateTo) ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                      >
+                        <Calendar className="h-4 w-4" />
+                        {(dateFrom || dateTo) ? (
+                          <span className="text-sm">
+                            {dateFrom ? dateFrom.toLocaleDateString() : '...'} - {dateTo ? dateTo.toLocaleDateString() : '...'}
+                          </span>
+                        ) : (
+                          <span className="text-sm">{t('reminders.appointments.filterByDate')}</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-3" align="start" sideOffset={5} avoidCollisions={true}>
+                      {/* Quick Date Range Presets */}
+                      <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            const endOfDay = new Date(today);
+                            endOfDay.setHours(23, 59, 59, 999);
+                            setDateFrom(today);
+                            setDateTo(endOfDay);
+                          }}
+                          className="text-xs"
+                        >
+                          Today
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            const oneWeekLater = new Date(today);
+                            oneWeekLater.setDate(oneWeekLater.getDate() + 7);
+                            oneWeekLater.setHours(23, 59, 59, 999);
+                            setDateFrom(today);
+                            setDateTo(oneWeekLater);
+                          }}
+                          className="text-xs"
+                        >
+                          1 Week
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            const oneMonthLater = new Date(today);
+                            oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
+                            oneMonthLater.setHours(23, 59, 59, 999);
+                            setDateFrom(today);
+                            setDateTo(oneMonthLater);
+                          }}
+                          className="text-xs"
+                        >
+                          1 Month
+                        </Button>
+                      </div>
+                      <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-1">
+                          <Label className="text-xs font-medium">{t('reminders.appointments.fromDate')}</Label>
+                          <Input
+                            type="date"
+                            value={dateFrom ? dateFrom.toISOString().split('T')[0] : ''}
+                            max={dateTo ? dateTo.toISOString().split('T')[0] : undefined}
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                const date = new Date(e.target.value + 'T00:00:00');
+                                setDateFrom(date);
+                              } else {
+                                setDateFrom(undefined);
+                              }
+                            }}
+                            className="w-full"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <Label className="text-xs font-medium">{t('reminders.appointments.toDate')}</Label>
+                          <Input
+                            type="date"
+                            value={dateTo ? dateTo.toISOString().split('T')[0] : ''}
+                            min={dateFrom ? dateFrom.toISOString().split('T')[0] : undefined}
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                const date = new Date(e.target.value + 'T23:59:59');
+                                setDateTo(date);
+                              } else {
+                                setDateTo(undefined);
+                              }
+                            }}
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+                      {(dateFrom || dateTo) && (
+                        <div className="mt-4 pt-4 border-t">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setDateFrom(undefined);
+                              setDateTo(undefined);
+                              setDateFilterOpen(false);
+                            }}
+                            className="w-full"
+                          >
+                            <XCircle className="h-4 w-4 mr-2" />
+                            {t('reminders.appointments.clearDates')}
+                          </Button>
+                        </div>
+                      )}
+                    </PopoverContent>
+                  </Popover>
                 </div>
 
-                <TabsContent value="upcoming" className="mt-0">
-                  {/* Search and Filter Controls */}
-                  <div className="flex items-center gap-4 p-6 border-b">
-                    <div className="relative flex-1 max-w-sm">
-                      <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        placeholder={t('reminders.appointments.searchPlaceholder')}
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10 pr-10"
-                      />
-                      {searchQuery && (
-                        <button
-                          onClick={() => setSearchQuery("")}
-                          className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                          aria-label="Clear search"
-                        >
-                          <XCircle className="h-4 w-4" />
-                        </button>
-                      )}
+                {/* Bulk Actions */}
+                {selectedAppointments.length > 0 && (
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-blue-50 dark:bg-blue-900/30 p-4 border-b border-blue-200 dark:border-blue-800">
+                    <div className="flex items-center gap-3">
+                      <Badge className="bg-blue-600 text-white text-sm px-3 py-1">
+                        {selectedAppointments.length} {t('reminders.appointments.selected')}
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedAppointments([])}
+                        className="hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        {t('reminders.appointments.clearSelection')}
+                      </Button>
                     </div>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-48">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">{t('reminders.appointments.allStatuses')}</SelectItem>
-                        <SelectItem value="scheduled">{t('reminders.appointments.scheduled')}</SelectItem>
-                        <SelectItem value="confirmed">{t('reminders.appointments.confirmed')}</SelectItem>
-                        <SelectItem value="cancelled">{t('reminders.appointments.cancelled')}</SelectItem>
-                        <SelectItem value="completed">{t('reminders.appointments.completed')}</SelectItem>
-                        <SelectItem value="no_show">{t('reminders.appointments.noShow')}</SelectItem>
-                      </SelectContent>
-                    </Select>
-
-                    {/* Date Range Filter */}
-                    <Popover open={dateFilterOpen} onOpenChange={setDateFilterOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className={`flex items-center gap-2 ${(dateFrom || dateTo) ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''}`}
-                        >
-                          <Calendar className="h-4 w-4" />
-                          {(dateFrom || dateTo) ? (
-                            <span className="text-sm">
-                              {dateFrom ? dateFrom.toLocaleDateString() : '...'} - {dateTo ? dateTo.toLocaleDateString() : '...'}
-                            </span>
-                          ) : (
-                            <span className="text-sm">{t('reminders.appointments.filterByDate')}</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-3" align="start" sideOffset={5} avoidCollisions={true}>
-                        {/* Quick Date Range Presets */}
-                        <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const today = new Date();
-                              today.setHours(0, 0, 0, 0);
-                              const endOfDay = new Date(today);
-                              endOfDay.setHours(23, 59, 59, 999);
-                              setDateFrom(today);
-                              setDateTo(endOfDay);
-                            }}
-                            className="text-xs"
-                          >
-                            Today
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const today = new Date();
-                              today.setHours(0, 0, 0, 0);
-                              const oneWeekLater = new Date(today);
-                              oneWeekLater.setDate(oneWeekLater.getDate() + 7);
-                              oneWeekLater.setHours(23, 59, 59, 999);
-                              setDateFrom(today);
-                              setDateTo(oneWeekLater);
-                            }}
-                            className="text-xs"
-                          >
-                            1 Week
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const today = new Date();
-                              today.setHours(0, 0, 0, 0);
-                              const oneMonthLater = new Date(today);
-                              oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
-                              oneMonthLater.setHours(23, 59, 59, 999);
-                              setDateFrom(today);
-                              setDateTo(oneMonthLater);
-                            }}
-                            className="text-xs"
-                          >
-                            1 Month
-                          </Button>
-                        </div>
-                        <div className="flex flex-col gap-3">
-                          <div className="flex flex-col gap-1">
-                            <Label className="text-xs font-medium">{t('reminders.appointments.fromDate')}</Label>
-                            <Input
-                              type="date"
-                              value={dateFrom ? dateFrom.toISOString().split('T')[0] : ''}
-                              max={dateTo ? dateTo.toISOString().split('T')[0] : undefined}
-                              onChange={(e) => {
-                                if (e.target.value) {
-                                  const date = new Date(e.target.value + 'T00:00:00');
-                                  setDateFrom(date);
-                                } else {
-                                  setDateFrom(undefined);
-                                }
-                              }}
-                              className="w-full"
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <Label className="text-xs font-medium">{t('reminders.appointments.toDate')}</Label>
-                            <Input
-                              type="date"
-                              value={dateTo ? dateTo.toISOString().split('T')[0] : ''}
-                              min={dateFrom ? dateFrom.toISOString().split('T')[0] : undefined}
-                              onChange={(e) => {
-                                if (e.target.value) {
-                                  const date = new Date(e.target.value + 'T23:59:59');
-                                  setDateTo(date);
-                                } else {
-                                  setDateTo(undefined);
-                                }
-                              }}
-                              className="w-full"
-                            />
-                          </div>
-                        </div>
-                        {(dateFrom || dateTo) && (
-                          <div className="mt-4 pt-4 border-t">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setDateFrom(undefined);
-                                setDateTo(undefined);
-                                setDateFilterOpen(false);
-                              }}
-                              className="w-full"
-                            >
-                              <XCircle className="h-4 w-4 mr-2" />
-                              {t('reminders.appointments.clearDates')}
-                            </Button>
-                          </div>
-                        )}
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  {/* Bulk Actions */}
-                  {selectedAppointments.length > 0 && (
-                    <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-4 border-b">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{selectedAppointments.length} {t('reminders.appointments.selected')}</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedAppointments([])}
-                        >
-                          {t('reminders.appointments.clearSelection')}
-                        </Button>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleSendReminders}
-                          disabled={sendReminderMutation.isPending}
-                        >
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        onClick={handleSendReminders}
+                        disabled={sendReminderMutation.isPending}
+                        className="shadow-sm hover:shadow-md transition-all"
+                      >
+                        {sendReminderMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
                           <Send className="h-4 w-4 mr-2" />
-                          {t('reminders.appointments.sendReminders')}
-                        </Button>
-                      </div>
+                        )}
+                        {t('reminders.appointments.sendReminders')}
+                      </Button>
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  <div className="min-h-[400px]">
-                    {appointmentsLoading ? (
-                      <div className="flex items-center justify-center py-12 min-h-[400px]">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
+                <div className="min-h-[400px]">
+                  {appointmentsLoading ? (
+                    <div className="flex items-center justify-center py-12 min-h-[400px]">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
+                    </div>
+                  ) : appointments.length === 0 ? (
+                    <div className="text-center py-16 min-h-[400px] flex flex-col items-center justify-center space-y-4">
+                      <div className="p-4 rounded-full bg-gray-100 dark:bg-gray-800">
+                        <Calendar className="h-16 w-16 text-gray-400" />
                       </div>
-                    ) : appointments.length === 0 ? (
-                      <div className="text-center py-12 min-h-[400px] flex flex-col items-center justify-center">
-                        <Calendar className="h-16 w-16 text-gray-400 mb-4" />
-                        <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">{t('reminders.appointments.noAppointments')}</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">{t('reminders.appointments.createFirst')}</p>
-                        <Button onClick={() => setNewAppointmentModalOpen(true)}>
-                          <CalendarPlus className="h-4 w-4 mr-2" />
-                          {t('reminders.appointments.createAppointment')}
-                        </Button>
+                      <div className="space-y-2">
+                        <p className="text-xl font-semibold text-gray-900 dark:text-gray-100">{t('reminders.appointments.noAppointments')}</p>
+                        <p className="text-sm text-muted-foreground max-w-md">{t('reminders.appointments.createFirst')}</p>
                       </div>
-                    ) : (
-                      <>
-                        {/* Desktop Table View - hidden on mobile/tablet */}
-                        <div className="hidden lg:block overflow-x-auto">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead className="w-12">
-                                  <Checkbox
-                                    checked={isAllSelected}
-                                    onCheckedChange={handleSelectAll}
-                                    aria-label="Select all appointments"
-                                  />
-                                </TableHead>
-                                <TableHead
-                                  className="cursor-pointer hover:bg-muted/50 select-none"
-                                  onClick={() => handleSort('customer')}
-                                >
-                                  <div className="flex items-center">
-                                    {t('reminders.table.customer')}
-                                    <SortIcon column="customer" />
-                                  </div>
-                                </TableHead>
-                                <TableHead
-                                  className="cursor-pointer hover:bg-muted/50 select-none"
-                                  onClick={() => handleSort('title')}
-                                >
-                                  <div className="flex items-center">
-                                    {t('reminders.table.appointment')}
-                                    <SortIcon column="title" />
-                                  </div>
-                                </TableHead>
-                                <TableHead
-                                  className="cursor-pointer hover:bg-muted/50 select-none"
-                                  onClick={() => handleSort('date')}
-                                >
-                                  <div className="flex items-center">
-                                    {t('reminders.table.dateTime')}
-                                    <SortIcon column="date" />
-                                  </div>
-                                </TableHead>
-                                <TableHead
-                                  className="cursor-pointer hover:bg-muted/50 select-none"
-                                  onClick={() => handleSort('status')}
-                                >
-                                  <div className="flex items-center">
-                                    {t('reminders.table.status')}
-                                    <SortIcon column="status" />
-                                  </div>
-                                </TableHead>
-                                <TableHead>{t('reminders.table.reminder')}</TableHead>
-                                <TableHead>{t('reminders.table.actions')}</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {(appointmentsLoading || (searchQuery !== debouncedSearchQuery && appointments.length === 0)) ? (
-                                // Skeleton loading rows - only show on initial load or empty search transition
-                                Array.from({ length: 5 }).map((_, index) => (
-                                  <TableRow key={`skeleton-${index}`}>
-                                    <TableCell><Skeleton className="h-4 w-4" /></TableCell>
-                                    <TableCell>
-                                      <div className="space-y-2">
-                                        <Skeleton className="h-4 w-32" />
-                                        <Skeleton className="h-3 w-40" />
-                                      </div>
-                                    </TableCell>
-                                    <TableCell>
-                                      <div className="space-y-2">
-                                        <Skeleton className="h-4 w-28" />
-                                        <Skeleton className="h-3 w-24" />
-                                      </div>
-                                    </TableCell>
-                                    <TableCell>
-                                      <div className="space-y-2">
-                                        <Skeleton className="h-4 w-36" />
-                                        <Skeleton className="h-3 w-20" />
-                                      </div>
-                                    </TableCell>
-                                    <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
-                                    <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                                    <TableCell><Skeleton className="h-8 w-24" /></TableCell>
-                                  </TableRow>
-                                ))
-                              ) : (
-                                appointments.map((appointment) => {
-                                  const isPending = pendingAppointmentIds.has(appointment.id);
-                                  return (
-                                    <TableRow
-                                      key={appointment.id}
-                                      onClick={() => !isPending && handleViewAppointment(appointment)}
-                                      className={`${isPending ? 'opacity-70 pointer-events-none' : 'cursor-pointer'} ${isPending ? 'animate-pulse bg-muted/30' : ''}`}
-                                    >
-                                      <TableCell onClick={(event) => event.stopPropagation()}>
-                                        {isPending ? (
-                                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                                        ) : (
-                                          <Checkbox
-                                            checked={selectedAppointments.includes(appointment.id)}
-                                            onCheckedChange={(checked) => handleSelectAppointment(appointment.id, checked as boolean)}
-                                          />
-                                        )}
-                                      </TableCell>
-                                      <TableCell>
-                                        <div>
-                                          <p className="font-medium">{getCustomerName(appointment.customer)}</p>
-                                          <p className="text-sm text-gray-500">{appointment.customer?.email}</p>
-                                        </div>
-                                      </TableCell>
-                                      <TableCell>
-                                        <div>
-                                          <p className="font-medium">{appointment.title}</p>
-                                          {appointment.location && (
-                                            <p className="text-sm text-gray-500 flex items-center gap-1">
-                                              <MapPin className="h-3 w-3" />
-                                              {appointment.location}
-                                            </p>
-                                          )}
-                                        </div>
-                                      </TableCell>
-                                      <TableCell>
-                                        <div>
-                                          <p className="font-medium">{formatDateTime(appointment.appointmentDate)}</p>
-                                          <p className="text-sm text-gray-500 flex items-center gap-1">
-                                            <Timer className="h-3 w-3" />
-                                            {appointment.duration} {t('reminders.appointments.minutes')}
-                                          </p>
-                                        </div>
-                                      </TableCell>
-                                      <TableCell>
-                                        {isPending ? (
-                                          <Badge className="bg-blue-100 text-blue-800">
-                                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                                            Saving...
-                                          </Badge>
-                                        ) : (
-                                          <Badge className={getStatusColor(appointment.status)}>
-                                            {appointment.status.replace('_', ' ')}
-                                          </Badge>
-                                        )}
-                                      </TableCell>
-                                      <TableCell>
-                                        <div className="flex items-center gap-2">
-                                          {(isPending || pendingReminderAppointmentIds.has(appointment.id)) ? (
-                                            <div className="flex items-center gap-1 text-blue-600">
-                                              <Loader2 className="h-4 w-4 animate-spin" />
-                                              <span className="text-sm">Loading...</span>
-                                            </div>
-                                          ) : (() => {
-                                            // Check reminder records for this appointment
-                                            const appointmentReminders = reminders.filter(r => r.appointmentId === appointment.id);
-                                            const hasSentReminder = appointmentReminders.some(r => r.status === 'sent') || appointment.reminderSent;
-                                            const hasPendingReminder = appointmentReminders.some(r => r.status === 'pending');
-
-                                            if (hasSentReminder) {
-                                              return (
-                                                <div className="flex items-center gap-1 text-green-600">
-                                                  <CheckCircle className="h-4 w-4" />
-                                                  <span className="text-sm">{t('reminders.reminderHistory.sent')}</span>
-                                                </div>
-                                              );
-                                            } else if (hasPendingReminder) {
-                                              return (
-                                                <div className="flex items-center gap-1 text-blue-600">
-                                                  <Clock className="h-4 w-4" />
-                                                  <span className="text-sm">Scheduled</span>
-                                                </div>
-                                              );
-                                            } else {
-                                              return (
-                                                <div className="flex items-center gap-1 text-gray-400">
-                                                  <Clock className="h-4 w-4" />
-                                                  <span className="text-sm">{t('reminders.reminderHistory.notSet')}</span>
-                                                </div>
-                                              );
-                                            }
-                                          })()}
-                                        </div>
-                                      </TableCell>
-                                      <TableCell>
-                                        <div className="flex items-center gap-1">
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={(event) => {
-                                              event.stopPropagation();
-                                              handleEditAppointment(appointment);
-                                            }}
-                                          >
-                                            <Edit className="h-4 w-4" />
-                                          </Button>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={(event) => {
-                                              event.stopPropagation();
-                                              handleViewAppointment(appointment);
-                                            }}
-                                          >
-                                            <Eye className="h-4 w-4" />
-                                          </Button>
-                                          <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={(event) => event.stopPropagation()}
-                                              >
-                                                <MoreVertical className="h-4 w-4" />
-                                              </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent>
-                                              <DropdownMenuItem onClick={() => confirmAppointmentMutation.mutate(appointment.id)}>
-                                                <CheckCircle className="h-4 w-4 mr-2" />
-                                                Confirm Appointment
-                                              </DropdownMenuItem>
-                                              <DropdownMenuSeparator />
-                                              <DropdownMenuItem onClick={() => sendReminderMutation.mutate({ appointmentIds: [appointment.id] })}>
-                                                <Send className="h-4 w-4 mr-2" />
-                                                {t('reminders.actions.sendReminder')}
-                                              </DropdownMenuItem>
-                                              <DropdownMenuItem onClick={() => openScheduleReminder(appointment.id)}>
-                                                <Clock className="h-4 w-4 mr-2" />
-                                                {t('reminders.actions.scheduleReminder')}
-                                              </DropdownMenuItem>
-                                              <DropdownMenuSeparator />
-                                              <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleCancelAppointment(appointment.id); }}>
-                                                <Trash2 className="h-4 w-4 mr-2" />
-                                                Delete
-                                              </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                          </DropdownMenu>
-                                        </div>
-                                      </TableCell>
-                                    </TableRow>
-                                  );
-                                })
-                              )}
-                            </TableBody>
-                          </Table>
-                        </div>
-
-                        {/* Mobile/Tablet Card View - visible only on mobile/tablet */}
-                        <div className="lg:hidden space-y-4">
-                          {(appointmentsLoading || (searchQuery !== debouncedSearchQuery && appointments.length === 0)) ? (
-                            // Skeleton loading cards
-                            Array.from({ length: 3 }).map((_, index) => (
-                              <Card key={`skeleton-card-${index}`} className="overflow-hidden">
-                                <CardContent className="p-4">
-                                  <div className="space-y-3">
-                                    <div className="flex items-start justify-between">
-                                      <div className="flex items-start gap-3">
-                                        <Skeleton className="h-4 w-4 mt-1" />
-                                        <div className="space-y-2">
-                                          <Skeleton className="h-5 w-40" />
-                                          <Skeleton className="h-4 w-32" />
-                                          <Skeleton className="h-3 w-44" />
-                                        </div>
-                                      </div>
-                                      <Skeleton className="h-6 w-20 rounded-full" />
-                                    </div>
+                      <Button onClick={() => setNewAppointmentModalOpen(true)} className="mt-4 shadow-sm hover:shadow-md transition-all">
+                        <CalendarPlus className="h-4 w-4 mr-2" />
+                        {t('reminders.appointments.createAppointment')}
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Desktop Table View - hidden on mobile/tablet */}
+                      <div className="hidden lg:block overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-12">
+                                <Checkbox
+                                  checked={isAllSelected}
+                                  onCheckedChange={handleSelectAll}
+                                  aria-label="Select all appointments"
+                                />
+                              </TableHead>
+                              <TableHead
+                                className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                                onClick={() => handleSort('customer')}
+                              >
+                                <div className="flex items-center font-semibold">
+                                  {t('reminders.table.customer')}
+                                  <SortIcon column="customer" />
+                                </div>
+                              </TableHead>
+                              <TableHead
+                                className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                                onClick={() => handleSort('title')}
+                              >
+                                <div className="flex items-center font-semibold">
+                                  {t('reminders.table.appointment')}
+                                  <SortIcon column="title" />
+                                </div>
+                              </TableHead>
+                              <TableHead
+                                className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                                onClick={() => handleSort('date')}
+                              >
+                                <div className="flex items-center font-semibold">
+                                  {t('reminders.table.dateTime')}
+                                  <SortIcon column="date" />
+                                </div>
+                              </TableHead>
+                              <TableHead
+                                className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                                onClick={() => handleSort('status')}
+                              >
+                                <div className="flex items-center font-semibold">
+                                  {t('reminders.table.status')}
+                                  <SortIcon column="status" />
+                                </div>
+                              </TableHead>
+                              <TableHead className="font-semibold">{t('reminders.table.reminder')}</TableHead>
+                              <TableHead>{t('reminders.table.actions')}</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {(appointmentsLoading || (searchQuery !== debouncedSearchQuery && appointments.length === 0)) ? (
+                              // Skeleton loading rows - only show on initial load or empty search transition
+                              Array.from({ length: 5 }).map((_, index) => (
+                                <TableRow key={`skeleton-${index}`}>
+                                  <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                                  <TableCell>
                                     <div className="space-y-2">
-                                      <div className="flex items-center gap-2">
-                                        <Skeleton className="h-4 w-4" />
-                                        <Skeleton className="h-4 w-36" />
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <Skeleton className="h-4 w-4" />
-                                        <Skeleton className="h-4 w-24" />
-                                      </div>
+                                      <Skeleton className="h-4 w-32" />
+                                      <Skeleton className="h-3 w-40" />
                                     </div>
-                                    <div className="flex items-center justify-between pt-2">
-                                      <Skeleton className="h-4 w-20" />
-                                      <Skeleton className="h-8 w-8 rounded" />
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="space-y-2">
+                                      <Skeleton className="h-4 w-28" />
+                                      <Skeleton className="h-3 w-24" />
                                     </div>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            ))
-                          ) : (
-                            appointments.map((appointment) => {
-                              const isPending = pendingAppointmentIds.has(appointment.id);
-                              return (
-                                <Card
-                                  key={appointment.id}
-                                  className={`overflow-hidden ${isPending ? 'opacity-70 pointer-events-none animate-pulse' : 'cursor-pointer'}`}
-                                  onClick={() => !isPending && handleViewAppointment(appointment)}
-                                >
-                                  <CardContent className="p-4">
-                                    <div className="space-y-3">
-                                      {/* Header with checkbox and status */}
-                                      <div className="flex items-start justify-between">
-                                        <div className="flex items-start gap-3">
-                                          <div onClick={(event) => event.stopPropagation()}>
-                                            {isPending ? (
-                                              <Loader2 className="h-4 w-4 animate-spin text-primary mt-1" />
-                                            ) : (
-                                              <Checkbox
-                                                checked={selectedAppointments.includes(appointment.id)}
-                                                onCheckedChange={(checked) => handleSelectAppointment(appointment.id, checked as boolean)}
-                                                className="mt-1"
-                                              />
-                                            )}
-                                          </div>
-                                          <div className="flex-1">
-                                            <h3 className="font-semibold text-base">{appointment.title}</h3>
-                                            <p className="text-sm text-gray-600 dark:text-gray-400">{getCustomerName(appointment.customer)}</p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-500">{appointment.customer?.email}</p>
-                                          </div>
-                                        </div>
-                                        {isPending ? (
-                                          <Badge className="bg-blue-100 text-blue-800">
-                                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                                            Saving...
-                                          </Badge>
-                                        ) : (
-                                          <Badge className={getStatusColor(appointment.status)}>
-                                            {appointment.status.replace('_', ' ')}
-                                          </Badge>
-                                        )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="space-y-2">
+                                      <Skeleton className="h-4 w-36" />
+                                      <Skeleton className="h-3 w-20" />
+                                    </div>
+                                  </TableCell>
+                                  <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                                  <TableCell><Skeleton className="h-8 w-24" /></TableCell>
+                                </TableRow>
+                              ))
+                            ) : (
+                              appointments.map((appointment) => {
+                                const isPending = pendingAppointmentIds.has(appointment.id);
+                                return (
+                                  <TableRow
+                                    key={appointment.id}
+                                    onClick={() => !isPending && handleViewAppointment(appointment)}
+                                    className={`cursor-pointer hover:bg-muted/30 transition-colors border-b border-gray-100 dark:border-gray-800 ${isPending ? 'opacity-70 pointer-events-none' : ''}`}
+                                  >
+                                    <TableCell onClick={(event) => event.stopPropagation()}>
+                                      {isPending ? (
+                                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                      ) : (
+                                        <Checkbox
+                                          checked={selectedAppointments.includes(appointment.id)}
+                                          onCheckedChange={(checked) => handleSelectAppointment(appointment.id, checked as boolean)}
+                                        />
+                                      )}
+                                    </TableCell>
+                                    <TableCell>
+                                      <div>
+                                        <p className="font-medium">{getCustomerName(appointment.customer)}</p>
+                                        <p className="text-sm text-gray-500">{appointment.customer?.email}</p>
                                       </div>
-
-                                      {/* Appointment details */}
-                                      <div className="space-y-2 text-sm">
-                                        <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                                          <Calendar className="h-4 w-4 text-gray-500" />
-                                          <span>{formatDateTime(appointment.appointmentDate)}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                                          <Timer className="h-4 w-4 text-gray-500" />
-                                          <span>{appointment.duration} {t('reminders.appointments.minutes')}</span>
-                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div>
+                                        <p className="font-medium">{appointment.title}</p>
                                         {appointment.location && (
-                                          <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                                            <MapPin className="h-4 w-4 text-gray-500" />
-                                            <span>{appointment.location}</span>
-                                          </div>
+                                          <p className="text-sm text-gray-500 flex items-center gap-1">
+                                            <MapPin className="h-3 w-3" />
+                                            {appointment.location}
+                                          </p>
                                         )}
-
-                                        {/* Reminder status */}
-                                        <div className="flex items-center gap-2">
-                                          {(isPending || pendingReminderAppointmentIds.has(appointment.id)) ? (
-                                            <div className="flex items-center gap-1 text-blue-600">
-                                              <Loader2 className="h-4 w-4 animate-spin" />
-                                              <span className="text-sm">Loading...</span>
-                                            </div>
-                                          ) : (() => {
-                                            const appointmentReminders = reminders.filter(r => r.appointmentId === appointment.id);
-                                            const hasSentReminder = appointmentReminders.some(r => r.status === 'sent') || appointment.reminderSent;
-                                            const hasPendingReminder = appointmentReminders.some(r => r.status === 'pending');
-
-                                            if (hasSentReminder) {
-                                              return (
-                                                <div className="flex items-center gap-1 text-green-600">
-                                                  <CheckCircle className="h-4 w-4" />
-                                                  <span className="text-sm">{t('reminders.reminderHistory.sent')}</span>
-                                                </div>
-                                              );
-                                            } else if (hasPendingReminder) {
-                                              return (
-                                                <div className="flex items-center gap-1 text-blue-600">
-                                                  <Clock className="h-4 w-4" />
-                                                  <span className="text-sm">Scheduled</span>
-                                                </div>
-                                              );
-                                            } else {
-                                              return (
-                                                <div className="flex items-center gap-1 text-gray-400">
-                                                  <Clock className="h-4 w-4" />
-                                                  <span className="text-sm">{t('reminders.reminderHistory.notSet')}</span>
-                                                </div>
-                                              );
-                                            }
-                                          })()}
-                                        </div>
                                       </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div>
+                                        <p className="font-medium">{formatDateTime(appointment.appointmentDate)}</p>
+                                        <p className="text-sm text-gray-500 flex items-center gap-1">
+                                          <Timer className="h-3 w-3" />
+                                          {appointment.duration} {t('reminders.appointments.minutes')}
+                                        </p>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      {isPending ? (
+                                        <Badge className="bg-blue-100 text-blue-800">
+                                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                          Saving...
+                                        </Badge>
+                                      ) : (
+                                        <Badge className={getStatusColor(appointment.status)}>
+                                          {appointment.status.replace('_', ' ')}
+                                        </Badge>
+                                      )}
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex items-center gap-2">
+                                        {(isPending || pendingReminderAppointmentIds.has(appointment.id)) ? (
+                                          <div className="flex items-center gap-1 text-blue-600">
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            <span className="text-sm">Loading...</span>
+                                          </div>
+                                        ) : (() => {
+                                          // Check reminder records for this appointment
+                                          const appointmentReminders = reminders.filter(r => r.appointmentId === appointment.id);
+                                          const hasSentReminder = appointmentReminders.some(r => r.status === 'sent') || appointment.reminderSent;
+                                          const hasPendingReminder = appointmentReminders.some(r => r.status === 'pending');
 
-                                      {/* Actions */}
-                                      <div className="flex items-center gap-2 pt-2 border-t">
+                                          if (hasSentReminder) {
+                                            return (
+                                              <div className="flex items-center gap-1 text-green-600">
+                                                <CheckCircle className="h-4 w-4" />
+                                                <span className="text-sm">{t('reminders.reminderHistory.sent')}</span>
+                                              </div>
+                                            );
+                                          } else if (hasPendingReminder) {
+                                            return (
+                                              <div className="flex items-center gap-1 text-blue-600">
+                                                <Clock className="h-4 w-4" />
+                                                <span className="text-sm">Scheduled</span>
+                                              </div>
+                                            );
+                                          } else {
+                                            return (
+                                              <div className="flex items-center gap-1 text-gray-400">
+                                                <Clock className="h-4 w-4" />
+                                                <span className="text-sm">{t('reminders.reminderHistory.notSet')}</span>
+                                              </div>
+                                            );
+                                          }
+                                        })()}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex items-center gap-1">
                                         <Button
-                                          variant="outline"
+                                          variant="ghost"
                                           size="sm"
                                           onClick={(event) => {
                                             event.stopPropagation();
                                             handleEditAppointment(appointment);
                                           }}
-                                          className="flex-1"
                                         >
-                                          <Edit className="h-4 w-4 mr-2" />
-                                          Edit
+                                          <Edit className="h-4 w-4" />
                                         </Button>
                                         <Button
-                                          variant="outline"
+                                          variant="ghost"
                                           size="sm"
                                           onClick={(event) => {
                                             event.stopPropagation();
                                             handleViewAppointment(appointment);
                                           }}
-                                          className="flex-1"
                                         >
-                                          <Eye className="h-4 w-4 mr-2" />
-                                          View
+                                          <Eye className="h-4 w-4" />
                                         </Button>
                                         <DropdownMenu>
                                           <DropdownMenuTrigger asChild>
                                             <Button
-                                              variant="outline"
+                                              variant="ghost"
                                               size="sm"
                                               onClick={(event) => event.stopPropagation()}
                                             >
                                               <MoreVertical className="h-4 w-4" />
                                             </Button>
                                           </DropdownMenuTrigger>
-                                          <DropdownMenuContent align="end">
+                                          <DropdownMenuContent>
                                             <DropdownMenuItem onClick={() => confirmAppointmentMutation.mutate(appointment.id)}>
                                               <CheckCircle className="h-4 w-4 mr-2" />
                                               Confirm Appointment
@@ -2611,489 +2428,700 @@ export default function RemindersPage() {
                                           </DropdownMenuContent>
                                         </DropdownMenu>
                                       </div>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+
+                      {/* Mobile/Tablet Card View - visible only on mobile/tablet */}
+                      <div className="lg:hidden space-y-4">
+                        {(appointmentsLoading || (searchQuery !== debouncedSearchQuery && appointments.length === 0)) ? (
+                          // Skeleton loading cards
+                          Array.from({ length: 3 }).map((_, index) => (
+                            <Card key={`skeleton-card-${index}`} className="overflow-hidden shadow-sm animate-pulse">
+                              <CardContent className="p-4">
+                                <div className="space-y-3">
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex items-start gap-3">
+                                      <Skeleton className="h-4 w-4 mt-1" />
+                                      <div className="space-y-2">
+                                        <Skeleton className="h-5 w-40" />
+                                        <Skeleton className="h-4 w-32" />
+                                        <Skeleton className="h-3 w-44" />
+                                      </div>
                                     </div>
-                                  </CardContent>
-                                </Card>
-                              );
-                            })
-                          )}
-                        </div>
-                      </>
-                    )}
-
-                  </div>
-
-                  {/* Pagination Controls */}
-                  {allAppointments.length > 0 && (
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 border-t">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>Showing {startIndex + 1}-{Math.min(endIndex, totalAppointments)} of {totalAppointments}</span>
-                        <span className="hidden sm:inline">•</span>
-                        <div className="flex items-center gap-2">
-                          <span className="hidden sm:inline">Rows per page:</span>
-                          <Select value={pageSize.toString()} onValueChange={(value) => {
-                            setPageSize(Number(value));
-                            setCurrentPage(1);
-                          }}>
-                            <SelectTrigger className="w-[70px] h-8 focus-visible:ring-0">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="10">10</SelectItem>
-                              <SelectItem value="25">25</SelectItem>
-                              <SelectItem value="50">50</SelectItem>
-                              <SelectItem value="100">100</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(1)}
-                          disabled={currentPage === 1}
-                        >
-                          First
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                          disabled={currentPage === 1}
-                        >
-                          Previous
-                        </Button>
-                        <span className="text-sm px-2">
-                          Page {currentPage} of {totalPages}
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                          disabled={currentPage === totalPages}
-                        >
-                          Next
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(totalPages)}
-                          disabled={currentPage === totalPages}
-                        >
-                          Last
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="past" className="mt-0">
-                  {/* Past Appointments Search and Filter */}
-                  <div className="flex items-center gap-4 p-6 border-b">
-                    <div className="relative flex-1 max-w-sm">
-                      <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        placeholder="Search past appointments..."
-                        value={pastSearchQuery}
-                        onChange={(e) => setPastSearchQuery(e.target.value)}
-                        className="pl-10 pr-10"
-                      />
-                      {pastSearchQuery && (
-                        <button
-                          onClick={() => setPastSearchQuery("")}
-                          className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                          aria-label="Clear search"
-                        >
-                          <XCircle className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                    <Select value={pastStatusFilter} onValueChange={setPastStatusFilter}>
-                      <SelectTrigger className="w-48">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">{t('reminders.appointments.allStatuses')}</SelectItem>
-                        <SelectItem value="scheduled">{t('reminders.appointments.scheduled')}</SelectItem>
-                        <SelectItem value="confirmed">{t('reminders.appointments.confirmed')}</SelectItem>
-                        <SelectItem value="cancelled">{t('reminders.appointments.cancelled')}</SelectItem>
-                        <SelectItem value="completed">{t('reminders.appointments.completed')}</SelectItem>
-                        <SelectItem value="no_show">{t('reminders.appointments.noShow')}</SelectItem>
-                      </SelectContent>
-                    </Select>
-
-                    {/* Past Appointments Date Range Filter */}
-                    <Popover open={pastDateFilterOpen} onOpenChange={setPastDateFilterOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className={`flex items-center gap-2 ${(pastDateFrom || pastDateTo) ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''}`}
-                        >
-                          <Calendar className="h-4 w-4" />
-                          {(pastDateFrom || pastDateTo) ? (
-                            <span className="text-sm">
-                              {pastDateFrom ? pastDateFrom.toLocaleDateString() : '...'} - {pastDateTo ? pastDateTo.toLocaleDateString() : '...'}
-                            </span>
-                          ) : (
-                            <span className="text-sm">{t('reminders.appointments.filterByDate')}</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-3" align="start" sideOffset={5} avoidCollisions={true}>
-                        {/* Quick Date Range Presets for Past */}
-                        <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const today = new Date();
-                              today.setHours(23, 59, 59, 999);
-                              const oneWeekAgo = new Date(today);
-                              oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-                              oneWeekAgo.setHours(0, 0, 0, 0);
-                              setPastDateFrom(oneWeekAgo);
-                              setPastDateTo(today);
-                            }}
-                            className="text-xs"
-                          >
-                            Last Week
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const today = new Date();
-                              today.setHours(23, 59, 59, 999);
-                              const oneMonthAgo = new Date(today);
-                              oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-                              oneMonthAgo.setHours(0, 0, 0, 0);
-                              setPastDateFrom(oneMonthAgo);
-                              setPastDateTo(today);
-                            }}
-                            className="text-xs"
-                          >
-                            Last Month
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const today = new Date();
-                              today.setHours(23, 59, 59, 999);
-                              const threeMonthsAgo = new Date(today);
-                              threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-                              threeMonthsAgo.setHours(0, 0, 0, 0);
-                              setPastDateFrom(threeMonthsAgo);
-                              setPastDateTo(today);
-                            }}
-                            className="text-xs"
-                          >
-                            Last 3 Months
-                          </Button>
-                        </div>
-                        <div className="flex flex-col gap-3">
-                          <div className="flex flex-col gap-1">
-                            <Label className="text-xs font-medium">{t('reminders.appointments.fromDate')}</Label>
-                            <Input
-                              type="date"
-                              value={pastDateFrom ? pastDateFrom.toISOString().split('T')[0] : ''}
-                              max={pastDateTo ? pastDateTo.toISOString().split('T')[0] : undefined}
-                              onChange={(e) => {
-                                if (e.target.value) {
-                                  const date = new Date(e.target.value + 'T00:00:00');
-                                  setPastDateFrom(date);
-                                } else {
-                                  setPastDateFrom(undefined);
-                                }
-                              }}
-                              className="w-full"
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <Label className="text-xs font-medium">{t('reminders.appointments.toDate')}</Label>
-                            <Input
-                              type="date"
-                              value={pastDateTo ? pastDateTo.toISOString().split('T')[0] : ''}
-                              min={pastDateFrom ? pastDateFrom.toISOString().split('T')[0] : undefined}
-                              onChange={(e) => {
-                                if (e.target.value) {
-                                  const date = new Date(e.target.value + 'T23:59:59');
-                                  setPastDateTo(date);
-                                } else {
-                                  setPastDateTo(undefined);
-                                }
-                              }}
-                              className="w-full"
-                            />
-                          </div>
-                        </div>
-                        {(pastDateFrom || pastDateTo) && (
-                          <div className="mt-4 pt-4 border-t">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setPastDateFrom(undefined);
-                                setPastDateTo(undefined);
-                                setPastDateFilterOpen(false);
-                              }}
-                              className="w-full"
-                            >
-                              <XCircle className="h-4 w-4 mr-2" />
-                              {t('reminders.appointments.clearDates')}
-                            </Button>
-                          </div>
-                        )}
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  <div className="min-h-[400px]">
-                    {(appointmentsLoading || pastSearchQuery !== debouncedPastSearchQuery) ? (
-                      <div className="flex items-center justify-center py-12 min-h-[400px]">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
-                      </div>
-                    ) : pastAppointments.length === 0 ? (
-                      <div className="text-center py-12 min-h-[400px] flex flex-col items-center justify-center">
-                        <Clock className="h-12 w-12 text-gray-400 mb-4" />
-                        <p className="text-gray-600 dark:text-gray-400">
-                          {(debouncedPastSearchQuery || pastStatusFilter !== 'all' || pastDateFrom || pastDateTo)
-                            ? 'No past appointments found matching your filters'
-                            : 'No past appointments'}
-                        </p>
-                        {(debouncedPastSearchQuery || pastStatusFilter !== 'all' || pastDateFrom || pastDateTo) && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setPastSearchQuery("");
-                              setPastStatusFilter("all");
-                              setPastDateFrom(undefined);
-                              setPastDateTo(undefined);
-                            }}
-                            className="mt-4"
-                          >
-                            Clear filters
-                          </Button>
-                        )}
-                      </div>
-                    ) : (
-                      <>
-                        {/* Desktop Table View */}
-                        <div className="hidden lg:block overflow-x-auto">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead
-                                  className="cursor-pointer hover:bg-muted/50 select-none"
-                                  onClick={() => handlePastSort('customer')}
-                                >
-                                  <div className="flex items-center">
-                                    {t('reminders.table.customer')}
-                                    <PastSortIcon column="customer" />
+                                    <Skeleton className="h-6 w-20 rounded-full" />
                                   </div>
-                                </TableHead>
-                                <TableHead
-                                  className="cursor-pointer hover:bg-muted/50 select-none"
-                                  onClick={() => handlePastSort('title')}
-                                >
-                                  <div className="flex items-center">
-                                    {t('reminders.table.appointment')}
-                                    <PastSortIcon column="title" />
-                                  </div>
-                                </TableHead>
-                                <TableHead
-                                  className="cursor-pointer hover:bg-muted/50 select-none"
-                                  onClick={() => handlePastSort('date')}
-                                >
-                                  <div className="flex items-center">
-                                    {t('reminders.table.dateTime')}
-                                    <PastSortIcon column="date" />
-                                  </div>
-                                </TableHead>
-                                <TableHead
-                                  className="cursor-pointer hover:bg-muted/50 select-none"
-                                  onClick={() => handlePastSort('status')}
-                                >
-                                  <div className="flex items-center">
-                                    {t('reminders.table.status')}
-                                    <PastSortIcon column="status" />
-                                  </div>
-                                </TableHead>
-                                <TableHead>{t('reminders.table.actions')}</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {pastAppointments.map((appointment) => (
-                                <TableRow
-                                  key={appointment.id}
-                                  onClick={() => handleViewAppointment(appointment)}
-                                  className="cursor-pointer"
-                                >
-                                  <TableCell>
-                                    <div>
-                                      <p className="font-medium">{getCustomerName(appointment.customer)}</p>
-                                      <p className="text-sm text-gray-500">{appointment.customer?.email}</p>
+                                  <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                      <Skeleton className="h-4 w-4" />
+                                      <Skeleton className="h-4 w-36" />
                                     </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div>
-                                      <p className="font-medium">{appointment.title}</p>
-                                      {appointment.location && (
-                                        <p className="text-sm text-gray-500 flex items-center gap-1">
-                                          <MapPin className="h-3 w-3" />
-                                          {appointment.location}
-                                        </p>
+                                    <div className="flex items-center gap-2">
+                                      <Skeleton className="h-4 w-4" />
+                                      <Skeleton className="h-4 w-24" />
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between pt-2">
+                                    <Skeleton className="h-4 w-20" />
+                                    <Skeleton className="h-8 w-8 rounded" />
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))
+                        ) : (
+                          appointments.map((appointment) => {
+                            const isPending = pendingAppointmentIds.has(appointment.id);
+                            return (
+                              <Card
+                                key={appointment.id}
+                                className={`overflow-hidden shadow-sm hover:shadow-md transition-all border border-gray-200 dark:border-gray-700 ${isPending ? 'opacity-70 pointer-events-none animate-pulse' : 'cursor-pointer'}`}
+                                onClick={() => !isPending && handleViewAppointment(appointment)}
+                              >
+                                <CardContent className="p-4">
+                                  <div className="space-y-3">
+                                    {/* Header with checkbox and status */}
+                                    <div className="flex items-start justify-between">
+                                      <div className="flex items-start gap-3">
+                                        <div onClick={(event) => event.stopPropagation()}>
+                                          {isPending ? (
+                                            <Loader2 className="h-4 w-4 animate-spin text-primary mt-1" />
+                                          ) : (
+                                            <Checkbox
+                                              checked={selectedAppointments.includes(appointment.id)}
+                                              onCheckedChange={(checked) => handleSelectAppointment(appointment.id, checked as boolean)}
+                                              className="mt-1"
+                                            />
+                                          )}
+                                        </div>
+                                        <div className="flex-1">
+                                          <h3 className="font-semibold text-base">{appointment.title}</h3>
+                                          <p className="text-sm text-gray-600 dark:text-gray-400">{getCustomerName(appointment.customer)}</p>
+                                          <p className="text-xs text-gray-500 dark:text-gray-500">{appointment.customer?.email}</p>
+                                        </div>
+                                      </div>
+                                      {isPending ? (
+                                        <Badge className="bg-blue-100 text-blue-800">
+                                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                          Saving...
+                                        </Badge>
+                                      ) : (
+                                        <Badge className={getStatusColor(appointment.status)}>
+                                          {appointment.status.replace('_', ' ')}
+                                        </Badge>
                                       )}
                                     </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div>
-                                      <p className="font-medium">{formatDateTime(appointment.appointmentDate)}</p>
-                                      <p className="text-sm text-gray-500 flex items-center gap-1">
-                                        <Timer className="h-3 w-3" />
-                                        {appointment.duration} {t('reminders.appointments.minutes')}
-                                      </p>
+
+                                    {/* Appointment details */}
+                                    <div className="space-y-2 text-sm">
+                                      <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                                        <Calendar className="h-4 w-4 text-gray-500" />
+                                        <span>{formatDateTime(appointment.appointmentDate)}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                                        <Timer className="h-4 w-4 text-gray-500" />
+                                        <span>{appointment.duration} {t('reminders.appointments.minutes')}</span>
+                                      </div>
+                                      {appointment.location && (
+                                        <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                                          <MapPin className="h-4 w-4 text-gray-500" />
+                                          <span>{appointment.location}</span>
+                                        </div>
+                                      )}
+
+                                      {/* Reminder status */}
+                                      <div className="flex items-center gap-2">
+                                        {(isPending || pendingReminderAppointmentIds.has(appointment.id)) ? (
+                                          <div className="flex items-center gap-1 text-blue-600">
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            <span className="text-sm">Loading...</span>
+                                          </div>
+                                        ) : (() => {
+                                          const appointmentReminders = reminders.filter(r => r.appointmentId === appointment.id);
+                                          const hasSentReminder = appointmentReminders.some(r => r.status === 'sent') || appointment.reminderSent;
+                                          const hasPendingReminder = appointmentReminders.some(r => r.status === 'pending');
+
+                                          if (hasSentReminder) {
+                                            return (
+                                              <div className="flex items-center gap-1 text-green-600">
+                                                <CheckCircle className="h-4 w-4" />
+                                                <span className="text-sm">{t('reminders.reminderHistory.sent')}</span>
+                                              </div>
+                                            );
+                                          } else if (hasPendingReminder) {
+                                            return (
+                                              <div className="flex items-center gap-1 text-blue-600">
+                                                <Clock className="h-4 w-4" />
+                                                <span className="text-sm">Scheduled</span>
+                                              </div>
+                                            );
+                                          } else {
+                                            return (
+                                              <div className="flex items-center gap-1 text-gray-400">
+                                                <Clock className="h-4 w-4" />
+                                                <span className="text-sm">{t('reminders.reminderHistory.notSet')}</span>
+                                              </div>
+                                            );
+                                          }
+                                        })()}
+                                      </div>
                                     </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge className={getStatusColor(appointment.status)}>
-                                      {appointment.status.replace('_', ' ')}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="flex items-center gap-1">
+
+                                    {/* Actions */}
+                                    <div className="flex items-center gap-2 pt-2 border-t">
                                       <Button
-                                        variant="ghost"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          handleEditAppointment(appointment);
+                                        }}
+                                        className="flex-1"
+                                      >
+                                        <Edit className="h-4 w-4 mr-2" />
+                                        Edit
+                                      </Button>
+                                      <Button
+                                        variant="outline"
                                         size="sm"
                                         onClick={(event) => {
                                           event.stopPropagation();
                                           handleViewAppointment(appointment);
                                         }}
+                                        className="flex-1"
                                       >
-                                        <Eye className="h-4 w-4" />
+                                        <Eye className="h-4 w-4 mr-2" />
+                                        View
                                       </Button>
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={(event) => event.stopPropagation()}
+                                          >
+                                            <MoreVertical className="h-4 w-4" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                          <DropdownMenuItem onClick={() => confirmAppointmentMutation.mutate(appointment.id)}>
+                                            <CheckCircle className="h-4 w-4 mr-2" />
+                                            Confirm Appointment
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem onClick={() => sendReminderMutation.mutate({ appointmentIds: [appointment.id] })}>
+                                            <Send className="h-4 w-4 mr-2" />
+                                            {t('reminders.actions.sendReminder')}
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => openScheduleReminder(appointment.id)}>
+                                            <Clock className="h-4 w-4 mr-2" />
+                                            {t('reminders.actions.scheduleReminder')}
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleCancelAppointment(appointment.id); }}>
+                                            <Trash2 className="h-4 w-4 mr-2" />
+                                            Delete
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
                                     </div>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-
-                        {/* Mobile/Tablet Card View */}
-                        <div className="lg:hidden space-y-4 p-4">
-                          {pastAppointments.map((appointment) => (
-                            <Card
-                              key={appointment.id}
-                              className="overflow-hidden cursor-pointer"
-                              onClick={() => handleViewAppointment(appointment)}
-                            >
-                              <CardContent className="p-4">
-                                <div className="space-y-3">
-                                  <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                      <h3 className="font-semibold text-base">{appointment.title}</h3>
-                                      <p className="text-sm text-gray-600 dark:text-gray-400">{getCustomerName(appointment.customer)}</p>
-                                      <p className="text-xs text-gray-500 dark:text-gray-500">{appointment.customer?.email}</p>
-                                    </div>
-                                    <Badge className={getStatusColor(appointment.status)}>
-                                      {appointment.status.replace('_', ' ')}
-                                    </Badge>
                                   </div>
-                                  <div className="space-y-2 text-sm">
-                                    <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                                      <Calendar className="h-4 w-4 text-gray-500" />
-                                      <span>{formatDateTime(appointment.appointmentDate)}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                                      <Timer className="h-4 w-4 text-gray-500" />
-                                      <span>{appointment.duration} {t('reminders.appointments.minutes')}</span>
-                                    </div>
-                                    {appointment.location && (
-                                      <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                                        <MapPin className="h-4 w-4 text-gray-500" />
-                                        <span>{appointment.location}</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Pagination Controls for Past Appointments */}
-                  {pastAppointmentsAll.length > 0 && (
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 border-t">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>Showing {pastStartIndex + 1}-{Math.min(pastEndIndex, totalPastAppointments)} of {totalPastAppointments}</span>
-                        <span className="hidden sm:inline">•</span>
-                        <div className="flex items-center gap-2">
-                          <span className="hidden sm:inline">Rows per page:</span>
-                          <Select value={pastPageSize.toString()} onValueChange={(value) => {
-                            setPastPageSize(Number(value));
-                            setPastCurrentPage(1);
-                          }}>
-                            <SelectTrigger className="w-[70px] h-8 focus-visible:ring-0">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="10">10</SelectItem>
-                              <SelectItem value="25">25</SelectItem>
-                              <SelectItem value="50">50</SelectItem>
-                              <SelectItem value="100">100</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })
+                        )}
                       </div>
+                    </>
+                  )}
+
+                </div>
+
+                {/* Pagination Controls */}
+                {totalAppointments > 0 && (
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 border-t">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>Showing {startIndex + 1}-{Math.min(endIndex, totalAppointments)} of {totalAppointments}</span>
+                      <span className="hidden sm:inline">•</span>
                       <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setPastCurrentPage(1)}
-                          disabled={pastCurrentPage === 1}
-                        >
-                          First
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setPastCurrentPage(prev => Math.max(1, prev - 1))}
-                          disabled={pastCurrentPage === 1}
-                        >
-                          Previous
-                        </Button>
-                        <span className="text-sm px-2">
-                          Page {pastCurrentPage} of {totalPastPages}
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setPastCurrentPage(prev => Math.min(totalPastPages, prev + 1))}
-                          disabled={pastCurrentPage === totalPastPages}
-                        >
-                          Next
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setPastCurrentPage(totalPastPages)}
-                          disabled={pastCurrentPage === totalPastPages}
-                        >
-                          Last
-                        </Button>
+                        <span className="hidden sm:inline">Rows per page:</span>
+                        <Select value={pageSize.toString()} onValueChange={(value) => {
+                          setPageSize(Number(value));
+                          setCurrentPage(1);
+                        }}>
+                          <SelectTrigger className="w-[70px] h-8 focus-visible:ring-0">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="10">10</SelectItem>
+                            <SelectItem value="25">25</SelectItem>
+                            <SelectItem value="50">50</SelectItem>
+                            <SelectItem value="100">100</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(1)}
+                        disabled={currentPage === 1}
+                      >
+                        First
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <span className="text-sm px-2">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage >= totalPages || totalPages === 0}
+                      >
+                        Next
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(totalPages)}
+                        disabled={currentPage >= totalPages || totalPages === 0}
+                      >
+                        Last
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="past" className="mt-0">
+                {/* Past Appointments Search and Filter */}
+                <div className="flex items-center gap-4 p-6 border-b">
+                  <div className="relative flex-1 max-w-sm">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search past appointments..."
+                      value={pastSearchQuery}
+                      onChange={(e) => setPastSearchQuery(e.target.value)}
+                      className="pl-10 pr-10"
+                    />
+                    {pastSearchQuery && (
+                      <button
+                        onClick={() => setPastSearchQuery("")}
+                        className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                        aria-label="Clear search"
+                      >
+                        <XCircle className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  <Select value={pastStatusFilter} onValueChange={setPastStatusFilter}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t('reminders.appointments.allStatuses')}</SelectItem>
+                      <SelectItem value="scheduled">{t('reminders.appointments.scheduled')}</SelectItem>
+                      <SelectItem value="confirmed">{t('reminders.appointments.confirmed')}</SelectItem>
+                      <SelectItem value="cancelled">{t('reminders.appointments.cancelled')}</SelectItem>
+                      <SelectItem value="completed">{t('reminders.appointments.completed')}</SelectItem>
+                      <SelectItem value="no_show">{t('reminders.appointments.noShow')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {/* Past Appointments Date Range Filter */}
+                  <Popover open={pastDateFilterOpen} onOpenChange={setPastDateFilterOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={`flex items-center gap-2 ${(pastDateFrom || pastDateTo) ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                      >
+                        <Calendar className="h-4 w-4" />
+                        {(pastDateFrom || pastDateTo) ? (
+                          <span className="text-sm">
+                            {pastDateFrom ? pastDateFrom.toLocaleDateString() : '...'} - {pastDateTo ? pastDateTo.toLocaleDateString() : '...'}
+                          </span>
+                        ) : (
+                          <span className="text-sm">{t('reminders.appointments.filterByDate')}</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-3" align="start" sideOffset={5} avoidCollisions={true}>
+                      {/* Quick Date Range Presets for Past */}
+                      <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const today = new Date();
+                            today.setHours(23, 59, 59, 999);
+                            const oneWeekAgo = new Date(today);
+                            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+                            oneWeekAgo.setHours(0, 0, 0, 0);
+                            setPastDateFrom(oneWeekAgo);
+                            setPastDateTo(today);
+                          }}
+                          className="text-xs"
+                        >
+                          Last Week
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const today = new Date();
+                            today.setHours(23, 59, 59, 999);
+                            const oneMonthAgo = new Date(today);
+                            oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+                            oneMonthAgo.setHours(0, 0, 0, 0);
+                            setPastDateFrom(oneMonthAgo);
+                            setPastDateTo(today);
+                          }}
+                          className="text-xs"
+                        >
+                          Last Month
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const today = new Date();
+                            today.setHours(23, 59, 59, 999);
+                            const threeMonthsAgo = new Date(today);
+                            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+                            threeMonthsAgo.setHours(0, 0, 0, 0);
+                            setPastDateFrom(threeMonthsAgo);
+                            setPastDateTo(today);
+                          }}
+                          className="text-xs"
+                        >
+                          Last 3 Months
+                        </Button>
+                      </div>
+                      <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-1">
+                          <Label className="text-xs font-medium">{t('reminders.appointments.fromDate')}</Label>
+                          <Input
+                            type="date"
+                            value={pastDateFrom ? pastDateFrom.toISOString().split('T')[0] : ''}
+                            max={pastDateTo ? pastDateTo.toISOString().split('T')[0] : undefined}
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                const date = new Date(e.target.value + 'T00:00:00');
+                                setPastDateFrom(date);
+                              } else {
+                                setPastDateFrom(undefined);
+                              }
+                            }}
+                            className="w-full"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <Label className="text-xs font-medium">{t('reminders.appointments.toDate')}</Label>
+                          <Input
+                            type="date"
+                            value={pastDateTo ? pastDateTo.toISOString().split('T')[0] : ''}
+                            min={pastDateFrom ? pastDateFrom.toISOString().split('T')[0] : undefined}
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                const date = new Date(e.target.value + 'T23:59:59');
+                                setPastDateTo(date);
+                              } else {
+                                setPastDateTo(undefined);
+                              }
+                            }}
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+                      {(pastDateFrom || pastDateTo) && (
+                        <div className="mt-4 pt-4 border-t">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setPastDateFrom(undefined);
+                              setPastDateTo(undefined);
+                              setPastDateFilterOpen(false);
+                            }}
+                            className="w-full"
+                          >
+                            <XCircle className="h-4 w-4 mr-2" />
+                            {t('reminders.appointments.clearDates')}
+                          </Button>
+                        </div>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="min-h-[400px]">
+                  {(appointmentsLoading || pastSearchQuery !== debouncedPastSearchQuery) ? (
+                    <div className="flex items-center justify-center py-12 min-h-[400px]">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
+                    </div>
+                  ) : pastAppointments.length === 0 ? (
+                    <div className="text-center py-16 min-h-[400px] flex flex-col items-center justify-center space-y-4">
+                      <div className="p-4 rounded-full bg-gray-100 dark:bg-gray-800">
+                        <Clock className="h-16 w-16 text-gray-400" />
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                          {(debouncedPastSearchQuery || pastStatusFilter !== 'all' || pastDateFrom || pastDateTo)
+                            ? 'No past appointments found'
+                            : 'No past appointments'}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {(debouncedPastSearchQuery || pastStatusFilter !== 'all' || pastDateFrom || pastDateTo)
+                            ? 'Try adjusting your filters to see more results'
+                            : 'Past appointments will appear here'}
+                        </p>
+                      </div>
+                      {(debouncedPastSearchQuery || pastStatusFilter !== 'all' || pastDateFrom || pastDateTo) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setPastSearchQuery("");
+                            setPastStatusFilter("all");
+                            setPastDateFrom(undefined);
+                            setPastDateTo(undefined);
+                          }}
+                          className="mt-4 hover:bg-muted/50 transition-colors"
+                        >
+                          <XCircle className="h-4 w-4 mr-2" />
+                          Clear filters
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      {/* Desktop Table View */}
+                      <div className="hidden lg:block overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead
+                                className="cursor-pointer hover:bg-muted/50 select-none"
+                                onClick={() => handlePastSort('customer')}
+                              >
+                                <div className="flex items-center">
+                                  {t('reminders.table.customer')}
+                                  <PastSortIcon column="customer" />
+                                </div>
+                              </TableHead>
+                              <TableHead
+                                className="cursor-pointer hover:bg-muted/50 select-none"
+                                onClick={() => handlePastSort('title')}
+                              >
+                                <div className="flex items-center">
+                                  {t('reminders.table.appointment')}
+                                  <PastSortIcon column="title" />
+                                </div>
+                              </TableHead>
+                              <TableHead
+                                className="cursor-pointer hover:bg-muted/50 select-none"
+                                onClick={() => handlePastSort('date')}
+                              >
+                                <div className="flex items-center">
+                                  {t('reminders.table.dateTime')}
+                                  <PastSortIcon column="date" />
+                                </div>
+                              </TableHead>
+                              <TableHead
+                                className="cursor-pointer hover:bg-muted/50 select-none"
+                                onClick={() => handlePastSort('status')}
+                              >
+                                <div className="flex items-center">
+                                  {t('reminders.table.status')}
+                                  <PastSortIcon column="status" />
+                                </div>
+                              </TableHead>
+                              <TableHead>{t('reminders.table.actions')}</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {pastAppointments.map((appointment) => (
+                              <TableRow
+                                key={appointment.id}
+                                onClick={() => handleViewAppointment(appointment)}
+                                className="cursor-pointer hover:bg-muted/30 transition-colors border-b border-gray-100 dark:border-gray-800"
+                              >
+                                <TableCell>
+                                  <div>
+                                    <p className="font-medium">{getCustomerName(appointment.customer)}</p>
+                                    <p className="text-sm text-gray-500">{appointment.customer?.email}</p>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div>
+                                    <p className="font-medium">{appointment.title}</p>
+                                    {appointment.location && (
+                                      <p className="text-sm text-gray-500 flex items-center gap-1">
+                                        <MapPin className="h-3 w-3" />
+                                        {appointment.location}
+                                      </p>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div>
+                                    <p className="font-medium">{formatDateTime(appointment.appointmentDate)}</p>
+                                    <p className="text-sm text-gray-500 flex items-center gap-1">
+                                      <Timer className="h-3 w-3" />
+                                      {appointment.duration} {t('reminders.appointments.minutes')}
+                                    </p>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge className={getStatusColor(appointment.status)}>
+                                    {appointment.status.replace('_', ' ')}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        handleViewAppointment(appointment);
+                                      }}
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+
+                      {/* Mobile/Tablet Card View */}
+                      <div className="lg:hidden space-y-4 p-4 lg:p-6">
+                        {pastAppointments.map((appointment) => (
+                          <Card
+                            key={appointment.id}
+                            className="overflow-hidden cursor-pointer shadow-sm hover:shadow-md transition-all border border-gray-200 dark:border-gray-700"
+                            onClick={() => handleViewAppointment(appointment)}
+                          >
+                            <CardContent className="p-4">
+                              <div className="space-y-3">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <h3 className="font-semibold text-base">{appointment.title}</h3>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">{getCustomerName(appointment.customer)}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-500">{appointment.customer?.email}</p>
+                                  </div>
+                                  <Badge className={getStatusColor(appointment.status)}>
+                                    {appointment.status.replace('_', ' ')}
+                                  </Badge>
+                                </div>
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                                    <Calendar className="h-4 w-4 text-gray-500" />
+                                    <span>{formatDateTime(appointment.appointmentDate)}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                                    <Timer className="h-4 w-4 text-gray-500" />
+                                    <span>{appointment.duration} {t('reminders.appointments.minutes')}</span>
+                                  </div>
+                                  {appointment.location && (
+                                    <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                                      <MapPin className="h-4 w-4 text-gray-500" />
+                                      <span>{appointment.location}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </>
                   )}
-                </TabsContent>
-              </Tabs>
-            </CardContent>
+                </div>
+
+                {/* Pagination Controls for Past Appointments */}
+                {totalPastAppointments > 0 && (
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 border-t">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>Showing {pastStartIndex + 1}-{Math.min(pastEndIndex, totalPastAppointments)} of {totalPastAppointments}</span>
+                      <span className="hidden sm:inline">•</span>
+                      <div className="flex items-center gap-2">
+                        <span className="hidden sm:inline">Rows per page:</span>
+                        <Select value={pastPageSize.toString()} onValueChange={(value) => {
+                          setPastPageSize(Number(value));
+                          setPastCurrentPage(1);
+                        }}>
+                          <SelectTrigger className="w-[70px] h-8 focus-visible:ring-0">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="10">10</SelectItem>
+                            <SelectItem value="25">25</SelectItem>
+                            <SelectItem value="50">50</SelectItem>
+                            <SelectItem value="100">100</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPastCurrentPage(1)}
+                        disabled={pastCurrentPage === 1}
+                      >
+                        First
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPastCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={pastCurrentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <span className="text-sm px-2">
+                        Page {pastCurrentPage} of {totalPastPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPastCurrentPage(prev => Math.min(totalPastPages, prev + 1))}
+                        disabled={pastCurrentPage === totalPastPages}
+                      >
+                        Next
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPastCurrentPage(totalPastPages)}
+                        disabled={pastCurrentPage === totalPastPages}
+                      >
+                        Last
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </Card>
         </div>
 
@@ -4313,4 +4341,3 @@ export default function RemindersPage() {
     </div>
   );
 }
-
