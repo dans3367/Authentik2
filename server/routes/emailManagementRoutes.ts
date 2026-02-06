@@ -1425,16 +1425,6 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       }
     }
 
-    // Ensure unsubscribe token exists (long-lived until used)
-    let unsub = await db.query.unsubscribeTokens.findFirst({
-      where: and(eq(unsubscribeTokens.tenantId, req.user.tenantId), eq(unsubscribeTokens.contactId, id), sql`${unsubscribeTokens.usedAt} IS NULL`),
-    });
-    if (!unsub) {
-      const token = crypto.randomBytes(24).toString('base64url');
-      const created = await db.insert(unsubscribeTokens).values({ tenantId: req.user.tenantId, contactId: id, token }).returning();
-      unsub = created[0];
-    }
-
     const scheduleDate = new Date(scheduleAt);
     if (isNaN(scheduleDate.getTime())) {
       return res.status(400).json({ message: 'Invalid scheduleAt date' });
@@ -3927,17 +3917,6 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       }
     }
 
-    // Generate or reuse unsubscribe token
-    let unsub = await db.query.unsubscribeTokens.findFirst({
-      where: and(eq(unsubscribeTokens.tenantId, tenantId), eq(unsubscribeTokens.contactId, contact.id), sql`${unsubscribeTokens.usedAt} IS NULL`),
-    });
-    if (!unsub) {
-      const token = crypto.randomBytes(24).toString('base64url');
-      const created = await db.insert(unsubscribeTokens).values({ tenantId, contactId: contact.id, token }).returning();
-      unsub = created[0];
-    }
-    const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(unsub.token)}&type=marketing`;
-
     // Build social links HTML if available
     let socialLinksHtml = '';
     if (design.socialLinks) {
@@ -4012,8 +3991,6 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
               <div style="font-size: 12px; line-height: 1.5; color: #94a3b8;">
                 <p style="margin: 0;">
                   Sent via ${design.displayCompanyName}
-                  <br>
-                  <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
                 </p>
               </div>
             </div>
@@ -4035,11 +4012,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
         to: contact.email,
         subject: subject,
         html: htmlContent,
-        text: `${content}\n\nUnsubscribe: ${unsubscribeUrl}`,
-        headers: {
-          'List-Unsubscribe': `<${unsubscribeUrl}>`,
-          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
-        },
+        text: content,
         metadata: {
           type: 'individual_contact_email',
           contactId: contact.id,
