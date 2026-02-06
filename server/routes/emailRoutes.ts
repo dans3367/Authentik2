@@ -177,9 +177,6 @@ emailRoutes.post('/unsubscribe/preferences', async (req, res) => {
           occurredAt: now,
         });
       }
-      occurredAt: now,
-        });
-      }
     }
 
 return res.json({ success: true });
