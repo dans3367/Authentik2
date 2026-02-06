@@ -49,7 +49,6 @@ interface Contact {
   consentMethod?: string | null;
   consentIpAddress?: string | null;
   // Email preferences (segmented unsubscribe)
-  prefTransactional?: boolean;
   prefMarketing?: boolean;
   prefCustomerEngagement?: boolean;
   prefNewsletters?: boolean;
@@ -667,7 +666,6 @@ export default function ViewContact() {
             </CardHeader>
             <CardContent className="space-y-3">
               {[
-                { label: 'Transactional', value: contact.prefTransactional, desc: 'Receipts & confirmations' },
                 { label: 'Marketing', value: contact.prefMarketing, desc: 'Promotions & offers' },
                 { label: 'Customer Engagement', value: contact.prefCustomerEngagement, desc: 'Birthday & loyalty' },
                 { label: 'Newsletters', value: contact.prefNewsletters, desc: 'Updates & digests' },

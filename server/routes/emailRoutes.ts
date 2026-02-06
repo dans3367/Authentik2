@@ -139,7 +139,7 @@ emailRoutes.post('/unsubscribe/preferences', async (req, res) => {
         if (!preferences.surveysForms) changedCategories.push('surveys_forms');
       }
 
-      // Determine if all non-transactional categories are opted out
+      // Determine if all categories are opted out
       const contact = await db.query.emailContacts.findFirst({
         where: and(eq(emailContacts.id, tokenRow.contactId), eq(emailContacts.tenantId, tokenRow.tenantId)),
         columns: { status: true, prefMarketing: true, prefCustomerEngagement: true, prefNewsletters: true, prefSurveysForms: true },
@@ -309,7 +309,6 @@ emailRoutes.get('/unsubscribe', async (req, res) => {
       columns: {
         email: true,
         firstName: true,
-        prefTransactional: true,
         prefMarketing: true,
         prefCustomerEngagement: true,
         prefNewsletters: true,
@@ -334,7 +333,6 @@ emailRoutes.get('/unsubscribe', async (req, res) => {
       customer_engagement: 'Customer Engagement',
       newsletters: 'Newsletters',
       surveys_forms: 'Surveys & Forms',
-      transactional: 'Transactional',
     };
     const highlightLabel = typeLabels[emailType] || '';
 
@@ -368,7 +366,6 @@ emailRoutes.get('/unsubscribe', async (req, res) => {
     .toggle .slider:before { content: ''; position: absolute; height: 20px; width: 20px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.25s; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
     .toggle input:checked + .slider { background: #3b82f6; }
     .toggle input:checked + .slider:before { transform: translateX(22px); }
-    .transactional-note { font-size: 11px; color: #94a3b8; font-style: italic; }
     .actions { display: flex; flex-direction: column; gap: 10px; }
     .btn { display: block; width: 100%; padding: 13px; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; }
     .btn-primary { background: #3b82f6; color: white; }
@@ -434,26 +431,18 @@ emailRoutes.get('/unsubscribe', async (req, res) => {
             </div>
             <label class="toggle"><input type="checkbox" id="pref_surveys_forms" ${contact.prefSurveysForms ? 'checked' : ''}><span class="slider"></span></label>
           </div>
-          <div class="pref-item">
-            <div class="pref-info">
-              <div class="pref-label">Transactional</div>
-              <div class="pref-desc">Appointment confirmations, receipts, and account notifications</div>
-              <div class="transactional-note">Required for service — cannot be disabled</div>
-            </div>
-            <label class="toggle"><input type="checkbox" checked disabled><span class="slider"></span></label>
-          </div>
         </div>
         <div class="actions">
-          <button class="btn btn-primary" id="saveBtn" onclick="savePreferences()">Save Preferences</button>
+          <button class="btn btn-primary" id="saveBtn">Save Preferences</button>
           <div class="divider"><hr><span>or</span><hr></div>
-          <button class="btn btn-danger" id="unsubAllBtn" onclick="unsubscribeAll()">Unsubscribe from All</button>
+          <button class="btn btn-danger" id="unsubAllBtn">Unsubscribe from All</button>
         </div>
       </div>
+    </div>
+  </div>
   <script>
     var TOKEN = ${JSON.stringify(token)};
-    function savePreferences() {
-    var TOKEN = '${token}';
-    function savePreferences() {
+    document.getElementById('saveBtn').addEventListener('click', function() {
       var btn = document.getElementById('saveBtn');
       btn.disabled = true;
       btn.textContent = 'Saving...';
@@ -484,9 +473,9 @@ emailRoutes.get('/unsubscribe', async (req, res) => {
         btn.disabled = false;
         btn.textContent = 'Save Preferences';
       });
-    }
-    function unsubscribeAll() {
-      if (!confirm('Are you sure you want to unsubscribe from all emails? You will only receive essential transactional emails.')) return;
+    });
+    document.getElementById('unsubAllBtn').addEventListener('click', function() {
+      if (!confirm('Are you sure you want to unsubscribe from all emails?')) return;
       var btn = document.getElementById('unsubAllBtn');
       btn.disabled = true;
       btn.textContent = 'Unsubscribing...';
@@ -500,7 +489,7 @@ emailRoutes.get('/unsubscribe', async (req, res) => {
           document.getElementById('formContent').classList.add('hidden');
           var msg = document.getElementById('successMsg');
           msg.querySelector('h2').textContent = 'Unsubscribed';
-          msg.querySelector('p').textContent = 'You have been unsubscribed from all non-essential emails. You will still receive transactional emails.';
+          msg.querySelector('p').textContent = 'You have been unsubscribed from all emails. You can close this page.';
           msg.classList.add('show');
         } else {
           document.getElementById('errorMsg').textContent = data.error || 'Failed to unsubscribe.';
@@ -514,7 +503,7 @@ emailRoutes.get('/unsubscribe', async (req, res) => {
         btn.disabled = false;
         btn.textContent = 'Unsubscribe from All';
       });
-    }
+    });
   </script>
 </body>
 </html>`);

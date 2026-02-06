@@ -12,7 +12,7 @@ import jwt from 'jsonwebtoken';
 import { enhancedEmailService } from '../emailService';
 import crypto from 'crypto';
 import { logActivity, computeChanges, allowedActivityTypes } from '../utils/activityLogger';
-import xss, { escapeAttrValue } from 'xss';
+import xss from 'xss';
 
 // Sanitize HTML content for emails - allows safe formatting tags, strips scripts and event handlers
 function sanitizeEmailHtml(html: string): string {
@@ -65,7 +65,7 @@ function sanitizeEmailHtml(html: string): string {
       // Allow data URIs for images only (base64 encoded images)
       if (tag === 'img' && name === 'src') {
         if (value.startsWith('data:image/') || value.startsWith('http://') || value.startsWith('https://')) {
-          return `${name}="${xss.escapeAttrValue(value)}"`;
+          return `${name}="${(xss as any).escapeAttrValue(value)}"`;
         }
         return ''; // Strip invalid src
       }
@@ -523,7 +523,6 @@ emailManagementRoutes.get("/email-contacts/:id", authenticateToken, requireTenan
         consentIpAddress: true,
         consentUserAgent: true,
         addedByUserId: true,
-        prefTransactional: true,
         prefMarketing: true,
         prefCustomerEngagement: true,
         prefNewsletters: true,
@@ -1571,6 +1570,13 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
     }
 
     // Format content as HTML using master email design (same as send-email route)
+    // Sanitize user-provided HTML content to prevent XSS
+    const sanitizedHtml = sanitizeEmailHtml(html);
+    // Escape text fields to prevent XSS in display names and text content
+    const safeDisplayCompanyName = escapeHtml(design.displayCompanyName || '');
+    const safeHeaderText = design.headerText ? escapeHtml(design.headerText) : null;
+    const safeFooterText = design.footerText ? escapeHtml(design.footerText) : null;
+
     const themedHtml = `
       <!DOCTYPE html>
       <html>
@@ -1584,18 +1590,18 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
             <!-- Hero Header -->
             <div style="padding: 40px 32px; text-align: center; background-color: ${design.primaryColor}; color: #ffffff;">
               ${design.logoUrl ? `
-                <img src="${design.logoUrl}" alt="${design.displayCompanyName}" style="height: 48px; width: auto; margin-bottom: 20px; object-fit: contain;" />
+                <img src="${escapeHtml(design.logoUrl)}" alt="${safeDisplayCompanyName}" style="height: 48px; width: auto; margin-bottom: 20px; object-fit: contain;" />
               ` : `
                 <div style="height: 48px; width: 48px; background-color: rgba(255,255,255,0.2); border-radius: 50%; margin: 0 auto 16px auto; line-height: 48px; font-size: 20px; font-weight: bold; color: #ffffff; text-align: center;">
-                  ${(design.displayCompanyName || 'C').charAt(0)}
+                  ${escapeHtml((design.displayCompanyName || 'C').charAt(0))}
                 </div>
               `}
               <h1 style="margin: 0 0 10px 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em; color: #ffffff;">
-                ${design.displayCompanyName}
+                ${safeDisplayCompanyName}
               </h1>
-              ${design.headerText ? `
+              ${safeHeaderText ? `
                 <p style="margin: 0 auto; font-size: 16px; opacity: 0.95; max-width: 400px; line-height: 1.5; color: #ffffff;">
-                  ${design.headerText}
+                  ${safeHeaderText}
                 </p>
               ` : ''}
             </div>
@@ -1603,7 +1609,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
             <!-- Body Content -->
             <div style="padding: 64px 48px; min-height: 200px;">
               <div style="font-size: 16px; line-height: 1.625; color: #334155;">
-                ${html}
+                ${sanitizedHtml}
               </div>
             </div>
 
@@ -1612,13 +1618,13 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
               
               ${socialLinksHtml}
               
-              ${design.footerText ? `
-                <p style="margin: 0 0 16px 0; font-size: 12px; line-height: 1.5; color: #64748b;">${design.footerText}</p>
+              ${safeFooterText ? `
+                <p style="margin: 0 0 16px 0; font-size: 12px; line-height: 1.5; color: #64748b;">${safeFooterText}</p>
               ` : ''}
               
               <div style="font-size: 12px; line-height: 1.5; color: #94a3b8;">
                 <p style="margin: 0;">
-                  Sent via ${design.displayCompanyName}
+                  Sent via ${safeDisplayCompanyName}
                 </p>
               </div>
             </div>
