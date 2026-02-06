@@ -97,7 +97,8 @@ start_service() {
     local working_dir=$4
     
     print_service "Starting $service_name on port $port..."
-    
+    local original_dir=$(pwd)
+
     if [ ! -z "$working_dir" ]; then
         cd "$working_dir"
     fi
@@ -105,6 +106,9 @@ start_service() {
     # Start the service in background and capture PID
     eval "$command" &
     local service_pid=$!
+
+    # Restore directory
+    cd "$original_dir"
     
     # Wait a moment for the service to start
     sleep 3
@@ -231,6 +235,7 @@ cleanup() {
     pkill -f "npx tsx server-node" 2>/dev/null
     pkill -f "npx tsx temporal-server" 2>/dev/null
     pkill -f "npx tsx server-hook" 2>/dev/null
+    pkill -f "go run main.go" 2>/dev/null
     
     print_success "All services stopped"
     exit 0

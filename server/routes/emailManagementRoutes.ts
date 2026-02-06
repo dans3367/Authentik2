@@ -113,6 +113,32 @@ function escapeHtml(str: string): string {
   });
 }
 
+function sanitizeFontFamily(fontFamily: string | undefined | null): string {
+  if (!fontFamily) return 'Arial, sans-serif';
+
+  // Strict allowlist of safe font stacks
+  // This prevents CSS injection by rejecting any input containing dangerous characters
+  // (quotes, semicolons, parentheses, URL-like patterns) that wouldn't match these exact strings.
+  const allowedFonts = [
+    'Arial, Helvetica, sans-serif',
+    'Georgia, serif',
+    'Tahoma, Geneva, sans-serif',
+    'Verdana, Geneva, sans-serif',
+    'Times New Roman, Times, serif',
+    'Courier New, Courier, monospace',
+    'Trebuchet MS, Helvetica, sans-serif',
+    'Impact, Charcoal, sans-serif',
+    'Lucida Console, Monaco, monospace'
+  ];
+
+  const normalized = fontFamily.trim();
+
+  // Case-insensitive match against allowlist
+  const match = allowedFonts.find(f => f.toLowerCase() === normalized.toLowerCase());
+
+  return match || 'Arial, sans-serif';
+}
+
 function maskEmail(email: string): string {
   const trimmed = String(email || '').trim();
   const atIndex = trimmed.indexOf('@');
@@ -1521,7 +1547,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       primaryColor: emailDesign?.primaryColor || '#3B82F6',
       secondaryColor: emailDesign?.secondaryColor || '#1E40AF',
       accentColor: emailDesign?.accentColor || '#10B981',
-      fontFamily: emailDesign?.fontFamily || 'Arial, sans-serif',
+      fontFamily: sanitizeFontFamily(emailDesign?.fontFamily),
       logoUrl: emailDesign?.logoUrl || company?.logoUrl || null,
       headerText: emailDesign?.headerText || null,
       footerText: emailDesign?.footerText || (companyName ? `© ${new Date().getFullYear()} ${companyName}. All rights reserved.` : ''),
@@ -4093,7 +4119,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       primaryColor: emailDesign?.primaryColor || '#3B82F6',
       secondaryColor: emailDesign?.secondaryColor || '#1E40AF',
       accentColor: emailDesign?.accentColor || '#10B981',
-      fontFamily: emailDesign?.fontFamily || 'Arial, sans-serif',
+      fontFamily: sanitizeFontFamily(emailDesign?.fontFamily),
       logoUrl: emailDesign?.logoUrl || company?.logoUrl || null,
       headerText: emailDesign?.headerText || null,
       footerText: emailDesign?.footerText || (companyName ? `© ${new Date().getFullYear()} ${companyName}. All rights reserved.` : ''),

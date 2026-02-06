@@ -2643,7 +2643,7 @@ export default function RemindersPage() {
                 </div>
 
                 {/* Pagination Controls */}
-                {allAppointments.length > 0 && (
+                {totalAppointments > 0 && (
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 border-t">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <span>Showing {startIndex + 1}-{Math.min(endIndex, totalAppointments)} of {totalAppointments}</span>
@@ -3058,7 +3058,7 @@ export default function RemindersPage() {
                 </div>
 
                 {/* Pagination Controls for Past Appointments */}
-                {pastAppointmentsAll.length > 0 && (
+                {totalPastAppointments > 0 && (
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 border-t">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <span>Showing {pastStartIndex + 1}-{Math.min(pastEndIndex, totalPastAppointments)} of {totalPastAppointments}</span>
