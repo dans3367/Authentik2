@@ -300,6 +300,16 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
   try {
     const token = (req.query.token as string) || '';
     const emailType = (req.query.type as string) || '';
+    
+    // Map email types to human-readable labels
+    const emailTypeLabels: Record<string, string> = {
+      'marketing': 'Marketing',
+      'customer_engagement': 'Customer Engagement', 
+      'newsletters': 'Newsletters',
+      'surveys_forms': 'Surveys & Forms'
+    };
+    const highlightLabel = emailTypeLabels[emailType] || '';
+    
     if (!token) {
       return res.status(400).type('text/html').send('<html><body><h1>Invalid request</h1><p>Missing token.</p></body></html>');
     }
@@ -321,7 +331,20 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
         prefMarketing: true,
         prefCustomerEngagement: true,
         prefNewsletters: true,
-      }
+        prefSurveysForms: true,
+      },
+    });
+
+    if (!contact) {
+      return res.status(400).type('text/html').send('<html><body><h1>Contact not found</h1><p>This unsubscribe link is no longer valid.</p></body></html>');
+    }
+
+    // Mask email for display
+    const emailParts = contact.email.split('@');
+    const maskedEmail = emailParts.length === 2 && emailParts[0].length > 0
+      ? emailParts[0].substring(0, 2) + '***@' + emailParts[1]
+      : '***';
+    const displayName = contact.firstName || maskedEmail;
 
     return res.status(200).type('text/html').send(`<!DOCTYPE html>
 <html lang="en">
@@ -329,7 +352,7 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Email Preferences</title>
-  <link href="/email-preferences.min.css" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-50 min-h-screen flex items-center justify-center p-4 text-slate-950">
   <div class="bg-white w-full max-w-[480px] rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -386,9 +409,9 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
                 Promotional offers, deals, and product announcements.
               </p>
             </div>
-            <div class="switch-root" data-state="${contact.prefMarketing ? 'checked' : 'unchecked'}" data-target="pref_marketing">
+            <div class="switch-root" role="switch" aria-checked="${contact.prefMarketing}" tabindex="0" data-state="${contact.prefMarketing ? 'checked' : 'unchecked'}" data-target="pref_marketing">
               <span class="switch-thumb"></span>
-              <input type="checkbox" id="pref_marketing" class="switch-input" ${contact.prefMarketing ? 'checked' : ''}>
+              <input type="checkbox" id="pref_marketing" class="switch-input" ${contact.prefMarketing ? 'checked' : ''} aria-hidden="true">
             </div>
           </div>
           
@@ -404,9 +427,9 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
                 Birthday wishes, personalized messages, and loyalty rewards.
               </p>
             </div>
-            <div class="switch-root" data-state="${contact.prefCustomerEngagement ? 'checked' : 'unchecked'}" data-target="pref_customer_engagement">
+            <div class="switch-root" role="switch" aria-checked="${contact.prefCustomerEngagement}" tabindex="0" data-state="${contact.prefCustomerEngagement ? 'checked' : 'unchecked'}" data-target="pref_customer_engagement">
               <span class="switch-thumb"></span>
-              <input type="checkbox" id="pref_customer_engagement" class="switch-input" ${contact.prefCustomerEngagement ? 'checked' : ''}>
+              <input type="checkbox" id="pref_customer_engagement" class="switch-input" ${contact.prefCustomerEngagement ? 'checked' : ''} aria-hidden="true">
             </div>
           </div>
 
@@ -422,9 +445,9 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
                 Regular updates, news, and monthly digests.
               </p>
             </div>
-            <div class="switch-root" data-state="${contact.prefNewsletters ? 'checked' : 'unchecked'}" data-target="pref_newsletters">
+            <div class="switch-root" role="switch" aria-checked="${contact.prefNewsletters}" tabindex="0" data-state="${contact.prefNewsletters ? 'checked' : 'unchecked'}" data-target="pref_newsletters">
               <span class="switch-thumb"></span>
-              <input type="checkbox" id="pref_newsletters" class="switch-input" ${contact.prefNewsletters ? 'checked' : ''}>
+              <input type="checkbox" id="pref_newsletters" class="switch-input" ${contact.prefNewsletters ? 'checked' : ''} aria-hidden="true">
             </div>
           </div>
 
@@ -440,9 +463,9 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
                 Feedback requests and satisfaction surveys.
               </p>
             </div>
-            <div class="switch-root" data-state="${contact.prefSurveysForms ? 'checked' : 'unchecked'}" data-target="pref_surveys_forms">
+            <div class="switch-root" role="switch" aria-checked="${contact.prefSurveysForms}" tabindex="0" data-state="${contact.prefSurveysForms ? 'checked' : 'unchecked'}" data-target="pref_surveys_forms">
               <span class="switch-thumb"></span>
-              <input type="checkbox" id="pref_surveys_forms" class="switch-input" ${contact.prefSurveysForms ? 'checked' : ''}>
+              <input type="checkbox" id="pref_surveys_forms" class="switch-input" ${contact.prefSurveysForms ? 'checked' : ''} aria-hidden="true">
             </div>
           </div>
 
@@ -468,12 +491,20 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
       const checkbox = document.getElementById(inputId);
       checkbox.checked = !checkbox.checked;
       element.setAttribute('data-state', checkbox.checked ? 'checked' : 'unchecked');
+      element.setAttribute('aria-checked', checkbox.checked);
     }
 
-    // Attach click handlers to all switches (CSP-safe: no inline handlers)
+    // Attach click and keyboard handlers to all switches (CSP-safe: no inline handlers)
     document.querySelectorAll('.switch-root[data-target]').forEach(function(el) {
       el.addEventListener('click', function() {
         toggleSwitch(this, this.getAttribute('data-target'));
+      });
+      
+      el.addEventListener('keydown', function(e) {
+        if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault();
+          toggleSwitch(this, this.getAttribute('data-target'));
+        }
       });
     });
 
@@ -484,7 +515,7 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
       btn.disabled = true;
       btn.innerHTML = '<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Saving...';
       
-      document.getElementById('errorMsg').style.display = 'none';
+      document.getElementById('errorMsg').classList.add('hidden');
       
       var prefs = {
         marketing: document.getElementById('pref_marketing').checked,
@@ -500,7 +531,7 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
       }).then(function(r) { return r.json(); }).then(function(data) {
         if (data.success) {
           document.getElementById('formContent').classList.add('hidden');
-          const headerP = document.querySelector('.header p');
+          const headerP = document.querySelector('.p-6.pb-2 p');
           if (headerP) headerP.remove();
           document.getElementById('successMsg').classList.remove('hidden');
           // Update header title to be more generic after save
@@ -524,7 +555,7 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
       
       btn.disabled = true;
       btn.textContent = 'Unsubscribing...';
-      document.getElementById('errorMsg').style.display = 'none';
+      document.getElementById('errorMsg').classList.add('hidden');
 
       fetch('/api/email/unsubscribe/preferences', {
         method: 'POST',
@@ -533,7 +564,7 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
       }).then(function(r) { return r.json(); }).then(function(data) {
         if (data.success) {
           document.getElementById('formContent').classList.add('hidden');
-          const headerP = document.querySelector('.header p');
+          const headerP = document.querySelector('.p-6.pb-2 p');
           if (headerP) headerP.remove();
           document.getElementById('unsubMsg').classList.remove('hidden');
           const h1 = document.querySelector('h1');
@@ -552,7 +583,6 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
       var el = document.getElementById('errorMsg');
       el.textContent = msg;
       el.classList.remove('hidden');
-      el.style.display = 'block';
     }
 
     function resetBtn(btn, text) {
