@@ -1507,15 +1507,30 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
 
     // Block scheduling for unsubscribed/bounced contacts unless override flags are provided
     const { allowUnsubscribed, isTransactional } = req.body || {};
-    if (contact.status === 'unsubscribed' || contact.status === 'bounced') {
-      if (allowUnsubscribed === true || isTransactional === true) {
+    const isUnsubscribedOrBounced = contact.status === 'unsubscribed' || contact.status === 'bounced';
+
+    if (isUnsubscribedOrBounced) {
+      // SECURITY: Only allow Administrators and Owners to override unsubscribe protection
+      const isAdminOrOwner = ['Administrator', 'Owner'].includes(req.user.role || '');
+      const userAttemptedOverride = allowUnsubscribed === true || isTransactional === true;
+      const canOverride = isAdminOrOwner && userAttemptedOverride;
+
+      if (canOverride) {
         // Audit log the override usage
-        console.log(`🔓 [ScheduleEmail] Override used for ${contact.status} contact ${maskEmail(String(contact.email))} - allowUnsubscribed: ${allowUnsubscribed}, isTransactional: ${isTransactional}, userId: ${req.user.id}, tenantId: ${tenantId}, timestamp: ${new Date().toISOString()}`);
+        console.log(`🔓 [ScheduleEmail] Override used for ${contact.status} contact ${maskEmail(String(contact.email))} - allowUnsubscribed: ${allowUnsubscribed}, isTransactional: ${isTransactional}, userId: ${req.user.id}, role: ${req.user.role}, tenantId: ${tenantId}, timestamp: ${new Date().toISOString()}`);
       } else {
-        console.log(`🚫 [ScheduleEmail] Blocked scheduling to ${contact.status} contact ${maskEmail(String(contact.email))} - no override flag provided`);
+        console.log(`🚫 [ScheduleEmail] Blocked scheduling to ${contact.status} contact ${maskEmail(String(contact.email))} - override denied or not provided`);
+
+        let errorMessage = `Cannot schedule email to ${contact.status} contact.`;
+        if (userAttemptedOverride && !isAdminOrOwner) {
+          errorMessage += " Insufficient permissions to override unsubscribe protection.";
+        } else {
+          errorMessage += " Use allowUnsubscribed or isTransactional flag to override (Requires Administrator role).";
+        }
+
         return res.status(403).json({
           success: false,
-          message: `Cannot schedule email to ${contact.status} contact. Use allowUnsubscribed or isTransactional flag to override.`,
+          message: errorMessage,
           contactStatus: contact.status,
           email: maskEmail(String(contact.email)),
         });
@@ -4082,15 +4097,30 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
 
     // Block sending for unsubscribed/bounced contacts unless override flags are provided
     const { allowUnsubscribed, isTransactional } = req.body || {};
-    if (contact.status === 'unsubscribed' || contact.status === 'bounced') {
-      if (allowUnsubscribed === true || isTransactional === true) {
+    const isUnsubscribedOrBounced = contact.status === 'unsubscribed' || contact.status === 'bounced';
+
+    if (isUnsubscribedOrBounced) {
+      // SECURITY: Only allow Administrators and Owners to override unsubscribe protection
+      const isAdminOrOwner = ['Administrator', 'Owner'].includes(req.user.role || '');
+      const userAttemptedOverride = allowUnsubscribed === true || isTransactional === true;
+      const canOverride = isAdminOrOwner && userAttemptedOverride;
+
+      if (canOverride) {
         // Audit log the override usage
-        console.log(`🔓 [SendEmail] Override used for ${contact.status} contact ${maskEmail(String(contact.email))} - allowUnsubscribed: ${allowUnsubscribed}, isTransactional: ${isTransactional}, userId: ${req.user.id}, tenantId: ${tenantId}, timestamp: ${new Date().toISOString()}`);
+        console.log(`🔓 [SendEmail] Override used for ${contact.status} contact ${maskEmail(String(contact.email))} - allowUnsubscribed: ${allowUnsubscribed}, isTransactional: ${isTransactional}, userId: ${req.user.id}, role: ${req.user.role}, tenantId: ${tenantId}, timestamp: ${new Date().toISOString()}`);
       } else {
-        console.log(`🚫 [SendEmail] Blocked sending to ${contact.status} contact ${maskEmail(String(contact.email))} - no override flag provided`);
+        console.log(`🚫 [SendEmail] Blocked sending to ${contact.status} contact ${maskEmail(String(contact.email))} - override denied or not provided`);
+
+        let errorMessage = `Cannot send email to ${contact.status} contact.`;
+        if (userAttemptedOverride && !isAdminOrOwner) {
+          errorMessage += " Insufficient permissions to override unsubscribe protection.";
+        } else {
+          errorMessage += " Use allowUnsubscribed or isTransactional flag to override (Requires Administrator role).";
+        }
+
         return res.status(403).json({
           success: false,
-          message: `Cannot send email to ${contact.status} contact. Use allowUnsubscribed or isTransactional flag to override.`,
+          message: errorMessage,
           contactStatus: contact.status,
           email: maskEmail(String(contact.email)),
         });
@@ -4201,7 +4231,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
             <!-- Body Content -->
             <div style="padding: 64px 48px; min-height: 200px;">
               <div style="font-size: 16px; line-height: 1.625; color: #334155;">
-                ${content.replace(/\n/g, '<br>')}
+                ${sanitizeEmailHtml(content.replace(/\n/g, '<br>'))}
               </div>
             </div>
 
@@ -4329,10 +4359,9 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       console.error(`⚠️ [SendEmail] Failed to log to email_sends table:`, logError);
     }
 
-    // Update contact stats - increment emailsSent for direct emails
+    // Update contact stats - update lastActivity (emailsSent increment is handled by internal callback)
     await db.update(emailContacts)
       .set({
-        emailsSent: sql`COALESCE(${emailContacts.emailsSent}, 0) + 1`,
         lastActivity: new Date(),
         updatedAt: new Date()
       })

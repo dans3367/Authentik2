@@ -217,8 +217,13 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
     queryClient.invalidateQueries({ queryKey: ['/api/email-contacts', contactId, 'stats'] });
   };
 
-  const isSendEmailDisabled = false;
-  const sendEmailDisabledReason = undefined;
+  // Guard against unsubscribed/bounced contacts to prevent server 403s
+  const isSendEmailDisabled = contact ? (contact.status === 'unsubscribed' || contact.status === 'bounced' || !!bouncedCheck?.isBounced) : false;
+  const sendEmailDisabledReason = isSendEmailDisabled
+    ? (contact?.status === 'bounced' || !!bouncedCheck?.isBounced
+      ? "Cannot send email to a bounced contact."
+      : "Cannot send email to an unsubscribed contact.")
+    : undefined;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

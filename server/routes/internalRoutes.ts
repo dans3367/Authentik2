@@ -3,7 +3,7 @@ import { db } from '../db';
 import { emailActivity, emailSends, emailContent, emailContacts } from '@shared/schema';
 import { authenticateInternalService, InternalServiceRequest } from '../middleware/internal-service-auth';
 import crypto from 'crypto';
-import { sql } from 'drizzle-orm';
+import { sql, eq } from 'drizzle-orm';
 
 const router = Router();
 
@@ -213,7 +213,12 @@ router.post(
   authenticateInternalService,
   async (req: InternalServiceRequest, res) => {
     try {
-      const { emailTrackingId, providerMessageId, status } = req.body;
+      let { emailTrackingId, providerMessageId, status } = req.body;
+
+      // Normalize 'queued' to 'pending' to support external callers (e.g. Trigger.dev)
+      if (status === 'queued') {
+        status = 'pending';
+      }
 
       const allowedStatuses = [
         'pending',
@@ -251,7 +256,6 @@ router.post(
       console.log(`📧 [Internal API] Updating email_sends record for tracking ID ${emailTrackingId} with status ${validatedStatus}${providerMessageId ? ` and provider ID ${providerMessageId}` : ''}`);
 
       // Find and update the email_sends record by the email tracking ID
-      const { eq } = await import('drizzle-orm');
       const now = new Date();
 
       const updatePayload: Record<string, unknown> = {

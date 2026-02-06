@@ -1643,7 +1643,7 @@ export default function RemindersPage() {
                           <Input
                             type="number"
                             value={newAppointmentData.duration}
-                            onChange={(e) => setNewAppointmentData(prev => ({ ...prev, duration: parseInt(e.target.value) }))}
+                            onChange={(e) => setNewAppointmentData(prev => ({ ...prev, duration: parseInt(e.target.value, 10) || prev.duration }))}
                             min="15"
                             step="15"
                             className="focus-visible:ring-0"

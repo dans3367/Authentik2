@@ -1,10 +1,19 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { enhancedEmailService } from '../emailService';
 import { db } from '../db';
 import { and, eq, sql } from 'drizzle-orm';
 import { unsubscribeTokens, emailContacts, emailActivity } from '@shared/schema';
 
 export const emailRoutes = Router();
+
+const unsubscribeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  limit: 20, // Limit each IP to 20 requests per `window` (here, per 15 minutes)
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  message: 'Too many requests from this IP, please try again later',
+});
 
 // Email system status endpoint
 emailRoutes.get('/status', async (req, res) => {
@@ -80,7 +89,7 @@ emailRoutes.post('/unsubscribe', async (req, res) => {
 });
 
 // Save granular email preferences
-emailRoutes.post('/unsubscribe/preferences', async (req, res) => {
+emailRoutes.post('/unsubscribe/preferences', unsubscribeLimiter, async (req, res) => {
   try {
     const { token, preferences, unsubscribeAll } = req.body;
     if (!token) {
@@ -287,7 +296,7 @@ emailRoutes.get('/providers', async (req, res) => {
 });
 
 // Public unsubscribe endpoint — shows preference management page
-emailRoutes.get('/unsubscribe', async (req, res) => {
+emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
   try {
     const token = (req.query.token as string) || '';
     const emailType = (req.query.type as string) || '';

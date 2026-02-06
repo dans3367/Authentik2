@@ -75,7 +75,7 @@ export default function ViewContact() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   // Get return URL from query parameters
   const urlParams = new URLSearchParams(window.location.search);
   const returnUrl = urlParams.get('return') || '/email-contacts';
@@ -85,12 +85,12 @@ export default function ViewContact() {
     queryFn: async () => {
       console.log(`Fetching contact with ID: ${id}`);
       const apiResponse = await apiRequest('GET', `/api/email-contacts/${id}`);
-      
+
       if (!apiResponse.ok) {
         console.error('API response not ok:', apiResponse.status, apiResponse.statusText);
         throw new Error(`Failed to fetch contact: ${apiResponse.status} ${apiResponse.statusText}`);
       }
-      
+
       const data = await apiResponse.json();
       console.log('API response for contact:', data);
       return data;
@@ -128,7 +128,7 @@ export default function ViewContact() {
   // Extract contact from response - the API returns { contact: ... }
   const contact: Contact | undefined = response?.contact;
   const engagementStats = statsResponse?.stats;
-  
+
   console.log('Processed contact data:', contact);
   console.log('Engagement stats:', engagementStats);
 
@@ -160,7 +160,7 @@ export default function ViewContact() {
   // Handle contact delete
   const handleDeleteContact = () => {
     if (!contact) return;
-    
+
     if (window.confirm('Are you sure you want to delete this contact? This action cannot be undone.')) {
       deleteContactMutation.mutate(contact.id);
     }
@@ -176,7 +176,7 @@ export default function ViewContact() {
 
     const config = statusConfig[status];
     const Icon = config.icon;
-    
+
     return (
       <Badge className={`${config.color} gap-1`}>
         <Icon className="w-3 h-3" />
@@ -194,10 +194,10 @@ export default function ViewContact() {
   const formatDate = (date: Date | string | null) => {
     if (!date) return 'Never';
     const dateObj = typeof date === 'string' ? new Date(date) : date;
-    return dateObj.toLocaleDateString("en-US", { 
+    return dateObj.toLocaleDateString("en-US", {
       weekday: 'short',
       year: 'numeric',
-      month: 'short', 
+      month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
@@ -207,10 +207,10 @@ export default function ViewContact() {
   const formatDateShort = (date: Date | string | null) => {
     if (!date) return 'Not set';
     const dateObj = typeof date === 'string' ? new Date(date) : date;
-    return dateObj.toLocaleDateString("en-US", { 
-      month: "short", 
-      day: "numeric", 
-      year: "numeric" 
+    return dateObj.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric"
     });
   };
 
@@ -233,11 +233,11 @@ export default function ViewContact() {
   };
 
   // Debug logging
-  console.log('ViewContact render:', { 
-    id, 
-    isLoading, 
-    error, 
-    contact, 
+  console.log('ViewContact render:', {
+    id,
+    isLoading,
+    error,
+    contact,
     response,
     hasEmail: contact?.email,
     contactEmail: contact?.email,
@@ -265,8 +265,8 @@ export default function ViewContact() {
           <p className="text-gray-600 dark:text-gray-400 mb-4">
             There was an error loading the contact: {error.message || 'Unknown error'}
           </p>
-          <Button 
-            onClick={() => setLocation(returnUrl)} 
+          <Button
+            onClick={() => setLocation(returnUrl)}
             variant="outline"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -289,8 +289,8 @@ export default function ViewContact() {
           <p className="text-sm text-gray-500 mb-4">
             Contact ID: {id}
           </p>
-          <Button 
-            onClick={() => setLocation(returnUrl)} 
+          <Button
+            onClick={() => setLocation(returnUrl)}
             variant="outline"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -310,8 +310,8 @@ export default function ViewContact() {
           <p className="text-gray-600 dark:text-gray-400 mb-4">
             This contact has missing or invalid email data.
           </p>
-          <Button 
-            onClick={() => setLocation('/email-contacts')} 
+          <Button
+            onClick={() => setLocation('/email-contacts')}
             variant="outline"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -322,22 +322,27 @@ export default function ViewContact() {
     );
   }
 
-  const isSendEmailDisabled = false;
-  const sendEmailDisabledReason = undefined;
+  // Guard against unsubscribed/bounced contacts to prevent server 403s
+  const isSendEmailDisabled = contact.status === 'unsubscribed' || contact.status === 'bounced' || !!bouncedCheck?.isBounced;
+  const sendEmailDisabledReason = isSendEmailDisabled
+    ? (contact.status === 'bounced' || !!bouncedCheck?.isBounced
+      ? "Cannot send email to a bounced contact."
+      : "Cannot send email to an unsubscribed contact.")
+    : undefined;
 
   return (
     <div className="max-w-6xl mx-auto p-4">
       {/* Header */}
       <div className="mb-6">
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           onClick={() => setLocation(returnUrl)}
           className="mb-4"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Contacts
         </Button>
-        
+
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
           <div className="flex items-start gap-4 min-w-0 flex-1">
             <Avatar className="h-16 w-16 flex-shrink-0">
@@ -357,7 +362,7 @@ export default function ViewContact() {
               </div>
             </div>
           </div>
-          
+
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 lg:flex-shrink-0">
             <SendEmailModal
               contactId={contact.id}
@@ -382,7 +387,7 @@ export default function ViewContact() {
               <Clock className="w-4 h-4 mr-2" />
               Send Later
             </Button>
-            <Button 
+            <Button
               variant="outline"
               className="justify-center"
               onClick={() => setLocation(`/email-contacts/view/${contact.id}/scheduled`)}
@@ -390,7 +395,7 @@ export default function ViewContact() {
               <Calendar className="w-4 h-4 mr-2" />
               View Scheduled
             </Button>
-            <Button 
+            <Button
               variant="outline"
               className="justify-center"
               onClick={() => setLocation(`/email-contacts/edit/${contact.id}`)}
@@ -474,7 +479,7 @@ export default function ViewContact() {
                       </div>
                       <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{engagementStats.emailsSent}</p>
                     </div>
-                    
+
                     <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                       <div className="flex items-center justify-center gap-2 mb-2">
                         <Eye className="w-5 h-5 text-green-600 dark:text-green-400" />
@@ -482,7 +487,7 @@ export default function ViewContact() {
                       </div>
                       <p className="text-2xl font-bold text-green-600 dark:text-green-400">{engagementStats.emailsOpened}</p>
                     </div>
-                    
+
                     <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                       <div className="flex items-center justify-center gap-2 mb-2">
                         <TrendingUp className="w-5 h-5 text-purple-600 dark:text-purple-400" />
@@ -509,7 +514,7 @@ export default function ViewContact() {
                           </p>
                         </div>
                       )}
-                      
+
                       {engagementStats.emailsBounced > 0 && (
                         <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
                           <div className="flex items-center justify-center gap-2 mb-2">
@@ -534,7 +539,7 @@ export default function ViewContact() {
                     </div>
                     <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{contact.emailsSent || 0}</p>
                   </div>
-                  
+
                   <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                     <div className="flex items-center justify-center gap-2 mb-2">
                       <Eye className="w-5 h-5 text-green-600 dark:text-green-400" />
@@ -542,7 +547,7 @@ export default function ViewContact() {
                     </div>
                     <p className="text-2xl font-bold text-green-600 dark:text-green-400">{contact.emailsOpened || 0}</p>
                   </div>
-                  
+
                   <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                     <div className="flex items-center justify-center gap-2 mb-2">
                       <TrendingUp className="w-5 h-5 text-purple-600 dark:text-purple-400" />
@@ -570,13 +575,13 @@ export default function ViewContact() {
                 {Array.isArray(contact.tags) && contact.tags.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {contact.tags.map((tag) => (
-                      <Badge 
-                        key={tag.id} 
-                        variant="outline" 
-                        style={{ 
-                          backgroundColor: tag.color + '20', 
+                      <Badge
+                        key={tag.id}
+                        variant="outline"
+                        style={{
+                          backgroundColor: tag.color + '20',
                           borderColor: tag.color,
-                          color: tag.color 
+                          color: tag.color
                         }}
                       >
                         {tag.name}
@@ -639,16 +644,16 @@ export default function ViewContact() {
                 <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Added Date</label>
                 <p className="text-gray-900 dark:text-white">{formatDateShort(contact.addedDate)}</p>
               </div>
-              
+
               <Separator />
-              
+
               <div>
                 <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Activity</label>
                 <p className="text-gray-900 dark:text-white">{formatDateShort(contact.lastActivity || null)}</p>
               </div>
-              
+
               <Separator />
-              
+
               <div>
                 <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Updated</label>
                 <p className="text-gray-900 dark:text-white">{formatDateShort(contact.updatedAt)}</p>
@@ -716,12 +721,12 @@ export default function ViewContact() {
               {contact.consentGiven && (
                 <>
                   <Separator />
-                  
+
                   <div>
                     <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Consent Date</label>
                     <p className="text-gray-900 dark:text-white">{formatDateShort(contact.consentDate || null)}</p>
                   </div>
-                  
+
                   {contact.consentMethod && (
                     <div>
                       <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Consent Method</label>
@@ -755,8 +760,8 @@ export default function ViewContact() {
                   </Button>
                 }
               />
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full justify-start"
                 disabled={isSendEmailDisabled}
                 onClick={() => setLocation(`/email-contacts/view/${contact.id}/schedule`)}
@@ -764,8 +769,8 @@ export default function ViewContact() {
                 <Clock className="w-4 h-4 mr-2" />
                 Send Later
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full justify-start"
                 onClick={() => setLocation(`/email-contacts/view/${contact.id}/scheduled`)}
               >
@@ -786,8 +791,8 @@ export default function ViewContact() {
                   </Button>
                 }
               />
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full justify-start text-red-600 hover:text-red-700"
                 onClick={handleDeleteContact}
                 disabled={deleteContactMutation.isPending}
