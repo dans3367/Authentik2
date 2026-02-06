@@ -451,6 +451,11 @@ emailManagementRoutes.get("/email-contacts/:id", authenticateToken, requireTenan
         consentIpAddress: true,
         consentUserAgent: true,
         addedByUserId: true,
+        prefTransactional: true,
+        prefMarketing: true,
+        prefCustomerEngagement: true,
+        prefNewsletters: true,
+        prefSurveysForms: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -1403,19 +1408,9 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       return res.status(400).json({ message: 'Contact email is missing' });
     }
 
-    // Validate contact is active and not globally suppressed
+    // Log warning for unsubscribed/bounced contacts but allow scheduling
     if (contact.status === 'unsubscribed' || contact.status === 'bounced') {
-      console.log(`📅 [ScheduleEmail] Contact ${maskEmail(String(contact.email))} is ${contact.status}, cannot send email`);
-      return res.status(400).json({ message: 'Contact is unsubscribed or bounced' });
-    }
-
-    const suppressed = await db.query.bouncedEmails.findFirst({
-      where: eq(bouncedEmails.email, String(contact.email).toLowerCase().trim()),
-    }).catch(() => null);
-
-    if (suppressed) {
-      console.log(`📅 [ScheduleEmail] Contact ${maskEmail(String(contact.email))} is globally suppressed/bounced`);
-      return res.status(400).json({ message: 'Email is globally suppressed/bounced' });
+      console.log(`⚠️ [ScheduleEmail] Contact ${maskEmail(String(contact.email))} is ${contact.status} - scheduling anyway per user request`);
     }
 
     // Ensure unsubscribe token exists (long-lived until used)
@@ -3857,21 +3852,13 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
 
     console.log(`📧 [SendEmail] Found contact: ${maskEmail(String(contact.email))}, status: ${contact.status}`);
 
-    // Check if contact can receive emails
+    // Log warning for unsubscribed/bounced contacts but allow sending
     if (contact.status === 'unsubscribed') {
-      console.log(`📧 [SendEmail] Contact ${maskEmail(String(contact.email))} is unsubscribed, cannot send email`);
-      return res.status(400).json({
-        success: false,
-        message: "Cannot send email to unsubscribed contact"
-      });
+      console.log(`⚠️ [SendEmail] Contact ${maskEmail(String(contact.email))} is unsubscribed - sending anyway per user request`);
     }
 
     if (contact.status === 'bounced') {
-      console.log(`📧 [SendEmail] Contact ${maskEmail(String(contact.email))} is bounced, cannot send email`);
-      return res.status(400).json({
-        success: false,
-        message: "Cannot send email to bounced contact"
-      });
+      console.log(`⚠️ [SendEmail] Contact ${maskEmail(String(contact.email))} is bounced - sending anyway per user request`);
     }
 
     // Get tenant info for from email
@@ -3929,7 +3916,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       const created = await db.insert(unsubscribeTokens).values({ tenantId, contactId: contact.id, token }).returning();
       unsub = created[0];
     }
-    const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(unsub.token)}`;
+    const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(unsub.token)}&type=marketing`;
 
     // Build social links HTML if available
     let socialLinksHtml = '';

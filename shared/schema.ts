@@ -364,6 +364,12 @@ export const emailContacts = pgTable("email_contacts", {
   country: text("country"),
   // Contact fields
   phoneNumber: text("phone_number"),
+  // Email preference fields (segmented unsubscribe)
+  prefTransactional: boolean("pref_transactional").notNull().default(true),
+  prefMarketing: boolean("pref_marketing").notNull().default(true),
+  prefCustomerEngagement: boolean("pref_customer_engagement").notNull().default(true),
+  prefNewsletters: boolean("pref_newsletters").notNull().default(true),
+  prefSurveysForms: boolean("pref_surveys_forms").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

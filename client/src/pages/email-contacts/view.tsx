@@ -48,6 +48,12 @@ interface Contact {
   consentDate?: Date | null;
   consentMethod?: string | null;
   consentIpAddress?: string | null;
+  // Email preferences (segmented unsubscribe)
+  prefTransactional?: boolean;
+  prefMarketing?: boolean;
+  prefCustomerEngagement?: boolean;
+  prefNewsletters?: boolean;
+  prefSurveysForms?: boolean;
   addedByUserId?: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -317,16 +323,8 @@ export default function ViewContact() {
     );
   }
 
-  const isSendEmailDisabled = contact.status === 'unsubscribed' || contact.status === 'bounced' || !!bouncedCheck?.isBounced;
-  const sendEmailDisabledReason = (() => {
-    if (contact.status === 'unsubscribed') {
-      return 'This contact has unsubscribed from emails.';
-    }
-    if (contact.status === 'bounced' || !!bouncedCheck?.isBounced) {
-      return 'This email address is marked as bounced or globally suppressed.';
-    }
-    return undefined;
-  })();
+  const isSendEmailDisabled = false;
+  const sendEmailDisabledReason = undefined;
 
   return (
     <div className="max-w-6xl mx-auto p-4">
@@ -408,20 +406,16 @@ export default function ViewContact() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Info */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Sending Disabled Alert */}
+          {/* Unsubscribed Contact Warning */}
           {(() => {
-            const isSuppressed = contact.status === 'unsubscribed' || contact.status === 'bounced' || !!bouncedCheck?.isBounced;
-            const dateRaw = bouncedCheck?.bouncedEmail?.lastBouncedAt || bouncedCheck?.bouncedEmail?.firstBouncedAt || bouncedCheck?.bouncedEmail?.bouncedAt;
-            const dateText = dateRaw ? formatDateShort(dateRaw as any) : null;
-            if (!isSuppressed) return null;
+            const isUnsubscribed = contact.status === 'unsubscribed' || contact.status === 'bounced' || !!bouncedCheck?.isBounced;
+            if (!isUnsubscribed) return null;
             return (
               <Alert className="border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-200 [&>svg]:text-yellow-600 dark:[&>svg]:text-yellow-400">
                 <AlertTriangleIcon className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <AlertTitle className="text-sm font-medium">Sending disabled</AlertTitle>
+                <AlertTitle className="text-sm font-medium">Unsubscribed Contact</AlertTitle>
                 <AlertDescription className="text-yellow-700 dark:text-yellow-300 text-sm leading-relaxed">
-                  {dateText
-                    ? `We are unable to send to this address because it is marked as bounced or is on a global do-not-contact list as of ${dateText}. If you believe this is an error, please contact our support team.`
-                    : `We are unable to send to this address because it is marked as bounced or is on a global do-not-contact list. If you believe this is an error, please contact our support team.`}
+                  This customer has unsubscribed from the mailing list. Please do not send marketing or promotional emails to this contact. You may still send direct or scheduled messages if needed.
                 </AlertDescription>
               </Alert>
             );
@@ -660,6 +654,38 @@ export default function ViewContact() {
                 <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Updated</label>
                 <p className="text-gray-900 dark:text-white">{formatDateShort(contact.updatedAt)}</p>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Email Preferences */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="w-5 h-5" />
+                Email Preferences
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {[
+                { label: 'Transactional', value: contact.prefTransactional, desc: 'Receipts & confirmations' },
+                { label: 'Marketing', value: contact.prefMarketing, desc: 'Promotions & offers' },
+                { label: 'Customer Engagement', value: contact.prefCustomerEngagement, desc: 'Birthday & loyalty' },
+                { label: 'Newsletters', value: contact.prefNewsletters, desc: 'Updates & digests' },
+                { label: 'Surveys & Forms', value: contact.prefSurveysForms, desc: 'Feedback requests' },
+              ].map((pref) => (
+                <div key={pref.label} className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{pref.label}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{pref.desc}</p>
+                  </div>
+                  <Badge className={pref.value !== false
+                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                    : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                  }>
+                    {pref.value !== false ? 'Opted In' : 'Opted Out'}
+                  </Badge>
+                </div>
+              ))}
             </CardContent>
           </Card>
 

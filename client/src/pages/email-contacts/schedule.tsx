@@ -43,7 +43,7 @@ export default function ScheduleContactEmailPage() {
     },
   });
 
-  const isSuppressed = contact?.status === "unsubscribed" || contact?.status === "bounced" || !!bouncedCheck?.isBounced;
+  const isUnsubscribed = contact?.status === "unsubscribed" || contact?.status === "bounced" || !!bouncedCheck?.isBounced;
 
   const scheduleMutation = useMutation({
     mutationFn: async () => {
@@ -60,13 +60,9 @@ export default function ScheduleContactEmailPage() {
     },
   });
 
-  const scheduleDisabledReason = (() => {
-    if (contact?.status === "unsubscribed") return "This contact has unsubscribed from emails.";
-    if (contact?.status === "bounced" || !!bouncedCheck?.isBounced) return "This address is bounced or globally suppressed.";
-    return undefined;
-  })();
+  const scheduleWarningMessage = "This customer has unsubscribed from the mailing list. Please do not send marketing or promotional emails to this contact. You may still send direct or scheduled messages if needed.";
 
-  const canSubmit = !!subject && !!content && !!date && !!id && !isSuppressed;
+  const canSubmit = !!subject && !!content && !!date && !!id;
 
   const handleTemplateSelect = (template: { subject: string; content: string }) => {
     setSubject(template.subject);
@@ -123,11 +119,11 @@ export default function ScheduleContactEmailPage() {
           </div>
         </div>
 
-        {isSuppressed && (
+        {isUnsubscribed && (
           <Alert className="border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-200">
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle className="text-sm font-medium">Sending disabled</AlertTitle>
-            <AlertDescription className="text-sm">{scheduleDisabledReason}</AlertDescription>
+            <AlertTitle className="text-sm font-medium">Unsubscribed Contact</AlertTitle>
+            <AlertDescription className="text-sm">{scheduleWarningMessage}</AlertDescription>
           </Alert>
         )}
 

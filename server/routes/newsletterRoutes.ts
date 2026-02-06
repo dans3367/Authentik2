@@ -15,7 +15,7 @@ async function getNewsletterRecipients(newsletter: any, tenantId: string) {
   console.log(`[Newsletter] Getting recipients for newsletter ${newsletter.id}, type: ${newsletter.recipientType}`);
   
   try {
-    let recipients: Array<{ id: string; email: string; firstName?: string; lastName?: string }> = [];
+    let recipients: Array<{ id: string; email: string; firstName?: string; lastName?: string; prefNewsletters?: boolean | null }> = [];
 
     switch (newsletter.recipientType) {
       case 'all':
@@ -30,6 +30,7 @@ async function getNewsletterRecipients(newsletter: any, tenantId: string) {
             email: true,
             firstName: true,
             lastName: true,
+            prefNewsletters: true,
           }
         });
         break;
@@ -48,6 +49,7 @@ async function getNewsletterRecipients(newsletter: any, tenantId: string) {
               email: true,
               firstName: true,
               lastName: true,
+              prefNewsletters: true,
             }
           });
         }
@@ -73,6 +75,7 @@ async function getNewsletterRecipients(newsletter: any, tenantId: string) {
                 email: true,
                 firstName: true,
                 lastName: true,
+                prefNewsletters: true,
               }
             });
           }
@@ -659,7 +662,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
       const suppressedMap = new Map<string, string>(suppressed.map(r => [String(r.email).toLowerCase().trim(), r.type]));
 
       const dedupedRecipients = Array.from(new Map(recipients.map((r: any) => [String(r.email).toLowerCase().trim(), r])).values());
-      const allowedRecipients = dedupedRecipients.filter((r: any) => !suppressedMap.has(String(r.email).toLowerCase().trim()));
+      const allowedRecipients = dedupedRecipients.filter((r: any) => !suppressedMap.has(String(r.email).toLowerCase().trim()) && r.prefNewsletters !== false);
       const blockedRecipients = dedupedRecipients.filter((r: any) => suppressedMap.has(String(r.email).toLowerCase().trim()));
 
       if (blockedRecipients.length > 0) {
@@ -809,7 +812,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
         // Prepare emails for batch sending (append unsubscribe link)
         const emails = allowedRecipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => {
           const token = tokenMap.get(contact.id)!;
-          const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(token)}`;
+          const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(token)}&type=newsletters`;
           const html = `${newsletter.content}
             <div style="padding: 16px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
               <p style="margin: 0; font-size: 12px; color: #94a3b8;">
@@ -959,7 +962,7 @@ newsletterRoutes.post('/:id/send-single', async (req, res) => {
       const created = await db.insert(unsubscribeTokens).values({ tenantId, contactId: recipient.id, token }).returning();
       unsub = created[0];
     }
-    const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(unsub.token)}`;
+    const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(unsub.token)}&type=newsletters`;
 
     const email = {
       to: recipient.email,

@@ -109,14 +109,6 @@ export default function SendEmailModal({
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
-    if (disabled && nextOpen) {
-      toast({
-        title: "Sending disabled",
-        description: disabledReason || "You cannot send an email to this contact.",
-        variant: "destructive",
-      });
-      return;
-    }
     setOpen(nextOpen);
   };
 
