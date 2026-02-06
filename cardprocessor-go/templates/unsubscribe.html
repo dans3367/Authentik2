@@ -232,10 +232,16 @@
                 {{else}}
                 <button type="submit" class="btn btn-primary">{{.Translations.UnsubscribeButton}}</button>
                 {{end}}
-                <a href="#" onclick="window.close(); return false;" class="btn btn-secondary">{{.TemplateText.CancelButton}}</a>
+                <a href="#" id="cancelBtn" class="btn btn-secondary">{{.TemplateText.CancelButton}}</a>
             </div>
         </form>
     </div>
+    <script>
+        document.getElementById('cancelBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            window.close();
+        });
+    </script>
 </body>
 
 </html>

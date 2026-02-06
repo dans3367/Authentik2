@@ -12,7 +12,7 @@ export const helmetMiddleware = helmet({
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://rsms.me"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com", "https://cdn.tailwindcss.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "https://rsms.me"],
       imgSrc: ["'self'", "data:", "https:", "http:"],
       connectSrc: [
@@ -44,7 +44,7 @@ export const helmetMiddleware = helmet({
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://rsms.me"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com", "https://cdn.tailwindcss.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "https://rsms.me"],
       imgSrc: ["'self'", "data:", "https:"],
       connectSrc: [
@@ -85,7 +85,7 @@ export const createRateLimiter = (options: {
   if (process.env.DISABLE_RATE_LIMITING === 'true') {
     return (req: any, res: any, next: any) => next();
   }
-  
+
   return rateLimit({
     windowMs: options.windowMs || 15 * 60 * 1000, // 15 minutes default
     max: options.max || 100, // limit each IP to 100 requests per windowMs
@@ -170,9 +170,9 @@ export const sanitizeMiddleware = (req: Request, res: Response, next: NextFuncti
 export const handleValidationErrors = (req: Request, res: Response, next: NextFunction) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       message: "Validation failed",
-      errors: errors.array() 
+      errors: errors.array()
     });
   }
   next();
