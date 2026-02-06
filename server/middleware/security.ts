@@ -12,7 +12,7 @@ export const helmetMiddleware = helmet({
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://rsms.me"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com", "https://cdn.tailwindcss.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "https://rsms.me"],
       imgSrc: ["'self'", "data:", "https:", "http:"],
       connectSrc: [
@@ -44,7 +44,7 @@ export const helmetMiddleware = helmet({
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://rsms.me"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com", "https://cdn.tailwindcss.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "https://rsms.me"],
       imgSrc: ["'self'", "data:", "https:"],
       connectSrc: [

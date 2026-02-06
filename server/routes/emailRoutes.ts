@@ -352,7 +352,56 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Email Preferences</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/email.css">
+  <style>
+    /* Switch component styles */
+    .switch-root {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 24px;
+      background-color: #e2e8f0;
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: background-color 150ms ease-in-out;
+      border: 1px solid #cbd5e1;
+    }
+    
+    .switch-root[data-state="checked"] {
+      background-color: #3b82f6;
+      border-color: #3b82f6;
+    }
+    
+    .switch-root:focus {
+      outline: 2px solid #3b82f6;
+      outline-offset: 2px;
+    }
+    
+    .switch-thumb {
+      position: absolute;
+      display: block;
+      width: 18px;
+      height: 18px;
+      background-color: white;
+      border-radius: 9999px;
+      transition: transform 150ms ease-in-out;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      left: 2px;
+    }
+    
+    .switch-root[data-state="checked"] .switch-thumb {
+      transform: translateX(20px);
+    }
+    
+    .switch-input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+      margin: 0;
+    }
+  </style>
 </head>
 <body class="bg-slate-50 min-h-screen flex items-center justify-center p-4 text-slate-950">
   <div class="bg-white w-full max-w-[480px] rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -384,14 +433,14 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
 
       <div id="formContent">
         <p class="text-sm text-slate-500 mb-6 leading-relaxed">
-          Hi <span class="font-medium text-slate-900">${displayName.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>, customize your subscription settings below:
+          Hi <span class="font-medium text-slate-900">${displayName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}</span>, customize your subscription settings below:
         </p>
 
         ${highlightLabel ? `
         <div class="mb-6 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
           <svg class="w-4 h-4 text-amber-600 mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           <div class="text-sm text-amber-900">
-            This email was sent as <span class="font-medium">${highlightLabel}</span>. You can opt-out of this specific category below.
+            This email was sent as <span class="font-medium">${highlightLabel.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}</span>. You can opt-out of this specific category below.
           </div>
         </div>` : ''}
 

@@ -3,12 +3,7 @@ module.exports = {
     content: [
         './server/routes/emailRoutes.ts',
     ],
-    safelist: [
-        // Extract classes dynamically from template strings
-        {
-            pattern: /bg-|text-|p-|m-|w-|h-|flex|grid|border|rounded|shadow|space-|gap-|items-|justify-|leading-|tracking-|font-|opacity-|transition-|focus-|hover:|disabled:|peer-|ring-|max-w-|min-h-|overflow-|hidden|inline|whitespace-|shrink-|relative|absolute|fixed|sticky|top|bottom|left|right|z-|transform|scale|rotate|translate|skew/
-        }
-    ],
+    safelist: [],
     theme: {
         extend: {
             fontFamily: {
