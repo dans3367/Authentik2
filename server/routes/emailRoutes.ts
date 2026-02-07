@@ -300,6 +300,16 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
   try {
     const token = (req.query.token as string) || '';
     const emailType = (req.query.type as string) || '';
+
+    // Map email types to human-readable labels
+    const emailTypeLabels: Record<string, string> = {
+      'marketing': 'Marketing',
+      'customer_engagement': 'Customer Engagement',
+      'newsletters': 'Newsletters',
+      'surveys_forms': 'Surveys & Forms'
+    };
+    const highlightLabel = emailTypeLabels[emailType] || '';
+
     if (!token) {
       return res.status(400).type('text/html').send('<html><body><h1>Invalid request</h1><p>Missing token.</p></body></html>');
     }
@@ -336,183 +346,310 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
       : '***';
     const displayName = contact.firstName || maskedEmail;
 
-    // Map emailType query param to a human-readable label for the highlight
-    const typeLabels: Record<string, string> = {
-      marketing: 'Marketing',
-      customer_engagement: 'Customer Engagement',
-      newsletters: 'Newsletters',
-      surveys_forms: 'Surveys & Forms',
-    };
-    const highlightLabel = typeLabels[emailType] || '';
-
     return res.status(200).type('text/html').send(`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Email Preferences</title>
+  <link rel="stylesheet" href="/email.css">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f1f5f9; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; color: #334155; }
-    .card { background: white; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); max-width: 520px; width: 100%; overflow: hidden; }
-    .header { background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); padding: 32px 28px; color: white; text-align: center; }
-    .header h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
-    .header p { font-size: 14px; opacity: 0.9; }
-    .body { padding: 28px; }
-    .greeting { font-size: 15px; color: #64748b; margin-bottom: 20px; line-height: 1.5; }
-    ${highlightLabel ? `.highlight-banner { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; color: #92400e; }
-    .highlight-banner strong { color: #78350f; }` : ''}
-    .pref-group { border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
-    .pref-item { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid #f1f5f9; transition: background 0.15s; }
-    .pref-item:last-child { border-bottom: none; }
-    .pref-item:hover { background: #f8fafc; }
-    .pref-info { flex: 1; margin-right: 16px; }
-    .pref-label { font-size: 15px; font-weight: 600; color: #1e293b; margin-bottom: 2px; }
-    .pref-desc { font-size: 12px; color: #94a3b8; line-height: 1.4; }
-    .toggle { position: relative; width: 48px; height: 26px; flex-shrink: 0; }
-    .toggle input { opacity: 0; width: 0; height: 0; }
-    .toggle .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #cbd5e1; border-radius: 26px; transition: 0.25s; }
-    .toggle .slider:before { content: ''; position: absolute; height: 20px; width: 20px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.25s; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
-    .toggle input:checked + .slider { background: #3b82f6; }
-    .toggle input:checked + .slider:before { transform: translateX(22px); }
-    .actions { display: flex; flex-direction: column; gap: 10px; }
-    .btn { display: block; width: 100%; padding: 13px; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; }
-    .btn-primary { background: #3b82f6; color: white; }
-    .btn-primary:hover { background: #2563eb; }
-    .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
-    .btn-danger { background: #fee2e2; color: #dc2626; }
-    .btn-danger:hover { background: #fecaca; }
-    .divider { display: flex; align-items: center; gap: 12px; margin: 4px 0; }
-    .divider span { font-size: 12px; color: #94a3b8; white-space: nowrap; }
-    .divider hr { flex: 1; border: none; border-top: 1px solid #e2e8f0; }
-    .success-msg { display: none; text-align: center; padding: 24px; }
-    .success-msg.show { display: block; }
-    .success-msg .icon { font-size: 48px; margin-bottom: 12px; }
-    .success-msg h2 { font-size: 20px; color: #16a34a; margin-bottom: 8px; }
-    .success-msg p { font-size: 14px; color: #64748b; }
-    .form-content { }
-    .form-content.hidden { display: none; }
-    .error-msg { background: #fef2f2; color: #dc2626; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; display: none; }
+    /* Switch component styles */
+    .switch-root {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 24px;
+      background-color: #e2e8f0;
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: background-color 150ms ease-in-out;
+      border: 1px solid #cbd5e1;
+    }
+    
+    .switch-root[data-state="checked"] {
+      background-color: #3b82f6;
+      border-color: #3b82f6;
+    }
+    
+    .switch-root:focus {
+      outline: 2px solid #3b82f6;
+      outline-offset: 2px;
+    }
+    
+    .switch-thumb {
+      position: absolute;
+      display: block;
+      width: 18px;
+      height: 18px;
+      background-color: white;
+      border-radius: 9999px;
+      transition: transform 150ms ease-in-out;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      left: 2px;
+    }
+    
+    .switch-root[data-state="checked"] .switch-thumb {
+      transform: translateX(20px);
+    }
+    
+    .switch-input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+      margin: 0;
+    }
   </style>
 </head>
-<body>
-  <div class="card">
-    <div class="header">
-      <h1>Email Preferences</h1>
-      <p>Manage which emails you receive</p>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center p-4 text-slate-950">
+  <div class="bg-white w-full max-w-[480px] rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    
+    <!-- Header -->
+    <div class="p-6 pb-2">
+      <h1 class="text-2xl font-semibold tracking-tight">Email Preferences</h1>
+      <p id="headerSubtitle" class="text-sm text-slate-500 mt-1">Manage which emails you receive from us</p>
     </div>
-    <div class="body">
-      <div class="success-msg" id="successMsg">
-        <div class="icon">&#10003;</div>
-        <h2>Preferences Saved</h2>
-        <p>Your email preferences have been updated successfully. You can close this page.</p>
-      </div>
-      <div class="form-content" id="formContent">
-        <p class="greeting">Hi ${displayName.replace(/</g, '&lt;').replace(/>/g, '&gt;')}, choose which types of emails you'd like to receive:</p>
-        ${highlightLabel ? `<div class="highlight-banner">This email was sent as <strong>${highlightLabel}</strong>. You can unsubscribe from this category below, or manage all your preferences.</div>` : ''}
-        <div class="error-msg" id="errorMsg"></div>
-        <div class="pref-group">
-          <div class="pref-item">
-            <div class="pref-info">
-              <div class="pref-label">Marketing</div>
-              <div class="pref-desc">Promotional offers, deals, and product announcements</div>
-            </div>
-            <label class="toggle"><input type="checkbox" id="pref_marketing" ${contact.prefMarketing ? 'checked' : ''}><span class="slider"></span></label>
-          </div>
-          <div class="pref-item">
-            <div class="pref-info">
-              <div class="pref-label">Customer Engagement</div>
-              <div class="pref-desc">Birthday wishes, loyalty rewards, and personalized messages</div>
-            </div>
-            <label class="toggle"><input type="checkbox" id="pref_customer_engagement" ${contact.prefCustomerEngagement ? 'checked' : ''}><span class="slider"></span></label>
-          </div>
-          <div class="pref-item">
-            <div class="pref-info">
-              <div class="pref-label">Newsletters</div>
-              <div class="pref-desc">Regular updates, news, and content digests</div>
-            </div>
-            <label class="toggle"><input type="checkbox" id="pref_newsletters" ${contact.prefNewsletters ? 'checked' : ''}><span class="slider"></span></label>
-          </div>
-          <div class="pref-item">
-            <div class="pref-info">
-              <div class="pref-label">Surveys &amp; Forms</div>
-              <div class="pref-desc">Feedback requests, surveys, and form invitations</div>
-            </div>
-            <label class="toggle"><input type="checkbox" id="pref_surveys_forms" ${contact.prefSurveysForms ? 'checked' : ''}><span class="slider"></span></label>
-          </div>
+
+    <div class="p-6 pt-4">
+      <!-- Success Message -->
+      <div id="successMsg" class="hidden mb-6 bg-green-50 border border-green-200 text-green-800 rounded-lg p-4 text-sm">
+        <div class="flex items-center gap-2 font-medium mb-1">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          Preferences Saved
         </div>
-        <div class="actions">
-          <button class="btn btn-primary" id="saveBtn">Save Preferences</button>
-          <div class="divider"><hr><span>or</span><hr></div>
-          <button class="btn btn-danger" id="unsubAllBtn">Unsubscribe from All</button>
+        <p class="text-green-700">Your email preferences have been updated successfully.</p>
+      </div>
+
+      <!-- Unsubscribed Message -->
+      <div id="unsubMsg" class="hidden mb-6 bg-slate-100 border border-slate-200 text-slate-800 rounded-lg p-4 text-sm">
+        <div class="flex items-center gap-2 font-medium mb-1">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+          Unsubscribed
+        </div>
+        <p class="text-slate-600">You have been unsubscribed from all emails.</p>
+      </div>
+
+      <div id="formContent">
+        <p class="text-sm text-slate-500 mb-6 leading-relaxed">
+          Hi <span class="font-medium text-slate-900">${displayName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}</span>, customize your subscription settings below:
+        </p>
+
+        ${highlightLabel ? `
+        <div class="mb-6 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+          <svg class="w-4 h-4 text-amber-600 mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <div class="text-sm text-amber-900">
+            This email was sent as <span class="font-medium">${highlightLabel.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}</span>. You can opt-out of this specific category below.
+          </div>
+        </div>` : ''}
+
+        <div id="errorMsg" class="hidden mb-4 p-3 bg-red-50 text-red-600 border border-red-200 rounded-md text-sm"></div>
+
+        <div class="space-y-6">
+          
+          <!-- Marketing Item -->
+          <div class="flex items-start justify-between space-x-4">
+            <div class="space-y-0.5">
+              <label class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" for="pref_marketing">
+                Marketing
+              </label>
+              <p class="text-[0.8rem] text-slate-500">
+                Promotional offers, deals, and product announcements.
+              </p>
+            </div>
+            <div class="switch-root" role="switch" aria-checked="${contact.prefMarketing}" tabindex="0" data-state="${contact.prefMarketing ? 'checked' : 'unchecked'}" data-target="pref_marketing">
+              <span class="switch-thumb"></span>
+              <input type="checkbox" id="pref_marketing" class="switch-input" ${contact.prefMarketing ? 'checked' : ''} aria-hidden="true">
+            </div>
+          </div>
+          
+          <div class="h-px bg-slate-100"></div>
+
+          <!-- Customer Engagement Item -->
+          <div class="flex items-start justify-between space-x-4">
+            <div class="space-y-0.5">
+              <label class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" for="pref_customer_engagement">
+                Customer Engagement
+              </label>
+              <p class="text-[0.8rem] text-slate-500">
+                Birthday wishes, personalized messages, and loyalty rewards.
+              </p>
+            </div>
+            <div class="switch-root" role="switch" aria-checked="${contact.prefCustomerEngagement}" tabindex="0" data-state="${contact.prefCustomerEngagement ? 'checked' : 'unchecked'}" data-target="pref_customer_engagement">
+              <span class="switch-thumb"></span>
+              <input type="checkbox" id="pref_customer_engagement" class="switch-input" ${contact.prefCustomerEngagement ? 'checked' : ''} aria-hidden="true">
+            </div>
+          </div>
+
+          <div class="h-px bg-slate-100"></div>
+
+          <!-- Newsletters Item -->
+          <div class="flex items-start justify-between space-x-4">
+            <div class="space-y-0.5">
+              <label class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" for="pref_newsletters">
+                Newsletters
+              </label>
+              <p class="text-[0.8rem] text-slate-500">
+                Regular updates, news, and monthly digests.
+              </p>
+            </div>
+            <div class="switch-root" role="switch" aria-checked="${contact.prefNewsletters}" tabindex="0" data-state="${contact.prefNewsletters ? 'checked' : 'unchecked'}" data-target="pref_newsletters">
+              <span class="switch-thumb"></span>
+              <input type="checkbox" id="pref_newsletters" class="switch-input" ${contact.prefNewsletters ? 'checked' : ''} aria-hidden="true">
+            </div>
+          </div>
+
+          <div class="h-px bg-slate-100"></div>
+
+          <!-- Surveys Item -->
+          <div class="flex items-start justify-between space-x-4">
+            <div class="space-y-0.5">
+              <label class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" for="pref_surveys_forms">
+                Surveys & Forms
+              </label>
+              <p class="text-[0.8rem] text-slate-500">
+                Feedback requests and satisfaction surveys.
+              </p>
+            </div>
+            <div class="switch-root" role="switch" aria-checked="${contact.prefSurveysForms}" tabindex="0" data-state="${contact.prefSurveysForms ? 'checked' : 'unchecked'}" data-target="pref_surveys_forms">
+              <span class="switch-thumb"></span>
+              <input type="checkbox" id="pref_surveys_forms" class="switch-input" ${contact.prefSurveysForms ? 'checked' : ''} aria-hidden="true">
+            </div>
+          </div>
+
+        </div>
+
+        <div class="mt-8 space-y-4">
+          <button id="saveBtn" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-slate-900 text-slate-50 hover:bg-slate-900/90 h-10 px-4 py-2 w-full">
+            Save Preferences
+          </button>
+          
+          <button id="unsubAllBtn" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 text-red-500 hover:text-red-700 hover:bg-red-50 h-9 px-4 py-2 w-full">
+            Unsubscribe from all emails
+          </button>
         </div>
       </div>
     </div>
   </div>
+
   <script>
     var TOKEN = ${JSON.stringify(token)};
+
+    function toggleSwitch(element, inputId) {
+      const checkbox = document.getElementById(inputId);
+      checkbox.checked = !checkbox.checked;
+      element.setAttribute('data-state', checkbox.checked ? 'checked' : 'unchecked');
+      element.setAttribute('aria-checked', checkbox.checked);
+    }
+
+    function showSuccess(elementId, title) {
+      document.getElementById('formContent').classList.add('hidden');
+      const headerP = document.getElementById('headerSubtitle');
+      if (headerP) headerP.remove();
+      document.getElementById(elementId).classList.remove('hidden');
+      const h1 = document.querySelector('h1');
+      if (h1) h1.textContent = title;
+    }
+
+    // Attach click and keyboard handlers to all switches (CSP-safe: no inline handlers)
+    document.querySelectorAll('.switch-root[data-target]').forEach(function(el) {
+      el.addEventListener('click', function() {
+        toggleSwitch(this, this.getAttribute('data-target'));
+      });
+      
+      el.addEventListener('keydown', function(e) {
+        if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault();
+          toggleSwitch(this, this.getAttribute('data-target'));
+        }
+      });
+    });
+
     document.getElementById('saveBtn').addEventListener('click', function() {
       var btn = document.getElementById('saveBtn');
+      var originalText = btn.textContent;
+      
       btn.disabled = true;
-      btn.textContent = 'Saving...';
-      document.getElementById('errorMsg').style.display = 'none';
+      btn.innerHTML = '<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Saving...';
+      
+      document.getElementById('errorMsg').classList.add('hidden');
+      
       var prefs = {
         marketing: document.getElementById('pref_marketing').checked,
         customerEngagement: document.getElementById('pref_customer_engagement').checked,
         newsletters: document.getElementById('pref_newsletters').checked,
         surveysForms: document.getElementById('pref_surveys_forms').checked,
       };
+
       fetch('/api/email/unsubscribe/preferences', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: TOKEN, preferences: prefs }),
-      }).then(function(r) { return r.json(); }).then(function(data) {
-        if (data.success) {
-          document.getElementById('formContent').classList.add('hidden');
-          document.getElementById('successMsg').classList.add('show');
-        } else {
-          document.getElementById('errorMsg').textContent = data.error || 'Failed to save preferences.';
-          document.getElementById('errorMsg').style.display = 'block';
-          btn.disabled = false;
-          btn.textContent = 'Save Preferences';
+      }).then(function(r) {
+        if (r.ok) {
+          return r.json();
         }
-      }).catch(function() {
-        document.getElementById('errorMsg').textContent = 'Network error. Please try again.';
-        document.getElementById('errorMsg').style.display = 'block';
-        btn.disabled = false;
-        btn.textContent = 'Save Preferences';
+        return r.text().then(function(text) {
+          throw new Error(text || r.status + ' ' + r.statusText);
+        });
+      }).then(function(data) {
+        if (data.success) {
+          showSuccess('successMsg', 'Preferences Updated');
+        } else {
+          showError(data.error || 'Failed to save preferences.');
+          resetBtn(btn, originalText);
+        }
+      }).catch(function(err) {
+        showError(err.message || 'Network error. Please try again.');
+        resetBtn(btn, originalText);
       });
     });
+
     document.getElementById('unsubAllBtn').addEventListener('click', function() {
       if (!confirm('Are you sure you want to unsubscribe from all emails?')) return;
+      
       var btn = document.getElementById('unsubAllBtn');
+      var originalText = btn.textContent;
+      
       btn.disabled = true;
       btn.textContent = 'Unsubscribing...';
-      document.getElementById('errorMsg').style.display = 'none';
+      document.getElementById('errorMsg').classList.add('hidden');
+
       fetch('/api/email/unsubscribe/preferences', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: TOKEN, unsubscribeAll: true }),
-      }).then(function(r) { return r.json(); }).then(function(data) {
-        if (data.success) {
-          document.getElementById('formContent').classList.add('hidden');
-          var msg = document.getElementById('successMsg');
-          msg.querySelector('h2').textContent = 'Unsubscribed';
-          msg.querySelector('p').textContent = 'You have been unsubscribed from all emails. You can close this page.';
-          msg.classList.add('show');
-        } else {
-          document.getElementById('errorMsg').textContent = data.error || 'Failed to unsubscribe.';
-          document.getElementById('errorMsg').style.display = 'block';
-          btn.disabled = false;
-          btn.textContent = 'Unsubscribe from All';
+      }).then(function(r) {
+        if (r.ok) {
+          return r.json();
         }
-      }).catch(function() {
-        document.getElementById('errorMsg').textContent = 'Network error. Please try again.';
-        document.getElementById('errorMsg').style.display = 'block';
-        btn.disabled = false;
-        btn.textContent = 'Unsubscribe from All';
+        return r.text().then(function(text) {
+          throw new Error(text || r.status + ' ' + r.statusText);
+        });
+      }).then(function(data) {
+        if (data.success) {
+          showSuccess('unsubMsg', 'Unsubscribed');
+        } else {
+          showError(data.error || 'Failed to unsubscribe.');
+          resetBtn(btn, originalText);
+        }
+      }).catch(function(err) {
+        showError(err.message || 'Network error. Please try again.');
+        resetBtn(btn, originalText);
       });
     });
+
+    function showError(msg) {
+      var el = document.getElementById('errorMsg');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    function resetBtn(btn, text) {
+      btn.disabled = false;
+      btn.textContent = text;
+    }
   </script>
 </body>
 </html>`);

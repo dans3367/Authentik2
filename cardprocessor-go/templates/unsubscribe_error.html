@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +11,7 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
@@ -20,7 +21,7 @@
             justify-content: center;
             padding: 20px;
         }
-        
+
         .container {
             background: white;
             border-radius: 16px;
@@ -30,7 +31,7 @@
             padding: 40px;
             text-align: center;
         }
-        
+
         .icon {
             width: 80px;
             height: 80px;
@@ -42,21 +43,21 @@
             justify-content: center;
             font-size: 36px;
         }
-        
+
         h1 {
             color: #2d3748;
             font-size: 28px;
             font-weight: 700;
             margin-bottom: 16px;
         }
-        
+
         .subtitle {
             color: #718096;
             font-size: 16px;
             margin-bottom: 32px;
             line-height: 1.5;
         }
-        
+
         .error-message {
             background: #fed7d7;
             border: 1px solid #feb2b2;
@@ -66,18 +67,18 @@
             color: #742a2a;
             text-align: left;
         }
-        
+
         .error-message h3 {
             color: #742a2a;
             font-size: 18px;
             margin-bottom: 8px;
         }
-        
+
         .error-message p {
             font-size: 14px;
             line-height: 1.5;
         }
-        
+
         .help-section {
             background: #f7fafc;
             border-radius: 12px;
@@ -85,24 +86,24 @@
             margin-bottom: 32px;
             text-align: left;
         }
-        
+
         .help-section h4 {
             color: #2d3748;
             font-size: 16px;
             margin-bottom: 12px;
         }
-        
+
         .help-section ul {
             color: #4a5568;
             font-size: 14px;
             line-height: 1.6;
             padding-left: 20px;
         }
-        
+
         .help-section li {
             margin-bottom: 8px;
         }
-        
+
         .btn {
             padding: 14px 24px;
             border: none;
@@ -117,20 +118,20 @@
             color: white;
             margin: 0 8px;
         }
-        
+
         .btn:hover {
             background: #2d3748;
             transform: translateY(-1px);
         }
-        
+
         .btn-primary {
             background: #3182ce;
         }
-        
+
         .btn-primary:hover {
             background: #2c5282;
         }
-        
+
         .footer {
             margin-top: 32px;
             padding-top: 24px;
@@ -138,16 +139,16 @@
             color: #718096;
             font-size: 14px;
         }
-        
+
         @media (max-width: 480px) {
             .container {
                 padding: 24px;
             }
-            
+
             h1 {
                 font-size: 24px;
             }
-            
+
             .btn {
                 display: block;
                 margin: 8px 0;
@@ -155,17 +156,18 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="icon">❌</div>
         <h1>{{.ErrorHeading}}</h1>
         <p class="subtitle">{{.TemplateText.ErrorPageSubtitle}}</p>
-        
+
         <div class="error-message">
             <h3>{{.TemplateText.ErrorDetailsHeading}}</h3>
             <p>{{.ErrorMessage}}</p>
         </div>
-        
+
         <div class="help-section">
             <h4>{{.TemplateText.WhatYouCanDoHeading}}</h4>
             <ul>
@@ -175,15 +177,34 @@
                 <li>{{.TemplateText.WhatYouCanDo4}}</li>
             </ul>
         </div>
-        
+
         <div>
-            <button onclick="window.location.reload()" class="btn btn-primary">{{.TemplateText.TryAgainButton}}</button>
-            <button onclick="window.close()" class="btn">{{.TemplateText.CloseWindowButton}}</button>
+            <button id="tryAgainBtn" class="btn btn-primary">{{.TemplateText.TryAgainButton}}</button>
+            <button id="closeWindowBtn" class="btn">{{.TemplateText.CloseWindowButton}}</button>
+            <p id="close-fallback" style="display: none; margin-top: 12px; font-size: 14px; color: #718096;">
+                Unable to close the tab automatically. Please close it manually.
+            </p>
         </div>
-        
+
         <div class="footer">
             <p>{{.TemplateText.ContinueIssuesText}}</p>
         </div>
     </div>
+    <script>
+        document.getElementById('tryAgainBtn').addEventListener('click', function () {
+            window.location.reload();
+        });
+        document.getElementById('closeWindowBtn').addEventListener('click', function () {
+            window.close();
+            // Fallback if window doesn't close (e.g. script didn't open it)
+            setTimeout(function () {
+                if (!window.closed) {
+                    var fallback = document.getElementById('close-fallback');
+                    if (fallback) fallback.style.display = 'block';
+                }
+            }, 100);
+        });
+    </script>
 </body>
+
 </html>

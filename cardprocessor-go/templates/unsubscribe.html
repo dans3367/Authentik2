@@ -189,7 +189,8 @@
         <div class="icon">🎂</div>
         {{if .TokenUsed}}
         <h1>You're Already Unsubscribed</h1>
-        <p class="subtitle">You have already unsubscribed from birthday card notifications. You can resubscribe below if you'd like to receive them again.</p>
+        <p class="subtitle">You have already unsubscribed from birthday card notifications. You can resubscribe below if
+            you'd like to receive them again.</p>
         {{else}}
         <h1>{{.Translations.UnsubscribeHeading}}</h1>
         <p class="subtitle">{{.Translations.UnsubscribeMessage}}</p>
@@ -221,8 +222,7 @@
 
             <div class="form-group">
                 <label for="feedback">{{.TemplateText.FeedbackLabel}}</label>
-                <textarea name="feedback" id="feedback"
-                    placeholder="{{.TemplateText.FeedbackPlaceholder}}"></textarea>
+                <textarea name="feedback" id="feedback" placeholder="{{.TemplateText.FeedbackPlaceholder}}"></textarea>
             </div>
             {{end}}
 
@@ -232,10 +232,42 @@
                 {{else}}
                 <button type="submit" class="btn btn-primary">{{.Translations.UnsubscribeButton}}</button>
                 {{end}}
-                <a href="#" onclick="window.close(); return false;" class="btn btn-secondary">{{.TemplateText.CancelButton}}</a>
+                <a href="#" id="cancelBtn" class="btn btn-secondary">{{.TemplateText.CancelButton}}</a>
             </div>
         </form>
     </div>
+    <script>
+        document.getElementById('cancelBtn').addEventListener('click', function (e) {
+            e.preventDefault();
+            window.close();
+
+            // Detect failure and provide fallback
+            setTimeout(function () {
+                if (!window.closed) {
+                    // 1. Try navigating back if there's history
+                    if (window.history.length > 1) {
+                        window.history.back();
+                    }
+
+                    // 2. Reveal an on-page message as visual feedback
+                    var msgId = 'cancel-fallback-msg';
+                    if (!document.getElementById(msgId)) {
+                        var msg = document.createElement('div');
+                        msg.id = msgId;
+                        msg.innerText = 'Unable to close automatically. You may close this tab.';
+                        msg.style.marginTop = '16px';
+                        msg.style.color = '#718096';
+                        msg.style.fontSize = '14px';
+
+                        var btnGroup = document.querySelector('.button-group');
+                        if (btnGroup && btnGroup.parentNode) {
+                            btnGroup.parentNode.insertBefore(msg, btnGroup.nextSibling);
+                        }
+                    }
+                }
+            }, 100);
+        });
+    </script>
 </body>
 
 </html>
