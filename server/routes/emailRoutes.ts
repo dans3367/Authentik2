@@ -409,7 +409,7 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
     <!-- Header -->
     <div class="p-6 pb-2">
       <h1 class="text-2xl font-semibold tracking-tight">Email Preferences</h1>
-      <p class="text-sm text-slate-500 mt-1">Manage which emails you receive from us</p>
+      <p id="headerSubtitle" class="text-sm text-slate-500 mt-1">Manage which emails you receive from us</p>
     </div>
 
     <div class="p-6 pt-4">
@@ -543,6 +543,15 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
       element.setAttribute('aria-checked', checkbox.checked);
     }
 
+    function showSuccess(elementId, title) {
+      document.getElementById('formContent').classList.add('hidden');
+      const headerP = document.getElementById('headerSubtitle');
+      if (headerP) headerP.remove();
+      document.getElementById(elementId).classList.remove('hidden');
+      const h1 = document.querySelector('h1');
+      if (h1) h1.textContent = title;
+    }
+
     // Attach click and keyboard handlers to all switches (CSP-safe: no inline handlers)
     document.querySelectorAll('.switch-root[data-target]').forEach(function(el) {
       el.addEventListener('click', function() {
@@ -586,13 +595,7 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
         });
       }).then(function(data) {
         if (data.success) {
-          document.getElementById('formContent').classList.add('hidden');
-          const headerP = document.querySelector('.p-6.pb-2 p');
-          if (headerP) headerP.remove();
-          document.getElementById('successMsg').classList.remove('hidden');
-          // Update header title to be more generic after save
-          const h1 = document.querySelector('h1');
-          if (h1) h1.textContent = 'Preferences Updated';
+          showSuccess('successMsg', 'Preferences Updated');
         } else {
           showError(data.error || 'Failed to save preferences.');
           resetBtn(btn, originalText);
@@ -626,12 +629,7 @@ emailRoutes.get('/unsubscribe', unsubscribeLimiter, async (req, res) => {
         });
       }).then(function(data) {
         if (data.success) {
-          document.getElementById('formContent').classList.add('hidden');
-          const headerP = document.querySelector('.p-6.pb-2 p');
-          if (headerP) headerP.remove();
-          document.getElementById('unsubMsg').classList.remove('hidden');
-          const h1 = document.querySelector('h1');
-          if (h1) h1.textContent = 'Unsubscribed';
+          showSuccess('unsubMsg', 'Unsubscribed');
         } else {
           showError(data.error || 'Failed to unsubscribe.');
           resetBtn(btn, originalText);
