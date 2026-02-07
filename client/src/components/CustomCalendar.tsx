@@ -4,7 +4,7 @@ import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterv
 import { Button } from '@/components/ui/button';
 
 interface ActivityIndicator {
-  type: 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'unsubscribed';
+  type: 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'unsubscribed' | 'preference_updated';
   count: number;
 }
 
@@ -26,6 +26,7 @@ const getActivityColor = (type: string): string => {
     case 'sent': return 'bg-gray-400';
     case 'bounced': case 'complained': return 'bg-red-500';
     case 'unsubscribed': return 'bg-orange-500';
+    case 'preference_updated': return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400';
     default: return 'bg-gray-300';
   }
 };
@@ -48,10 +49,10 @@ const CustomCalendar: React.FC<CalendarProps> = ({
     const monthStart = startOfMonth(monthDate);
     const monthEnd = endOfMonth(monthDate);
     const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
-    
+
     // Get the first day of the week for the month (0 = Sunday)
     const firstDayOfWeek = monthStart.getDay();
-    
+
     // Create empty cells for days before the month starts
     const emptyDays = Array.from({ length: firstDayOfWeek }, (_, i) => i);
 
@@ -82,12 +83,12 @@ const CustomCalendar: React.FC<CalendarProps> = ({
       } else {
         const range = selected as { from?: Date; to?: Date } | undefined;
         if (!range) return false;
-        
+
         // Normalize dates to start of day for accurate comparison
         const normalizedDate = startOfDay(date);
         const normalizedFrom = range.from ? startOfDay(range.from) : null;
         const normalizedTo = range.to ? startOfDay(range.to) : null;
-        
+
         if (normalizedFrom && normalizedTo) {
           return normalizedDate.getTime() >= normalizedFrom.getTime() && normalizedDate.getTime() <= normalizedTo.getTime();
         }
@@ -99,27 +100,27 @@ const CustomCalendar: React.FC<CalendarProps> = ({
       if (mode !== 'range') return false;
       const range = selected as { from?: Date; to?: Date } | undefined;
       if (!range?.from) return false;
-      
+
       // Handle single date selection (only 'from' is set)
       if (range.from && !range.to) {
         return isSameDay(date, range.from) ? 'start' : false;
       }
-      
+
       // Handle complete range selection
       if (range.from && range.to) {
         if (isSameDay(date, range.from)) return 'start';
         if (isSameDay(date, range.to)) return 'end';
-        
+
         // Use normalized dates for middle comparison
         const normalizedDate = startOfDay(date);
         const normalizedFrom = startOfDay(range.from);
         const normalizedTo = startOfDay(range.to);
-        
+
         if (normalizedDate > normalizedFrom && normalizedDate < normalizedTo) {
           return 'middle';
         }
       }
-      
+
       return false;
     };
 
@@ -167,7 +168,7 @@ const CustomCalendar: React.FC<CalendarProps> = ({
           {emptyDays.map(i => (
             <div key={`empty-${i}`} className="h-10" />
           ))}
-          
+
           {/* Month days */}
           {days.map(date => {
             const dateStr = format(date, 'yyyy-MM-dd');
@@ -215,7 +216,7 @@ const CustomCalendar: React.FC<CalendarProps> = ({
                 <span className="relative z-10">
                   {format(date, 'd')}
                 </span>
-                
+
                 {/* Activity indicators */}
                 {activities.length > 0 && (
                   <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 flex gap-0.5">

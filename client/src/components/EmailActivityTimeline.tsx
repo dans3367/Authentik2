@@ -19,7 +19,8 @@ import {
   CalendarDays,
   X,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Settings
 } from "lucide-react";
 import ActivityIcon from "@assets/28_new.svg";
 import { useEffect, useState } from "react";
@@ -27,7 +28,7 @@ import { addDays, format } from "date-fns";
 
 interface EmailActivity {
   id: string;
-  activityType: 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'unsubscribed';
+  activityType: 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'unsubscribed' | 'preference_updated';
   occurredAt: string;
   activityData?: string;
   userAgent?: string;
@@ -68,6 +69,7 @@ const getActivityIcon = (activityType: EmailActivity['activityType']) => {
     bounced: AlertTriangle,
     complained: Shield,
     unsubscribed: UserMinus,
+    preference_updated: Settings,
   };
   return iconMap[activityType] || CustomClockIcon;
 };
@@ -81,6 +83,7 @@ const getActivityColor = (activityType: EmailActivity['activityType']) => {
     bounced: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
     complained: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
     unsubscribed: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400",
+    preference_updated: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
   };
   return colorMap[activityType] || "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400";
 };
@@ -94,6 +97,7 @@ const getActivityDescription = (activityType: EmailActivity['activityType']) => 
     bounced: "Email bounced and couldn't be delivered",
     complained: "Recipient marked as spam",
     unsubscribed: "Recipient unsubscribed",
+    preference_updated: "Email preferences were updated",
   };
   return descriptionMap[activityType] || "Activity recorded";
 };
@@ -843,6 +847,52 @@ export default function EmailActivityTimeline({ contactId, pageSize = 20, initia
                       </div>
                     )}
                     
+                    {/* Preference update details */}
+                    {activity.activityType === 'preference_updated' && parsedActivityData?.preferences && (
+                      <div className="mt-2 p-2.5 bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-800/30 rounded-md space-y-1.5">
+                        <p className="text-xs font-medium text-indigo-700 dark:text-indigo-300">Channel preferences:</p>
+                        <div className="grid grid-cols-2 gap-1">
+                          {[
+                            { key: 'marketing', label: 'Marketing' },
+                            { key: 'customerEngagement', label: 'Customer Engagement' },
+                            { key: 'newsletters', label: 'Newsletters' },
+                            { key: 'surveysForms', label: 'Surveys & Forms' },
+                          ].map((ch) => (
+                            <div key={ch.key} className="flex items-center gap-1.5 text-xs">
+                              <span className={`inline-block w-2 h-2 rounded-full ${parsedActivityData.preferences[ch.key] ? 'bg-green-500' : 'bg-red-400'}`} />
+                              <span className="text-gray-700 dark:text-gray-300">{ch.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {parsedActivityData.unsubscribedFrom?.length > 0 && (
+                          <p className="text-xs text-red-600 dark:text-red-400">
+                            Opted out of: {parsedActivityData.unsubscribedFrom.map((c: string) => c.replace(/_/g, ' ')).join(', ')}
+                          </p>
+                        )}
+                        {parsedActivityData.source && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Via: {parsedActivityData.source.replace(/_/g, ' ')}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Unsubscribe details */}
+                    {activity.activityType === 'unsubscribed' && parsedActivityData && (
+                      <div className="mt-2 p-2.5 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-md space-y-1">
+                        {parsedActivityData.categories && (
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            <span className="font-medium">Scope:</span> {parsedActivityData.categories === 'all' ? 'All email categories' : parsedActivityData.categories}
+                          </p>
+                        )}
+                        {parsedActivityData.source && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Via: {parsedActivityData.source.replace(/_/g, ' ')}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     {/* User agent and IP for certain activities */}
                     {(activity.activityType === 'opened' || activity.activityType === 'clicked') && (activity.userAgent || activity.ipAddress) && (
                       <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">

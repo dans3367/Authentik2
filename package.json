@@ -15,7 +15,8 @@
     "db:init": "tsx server/init-db.ts",
     "user:set-owner": "tsx server/update-user-role.ts",
     "db:fix-foreign-keys": "tsx server/migrate-users.ts",
-    "seed:owner-company": "tsx seeders/create-owner-company-seeder.ts"
+    "seed:owner-company": "tsx seeders/create-owner-company-seeder.ts",
+    "build:email-css": "tailwindcss -c tailwind.email.config.js -o server/public/email.css --minify"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.17",
