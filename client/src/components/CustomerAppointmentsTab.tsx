@@ -15,6 +15,16 @@ import {
     SheetTitle,
 } from "@/components/ui/sheet";
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
@@ -47,6 +57,7 @@ import {
     ChevronLeft,
     Mail,
     Send,
+    Plus,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -142,6 +153,99 @@ export default function CustomerAppointmentsTab({
             });
         },
     });
+
+    // Create appointment state and mutation
+    const [createDialogOpen, setCreateDialogOpen] = useState(false);
+    const [newAppointment, setNewAppointment] = useState({
+        title: "",
+        description: "",
+        appointmentDate: "",
+        appointmentTime: "",
+        duration: 60,
+        location: "",
+        serviceType: "",
+        notes: "",
+    });
+    const [formErrors, setFormErrors] = useState<{ title?: boolean; date?: boolean }>({});
+
+    const resetForm = () => {
+        setNewAppointment({
+            title: "",
+            description: "",
+            appointmentDate: "",
+            appointmentTime: "",
+            duration: 60,
+            location: "",
+            serviceType: "",
+            notes: "",
+        });
+        setFormErrors({});
+    };
+
+    const createAppointmentMutation = useMutation({
+        mutationFn: async (data: Record<string, any>) => {
+            const response = await apiRequest("POST", "/api/appointments", data);
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+            toast({
+                title: "Appointment Created",
+                description: "The appointment has been scheduled successfully.",
+            });
+            setCreateDialogOpen(false);
+            resetForm();
+        },
+        onError: (error: any) => {
+            toast({
+                title: "Error",
+                description: error.message || "Failed to create appointment",
+                variant: "destructive",
+            });
+        },
+    });
+
+    const handleCreateAppointment = () => {
+        const errors: { title?: boolean; date?: boolean } = {};
+        if (!newAppointment.title.trim()) errors.title = true;
+        if (!newAppointment.appointmentDate) errors.date = true;
+
+        if (Object.keys(errors).length > 0) {
+            setFormErrors(errors);
+            toast({
+                title: "Validation Error",
+                description: "Please fill in all required fields.",
+                variant: "destructive",
+            });
+            return;
+        }
+        setFormErrors({});
+
+        // Combine date and time into a single Date
+        const dateStr = newAppointment.appointmentDate;
+        const timeStr = newAppointment.appointmentTime || "09:00";
+        const appointmentDate = new Date(`${dateStr}T${timeStr}`);
+
+        if (appointmentDate < new Date()) {
+            toast({
+                title: "Invalid Date",
+                description: "Appointment date must be in the future.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        createAppointmentMutation.mutate({
+            customerId,
+            title: newAppointment.title.trim(),
+            description: newAppointment.description.trim() || undefined,
+            appointmentDate: appointmentDate.toISOString(),
+            duration: newAppointment.duration,
+            location: newAppointment.location.trim() || undefined,
+            serviceType: newAppointment.serviceType.trim() || undefined,
+            notes: newAppointment.notes.trim() || undefined,
+        });
+    };
 
     const appointments = appointmentsData?.appointments || [];
 
@@ -348,6 +452,124 @@ export default function CustomerAppointmentsTab({
         </button>
     );
 
+    const createAppointmentDialog = (
+        <Dialog open={createDialogOpen} onOpenChange={(open) => {
+            setCreateDialogOpen(open);
+            if (!open) resetForm();
+        }}>
+            <DialogContent className="max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+                <DialogHeader>
+                    <DialogTitle>New Appointment</DialogTitle>
+                    <DialogDescription>
+                        Schedule a new appointment for this customer.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 overflow-y-auto flex-1 px-1 py-1">
+                    <div>
+                        <Label className={formErrors.title ? "text-red-500" : ""}>
+                            Title <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                            value={newAppointment.title}
+                            onChange={(e) => {
+                                setNewAppointment(prev => ({ ...prev, title: e.target.value }));
+                                setFormErrors(prev => ({ ...prev, title: false }));
+                            }}
+                            placeholder="e.g. Follow-up consultation"
+                            className={formErrors.title ? "border-red-500" : ""}
+                        />
+                    </div>
+
+                    <div>
+                        <Label className={formErrors.date ? "text-red-500" : ""}>
+                            Date & Time <span className="text-red-500">*</span>
+                        </Label>
+                        <div className="grid grid-cols-2 gap-2">
+                            <Input
+                                type="date"
+                                value={newAppointment.appointmentDate}
+                                onChange={(e) => {
+                                    setNewAppointment(prev => ({ ...prev, appointmentDate: e.target.value }));
+                                    setFormErrors(prev => ({ ...prev, date: false }));
+                                }}
+                                className={formErrors.date ? "border-red-500" : ""}
+                            />
+                            <Input
+                                type="time"
+                                value={newAppointment.appointmentTime}
+                                onChange={(e) => setNewAppointment(prev => ({ ...prev, appointmentTime: e.target.value }))}
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <Label>Duration (minutes)</Label>
+                        <Input
+                            type="number"
+                            value={newAppointment.duration}
+                            onChange={(e) => setNewAppointment(prev => ({ ...prev, duration: parseInt(e.target.value, 10) || 60 }))}
+                            min="15"
+                            step="15"
+                        />
+                    </div>
+
+                    <div>
+                        <Label>Location</Label>
+                        <Input
+                            value={newAppointment.location}
+                            onChange={(e) => setNewAppointment(prev => ({ ...prev, location: e.target.value }))}
+                            placeholder="e.g. Office, Zoom, etc."
+                        />
+                    </div>
+
+                    <div>
+                        <Label>Service Type</Label>
+                        <Input
+                            value={newAppointment.serviceType}
+                            onChange={(e) => setNewAppointment(prev => ({ ...prev, serviceType: e.target.value }))}
+                            placeholder="e.g. Consultation, Check-up"
+                        />
+                    </div>
+
+                    <div>
+                        <Label>Description</Label>
+                        <Textarea
+                            value={newAppointment.description}
+                            onChange={(e) => setNewAppointment(prev => ({ ...prev, description: e.target.value }))}
+                            placeholder="Brief description of the appointment..."
+                            rows={2}
+                        />
+                    </div>
+
+                    <div>
+                        <Label>Notes</Label>
+                        <Textarea
+                            value={newAppointment.notes}
+                            onChange={(e) => setNewAppointment(prev => ({ ...prev, notes: e.target.value }))}
+                            placeholder="Internal notes..."
+                            rows={2}
+                        />
+                    </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4 border-t">
+                    <Button variant="outline" onClick={() => {
+                        setCreateDialogOpen(false);
+                        resetForm();
+                    }}>
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleCreateAppointment}
+                        disabled={createAppointmentMutation.isPending}
+                    >
+                        {createAppointmentMutation.isPending ? "Creating..." : "Create Appointment"}
+                    </Button>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+
     if (isLoading) {
         return (
             <div className="space-y-4">
@@ -379,17 +601,27 @@ export default function CustomerAppointmentsTab({
 
     if (appointments.length === 0) {
         return (
-            <Card>
-                <CardContent className="py-12">
-                    <div className="text-center text-gray-500 dark:text-gray-400">
-                        <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                        <p className="font-medium">No appointments found</p>
-                        <p className="text-sm mt-1">
-                            This customer doesn't have any appointments yet.
-                        </p>
-                    </div>
-                </CardContent>
-            </Card>
+            <>
+                <Card>
+                    <CardContent className="py-12">
+                        <div className="text-center text-gray-500 dark:text-gray-400">
+                            <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                            <p className="font-medium">No appointments found</p>
+                            <p className="text-sm mt-1">
+                                This customer doesn't have any appointments yet.
+                            </p>
+                            <Button
+                                className="mt-4"
+                                onClick={() => setCreateDialogOpen(true)}
+                            >
+                                <Plus className="w-4 h-4 mr-2" />
+                                New Appointment
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+                {createAppointmentDialog}
+            </>
         );
     }
 
@@ -399,15 +631,24 @@ export default function CustomerAppointmentsTab({
                 {/* Upcoming Appointments */}
                 <Card>
                     <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center gap-2 text-base">
-                            <CalendarClock className="w-4 h-4 text-blue-500" />
-                            Upcoming Appointments
-                            {upcomingAppointments.length > 0 && (
-                                <Badge variant="secondary" className="ml-1">
-                                    {upcomingAppointments.length}
-                                </Badge>
-                            )}
-                        </CardTitle>
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <CalendarClock className="w-4 h-4 text-blue-500" />
+                                Upcoming Appointments
+                                {upcomingAppointments.length > 0 && (
+                                    <Badge variant="secondary" className="ml-1">
+                                        {upcomingAppointments.length}
+                                    </Badge>
+                                )}
+                            </CardTitle>
+                            <Button
+                                size="sm"
+                                onClick={() => setCreateDialogOpen(true)}
+                            >
+                                <Plus className="w-4 h-4 mr-1" />
+                                New
+                            </Button>
+                        </div>
                     </CardHeader>
                     <CardContent>
                         {upcomingAppointments.length > 0 ? (
@@ -723,6 +964,9 @@ export default function CustomerAppointmentsTab({
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* Create Appointment Dialog */}
+            {createAppointmentDialog}
         </>
     );
 }
