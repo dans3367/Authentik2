@@ -176,44 +176,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Birthday test endpoints - proxy to server-node
+  // Birthday test endpoint - sends a test birthday card via Trigger.io + Resend
   app.post("/api/birthday-test", authenticateToken, async (req: any, res) => {
     try {
-      console.log('🎂 [Birthday Test Proxy] Forwarding test request to server-node for user:', req.user.id);
+      const tenantId = req.user.tenantId;
+      const { userEmail, userFirstName, userLastName, emailTemplate, customMessage, customThemeData, senderName, promotionId, splitPromotionalEmail } = req.body;
 
-      // Forward request to server-node with authentication
-      const response = await fetch('http://localhost:3502/api/birthday-test', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': req.headers.authorization || '',
-        },
-        body: JSON.stringify({
-          ...req.body,
-          userId: req.user.id,
-          tenantId: req.user.tenantId
-        })
-      });
+      console.log('🎂 [Birthday Test] Sending test birthday card to:', userEmail, 'for tenant:', tenantId);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ [Birthday Test Proxy] server-node returned error:', response.status, errorText);
-        return res.status(response.status).json({
-          success: false,
-          message: 'server-node request failed',
-          error: errorText
-        });
+      if (!userEmail) {
+        return res.status(400).json({ success: false, error: 'userEmail is required' });
       }
 
-      const result = await response.json();
-      console.log('✅ [Birthday Test Proxy] server-node response:', result);
-      res.json(result);
+      // Fetch birthday settings for this tenant
+      const { db } = await import('./db');
+      const { birthdaySettings, companies, promotions, emailContacts, unsubscribeTokens } = await import('@shared/schema');
+      const { eq, and, sql } = await import('drizzle-orm');
+      const crypto = await import('crypto');
+
+      const settings = await db.query.birthdaySettings.findFirst({
+        where: eq(birthdaySettings.tenantId, tenantId),
+        with: { promotion: true },
+      });
+
+      // Fetch company info for branding
+      const company = await db.query.companies.findFirst({
+        where: and(eq(companies.tenantId, tenantId), eq(companies.isActive, true)),
+      });
+
+      const resolvedTemplate = emailTemplate || settings?.emailTemplate || 'default';
+      const resolvedMessage = customMessage || settings?.customMessage || 'Wishing you a wonderful birthday!';
+      const resolvedCustomThemeData = customThemeData || settings?.customThemeData || null;
+      const resolvedSenderName = senderName || settings?.senderName || company?.name || 'Your Team';
+      const companyName = company?.name || resolvedSenderName;
+
+      // Build recipient name
+      const recipientName = userFirstName
+        ? `${userFirstName}${userLastName ? ` ${userLastName}` : ''}`
+        : userEmail.split('@')[0];
+
+      // Look up contact and check Customer Engagement opt-out
+      let unsubscribeToken: string | undefined;
+      try {
+        const contact = await db.query.emailContacts.findFirst({
+          where: and(eq(emailContacts.email, userEmail), eq(emailContacts.tenantId, tenantId)),
+          columns: { id: true, prefCustomerEngagement: true },
+        });
+
+        if (contact && contact.prefCustomerEngagement === false) {
+          console.log(`🚫 [Birthday Test] Contact ${userEmail} has opted out of Customer Engagement emails`);
+          return res.status(403).json({
+            success: false,
+            error: 'This contact has opted out of Customer Engagement emails. The birthday card was not sent.',
+          });
+        }
+
+        if (contact) {
+          // Look for existing unused token
+          let existingToken = await db.query.unsubscribeTokens.findFirst({
+            where: and(
+              eq(unsubscribeTokens.tenantId, tenantId),
+              eq(unsubscribeTokens.contactId, contact.id),
+              sql`${unsubscribeTokens.usedAt} IS NULL`
+            ),
+          });
+
+          if (!existingToken) {
+            const token = crypto.randomBytes(24).toString('base64url');
+            const created = await db.insert(unsubscribeTokens).values({
+              tenantId,
+              contactId: contact.id,
+              token,
+            }).returning();
+            existingToken = created[0];
+          }
+
+          unsubscribeToken = existingToken?.token;
+          console.log(`🔗 [Birthday Test] Generated unsubscribe token for ${userEmail}`);
+        } else {
+          console.log(`⚠️ [Birthday Test] No contact found for ${userEmail}, skipping unsubscribe token`);
+        }
+      } catch (tokenError) {
+        console.warn(`⚠️ [Birthday Test] Error generating unsubscribe token:`, tokenError);
+      }
+
+      // Import the renderBirthdayTemplate helper from emailManagementRoutes
+      const { renderBirthdayTemplate } = await import('./routes/emailManagementRoutes');
+
+      const htmlContent = renderBirthdayTemplate(resolvedTemplate as any, {
+        recipientName,
+        message: resolvedMessage,
+        brandName: companyName,
+        customThemeData: resolvedCustomThemeData ? (typeof resolvedCustomThemeData === 'string' ? JSON.parse(resolvedCustomThemeData) : resolvedCustomThemeData) : null,
+        senderName: resolvedSenderName,
+        promotionContent: settings?.promotion?.content,
+        promotionTitle: settings?.promotion?.title,
+        promotionDescription: settings?.promotion?.description,
+        unsubscribeToken,
+      });
+
+      // Build unsubscribe URL for List-Unsubscribe header
+      const baseUrl = process.env.APP_URL || 'http://localhost:5000';
+      const unsubscribeUrl = unsubscribeToken
+        ? `${baseUrl}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
+        : undefined;
+
+      // Send via Trigger.io sendEmailTask (same path as direct email flow)
+      const { tasks } = await import('@trigger.dev/sdk/v3');
+      const subject = `🎉 Happy Birthday ${recipientName}! (Test)`;
+
+      const handle = await tasks.trigger('send-email', {
+        to: userEmail,
+        subject,
+        html: htmlContent,
+        from: process.env.EMAIL_FROM || 'admin@zendwise.com',
+        headers: unsubscribeUrl ? {
+          'List-Unsubscribe': `<${unsubscribeUrl}>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        } : undefined,
+        metadata: {
+          type: 'birthday-card-test',
+          tenantId,
+          userId: req.user.id,
+          test: true,
+        },
+      });
+
+      console.log(`✅ [Birthday Test] Triggered send-email task, runId: ${handle.id}`);
+
+      res.json({
+        success: true,
+        message: 'Test birthday card sent successfully',
+        runId: handle.id,
+        recipient: userEmail,
+      });
     } catch (error) {
-      console.error('❌ [Birthday Test Proxy] Failed to communicate with server-node:', error);
+      console.error('❌ [Birthday Test] Failed to send test birthday card:', error);
       res.status(500).json({
         success: false,
-        message: 'Failed to communicate with birthday test service',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   });

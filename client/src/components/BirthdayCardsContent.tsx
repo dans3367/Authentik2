@@ -735,56 +735,14 @@ export function BirthdayCardsContent() {
     },
   });
 
-  // Mutation: send test birthday card to users
+  // Mutation: send test birthday card to users via Trigger.io + Resend
   const sendTestBirthdayMutation = useMutation({
     mutationFn: async (userId: string) => {
-      // Check if we have a valid token, if not try to refresh it
-      let currentToken = accessToken;
-
-      if (!currentToken) {
-        console.log('🔄 [Birthday Test] No token available, attempting to refresh...');
-        try {
-          const refreshedTokenData = await refetchToken();
-          currentToken = refreshedTokenData.data?.token;
-
-          if (!currentToken) {
-            if (tokenLoading) {
-              throw new Error('Authentication token is still loading. Please wait a moment and try again.');
-            }
-            if (tokenError) {
-              throw new Error(`Authentication failed: ${tokenError.message}`);
-            }
-            throw new Error('No authentication token available. Please make sure you are logged in.');
-          }
-
-          console.log('✅ [Birthday Test] Token refreshed successfully');
-        } catch (refreshError) {
-          console.error('❌ [Birthday Test] Token refresh failed:', refreshError);
-          throw new Error('Failed to refresh authentication token. Please try again.');
-        }
-      }
-
       // Find the user to get additional details
       const user = users.find(u => u.id === userId);
       if (!user) {
         throw new Error('User not found');
       }
-
-      // Call the cardprocessor API directly for test birthday cards
-      const getCardprocessorUrl = () => {
-        if (import.meta.env.VITE_CARDPROCESSOR_URL) {
-          return import.meta.env.VITE_CARDPROCESSOR_URL;
-        }
-        if (typeof window !== 'undefined') {
-          const { hostname, protocol } = window.location;
-          if (hostname === 'localhost' || hostname === '127.0.0.1') {
-            return 'http://localhost:5004';
-          }
-          return `${protocol}//${hostname}:5004`;
-        }
-        return 'http://localhost:5004';
-      };
-      const cardprocessorUrl = getCardprocessorUrl();
 
       // Prepare request payload
       const requestPayload = {
@@ -799,96 +757,22 @@ export function BirthdayCardsContent() {
         splitPromotionalEmail: splitPromotionalEmail
       };
 
-      console.log('🎂 [Birthday Test] Starting test birthday card request:', {
-        url: `${cardprocessorUrl}/api/birthday-test`,
-        userId: userId,
+      console.log('🎂 [Birthday Test] Sending test birthday card via server API:', {
+        userId,
         userEmail: user.email,
-        userFirstName: user.firstName,
-        userLastName: user.lastName,
-        accessTokenLength: currentToken?.length,
-        accessTokenPreview: currentToken ? `${currentToken.substring(0, 20)}...` : 'null',
-        birthdaySettings: {
-          emailTemplate: birthdaySettings?.emailTemplate,
-          customMessage: birthdaySettings?.customMessage,
-          customThemeData: birthdaySettings?.customThemeData,
-          senderName: birthdaySettings?.senderName
-        },
-        requestPayload: requestPayload
+        emailTemplate: requestPayload.emailTemplate,
       });
 
-      const response = await fetch(`${cardprocessorUrl}/api/birthday-test`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${currentToken}`,
-        },
-        body: JSON.stringify(requestPayload),
-      });
-
-      console.log('🎂 [Birthday Test] Response received:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        headers: Object.fromEntries(response.headers.entries())
-      });
+      // Call the server's birthday-test endpoint (uses Trigger.io + Resend)
+      const response = await apiRequest('POST', '/api/birthday-test', requestPayload);
 
       if (!response.ok) {
-        let errorData;
-        try {
-          errorData = await response.json();
-        } catch (parseError) {
-          console.error('🎂 [Birthday Test] Failed to parse error response:', parseError);
-          errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
-        }
-
-        // If it's an authentication error, try to refresh the token and retry once
-        if (response.status === 401 && errorData.error?.includes('Invalid token')) {
-          console.log('🔄 [Birthday Test] Token appears to be expired, attempting refresh and retry...');
-
-          try {
-            const refreshedTokenData = await refetchToken();
-            const newToken = refreshedTokenData.data?.token;
-
-            if (newToken && newToken !== currentToken) {
-              console.log('✅ [Birthday Test] Token refreshed, retrying request...');
-
-              const retryResponse = await fetch(`${cardprocessorUrl}/api/birthday-test`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${newToken}`,
-                },
-                body: JSON.stringify(requestPayload),
-              });
-
-              if (retryResponse.ok) {
-                const retryResponseData = await retryResponse.json();
-                console.log('✅ [Birthday Test] Retry successful:', retryResponseData);
-                return retryResponseData;
-              }
-            }
-          } catch (retryError) {
-            console.error('❌ [Birthday Test] Token refresh retry failed:', retryError);
-          }
-        }
-
-        console.error('🎂 [Birthday Test] Request failed:', {
-          status: response.status,
-          statusText: response.statusText,
-          errorData: errorData,
-          requestPayload: requestPayload,
-          url: `${cardprocessorUrl}/api/birthday-test`
-        });
-
+        const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
         throw new Error(errorData.error || `Failed to send test birthday card (${response.status})`);
       }
 
       const responseData = await response.json();
-      console.log('🎂 [Birthday Test] Success response:', {
-        responseData: responseData,
-        requestPayload: requestPayload
-      });
-
+      console.log('🎂 [Birthday Test] Success:', responseData);
       return responseData;
     },
     onSuccess: () => {
