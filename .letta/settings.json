@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(git shortlog:*)",
-      "Edit(client/src/pages/**)"
-    ]
-  }
-}

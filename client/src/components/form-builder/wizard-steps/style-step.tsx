@@ -82,6 +82,16 @@ export function StyleStep({ themes, selectedTheme, onSelectTheme }: StyleStepPro
                           ✨ Pastel Dreams ✨
                         </div>
                       )}
+                      {theme.id === 'ocean-breeze' && (
+                        <div className="text-white font-bold text-lg tracking-wide drop-shadow-lg">
+                          <span className="text-cyan-100">~</span> Ocean Breeze <span className="text-cyan-100">~</span>
+                        </div>
+                      )}
+                      {theme.id === 'sunset-warmth' && (
+                        <div className="text-white font-bold text-lg tracking-wide drop-shadow-lg">
+                          Sunset Warmth
+                        </div>
+                      )}
                       {theme.id === 'professional' && (
                         <div className="text-blue-600 font-semibold text-lg">
                           PROFESSIONAL
@@ -107,7 +117,7 @@ export function StyleStep({ themes, selectedTheme, onSelectTheme }: StyleStepPro
                           MINIMAL
                         </div>
                       )}
-                      {!['neon', 'nature', 'luxury', 'retro', 'cosmic', 'brutalist', 'pastel-dream', 'professional', 'neo-modern', 'minimal', 'modern-bold', 'glassmorphism', 'aurora'].includes(theme.id) && (
+                      {!['neon', 'nature', 'luxury', 'retro', 'cosmic', 'brutalist', 'pastel-dream', 'ocean-breeze', 'sunset-warmth', 'professional', 'neo-modern', 'minimal', 'modern-bold', 'glassmorphism', 'aurora'].includes(theme.id) && (
                         <>
                           <div className="text-white font-semibold opacity-90 text-lg">{theme.name}</div>
                           <div className="text-white text-sm opacity-60 mt-1">Theme Preview</div>
@@ -140,6 +150,8 @@ export function StyleStep({ themes, selectedTheme, onSelectTheme }: StyleStepPro
                           theme.id === 'pastel-dream' ? 'bg-white/70 border-2 border-purple-200 rounded-2xl' :
                           theme.id === 'neo-modern' ? 'bg-black/50 border border-green-400/30 text-green-100 font-mono' :
                           theme.id === 'modern-bold' ? 'bg-gradient-to-r from-white to-gray-50 border-3 border-orange-500/30 text-gray-900 font-semibold rounded-2xl shadow-lg' :
+                          theme.id === 'ocean-breeze' ? 'bg-white/70 border-2 border-cyan-200 rounded-2xl backdrop-blur-sm' :
+                          theme.id === 'sunset-warmth' ? 'bg-white/80 border-2 border-amber-200 rounded-xl' :
                           'bg-white border border-gray-300 rounded-lg'
                         }`}>
                           <div className={theme.id === 'neon' || theme.id === 'luxury' || theme.id === 'elegant' || theme.id === 'glassmorphism' || theme.id === 'cosmic' || theme.id === 'neo-modern' ? 'text-gray-300' : theme.id === 'brutalist' || theme.id === 'modern-bold' ? 'text-black' : 'text-slate-400'}>
@@ -164,6 +176,8 @@ export function StyleStep({ themes, selectedTheme, onSelectTheme }: StyleStepPro
                           theme.id === 'pastel-dream' ? 'bg-white/70 border-2 border-purple-200 rounded-2xl' :
                           theme.id === 'neo-modern' ? 'bg-black/50 border border-green-400/30 text-green-100 font-mono' :
                           theme.id === 'modern-bold' ? 'bg-gradient-to-r from-white to-gray-50 border-3 border-orange-500/30 text-gray-900 font-semibold rounded-2xl shadow-lg' :
+                          theme.id === 'ocean-breeze' ? 'bg-white/70 border-2 border-cyan-200 rounded-2xl backdrop-blur-sm' :
+                          theme.id === 'sunset-warmth' ? 'bg-white/80 border-2 border-amber-200 rounded-xl' :
                           'bg-white border border-gray-300 rounded-lg'
                         }`}>
                           <div className={theme.id === 'neon' || theme.id === 'luxury' || theme.id === 'elegant' || theme.id === 'glassmorphism' || theme.id === 'cosmic' || theme.id === 'neo-modern' ? 'text-gray-300' : theme.id === 'brutalist' || theme.id === 'modern-bold' ? 'text-black' : 'text-slate-400'}>
@@ -186,6 +200,8 @@ export function StyleStep({ themes, selectedTheme, onSelectTheme }: StyleStepPro
                         theme.id === 'pastel-dream' ? 'bg-gradient-to-r from-purple-400 to-pink-400 text-white rounded-2xl' :
                         theme.id === 'neo-modern' ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-black font-mono border border-green-400/50' :
                         theme.id === 'modern-bold' ? 'bg-gradient-to-r from-orange-500 via-red-500 to-purple-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-2xl border-2 border-white/20' :
+                        theme.id === 'ocean-breeze' ? 'bg-gradient-to-r from-cyan-500 via-teal-500 to-blue-600 text-white rounded-2xl' :
+                        theme.id === 'sunset-warmth' ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white rounded-xl' :
                         'bg-gray-900 text-white rounded-lg'
                       }`}>
                         Submit

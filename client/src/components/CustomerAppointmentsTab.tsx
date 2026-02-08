@@ -296,6 +296,16 @@ export default function CustomerAppointmentsTab({
             scheduledFor = new Date(createdAppointmentDate.getTime() - minutes * 60 * 1000);
         }
 
+        // Validate that the scheduled time is not in the past
+        if (scheduledFor < new Date() && reminderData.reminderTiming !== "now") {
+            toast({
+                title: "Invalid Reminder Time",
+                description: "The selected reminder time would be in the past. Choose a closer time or send now.",
+                variant: "destructive",
+            });
+            return;
+        }
+
         createReminderMutation.mutate({
             appointmentId: createdAppointmentId,
             data: {

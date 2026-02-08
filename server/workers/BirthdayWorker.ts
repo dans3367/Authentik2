@@ -3,6 +3,7 @@ import { db } from '../db';
 import { emailContacts, birthdaySettings, promotions } from '@shared/schema';
 import { eq, and, sql, isNotNull } from 'drizzle-orm';
 import { enhancedEmailService } from '../emailService';
+import { sanitizeEmailHtml } from '../routes/emailManagementRoutes';
 
 export interface BirthdayJob {
   id: string;
@@ -399,11 +400,16 @@ export class BirthdayWorker extends EventEmitter {
     // Build promotion section if promotion content exists
     let promotionSection = '';
     if (params.promotionContent) {
+      // Sanitize promotion fields to prevent XSS/HTML injection
+      const safePromoTitle = params.promotionTitle ? sanitizeEmailHtml(params.promotionTitle) : '';
+      const safePromoDesc = params.promotionDescription ? sanitizeEmailHtml(params.promotionDescription) : '';
+      const safePromoContent = sanitizeEmailHtml(params.promotionContent);
+
       promotionSection = `
         <div style="margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border-radius: 8px; border-left: 4px solid ${colors.primary};">
-          ${params.promotionTitle ? `<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">${params.promotionTitle}</h3>` : ''}
-          ${params.promotionDescription ? `<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${params.promotionDescription}</p>` : ''}
-          <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${params.promotionContent}</div>
+          ${safePromoTitle ? `<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">${safePromoTitle}</h3>` : ''}
+          ${safePromoDesc ? `<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${safePromoDesc}</p>` : ''}
+          <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${safePromoContent}</div>
         </div>
       `;
     }
@@ -413,7 +419,7 @@ export class BirthdayWorker extends EventEmitter {
     if (params.unsubscribeToken && params.promotionContent) {
       // Use the main server's unsubscribe endpoint
       const baseUrl = process.env.APP_URL || 'http://localhost:5000';
-      const unsubscribeUrl = `${baseUrl}/api/unsubscribe/birthday?token=${params.unsubscribeToken}`;
+      const unsubscribeUrl = `${baseUrl}/api/email/unsubscribe?token=${encodeURIComponent(params.unsubscribeToken)}&type=customer_engagement`;
       unsubscribeSection = `
         <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">
           <p style="margin: 0; font-size: 0.8rem; color: #a0aec0; line-height: 1.4;">
