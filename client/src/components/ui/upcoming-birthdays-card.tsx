@@ -40,20 +40,20 @@ export function UpcomingBirthdaysCard() {
     if (!contact.birthday) return false;
     // Parse the stored birthday to get month and day
     const [, month, day] = contact.birthday.split('-').map(Number);
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
-    
+
     // Create birthday date for this year
     const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
     thisYearBirthday.setHours(0, 0, 0, 0);
-    
+
     // If birthday already passed this year, use next year
-    const nextBirthday = thisYearBirthday < today 
+    const nextBirthday = thisYearBirthday < today
       ? new Date(today.getFullYear() + 1, month - 1, day)
       : thisYearBirthday;
     nextBirthday.setHours(0, 0, 0, 0);
-    
+
     const daysUntilBirthday = Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     return daysUntilBirthday >= 0 && daysUntilBirthday <= 30;
   }).sort((a, b) => {
@@ -64,7 +64,7 @@ export function UpcomingBirthdaysCard() {
       today.setHours(0, 0, 0, 0);
       const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
       thisYearBirthday.setHours(0, 0, 0, 0);
-      const nextBirthday = thisYearBirthday < today 
+      const nextBirthday = thisYearBirthday < today
         ? new Date(today.getFullYear() + 1, month - 1, day)
         : thisYearBirthday;
       nextBirthday.setHours(0, 0, 0, 0);
@@ -151,17 +151,17 @@ export function UpcomingBirthdaysCard() {
                   today.setHours(0, 0, 0, 0);
                   const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
                   thisYearBirthday.setHours(0, 0, 0, 0);
-                  const nextBirthday = thisYearBirthday < today 
+                  const nextBirthday = thisYearBirthday < today
                     ? new Date(today.getFullYear() + 1, month - 1, day)
                     : thisYearBirthday;
                   nextBirthday.setHours(0, 0, 0, 0);
                   return Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                 };
                 const daysUntil = contact.birthday ? getDaysUntil(contact.birthday) : 0;
-                
+
                 return (
-                  <div 
-                    key={contact.id} 
+                  <div
+                    key={contact.id}
                     onClick={() => setLocation(`/email-contacts/view/${contact.id}`)}
                     className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                   >
@@ -181,7 +181,9 @@ export function UpcomingBirthdaysCard() {
                       </p>
                     </div>
                     {contact.birthdayUnsubscribedAt ? (
-                      <AlertTriangle className="h-4 w-4 text-orange-500 ml-2" title="Unsubscribed from birthday emails" />
+                      <span title="Unsubscribed from birthday emails">
+                        <AlertTriangle className="h-4 w-4 text-orange-500 ml-2" />
+                      </span>
                     ) : contact.birthdayEmailEnabled ? (
                       <CheckCircle className="h-4 w-4 text-green-500 ml-2" />
                     ) : (
