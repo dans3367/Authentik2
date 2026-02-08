@@ -21,13 +21,18 @@ tenantFixRoutes.post(
 
       console.log(`🔧 [Tenant Fix] Creating unique tenant for user: ${userId}`);
 
-      // Get the user
+      // Get the user - only allow fixing users in the caller's own tenant
       const user = await db.query.betterAuthUser.findFirst({
         where: eq(betterAuthUser.id, userId),
       });
 
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Prevent cross-tenant manipulation: only allow fixing users in the same tenant
+      if (user.tenantId !== req.user.tenantId) {
+        return res.status(403).json({ message: 'Cannot modify users outside your tenant' });
       }
 
       // Check if user is in a shared/default tenant
@@ -232,6 +237,11 @@ tenantFixRoutes.post(
       const { tenantId } = req.params;
 
       console.log(`🔧 [Tenant Fix] Bulk fixing users in tenant: ${tenantId}`);
+
+      // Only allow fixing users in the caller's own tenant
+      if (tenantId !== req.user.tenantId) {
+        return res.status(403).json({ message: 'Cannot modify users outside your tenant' });
+      }
 
       // Get all users in this tenant
       const users = await db.query.betterAuthUser.findMany({
