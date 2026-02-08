@@ -3571,7 +3571,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           const safePromoDescription = settings.promotion.description ? sanitizeEmailHtml(settings.promotion.description) : '';
           const safePromoContent = sanitizeEmailHtml(settings.promotion.content || '');
 
-          const promoSubject = settings.promotion.title || 'Special Birthday Offer!';
+          const promoSubject = sanitizeEmailHtml(settings.promotion.title || 'Special Birthday Offer!');
           const htmlPromo = `
             <html>
               <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">

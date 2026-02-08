@@ -242,12 +242,12 @@ async function sendSplitBirthdayEmails(
     const safePromoDescription = promotion?.description ? sanitizeEmailHtml(promotion.description) : '';
     const safePromoContent = sanitizeEmailHtml(promotion?.content || '');
 
-    const promoSubject = promotion?.title || 'Special Birthday Offer! (Test)';
+    const promoSubject = sanitizeEmailHtml(promotion?.title || 'Special Birthday Offer! (Test)');
     const htmlPromo = buildPromotionalEmailHtml(safePromoTitle, safePromoDescription, safePromoContent, unsubscribeUrl);
 
     const promoHandle = await tasks.trigger('send-email', {
         to: userEmail,
-        subject: `${promoSubject} (Test)`,
+        subject: `${promoSubject}`,
         html: htmlPromo,
         from: process.env.EMAIL_FROM || 'admin@zendwise.com',
         headers: unsubscribeUrl ? {
