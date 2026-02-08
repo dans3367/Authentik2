@@ -189,7 +189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (!result.success) {
-        const statusCode = result.error?.includes('opted out') ? 403 : 400;
+        const statusCode = result.errorCode === 'opted_out' ? 403 : 400;
         return res.status(statusCode).json(result);
       }
 

@@ -47,7 +47,10 @@ const getThemePreview = (themeId: string): string => {
     'aurora': 'bg-[radial-gradient(120%_120%_at_0%_0%,_#7dd3fc_0%,_transparent_40%),_radial-gradient(120%_120%_at_100%_0%,_#c084fc_0%,_transparent_40%),_radial-gradient(120%_120%_at_100%_100%,_#fca5a5_0%,_transparent_40%),_radial-gradient(120%_120%_at_0%_100%,_#86efac_0%,_transparent_40%)]',
     'cosmic': 'bg-gradient-to-br from-purple-900 via-indigo-900 to-black',
     'brutalist': 'bg-gray-800 border-4 border-black',
-    'pastel-dream': 'bg-gradient-to-br from-pink-200 via-purple-200 to-indigo-200'
+    'pastel-dream': 'bg-gradient-to-br from-pink-200 via-purple-200 to-indigo-200',
+    'promotional': 'bg-gradient-to-br from-red-500 to-orange-500',
+    'ocean-breeze': 'bg-gradient-to-br from-cyan-400 via-teal-500 to-blue-600',
+    'sunset-warmth': 'bg-gradient-to-br from-amber-400 via-orange-400 to-rose-500'
   };
 
   return themePreviewMap[themeId] || themePreviewMap['minimal'];
@@ -150,6 +153,24 @@ const getThemePreviewContent = (themeId: string) => {
       return (
         <div className="text-gray-800 font-light text-sm tracking-wide">
           MINIMAL
+        </div>
+      );
+    case 'promotional':
+      return (
+        <div className="text-white font-black text-sm tracking-wider drop-shadow-lg uppercase">
+          PROMO
+        </div>
+      );
+    case 'ocean-breeze':
+      return (
+        <div className="text-white font-bold text-sm tracking-wide drop-shadow-lg">
+          <span className="text-cyan-100">~</span> Ocean Breeze <span className="text-cyan-100">~</span>
+        </div>
+      );
+    case 'sunset-warmth':
+      return (
+        <div className="text-white font-bold text-sm tracking-wide drop-shadow-lg">
+          Sunset Warmth
         </div>
       );
     default:

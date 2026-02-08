@@ -430,6 +430,56 @@ export const defaultThemes: FormTheme[] = [
         fill: 'bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 h-6 rounded-lg transition-all duration-700 ease-out relative overflow-hidden before:content-[""] before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-white/30 before:to-transparent before:animate-shimmer'
       }
     }
+  },
+  {
+    id: 'ocean-breeze',
+    name: 'Ocean Breeze',
+    description: 'Calming coastal design with teal gradients and wave-inspired elements',
+    preview: 'bg-gradient-to-br from-cyan-400 via-teal-500 to-blue-600',
+    styles: {
+      container: 'max-w-2xl mx-auto p-10 bg-gradient-to-br from-white/90 to-cyan-50/90 backdrop-blur-lg border border-cyan-200/50 rounded-3xl shadow-2xl relative overflow-hidden before:content-[""] before:absolute before:bottom-0 before:left-0 before:right-0 before:h-2 before:bg-gradient-to-r before:from-cyan-400 before:via-teal-500 before:to-blue-600',
+      header: 'text-4xl font-bold bg-gradient-to-r from-cyan-600 via-teal-600 to-blue-700 bg-clip-text text-transparent mb-8 tracking-tight',
+      field: 'mb-7',
+      label: 'block text-sm font-semibold text-teal-700 mb-3 tracking-wide',
+      input: 'w-full px-5 py-3 h-12 border-2 border-cyan-200 rounded-2xl focus:outline-none focus:ring-3 focus:ring-teal-400/40 focus:border-teal-400 transition-all duration-300 bg-white/70 backdrop-blur-sm placeholder-teal-300',
+      button: 'w-full bg-gradient-to-r from-cyan-500 via-teal-500 to-blue-600 text-white py-4 px-6 rounded-2xl hover:from-cyan-600 hover:via-teal-600 hover:to-blue-700 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl hover:shadow-teal-500/25 transform hover:scale-105',
+      background: 'bg-gradient-to-br from-cyan-50 via-teal-50 to-blue-50',
+      booleanSwitch: {
+        track: 'border-2 data-[state=unchecked]:bg-cyan-100 data-[state=unchecked]:border-cyan-300 data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-cyan-500 data-[state=checked]:to-teal-500 data-[state=checked]:border-teal-400',
+        thumb: 'data-[state=unchecked]:bg-teal-400 data-[state=checked]:bg-white shadow-md',
+        activeLabel: 'text-teal-700 font-semibold',
+        inactiveLabel: 'text-cyan-400'
+      },
+      progressBar: {
+        container: 'w-full bg-cyan-100 rounded-full h-3 mb-8 border border-cyan-200',
+        fill: 'bg-gradient-to-r from-cyan-500 via-teal-500 to-blue-600 h-3 rounded-full transition-all duration-700 ease-out shadow-sm'
+      }
+    }
+  },
+  {
+    id: 'sunset-warmth',
+    name: 'Sunset Warmth',
+    description: 'Warm amber and coral tones with a golden hour glow aesthetic',
+    preview: 'bg-gradient-to-br from-amber-400 via-orange-400 to-rose-500',
+    styles: {
+      container: 'max-w-2xl mx-auto p-10 bg-gradient-to-br from-amber-50/95 to-rose-50/95 backdrop-blur-lg border border-amber-200/60 rounded-3xl shadow-2xl relative overflow-hidden before:content-[""] before:absolute before:top-0 before:left-0 before:right-0 before:h-1.5 before:bg-gradient-to-r before:from-amber-400 before:via-orange-400 before:to-rose-500',
+      header: 'text-4xl font-bold bg-gradient-to-r from-amber-600 via-orange-600 to-rose-600 bg-clip-text text-transparent mb-8 tracking-tight',
+      field: 'mb-7',
+      label: 'block text-sm font-semibold text-amber-800 mb-3 tracking-wide',
+      input: 'w-full px-5 py-3 h-12 border-2 border-amber-200 rounded-xl focus:outline-none focus:ring-3 focus:ring-orange-400/40 focus:border-orange-400 transition-all duration-300 bg-white/80 placeholder-amber-300',
+      button: 'w-full bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white py-4 px-6 rounded-xl hover:from-amber-600 hover:via-orange-600 hover:to-rose-600 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl hover:shadow-orange-500/25 transform hover:scale-105',
+      background: 'bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50',
+      booleanSwitch: {
+        track: 'border-2 data-[state=unchecked]:bg-amber-100 data-[state=unchecked]:border-amber-300 data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-amber-500 data-[state=checked]:to-rose-500 data-[state=checked]:border-orange-400',
+        thumb: 'data-[state=unchecked]:bg-orange-400 data-[state=checked]:bg-white shadow-md',
+        activeLabel: 'text-amber-800 font-semibold',
+        inactiveLabel: 'text-amber-400'
+      },
+      progressBar: {
+        container: 'w-full bg-amber-100 rounded-full h-3 mb-8 border border-amber-200',
+        fill: 'bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 h-3 rounded-full transition-all duration-700 ease-out shadow-sm'
+      }
+    }
   }
 ];
 

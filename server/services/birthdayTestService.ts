@@ -28,6 +28,7 @@ export interface BirthdayTestResult {
     success: boolean;
     message?: string;
     error?: string;
+    errorCode?: 'opted_out' | 'validation_error';
     runId?: string;
     promoRunId?: string;
     recipient?: string;
@@ -96,7 +97,7 @@ export async function sendBirthdayTestEmail(
     console.log('🎂 [Birthday Test] Sending test birthday card to:', userEmail, 'for tenant:', tenantId);
 
     if (!userEmail) {
-        return { success: false, error: 'userEmail is required' };
+        return { success: false, error: 'userEmail is required', errorCode: 'validation_error' };
     }
 
     // Fetch birthday settings for this tenant
@@ -129,6 +130,7 @@ export async function sendBirthdayTestEmail(
         return {
             success: false,
             error: 'This contact has opted out of Customer Engagement emails. The birthday card was not sent.',
+            errorCode: 'opted_out',
         };
     }
 
