@@ -42,6 +42,7 @@ import { tenantFixRoutes } from "./routes/tenantFixRoutes";
 import { segmentListRoutes } from "./routes/segmentListRoutes";
 import { activityRoutes } from "./routes/activityRoutes";
 import { accountUsageRoutes } from "./routes/accountUsageRoutes";
+import { roleRoutes } from "./routes/roleRoutes";
 import internalRoutes from "./routes/internalRoutes";
 
 // Import middleware
@@ -131,6 +132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/dev", devRoutes);
   app.use("/api/email", emailRoutes);
   app.use("/api/users", userRoutes);
+  app.use("/api/roles", roleRoutes);
   app.use("/api/2fa", twoFactorRoutes);
   app.use("/api/auth", loginRoutes);
   app.use("/api/tenant-limits", tenantLimitsRoutes);
