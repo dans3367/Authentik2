@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { isPast } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { TIMEZONE_OPTIONS } from "@/utils/appointment-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -771,16 +772,9 @@ export default function CustomerAppointmentsTab({
                                         <SelectValue placeholder="Select timezone" />
                                     </SelectTrigger>
                                     <SelectContent className="max-h-[300px]">
-                                        <SelectItem value="America/New_York">Eastern Time (ET)</SelectItem>
-                                        <SelectItem value="America/Chicago">Central Time (CT)</SelectItem>
-                                        <SelectItem value="America/Denver">Mountain Time (MT)</SelectItem>
-                                        <SelectItem value="America/Los_Angeles">Pacific Time (PT)</SelectItem>
-                                        <SelectItem value="America/Anchorage">Alaska Time (AKT)</SelectItem>
-                                        <SelectItem value="Pacific/Honolulu">Hawaii Time (HT)</SelectItem>
-                                        <SelectItem value="Europe/London">London (GMT/BST)</SelectItem>
-                                        <SelectItem value="Europe/Paris">Paris (CET)</SelectItem>
-                                        <SelectItem value="Asia/Tokyo">Tokyo (JST)</SelectItem>
-                                        <SelectItem value="UTC">UTC</SelectItem>
+                                        {TIMEZONE_OPTIONS.map(tz => (
+                                            <SelectItem key={tz.value} value={tz.value}>{tz.label}</SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                             </div>
