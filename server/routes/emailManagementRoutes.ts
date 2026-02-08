@@ -3934,9 +3934,9 @@ export function renderBirthdayTemplate(
          </div>`
       : '';
 
-    // Build unsubscribe section if token exists
+    // Build unsubscribe section only if token exists AND email contains promotional content
     let unsubscribeSection = '';
-    if (params.unsubscribeToken) {
+    if (params.unsubscribeToken && params.promotionContent) {
       const baseUrl = process.env.APP_URL || 'http://localhost:5000';
       const unsubscribeUrl = `${baseUrl}/api/email/unsubscribe?token=${encodeURIComponent(params.unsubscribeToken)}&type=customer_engagement`;
       unsubscribeSection = `
@@ -4050,9 +4050,9 @@ export function renderBirthdayTemplate(
     ? `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #718096; font-size: 0.9rem; font-weight: 600;">${fromMessage}</div>`
     : '';
 
-  // Build unsubscribe section if token exists
+  // Build unsubscribe section only if token exists AND email contains promotional content
   let unsubscribeSection = '';
-  if (params.unsubscribeToken) {
+  if (params.unsubscribeToken && params.promotionContent) {
     const baseUrl = process.env.APP_URL || 'http://localhost:5000';
     const unsubscribeUrl = `${baseUrl}/api/email/unsubscribe?token=${encodeURIComponent(params.unsubscribeToken)}&type=customer_engagement`;
     unsubscribeSection = `

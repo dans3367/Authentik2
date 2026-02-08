@@ -64,22 +64,28 @@ func (r *Repository) CreateBirthdaySettings(tenantID string, req *models.CreateB
 	id := uuid.New().String()
 	now := time.Now()
 
+	// Resolve split promotional email value
+	splitEmail := false
+	if req.SplitPromotionalEmail != nil {
+		splitEmail = *req.SplitPromotionalEmail
+	}
+
 	query := `
 		INSERT INTO birthday_settings (
 			id, tenant_id, enabled, email_template, segment_filter,
 			custom_message, custom_theme_data, sender_name, promotion_id,
-			created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			split_promotional_email, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		RETURNING id, tenant_id, enabled, email_template, segment_filter,
 		          custom_message, custom_theme_data, sender_name, promotion_id,
-		          created_at, updated_at
+		          split_promotional_email, created_at, updated_at
 	`
 
 	var settings models.BirthdaySettings
 	err := r.db.QueryRow(query,
 		id, tenantID, req.Enabled, req.EmailTemplate, req.SegmentFilter,
 		req.CustomMessage, req.CustomThemeData, req.SenderName, req.PromotionID,
-		now, now,
+		splitEmail, now, now,
 	).Scan(
 		&settings.ID,
 		&settings.TenantID,
@@ -112,14 +118,16 @@ func (r *Repository) UpdateBirthdaySettings(ctx context.Context, settings *model
 
 	if existingSettings == nil {
 		// Create new settings
+		splitEmail := settings.SplitPromotionalEmail
 		req := &models.CreateBirthdaySettingsRequest{
-			Enabled:         settings.Enabled,
-			EmailTemplate:   settings.EmailTemplate,
-			SegmentFilter:   settings.SegmentFilter,
-			CustomMessage:   settings.CustomMessage,
-			CustomThemeData: settings.CustomThemeData,
-			SenderName:      settings.SenderName,
-			PromotionID:     settings.PromotionID,
+			Enabled:               settings.Enabled,
+			EmailTemplate:         settings.EmailTemplate,
+			SegmentFilter:         settings.SegmentFilter,
+			CustomMessage:         settings.CustomMessage,
+			CustomThemeData:       settings.CustomThemeData,
+			SenderName:            settings.SenderName,
+			PromotionID:           settings.PromotionID,
+			SplitPromotionalEmail: &splitEmail,
 		}
 		return r.CreateBirthdaySettings(settings.TenantID, req)
 	}
@@ -129,18 +137,18 @@ func (r *Repository) UpdateBirthdaySettings(ctx context.Context, settings *model
 		UPDATE birthday_settings 
 		SET enabled = $1, email_template = $2, segment_filter = $3,
 		    custom_message = $4, custom_theme_data = $5, sender_name = $6,
-		    promotion_id = $7, updated_at = $8
-		WHERE tenant_id = $9
+		    promotion_id = $7, split_promotional_email = $8, updated_at = $9
+		WHERE tenant_id = $10
 		RETURNING id, tenant_id, enabled, email_template, segment_filter,
 		          custom_message, custom_theme_data, sender_name, promotion_id,
-		          created_at, updated_at
+		          split_promotional_email, created_at, updated_at
 	`
 
 	var updatedSettings models.BirthdaySettings
 	err = r.db.QueryRowContext(ctx, query,
 		settings.Enabled, settings.EmailTemplate, settings.SegmentFilter,
 		settings.CustomMessage, settings.CustomThemeData, settings.SenderName,
-		settings.PromotionID, time.Now(), settings.TenantID,
+		settings.PromotionID, settings.SplitPromotionalEmail, time.Now(), settings.TenantID,
 	).Scan(
 		&updatedSettings.ID,
 		&updatedSettings.TenantID,
@@ -151,6 +159,7 @@ func (r *Repository) UpdateBirthdaySettings(ctx context.Context, settings *model
 		&updatedSettings.CustomThemeData,
 		&updatedSettings.SenderName,
 		&updatedSettings.PromotionID,
+		&updatedSettings.SplitPromotionalEmail,
 		&updatedSettings.CreatedAt,
 		&updatedSettings.UpdatedAt,
 	)

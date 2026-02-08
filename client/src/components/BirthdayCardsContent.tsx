@@ -38,7 +38,8 @@ import {
   Download,
   Upload,
   Palette,
-  Save
+  Save,
+  Loader2
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -360,19 +361,33 @@ export function BirthdayCardsContent() {
     onSuccess: (updatedSettings) => {
       console.log('✅ [Birthday Settings] Update success, updating cache with:', updatedSettings);
       console.log('📌 [Birthday Settings] New emailTemplate should be:', updatedSettings?.emailTemplate);
-      
+
       toast({
         title: "Success",
         description: "Birthday settings updated successfully",
       });
-      
+
       // Update the query cache immediately with the server response (now returns settings directly)
-      queryClient.setQueryData(['/api/birthday-settings'], updatedSettings);
+      // We manually merge to preserve the promotion object if missing, avoiding UI layout shifts
+      queryClient.setQueryData<BirthdaySettings>(['/api/birthday-settings'], (oldSettings) => {
+        if (!oldSettings) return updatedSettings;
+
+        // If the server response is missing the promotion object but the ID matches, keep the old one
+        // We check both camelCase and snake_case for promotionId just in case
+        const newPromotionId = updatedSettings.promotionId || updatedSettings.promotion_id;
+        const oldPromotionId = oldSettings.promotionId || oldSettings.promotion?.id;
+
+        if (oldSettings.promotion && !updatedSettings.promotion && newPromotionId && newPromotionId === oldPromotionId) {
+          console.log('🧩 [Birthday Settings] Preserving existing promotion object in cache update');
+          return {
+            ...updatedSettings,
+            promotion: oldSettings.promotion
+          };
+        }
+
+        return updatedSettings;
+      });
       console.log('💾 [Birthday Settings] Cache updated');
-      
-      // Force a re-render by invalidating the query
-      queryClient.invalidateQueries({ queryKey: ['/api/birthday-settings'] });
-      console.log('🔄 [Birthday Settings] Query invalidated, will refetch');
     },
     onError: (error: any) => {
       console.error('🎨 [Birthday Cards] Update settings error:', error);
@@ -973,20 +988,20 @@ export function BirthdayCardsContent() {
     if (!contact.birthday) return false;
     // Parse the stored birthday to get month and day
     const [, month, day] = contact.birthday.split('-').map(Number);
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
-    
+
     // Create birthday date for this year
     const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
     thisYearBirthday.setHours(0, 0, 0, 0);
-    
+
     // If birthday already passed this year, use next year
-    const nextBirthday = thisYearBirthday < today 
+    const nextBirthday = thisYearBirthday < today
       ? new Date(today.getFullYear() + 1, month - 1, day)
       : thisYearBirthday;
     nextBirthday.setHours(0, 0, 0, 0);
-    
+
     const daysUntilBirthday = Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     return daysUntilBirthday >= 0 && daysUntilBirthday <= 30;
   }).sort((a, b) => {
@@ -997,7 +1012,7 @@ export function BirthdayCardsContent() {
       today.setHours(0, 0, 0, 0);
       const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
       thisYearBirthday.setHours(0, 0, 0, 0);
-      const nextBirthday = thisYearBirthday < today 
+      const nextBirthday = thisYearBirthday < today
         ? new Date(today.getFullYear() + 1, month - 1, day)
         : thisYearBirthday;
       nextBirthday.setHours(0, 0, 0, 0);
@@ -1518,7 +1533,7 @@ export function BirthdayCardsContent() {
                 customThemeData: JSON.stringify(updatedThemeData),
                 senderName: birthdaySettings?.senderName || company?.name || 'Your Company',
               };
-              
+
               console.log('🎨 [Birthday Cards] Custom theme payload:', payload);
               updateSettingsMutation.mutate(payload);
             } else if (isDefaultTheme && (hasTextCustomizations || data.message !== (birthdaySettings?.customMessage || ''))) {
@@ -1533,7 +1548,7 @@ export function BirthdayCardsContent() {
                 customThemeData: JSON.stringify(updatedThemeData), // Save theme-specific data
                 senderName: birthdaySettings?.senderName || company?.name || 'Your Company',
               };
-              
+
               console.log('🎨 [Birthday Cards] Default theme with customizations payload:', payload);
               updateSettingsMutation.mutate(payload);
             } else {
@@ -1547,7 +1562,7 @@ export function BirthdayCardsContent() {
                 customMessage: data.message,
                 senderName: birthdaySettings?.senderName || company?.name || 'Your Company',
               };
-              
+
               console.log('🎨 [Birthday Cards] Default theme payload:', payload);
               updateSettingsMutation.mutate(payload);
             }
@@ -1558,7 +1573,7 @@ export function BirthdayCardsContent() {
           isCurrentlyActive={(() => {
             const currentTemplate = birthdaySettings?.emailTemplate || 'default';
             const selectedTheme = designerThemeId || 'default';
-            
+
             console.log('🎯 [Theme Active Check]', {
               currentTemplate,
               selectedTheme,
@@ -1670,17 +1685,17 @@ export function BirthdayCardsContent() {
                           today.setHours(0, 0, 0, 0);
                           const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
                           thisYearBirthday.setHours(0, 0, 0, 0);
-                          const nextBirthday = thisYearBirthday < today 
+                          const nextBirthday = thisYearBirthday < today
                             ? new Date(today.getFullYear() + 1, month - 1, day)
                             : thisYearBirthday;
                           nextBirthday.setHours(0, 0, 0, 0);
                           return Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                         };
                         const daysUntil = contact.birthday ? getDaysUntil(contact.birthday) : 0;
-                        
+
                         return (
-                          <div 
-                            key={contact.id} 
+                          <div
+                            key={contact.id}
                             onClick={() => setLocation(`/email-contacts/view/${contact.id}`)}
                             className="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                           >
@@ -1925,7 +1940,7 @@ export function BirthdayCardsContent() {
                             )}
                           </TableCell>
 
-                        
+
                           <TableCell>
                             {!contact.birthday && (
                               <Button
@@ -1940,7 +1955,7 @@ export function BirthdayCardsContent() {
                               </Button>
                             )}
                           </TableCell>
-</TableRow>
+                        </TableRow>
                       ))}
                     </TableBody>
                   </Table>
@@ -2117,27 +2132,34 @@ export function BirthdayCardsContent() {
                 {selectedPromotions.length > 0 && (
                   <div className="mt-4 p-4 border rounded-lg bg-white dark:bg-gray-900">
                     <div className="flex items-start space-x-3">
-                      <Checkbox
-                        id="splitPromotionalEmail"
-                        checked={splitPromotionalEmail}
-                        onCheckedChange={(checked) => {
-                          setSplitPromotionalEmail(checked as boolean);
-                          if (birthdaySettings) {
-                            const promotionId = selectedPromotions.length > 0 ? selectedPromotions[0] : null;
-                            updateSettingsMutation.mutate({
-                              id: birthdaySettings.id,
-                              enabled: birthdaySettings.enabled,
-                              emailTemplate: birthdaySettings.emailTemplate || 'default',
-                              segmentFilter: birthdaySettings.segmentFilter || 'all',
-                              customMessage: birthdaySettings.customMessage || '',
-                              senderName: birthdaySettings.senderName || '',
-                              customThemeData: birthdaySettings.customThemeData,
-                              promotionId: promotionId,
-                              splitPromotionalEmail: checked as boolean,
-                            });
-                          }
-                        }}
-                      />
+                      {updateSettingsMutation.isPending ? (
+                        <div className="flex items-center justify-center h-4 w-4 mt-0.5">
+                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        </div>
+                      ) : (
+                        <Checkbox
+                          id="splitPromotionalEmail"
+                          checked={splitPromotionalEmail}
+                          disabled={updateSettingsMutation.isPending}
+                          onCheckedChange={(checked) => {
+                            setSplitPromotionalEmail(checked as boolean);
+                            if (birthdaySettings) {
+                              const promotionId = selectedPromotions.length > 0 ? selectedPromotions[0] : null;
+                              updateSettingsMutation.mutate({
+                                id: birthdaySettings.id,
+                                enabled: birthdaySettings.enabled,
+                                emailTemplate: birthdaySettings.emailTemplate || 'default',
+                                segmentFilter: birthdaySettings.segmentFilter || 'all',
+                                customMessage: birthdaySettings.customMessage || '',
+                                senderName: birthdaySettings.senderName || '',
+                                customThemeData: birthdaySettings.customThemeData,
+                                promotionId: promotionId,
+                                splitPromotionalEmail: checked as boolean,
+                              });
+                            }
+                          }}
+                        />
+                      )}
                       <div className="flex-1">
                         <label
                           htmlFor="splitPromotionalEmail"

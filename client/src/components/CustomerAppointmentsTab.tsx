@@ -156,6 +156,9 @@ export default function CustomerAppointmentsTab({
 
     // Create appointment state and mutation
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
+    const [dialogStep, setDialogStep] = useState<"form" | "reminder">("form");
+    const [createdAppointmentId, setCreatedAppointmentId] = useState<string | null>(null);
+    const [createdAppointmentDate, setCreatedAppointmentDate] = useState<Date | null>(null);
     const [newAppointment, setNewAppointment] = useState({
         title: "",
         description: "",
@@ -167,6 +170,19 @@ export default function CustomerAppointmentsTab({
         notes: "",
     });
     const [formErrors, setFormErrors] = useState<{ title?: boolean; date?: boolean }>({});
+    const [reminderData, setReminderData] = useState<{
+        reminderType: "email" | "sms" | "push";
+        reminderTiming: "now" | "5m" | "30m" | "1h" | "5h" | "10h" | "custom";
+        customMinutesBefore?: number;
+        timezone: string;
+        content: string;
+    }>({
+        reminderType: "email",
+        reminderTiming: "1h",
+        customMinutesBefore: undefined,
+        timezone: "America/Chicago",
+        content: "",
+    });
 
     const resetForm = () => {
         setNewAppointment({
@@ -180,6 +196,16 @@ export default function CustomerAppointmentsTab({
             notes: "",
         });
         setFormErrors({});
+        setDialogStep("form");
+        setCreatedAppointmentId(null);
+        setCreatedAppointmentDate(null);
+        setReminderData({
+            reminderType: "email",
+            reminderTiming: "1h",
+            customMinutesBefore: undefined,
+            timezone: "America/Chicago",
+            content: "",
+        });
     };
 
     const createAppointmentMutation = useMutation({
@@ -187,14 +213,23 @@ export default function CustomerAppointmentsTab({
             const response = await apiRequest("POST", "/api/appointments", data);
             return response.json();
         },
-        onSuccess: () => {
+        onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
             toast({
                 title: "Appointment Created",
                 description: "The appointment has been scheduled successfully.",
             });
-            setCreateDialogOpen(false);
-            resetForm();
+            // Transition to reminder step
+            const appointmentId = data?.appointment?.id;
+            const appointmentDate = data?.appointment?.appointmentDate;
+            if (appointmentId) {
+                setCreatedAppointmentId(appointmentId);
+                setCreatedAppointmentDate(appointmentDate ? new Date(appointmentDate) : null);
+                setDialogStep("reminder");
+            } else {
+                setCreateDialogOpen(false);
+                resetForm();
+            }
         },
         onError: (error: any) => {
             toast({
@@ -204,6 +239,74 @@ export default function CustomerAppointmentsTab({
             });
         },
     });
+
+    const createReminderMutation = useMutation({
+        mutationFn: async ({ appointmentId, data }: { appointmentId: string; data: Record<string, any> }) => {
+            const response = await apiRequest("POST", "/api/appointment-reminders", {
+                appointmentId,
+                ...data,
+            });
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+            toast({
+                title: "Reminder Scheduled",
+                description: "A reminder has been set for this appointment.",
+            });
+            setCreateDialogOpen(false);
+            resetForm();
+        },
+        onError: (error: any) => {
+            toast({
+                title: "Error",
+                description: error.message || "Failed to schedule reminder",
+                variant: "destructive",
+            });
+        },
+    });
+
+    const handleScheduleReminder = () => {
+        if (!createdAppointmentId || !createdAppointmentDate) return;
+
+        if (reminderData.reminderTiming === "custom" && !reminderData.customMinutesBefore) {
+            toast({
+                title: "Validation Error",
+                description: "Please enter the number of minutes before the appointment.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        let scheduledFor: Date;
+        if (reminderData.reminderTiming === "now") {
+            scheduledFor = new Date();
+        } else if (reminderData.reminderTiming === "custom" && reminderData.customMinutesBefore) {
+            scheduledFor = new Date(createdAppointmentDate.getTime() - reminderData.customMinutesBefore * 60 * 1000);
+        } else {
+            const timingMap: Record<string, number> = {
+                "5m": 5,
+                "30m": 30,
+                "1h": 60,
+                "5h": 300,
+                "10h": 600,
+            };
+            const minutes = timingMap[reminderData.reminderTiming] || 60;
+            scheduledFor = new Date(createdAppointmentDate.getTime() - minutes * 60 * 1000);
+        }
+
+        createReminderMutation.mutate({
+            appointmentId: createdAppointmentId,
+            data: {
+                reminderType: reminderData.reminderType,
+                reminderTiming: reminderData.reminderTiming,
+                customMinutesBefore: reminderData.customMinutesBefore,
+                scheduledFor,
+                timezone: reminderData.timezone,
+                content: reminderData.content || undefined,
+            },
+        });
+    };
 
     const handleCreateAppointment = () => {
         const errors: { title?: boolean; date?: boolean } = {};
@@ -454,118 +557,262 @@ export default function CustomerAppointmentsTab({
 
     const createAppointmentDialog = (
         <Dialog open={createDialogOpen} onOpenChange={(open) => {
+            if (!open && dialogStep === "reminder") {
+                // If closing during reminder step, just close (appointment already created)
+                setCreateDialogOpen(false);
+                resetForm();
+                return;
+            }
             setCreateDialogOpen(open);
             if (!open) resetForm();
         }}>
             <DialogContent className="max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
-                <DialogHeader>
-                    <DialogTitle>New Appointment</DialogTitle>
-                    <DialogDescription>
-                        Schedule a new appointment for this customer.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 overflow-y-auto flex-1 px-1 py-1">
-                    <div>
-                        <Label className={formErrors.title ? "text-red-500" : ""}>
-                            Title <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                            value={newAppointment.title}
-                            onChange={(e) => {
-                                setNewAppointment(prev => ({ ...prev, title: e.target.value }));
-                                setFormErrors(prev => ({ ...prev, title: false }));
-                            }}
-                            placeholder="e.g. Follow-up consultation"
-                            className={formErrors.title ? "border-red-500" : ""}
-                        />
-                    </div>
+                {dialogStep === "form" ? (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle>New Appointment</DialogTitle>
+                            <DialogDescription>
+                                Schedule a new appointment for this customer.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 overflow-y-auto flex-1 px-1 py-1">
+                            <div>
+                                <Label className={formErrors.title ? "text-red-500" : ""}>
+                                    Title <span className="text-red-500">*</span>
+                                </Label>
+                                <Input
+                                    value={newAppointment.title}
+                                    onChange={(e) => {
+                                        setNewAppointment(prev => ({ ...prev, title: e.target.value }));
+                                        setFormErrors(prev => ({ ...prev, title: false }));
+                                    }}
+                                    placeholder="e.g. Follow-up consultation"
+                                    className={formErrors.title ? "border-red-500" : ""}
+                                />
+                            </div>
 
-                    <div>
-                        <Label className={formErrors.date ? "text-red-500" : ""}>
-                            Date & Time <span className="text-red-500">*</span>
-                        </Label>
-                        <div className="grid grid-cols-2 gap-2">
-                            <Input
-                                type="date"
-                                value={newAppointment.appointmentDate}
-                                onChange={(e) => {
-                                    setNewAppointment(prev => ({ ...prev, appointmentDate: e.target.value }));
-                                    setFormErrors(prev => ({ ...prev, date: false }));
-                                }}
-                                className={formErrors.date ? "border-red-500" : ""}
-                            />
-                            <Input
-                                type="time"
-                                value={newAppointment.appointmentTime}
-                                onChange={(e) => setNewAppointment(prev => ({ ...prev, appointmentTime: e.target.value }))}
-                            />
+                            <div>
+                                <Label className={formErrors.date ? "text-red-500" : ""}>
+                                    Date & Time <span className="text-red-500">*</span>
+                                </Label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Input
+                                        type="date"
+                                        value={newAppointment.appointmentDate}
+                                        onChange={(e) => {
+                                            setNewAppointment(prev => ({ ...prev, appointmentDate: e.target.value }));
+                                            setFormErrors(prev => ({ ...prev, date: false }));
+                                        }}
+                                        className={formErrors.date ? "border-red-500" : ""}
+                                    />
+                                    <Input
+                                        type="time"
+                                        value={newAppointment.appointmentTime}
+                                        onChange={(e) => setNewAppointment(prev => ({ ...prev, appointmentTime: e.target.value }))}
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <Label>Duration (minutes)</Label>
+                                <Input
+                                    type="number"
+                                    value={newAppointment.duration}
+                                    onChange={(e) => setNewAppointment(prev => ({ ...prev, duration: parseInt(e.target.value, 10) || 60 }))}
+                                    min="15"
+                                    step="15"
+                                />
+                            </div>
+
+                            <div>
+                                <Label>Location</Label>
+                                <Input
+                                    value={newAppointment.location}
+                                    onChange={(e) => setNewAppointment(prev => ({ ...prev, location: e.target.value }))}
+                                    placeholder="e.g. Office, Zoom, etc."
+                                />
+                            </div>
+
+                            <div>
+                                <Label>Service Type</Label>
+                                <Input
+                                    value={newAppointment.serviceType}
+                                    onChange={(e) => setNewAppointment(prev => ({ ...prev, serviceType: e.target.value }))}
+                                    placeholder="e.g. Consultation, Check-up"
+                                />
+                            </div>
+
+                            <div>
+                                <Label>Description</Label>
+                                <Textarea
+                                    value={newAppointment.description}
+                                    onChange={(e) => setNewAppointment(prev => ({ ...prev, description: e.target.value }))}
+                                    placeholder="Brief description of the appointment..."
+                                    rows={2}
+                                />
+                            </div>
+
+                            <div>
+                                <Label>Notes</Label>
+                                <Textarea
+                                    value={newAppointment.notes}
+                                    onChange={(e) => setNewAppointment(prev => ({ ...prev, notes: e.target.value }))}
+                                    placeholder="Internal notes..."
+                                    rows={2}
+                                />
+                            </div>
                         </div>
-                    </div>
 
-                    <div>
-                        <Label>Duration (minutes)</Label>
-                        <Input
-                            type="number"
-                            value={newAppointment.duration}
-                            onChange={(e) => setNewAppointment(prev => ({ ...prev, duration: parseInt(e.target.value, 10) || 60 }))}
-                            min="15"
-                            step="15"
-                        />
-                    </div>
+                        <div className="flex justify-end gap-2 pt-4 border-t">
+                            <Button variant="outline" onClick={() => {
+                                setCreateDialogOpen(false);
+                                resetForm();
+                            }}>
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={handleCreateAppointment}
+                                disabled={createAppointmentMutation.isPending}
+                            >
+                                {createAppointmentMutation.isPending ? "Creating..." : "Create Appointment"}
+                            </Button>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <Bell className="h-5 w-5 text-blue-500" />
+                                Set a Reminder
+                            </DialogTitle>
+                            <DialogDescription>
+                                Would you like to schedule a reminder for this appointment?
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 overflow-y-auto flex-1 px-1 py-1">
+                            <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+                                <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    <span className="font-medium">Appointment created successfully!</span>
+                                </div>
+                            </div>
 
-                    <div>
-                        <Label>Location</Label>
-                        <Input
-                            value={newAppointment.location}
-                            onChange={(e) => setNewAppointment(prev => ({ ...prev, location: e.target.value }))}
-                            placeholder="e.g. Office, Zoom, etc."
-                        />
-                    </div>
+                            <div>
+                                <Label>Reminder Type</Label>
+                                <Select
+                                    value={reminderData.reminderType}
+                                    onValueChange={(value: "email" | "sms" | "push") =>
+                                        setReminderData(prev => ({ ...prev, reminderType: value }))
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="email">Email</SelectItem>
+                                        <SelectItem value="sms" disabled>SMS (coming soon)</SelectItem>
+                                        <SelectItem value="push" disabled>Push (coming soon)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
 
-                    <div>
-                        <Label>Service Type</Label>
-                        <Input
-                            value={newAppointment.serviceType}
-                            onChange={(e) => setNewAppointment(prev => ({ ...prev, serviceType: e.target.value }))}
-                            placeholder="e.g. Consultation, Check-up"
-                        />
-                    </div>
+                            <div>
+                                <Label>When to Send</Label>
+                                <Select
+                                    value={reminderData.reminderTiming}
+                                    onValueChange={(value: "now" | "5m" | "30m" | "1h" | "5h" | "10h" | "custom") =>
+                                        setReminderData(prev => ({ ...prev, reminderTiming: value }))
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="now">Send Now</SelectItem>
+                                        <SelectItem value="5m">5 minutes before</SelectItem>
+                                        <SelectItem value="30m">30 minutes before</SelectItem>
+                                        <SelectItem value="1h">1 hour before</SelectItem>
+                                        <SelectItem value="5h">5 hours before</SelectItem>
+                                        <SelectItem value="10h">10 hours before</SelectItem>
+                                        <SelectItem value="custom">Custom time</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
 
-                    <div>
-                        <Label>Description</Label>
-                        <Textarea
-                            value={newAppointment.description}
-                            onChange={(e) => setNewAppointment(prev => ({ ...prev, description: e.target.value }))}
-                            placeholder="Brief description of the appointment..."
-                            rows={2}
-                        />
-                    </div>
+                            {reminderData.reminderTiming === "custom" && (
+                                <div>
+                                    <Label>Minutes Before Appointment <span className="text-red-500">*</span></Label>
+                                    <Input
+                                        type="number"
+                                        min="1"
+                                        max="10080"
+                                        placeholder="e.g. 120 for 2 hours"
+                                        value={reminderData.customMinutesBefore || ""}
+                                        onChange={(e) =>
+                                            setReminderData(prev => ({
+                                                ...prev,
+                                                customMinutesBefore: e.target.value ? parseInt(e.target.value) : undefined,
+                                            }))
+                                        }
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Enter the number of minutes before the appointment (max 10080 = 7 days)
+                                    </p>
+                                </div>
+                            )}
 
-                    <div>
-                        <Label>Notes</Label>
-                        <Textarea
-                            value={newAppointment.notes}
-                            onChange={(e) => setNewAppointment(prev => ({ ...prev, notes: e.target.value }))}
-                            placeholder="Internal notes..."
-                            rows={2}
-                        />
-                    </div>
-                </div>
+                            <div>
+                                <Label>Timezone</Label>
+                                <Select
+                                    value={reminderData.timezone}
+                                    onValueChange={(value) => setReminderData(prev => ({ ...prev, timezone: value }))}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select timezone" />
+                                    </SelectTrigger>
+                                    <SelectContent className="max-h-[300px]">
+                                        <SelectItem value="America/New_York">Eastern Time (ET)</SelectItem>
+                                        <SelectItem value="America/Chicago">Central Time (CT)</SelectItem>
+                                        <SelectItem value="America/Denver">Mountain Time (MT)</SelectItem>
+                                        <SelectItem value="America/Los_Angeles">Pacific Time (PT)</SelectItem>
+                                        <SelectItem value="America/Anchorage">Alaska Time (AKT)</SelectItem>
+                                        <SelectItem value="Pacific/Honolulu">Hawaii Time (HT)</SelectItem>
+                                        <SelectItem value="Europe/London">London (GMT/BST)</SelectItem>
+                                        <SelectItem value="Europe/Paris">Paris (CET)</SelectItem>
+                                        <SelectItem value="Asia/Tokyo">Tokyo (JST)</SelectItem>
+                                        <SelectItem value="UTC">UTC</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
 
-                <div className="flex justify-end gap-2 pt-4 border-t">
-                    <Button variant="outline" onClick={() => {
-                        setCreateDialogOpen(false);
-                        resetForm();
-                    }}>
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleCreateAppointment}
-                        disabled={createAppointmentMutation.isPending}
-                    >
-                        {createAppointmentMutation.isPending ? "Creating..." : "Create Appointment"}
-                    </Button>
-                </div>
+                            <div>
+                                <Label>Message (optional)</Label>
+                                <Textarea
+                                    value={reminderData.content}
+                                    onChange={(e) => setReminderData(prev => ({ ...prev, content: e.target.value }))}
+                                    placeholder="Custom reminder message..."
+                                    rows={3}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex justify-between gap-2 pt-4 border-t">
+                            <Button variant="ghost" onClick={() => {
+                                setCreateDialogOpen(false);
+                                resetForm();
+                            }}>
+                                Skip
+                            </Button>
+                            <Button
+                                onClick={handleScheduleReminder}
+                                disabled={createReminderMutation.isPending}
+                            >
+                                <Bell className="w-4 h-4 mr-2" />
+                                {createReminderMutation.isPending ? "Scheduling..." : "Schedule Reminder"}
+                            </Button>
+                        </div>
+                    </>
+                )}
             </DialogContent>
         </Dialog>
     );

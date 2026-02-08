@@ -263,17 +263,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Import the renderBirthdayTemplate helper from emailManagementRoutes
       const { renderBirthdayTemplate } = await import('./routes/emailManagementRoutes');
 
-      const htmlContent = renderBirthdayTemplate(resolvedTemplate as any, {
-        recipientName,
-        message: resolvedMessage,
-        brandName: companyName,
-        customThemeData: resolvedCustomThemeData ? (typeof resolvedCustomThemeData === 'string' ? JSON.parse(resolvedCustomThemeData) : resolvedCustomThemeData) : null,
-        senderName: resolvedSenderName,
-        promotionContent: settings?.promotion?.content,
-        promotionTitle: settings?.promotion?.title,
-        promotionDescription: settings?.promotion?.description,
-        unsubscribeToken,
-      });
+      // Determine if we should split the email
+      const shouldSplit = (splitPromotionalEmail ?? settings?.splitPromotionalEmail) && settings?.promotion;
+
+      console.log(`📧 [Birthday Test] Split email enabled: ${splitPromotionalEmail ?? settings?.splitPromotionalEmail}, Has promotion: ${!!settings?.promotion}, Will split: ${!!shouldSplit}`);
 
       // Build unsubscribe URL for List-Unsubscribe header
       const baseUrl = process.env.APP_URL || 'http://localhost:5000';
@@ -281,35 +274,137 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? `${baseUrl}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
         : undefined;
 
-      // Send via Trigger.io sendEmailTask (same path as direct email flow)
       const { tasks } = await import('@trigger.dev/sdk/v3');
-      const subject = `🎉 Happy Birthday ${recipientName}! (Test)`;
 
-      const handle = await tasks.trigger('send-email', {
-        to: userEmail,
-        subject,
-        html: htmlContent,
-        from: process.env.EMAIL_FROM || 'admin@zendwise.com',
-        headers: unsubscribeUrl ? {
-          'List-Unsubscribe': `<${unsubscribeUrl}>`,
-          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
-        } : undefined,
-        metadata: {
-          type: 'birthday-card-test',
-          tenantId,
-          userId: req.user.id,
-          test: true,
-        },
-      });
+      if (shouldSplit) {
+        // --- SPLIT EMAIL FLOW: Send birthday card WITHOUT promotion, then queue promotion separately ---
+        console.log(`✅ [Birthday Test SPLIT FLOW] Sending birthday and promo as SEPARATE emails to ${userEmail}`);
 
-      console.log(`✅ [Birthday Test] Triggered send-email task, runId: ${handle.id}`);
+        // Email 1: Birthday card WITHOUT promotion
+        const htmlBirthday = renderBirthdayTemplate(resolvedTemplate as any, {
+          recipientName,
+          message: resolvedMessage,
+          brandName: companyName,
+          customThemeData: resolvedCustomThemeData ? (typeof resolvedCustomThemeData === 'string' ? JSON.parse(resolvedCustomThemeData) : resolvedCustomThemeData) : null,
+          senderName: resolvedSenderName,
+          // NO promotion fields - intentionally omitted for split flow
+          unsubscribeToken,
+        });
 
-      res.json({
-        success: true,
-        message: 'Test birthday card sent successfully',
-        runId: handle.id,
-        recipient: userEmail,
-      });
+        const birthdaySubject = `🎉 Happy Birthday ${recipientName}! (Test)`;
+        const birthdayHandle = await tasks.trigger('send-email', {
+          to: userEmail,
+          subject: birthdaySubject,
+          html: htmlBirthday,
+          from: process.env.EMAIL_FROM || 'admin@zendwise.com',
+          headers: unsubscribeUrl ? {
+            'List-Unsubscribe': `<${unsubscribeUrl}>`,
+            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+          } : undefined,
+          metadata: {
+            type: 'birthday-card-test',
+            tenantId,
+            userId: req.user.id,
+            test: true,
+            split: true,
+          },
+        });
+
+        console.log(`✅ [Birthday Test SPLIT FLOW] Email 1/2: Birthday card sent, runId: ${birthdayHandle.id}`);
+
+        // Email 2: Promotional email queued with 20s delay
+        const promoSubject = settings.promotion.title || 'Special Birthday Offer! (Test)';
+        const htmlPromo = `
+          <html>
+            <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+              <div style="max-width: 600px; margin: 20px auto; padding: 32px 24px; background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border-radius: 8px;">
+                <h2 style="font-size: 1.5rem; font-weight: bold; margin: 0 0 16px 0; color: #2d3748;">${settings.promotion.title || 'Special Birthday Offer!'}</h2>
+                ${settings.promotion.description ? `<p style="margin: 0 0 20px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${settings.promotion.description}</p>` : ''}
+                <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${settings.promotion.content || ''}</div>
+                <hr style="margin: 32px 0 16px 0; border: none; border-top: 1px solid #e2e8f0;">
+                <p style="margin: 0; font-size: 0.85rem; color: #a0aec0; text-align: center;">
+                  This is a special birthday promotion for valued subscribers.
+                </p>
+                ${unsubscribeUrl ? `<p style="margin: 8px 0 0 0; font-size: 0.8rem; color: #a0aec0; text-align: center;">
+                  <a href="${unsubscribeUrl}" style="color: #667eea; text-decoration: none;">Manage preferences</a>
+                </p>` : ''}
+              </div>
+            </body>
+          </html>
+        `;
+
+        const promoHandle = await tasks.trigger('send-email', {
+          to: userEmail,
+          subject: `${promoSubject} (Test)`,
+          html: htmlPromo,
+          from: process.env.EMAIL_FROM || 'admin@zendwise.com',
+          headers: unsubscribeUrl ? {
+            'List-Unsubscribe': `<${unsubscribeUrl}>`,
+            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+          } : undefined,
+          metadata: {
+            type: 'birthday-promotion-test',
+            tenantId,
+            userId: req.user.id,
+            test: true,
+            split: true,
+          },
+        }, {
+          delay: '20s',
+        });
+
+        console.log(`✅ [Birthday Test SPLIT FLOW] Email 2/2: Promotional email queued (20s delay), runId: ${promoHandle.id}`);
+
+        res.json({
+          success: true,
+          message: 'Test birthday card sent (split flow: birthday card sent, promotion queued with 20s delay)',
+          runId: birthdayHandle.id,
+          promoRunId: promoHandle.id,
+          recipient: userEmail,
+          split: true,
+        });
+      } else {
+        // --- COMBINED EMAIL FLOW: Single email with promotion embedded ---
+        const htmlContent = renderBirthdayTemplate(resolvedTemplate as any, {
+          recipientName,
+          message: resolvedMessage,
+          brandName: companyName,
+          customThemeData: resolvedCustomThemeData ? (typeof resolvedCustomThemeData === 'string' ? JSON.parse(resolvedCustomThemeData) : resolvedCustomThemeData) : null,
+          senderName: resolvedSenderName,
+          promotionContent: settings?.promotion?.content,
+          promotionTitle: settings?.promotion?.title,
+          promotionDescription: settings?.promotion?.description,
+          unsubscribeToken,
+        });
+
+        const subject = `🎉 Happy Birthday ${recipientName}! (Test)`;
+
+        const handle = await tasks.trigger('send-email', {
+          to: userEmail,
+          subject,
+          html: htmlContent,
+          from: process.env.EMAIL_FROM || 'admin@zendwise.com',
+          headers: unsubscribeUrl ? {
+            'List-Unsubscribe': `<${unsubscribeUrl}>`,
+            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+          } : undefined,
+          metadata: {
+            type: 'birthday-card-test',
+            tenantId,
+            userId: req.user.id,
+            test: true,
+          },
+        });
+
+        console.log(`✅ [Birthday Test] Triggered send-email task, runId: ${handle.id}`);
+
+        res.json({
+          success: true,
+          message: 'Test birthday card sent successfully',
+          runId: handle.id,
+          recipient: userEmail,
+        });
+      }
     } catch (error) {
       console.error('❌ [Birthday Test] Failed to send test birthday card:', error);
       res.status(500).json({

@@ -408,9 +408,9 @@ export class BirthdayWorker extends EventEmitter {
       `;
     }
 
-    // Build unsubscribe section if token exists
+    // Build unsubscribe section only if token exists AND email contains promotional content
     let unsubscribeSection = '';
-    if (params.unsubscribeToken) {
+    if (params.unsubscribeToken && params.promotionContent) {
       // Use the main server's unsubscribe endpoint
       const baseUrl = process.env.APP_URL || 'http://localhost:5000';
       const unsubscribeUrl = `${baseUrl}/api/unsubscribe/birthday?token=${params.unsubscribeToken}`;
