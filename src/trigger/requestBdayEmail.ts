@@ -6,24 +6,24 @@ import { createHmac } from "crypto";
 // Initialize Resend for email sending
 const resend = new Resend(process.env.RESEND_API_KEY);
 
- function escapeHtml(str: string): string {
-   return str.replace(/[&<>"']/g, (char) => {
-     switch (char) {
-       case "&":
-         return "&amp;";
-       case "<":
-         return "&lt;";
-       case ">":
-         return "&gt;";
-       case '"':
-         return "&quot;";
-       case "'":
-         return "&#39;";
-       default:
-         return char;
-     }
-   });
- }
+function escapeHtml(str: string): string {
+  return str.replace(/[&<>"']/g, (char) => {
+    switch (char) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      case "'":
+        return "&#39;";
+      default:
+        return char;
+    }
+  });
+}
 
 // Schema for birthday request email payload
 const requestBdayEmailPayloadSchema = z.object({
@@ -72,7 +72,7 @@ export const requestBdayEmailTask = task({
     try {
       const data = requestBdayEmailPayloadSchema.parse(payload);
 
-      const apiUrl = process.env.API_URL || 'http://localhost:5000';
+      const apiUrl = process.env.API_URL || 'http://localhost:5002';
       const secret = process.env.INTERNAL_SERVICE_SECRET;
 
       const signInternal = (body: object): { timestamp: number; signature: string } => {
@@ -289,7 +289,7 @@ export const requestBdayEmailTask = task({
       try {
         const parsed = requestBdayEmailPayloadSchema.safeParse(payload);
         if (parsed.success) {
-          const apiUrl = process.env.API_URL || 'http://localhost:5000';
+          const apiUrl = process.env.API_URL || 'http://localhost:5002';
           const secret = process.env.INTERNAL_SERVICE_SECRET;
           if (secret) {
             const body = {

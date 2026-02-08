@@ -170,7 +170,7 @@
     $ curl http://localhost:5004/health
 
     Test Unsubscribe (replace TOKEN):
-    $ curl "http://localhost:5000/api/unsubscribe/birthday?token=TOKEN"
+    $ curl "http://localhost:5002/api/unsubscribe/birthday?token=TOKEN"
     $ curl "http://localhost:5004/api/unsubscribe/birthday?token=TOKEN"
 
     Check Database:

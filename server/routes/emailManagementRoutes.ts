@@ -2781,7 +2781,7 @@ emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken,
       { expiresIn: '30d' }
     );
 
-    const baseUrl = process.env.APP_URL || 'http://localhost:5000';
+    const baseUrl = process.env.APP_URL || 'http://localhost:5002';
     const profileUpdateUrl = `${baseUrl}/update-profile?token=${profileUpdateToken}`;
     const maskedToken = profileUpdateToken.length > 8
       ? `${profileUpdateToken.slice(0, 4)}...${profileUpdateToken.slice(-4)}`
@@ -3486,7 +3486,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
 
           // Build unsubscribe URL for List-Unsubscribe header
           const bdayUnsubUrl = unsubscribeToken
-            ? `${process.env.APP_URL || 'http://localhost:5000'}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
+            ? `${process.env.APP_URL || 'http://localhost:5002'}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
             : undefined;
 
           const birthdayResult = await enhancedEmailService.sendCustomEmail(
@@ -3648,7 +3648,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
 
         // Build unsubscribe URL for List-Unsubscribe header
         const combinedUnsubUrl = unsubscribeToken
-          ? `${process.env.APP_URL || 'http://localhost:5000'}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
+          ? `${process.env.APP_URL || 'http://localhost:5002'}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
           : undefined;
 
         // Send the birthday email
@@ -3947,7 +3947,7 @@ export function renderBirthdayTemplate(
     // Build unsubscribe section only if token exists AND email contains promotional content
     let unsubscribeSection = '';
     if (params.unsubscribeToken && params.promotionContent) {
-      const baseUrl = process.env.APP_URL || 'http://localhost:5000';
+      const baseUrl = process.env.APP_URL || 'http://localhost:5002';
       const unsubscribeUrl = `${baseUrl}/api/email/unsubscribe?token=${encodeURIComponent(params.unsubscribeToken)}&type=customer_engagement`;
       unsubscribeSection = `
         <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">
@@ -4068,7 +4068,7 @@ export function renderBirthdayTemplate(
   // Build unsubscribe section only if token exists AND email contains promotional content
   let unsubscribeSection = '';
   if (params.unsubscribeToken && params.promotionContent) {
-    const baseUrl = process.env.APP_URL || 'http://localhost:5000';
+    const baseUrl = process.env.APP_URL || 'http://localhost:5002';
     const unsubscribeUrl = `${baseUrl}/api/email/unsubscribe?token=${encodeURIComponent(params.unsubscribeToken)}&type=customer_engagement`;
     unsubscribeSection = `
       <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">

@@ -146,7 +146,7 @@ If you need to re-enable workers in Express:
 
 ### Express Server
 ```bash
-curl http://localhost:5000/health
+curl http://localhost:5002/health
 # Should respond quickly, no worker load
 ```
 

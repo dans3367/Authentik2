@@ -61,7 +61,7 @@ const OWNER_USERS: OwnerUserConfig[] = [
   },
   {
     email: "owner2@example.com",
-    name: "Owner User 2", 
+    name: "Owner User 2",
     firstName: "Owner",
     lastName: "User 2",
     password: "password123"
@@ -74,11 +74,11 @@ async function createOwnerCompanySeeder() {
   console.log("   1. Create a separate company/tenant for Owner users");
   console.log("   2. Create two Owner users with proper BetterAuth authentication");
   console.log("   3. Assign users to the new company");
-  
+
   try {
     // Step 1: Check if the company already exists
     console.log(`\n🔍 Checking if company "${COMPANY_CONFIG.name}" already exists...`);
-    
+
     const existingTenant = await db
       .select()
       .from(tenants)
@@ -86,14 +86,14 @@ async function createOwnerCompanySeeder() {
       .limit(1);
 
     let companyTenant;
-    
+
     if (existingTenant.length > 0) {
       console.log(`✅ Company tenant "${COMPANY_CONFIG.name}" already exists`);
       companyTenant = existingTenant[0];
     } else {
       // Step 2: Create the company tenant
       console.log(`📝 Creating new company tenant: ${COMPANY_CONFIG.name}`);
-      
+
       const [newTenant] = await db.insert(tenants).values({
         name: COMPANY_CONFIG.name,
         slug: COMPANY_CONFIG.slug,
@@ -115,7 +115,7 @@ async function createOwnerCompanySeeder() {
 
     // Step 3: Process each Owner user
     let firstOwnerId: string | null = null;
-    
+
     for (const userData of OWNER_USERS) {
       console.log(`\n👤 Processing user: ${userData.email}`);
 
@@ -128,7 +128,7 @@ async function createOwnerCompanySeeder() {
 
       if (existingUser.length > 0) {
         console.log(`⚠️  User ${userData.email} already exists, updating tenant and role...`);
-        
+
         // Update existing user to belong to our company tenant
         await db
           .update(betterAuthUser)
@@ -144,7 +144,7 @@ async function createOwnerCompanySeeder() {
         if (!firstOwnerId) {
           firstOwnerId = existingUser[0].id;
         }
-        
+
         console.log(`✅ Updated ${userData.email} - moved to company tenant`);
         continue;
       }
@@ -163,7 +163,7 @@ async function createOwnerCompanySeeder() {
 
         if (signUpResult?.user) {
           console.log(`✅ User ${userData.email} created via BetterAuth API!`);
-          
+
           // Update with Owner role and assign to company tenant
           await db
             .update(betterAuthUser)
@@ -195,10 +195,10 @@ async function createOwnerCompanySeeder() {
       } catch (authError: any) {
         console.error(`❌ BetterAuth API error for ${userData.email}:`, authError.message);
         console.log(`🔄 Attempting fallback creation method...`);
-        
+
         // Fallback: Try using the handler method
         try {
-          const createUserRequest = new Request("http://localhost:5000/api/auth/sign-up/email", {
+          const createUserRequest = new Request("http://localhost:5002/api/auth/sign-up/email", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -211,10 +211,10 @@ async function createOwnerCompanySeeder() {
           });
 
           const response = await auth.handler(createUserRequest);
-          
+
           if (response.status === 200 || response.status === 201) {
             console.log(`✅ User ${userData.email} created via fallback method!`);
-            
+
             // Find the created user and update it
             const newUser = await db
               .select()
@@ -254,7 +254,7 @@ async function createOwnerCompanySeeder() {
     // Step 4: Create company record if we have at least one owner
     if (firstOwnerId) {
       console.log(`\n🏢 Creating company record...`);
-      
+
       const existingCompany = await db
         .select()
         .from(companies)
@@ -285,7 +285,7 @@ async function createOwnerCompanySeeder() {
     console.log(`🏢 Company: ${COMPANY_CONFIG.name}`);
     console.log(`🆔 Tenant ID: ${companyTenant.id}`);
     console.log(`📝 Slug: ${COMPANY_CONFIG.slug}`);
-    
+
     const companyUsers = await db
       .select()
       .from(betterAuthUser)

@@ -129,7 +129,7 @@ go run main.go
 ### Check Health
 ```bash
 # Via proxy (main domain)
-curl http://localhost:5000/api/unsubscribe/birthday
+curl http://localhost:5002/api/unsubscribe/birthday
 
 # Direct access to cardprocessor-go
 curl http://localhost:5004/health
@@ -139,7 +139,7 @@ curl http://localhost:5004/health
 
 ### Manual Test
 1. Get or generate a valid unsubscribe token
-2. Visit: `http://localhost:5000/api/unsubscribe/birthday?token=YOUR_TOKEN`
+2. Visit: `http://localhost:5002/api/unsubscribe/birthday?token=YOUR_TOKEN`
 3. Submit the unsubscribe form
 4. Verify contact is marked as unsubscribed in database
 

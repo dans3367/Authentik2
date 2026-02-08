@@ -6,7 +6,7 @@
 const crypto = require('crypto');
 
 // Configuration
-const WEBHOOK_URL = 'http://localhost:5000/api/webhooks/resend';
+const WEBHOOK_URL = 'http://localhost:5002/api/webhooks/resend';
 const WEBHOOK_SECRET = 'whsec_dQmHqFcRLvFHgdRvQwBHQXcm8GnvCrF6'; // Matches RESEND_WEBHOOK_SECRET in .env
 
 // Helper function to generate webhook signature
@@ -34,7 +34,7 @@ async function sendWebhook(eventType, email, newsletterId, groupUUID, additional
   };
 
   const signature = generateSignature(payload, WEBHOOK_SECRET);
-  
+
   try {
     const response = await fetch(WEBHOOK_URL, {
       method: 'POST',
@@ -57,20 +57,20 @@ async function sendWebhook(eventType, email, newsletterId, groupUUID, additional
 // Main test function
 async function testNewsletterEngagement() {
   console.log('🚀 Testing Newsletter Webhook Engagement Tracking with GroupUUID\n');
-  
+
   // Get newsletter ID from command line or use a default
   const newsletterId = process.argv[2];
-  
+
   if (!newsletterId) {
     console.error('❌ Please provide a newsletter ID as an argument');
     console.log('Usage: node test-newsletter-webhook.js <newsletter-id>');
     console.log('Example: node test-newsletter-webhook.js d7a2cc8d-2ac5-4fea-b263-e4b67c5b34fe');
     process.exit(1);
   }
-  
+
   // Generate a unique groupUUID for this test batch (simulating real newsletter batch)
   const groupUUID = crypto.randomUUID();
-  
+
   const testEmails = [
     'subscriber1@example.com',
     'subscriber2@example.com',
@@ -78,24 +78,24 @@ async function testNewsletterEngagement() {
     'subscriber4@example.com',
     'subscriber5@example.com'
   ];
-  
+
   console.log(`📧 Testing newsletter: ${newsletterId}`);
   console.log(`🔗 Generated groupUUID: ${groupUUID}`);
   console.log(`📬 Testing with ${testEmails.length} test emails\n`);
-  
+
   // Step 1: Simulate email sent events
   console.log('1️⃣ Simulating email sent events...');
   for (const email of testEmails) {
     await sendWebhook('email.sent', email, newsletterId, groupUUID);
     await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
   }
-  
+
   console.log('\n2️⃣ Simulating email delivered events...');
   for (const email of testEmails) {
     await sendWebhook('email.delivered', email, newsletterId, groupUUID);
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  
+
   console.log('\n3️⃣ Simulating email opened events (60% open rate)...');
   const openedEmails = testEmails.slice(0, 3); // 3 out of 5 = 60%
   for (const email of openedEmails) {
@@ -105,7 +105,7 @@ async function testNewsletterEngagement() {
     });
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  
+
   console.log('\n4️⃣ Simulating email clicked events (33% CTR)...');
   const clickedEmails = openedEmails.slice(0, 1); // 1 out of 3 opened = 33%
   for (const email of clickedEmails) {
@@ -116,12 +116,12 @@ async function testNewsletterEngagement() {
     });
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  
+
   console.log('\n5️⃣ Simulating bounced email...');
   await sendWebhook('email.bounced', 'bounced@example.com', newsletterId, groupUUID, {
     bounce_type: 'hard'
   });
-  
+
   console.log('\n✨ Test complete!');
   console.log('\n📊 Expected results in newsletter view:');
   console.log('- Recipients: 5');

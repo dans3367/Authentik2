@@ -190,7 +190,7 @@ go build -o bin/cardprocessor-go main.go
 Test the unsubscribe flow:
 
 1. Generate a token (via the main API)
-2. Visit: `http://localhost:5004/api/unsubscribe/birthday?token={token}` or `http://localhost:5000/api/unsubscribe/birthday?token={token}` (proxied)
+2. Visit: `http://localhost:5004/api/unsubscribe/birthday?token={token}` or `http://localhost:5002/api/unsubscribe/birthday?token={token}` (proxied)
 3. Submit the form
 4. Verify the contact is marked as unsubscribed in the database
 

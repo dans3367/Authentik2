@@ -170,7 +170,7 @@ PROJECT_ROOT=$(pwd)
 # 1. Start Main Server
 start_service "Main Server" "5000" "NODE_ENV=development PORT=5000 npx tsx server/index.ts" "$PROJECT_ROOT"
 if [ $? -eq 0 ]; then
-    print_port "Main Server: http://localhost:5000"
+    print_port "Main Server: http://localhost:5002"
 fi
 
 # 2. Start Form Server

@@ -350,10 +350,10 @@ curl -X POST http://localhost:5004/api/birthday-unsubscribe-token/CONTACT_ID \
 ### Test Unsubscribe Flow
 ```bash
 # 1. Get the form
-curl "http://localhost:5000/api/unsubscribe/birthday?token=YOUR_TOKEN"
+curl "http://localhost:5002/api/unsubscribe/birthday?token=YOUR_TOKEN"
 
 # 2. Submit unsubscribe
-curl -X POST http://localhost:5000/api/unsubscribe/birthday \
+curl -X POST http://localhost:5002/api/unsubscribe/birthday \
   -d "token=YOUR_TOKEN" \
   -d "reason=not_interested" \
   -d "feedback=Just testing"
