@@ -179,6 +179,11 @@ newsletterWorkerRoutes.get("/jobs/:jobId/status", authenticateToken, async (req:
       return res.status(404).json({ message: 'Job not found' });
     }
 
+    // Verify job belongs to the user's tenant
+    if ((jobStatus as any).tenantId && (jobStatus as any).tenantId !== req.user.tenantId) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+
     res.json({
       status: 'success',
       job: jobStatus,
@@ -199,11 +204,10 @@ newsletterWorkerRoutes.get("/jobs", authenticateToken, async (req: any, res) => 
   try {
     const allJobs = newsletterWorkerService.getAllJobStatuses();
     
-    // Filter jobs by tenant (if job metadata contains tenant info)
+    // Filter jobs by tenant to enforce tenant isolation
     const tenantJobs = Object.fromEntries(
       Object.entries(allJobs).filter(([_, job]) => {
-        // Basic filtering - in a production system, you'd want more robust tenant filtering
-        return true; // For now, return all jobs (implement tenant filtering based on your needs)
+        return (job as any).tenantId === req.user.tenantId;
       })
     );
 
@@ -228,6 +232,12 @@ newsletterWorkerRoutes.post("/jobs/:jobId/cancel", authenticateToken, async (req
   try {
     const { jobId } = req.params;
     
+    // Verify job belongs to the user's tenant before cancelling
+    const jobStatus = newsletterWorkerService.getJobStatus(jobId);
+    if (!jobStatus || ((jobStatus as any).tenantId && (jobStatus as any).tenantId !== req.user.tenantId)) {
+      return res.status(404).json({ message: 'Job not found or cannot be cancelled' });
+    }
+
     const cancelled = await newsletterWorkerService.cancelJob(jobId);
     
     if (!cancelled) {

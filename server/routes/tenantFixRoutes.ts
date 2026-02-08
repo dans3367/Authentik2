@@ -7,6 +7,22 @@ import { authenticateToken, requireRole } from '../middleware/auth-middleware';
 export const tenantFixRoutes = Router();
 
 /**
+ * Known shared/default tenant IDs that contain users needing migration
+ */
+const SHARED_TENANT_IDS = new Set([
+  '00000000-0000-0000-0000-000000000000',
+  '29c69b4f-3129-4aa4-a475-7bf892e5c5b9',
+  '2f6f5ec2-a56f-47d0-887d-c6b9c1bb56ff',
+]);
+
+/**
+ * Helper to check if a user has super-admin privileges
+ */
+function isSuperAdmin(user: { role?: string }): boolean {
+  return user?.role === 'SuperAdmin';
+}
+
+/**
  * Admin endpoint to create unique tenants for users stuck in default/shared tenants
  * Only accessible by owners/administrators
  */
@@ -21,7 +37,7 @@ tenantFixRoutes.post(
 
       console.log(`🔧 [Tenant Fix] Creating unique tenant for user: ${userId}`);
 
-      // Get the user
+      // Get the user - only allow fixing users in the caller's own tenant
       const user = await db.query.betterAuthUser.findFirst({
         where: eq(betterAuthUser.id, userId),
       });
@@ -30,14 +46,14 @@ tenantFixRoutes.post(
         return res.status(404).json({ message: 'User not found' });
       }
 
-      // Check if user is in a shared/default tenant
-      const sharedTenantIds = [
-        '00000000-0000-0000-0000-000000000000',
-        '29c69b4f-3129-4aa4-a475-7bf892e5c5b9',
-        '2f6f5ec2-a56f-47d0-887d-c6b9c1bb56ff',
-      ];
+      // Prevent cross-tenant manipulation: only allow fixing users in the same tenant
+      if (user.tenantId !== req.user.tenantId) {
+        return res.status(403).json({ message: 'Cannot modify users outside your tenant' });
+      }
 
-      if (!sharedTenantIds.includes(user.tenantId)) {
+      // Check if user is in a shared/default tenant
+
+      if (!SHARED_TENANT_IDS.has(user.tenantId)) {
         // Check if this tenant has multiple users
         const tenantUsers = await db.query.betterAuthUser.findMany({
           where: eq(betterAuthUser.tenantId, user.tenantId),
@@ -145,11 +161,7 @@ tenantFixRoutes.get(
   requireRole(['Owner', 'Administrator']),
   async (req: any, res) => {
     try {
-      const sharedTenantIds = [
-        '00000000-0000-0000-0000-000000000000',
-        '29c69b4f-3129-4aa4-a475-7bf892e5c5b9',
-        '2f6f5ec2-a56f-47d0-887d-c6b9c1bb56ff',
-      ];
+      const sharedTenantIds = Array.from(SHARED_TENANT_IDS);
 
       // Get users in shared tenants
       const usersInSharedTenants = await db.query.betterAuthUser.findMany({
@@ -232,6 +244,12 @@ tenantFixRoutes.post(
       const { tenantId } = req.params;
 
       console.log(`🔧 [Tenant Fix] Bulk fixing users in tenant: ${tenantId}`);
+
+      // Allow fixing if: (1) target is a known shared tenant, or (2) caller is a super-admin
+      // This prevents normal tenant-scoped users from cross-tenant manipulation
+      if (!SHARED_TENANT_IDS.has(tenantId) && !isSuperAdmin(req.user)) {
+        return res.status(403).json({ message: 'Cannot modify users outside your tenant' });
+      }
 
       // Get all users in this tenant
       const users = await db.query.betterAuthUser.findMany({

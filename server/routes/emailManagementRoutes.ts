@@ -226,7 +226,7 @@ async function sendPromotionalEmailJob(payload: PromotionalEmailJobPayload): Pro
     payload.htmlPromo,
     {
       text: payload.htmlPromo.replace(/<[^>]*>/g, ''),
-      from: 'admin@zendwise.work',
+      from: 'admin@zendwise.com',
       metadata: {
         type: 'birthday-promotion',
         contactId: payload.contactId,
@@ -260,7 +260,7 @@ async function sendPromotionalEmailJob(payload: PromotionalEmailJobPayload): Pro
           split: true,
           subject: `🎁 ${payload.promoSubject}`,
           recipient: payload.recipientEmail,
-          from: 'admin@zendwise.work',
+          from: 'admin@zendwise.com',
           error: promoResult.error,
           providerId: promoResult.providerId,
         }),
@@ -278,7 +278,7 @@ async function sendPromotionalEmailJob(payload: PromotionalEmailJobPayload): Pro
         tenantId: payload.tenantId,
         recipientEmail: payload.recipientEmail,
         recipientName: payload.recipientName,
-        senderEmail: 'admin@zendwise.work',
+        senderEmail: 'admin@zendwise.com',
         senderName: payload.senderName,
         subject: `🎁 ${payload.promoSubject}`,
         emailType: 'promotional',
@@ -318,7 +318,7 @@ async function sendPromotionalEmailJob(payload: PromotionalEmailJobPayload): Pro
         split: true,
         subject: `🎁 ${payload.promoSubject}`,
         recipient: payload.recipientEmail,
-        from: 'admin@zendwise.work',
+        from: 'admin@zendwise.com',
         messageId: providerMessageId,
         providerId: promoResult.providerId,
       }),
@@ -336,7 +336,7 @@ async function sendPromotionalEmailJob(payload: PromotionalEmailJobPayload): Pro
       tenantId: payload.tenantId,
       recipientEmail: payload.recipientEmail,
       recipientName: payload.recipientName,
-      senderEmail: 'admin@zendwise.work',
+      senderEmail: 'admin@zendwise.com',
       senderName: payload.senderName,
       subject: `🎁 ${payload.promoSubject}`,
       emailType: 'promotional',
@@ -2997,7 +2997,7 @@ emailManagementRoutes.post("/internal/birthday-invitation", async (req: any, res
       '🎂 Help us celebrate your special day!',
       htmlContent,
       {
-        from: fromEmail || 'admin@zendwise.work',
+        from: fromEmail || 'admin@zendwise.com',
         metadata: {
           type: 'birthday_invitation',
           contactId: contactId,
@@ -3418,42 +3418,48 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
     const { enhancedEmailService } = await import('../emailService');
 
     // Send birthday cards to each contact
+    const skippedOptOut: string[] = [];
     for (const contact of contacts) {
       try {
+        // Check if contact has opted out of Customer Engagement emails
+        if (contact.prefCustomerEngagement === false) {
+          const contactName = contact.firstName || contact.lastName
+            ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
+            : contact.email;
+          console.log(`🚫 [ManualBirthdayCard] Skipping ${contact.email} - opted out of Customer Engagement`);
+          skippedOptOut.push(contactName);
+          results.push({ contactId: contact.id, email: contact.email, success: false, error: 'Opted out of Customer Engagement' });
+          continue;
+        }
+
         // Prepare recipient name (needed for both split and combined flows)
         const recipientName = contact.firstName || contact.lastName
           ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
           : contact.email.split('@')[0];
 
-        // Generate unsubscribe token (needed for both split and combined flows)
+        // Generate or reuse unsubscribe token (needed for both split and combined flows)
         let unsubscribeToken: string | undefined;
         try {
-          // Generate a JWT token for internal API call to cardprocessor
-          const internalToken = jwt.sign(
-            {
-              sub: req.user.id,
-              tenant: tenantId,
-              type: 'internal',
-            },
-            process.env.JWT_SECRET || '',
-            { expiresIn: '5m' }
-          );
-
-          const tokenResponse = await fetch(`${cardprocessorUrl}/api/birthday-unsubscribe-token/${contact.id}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${internalToken}`,
-            },
+          let existingToken = await db.query.unsubscribeTokens.findFirst({
+            where: and(
+              eq(unsubscribeTokens.tenantId, tenantId),
+              eq(unsubscribeTokens.contactId, contact.id),
+              sql`${unsubscribeTokens.usedAt} IS NULL`
+            ),
           });
 
-          if (tokenResponse.ok) {
-            const tokenData = await tokenResponse.json();
-            unsubscribeToken = tokenData.token;
-            console.log(`🔗 [ManualBirthdayCard] Generated unsubscribe token for ${contact.email}`);
-          } else {
-            console.warn(`⚠️ [ManualBirthdayCard] Failed to generate unsubscribe token for ${contact.email}`);
+          if (!existingToken) {
+            const token = crypto.randomBytes(24).toString('base64url');
+            const created = await db.insert(unsubscribeTokens).values({
+              tenantId,
+              contactId: contact.id,
+              token,
+            }).returning();
+            existingToken = created[0];
           }
+
+          unsubscribeToken = existingToken?.token;
+          console.log(`🔗 [ManualBirthdayCard] Generated unsubscribe token for ${contact.email}`);
         } catch (error) {
           console.warn(`⚠️ [ManualBirthdayCard] Error generating unsubscribe token for ${contact.email}:`, error);
         }
@@ -3478,13 +3484,22 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
             unsubscribeToken,
           });
 
+          // Build unsubscribe URL for List-Unsubscribe header
+          const bdayUnsubUrl = unsubscribeToken
+            ? `${process.env.BASE_URL || 'http://localhost:5002'}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
+            : undefined;
+
           const birthdayResult = await enhancedEmailService.sendCustomEmail(
             contact.email,
             `🎉 Happy Birthday ${recipientName}!`,
             htmlBirthday,
             {
               text: htmlBirthday.replace(/<[^>]*>/g, ''),
-              from: 'admin@zendwise.work',
+              from: 'admin@zendwise.com',
+              headers: bdayUnsubUrl ? {
+                'List-Unsubscribe': `<${bdayUnsubUrl}>`,
+                'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+              } : undefined,
               metadata: {
                 type: 'birthday-card',
                 contactId: contact.id,
@@ -3504,7 +3519,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               tenantId: tenantId,
               contactId: contact.id,
               activityType: 'sent',
-              activityData: JSON.stringify({ type: 'birthday-card', manual: true, split: true, subject: `🎉 Happy Birthday ${recipientName}!`, recipient: contact.email, from: 'admin@zendwise.work' }),
+              activityData: JSON.stringify({ type: 'birthday-card', manual: true, split: true, subject: `🎉 Happy Birthday ${recipientName}!`, recipient: contact.email, from: 'admin@zendwise.com' }),
               occurredAt: new Date(),
             });
             console.log(`📝 [SPLIT FLOW] Logged birthday card activity for ${contact.email}`);
@@ -3520,7 +3535,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               tenantId: tenantId,
               recipientEmail: contact.email,
               recipientName: recipientName,
-              senderEmail: 'admin@zendwise.work',
+              senderEmail: 'admin@zendwise.com',
               senderName: resolvedSenderName,
               subject: `🎉 Happy Birthday ${recipientName}!`,
               emailType: 'birthday_card',
@@ -3626,6 +3641,11 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           unsubscribeToken,
         });
 
+        // Build unsubscribe URL for List-Unsubscribe header
+        const combinedUnsubUrl = unsubscribeToken
+          ? `${process.env.APP_URL || 'http://localhost:5000'}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
+          : undefined;
+
         // Send the birthday email
         const result = await enhancedEmailService.sendCustomEmail(
           contact.email,
@@ -3633,7 +3653,11 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           htmlContent,
           {
             text: htmlContent.replace(/<[^>]*>/g, ''),
-            from: 'admin@zendwise.work',
+            from: 'admin@zendwise.com',
+            headers: combinedUnsubUrl ? {
+              'List-Unsubscribe': `<${combinedUnsubUrl}>`,
+              'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+            } : undefined,
             metadata: {
               type: 'birthday-card',
               contactId: contact.id,
@@ -3654,7 +3678,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               tenantId: tenantId,
               contactId: contact.id,
               activityType: 'sent',
-              activityData: JSON.stringify({ type: 'birthday-card', manual: true, queued: true, subject: `🎉 Happy Birthday ${recipientName}!`, recipient: contact.email, from: 'admin@zendwise.work' }),
+              activityData: JSON.stringify({ type: 'birthday-card', manual: true, queued: true, subject: `🎉 Happy Birthday ${recipientName}!`, recipient: contact.email, from: 'admin@zendwise.com' }),
               occurredAt: new Date(),
             });
             console.log(`📝 [ManualBirthdayCard] Logged queued birthday card activity for ${contact.email}`);
@@ -3670,7 +3694,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               tenantId: tenantId,
               recipientEmail: contact.email,
               recipientName: recipientName,
-              senderEmail: 'admin@zendwise.work',
+              senderEmail: 'admin@zendwise.com',
               senderName: resolvedSenderName,
               subject: `🎉 Happy Birthday ${recipientName}!`,
               emailType: 'birthday_card',
@@ -3715,7 +3739,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               tenantId: tenantId,
               contactId: contact.id,
               activityType: 'sent',
-              activityData: JSON.stringify({ type: 'birthday-card', manual: true, subject: `🎉 Happy Birthday ${recipientName}!`, recipient: contact.email, from: 'admin@zendwise.work' }),
+              activityData: JSON.stringify({ type: 'birthday-card', manual: true, subject: `🎉 Happy Birthday ${recipientName}!`, recipient: contact.email, from: 'admin@zendwise.com' }),
               occurredAt: new Date(),
             });
             console.log(`📝 [ManualBirthdayCard] Logged birthday card activity for ${contact.email}`);
@@ -3731,7 +3755,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
               tenantId: tenantId,
               recipientEmail: contact.email,
               recipientName: recipientName,
-              senderEmail: 'admin@zendwise.work',
+              senderEmail: 'admin@zendwise.com',
               senderName: resolvedSenderName,
               subject: `🎉 Happy Birthday ${recipientName}!`,
               emailType: 'birthday_card',
@@ -3787,15 +3811,23 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
 
     const successCount = results.filter(r => r.success).length;
     const failureCount = results.filter(r => !r.success).length;
+    const optOutCount = skippedOptOut.length;
+
+    let message = `Birthday cards sent: ${successCount} successful, ${failureCount} failed`;
+    if (optOutCount > 0) {
+      message += `. ${optOutCount} contact(s) skipped (opted out of Customer Engagement): ${skippedOptOut.join(', ')}`;
+    }
 
     res.json({
       success: true,
-      message: `Birthday cards sent: ${successCount} successful, ${failureCount} failed`,
+      message,
       results,
       summary: {
         total: results.length,
         successful: successCount,
         failed: failureCount,
+        optedOut: optOutCount,
+        optedOutContacts: skippedOptOut,
       },
     });
 
@@ -3826,8 +3858,8 @@ function processPlaceholders(content: string, params: { recipientName?: string }
   return processed;
 }
 
-// Helper function to render birthday template
-function renderBirthdayTemplate(
+// Helper function to render birthday template (also exported for test endpoint)
+export function renderBirthdayTemplate(
   template: 'default' | 'confetti' | 'balloons' | 'custom',
   params: {
     recipientName?: string;
@@ -3902,16 +3934,16 @@ function renderBirthdayTemplate(
          </div>`
       : '';
 
-    // Build unsubscribe section if token exists
+    // Build unsubscribe section only if token exists AND email contains promotional content
     let unsubscribeSection = '';
-    if (params.unsubscribeToken) {
+    if (params.unsubscribeToken && params.promotionContent) {
       const baseUrl = process.env.APP_URL || 'http://localhost:5000';
-      const unsubscribeUrl = `${baseUrl}/api/unsubscribe/birthday?token=${params.unsubscribeToken}`;
+      const unsubscribeUrl = `${baseUrl}/api/email/unsubscribe?token=${encodeURIComponent(params.unsubscribeToken)}&type=customer_engagement`;
       unsubscribeSection = `
         <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">
           <p style="margin: 0; font-size: 0.8rem; color: #a0aec0; line-height: 1.4;">
-            Don't want to receive birthday cards? 
-            <a href="${unsubscribeUrl}" style="color: #667eea; text-decoration: none;">Unsubscribe here</a>
+            Don't want to receive these emails? 
+            <a href="${unsubscribeUrl}" style="color: #667eea; text-decoration: none;">Manage preferences</a>
           </p>
         </div>
       `;
@@ -4018,16 +4050,16 @@ function renderBirthdayTemplate(
     ? `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #718096; font-size: 0.9rem; font-weight: 600;">${fromMessage}</div>`
     : '';
 
-  // Build unsubscribe section if token exists
+  // Build unsubscribe section only if token exists AND email contains promotional content
   let unsubscribeSection = '';
-  if (params.unsubscribeToken) {
+  if (params.unsubscribeToken && params.promotionContent) {
     const baseUrl = process.env.APP_URL || 'http://localhost:5000';
-    const unsubscribeUrl = `${baseUrl}/api/unsubscribe/birthday?token=${params.unsubscribeToken}`;
+    const unsubscribeUrl = `${baseUrl}/api/email/unsubscribe?token=${encodeURIComponent(params.unsubscribeToken)}&type=customer_engagement`;
     unsubscribeSection = `
       <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">
         <p style="margin: 0; font-size: 0.8rem; color: #a0aec0; line-height: 1.4;">
-          Don't want to receive birthday cards? 
-          <a href="${unsubscribeUrl}" style="color: #667eea; text-decoration: none;">Unsubscribe here</a>
+          Don't want to receive these emails? 
+          <a href="${unsubscribeUrl}" style="color: #667eea; text-decoration: none;">Manage preferences</a>
         </p>
       </div>
     `;
@@ -4343,7 +4375,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
         tenantId: tenantId,
         recipientEmail: contact.email,
         recipientName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email,
-        senderEmail: 'admin@zendwise.work', // Default sender or configured one
+        senderEmail: 'admin@zendwise.com', // Default sender or configured one
         senderName: design.displayCompanyName || 'Manager',
         subject: subject,
         emailType: 'individual',

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, and, like, desc, inArray } from 'drizzle-orm';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
+import { authenticateInternalService } from '../middleware/internal-service-auth';
 import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, betterAuthUser, emailContacts, contactTagAssignments, bouncedEmails, unsubscribeTokens } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 import { emailService, enhancedEmailService } from '../emailService';
@@ -398,13 +399,8 @@ newsletterRoutes.get("/:id/task-status", authenticateToken, requireTenant, async
 });
 
 // Update newsletter status (internal service endpoint for temporal server)
-newsletterRoutes.put("/:id/status", async (req: any, res) => {
+newsletterRoutes.put("/:id/status", authenticateInternalService, async (req: any, res) => {
   try {
-    // Check for internal service authentication
-    const internalServiceHeader = req.headers['x-internal-service'];
-    if (internalServiceHeader !== 'temporal-server') {
-      return res.status(403).json({ message: 'Unauthorized: Internal service access only' });
-    }
 
     const { id } = req.params;
     const { status, metadata } = req.body;
@@ -443,13 +439,8 @@ newsletterRoutes.put("/:id/status", async (req: any, res) => {
 });
 
 // Log newsletter activity (internal service endpoint for temporal server)
-newsletterRoutes.post("/:id/log", async (req: any, res) => {
+newsletterRoutes.post("/:id/log", authenticateInternalService, async (req: any, res) => {
   try {
-    // Check for internal service authentication
-    const internalServiceHeader = req.headers['x-internal-service'];
-    if (internalServiceHeader !== 'temporal-server') {
-      return res.status(403).json({ message: 'Unauthorized: Internal service access only' });
-    }
 
     const { id } = req.params;
     const { activity, details, timestamp } = req.body;
@@ -483,7 +474,7 @@ newsletterRoutes.post("/:id/task-status", authenticateToken, requireTenant, asyn
     const { status, progress, totalRecipients, processedRecipients, failedRecipients, error } = req.body;
 
     const newsletter = await db.query.newsletters.findFirst({
-      where: eq(newsletters.id, id),
+      where: and(eq(newsletters.id, id), eq(newsletters.tenantId, req.user.tenantId)),
       with: {
         user: true
       }
@@ -520,7 +511,7 @@ newsletterRoutes.put("/:newsletterId/task-status/:taskId", authenticateToken, re
     const { status, progress, error } = req.body;
 
     const newsletter = await db.query.newsletters.findFirst({
-      where: eq(newsletters.id, newsletterId),
+      where: and(eq(newsletters.id, newsletterId), eq(newsletters.tenantId, req.user.tenantId)),
     });
 
     if (!newsletter) {
@@ -550,7 +541,7 @@ newsletterRoutes.post("/:id/initialize-tasks", authenticateToken, requireTenant,
     const { id } = req.params;
 
     const newsletter = await db.query.newsletters.findFirst({
-      where: eq(newsletters.id, id),
+      where: and(eq(newsletters.id, id), eq(newsletters.tenantId, req.user.tenantId)),
       with: {
         user: true
       }
@@ -915,7 +906,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
 });
 
 // Endpoint for sending a single newsletter email (called by Temporal activities)
-newsletterRoutes.post('/:id/send-single', async (req, res) => {
+newsletterRoutes.post('/:id/send-single', authenticateInternalService, async (req: any, res) => {
   try {
     const { id } = req.params;
     const { recipient, subject, content, groupUUID, tenantId } = req.body;

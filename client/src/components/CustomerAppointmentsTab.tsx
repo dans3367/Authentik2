@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { isPast } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { TIMEZONE_OPTIONS } from "@/utils/appointment-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,6 +15,16 @@ import {
     SheetHeader,
     SheetTitle,
 } from "@/components/ui/sheet";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -47,6 +58,7 @@ import {
     ChevronLeft,
     Mail,
     Send,
+    Plus,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -142,6 +154,202 @@ export default function CustomerAppointmentsTab({
             });
         },
     });
+
+    // Create appointment state and mutation
+    const [createDialogOpen, setCreateDialogOpen] = useState(false);
+    const [dialogStep, setDialogStep] = useState<"form" | "reminder">("form");
+    const [createdAppointmentId, setCreatedAppointmentId] = useState<string | null>(null);
+    const [createdAppointmentDate, setCreatedAppointmentDate] = useState<Date | null>(null);
+    const [newAppointment, setNewAppointment] = useState({
+        title: "",
+        description: "",
+        appointmentDate: "",
+        appointmentTime: "",
+        duration: 60,
+        location: "",
+        serviceType: "",
+        notes: "",
+    });
+    const [formErrors, setFormErrors] = useState<{ title?: boolean; date?: boolean }>({});
+    const [reminderData, setReminderData] = useState<{
+        reminderType: "email" | "sms" | "push";
+        reminderTiming: "now" | "5m" | "30m" | "1h" | "5h" | "10h" | "custom";
+        customMinutesBefore?: number;
+        timezone: string;
+        content: string;
+    }>({
+        reminderType: "email",
+        reminderTiming: "1h",
+        customMinutesBefore: undefined,
+        timezone: "America/Chicago",
+        content: "",
+    });
+
+    const resetForm = () => {
+        setNewAppointment({
+            title: "",
+            description: "",
+            appointmentDate: "",
+            appointmentTime: "",
+            duration: 60,
+            location: "",
+            serviceType: "",
+            notes: "",
+        });
+        setFormErrors({});
+        setDialogStep("form");
+        setCreatedAppointmentId(null);
+        setCreatedAppointmentDate(null);
+        setReminderData({
+            reminderType: "email",
+            reminderTiming: "1h",
+            customMinutesBefore: undefined,
+            timezone: "America/Chicago",
+            content: "",
+        });
+    };
+
+    const createAppointmentMutation = useMutation({
+        mutationFn: async (data: Record<string, any>) => {
+            const response = await apiRequest("POST", "/api/appointments", data);
+            return response.json();
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+            toast({
+                title: "Appointment Created",
+                description: "The appointment has been scheduled successfully.",
+            });
+            // Transition to reminder step
+            const appointmentId = data?.appointment?.id;
+            const appointmentDate = data?.appointment?.appointmentDate;
+            if (appointmentId) {
+                setCreatedAppointmentId(appointmentId);
+                setCreatedAppointmentDate(appointmentDate ? new Date(appointmentDate) : null);
+                setDialogStep("reminder");
+            } else {
+                setCreateDialogOpen(false);
+                resetForm();
+            }
+        },
+        onError: (error: any) => {
+            toast({
+                title: "Error",
+                description: error.message || "Failed to create appointment",
+                variant: "destructive",
+            });
+        },
+    });
+
+    const createReminderMutation = useMutation({
+        mutationFn: async ({ appointmentId, data }: { appointmentId: string; data: Record<string, any> }) => {
+            const response = await apiRequest("POST", "/api/appointment-reminders", {
+                appointmentId,
+                ...data,
+            });
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+            toast({
+                title: "Reminder Scheduled",
+                description: "A reminder has been set for this appointment.",
+            });
+            setCreateDialogOpen(false);
+            resetForm();
+        },
+        onError: (error: any) => {
+            toast({
+                title: "Error",
+                description: error.message || "Failed to schedule reminder",
+                variant: "destructive",
+            });
+        },
+    });
+
+    const handleScheduleReminder = () => {
+        if (!createdAppointmentId || !createdAppointmentDate) return;
+
+        if (reminderData.reminderTiming === "custom" && !reminderData.customMinutesBefore) {
+            toast({
+                title: "Validation Error",
+                description: "Please enter the number of minutes before the appointment.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        let scheduledFor: Date;
+        if (reminderData.reminderTiming === "now") {
+            scheduledFor = new Date();
+        } else if (reminderData.reminderTiming === "custom" && reminderData.customMinutesBefore) {
+            scheduledFor = new Date(createdAppointmentDate.getTime() - reminderData.customMinutesBefore * 60 * 1000);
+        } else {
+            const timingMap: Record<string, number> = {
+                "5m": 5,
+                "30m": 30,
+                "1h": 60,
+                "5h": 300,
+                "10h": 600,
+            };
+            const minutes = timingMap[reminderData.reminderTiming] || 60;
+            scheduledFor = new Date(createdAppointmentDate.getTime() - minutes * 60 * 1000);
+        }
+
+        createReminderMutation.mutate({
+            appointmentId: createdAppointmentId,
+            data: {
+                reminderType: reminderData.reminderType,
+                reminderTiming: reminderData.reminderTiming,
+                customMinutesBefore: reminderData.customMinutesBefore,
+                scheduledFor,
+                timezone: reminderData.timezone,
+                content: reminderData.content || undefined,
+            },
+        });
+    };
+
+    const handleCreateAppointment = () => {
+        const errors: { title?: boolean; date?: boolean } = {};
+        if (!newAppointment.title.trim()) errors.title = true;
+        if (!newAppointment.appointmentDate) errors.date = true;
+
+        if (Object.keys(errors).length > 0) {
+            setFormErrors(errors);
+            toast({
+                title: "Validation Error",
+                description: "Please fill in all required fields.",
+                variant: "destructive",
+            });
+            return;
+        }
+        setFormErrors({});
+
+        // Combine date and time into a single Date
+        const dateStr = newAppointment.appointmentDate;
+        const timeStr = newAppointment.appointmentTime || "09:00";
+        const appointmentDate = new Date(`${dateStr}T${timeStr}`);
+
+        if (appointmentDate < new Date()) {
+            toast({
+                title: "Invalid Date",
+                description: "Appointment date must be in the future.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        createAppointmentMutation.mutate({
+            customerId,
+            title: newAppointment.title.trim(),
+            description: newAppointment.description.trim() || undefined,
+            appointmentDate: appointmentDate.toISOString(),
+            duration: newAppointment.duration,
+            location: newAppointment.location.trim() || undefined,
+            serviceType: newAppointment.serviceType.trim() || undefined,
+            notes: newAppointment.notes.trim() || undefined,
+        });
+    };
 
     const appointments = appointmentsData?.appointments || [];
 
@@ -348,6 +556,261 @@ export default function CustomerAppointmentsTab({
         </button>
     );
 
+    const createAppointmentDialog = (
+        <Dialog open={createDialogOpen} onOpenChange={(open) => {
+            if (!open && dialogStep === "reminder") {
+                // If closing during reminder step, just close (appointment already created)
+                setCreateDialogOpen(false);
+                resetForm();
+                return;
+            }
+            setCreateDialogOpen(open);
+            if (!open) resetForm();
+        }}>
+            <DialogContent className="max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+                {dialogStep === "form" ? (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle>New Appointment</DialogTitle>
+                            <DialogDescription>
+                                Schedule a new appointment for this customer.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 overflow-y-auto flex-1 px-1 py-1">
+                            <div>
+                                <Label className={formErrors.title ? "text-red-500" : ""}>
+                                    Title <span className="text-red-500">*</span>
+                                </Label>
+                                <Input
+                                    value={newAppointment.title}
+                                    onChange={(e) => {
+                                        setNewAppointment(prev => ({ ...prev, title: e.target.value }));
+                                        setFormErrors(prev => ({ ...prev, title: false }));
+                                    }}
+                                    placeholder="e.g. Follow-up consultation"
+                                    className={formErrors.title ? "border-red-500" : ""}
+                                />
+                            </div>
+
+                            <div>
+                                <Label className={formErrors.date ? "text-red-500" : ""}>
+                                    Date & Time <span className="text-red-500">*</span>
+                                </Label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Input
+                                        type="date"
+                                        value={newAppointment.appointmentDate}
+                                        onChange={(e) => {
+                                            setNewAppointment(prev => ({ ...prev, appointmentDate: e.target.value }));
+                                            setFormErrors(prev => ({ ...prev, date: false }));
+                                        }}
+                                        className={formErrors.date ? "border-red-500" : ""}
+                                    />
+                                    <Input
+                                        type="time"
+                                        value={newAppointment.appointmentTime}
+                                        onChange={(e) => setNewAppointment(prev => ({ ...prev, appointmentTime: e.target.value }))}
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <Label>Duration (minutes)</Label>
+                                <Input
+                                    type="number"
+                                    value={newAppointment.duration}
+                                    onChange={(e) => setNewAppointment(prev => ({ ...prev, duration: parseInt(e.target.value, 10) || 60 }))}
+                                    min="15"
+                                    step="15"
+                                />
+                            </div>
+
+                            <div>
+                                <Label>Location</Label>
+                                <Input
+                                    value={newAppointment.location}
+                                    onChange={(e) => setNewAppointment(prev => ({ ...prev, location: e.target.value }))}
+                                    placeholder="e.g. Office, Zoom, etc."
+                                />
+                            </div>
+
+                            <div>
+                                <Label>Service Type</Label>
+                                <Input
+                                    value={newAppointment.serviceType}
+                                    onChange={(e) => setNewAppointment(prev => ({ ...prev, serviceType: e.target.value }))}
+                                    placeholder="e.g. Consultation, Check-up"
+                                />
+                            </div>
+
+                            <div>
+                                <Label>Description</Label>
+                                <Textarea
+                                    value={newAppointment.description}
+                                    onChange={(e) => setNewAppointment(prev => ({ ...prev, description: e.target.value }))}
+                                    placeholder="Brief description of the appointment..."
+                                    rows={2}
+                                />
+                            </div>
+
+                            <div>
+                                <Label>Notes</Label>
+                                <Textarea
+                                    value={newAppointment.notes}
+                                    onChange={(e) => setNewAppointment(prev => ({ ...prev, notes: e.target.value }))}
+                                    placeholder="Internal notes..."
+                                    rows={2}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-4 border-t">
+                            <Button variant="outline" onClick={() => {
+                                setCreateDialogOpen(false);
+                                resetForm();
+                            }}>
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={handleCreateAppointment}
+                                disabled={createAppointmentMutation.isPending}
+                            >
+                                {createAppointmentMutation.isPending ? "Creating..." : "Create Appointment"}
+                            </Button>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <Bell className="h-5 w-5 text-blue-500" />
+                                Set a Reminder
+                            </DialogTitle>
+                            <DialogDescription>
+                                Would you like to schedule a reminder for this appointment?
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 overflow-y-auto flex-1 px-1 py-1">
+                            <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+                                <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    <span className="font-medium">Appointment created successfully!</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <Label>Reminder Type</Label>
+                                <Select
+                                    value={reminderData.reminderType}
+                                    onValueChange={(value: "email" | "sms" | "push") =>
+                                        setReminderData(prev => ({ ...prev, reminderType: value }))
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="email">Email</SelectItem>
+                                        <SelectItem value="sms" disabled>SMS (coming soon)</SelectItem>
+                                        <SelectItem value="push" disabled>Push (coming soon)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div>
+                                <Label>When to Send</Label>
+                                <Select
+                                    value={reminderData.reminderTiming}
+                                    onValueChange={(value: "now" | "5m" | "30m" | "1h" | "5h" | "10h" | "custom") =>
+                                        setReminderData(prev => ({ ...prev, reminderTiming: value }))
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="now">Send Now</SelectItem>
+                                        <SelectItem value="5m">5 minutes before</SelectItem>
+                                        <SelectItem value="30m">30 minutes before</SelectItem>
+                                        <SelectItem value="1h">1 hour before</SelectItem>
+                                        <SelectItem value="5h">5 hours before</SelectItem>
+                                        <SelectItem value="10h">10 hours before</SelectItem>
+                                        <SelectItem value="custom">Custom time</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {reminderData.reminderTiming === "custom" && (
+                                <div>
+                                    <Label>Minutes Before Appointment <span className="text-red-500">*</span></Label>
+                                    <Input
+                                        type="number"
+                                        min="1"
+                                        max="10080"
+                                        placeholder="e.g. 120 for 2 hours"
+                                        value={reminderData.customMinutesBefore || ""}
+                                        onChange={(e) =>
+                                            setReminderData(prev => ({
+                                                ...prev,
+                                                customMinutesBefore: e.target.value ? parseInt(e.target.value) : undefined,
+                                            }))
+                                        }
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Enter the number of minutes before the appointment (max 10080 = 7 days)
+                                    </p>
+                                </div>
+                            )}
+
+                            <div>
+                                <Label>Timezone</Label>
+                                <Select
+                                    value={reminderData.timezone}
+                                    onValueChange={(value) => setReminderData(prev => ({ ...prev, timezone: value }))}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select timezone" />
+                                    </SelectTrigger>
+                                    <SelectContent className="max-h-[300px]">
+                                        {TIMEZONE_OPTIONS.map(tz => (
+                                            <SelectItem key={tz.value} value={tz.value}>{tz.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div>
+                                <Label>Message (optional)</Label>
+                                <Textarea
+                                    value={reminderData.content}
+                                    onChange={(e) => setReminderData(prev => ({ ...prev, content: e.target.value }))}
+                                    placeholder="Custom reminder message..."
+                                    rows={3}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex justify-between gap-2 pt-4 border-t">
+                            <Button variant="ghost" onClick={() => {
+                                setCreateDialogOpen(false);
+                                resetForm();
+                            }}>
+                                Skip
+                            </Button>
+                            <Button
+                                onClick={handleScheduleReminder}
+                                disabled={createReminderMutation.isPending}
+                            >
+                                <Bell className="w-4 h-4 mr-2" />
+                                {createReminderMutation.isPending ? "Scheduling..." : "Schedule Reminder"}
+                            </Button>
+                        </div>
+                    </>
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+
     if (isLoading) {
         return (
             <div className="space-y-4">
@@ -379,17 +842,27 @@ export default function CustomerAppointmentsTab({
 
     if (appointments.length === 0) {
         return (
-            <Card>
-                <CardContent className="py-12">
-                    <div className="text-center text-gray-500 dark:text-gray-400">
-                        <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                        <p className="font-medium">No appointments found</p>
-                        <p className="text-sm mt-1">
-                            This customer doesn't have any appointments yet.
-                        </p>
-                    </div>
-                </CardContent>
-            </Card>
+            <>
+                <Card>
+                    <CardContent className="py-12">
+                        <div className="text-center text-gray-500 dark:text-gray-400">
+                            <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                            <p className="font-medium">No appointments found</p>
+                            <p className="text-sm mt-1">
+                                This customer doesn't have any appointments yet.
+                            </p>
+                            <Button
+                                className="mt-4"
+                                onClick={() => setCreateDialogOpen(true)}
+                            >
+                                <Plus className="w-4 h-4 mr-2" />
+                                New Appointment
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+                {createAppointmentDialog}
+            </>
         );
     }
 
@@ -399,15 +872,24 @@ export default function CustomerAppointmentsTab({
                 {/* Upcoming Appointments */}
                 <Card>
                     <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center gap-2 text-base">
-                            <CalendarClock className="w-4 h-4 text-blue-500" />
-                            Upcoming Appointments
-                            {upcomingAppointments.length > 0 && (
-                                <Badge variant="secondary" className="ml-1">
-                                    {upcomingAppointments.length}
-                                </Badge>
-                            )}
-                        </CardTitle>
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <CalendarClock className="w-4 h-4 text-blue-500" />
+                                Upcoming Appointments
+                                {upcomingAppointments.length > 0 && (
+                                    <Badge variant="secondary" className="ml-1">
+                                        {upcomingAppointments.length}
+                                    </Badge>
+                                )}
+                            </CardTitle>
+                            <Button
+                                size="sm"
+                                onClick={() => setCreateDialogOpen(true)}
+                            >
+                                <Plus className="w-4 h-4 mr-1" />
+                                New
+                            </Button>
+                        </div>
                     </CardHeader>
                     <CardContent>
                         {upcomingAppointments.length > 0 ? (
@@ -599,7 +1081,7 @@ export default function CustomerAppointmentsTab({
                                         </>
                                     )}
 
-                                    {/* Reminder & Confirmation Status */}
+                                    {/* Confirmation & Reminder Status */}
                                     <Separator />
                                     <div className="space-y-3">
                                         <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
@@ -607,22 +1089,6 @@ export default function CustomerAppointmentsTab({
                                             Status
                                         </h4>
                                         <div className="grid grid-cols-2 gap-3">
-                                            <div className="p-3 rounded-lg bg-muted/50">
-                                                <p className="text-xs text-muted-foreground mb-1">Reminder</p>
-                                                <div className="flex items-center gap-1.5">
-                                                    {selectedAppointment.reminderSent ? (
-                                                        <>
-                                                            <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                                                            <span className="text-sm text-green-600 dark:text-green-400">Sent</span>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Clock className="h-3.5 w-3.5 text-gray-400" />
-                                                            <span className="text-sm text-muted-foreground">Pending</span>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </div>
                                             <div className="p-3 rounded-lg bg-muted/50">
                                                 <p className="text-xs text-muted-foreground mb-1">Confirmation</p>
                                                 <div className="flex items-center gap-1.5">
@@ -635,6 +1101,22 @@ export default function CustomerAppointmentsTab({
                                                         <>
                                                             <Clock className="h-3.5 w-3.5 text-gray-400" />
                                                             <span className="text-sm text-muted-foreground">Awaiting</span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="p-3 rounded-lg bg-muted/50">
+                                                <p className="text-xs text-muted-foreground mb-1">Reminder</p>
+                                                <div className="flex items-center gap-1.5">
+                                                    {selectedAppointment.reminderSent ? (
+                                                        <>
+                                                            <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                                                            <span className="text-sm text-green-600 dark:text-green-400">Sent</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Clock className="h-3.5 w-3.5 text-gray-400" />
+                                                            <span className="text-sm text-muted-foreground">Pending</span>
                                                         </>
                                                     )}
                                                 </div>
@@ -723,6 +1205,9 @@ export default function CustomerAppointmentsTab({
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* Create Appointment Dialog */}
+            {createAppointmentDialog}
         </>
     );
 }

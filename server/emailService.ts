@@ -15,9 +15,9 @@ const enhancedEmailService = new EnhancedEmailService();
 export { enhancedEmailService };
 
 export class EmailService {
-  private fromEmail = process.env.FROM_EMAIL || 'dan@zendwise.work';
+  private fromEmail = process.env.FROM_EMAIL || 'dan@zendwise.com';
   private appName = process.env.APP_NAME || 'SaaS Auth App';
-  private baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+  private baseUrl = process.env.BASE_URL || 'http://localhost:5002';
   private useEnhanced = process.env.USE_ENHANCED_EMAIL !== 'false'; // Default to true
 
   async sendVerificationEmail(email: string, verificationToken: string, firstName?: string) {
@@ -26,7 +26,7 @@ export class EmailService {
       try {
         console.log('[EmailService] Using enhanced email service for verification email');
         const result = await enhancedEmailService.sendVerificationEmail(email, verificationToken, firstName);
-        
+
         if (result.success) {
           return { id: result.messageId, ...result };
         } else {
@@ -124,7 +124,7 @@ export class EmailService {
       try {
         console.log('[EmailService] Using enhanced email service for approval email');
         const result = await enhancedEmailService.sendReviewerApprovalEmail(email, approveUrl, subject, emailData);
-        
+
         if (result.success) {
           return { id: result.messageId, ...result };
         } else {
@@ -203,7 +203,7 @@ export class EmailService {
       try {
         console.log('[EmailService] Using enhanced email service for welcome email');
         const result = await enhancedEmailService.sendWelcomeEmail(email, firstName);
-        
+
         if (result.success) {
           return { id: result.messageId, ...result };
         } else {
@@ -322,7 +322,7 @@ export class EmailService {
     if (this.useEnhanced) {
       return await enhancedEmailService.sendCustomEmail(to, subject, html, options);
     }
-    
+
     // Legacy implementation
     const recipients = Array.isArray(to) ? to : [to];
     try {

@@ -4,6 +4,7 @@ import { enhancedEmailService } from '../emailService';
 import { db } from '../db';
 import { and, eq, sql } from 'drizzle-orm';
 import { unsubscribeTokens, emailContacts, emailActivity } from '@shared/schema';
+import { authenticateToken, requireRole } from '../middleware/auth-middleware';
 
 export const emailRoutes = Router();
 
@@ -16,7 +17,7 @@ const unsubscribeLimiter = rateLimit({
 });
 
 // Email system status endpoint
-emailRoutes.get('/status', async (req, res) => {
+emailRoutes.get('/status', authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const status = enhancedEmailService.getStatus();
     const healthCheck = await enhancedEmailService.healthCheck();
@@ -197,7 +198,7 @@ emailRoutes.post('/unsubscribe/preferences', unsubscribeLimiter, async (req, res
 
 
 // Send custom email endpoint (for testing)
-emailRoutes.post('/send', async (req, res) => {
+emailRoutes.post('/send', authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const {
       to,
@@ -208,9 +209,9 @@ emailRoutes.post('/send', async (req, res) => {
       useQueue,
       metadata,
       fromEmail,
-      tenantId,
-      tenantName
     } = req.body;
+    const tenantId = req.user.tenantId;
+    const tenantName = req.user.tenantName || undefined;
 
     if (!to || !subject || !html) {
       return res.status(400).json({
@@ -276,7 +277,7 @@ emailRoutes.get('/health', async (req, res) => {
 });
 
 // Provider configuration endpoints (for admin use)
-emailRoutes.get('/providers', async (req, res) => {
+emailRoutes.get('/providers', authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const status = enhancedEmailService.getStatus();
 

@@ -148,13 +148,14 @@ type BirthdayJobProgress struct {
 
 // CreateBirthdaySettingsRequest represents the request to create birthday settings
 type CreateBirthdaySettingsRequest struct {
-	Enabled         bool    `json:"enabled"`
-	EmailTemplate   string  `json:"emailTemplate"`
-	SegmentFilter   string  `json:"segmentFilter"`
-	CustomMessage   string  `json:"customMessage"`
-	CustomThemeData *string `json:"customThemeData"`
-	SenderName      string  `json:"senderName"`
-	PromotionID     *string `json:"promotionId"`
+	Enabled               bool    `json:"enabled"`
+	EmailTemplate         string  `json:"emailTemplate"`
+	SegmentFilter         string  `json:"segmentFilter"`
+	CustomMessage         string  `json:"customMessage"`
+	CustomThemeData       *string `json:"customThemeData"`
+	SenderName            string  `json:"senderName"`
+	PromotionID           *string `json:"promotionId"`
+	SplitPromotionalEmail *bool   `json:"splitPromotionalEmail,omitempty"`
 }
 
 // UpdateBirthdaySettingsRequest represents the request to update birthday settings
