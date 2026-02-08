@@ -1087,7 +1087,7 @@ export default function CustomerAppointmentsTab({
                                         </>
                                     )}
 
-                                    {/* Reminder & Confirmation Status */}
+                                    {/* Confirmation & Reminder Status */}
                                     <Separator />
                                     <div className="space-y-3">
                                         <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
@@ -1095,22 +1095,6 @@ export default function CustomerAppointmentsTab({
                                             Status
                                         </h4>
                                         <div className="grid grid-cols-2 gap-3">
-                                            <div className="p-3 rounded-lg bg-muted/50">
-                                                <p className="text-xs text-muted-foreground mb-1">Reminder</p>
-                                                <div className="flex items-center gap-1.5">
-                                                    {selectedAppointment.reminderSent ? (
-                                                        <>
-                                                            <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                                                            <span className="text-sm text-green-600 dark:text-green-400">Sent</span>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Clock className="h-3.5 w-3.5 text-gray-400" />
-                                                            <span className="text-sm text-muted-foreground">Pending</span>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </div>
                                             <div className="p-3 rounded-lg bg-muted/50">
                                                 <p className="text-xs text-muted-foreground mb-1">Confirmation</p>
                                                 <div className="flex items-center gap-1.5">
@@ -1123,6 +1107,22 @@ export default function CustomerAppointmentsTab({
                                                         <>
                                                             <Clock className="h-3.5 w-3.5 text-gray-400" />
                                                             <span className="text-sm text-muted-foreground">Awaiting</span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="p-3 rounded-lg bg-muted/50">
+                                                <p className="text-xs text-muted-foreground mb-1">Reminder</p>
+                                                <div className="flex items-center gap-1.5">
+                                                    {selectedAppointment.reminderSent ? (
+                                                        <>
+                                                            <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                                                            <span className="text-sm text-green-600 dark:text-green-400">Sent</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Clock className="h-3.5 w-3.5 text-gray-400" />
+                                                            <span className="text-sm text-muted-foreground">Pending</span>
                                                         </>
                                                     )}
                                                 </div>
