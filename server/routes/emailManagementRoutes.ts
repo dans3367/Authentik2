@@ -3486,7 +3486,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
 
           // Build unsubscribe URL for List-Unsubscribe header
           const bdayUnsubUrl = unsubscribeToken
-            ? `${process.env.APP_URL || 'http://localhost:5000'}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
+            ? `${process.env.BASE_URL || 'http://localhost:5002'}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
             : undefined;
 
           const birthdayResult = await enhancedEmailService.sendCustomEmail(

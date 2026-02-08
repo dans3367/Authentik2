@@ -62,7 +62,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Note: Auth routes handled by better-auth middleware
   // Internal routes (authenticated via internal service middleware)
   app.use("/api/internal", internalRoutes);
-  
+
   // Public routes (no authentication required)
   app.use("/api/appointments", appointmentConfirmationRoutes); // Public appointment confirmation/decline
 
@@ -269,7 +269,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`📧 [Birthday Test] Split email enabled: ${splitPromotionalEmail ?? settings?.splitPromotionalEmail}, Has promotion: ${!!settings?.promotion}, Will split: ${!!shouldSplit}`);
 
       // Build unsubscribe URL for List-Unsubscribe header
-      const baseUrl = process.env.APP_URL || 'http://localhost:5000';
+      const baseUrl = process.env.BASE_URL || 'http://localhost:5002';
       const unsubscribeUrl = unsubscribeToken
         ? `${baseUrl}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
         : undefined;

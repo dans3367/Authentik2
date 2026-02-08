@@ -671,16 +671,16 @@ export function ECardsContent() {
       console.log('✅ [Birthday Settings] Update success, updating cache with:', updatedSettings);
       console.log('📌 [Birthday Settings] customThemeData value:', updatedSettings?.customThemeData);
       console.log('📌 [Birthday Settings] customThemeData type:', typeof updatedSettings?.customThemeData);
-      
+
       toast({
         title: "Success",
         description: "E-card settings updated successfully",
       });
-      
+
       // Update the query cache immediately with the server response (same as /birthdays)
       queryClient.setQueryData(['/api/e-card-settings'], updatedSettings);
       console.log('💾 [Birthday Settings] Cache updated');
-      
+
       // Force a re-render by invalidating the query
       queryClient.invalidateQueries({ queryKey: ['/api/e-card-settings'] });
       console.log('🔄 [Birthday Settings] Query invalidated, will refetch');
@@ -808,7 +808,7 @@ export function ECardsContent() {
   const cardDesignerInitialData = useMemo(() => {
     // Check if we're editing a custom card by looking for it in customCards array
     const existingCard = designerThemeId ? customCards.find(c => c.id === designerThemeId) : null;
-    
+
     if (existingCard) {
       // Editing an existing custom card
       const hasImage = Boolean(existingCard.data.imageUrl);
@@ -828,7 +828,7 @@ export function ECardsContent() {
         occasionType: existingCard.occasionType || '',
       };
     }
-    
+
     // Check if creating a new custom card (designerThemeId starts with 'custom-')
     if (designerThemeId && designerThemeId.startsWith('custom-')) {
       // New custom card - return empty data
@@ -896,7 +896,7 @@ export function ECardsContent() {
 
     // PRIORITY 3: Default empty data if no saved data found
     console.log('🆕 [Card Designer Initial Data] No saved data found, returning defaults for theme:', currentThemeId);
-    
+
     // Map theme IDs to their default titles
     const defaultTitlesByTheme: Record<string, string> = {
       'default': t('ecards.preview.defaultTitle') || 'Merry Christmas!',
@@ -909,9 +909,9 @@ export function ECardsContent() {
       'pastel-eggs': t('ecards.preview.easter') || "Celebrate Easter with Joy!",
       'midnight-sparkles': t('ecards.preview.newYearsDay') || "Happy New Year!",
     };
-    
+
     const defaultTitle = defaultTitlesByTheme[currentThemeId] || '';
-    
+
     return {
       title: defaultTitle,
       description: '',
@@ -967,9 +967,9 @@ export function ECardsContent() {
       const newDisabled = currentDisabled.includes(parentHolidayId)
         ? currentDisabled.filter(id => id !== parentHolidayId)
         : [...currentDisabled, parentHolidayId];
-      
+
       setDisabledHolidays(newDisabled);
-      
+
       updateSettingsMutation.mutate({
         ...eCardSettings,
         disabledHolidays: newDisabled,
@@ -980,10 +980,10 @@ export function ECardsContent() {
   // Handler for toggling custom card active state
   const handleToggleCustomCardActive = async () => {
     const isCustomCard = designerThemeId && (
-      designerThemeId.startsWith('custom-') || 
+      designerThemeId.startsWith('custom-') ||
       customCards.some(c => c.id === designerThemeId)
     );
-    
+
     if (isCustomCard) {
       const card = customCards.find(c => c.id === designerThemeId);
       if (!card) return;
@@ -1057,7 +1057,7 @@ export function ECardsContent() {
       // If the user is editing a card and hasn't saved it yet, we need to include
       // that data in the themes object before saving promotions
       const preservedThemes = { ...existingThemeData.themes };
-      
+
       // If there's preview data for this theme, merge it into the themes object
       if (themePreviewData[themeId]) {
         preservedThemes[themeId] = themePreviewData[themeId];
@@ -1468,55 +1468,32 @@ export function ECardsContent() {
               </div>
 
               <div>
-                {holidaySections.map((section) => {
-                  const isDisabled = disabledSet.has(section.id);
-                  const shouldShow = (cardFilter === 'active' && !isDisabled) || (cardFilter === 'inactive' && isDisabled);
-                  if (!shouldShow) return null;
-                  return (
-                    <div className="mt-6" key={section.id}>
-                      <Label className="text-sm">{section.label}</Label>
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
-                        {section.themes.map((theme) => (
-                          <ThemeCard
-                            key={theme.id}
-                            theme={theme}
-                            themePreviewData={themePreviewData}
-                            parsedCustomThemeData={parsedCustomThemeData}
-                            defaultTitle={section.defaultTitle}
-                            previewLabel={t('ecards.previewLabel')}
-                            onCardClick={handleOpenDesigner}
-                            disabled={updateSettingsMutation.isPending}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-6">
+                  {holidaySections.flatMap((section) => {
+                    const isDisabled = disabledSet.has(section.id);
+                    const shouldShow = (cardFilter === 'active' && !isDisabled) || (cardFilter === 'inactive' && isDisabled);
+                    if (!shouldShow) return [];
+
+                    return section.themes.map((theme) => (
+                      <ThemeCard
+                        key={theme.id}
+                        theme={theme}
+                        themePreviewData={themePreviewData}
+                        parsedCustomThemeData={parsedCustomThemeData}
+                        defaultTitle={section.defaultTitle}
+                        previewLabel={t('ecards.previewLabel')}
+                        onCardClick={handleOpenDesigner}
+                        disabled={updateSettingsMutation.isPending}
+                      />
+                    ));
+                  })}
+                </div>
 
                 {/* Custom Cards Section */}
                 {cardFilter === "active" && (
-                <div className="mt-8">
-                  <div className="flex items-center justify-between mb-4">
-                    <Label className="text-lg font-semibold">{t('ecards.cards.custom')}</Label>
-                    <Button
-                      onClick={() => {
-                        const newCardId = `custom-${Date.now()}`;
-                        setDesignerThemeId(newCardId);
-                        setDesignerOpen(true);
-                      }}
-                      size="sm"
-                      className="flex items-center gap-2"
-                    >
-                      <Plus className="h-4 w-4" />
-                      {t('ecards.cards.createCustom')}
-                    </Button>
-                  </div>
-                  
-                  {customCards.filter(c => c.active !== false).length === 0 ? (
-                    <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50">
-                      <Palette className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                      <p className="text-gray-600 font-medium mb-1">{t('ecards.cards.noCustomCards')}</p>
-                      <p className="text-sm text-gray-500 mb-4">{t('ecards.cards.noCustomCardsDescription')}</p>
+                  <div className="mt-8">
+                    <div className="flex items-center justify-between mb-4">
+                      <Label className="text-lg font-semibold">{t('ecards.cards.custom')}</Label>
                       <Button
                         onClick={() => {
                           const newCardId = `custom-${Date.now()}`;
@@ -1524,121 +1501,140 @@ export function ECardsContent() {
                           setDesignerOpen(true);
                         }}
                         size="sm"
+                        className="flex items-center gap-2"
                       >
-                        <Plus className="h-4 w-4 mr-2" />
-                        {t('ecards.cards.createFirstCard')}
+                        <Plus className="h-4 w-4" />
+                        {t('ecards.cards.createCustom')}
                       </Button>
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                      {customCards.filter(c => c.active !== false).map((card) => {
-                        console.log('🖼️ Rendering custom card:', { id: card.id, name: card.name, imageUrl: card.data.imageUrl, hasImageUrl: !!card.data.imageUrl });
-                        const isSelected = eCardSettings?.emailTemplate === card.id;
-                        return (
-                          <div
-                            key={card.id}
-                            className="relative rounded-xl border border-gray-200 hover:border-gray-300 p-3 transition-colors"
-                          >
-                            <div className="relative h-40 rounded-lg overflow-hidden bg-gray-100">
-                              {card.data.imageUrl ? (
-                                <>
-                                  <img
-                                    src={card.data.imageUrl}
-                                    alt={card.name}
-                                    className="absolute inset-0 h-full w-full object-cover z-0"
-                                    onError={(e) => {
-                                      console.error('🖼️ Image failed to load:', card.data.imageUrl, e);
-                                      // Hide the failed image
-                                      (e.target as HTMLImageElement).style.display = 'none';
-                                    }}
-                                    onLoad={() => {
-                                      console.log('🖼️ Image loaded successfully:', card.data.imageUrl);
-                                    }}
-                                  />
-                                  <div className="absolute inset-0 bg-black/20 z-10" />
-                                  <div className="absolute inset-0 flex items-center justify-center z-20">
-                                    <div className="text-center px-2">
-                                      <div className="font-bold text-white drop-shadow-lg text-shadow line-clamp-2">
-                                        {card.data.title || card.name}
+
+                    {customCards.filter(c => c.active !== false).length === 0 ? (
+                      <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50">
+                        <Palette className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                        <p className="text-gray-600 font-medium mb-1">{t('ecards.cards.noCustomCards')}</p>
+                        <p className="text-sm text-gray-500 mb-4">{t('ecards.cards.noCustomCardsDescription')}</p>
+                        <Button
+                          onClick={() => {
+                            const newCardId = `custom-${Date.now()}`;
+                            setDesignerThemeId(newCardId);
+                            setDesignerOpen(true);
+                          }}
+                          size="sm"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          {t('ecards.cards.createFirstCard')}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                        {customCards.filter(c => c.active !== false).map((card) => {
+                          console.log('🖼️ Rendering custom card:', { id: card.id, name: card.name, imageUrl: card.data.imageUrl, hasImageUrl: !!card.data.imageUrl });
+                          const isSelected = eCardSettings?.emailTemplate === card.id;
+                          return (
+                            <div
+                              key={card.id}
+                              className="relative rounded-xl border border-gray-200 hover:border-gray-300 p-3 transition-colors"
+                            >
+                              <div className="relative h-40 rounded-lg overflow-hidden bg-gray-100">
+                                {card.data.imageUrl ? (
+                                  <>
+                                    <img
+                                      src={card.data.imageUrl}
+                                      alt={card.name}
+                                      className="absolute inset-0 h-full w-full object-cover z-0"
+                                      onError={(e) => {
+                                        console.error('🖼️ Image failed to load:', card.data.imageUrl, e);
+                                        // Hide the failed image
+                                        (e.target as HTMLImageElement).style.display = 'none';
+                                      }}
+                                      onLoad={() => {
+                                        console.log('🖼️ Image loaded successfully:', card.data.imageUrl);
+                                      }}
+                                    />
+                                    <div className="absolute inset-0 bg-black/20 z-10" />
+                                    <div className="absolute inset-0 flex items-center justify-center z-20">
+                                      <div className="text-center px-2">
+                                        <div className="font-bold text-white drop-shadow-lg text-shadow line-clamp-2">
+                                          {card.data.title || card.name}
+                                        </div>
                                       </div>
                                     </div>
+                                  </>
+                                ) : (
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <Palette className="h-12 w-12 text-gray-400" />
                                   </div>
-                                </>
-                              ) : (
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                  <Palette className="h-12 w-12 text-gray-400" />
-                                </div>
-                              )}
-                            </div>
-                            <div className="mt-2 space-y-1">
-                              <div>
-                                <span className="text-sm font-medium text-gray-900 truncate">{card.name}</span>
+                                )}
                               </div>
-                              {card.occasionType && (
-                                <div className="text-xs text-gray-600 font-medium">
-                                  🎉 {card.occasionType}
+                              <div className="mt-2 space-y-1">
+                                <div>
+                                  <span className="text-sm font-medium text-gray-900 truncate">{card.name}</span>
                                 </div>
-                              )}
-                              <div className="text-xs text-gray-500">
-                                📅 {t('ecards.cards.sendsOn')} {new Date(card.sendDate).toLocaleDateString()}
+                                {card.occasionType && (
+                                  <div className="text-xs text-gray-600 font-medium">
+                                    🎉 {card.occasionType}
+                                  </div>
+                                )}
+                                <div className="text-xs text-gray-500">
+                                  📅 {t('ecards.cards.sendsOn')} {new Date(card.sendDate).toLocaleDateString()}
+                                </div>
                               </div>
-                            </div>
-                            <div className="mt-2 space-y-2">
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="flex-1"
-                                  onClick={() => {
-                                    setDesignerThemeId(card.id);
-                                    setDesignerOpen(true);
-                                  }}
-                                >
-                                  <Edit className="h-3 w-3 mr-1" />
-                                  {t('common.edit')}
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={async () => {
-                                    if (confirm(`Delete "${card.name}"? This cannot be undone.`)) {
-                                      try {
-                                        const response = await fetch(`/api/custom-cards/${card.id}`, {
-                                          method: 'DELETE',
-                                        });
+                              <div className="mt-2 space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1"
+                                    onClick={() => {
+                                      setDesignerThemeId(card.id);
+                                      setDesignerOpen(true);
+                                    }}
+                                  >
+                                    <Edit className="h-3 w-3 mr-1" />
+                                    {t('common.edit')}
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={async () => {
+                                      if (confirm(`Delete "${card.name}"? This cannot be undone.`)) {
+                                        try {
+                                          const response = await fetch(`/api/custom-cards/${card.id}`, {
+                                            method: 'DELETE',
+                                          });
 
-                                        if (!response.ok) {
-                                          throw new Error('Failed to delete card');
+                                          if (!response.ok) {
+                                            throw new Error('Failed to delete card');
+                                          }
+
+                                          // Refetch custom cards to update the list
+                                          await refetchCustomCards();
+
+                                          toast({
+                                            title: "Card Deleted",
+                                            description: `"${card.name}" has been deleted.`,
+                                          });
+                                        } catch (error) {
+                                          console.error('Error deleting custom card:', error);
+                                          toast({
+                                            title: "Delete Failed",
+                                            description: "Failed to delete card. Please try again.",
+                                            variant: "destructive",
+                                          });
                                         }
-
-                                        // Refetch custom cards to update the list
-                                        await refetchCustomCards();
-
-                                        toast({
-                                          title: "Card Deleted",
-                                          description: `"${card.name}" has been deleted.`,
-                                        });
-                                      } catch (error) {
-                                        console.error('Error deleting custom card:', error);
-                                        toast({
-                                          title: "Delete Failed",
-                                          description: "Failed to delete card. Please try again.",
-                                          variant: "destructive",
-                                        });
                                       }
-                                    }
-                                  }}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {/* Inactive custom cards section */}
@@ -1732,327 +1728,327 @@ export function ECardsContent() {
 
         {/* Card Designer */}
         <Suspense fallback={null}>
-        <ECardDesignerDialog
-          open={designerOpen}
-          onOpenChange={(open: boolean) => {
-            setDesignerOpen(open);
-            
-            // When opening, refetch latest data from database
-            if (open) {
-              console.log('🔄 [Card Designer] Dialog opened, refetching latest data from DB');
-              refetchSettings();
-            }
-            
-            // When closing, preserve preview data so users can see their changes
-            // Only clear preview data if the user explicitly cancels without saving
-            // The preview data will be useful for showing real-time updates
-            if (!open && designerThemeId) {
-              // We'll keep the preview data to maintain the visual state
-              // This allows users to see their changes even after closing the designer
-              console.log('🎨 [Birthday Cards] Designer closed, preserving preview data for theme:', designerThemeId);
-            }
-          }}
-          initialThemeId={designerThemeId || undefined}
-          onPreviewChange={handlePreviewChange}
-          initialData={cardDesignerInitialData}
-          themeMetadataById={themeMetadataById}
-          onSave={async (data: any) => {
-            console.log('💾 [onSave] Received data from ECardDesignerDialog:', {
-              imageUrl: data.imageUrl,
-              customImage: (data as any).customImage,
-              title: data.title,
-              hasImageUrl: !!data.imageUrl
-            });
+          <ECardDesignerDialog
+            open={designerOpen}
+            onOpenChange={(open: boolean) => {
+              setDesignerOpen(open);
 
-            try {
-              localStorage.setItem(`eCardDesignerDraft:${data.themeId || designerThemeId || 'default'}`, JSON.stringify({ title: data.title, description: data.description, message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId, customImage: (data as any).customImage }));
-            } catch { }
-
-            // Create theme data for preview updates
-            const themeData: CustomThemeData = {
-              title: data.title,
-              description: data.description,
-              message: data.message,
-              signature: data.signature || '',
-              imageUrl: data.imageUrl || null,
-              customImage: (data as any).customImage || false,
-              imagePosition: (data as any).imagePosition || { x: 0, y: 0 },
-              imageScale: (data as any).imageScale || 1,
-            };
-
-            console.log('💾 [onSave] Created themeData:', {
-              imageUrl: themeData.imageUrl,
-              customImage: themeData.customImage,
-              hasImageUrl: !!themeData.imageUrl,
-              title: themeData.title,
-              message: themeData.message,
-              signature: themeData.signature,
-              description: themeData.description
-            });
-
-            // Check if this is a custom card - either starts with 'custom-' or is found in customCards array
-            const isCustomCard = designerThemeId && (
-              designerThemeId.startsWith('custom-') || 
-              customCards.some(c => c.id === designerThemeId)
-            );
-
-            if (isCustomCard) {
-              const existingCard = customCards.find(c => c.id === designerThemeId);
-              const cardName = (data as any).cardName || existingCard?.name || '';
-              const sendDate = (data as any).sendDate || existingCard?.sendDate || '';
-              const occasionType = (data as any).occasionType || existingCard?.occasionType || '';
-
-              console.log('💾 [Custom Card Save] Preparing to save custom card:', {
-                designerThemeId,
-                cardName,
-                sendDate,
-                occasionType,
-                themeDataTitle: themeData.title,
-                themeDataMessage: themeData.message,
-                themeDataSignature: themeData.signature,
-                dataReceived: data
-              });
-
-              // Validation is now handled in ECardDesignerDialog
-              if (!cardName || !sendDate || !occasionType) {
-                toast({
-                  title: "Save Failed",
-                  description: "Card name, send date, and occasion type are required.",
-                  variant: "destructive",
-                });
-                return;
+              // When opening, refetch latest data from database
+              if (open) {
+                console.log('🔄 [Card Designer] Dialog opened, refetching latest data from DB');
+                refetchSettings();
               }
 
-              // Save or update the custom card via API
+              // When closing, preserve preview data so users can see their changes
+              // Only clear preview data if the user explicitly cancels without saving
+              // The preview data will be useful for showing real-time updates
+              if (!open && designerThemeId) {
+                // We'll keep the preview data to maintain the visual state
+                // This allows users to see their changes even after closing the designer
+                console.log('🎨 [Birthday Cards] Designer closed, preserving preview data for theme:', designerThemeId);
+              }
+            }}
+            initialThemeId={designerThemeId || undefined}
+            onPreviewChange={handlePreviewChange}
+            initialData={cardDesignerInitialData}
+            themeMetadataById={themeMetadataById}
+            onSave={async (data: any) => {
+              console.log('💾 [onSave] Received data from ECardDesignerDialog:', {
+                imageUrl: data.imageUrl,
+                customImage: (data as any).customImage,
+                title: data.title,
+                hasImageUrl: !!data.imageUrl
+              });
+
               try {
-                const existing = customCards.find(c => c.id === designerThemeId);
-                const cardPayload = {
-                  name: cardName,
+                localStorage.setItem(`eCardDesignerDraft:${data.themeId || designerThemeId || 'default'}`, JSON.stringify({ title: data.title, description: data.description, message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId, customImage: (data as any).customImage }));
+              } catch { }
+
+              // Create theme data for preview updates
+              const themeData: CustomThemeData = {
+                title: data.title,
+                description: data.description,
+                message: data.message,
+                signature: data.signature || '',
+                imageUrl: data.imageUrl || null,
+                customImage: (data as any).customImage || false,
+                imagePosition: (data as any).imagePosition || { x: 0, y: 0 },
+                imageScale: (data as any).imageScale || 1,
+              };
+
+              console.log('💾 [onSave] Created themeData:', {
+                imageUrl: themeData.imageUrl,
+                customImage: themeData.customImage,
+                hasImageUrl: !!themeData.imageUrl,
+                title: themeData.title,
+                message: themeData.message,
+                signature: themeData.signature,
+                description: themeData.description
+              });
+
+              // Check if this is a custom card - either starts with 'custom-' or is found in customCards array
+              const isCustomCard = designerThemeId && (
+                designerThemeId.startsWith('custom-') ||
+                customCards.some(c => c.id === designerThemeId)
+              );
+
+              if (isCustomCard) {
+                const existingCard = customCards.find(c => c.id === designerThemeId);
+                const cardName = (data as any).cardName || existingCard?.name || '';
+                const sendDate = (data as any).sendDate || existingCard?.sendDate || '';
+                const occasionType = (data as any).occasionType || existingCard?.occasionType || '';
+
+                console.log('💾 [Custom Card Save] Preparing to save custom card:', {
+                  designerThemeId,
+                  cardName,
                   sendDate,
                   occasionType,
-                  active: existing?.active ?? true,
-                  cardData: JSON.stringify(themeData),
-                  promotionIds: [], // TODO: Add promotion support
-                };
-
-                console.log('💾 [Custom Card Save] Payload being sent to API:', {
-                  ...cardPayload,
-                  cardDataParsed: JSON.parse(cardPayload.cardData)
+                  themeDataTitle: themeData.title,
+                  themeDataMessage: themeData.message,
+                  themeDataSignature: themeData.signature,
+                  dataReceived: data
                 });
 
-                let response;
-                if (existing) {
-                  // Update existing card
-                  response = await fetch(`/api/custom-cards/${designerThemeId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(cardPayload),
+                // Validation is now handled in ECardDesignerDialog
+                if (!cardName || !sendDate || !occasionType) {
+                  toast({
+                    title: "Save Failed",
+                    description: "Card name, send date, and occasion type are required.",
+                    variant: "destructive",
                   });
-                } else {
-                  // Create new card
-                  response = await fetch('/api/custom-cards', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(cardPayload),
-                  });
+                  return;
                 }
 
-                if (!response.ok) {
-                  throw new Error('Failed to save custom card');
-                }
-
-                // Invalidate and refetch custom cards to update the list with fresh data
-                await queryClient.invalidateQueries({ queryKey: ['/api/custom-cards'] });
-
-                toast({
-                  title: existing ? "Card Updated" : "Card Created",
-                  description: `"${cardName}" (${occasionType}) will be sent on ${new Date(sendDate).toLocaleDateString()}.`,
-                });
-
-                setDesignerOpen(false);
-                return;
-              } catch (error) {
-                console.error('Error saving custom card:', error);
-                toast({
-                  title: "Save Failed",
-                  description: "Failed to save custom card. Please try again.",
-                  variant: "destructive",
-                });
-                return;
-              }
-            }
-
-            // Update preview state immediately for instant visual feedback
-            setThemePreviewData(prev => ({
-              ...prev,
-              [designerThemeId || 'default']: themeData
-            }));
-
-            // Parse existing customThemeData or create new structure
-            // IMPORTANT: Get the latest birthday settings from the cache, not from closure
-            const latestECardSettings = queryClient.getQueryData<ECardSettings>(['/api/e-card-settings']) || eCardSettings;
-            console.log('🔄 [Card Save] Using latest settings from cache. Has themes:', !!latestECardSettings?.customThemeData);
-            let existingThemeData: Record<string, any> = {};
-            if (latestECardSettings?.customThemeData) {
-              try {
-                const parsed = JSON.parse(latestECardSettings.customThemeData);
-                // Check if it's the new structure (has themes property) or old structure
-                if (parsed.themes) {
-                  existingThemeData = parsed;
-                } else {
-                  // Migrate old structure to new structure
-                  existingThemeData = {
-                    themes: {
-                      custom: parsed // Assume old data was for custom theme
-                    }
+                // Save or update the custom card via API
+                try {
+                  const existing = customCards.find(c => c.id === designerThemeId);
+                  const cardPayload = {
+                    name: cardName,
+                    sendDate,
+                    occasionType,
+                    active: existing?.active ?? true,
+                    cardData: JSON.stringify(themeData),
+                    promotionIds: [], // TODO: Add promotion support
                   };
+
+                  console.log('💾 [Custom Card Save] Payload being sent to API:', {
+                    ...cardPayload,
+                    cardDataParsed: JSON.parse(cardPayload.cardData)
+                  });
+
+                  let response;
+                  if (existing) {
+                    // Update existing card
+                    response = await fetch(`/api/custom-cards/${designerThemeId}`, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(cardPayload),
+                    });
+                  } else {
+                    // Create new card
+                    response = await fetch('/api/custom-cards', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(cardPayload),
+                    });
+                  }
+
+                  if (!response.ok) {
+                    throw new Error('Failed to save custom card');
+                  }
+
+                  // Invalidate and refetch custom cards to update the list with fresh data
+                  await queryClient.invalidateQueries({ queryKey: ['/api/custom-cards'] });
+
+                  toast({
+                    title: existing ? "Card Updated" : "Card Created",
+                    description: `"${cardName}" (${occasionType}) will be sent on ${new Date(sendDate).toLocaleDateString()}.`,
+                  });
+
+                  setDesignerOpen(false);
+                  return;
+                } catch (error) {
+                  console.error('Error saving custom card:', error);
+                  toast({
+                    title: "Save Failed",
+                    description: "Failed to save custom card. Please try again.",
+                    variant: "destructive",
+                  });
+                  return;
                 }
-              } catch {
+              }
+
+              // Update preview state immediately for instant visual feedback
+              setThemePreviewData(prev => ({
+                ...prev,
+                [designerThemeId || 'default']: themeData
+              }));
+
+              // Parse existing customThemeData or create new structure
+              // IMPORTANT: Get the latest birthday settings from the cache, not from closure
+              const latestECardSettings = queryClient.getQueryData<ECardSettings>(['/api/e-card-settings']) || eCardSettings;
+              console.log('🔄 [Card Save] Using latest settings from cache. Has themes:', !!latestECardSettings?.customThemeData);
+              let existingThemeData: Record<string, any> = {};
+              if (latestECardSettings?.customThemeData) {
+                try {
+                  const parsed = JSON.parse(latestECardSettings.customThemeData);
+                  // Check if it's the new structure (has themes property) or old structure
+                  if (parsed.themes) {
+                    existingThemeData = parsed;
+                  } else {
+                    // Migrate old structure to new structure
+                    existingThemeData = {
+                      themes: {
+                        custom: parsed // Assume old data was for custom theme
+                      }
+                    };
+                  }
+                } catch {
+                  existingThemeData = { themes: {} };
+                }
+              } else {
                 existingThemeData = { themes: {} };
               }
-            } else {
-              existingThemeData = { themes: {} };
-            }
 
-            // Update the specific theme's data
-            const currentThemeId = designerThemeId || 'default';
-            console.log('💾 [Card Save] Saving theme data for:', currentThemeId, 'Data:', themeData);
-            const updatedThemeData = {
-              ...existingThemeData,
-              themes: {
-                ...existingThemeData.themes,
-                [currentThemeId]: themeData
+              // Update the specific theme's data
+              const currentThemeId = designerThemeId || 'default';
+              console.log('💾 [Card Save] Saving theme data for:', currentThemeId, 'Data:', themeData);
+              const updatedThemeData = {
+                ...existingThemeData,
+                themes: {
+                  ...existingThemeData.themes,
+                  [currentThemeId]: themeData
+                }
+              };
+              console.log('💾 [Card Save] Updated theme data structure:', JSON.stringify(updatedThemeData));
+
+              // Check if user has made any customizations (title, signature, or image)
+              const defaultThemeImage = themeMetadataById[currentThemeId]?.image;
+              const hasImageCustomization = themeData.imageUrl !== defaultThemeImage;
+              const hasTextCustomizations = data.title !== '' || data.signature !== '';
+              const hasCustomizations = hasTextCustomizations || hasImageCustomization;
+
+              console.log('🔍 [Card Save] Customization check:', {
+                currentThemeId,
+                defaultThemeImage,
+                currentImageUrl: themeData.imageUrl,
+                hasImageCustomization,
+                hasTextCustomizations,
+                hasCustomizations
+              });
+
+              // Save button should save theme-specific data and update emailTemplate to the specific theme variant
+              if (designerThemeId === 'custom') {
+                console.log('🎨 [Birthday Cards] Saving custom theme data');
+
+                // Update real-time preview immediately for instant visual feedback
+                setCustomThemePreview(themeData);
+
+                const savePayload = {
+                  ...latestECardSettings,
+                  emailTemplate: 'custom',
+                  customMessage: data.message,
+                  customThemeData: JSON.stringify(updatedThemeData),
+                };
+                console.log('📤 [Card Save] Sending to server:', { customThemeData: savePayload.customThemeData });
+
+                // Update both the custom theme data and keep the email template as custom
+                updateSettingsMutation.mutate(savePayload, {
+                  onSuccess: () => {
+                    // Clear localStorage draft since data is now saved to DB
+                    try {
+                      localStorage.removeItem(`eCardDesignerDraft:${currentThemeId}`);
+                      console.log('🗑️ [Card Save] Cleared localStorage draft for theme:', currentThemeId);
+                    } catch (error) {
+                      console.warn('⚠️ [Card Save] Failed to clear localStorage draft:', error);
+                    }
+
+                    toast({
+                      title: "Card Saved",
+                      description: "Your custom card has been saved.",
+                    });
+
+                    setDesignerOpen(false);
+                  }
+                });
+              } else if (hasCustomizations || data.message !== (latestECardSettings?.customMessage || '')) {
+                // For holiday theme variants with any customizations (text or image), save the theme-specific data
+                // and set emailTemplate to the specific theme variant ID
+                console.log('🎨 [Birthday Cards] Saving theme-specific customizations for', currentThemeId, 'with data:', themeData);
+
+                const savePayload = {
+                  ...latestECardSettings,
+                  emailTemplate: currentThemeId, // Set to the specific theme variant ID
+                  customMessage: data.message,
+                  customThemeData: JSON.stringify(updatedThemeData), // Save theme-specific data
+                };
+                console.log('📤 [Card Save] Sending to server (customizations):', { customThemeData: savePayload.customThemeData });
+
+                updateSettingsMutation.mutate(savePayload, {
+                  onSuccess: () => {
+                    // Clear localStorage draft since data is now saved to DB
+                    try {
+                      localStorage.removeItem(`eCardDesignerDraft:${currentThemeId}`);
+                      console.log('🗑️ [Card Save] Cleared localStorage draft for theme:', currentThemeId);
+                    } catch (error) {
+                      console.warn('⚠️ [Card Save] Failed to clear localStorage draft:', error);
+                    }
+
+                    toast({
+                      title: "Card Saved",
+                      description: "Your card customizations have been saved.",
+                    });
+
+                    setDesignerOpen(false);
+                  }
+                });
+              } else {
+                // For default themes with no customizations, just save the message
+                // but still update emailTemplate if we're editing a specific theme
+                updateSettingsMutation.mutate({
+                  ...latestECardSettings,
+                  emailTemplate: currentThemeId || 'default', // Use current theme ID
+                  customMessage: data.message,
+                }, {
+                  onSuccess: () => {
+                    // Clear localStorage draft since data is now saved to DB
+                    try {
+                      localStorage.removeItem(`eCardDesignerDraft:${currentThemeId}`);
+                      console.log('🗑️ [Card Save] Cleared localStorage draft for theme:', currentThemeId);
+                    } catch (error) {
+                      console.warn('⚠️ [Card Save] Failed to clear localStorage draft:', error);
+                    }
+
+                    toast({
+                      title: "Card Saved",
+                      description: "Your card has been saved.",
+                    });
+
+                    setDesignerOpen(false);
+                  }
+                });
               }
-            };
-            console.log('💾 [Card Save] Updated theme data structure:', JSON.stringify(updatedThemeData));
-
-            // Check if user has made any customizations (title, signature, or image)
-            const defaultThemeImage = themeMetadataById[currentThemeId]?.image;
-            const hasImageCustomization = themeData.imageUrl !== defaultThemeImage;
-            const hasTextCustomizations = data.title !== '' || data.signature !== '';
-            const hasCustomizations = hasTextCustomizations || hasImageCustomization;
-
-            console.log('🔍 [Card Save] Customization check:', {
-              currentThemeId,
-              defaultThemeImage,
-              currentImageUrl: themeData.imageUrl,
-              hasImageCustomization,
-              hasTextCustomizations,
-              hasCustomizations
-            });
-
-            // Save button should save theme-specific data and update emailTemplate to the specific theme variant
-            if (designerThemeId === 'custom') {
-              console.log('🎨 [Birthday Cards] Saving custom theme data');
-
-              // Update real-time preview immediately for instant visual feedback
-              setCustomThemePreview(themeData);
-
-              const savePayload = {
-                ...latestECardSettings,
-                emailTemplate: 'custom',
-                customMessage: data.message,
-                customThemeData: JSON.stringify(updatedThemeData),
-              };
-              console.log('📤 [Card Save] Sending to server:', { customThemeData: savePayload.customThemeData });
-
-              // Update both the custom theme data and keep the email template as custom
-              updateSettingsMutation.mutate(savePayload, {
-                onSuccess: () => {
-                  // Clear localStorage draft since data is now saved to DB
-                  try {
-                    localStorage.removeItem(`eCardDesignerDraft:${currentThemeId}`);
-                    console.log('🗑️ [Card Save] Cleared localStorage draft for theme:', currentThemeId);
-                  } catch (error) {
-                    console.warn('⚠️ [Card Save] Failed to clear localStorage draft:', error);
-                  }
-                  
-                  toast({
-                    title: "Card Saved",
-                    description: "Your custom card has been saved.",
-                  });
-                  
-                  setDesignerOpen(false);
-                }
-              });
-            } else if (hasCustomizations || data.message !== (latestECardSettings?.customMessage || '')) {
-              // For holiday theme variants with any customizations (text or image), save the theme-specific data
-              // and set emailTemplate to the specific theme variant ID
-              console.log('🎨 [Birthday Cards] Saving theme-specific customizations for', currentThemeId, 'with data:', themeData);
-              
-              const savePayload = {
-                ...latestECardSettings,
-                emailTemplate: currentThemeId, // Set to the specific theme variant ID
-                customMessage: data.message,
-                customThemeData: JSON.stringify(updatedThemeData), // Save theme-specific data
-              };
-              console.log('📤 [Card Save] Sending to server (customizations):', { customThemeData: savePayload.customThemeData });
-
-              updateSettingsMutation.mutate(savePayload, {
-                onSuccess: () => {
-                  // Clear localStorage draft since data is now saved to DB
-                  try {
-                    localStorage.removeItem(`eCardDesignerDraft:${currentThemeId}`);
-                    console.log('🗑️ [Card Save] Cleared localStorage draft for theme:', currentThemeId);
-                  } catch (error) {
-                    console.warn('⚠️ [Card Save] Failed to clear localStorage draft:', error);
-                  }
-                  
-                  toast({
-                    title: "Card Saved",
-                    description: "Your card customizations have been saved.",
-                  });
-                  
-                  setDesignerOpen(false);
-                }
-              });
-            } else {
-              // For default themes with no customizations, just save the message
-              // but still update emailTemplate if we're editing a specific theme
-              updateSettingsMutation.mutate({
-                ...latestECardSettings,
-                emailTemplate: currentThemeId || 'default', // Use current theme ID
-                customMessage: data.message,
-              }, {
-                onSuccess: () => {
-                  // Clear localStorage draft since data is now saved to DB
-                  try {
-                    localStorage.removeItem(`eCardDesignerDraft:${currentThemeId}`);
-                    console.log('🗑️ [Card Save] Cleared localStorage draft for theme:', currentThemeId);
-                  } catch (error) {
-                    console.warn('⚠️ [Card Save] Failed to clear localStorage draft:', error);
-                  }
-                  
-                  toast({
-                    title: "Card Saved",
-                    description: "Your card has been saved.",
-                  });
-                  
-                  setDesignerOpen(false);
-                }
-              });
+            }}
+            senderName={eCardSettings?.senderName}
+            businessName={company?.name || currentUser?.name}
+            holidayId={designerThemeId || undefined}
+            isHolidayDisabled={designerThemeId ? disabledHolidays.includes(getParentHolidayId(designerThemeId) || designerThemeId) : false}
+            onToggleHoliday={handleToggleHoliday}
+            customCardActive={
+              designerThemeId && (designerThemeId.startsWith("custom-") || customCards.some(c => c.id === designerThemeId))
+                ? customCards.find(c => c.id === designerThemeId)?.active
+                : undefined
             }
-          }}
-          senderName={eCardSettings?.senderName}
-          businessName={company?.name || currentUser?.name}
-          holidayId={designerThemeId || undefined}
-          isHolidayDisabled={designerThemeId ? disabledHolidays.includes(getParentHolidayId(designerThemeId) || designerThemeId) : false}
-          onToggleHoliday={handleToggleHoliday}
-          customCardActive={
-            designerThemeId && (designerThemeId.startsWith("custom-") || customCards.some(c => c.id === designerThemeId))
-              ? customCards.find(c => c.id === designerThemeId)?.active 
-              : undefined
-          }
-          onToggleCustomCardActive={
-            designerThemeId && (designerThemeId.startsWith("custom-") || customCards.some(c => c.id === designerThemeId))
-              ? handleToggleCustomCardActive 
-              : undefined
-          }
-          customCardToggleLoading={customCardToggleLoading}
-          selectedPromotions={designerThemeId ? (cardPromotions[designerThemeId] || []) : []}
-          onPromotionsChange={designerThemeId ? (promotionIds: string[]) => handleCardPromotionsChange(designerThemeId, promotionIds) : undefined}
-          hideDescription={false}
-        />
+            onToggleCustomCardActive={
+              designerThemeId && (designerThemeId.startsWith("custom-") || customCards.some(c => c.id === designerThemeId))
+                ? handleToggleCustomCardActive
+                : undefined
+            }
+            customCardToggleLoading={customCardToggleLoading}
+            selectedPromotions={designerThemeId ? (cardPromotions[designerThemeId] || []) : []}
+            onPromotionsChange={designerThemeId ? (promotionIds: string[]) => handleCardPromotionsChange(designerThemeId, promotionIds) : undefined}
+            hideDescription={false}
+          />
         </Suspense>
 
         {/* Settings Tab */}
