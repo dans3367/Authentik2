@@ -2,7 +2,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const routesDir = '/Users/dan/Documents/GitHub/Authentik/server/routes';
+const routesDir = path.resolve(__dirname, 'server/routes');
 const files = fs.readdirSync(routesDir);
 
 console.log('Scanning route files...\n');
