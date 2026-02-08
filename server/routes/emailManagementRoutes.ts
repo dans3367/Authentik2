@@ -15,7 +15,7 @@ import { logActivity, computeChanges, allowedActivityTypes } from '../utils/acti
 import xss from 'xss';
 
 // Sanitize HTML content for emails - allows safe formatting tags, strips scripts and event handlers
-function sanitizeEmailHtml(html: string): string {
+export function sanitizeEmailHtml(html: string): string {
   return xss(html, {
     whiteList: {
       // Text formatting
@@ -2781,7 +2781,7 @@ emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken,
       { expiresIn: '30d' }
     );
 
-    const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+    const baseUrl = process.env.APP_URL || 'http://localhost:5000';
     const profileUpdateUrl = `${baseUrl}/update-profile?token=${profileUpdateToken}`;
     const maskedToken = profileUpdateToken.length > 8
       ? `${profileUpdateToken.slice(0, 4)}...${profileUpdateToken.slice(-4)}`
@@ -3486,7 +3486,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
 
           // Build unsubscribe URL for List-Unsubscribe header
           const bdayUnsubUrl = unsubscribeToken
-            ? `${process.env.BASE_URL || 'http://localhost:5002'}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
+            ? `${process.env.APP_URL || 'http://localhost:5000'}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
             : undefined;
 
           const birthdayResult = await enhancedEmailService.sendCustomEmail(
@@ -3566,14 +3566,19 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
 
           // Wait 20 seconds before sending promotional email
           // Send promotional email separately (queued)
+          // Sanitize promotion fields to prevent XSS/HTML injection
+          const safePromoTitle = sanitizeEmailHtml(settings.promotion.title || 'Special Birthday Offer!');
+          const safePromoDescription = settings.promotion.description ? sanitizeEmailHtml(settings.promotion.description) : '';
+          const safePromoContent = sanitizeEmailHtml(settings.promotion.content || '');
+
           const promoSubject = settings.promotion.title || 'Special Birthday Offer!';
           const htmlPromo = `
             <html>
               <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
                 <div style="max-width: 600px; margin: 20px auto; padding: 32px 24px; background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border-radius: 8px;">
-                  <h2 style="font-size: 1.5rem; font-weight: bold; margin: 0 0 16px 0; color: #2d3748;">${settings.promotion.title || 'Special Birthday Offer!'}</h2>
-                  ${settings.promotion.description ? `<p style="margin: 0 0 20px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${settings.promotion.description}</p>` : ''}
-                  <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${settings.promotion.content || ''}</div>
+                  <h2 style="font-size: 1.5rem; font-weight: bold; margin: 0 0 16px 0; color: #2d3748;">${safePromoTitle}</h2>
+                  ${safePromoDescription ? `<p style="margin: 0 0 20px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${safePromoDescription}</p>` : ''}
+                  <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${safePromoContent}</div>
                   <hr style="margin: 32px 0 16px 0; border: none; border-top: 1px solid #e2e8f0;">
                   <p style="margin: 0; font-size: 0.85rem; color: #a0aec0; text-align: center;">
                     This is a special birthday promotion for valued subscribers.
@@ -3911,11 +3916,16 @@ export function renderBirthdayTemplate(
     // Build promotion section if promotion content exists
     let promotionSection = '';
     if (params.promotionContent) {
+      // Sanitize promotion fields to prevent XSS/HTML injection
+      const safePromoTitle = params.promotionTitle ? sanitizeEmailHtml(processPlaceholders(params.promotionTitle, params)) : '';
+      const safePromoDesc = params.promotionDescription ? sanitizeEmailHtml(processPlaceholders(params.promotionDescription, params)) : '';
+      const safePromoContent = sanitizeEmailHtml(processPlaceholders(params.promotionContent, params));
+
       promotionSection = `
         <div style="margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border-radius: 8px; border-left: 4px solid #667eea;">
-          ${params.promotionTitle ? `<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">${processPlaceholders(params.promotionTitle, params)}</h3>` : ''}
-          ${params.promotionDescription ? `<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${processPlaceholders(params.promotionDescription, params)}</p>` : ''}
-          <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${processPlaceholders(params.promotionContent, params)}</div>
+          ${safePromoTitle ? `<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">${safePromoTitle}</h3>` : ''}
+          ${safePromoDesc ? `<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${safePromoDesc}</p>` : ''}
+          <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${safePromoContent}</div>
         </div>
       `;
     }
@@ -4031,11 +4041,16 @@ export function renderBirthdayTemplate(
   // Build promotion section if promotion content exists
   let promotionSection = '';
   if (params.promotionContent) {
+    // Sanitize promotion fields to prevent XSS/HTML injection
+    const safePromoTitle = params.promotionTitle ? sanitizeEmailHtml(processPlaceholders(params.promotionTitle, params)) : '';
+    const safePromoDesc = params.promotionDescription ? sanitizeEmailHtml(processPlaceholders(params.promotionDescription, params)) : '';
+    const safePromoContent = sanitizeEmailHtml(processPlaceholders(params.promotionContent, params));
+
     promotionSection = `
       <div style="margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border-radius: 8px; border-left: 4px solid ${colors.primary};">
-        ${params.promotionTitle ? `<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">${processPlaceholders(params.promotionTitle, params)}</h3>` : ''}
-        ${params.promotionDescription ? `<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${processPlaceholders(params.promotionDescription, params)}</p>` : ''}
-        <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${processPlaceholders(params.promotionContent, params)}</div>
+        ${safePromoTitle ? `<h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 1.3rem; font-weight: 600;">${safePromoTitle}</h3>` : ''}
+        ${safePromoDesc ? `<p style="margin: 0 0 15px 0; color: #4a5568; font-size: 1rem; line-height: 1.5;">${safePromoDesc}</p>` : ''}
+        <div style="color: #2d3748; font-size: 1rem; line-height: 1.6;">${safePromoContent}</div>
       </div>
     `;
   }
