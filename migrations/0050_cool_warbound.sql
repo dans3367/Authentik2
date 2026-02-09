@@ -15,6 +15,3 @@ ALTER TABLE "role_permissions"
 CREATE UNIQUE INDEX "role_permissions_tenant_role_idx" ON "role_permissions" USING btree ("tenant_id","role");
 --> statement-breakpoint
 CREATE INDEX "role_permissions_tenant_id_idx" ON "role_permissions" USING btree ("tenant_id");
---> statement-breakpoint
-CREATE UNIQUE INDEX "role_permissions_tenant_role_idx" ON "role_permissions" USING btree ("tenant_id","role");--> statement-breakpoint
-CREATE INDEX "role_permissions_tenant_id_idx" ON "role_permissions" USING btree ("tenant_id");

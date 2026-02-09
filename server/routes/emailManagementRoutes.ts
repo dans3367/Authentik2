@@ -3353,7 +3353,7 @@ emailManagementRoutes.post("/api/unsubscribe/birthday", async (req: any, res) =>
   }
 });
 // Send manual birthday cards to selected contacts
-emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateToken, requirePermission('contacts.edit'), async (req: any, res) => {
+emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
   try {
     const { contactIds } = req.body;
     const tenantId = req.user.tenantId;

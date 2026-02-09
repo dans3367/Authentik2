@@ -973,7 +973,7 @@ export default function ShopsPage() {
           ) : error ? (
             <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
               <CardContent className="py-8">
-                {((error as any)?.status === 403 || (error instanceof Error && error.message?.startsWith('403:'))) ? (
+                {(error as any)?.status === 403 ? (
                   <div className="text-center space-y-3">
                     <AlertCircle className="mx-auto h-10 w-10 text-orange-500" />
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('common.permissionDenied', 'Permission Denied')}</h3>

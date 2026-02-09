@@ -2463,7 +2463,7 @@ export const templateRelations = relations(templates, ({ one }) => ({
 }));
 
 // Template channel and category enums
-export const templateChannels = ['individual', 'promotional', 'newsletter', 'transactional'] as const;
+export const templateChannels = ['individual', 'promotional', 'newsletter', 'transactional', 'single-purpose'] as const;
 export type TemplateChannel = typeof templateChannels[number];
 
 export const templateCategories = ['welcome', 'retention', 'seasonal', 'update', 'custom'] as const;

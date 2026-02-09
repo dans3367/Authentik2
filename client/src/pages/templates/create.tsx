@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { SINGLE_PURPOSE_PRESETS, type SinglePurposePreset } from "@/config/templatePresets";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
@@ -14,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Copy, LayoutDashboard, Eye, X, Monitor, Smartphone, Tag, User, Mail, Phone, MapPin, Clock, CreditCard } from "lucide-react";
+import { Copy, LayoutDashboard, Eye, X, Monitor, Smartphone, Tag, User, Mail, Phone, MapPin, Clock, CreditCard, Sparkles, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import RichTextEditor from "@/components/LazyRichTextEditor";
 import {
@@ -31,6 +32,7 @@ const channelOptions = [
   { value: "promotional", label: "Promotional", description: "Campaign blasts and seasonal offers" },
   { value: "newsletter", label: "Newsletter", description: "Recurring newsletter layouts" },
   { value: "transactional", label: "Transactional", description: "Receipts, confirmations, and notifications" },
+  { value: "single-purpose", label: "Single Purpose", description: "One-off templates for specific occasions" },
 ];
 
 const getChannelOptions = (t: any) => [
@@ -38,6 +40,7 @@ const getChannelOptions = (t: any) => [
   { value: "promotional", label: t('templatesPage.channels.promotional'), description: t('templatesPage.channels.promotionalDesc') },
   { value: "newsletter", label: t('templatesPage.channels.newsletter'), description: t('templatesPage.channels.newsletterDesc') },
   { value: "transactional", label: t('templatesPage.channels.transactional'), description: t('templatesPage.channels.transactionalDesc') },
+  { value: "single-purpose", label: t('templatesPage.channels.singlePurpose', 'Single Purpose'), description: t('templatesPage.channels.singlePurposeDesc', 'One-off templates for specific occasions') },
 ];
 
 const categoryOptions = [
@@ -171,6 +174,24 @@ export default function CreateTemplatePage() {
   const [tagInput, setTagInput] = useState("");
   const [showPreview, setShowPreview] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+
+  const handleSelectPreset = (preset: SinglePurposePreset) => {
+    setSelectedPreset(preset.id);
+    setName(preset.label);
+    setCategory(preset.category);
+    setSubjectLine(preset.subjectLine);
+    setContent(preset.body);
+    setTags(preset.tags);
+    setTagInput("");
+  };
+
+  const handleChannelChange = (value: TemplateChannel) => {
+    setChannel(value);
+    if (value !== "single-purpose") {
+      setSelectedPreset(null);
+    }
+  };
 
   const { data: masterDesign } = useQuery({
     queryKey: ["/api/master-email-design"],
@@ -294,7 +315,7 @@ export default function CreateTemplatePage() {
 
               <div className="grid gap-2">
                 <Label htmlFor="template-channel">{t('templatesPage.createTemplatePage.channel')}</Label>
-                <Select value={channel} onValueChange={(value: TemplateChannel) => setChannel(value)}>
+                <Select value={channel} onValueChange={(value: TemplateChannel) => handleChannelChange(value)}>
                   <SelectTrigger id="template-channel">
                     <SelectValue placeholder={t('templatesPage.createTemplatePage.selectChannel')} />
                   </SelectTrigger>
@@ -310,6 +331,45 @@ export default function CreateTemplatePage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {channel === "single-purpose" && (
+                <div className="grid gap-2">
+                  <Label>{t('templatesPage.createTemplatePage.selectPurpose', 'Select a Purpose')}</Label>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    {t('templatesPage.createTemplatePage.selectPurposeHelp', 'Choose a preset to auto-fill the template with starter content. You can customize it afterwards.')}
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {SINGLE_PURPOSE_PRESETS.map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => handleSelectPreset(preset)}
+                        className={`relative flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all hover:shadow-sm ${
+                          selectedPreset === preset.id
+                            ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-400 ring-1 ring-blue-500 dark:ring-blue-400"
+                            : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                        }`}
+                      >
+                        {selectedPreset === preset.id && (
+                          <CheckCircle className="absolute top-2 right-2 h-4 w-4 text-blue-500 dark:text-blue-400" />
+                        )}
+                        <div className="flex items-center gap-2">
+                          <Sparkles className={`h-4 w-4 ${selectedPreset === preset.id ? "text-blue-500 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}`} />
+                          <span className="font-medium text-sm text-gray-900 dark:text-gray-100">{preset.label}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground leading-snug">{preset.description}</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {preset.tags.map((tag) => (
+                            <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="grid gap-2">
                 <Label htmlFor="template-category">{t('templatesPage.createTemplatePage.category')}</Label>

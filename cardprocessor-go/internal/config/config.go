@@ -158,14 +158,14 @@ func Load() *Config {
 		CORSAllowedOrigins: getEnvAsSlice("CORS_ALLOWED_ORIGINS", []string{
 			"http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003",
 			"http://localhost:4000", "http://localhost:4001", "http://localhost:4002", "http://localhost:4003",
-			"http://localhost:5002", "http://localhost:5001", "http://localhost:5002", "http://localhost:5003",
+			"http://localhost:5000", "http://localhost:5001", "http://localhost:5002", "http://localhost:5003",
 			"http://localhost:5173", "http://localhost:5174", "http://localhost:8000", "http://localhost:8080",
 		}),
 		CORS: CORSConfig{
 			AllowedOrigins: getEnvAsSlice("CORS_ALLOWED_ORIGINS", []string{
 				"http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003",
 				"http://localhost:4000", "http://localhost:4001", "http://localhost:4002", "http://localhost:4003",
-				"http://localhost:5002", "http://localhost:5001", "http://localhost:5002", "http://localhost:5003",
+				"http://localhost:5001", "http://localhost:5002", "http://localhost:5003",
 				"http://localhost:5173", "http://localhost:5174", "http://localhost:8000", "http://localhost:8080",
 			}),
 			AllowedMethods:   getEnvAsSlice("CORS_ALLOWED_METHODS", []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"}),
