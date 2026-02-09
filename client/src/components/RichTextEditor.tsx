@@ -9,7 +9,7 @@ import { Color } from "@tiptap/extension-color";
 import { Placeholder } from "@tiptap/extension-placeholder";
 import { Image } from "@tiptap/extension-image";
 import { Button } from "@/components/ui/button";
-import { Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, Droplet, User, Sparkles, Wand2, PartyPopper, ArrowRightFromLine, ArrowLeftToLine, Tag, Undo, Redo, Languages, List, ListOrdered, Heading1, Heading2, Link as LinkIcon, Minus } from "lucide-react";
+import { Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, Droplet, User, Sparkles, Wand2, PartyPopper, ArrowRightFromLine, ArrowLeftToLine, Tag, Undo, Redo, Languages, List, ListOrdered, Heading1, Heading2, Link as LinkIcon, Minus, Mail, Phone, MapPin, Clock } from "lucide-react";
 import { generateBirthdayMessage, improveText, emojifyText, expandText, shortenText, makeMoreCasualText, makeMoreFormalText, translateText } from "@/lib/aiApi";
 import { useTranslation } from "react-i18next";
 import {
@@ -74,11 +74,10 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
   const [isHeading2, setIsHeading2] = useState(false);
 
   // Function to insert placeholder text
-  // Placeholders are inserted in the format {{firstName}} or {{lastName}}
-  const insertPlaceholder = (type: 'firstName' | 'lastName') => {
+  // Placeholders are inserted in liquid-style format e.g. {{first_name}}
+  const insertPlaceholder = (variable: string) => {
     if (editor) {
-      const placeholderText = `{{${type}}}`;
-      editor.chain().focus().insertContent(placeholderText).run();
+      editor.chain().focus().insertContent(`{{${variable}}}`).run();
     }
   };
 
@@ -640,18 +639,46 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="bg-gray-800 border-gray-700">
             <DropdownMenuItem
-              onClick={() => insertPlaceholder('firstName')}
+              onClick={() => insertPlaceholder('first_name')}
               className="text-white hover:bg-gray-700 cursor-pointer"
             >
               <User className="w-3 h-3 mr-2" />
               {t('ecards.editor.firstName')}
             </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={() => insertPlaceholder('lastName')}
+              onClick={() => insertPlaceholder('last_name')}
               className="text-white hover:bg-gray-700 cursor-pointer"
             >
               <User className="w-3 h-3 mr-2" />
               {t('ecards.editor.lastName')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => insertPlaceholder('email')}
+              className="text-white hover:bg-gray-700 cursor-pointer"
+            >
+              <Mail className="w-3 h-3 mr-2" />
+              {t('ecards.editor.emailVar', 'Email')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => insertPlaceholder('phone')}
+              className="text-white hover:bg-gray-700 cursor-pointer"
+            >
+              <Phone className="w-3 h-3 mr-2" />
+              {t('ecards.editor.phone', 'Phone')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => insertPlaceholder('address')}
+              className="text-white hover:bg-gray-700 cursor-pointer"
+            >
+              <MapPin className="w-3 h-3 mr-2" />
+              {t('ecards.editor.address', 'Address')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => insertPlaceholder('office_hours')}
+              className="text-white hover:bg-gray-700 cursor-pointer"
+            >
+              <Clock className="w-3 h-3 mr-2" />
+              {t('ecards.editor.officeHours', 'Office Hours')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
