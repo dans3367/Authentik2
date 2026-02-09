@@ -22,6 +22,10 @@ PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+# Define services and their ports (global scope for stop_services)
+SERVICE_NAMES=("Main Server" "Webhook Server")
+SERVICE_PORTS=("5002" "3505")
+
 # Function to print colored output
 print_status() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -180,10 +184,6 @@ start_services() {
     # Clean up any existing PID file
     rm -f /tmp/authentik_pids.txt
 
-    # Define services and their ports
-    SERVICE_NAMES=("Main Server" "Webhook Server")
-    SERVICE_PORTS=("5002" "3505")
-
     print_status "Checking and cleaning up ports for all services..."
 
     # Check and kill processes on all required ports BEFORE starting
@@ -213,14 +213,14 @@ start_services() {
     PROJECT_ROOT=$(pwd)
 
     # 1. Start Main Server (npm run dev equivalent)
-    start_service "Main Server" "5002" "NODE_ENV=development PORT=5002 npx tsx server/index.ts" "$PROJECT_ROOT"
+    start_service "Main Server" "$PORT" "NODE_ENV=$NODE_ENV PORT=$PORT npx tsx server/index.ts" "$PROJECT_ROOT"
     if [ $? -eq 0 ]; then
         print_port "Main Server: http://localhost:5002"
     fi
 
     # 2. Start Webhook Server (for Resend webhooks)
     if [ -d "$PROJECT_ROOT/server-hook" ]; then
-        start_service "Webhook Server" "3505" "NODE_ENV=development npx tsx index.ts" "$PROJECT_ROOT/server-hook"
+        start_service "Webhook Server" "$WEBHOOK_PORT" "NODE_ENV=$NODE_ENV WEBHOOK_PORT=$WEBHOOK_PORT npx tsx index.ts" "$PROJECT_ROOT/server-hook"
         if [ $? -eq 0 ]; then
             print_port "Webhook Server: http://localhost:3505"
         fi

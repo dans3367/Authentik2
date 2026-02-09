@@ -28,7 +28,8 @@ import {
   Eye,
   Send,
   TrendingUp,
-  Clock
+  Clock,
+  ShieldAlert
 } from "lucide-react";
 
 interface Contact {
@@ -149,9 +150,12 @@ export default function ViewContact() {
       setLocation(returnUrl);
     },
     onError: (error: any) => {
+      const is403 = error instanceof Error && error.message?.startsWith('403:');
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete contact",
+        title: is403 ? "Permission Denied" : "Error",
+        description: is403
+          ? "You do not have permission to delete contacts. Contact your administrator to request access."
+          : (error.message || "Failed to delete contact"),
         variant: "destructive",
       });
     },
@@ -258,6 +262,28 @@ export default function ViewContact() {
 
   if (error) {
     console.error('Contact fetch error:', error);
+    const is403 = error instanceof Error && error.message?.startsWith('403:');
+    if (is403) {
+      return (
+        <div className="max-w-6xl mx-auto p-4">
+          <Card>
+            <CardContent className="py-12">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <ShieldAlert className="h-12 w-12 text-orange-500" />
+                <h2 className="text-xl font-semibold">Permission Denied</h2>
+                <p className="text-muted-foreground text-sm max-w-md">
+                  You do not have permission to view this contact. Contact your administrator to request access.
+                </p>
+                <Button variant="outline" onClick={() => setLocation(returnUrl)}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back to Contacts
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
     return (
       <div className="max-w-6xl mx-auto p-4">
         <div className="text-center">

@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Save, Loader2, X, Mail, CheckCircle2, UserCheck, Tag, Calendar, Shield, AlertTriangle, CalendarIcon } from "lucide-react";
+import { ArrowLeft, Save, Loader2, X, Mail, CheckCircle2, UserCheck, Tag, Calendar, Shield, AlertTriangle, CalendarIcon, ShieldAlert } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -163,9 +163,12 @@ export default function EditEmailContact() {
       setLocation("/email-contacts");
     },
     onError: (error: any) => {
+      const is403 = error instanceof Error && error.message?.startsWith('403:');
       toast({
-        title: "Error",
-        description: error.message || "Failed to update contact. Please try again.",
+        title: is403 ? "Permission Denied" : "Error",
+        description: is403
+          ? "You do not have permission to edit contacts. Contact your administrator to request access."
+          : (error.message || "Failed to update contact. Please try again."),
         variant: "destructive",
       });
     },
@@ -209,6 +212,28 @@ export default function EditEmailContact() {
   }
 
   if (contactError || !(contactData as any)?.contact) {
+    const is403 = contactError instanceof Error && contactError.message?.startsWith('403:');
+    if (is403) {
+      return (
+        <div className="max-w-6xl mx-auto p-4">
+          <Card>
+            <CardContent className="py-12">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <ShieldAlert className="h-12 w-12 text-orange-500" />
+                <h2 className="text-xl font-semibold">Permission Denied</h2>
+                <p className="text-muted-foreground text-sm max-w-md">
+                  You do not have permission to edit this contact. Contact your administrator to request access.
+                </p>
+                <Button variant="outline" onClick={() => setLocation("/email-contacts")}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back to Contacts
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
     return (
       <div className="max-w-6xl mx-auto p-4">
         <Card>

@@ -7,5 +7,14 @@ CREATE TABLE "role_permissions" (
 	"updated_by" text
 );
 --> statement-breakpoint
+ALTER TABLE "role_permissions"
+  ADD CONSTRAINT "role_permissions_tenant_id_tenants_id_fk"
+  FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id")
+  ON DELETE CASCADE ON UPDATE NO ACTION;
+--> statement-breakpoint
+CREATE UNIQUE INDEX "role_permissions_tenant_role_idx" ON "role_permissions" USING btree ("tenant_id","role");
+--> statement-breakpoint
+CREATE INDEX "role_permissions_tenant_id_idx" ON "role_permissions" USING btree ("tenant_id");
+--> statement-breakpoint
 CREATE UNIQUE INDEX "role_permissions_tenant_role_idx" ON "role_permissions" USING btree ("tenant_id","role");--> statement-breakpoint
 CREATE INDEX "role_permissions_tenant_id_idx" ON "role_permissions" USING btree ("tenant_id");

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateToken, requireRole } from '../middleware/auth-middleware';
+import { authenticateToken, requirePermission } from '../middleware/auth-middleware';
 import { storage } from '../storage';
 import { db } from '../db';
 import { 
@@ -16,7 +16,7 @@ import { eq, count, and, gte, sql } from 'drizzle-orm';
 export const accountUsageRoutes = Router();
 
 // Get comprehensive account usage data
-accountUsageRoutes.get('/', authenticateToken, requireRole(['Owner', 'Administrator', 'Manager']), async (req: any, res) => {
+accountUsageRoutes.get('/', authenticateToken, requirePermission('account_usage.view'), async (req: any, res) => {
   try {
     const tenantId = req.user.tenantId;
 

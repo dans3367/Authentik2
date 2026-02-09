@@ -17,7 +17,8 @@ import {
   AlertCircle,
   CheckCircle2,
   Infinity,
-  ArrowUpRight
+  ArrowUpRight,
+  ShieldAlert
 } from "lucide-react";
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
@@ -136,16 +137,25 @@ export function AccountUsageCard() {
   }
 
   if (error || !data) {
+    const is403 = error instanceof Error && error.message?.startsWith('403:');
     return (
       <Card>
         <CardHeader>
           <CardTitle>{t('management.accountUsage.title', 'Account Usage')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-2 text-destructive">
-            <AlertCircle className="h-4 w-4" />
-            <span>{t('management.accountUsage.error', 'Failed to load usage data')}</span>
-          </div>
+          {is403 ? (
+            <div className="flex flex-col items-center gap-2 py-4 text-center">
+              <ShieldAlert className="h-8 w-8 text-orange-500" />
+              <p className="font-medium text-sm">{t('common.permissionDenied', 'Permission Denied')}</p>
+              <p className="text-xs text-muted-foreground max-w-xs">{t('common.permissionDeniedDescription', 'You do not have permission to view this section. Contact your administrator to request access.')}</p>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-4 w-4" />
+              <span>{t('management.accountUsage.error', 'Failed to load usage data')}</span>
+            </div>
+          )}
         </CardContent>
       </Card>
     );
@@ -248,16 +258,25 @@ export function ResourceUsageCard() {
   }
 
   if (error || !data) {
+    const is403 = error instanceof Error && error.message?.startsWith('403:');
     return (
       <Card>
         <CardHeader>
           <CardTitle>{t('management.resourceUsage.title', 'Resource Usage')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-2 text-destructive">
-            <AlertCircle className="h-4 w-4" />
-            <span>{t('management.resourceUsage.error', 'Failed to load usage data')}</span>
-          </div>
+          {is403 ? (
+            <div className="flex flex-col items-center gap-2 py-4 text-center">
+              <ShieldAlert className="h-8 w-8 text-orange-500" />
+              <p className="font-medium text-sm">{t('common.permissionDenied', 'Permission Denied')}</p>
+              <p className="text-xs text-muted-foreground max-w-xs">{t('common.permissionDeniedDescription', 'You do not have permission to view this section. Contact your administrator to request access.')}</p>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-4 w-4" />
+              <span>{t('management.resourceUsage.error', 'Failed to load usage data')}</span>
+            </div>
+          )}
         </CardContent>
       </Card>
     );

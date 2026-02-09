@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { db } from '../db';
-import { betterAuthSession, betterAuthUser, tenants } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { betterAuthSession, betterAuthUser, tenants, rolePermissions } from '@shared/schema';
+import { eq, and } from 'drizzle-orm';
 import { auth } from '../auth';
 
 // Better Auth session-based authentication middleware
@@ -125,6 +125,167 @@ export const requireRole = (requiredRole: string | string[]) => {
     if (!hasAccess) {
       return res.status(403).json({
         message: `Insufficient permissions. Required role(s): ${requiredRoles.join(', ')}, your role: ${req.user.role}`
+      });
+    }
+
+    next();
+  };
+};
+
+// ─── Default permission definitions per role (must match roleRoutes.ts) ──────
+const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
+  Owner: {
+    'users.view': true, 'users.create': true, 'users.edit': true, 'users.delete': true, 'users.manage_roles': true, 'users.toggle_status': true,
+    'shops.view': true, 'shops.create': true, 'shops.edit': true, 'shops.delete': true, 'shops.toggle_status': true,
+    'company.view': true, 'company.create': true, 'company.edit': true, 'company.manage_users': true,
+    'billing.view': true, 'billing.manage_subscription': true, 'billing.manage_checkout': true, 'billing.view_usage': true,
+    'tenant.view_limits': true, 'tenant.edit_limits': true, 'tenant.fix_issues': true,
+    'emails.view': true, 'emails.send': true, 'emails.view_status': true, 'emails.manage_design': true, 'emails.manage_suppression': true,
+    'newsletters.view': true, 'newsletters.create': true, 'newsletters.send': true, 'newsletters.view_stats': true,
+    'campaigns.view': true, 'campaigns.create': true, 'campaigns.manage': true,
+    'contacts.view': true, 'contacts.create': true, 'contacts.edit': true, 'contacts.delete': true, 'contacts.import': true, 'contacts.export': true,
+    'tags.view': true, 'tags.create': true, 'tags.edit': true, 'tags.delete': true,
+    'forms.view': true, 'forms.create': true, 'forms.edit': true, 'forms.delete': true,
+    'promotions.view': true, 'promotions.create': true, 'promotions.manage': true,
+    'cards.view': true, 'cards.create': true, 'cards.edit': true, 'cards.manage_images': true,
+    'appointments.view': true, 'appointments.create': true, 'appointments.edit': true, 'appointments.delete': true, 'appointments.manage_reminders': true, 'appointments.manage_notes': true, 'appointments.send_reschedule': true,
+    'segments.view': true, 'segments.create': true, 'segments.edit': true, 'segments.delete': true,
+    'templates.view': true, 'templates.create': true, 'templates.edit': true, 'templates.delete': true, 'templates.duplicate': true,
+    'birthdays.view': true, 'birthdays.manage': true,
+    'ai.use': true, 'activity.view': true,
+    'analytics.view_dashboard': true, 'analytics.view_reports': true, 'analytics.export': true,
+    'account_usage.view': true,
+    'admin.view_sessions': true, 'admin.manage_sessions': true, 'admin.view_system_stats': true, 'admin.system_health': true,
+    'webhooks.view': true, 'webhooks.manage': true,
+    'settings.view': true, 'settings.edit': true, 'settings.manage_2fa': true,
+  },
+  Administrator: {
+    'users.view': true, 'users.create': true, 'users.edit': true, 'users.delete': true, 'users.manage_roles': true, 'users.toggle_status': true,
+    'shops.view': true, 'shops.create': true, 'shops.edit': true, 'shops.delete': true, 'shops.toggle_status': true,
+    'company.view': true, 'company.create': true, 'company.edit': true, 'company.manage_users': true,
+    'billing.view': true, 'billing.manage_subscription': false, 'billing.manage_checkout': false, 'billing.view_usage': true,
+    'tenant.view_limits': true, 'tenant.edit_limits': true, 'tenant.fix_issues': true,
+    'emails.view': true, 'emails.send': true, 'emails.view_status': true, 'emails.manage_design': true, 'emails.manage_suppression': true,
+    'newsletters.view': true, 'newsletters.create': true, 'newsletters.send': true, 'newsletters.view_stats': true,
+    'campaigns.view': true, 'campaigns.create': true, 'campaigns.manage': true,
+    'contacts.view': true, 'contacts.create': true, 'contacts.edit': true, 'contacts.delete': true, 'contacts.import': true, 'contacts.export': true,
+    'tags.view': true, 'tags.create': true, 'tags.edit': true, 'tags.delete': true,
+    'forms.view': true, 'forms.create': true, 'forms.edit': true, 'forms.delete': true,
+    'promotions.view': true, 'promotions.create': true, 'promotions.manage': true,
+    'cards.view': true, 'cards.create': true, 'cards.edit': true, 'cards.manage_images': true,
+    'appointments.view': true, 'appointments.create': true, 'appointments.edit': true, 'appointments.delete': true, 'appointments.manage_reminders': true, 'appointments.manage_notes': true, 'appointments.send_reschedule': true,
+    'segments.view': true, 'segments.create': true, 'segments.edit': true, 'segments.delete': true,
+    'templates.view': true, 'templates.create': true, 'templates.edit': true, 'templates.delete': true, 'templates.duplicate': true,
+    'birthdays.view': true, 'birthdays.manage': true,
+    'ai.use': true, 'activity.view': true,
+    'analytics.view_dashboard': true, 'analytics.view_reports': true, 'analytics.export': true,
+    'account_usage.view': true,
+    'admin.view_sessions': true, 'admin.manage_sessions': true, 'admin.view_system_stats': true, 'admin.system_health': true,
+    'webhooks.view': true, 'webhooks.manage': true,
+    'settings.view': true, 'settings.edit': false, 'settings.manage_2fa': true,
+  },
+  Manager: {
+    'users.view': true, 'users.create': false, 'users.edit': false, 'users.delete': false, 'users.manage_roles': false, 'users.toggle_status': false,
+    'shops.view': true, 'shops.create': true, 'shops.edit': true, 'shops.delete': false, 'shops.toggle_status': true,
+    'company.view': true, 'company.create': false, 'company.edit': false, 'company.manage_users': false,
+    'billing.view': false, 'billing.manage_subscription': false, 'billing.manage_checkout': false, 'billing.view_usage': false,
+    'tenant.view_limits': false, 'tenant.edit_limits': false, 'tenant.fix_issues': false,
+    'emails.view': true, 'emails.send': true, 'emails.view_status': false, 'emails.manage_design': false, 'emails.manage_suppression': false,
+    'newsletters.view': true, 'newsletters.create': true, 'newsletters.send': true, 'newsletters.view_stats': true,
+    'campaigns.view': true, 'campaigns.create': true, 'campaigns.manage': false,
+    'contacts.view': true, 'contacts.create': true, 'contacts.edit': true, 'contacts.delete': false, 'contacts.import': true, 'contacts.export': true,
+    'tags.view': true, 'tags.create': true, 'tags.edit': true, 'tags.delete': false,
+    'forms.view': true, 'forms.create': true, 'forms.edit': true, 'forms.delete': false,
+    'promotions.view': true, 'promotions.create': true, 'promotions.manage': false,
+    'cards.view': true, 'cards.create': true, 'cards.edit': true, 'cards.manage_images': true,
+    'appointments.view': true, 'appointments.create': true, 'appointments.edit': true, 'appointments.delete': true, 'appointments.manage_reminders': true, 'appointments.manage_notes': true, 'appointments.send_reschedule': true,
+    'segments.view': true, 'segments.create': true, 'segments.edit': true, 'segments.delete': false,
+    'templates.view': true, 'templates.create': true, 'templates.edit': true, 'templates.delete': false, 'templates.duplicate': true,
+    'birthdays.view': true, 'birthdays.manage': true,
+    'ai.use': true, 'activity.view': true,
+    'analytics.view_dashboard': true, 'analytics.view_reports': true, 'analytics.export': false,
+    'account_usage.view': true,
+    'admin.view_sessions': false, 'admin.manage_sessions': false, 'admin.view_system_stats': false, 'admin.system_health': false,
+    'webhooks.view': false, 'webhooks.manage': false,
+    'settings.view': true, 'settings.edit': false, 'settings.manage_2fa': true,
+  },
+  Employee: {
+    'users.view': false, 'users.create': false, 'users.edit': false, 'users.delete': false, 'users.manage_roles': false, 'users.toggle_status': false,
+    'shops.view': true, 'shops.create': false, 'shops.edit': false, 'shops.delete': false, 'shops.toggle_status': false,
+    'company.view': true, 'company.create': false, 'company.edit': false, 'company.manage_users': false,
+    'billing.view': false, 'billing.manage_subscription': false, 'billing.manage_checkout': false, 'billing.view_usage': false,
+    'tenant.view_limits': false, 'tenant.edit_limits': false, 'tenant.fix_issues': false,
+    'emails.view': true, 'emails.send': false, 'emails.view_status': false, 'emails.manage_design': false, 'emails.manage_suppression': false,
+    'newsletters.view': true, 'newsletters.create': false, 'newsletters.send': false, 'newsletters.view_stats': true,
+    'campaigns.view': true, 'campaigns.create': false, 'campaigns.manage': false,
+    'contacts.view': true, 'contacts.create': true, 'contacts.edit': false, 'contacts.delete': false, 'contacts.import': false, 'contacts.export': false,
+    'tags.view': true, 'tags.create': false, 'tags.edit': false, 'tags.delete': false,
+    'forms.view': true, 'forms.create': false, 'forms.edit': false, 'forms.delete': false,
+    'promotions.view': true, 'promotions.create': false, 'promotions.manage': false,
+    'cards.view': true, 'cards.create': false, 'cards.edit': false, 'cards.manage_images': false,
+    'appointments.view': true, 'appointments.create': true, 'appointments.edit': false, 'appointments.delete': false, 'appointments.manage_reminders': false, 'appointments.manage_notes': true, 'appointments.send_reschedule': false,
+    'segments.view': true, 'segments.create': false, 'segments.edit': false, 'segments.delete': false,
+    'templates.view': true, 'templates.create': false, 'templates.edit': false, 'templates.delete': false, 'templates.duplicate': false,
+    'birthdays.view': true, 'birthdays.manage': false,
+    'ai.use': false, 'activity.view': false,
+    'analytics.view_dashboard': false, 'analytics.view_reports': false, 'analytics.export': false,
+    'account_usage.view': false,
+    'admin.view_sessions': false, 'admin.manage_sessions': false, 'admin.view_system_stats': false, 'admin.system_health': false,
+    'webhooks.view': false, 'webhooks.manage': false,
+    'settings.view': false, 'settings.edit': false, 'settings.manage_2fa': true,
+  },
+};
+
+// Permission-based access control middleware
+// Checks custom per-tenant permission overrides from rolePermissions table,
+// falling back to DEFAULT_ROLE_PERMISSIONS when no overrides exist.
+export const requirePermission = (permission: string | string[]) => {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const userRole = req.user.role;
+    const tenantId = req.user.tenantId;
+    const requiredPermissions = Array.isArray(permission) ? permission : [permission];
+
+    // Owner always has full access (cannot be customized)
+    if (userRole === 'Owner') {
+      return next();
+    }
+
+    // Get the effective permissions: custom overrides merged with defaults
+    let effectivePermissions: Record<string, boolean> = { ...(DEFAULT_ROLE_PERMISSIONS[userRole] || {}) };
+
+    try {
+      if (tenantId) {
+        const customRow = await db.query.rolePermissions.findFirst({
+          where: and(
+            eq(rolePermissions.tenantId, tenantId),
+            eq(rolePermissions.role, userRole)
+          ),
+        });
+
+        if (customRow) {
+          try {
+            const customPerms = JSON.parse(customRow.permissions);
+            effectivePermissions = { ...effectivePermissions, ...customPerms };
+          } catch (e) {
+            console.error(`Failed to parse custom permissions for role ${userRole}, tenant ${tenantId}:`, e);
+          }
+        }
+      }
+    } catch (e) {
+      // rolePermissions table may not exist yet — use defaults
+      console.log('rolePermissions table not available, using defaults');
+    }
+
+    // Check if user has ANY of the required permissions
+    const hasPermission = requiredPermissions.some(perm => effectivePermissions[perm] === true);
+
+    if (!hasPermission) {
+      return res.status(403).json({
+        message: `Insufficient permissions. Required: ${requiredPermissions.join(' or ')}, your role: ${userRole}`,
       });
     }
 

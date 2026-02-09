@@ -804,46 +804,26 @@ roleRoutes.put("/permissions", authenticateToken, requireRole(['Owner']), async 
         },
       });
     } catch (e: any) {
-      // If table doesn't exist, create it and retry
       if (e.message?.includes('relation "role_permissions" does not exist')) {
-        await db.execute(sql`
-          CREATE TABLE IF NOT EXISTS role_permissions (
-            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-            tenant_id VARCHAR NOT NULL,
-            role TEXT NOT NULL,
-            permissions TEXT NOT NULL,
-            updated_at TIMESTAMP DEFAULT NOW() NOT NULL,
-            updated_by TEXT,
-            UNIQUE(tenant_id, role)
-          )
-        `);
-        await db.insert(rolePermissions).values({
-          tenantId,
-          role,
-          permissions: permissionsJson,
-          updatedAt: new Date(),
-          updatedBy: req.user.id,
-        }).onConflictDoUpdate({
-          target: [rolePermissions.tenantId, rolePermissions.role],
-          set: {
-            permissions: permissionsJson,
-            updatedAt: new Date(),
-            updatedBy: req.user.id,
-          },
+        return res.status(503).json({
+          message: 'role_permissions table is missing. Please run migrations.',
         });
-      } else {
-        throw e;
       }
+      throw e;
     }
+  } else {
+    throw e;
+  }
+}
 
     res.json({
-      message: `Permissions for ${role} updated successfully`,
-      role,
-    });
+  message: `Permissions for ${role} updated successfully`,
+  role,
+});
   } catch (error) {
-    console.error('Save permissions error:', error);
-    res.status(500).json({ message: 'Failed to save permissions' });
-  }
+  console.error('Save permissions error:', error);
+  res.status(500).json({ message: 'Failed to save permissions' });
+}
 });
 
 // POST /api/roles/permissions/reset - Reset a role's permissions to defaults (Owner only)
