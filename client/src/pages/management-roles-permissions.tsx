@@ -648,7 +648,7 @@ export default function ManagementRolesPermissions() {
                         </TableRow>
                       ) : (
                         filteredCategories.map((category) => {
-                          const isExpanded = expandedCategories[category.key] !== false;
+                          const isExpanded = expandedCategories[category.key] === true;
                           return (
                             <React.Fragment key={category.key}>
                               {/* Category Header Row */}
