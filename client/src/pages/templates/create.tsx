@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Copy, LayoutDashboard, ArrowLeft, Eye, X, Monitor, Smartphone, Tag, User, Mail, Phone, MapPin, Clock } from "lucide-react";
+import { Copy, LayoutDashboard, Eye, X, Monitor, Smartphone, Tag, User, Mail, Phone, MapPin, Clock, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import RichTextEditor from "@/components/LazyRichTextEditor";
 import {
@@ -82,6 +82,50 @@ const TEMPLATE_VARIABLES = [
   { key: 'address', icon: MapPin, labelKey: 'ecards.editor.address' },
   { key: 'office_hours', icon: Clock, labelKey: 'ecards.editor.officeHours' },
 ] as const;
+
+const CONTACT_CARD_TEMPLATE = `<p><strong>{{company_name}}</strong></p><p>\u2709 {{email}}</p><p>\u260E {{phone}}</p><p>\u{1F4CD} {{address}}</p>`;
+
+function formatOperatingHours(raw: string | undefined | null): string {
+  if (!raw) return 'Mon–Fri 9AM–5PM';
+  try {
+    const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const dayOrder = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const dayAbbr: Record<string, string> = {
+      monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu',
+      friday: 'Fri', saturday: 'Sat', sunday: 'Sun',
+    };
+
+    const fmt = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      const suffix = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      return m === 0 ? `${h12}${suffix}` : `${h12}:${String(m).padStart(2, '0')}${suffix}`;
+    };
+
+    // Group consecutive days with the same hours
+    const groups: { days: string[]; hours: string }[] = [];
+    for (const day of dayOrder) {
+      const info = data[day];
+      const hours = info?.closed ? 'Closed' : info?.open && info?.close ? `${fmt(info.open)}\u2013${fmt(info.close)}` : null;
+      if (!hours) continue;
+      const last = groups[groups.length - 1];
+      if (last && last.hours === hours) {
+        last.days.push(dayAbbr[day]);
+      } else {
+        groups.push({ days: [dayAbbr[day]], hours });
+      }
+    }
+
+    return groups.map(g => {
+      const label = g.days.length > 2
+        ? `${g.days[0]}\u2013${g.days[g.days.length - 1]}`
+        : g.days.join(', ');
+      return `${label}: ${g.hours}`;
+    }).join(' | ');
+  } catch {
+    return String(raw);
+  }
+}
 
 
 const createTemplate = async (templateData: CreateTemplatePayload) => {
@@ -169,7 +213,8 @@ export default function CreateTemplatePage() {
       email: companyData?.companyEmail || 'john.doe@example.com',
       phone: companyData?.phone || '(555) 123-4567',
       address: companyData?.address || '123 Main St',
-      office_hours: firstShop?.operatingHours || 'Mon-Fri 9AM-5PM',
+      office_hours: formatOperatingHours(firstShop?.operatingHours),
+      company_name: companyData?.name || masterDesign?.companyName || 'Your Company',
     };
 
     return (text: string) => {
@@ -177,7 +222,7 @@ export default function CreateTemplatePage() {
         return variableMap[key] ?? match;
       });
     };
-  }, [companyData, shopsData]);
+  }, [companyData, shopsData, masterDesign]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -221,214 +266,217 @@ export default function CreateTemplatePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto p-6 space-y-8">
-        <header className="flex flex-col gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-50">{t('templatesPage.createTemplatePage.title')}</h1>
-            <p className="text-gray-600 dark:text-gray-300">
-              {t('templatesPage.createTemplatePage.subtitle')}
-            </p>
-          </div>
-        </header>
-
-        <div className="max-w-4xl mx-auto space-y-8">
-
-          <Card className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm">
-            <CardHeader>
-              <CardTitle>{t('templatesPage.createTemplatePage.templateDetails')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="template-name">{t('templatesPage.createTemplatePage.templateName')}</Label>
-                    <Input
-                      id="template-name"
-                      placeholder={t('templatesPage.createTemplatePage.templateNamePlaceholder')}
-                      value={name}
-                      onChange={(event) => setName(event.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="template-channel">{t('templatesPage.createTemplatePage.channel')}</Label>
-                    <Select value={channel} onValueChange={(value: TemplateChannel) => setChannel(value)}>
-                      <SelectTrigger id="template-channel">
-                        <SelectValue placeholder={t('templatesPage.createTemplatePage.selectChannel')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {localizedChannelOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{option.label}</span>
-                              <span className="text-xs text-muted-foreground">{option.description}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="template-category">{t('templatesPage.createTemplatePage.category')}</Label>
-                    <Select value={category} onValueChange={(value: TemplateCategory) => setCategory(value)}>
-                      <SelectTrigger id="template-category">
-                        <SelectValue placeholder={t('templatesPage.createTemplatePage.selectCategory')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {localizedCategoryOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="template-subject">{t('templatesPage.createTemplatePage.subjectLine')}</Label>
-                    <Input
-                      id="template-subject"
-                      placeholder={t('templatesPage.createTemplatePage.subjectLinePlaceholder')}
-                      value={subjectLine}
-                      onChange={(event) => setSubjectLine(event.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="template-content">{t('templatesPage.createTemplatePage.content')}</Label>
-
-                    {/* Variable quick-insert bar */}
-                    <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-50 dark:bg-slate-900/50 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg">
-                      <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 mr-1">
-                        <Tag className="w-3.5 h-3.5" />
-                        <span>{t('ecards.editor.insertPlaceholders')}:</span>
-                      </div>
-                      {TEMPLATE_VARIABLES.map((v) => {
-                        const Icon = v.icon;
-                        return (
-                          <button
-                            key={v.key}
-                            type="button"
-                            onClick={() => {
-                              setContent((prev) => prev + `{{${v.key}}}`);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer"
-                            title={`Insert {{${v.key}}}`}
-                          >
-                            <Icon className="w-3 h-3" />
-                            {t(v.labelKey, v.key)}
-                            <span className="text-blue-400 dark:text-blue-500 font-mono text-[10px]">{`{{${v.key}}}`}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <RichTextEditor
-                      value={content}
-                      onChange={setContent}
-                      placeholder={t('templatesPage.createTemplatePage.contentPlaceholder')}
-                      className="min-h-[300px]"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      {t('templatesPage.createTemplatePage.contentHelp')}
-                    </p>
-                  </div>
-
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="template-tags">{t('templatesPage.createTemplatePage.tags')}</Label>
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap gap-2 min-h-[40px] p-2 border rounded-md bg-background">
-                        {tags.length === 0 && (
-                          <span className="text-sm text-muted-foreground">{t('templatesPage.createTemplatePage.noTagsAdded')}</span>
-                        )}
-                        {tags.map((tag, index) => (
-                          <Badge
-                            key={index}
-                            variant="secondary"
-                            className="gap-1 pr-1"
-                          >
-                            {tag}
-                            <button
-                              type="button"
-                              onClick={() => setTags(tags.filter((_, i) => i !== index))}
-                              className="ml-1 rounded-full hover:bg-muted p-0.5"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                      <div className="flex gap-2">
-                        <Input
-                          id="template-tags"
-                          placeholder={t('templatesPage.createTemplatePage.addTagPlaceholder')}
-                          value={tagInput}
-                          onChange={(event) => setTagInput(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter') {
-                              event.preventDefault();
-                              const newTag = tagInput.trim();
-                              if (newTag && !tags.includes(newTag)) {
-                                setTags([...tags, newTag]);
-                                setTagInput("");
-                              }
-                            }
-                          }}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            const newTag = tagInput.trim();
-                            if (newTag && !tags.includes(newTag)) {
-                              setTags([...tags, newTag]);
-                              setTagInput("");
-                            }
-                          }}
-                          disabled={!tagInput.trim()}
-                        >
-                          {t('common.add')}
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {t('templatesPage.createTemplatePage.addTagHelp')}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 justify-end pt-4 border-t">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setLocation('/templates')}
-                    disabled={isSubmitting}
-                  >
-                    {t('templatesPage.createTemplatePage.cancel')}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowPreview(true)}
-                    disabled={!hasContent(content)}
-                  >
-                    <Eye className="w-4 h-4 mr-2" />
-                    {t('templatesPage.createTemplatePage.preview')}
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? t('templatesPage.createTemplatePage.creating') : t('templatesPage.createTemplatePage.createTemplate')}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+    <div className="container mx-auto py-8 px-4 max-w-4xl">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{t('templatesPage.createTemplatePage.title')}</h1>
+        <p className="text-gray-600 dark:text-gray-400">
+          {t('templatesPage.createTemplatePage.subtitle')}
+        </p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('templatesPage.createTemplatePage.templateDetails')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="template-name">{t('templatesPage.createTemplatePage.templateName')}</Label>
+                <Input
+                  id="template-name"
+                  placeholder={t('templatesPage.createTemplatePage.templateNamePlaceholder')}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="template-channel">{t('templatesPage.createTemplatePage.channel')}</Label>
+                <Select value={channel} onValueChange={(value: TemplateChannel) => setChannel(value)}>
+                  <SelectTrigger id="template-channel">
+                    <SelectValue placeholder={t('templatesPage.createTemplatePage.selectChannel')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {localizedChannelOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{option.label}</span>
+                          <span className="text-xs text-muted-foreground">{option.description}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="template-category">{t('templatesPage.createTemplatePage.category')}</Label>
+                <Select value={category} onValueChange={(value: TemplateCategory) => setCategory(value)}>
+                  <SelectTrigger id="template-category">
+                    <SelectValue placeholder={t('templatesPage.createTemplatePage.selectCategory')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {localizedCategoryOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="template-subject">{t('templatesPage.createTemplatePage.subjectLine')}</Label>
+                <Input
+                  id="template-subject"
+                  placeholder={t('templatesPage.createTemplatePage.subjectLinePlaceholder')}
+                  value={subjectLine}
+                  onChange={(event) => setSubjectLine(event.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="template-content">{t('templatesPage.createTemplatePage.content')}</Label>
+
+                {/* Variable quick-insert bar */}
+                <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-50 dark:bg-slate-900/50 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 mr-1">
+                    <Tag className="w-3.5 h-3.5" />
+                    <span>{t('ecards.editor.insertPlaceholders')}:</span>
+                  </div>
+                  {TEMPLATE_VARIABLES.map((v) => {
+                    const Icon = v.icon;
+                    return (
+                      <button
+                        key={v.key}
+                        type="button"
+                        onClick={() => {
+                          setContent((prev) => prev + `{{${v.key}}}`);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer"
+                        title={`Insert {{${v.key}}}`}
+                      >
+                        <Icon className="w-3 h-3" />
+                        {t(v.labelKey, v.key)}
+                        <span className="text-blue-400 dark:text-blue-500 font-mono text-[10px]">{`{{${v.key}}}`}</span>
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setContent((prev) => prev + CONTACT_CARD_TEMPLATE);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors cursor-pointer"
+                    title="Insert formatted contact card block"
+                  >
+                    <CreditCard className="w-3 h-3" />
+                    {t('ecards.editor.contactCard', 'Contact Card')}
+                  </button>
+                </div>
+
+                <RichTextEditor
+                  value={content}
+                  onChange={setContent}
+                  placeholder={t('templatesPage.createTemplatePage.contentPlaceholder')}
+                  className="min-h-[300px]"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t('templatesPage.createTemplatePage.contentHelp')}
+                </p>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="template-tags">{t('templatesPage.createTemplatePage.tags')}</Label>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2 min-h-[40px] p-2 border rounded-md bg-background">
+                    {tags.length === 0 && (
+                      <span className="text-sm text-muted-foreground">{t('templatesPage.createTemplatePage.noTagsAdded')}</span>
+                    )}
+                    {tags.map((tag, index) => (
+                      <Badge
+                        key={index}
+                        variant="secondary"
+                        className="gap-1 pr-1"
+                      >
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => setTags(tags.filter((_, i) => i !== index))}
+                          className="ml-1 rounded-full hover:bg-muted p-0.5"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      id="template-tags"
+                      placeholder={t('templatesPage.createTemplatePage.addTagPlaceholder')}
+                      value={tagInput}
+                      onChange={(event) => setTagInput(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          const newTag = tagInput.trim();
+                          if (newTag && !tags.includes(newTag)) {
+                            setTags([...tags, newTag]);
+                            setTagInput("");
+                          }
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        const newTag = tagInput.trim();
+                        if (newTag && !tags.includes(newTag)) {
+                          setTags([...tags, newTag]);
+                          setTagInput("");
+                        }
+                      }}
+                      disabled={!tagInput.trim()}
+                    >
+                      {t('common.add')}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {t('templatesPage.createTemplatePage.addTagHelp')}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-4 pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setLocation('/templates')}
+                disabled={isSubmitting}
+              >
+                {t('templatesPage.createTemplatePage.cancel')}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowPreview(true)}
+                disabled={!hasContent(content)}
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                {t('templatesPage.createTemplatePage.preview')}
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? t('templatesPage.createTemplatePage.creating') : t('templatesPage.createTemplatePage.createTemplate')}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
 
       {/* Preview Dialog */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>

@@ -9,7 +9,7 @@ import { Color } from "@tiptap/extension-color";
 import { Placeholder } from "@tiptap/extension-placeholder";
 import { Image } from "@tiptap/extension-image";
 import { Button } from "@/components/ui/button";
-import { Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, Droplet, User, Sparkles, Wand2, PartyPopper, ArrowRightFromLine, ArrowLeftToLine, Tag, Undo, Redo, Languages, List, ListOrdered, Heading1, Heading2, Link as LinkIcon, Minus, Mail, Phone, MapPin, Clock } from "lucide-react";
+import { Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, Droplet, User, Sparkles, Wand2, PartyPopper, ArrowRightFromLine, ArrowLeftToLine, Tag, Undo, Redo, Languages, List, ListOrdered, Heading1, Heading2, Link as LinkIcon, Minus, Mail, Phone, MapPin, Clock, CreditCard } from "lucide-react";
 import { generateBirthdayMessage, improveText, emojifyText, expandText, shortenText, makeMoreCasualText, makeMoreFormalText, translateText } from "@/lib/aiApi";
 import { useTranslation } from "react-i18next";
 import {
@@ -679,6 +679,19 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
             >
               <Clock className="w-3 h-3 mr-2" />
               {t('ecards.editor.officeHours', 'Office Hours')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                if (editor) {
+                  editor.chain().focus().insertContent(
+                    `<p><strong>{{company_name}}</strong></p><p>\u2709 {{email}}</p><p>\u260E {{phone}}</p><p>\u{1F4CD} {{address}}</p>`
+                  ).run();
+                }
+              }}
+              className="text-white hover:bg-gray-700 cursor-pointer border-t border-gray-600 mt-1 pt-1"
+            >
+              <CreditCard className="w-3 h-3 mr-2" />
+              {t('ecards.editor.contactCard', 'Contact Card')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

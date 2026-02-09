@@ -803,6 +803,11 @@ roleRoutes.put("/permissions", authenticateToken, requireRole(['Owner']), async 
           updatedBy: req.user.id,
         },
       });
+
+      res.json({
+        message: `Permissions for ${role} updated successfully`,
+        role,
+      });
     } catch (e: any) {
       if (e.message?.includes('relation "role_permissions" does not exist')) {
         return res.status(503).json({
@@ -811,19 +816,10 @@ roleRoutes.put("/permissions", authenticateToken, requireRole(['Owner']), async 
       }
       throw e;
     }
-  } else {
-    throw e;
-  }
-}
-
-    res.json({
-  message: `Permissions for ${role} updated successfully`,
-  role,
-});
   } catch (error) {
-  console.error('Save permissions error:', error);
-  res.status(500).json({ message: 'Failed to save permissions' });
-}
+    console.error('Save permissions error:', error);
+    res.status(500).json({ message: 'Failed to save permissions' });
+  }
 });
 
 // POST /api/roles/permissions/reset - Reset a role's permissions to defaults (Owner only)
