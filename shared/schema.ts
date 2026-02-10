@@ -2463,7 +2463,7 @@ export const templateRelations = relations(templates, ({ one }) => ({
 }));
 
 // Template channel and category enums
-export const templateChannels = ['individual', 'promotional', 'newsletter', 'transactional'] as const;
+export const templateChannels = ['individual', 'promotional', 'newsletter', 'transactional', 'single-purpose'] as const;
 export type TemplateChannel = typeof templateChannels[number];
 
 export const templateCategories = ['welcome', 'retention', 'seasonal', 'update', 'custom'] as const;
@@ -2594,3 +2594,30 @@ export const activityLogQuerySchema = z.object({
 });
 
 export type ActivityLogQuery = z.infer<typeof activityLogQuerySchema>;
+
+// Role Permissions - stores custom permission overrides per tenant
+export const rolePermissions = pgTable("role_permissions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: varchar("tenant_id").notNull(),
+  role: text("role").notNull(), // Owner, Administrator, Manager, Employee
+  permissions: text("permissions").notNull(), // JSON string of permission overrides
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  updatedBy: text("updated_by"), // user ID who last updated
+}, (table) => ({
+  tenantRoleIdx: uniqueIndex("role_permissions_tenant_role_idx").on(table.tenantId, table.role),
+  tenantIdIdx: index("role_permissions_tenant_id_idx").on(table.tenantId),
+}));
+
+export const rolePermissionRelations = relations(rolePermissions, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [rolePermissions.tenantId],
+    references: [tenants.id],
+  }),
+  updatedByUser: one(betterAuthUser, {
+    fields: [rolePermissions.updatedBy],
+    references: [betterAuthUser.id],
+  }),
+}));
+
+export type RolePermission = typeof rolePermissions.$inferSelect;
+export type InsertRolePermission = typeof rolePermissions.$inferInsert;

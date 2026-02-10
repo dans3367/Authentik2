@@ -5,6 +5,7 @@ import { triggerTasks, type TriggerTaskStatus, type TriggerTaskRelatedType } fro
 import { eq } from 'drizzle-orm';
 import type { sendReminderTask, scheduleReminderTask, sendBulkRemindersTask, ReminderPayload } from "../../src/trigger/reminders";
 import type { sendRescheduleEmailTask, RescheduleEmailPayload } from "../../src/trigger/appointmentRescheduleEmail";
+import type { sendThankYouEmailTask, ThankYouEmailPayload } from "../../src/trigger/appointmentThankYouEmail";
 import type { requestBdayEmailTask, RequestBdayEmailPayload } from "../../src/trigger/requestBdayEmail";
 
 /**
@@ -527,6 +528,61 @@ export async function triggerRequestBdayEmail(payload: RequestBdayEmailPayload):
         logErrorMessage
       );
     }
+
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+}
+
+/**
+ * Trigger a thank-you email via Trigger.dev
+ * Sent when an appointment is marked as completed
+ */
+export async function triggerThankYouEmail(payload: ThankYouEmailPayload): Promise<{
+  success: boolean;
+  runId?: string;
+  taskLogId?: string;
+  error?: string;
+}> {
+  const taskId = "send-thank-you-email";
+  let taskLogId: string | null = null;
+
+  try {
+    const handle = await tasks.trigger<typeof sendThankYouEmailTask>(taskId, payload);
+
+    console.log(`📧 [Trigger.dev] Triggered ${taskId}, runId: ${handle.id}`);
+
+    // Log to trigger_tasks table
+    taskLogId = await logTriggerTask({
+      taskId,
+      runId: handle.id,
+      payload,
+      status: 'triggered',
+      tenantId: payload.tenantId,
+      relatedType: 'email',
+      relatedId: payload.appointmentId,
+    });
+
+    return {
+      success: true,
+      runId: handle.id,
+      taskLogId: taskLogId || undefined,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error(`📧 [Trigger.dev] Failed to trigger ${taskId}:`, errorMessage);
+
+    // Log failed attempt
+    await logTriggerTask({
+      taskId,
+      payload,
+      status: 'failed',
+      tenantId: payload.tenantId,
+      relatedType: 'email',
+      relatedId: payload.appointmentId,
+    });
 
     return {
       success: false,

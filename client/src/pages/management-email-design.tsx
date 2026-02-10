@@ -15,7 +15,8 @@ import {
   Type,
   Layout,
   Globe,
-  Mail
+  Mail,
+  ShieldAlert
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -186,14 +187,18 @@ export default function ManagementEmailDesign() {
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
   const [activeTab, setActiveTab] = useState("brand");
 
-  const { data: masterDesign, isLoading } = useQuery({
+  const { data: masterDesign, isLoading, error } = useQuery({
     queryKey: ["/api/master-email-design"],
     queryFn: async () => {
       const response = await fetch('/api/master-email-design', {
         credentials: 'include',
       });
       if (!response.ok) {
-        throw new Error('Failed to fetch email design');
+        const err = new Error(
+          response.status === 403 ? '403: Insufficient permissions' : 'Failed to fetch email design'
+        );
+        (err as any).status = response.status;
+        throw err;
       }
       return response.json();
     },
@@ -281,6 +286,21 @@ export default function ManagementEmailDesign() {
         <Mail className="w-10 h-10 animate-bounce text-primary mb-4" />
         <p className="text-muted-foreground animate-pulse">Loading design studio...</p>
       </div>
+    );
+  }
+
+  const is403 = error instanceof Error && (error.message?.startsWith('403:') || (error as any).status === 403);
+  if (is403) {
+    return (
+      <Card>
+        <CardContent className="py-8">
+          <div className="flex flex-col items-center gap-2 py-4 text-center">
+            <ShieldAlert className="h-8 w-8 text-orange-500" />
+            <p className="font-medium text-sm">{t('common.permissionDenied', 'Permission Denied')}</p>
+            <p className="text-xs text-muted-foreground max-w-xs">{t('common.permissionDeniedDescription', 'You do not have permission to view this section. Contact your administrator to request access.')}</p>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 

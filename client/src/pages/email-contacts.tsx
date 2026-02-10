@@ -33,7 +33,8 @@ import {
   Edit,
   Trash2,
   UserCheck,
-  LayoutDashboard
+  LayoutDashboard,
+  ShieldAlert
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -273,9 +274,12 @@ export default function EmailContacts() {
       });
     },
     onError: (error: any) => {
+      const is403 = error instanceof Error && error.message?.startsWith('403:');
       toast({
-        title: t('emailContacts.toasts.error'),
-        description: error.message || t('emailContacts.toasts.deleteError'),
+        title: is403 ? t('common.permissionDenied', 'Permission Denied') : t('emailContacts.toasts.error'),
+        description: is403
+          ? t('common.permissionDeniedDescription', 'You do not have permission to perform this action. Contact your administrator to request access.')
+          : (error.message || t('emailContacts.toasts.deleteError')),
         variant: "destructive",
       });
     },
@@ -314,6 +318,24 @@ export default function EmailContacts() {
 
   // Show error state
   if (contactsError) {
+    const is403 = contactsError instanceof Error && contactsError.message?.startsWith('403:');
+    if (is403) {
+      return (
+        <div className="p-6">
+          <Card>
+            <CardContent className="py-12">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <ShieldAlert className="h-12 w-12 text-orange-500" />
+                <h2 className="text-xl font-semibold">{t('common.permissionDenied', 'Permission Denied')}</h2>
+                <p className="text-muted-foreground text-sm max-w-md">
+                  {t('common.permissionDeniedDescription', 'You do not have permission to view this section. Contact your administrator to request access.')}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
     return (
       <div className="p-6">
         <div className="text-center">

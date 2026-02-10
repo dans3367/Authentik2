@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Trash2, Plus } from "lucide-react";
+import { Pencil, Trash2, Plus, ShieldAlert, AlertCircle } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface Tag {
   id: string;
@@ -38,7 +39,7 @@ export default function ManagementTags() {
   const [editColor, setEditColor] = useState("#3B82F6");
   const [editDesc, setEditDesc] = useState("");
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ["/api/contact-tags"],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/contact-tags");
@@ -102,6 +103,25 @@ export default function ManagementTags() {
     setEditColor(t.color);
     setEditDesc(t.description || "");
   };
+
+  const is403 = error instanceof Error && error.message?.startsWith('403:');
+
+  if (is403) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('management.tags.title')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center gap-2 py-4 text-center">
+            <ShieldAlert className="h-8 w-8 text-orange-500" />
+            <p className="font-medium text-sm">{t('common.permissionDenied', 'Permission Denied')}</p>
+            <p className="text-xs text-muted-foreground max-w-xs">{t('common.permissionDeniedDescription', 'You do not have permission to view this section. Contact your administrator to request access.')}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">

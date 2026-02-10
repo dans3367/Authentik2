@@ -2,13 +2,13 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { contactTags } from '@shared/schema';
-import { authenticateToken } from '../middleware/auth-middleware';
+import { authenticateToken, requirePermission } from '../middleware/auth-middleware';
 import { sanitizeString } from '../utils/sanitization';
 
 export const formTagsRoutes = Router();
 
 // Get all form tags for the user's tenant
-formTagsRoutes.get("/", authenticateToken, async (req: any, res) => {
+formTagsRoutes.get("/", authenticateToken, requirePermission('tags.view'), async (req: any, res) => {
   try {
     console.log('Fetching form tags for tenant:', req.user.tenantId);
     
@@ -26,7 +26,7 @@ const tagsList = await db.select()
 });
 
 // Create new form tag
-formTagsRoutes.post("/", authenticateToken, async (req: any, res) => {
+formTagsRoutes.post("/", authenticateToken, requirePermission('tags.create'), async (req: any, res) => {
   try {
     const { name, color } = req.body;
 
@@ -59,7 +59,7 @@ const newTag = await db.insert(contactTags).values({
 });
 
 // Delete form tag
-formTagsRoutes.delete("/:id", authenticateToken, async (req: any, res) => {
+formTagsRoutes.delete("/:id", authenticateToken, requirePermission('tags.delete'), async (req: any, res) => {
   try {
     const { id } = req.params;
 

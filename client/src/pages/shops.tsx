@@ -383,7 +383,14 @@ export default function ShopsPage() {
             console.error('❌ [Frontend] Could not parse error response:', parseError);
           }
 
-          throw new Error(`Failed to fetch shops: ${response.status} ${response.statusText}`);
+          // Preserve status code and server message for permission errors
+          const err = new Error(
+            response.status === 403
+              ? ((() => { try { return JSON.parse(errorDetails || '{}').message; } catch { return ''; } })() || 'Insufficient permissions')
+              : `Failed to fetch shops: ${response.status} ${response.statusText}`
+          );
+          (err as any).status = response.status;
+          throw err;
         }
 
         const responseData = await response.json();
@@ -966,7 +973,17 @@ export default function ShopsPage() {
           ) : error ? (
             <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
               <CardContent className="py-8">
-                <p className="text-center text-gray-600 dark:text-gray-300">{t('shops.toasts.fetchError')}</p>
+                {(error as any)?.status === 403 ? (
+                  <div className="text-center space-y-3">
+                    <AlertCircle className="mx-auto h-10 w-10 text-orange-500" />
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('common.permissionDenied', 'Permission Denied')}</h3>
+                    <p className="text-gray-600 dark:text-gray-300 text-sm max-w-md mx-auto">
+                      {error.message || t('common.permissionDeniedDescription', 'You do not have permission to access this section. Contact your administrator to request access.')}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-center text-gray-600 dark:text-gray-300">{t('shops.toasts.fetchError')}</p>
+                )}
               </CardContent>
             </Card>
           ) : (

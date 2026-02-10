@@ -351,6 +351,13 @@
       "when": 1770343270910,
       "tag": "0049_melted_longshot",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1770590421102,
+      "tag": "0050_cool_warbound",
+      "breakpoints": true
     }
   ]
 }

@@ -306,7 +306,7 @@ func renderUnsubscribeSection(params TemplateParams) string {
 		return ""
 	}
 
-	unsubscribeUrl := fmt.Sprintf("http://localhost:5000/api/unsubscribe/birthday?token=%s", params.UnsubscribeToken)
+	unsubscribeUrl := fmt.Sprintf("http://localhost:5002/api/unsubscribe/birthday?token=%s", params.UnsubscribeToken)
 
 	return fmt.Sprintf(`
 		<div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">

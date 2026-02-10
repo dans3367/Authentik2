@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { SINGLE_PURPOSE_PRESETS, type SinglePurposePreset } from "@/config/templatePresets";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,12 +33,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  CheckCircle,
   Copy,
   Eye,
   Filter,
+  Monitor,
   MoreVertical,
   Plus,
   Search,
+  Smartphone,
+  Sparkles,
   Star,
   StarOff,
   Trash2,
@@ -50,6 +56,7 @@ const channelOptions = [
   { value: "promotional", label: "Promotional", description: "Campaign blasts and seasonal offers" },
   { value: "newsletter", label: "Newsletter", description: "Recurring newsletter layouts" },
   { value: "transactional", label: "Transactional", description: "Receipts, confirmations, and notifications" },
+  { value: "single-purpose", label: "Single Purpose", description: "One-off templates for specific occasions" },
 ];
 
 const categoryOptions = [
@@ -271,10 +278,10 @@ interface CreateTemplatePayload {
 
 interface TemplateCardProps {
   template: Template;
+  masterDesign: any;
   onToggleFavorite: (id: string) => void;
   onDuplicate: (template: Template) => void;
   onDelete: (id: string) => void;
-  onUse: (template: Template) => void;
   onEdit: (template: Template) => void;
 }
 
@@ -288,14 +295,17 @@ function getChannelBadgeClasses(channel: TemplateChannel) {
       return "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300";
     case "transactional":
       return "bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300";
+    case "single-purpose":
+      return "bg-teal-100 text-teal-700 dark:bg-teal-900/20 dark:text-teal-300";
     default:
       return "bg-gray-100 text-gray-700 dark:bg-gray-800/40 dark:text-gray-300";
   }
 }
 
-function TemplateCard({ template, onToggleFavorite, onDuplicate, onDelete, onUse, onEdit }: TemplateCardProps) {
+function TemplateCard({ template, masterDesign, onToggleFavorite, onDuplicate, onDelete, onEdit }: TemplateCardProps) {
   const { t } = useTranslation();
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
 
   return (
     <Card className="h-full flex flex-col">
@@ -387,28 +397,133 @@ function TemplateCard({ template, onToggleFavorite, onDuplicate, onDelete, onUse
                 {t('templatesPage.card.preview')}
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-hidden">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
               <DialogHeader>
-                <DialogTitle>{template.name}</DialogTitle>
+                <DialogTitle className="flex items-center gap-2">
+                  <Eye className="w-5 h-5" />
+                  {template.name}
+                </DialogTitle>
                 <DialogDescription>
                   {t('templatesPage.subject')}: {template.subjectLine}
                 </DialogDescription>
               </DialogHeader>
-              <div
-                className="max-h-[60vh] overflow-y-auto rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-4 py-3 text-sm"
-                dangerouslySetInnerHTML={{ __html: template.body }}
-              />
+
+              {/* Device toggle */}
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-muted-foreground">Preview:</span>
+                  <div className="flex bg-muted/50 p-1 rounded-md">
+                    <Button
+                      variant={previewDevice === "desktop" ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-7 px-3 text-xs"
+                      onClick={() => setPreviewDevice("desktop")}
+                      type="button"
+                    >
+                      <Monitor className="w-3.5 h-3.5 mr-1.5" />
+                      Desktop
+                    </Button>
+                    <Button
+                      variant={previewDevice === "mobile" ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-7 px-3 text-xs"
+                      onClick={() => setPreviewDevice("mobile")}
+                      type="button"
+                    >
+                      <Smartphone className="w-3.5 h-3.5 mr-1.5" />
+                      Mobile
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Email preview canvas */}
+              <div className="flex-1 overflow-y-auto">
+                <div className={`transition-all duration-300 mx-auto p-4 sm:p-6 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl ${
+                  previewDevice === "mobile" ? "max-w-[400px]" : "w-full"
+                }`}>
+                  <div className="bg-white text-slate-900 shadow-2xl mx-auto rounded overflow-hidden max-w-[600px] w-full" style={{ fontFamily: masterDesign?.fontFamily || "Arial, sans-serif" }}>
+
+                    {/* Simulated email header */}
+                    <div className="border-b bg-gray-50 p-4 text-xs sm:text-sm text-gray-500">
+                      <div className="flex gap-2 mb-1">
+                        <span className="font-semibold text-right w-14">To:</span>
+                        <span className="text-gray-900">customer@example.com</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <span className="font-semibold text-right w-14">Subject:</span>
+                        <span className="text-gray-900 font-bold">{template.subjectLine || "(no subject)"}</span>
+                      </div>
+                    </div>
+
+                    {/* Hero header from email design */}
+                    <div
+                      className="p-8 text-center"
+                      style={{ backgroundColor: masterDesign?.primaryColor || "#3B82F6", color: "#ffffff" }}
+                    >
+                      {masterDesign?.logoUrl ? (
+                        <img
+                          src={masterDesign.logoUrl}
+                          alt="Logo"
+                          className="h-12 mx-auto mb-4 object-contain"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                        />
+                      ) : (
+                        <div className="h-12 w-12 bg-white/20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                          <span className="text-xl font-bold opacity-80">{masterDesign?.companyName?.charAt(0) || "C"}</span>
+                        </div>
+                      )}
+                      <h1 className="text-2xl font-bold mb-2 tracking-tight">
+                        {masterDesign?.companyName || "Your Company"}
+                      </h1>
+                      {masterDesign?.headerText && (
+                        <p className="text-base opacity-95 max-w-sm mx-auto leading-normal">
+                          {masterDesign.headerText}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Template body content */}
+                    <div className="p-8 flex-1">
+                      <div
+                        className="prose prose-sm max-w-none"
+                        dangerouslySetInnerHTML={{ __html: template.body || "<p style='color:#94a3b8;'>No content</p>" }}
+                      />
+                    </div>
+
+                    {/* Footer from email design */}
+                    <div className="bg-slate-100 p-8 text-center border-t border-slate-200">
+                      {(masterDesign?.socialLinks?.facebook || masterDesign?.socialLinks?.twitter || masterDesign?.socialLinks?.instagram || masterDesign?.socialLinks?.linkedin) && (
+                        <div className="flex justify-center gap-6 mb-6">
+                          {masterDesign?.socialLinks?.facebook && (
+                            <span className="text-slate-400 text-sm">Facebook</span>
+                          )}
+                          {masterDesign?.socialLinks?.twitter && (
+                            <span className="text-slate-400 text-sm">Twitter</span>
+                          )}
+                          {masterDesign?.socialLinks?.instagram && (
+                            <span className="text-slate-400 text-sm">Instagram</span>
+                          )}
+                          {masterDesign?.socialLinks?.linkedin && (
+                            <span className="text-slate-400 text-sm">LinkedIn</span>
+                          )}
+                        </div>
+                      )}
+                      <div className="text-xs text-slate-500 space-y-2 max-w-xs mx-auto">
+                        <p>{masterDesign?.footerText || "© 2025 All rights reserved."}</p>
+                        <p className="text-slate-400">
+                          You are receiving this email because you signed up on our website.
+                          <br />
+                          <span className="underline cursor-pointer hover:text-slate-600">Unsubscribe</span>
+                        </p>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
             </DialogContent>
           </Dialog>
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1"
-            onClick={() => onUse(template)}
-          >
-            <Copy className="mr-2 h-4 w-4" />
-            {t('templatesPage.card.useTemplate')}
-          </Button>
         </div>
       </CardContent>
     </Card>
@@ -431,6 +546,7 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
   const [subjectLine, setSubjectLine] = useState("");
   const [content, setContent] = useState("");
   const [tagInput, setTagInput] = useState("");
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
 
   // Initialize form when template changes
   useEffect(() => {
@@ -442,8 +558,31 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
       setContent(template.body);
       setTagInput(template.tags.join(", "));
       setOpen(true);
+      // If editing a single-purpose template, try to match it to a preset
+      if (template.channel === "single-purpose") {
+        const matchedPreset = SINGLE_PURPOSE_PRESETS.find(p => p.label === template.name);
+        setSelectedPreset(matchedPreset?.id || null);
+      } else {
+        setSelectedPreset(null);
+      }
     }
   }, [template]);
+
+  const handleSelectPreset = (preset: SinglePurposePreset) => {
+    setSelectedPreset(preset.id);
+    setName(preset.label);
+    setCategory(preset.category as TemplateCategory);
+    setSubjectLine(preset.subjectLine);
+    setContent(preset.body);
+    setTagInput(preset.tags.join(", "));
+  };
+
+  const handleChannelChange = (value: TemplateChannel) => {
+    setChannel(value);
+    if (value !== "single-purpose") {
+      setSelectedPreset(null);
+    }
+  };
 
   const resetForm = () => {
     setName("");
@@ -452,6 +591,7 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
     setSubjectLine("");
     setContent("");
     setTagInput("");
+    setSelectedPreset(null);
   };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -511,7 +651,7 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
 
             <div className="grid gap-2">
               <Label htmlFor="edit-template-channel">{t('templatesPage.editDialog.channel')}</Label>
-              <Select value={channel} onValueChange={(value: TemplateChannel) => setChannel(value)}>
+              <Select value={channel} onValueChange={(value: TemplateChannel) => handleChannelChange(value)}>
                 <SelectTrigger id="edit-template-channel">
                   <SelectValue placeholder={t('templatesPage.editDialog.selectChannel')} />
                 </SelectTrigger>
@@ -527,6 +667,45 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
                 </SelectContent>
               </Select>
             </div>
+
+            {channel === "single-purpose" && (
+              <div className="grid gap-2">
+                <Label>{t('templatesPage.createTemplatePage.selectPurpose', 'Select a Purpose')}</Label>
+                <p className="text-xs text-muted-foreground mb-1">
+                  {t('templatesPage.createTemplatePage.selectPurposeHelp', 'Choose a preset to auto-fill the template with starter content. You can customize it afterwards.')}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {SINGLE_PURPOSE_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => handleSelectPreset(preset)}
+                      className={`relative flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all hover:shadow-sm ${
+                        selectedPreset === preset.id
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-400 ring-1 ring-blue-500 dark:ring-blue-400"
+                          : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                      }`}
+                    >
+                      {selectedPreset === preset.id && (
+                        <CheckCircle className="absolute top-2 right-2 h-4 w-4 text-blue-500 dark:text-blue-400" />
+                      )}
+                      <div className="flex items-center gap-2">
+                        <Sparkles className={`h-4 w-4 ${selectedPreset === preset.id ? "text-blue-500 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}`} />
+                        <span className="font-medium text-sm text-gray-900 dark:text-gray-100">{preset.label}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground leading-snug">{preset.description}</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {preset.tags.map((tag) => (
+                          <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="grid gap-2">
               <Label htmlFor="edit-template-category">{t('templatesPage.editDialog.category')}</Label>
@@ -613,6 +792,17 @@ export default function TemplatesPage() {
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
 
+  const { data: masterDesign } = useQuery({
+    queryKey: ["/api/master-email-design"],
+    queryFn: async () => {
+      const response = await fetch('/api/master-email-design', {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch email design');
+      return response.json();
+    },
+  });
+
   // Load templates and stats on component mount and when filters change
   const loadTemplates = async () => {
     try {
@@ -680,23 +870,6 @@ export default function TemplatesPage() {
       toast({
         title: t('templatesPage.toasts.error'),
         description: t('templatesPage.toasts.favoriteError'),
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleUseTemplate = async (template: Template) => {
-    try {
-      await useTemplate(template.id);
-      await loadTemplates(); // Refresh to show updated usage count
-      toast({
-        title: t('templatesPage.toasts.templateApplied'),
-        description: t('templatesPage.toasts.templateAppliedDesc', { name: template.name }),
-      });
-    } catch (error) {
-      toast({
-        title: t('templatesPage.toasts.error'),
-        description: t('templatesPage.toasts.useError'),
         variant: "destructive",
       });
     }
@@ -931,10 +1104,10 @@ export default function TemplatesPage() {
                   <TemplateCard
                     key={template.id}
                     template={template}
+                    masterDesign={masterDesign}
                     onToggleFavorite={handleToggleFavorite}
                     onDuplicate={handleDuplicateTemplate}
                     onDelete={handleDeleteTemplate}
-                    onUse={handleUseTemplate}
                     onEdit={handleEditTemplate}
                   />
                 ))}

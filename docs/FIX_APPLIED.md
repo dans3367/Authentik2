@@ -32,7 +32,7 @@ The new endpoint code was using Drizzle ORM operators (`eq`, `and`) and the emai
 
 ### Test 1: Endpoint exists (no more 404)
 ```bash
-curl -X POST http://localhost:5000/api/email-contacts/send-birthday-card \
+curl -X POST http://localhost:5002/api/email-contacts/send-birthday-card \
   -H "Content-Type: application/json" \
   -d '{"contactIds": []}'
 ```

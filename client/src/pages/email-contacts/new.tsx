@@ -20,7 +20,8 @@ import {
   User,
   Tag,
   List,
-  Loader2
+  Loader2,
+  ShieldAlert
 } from "lucide-react";
 import {
   Form,
@@ -188,9 +189,12 @@ export default function NewEmailContact() {
       queryClient.invalidateQueries({ queryKey: ['/api/email-contacts'] });
       queryClient.invalidateQueries({ queryKey: ['/api/email-contacts-stats'] });
 
+      const is403 = err instanceof Error && err.message?.startsWith('403:');
       toast({
-        title: t('emailContacts.toasts.error'),
-        description: err?.message || t('emailContacts.newContact.toasts.createError'),
+        title: is403 ? t('common.permissionDenied', 'Permission Denied') : t('emailContacts.toasts.error'),
+        description: is403
+          ? t('common.permissionDeniedDescription', 'You do not have permission to perform this action. Contact your administrator to request access.')
+          : (err?.message || t('emailContacts.newContact.toasts.createError')),
         variant: "destructive",
       });
     },

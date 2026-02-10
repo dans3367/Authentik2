@@ -251,6 +251,13 @@ export default function RemindersPage() {
     updateLocal: boolean;
   } | null>(null);
 
+  // Thank-you email dialog state
+  const [thankYouEmailDialogOpen, setThankYouEmailDialogOpen] = useState(false);
+  const [pendingCompletedChange, setPendingCompletedChange] = useState<{
+    appointmentId: string;
+    updateLocal: boolean;
+  } | null>(null);
+
   // Pagination state for reminders table
   const [remindersPage, setRemindersPage] = useState(1);
   const [remindersPageSize] = useState(10);
@@ -759,6 +766,27 @@ export default function RemindersPage() {
     },
   });
 
+  // Send thank-you email mutation
+  const sendThankYouEmailMutation = useMutation({
+    mutationFn: async (appointmentId: string) => {
+      const response = await apiRequest("POST", `/api/appointments/${appointmentId}/send-thank-you-email`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Email Sent",
+        description: "Thank-you email sent to customer",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t("reminders.toasts.error"),
+        description: error.message || "Failed to send thank-you email",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Create appointment mutation with optimistic updates
   const createAppointmentMutation = useMutation({
     mutationFn: async (params: { appointmentData: any; createReminder: boolean; reminderSettings: any }) => {
@@ -1093,6 +1121,38 @@ export default function RemindersPage() {
           // Reset dialog state
           setRescheduleEmailDialogOpen(false);
           setPendingStatusChange(null);
+        }
+      }
+    );
+  };
+
+  const handleThankYouEmailConfirm = (sendEmail: boolean) => {
+    if (!pendingCompletedChange) return;
+
+    const { appointmentId, updateLocal } = pendingCompletedChange;
+
+    // Update the appointment status to completed
+    updateAppointmentMutation.mutate(
+      { id: appointmentId, data: { status: 'completed' } },
+      {
+        onSuccess: () => {
+          if (updateLocal) {
+            setViewingAppointment(prev => prev ? { ...prev, status: 'completed' } : null);
+          }
+
+          // Send thank-you email if requested
+          if (sendEmail) {
+            sendThankYouEmailMutation.mutate(appointmentId);
+          }
+
+          // Reset dialog state
+          setThankYouEmailDialogOpen(false);
+          setPendingCompletedChange(null);
+        },
+        onError: () => {
+          // Reset dialog state even on error so it doesn't get stuck
+          setThankYouEmailDialogOpen(false);
+          setPendingCompletedChange(null);
         }
       }
     );
@@ -3793,6 +3853,15 @@ export default function RemindersPage() {
                                       setRescheduleEmailDialogOpen(true);
                                       return;
                                     }
+                                    // If changing to completed, prompt to send thank-you email
+                                    if (value === 'completed') {
+                                      setPendingCompletedChange({
+                                        appointmentId: viewingAppointment.id,
+                                        updateLocal: true,
+                                      });
+                                      setThankYouEmailDialogOpen(true);
+                                      return;
+                                    }
                                     // For other statuses, update directly
                                     updateAppointmentMutation.mutate(
                                       { id: viewingAppointment.id, data: { status: value } },
@@ -4326,6 +4395,44 @@ export default function RemindersPage() {
               >
                 <Send className="h-4 w-4 mr-2" />
                 Yes, Send Email
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Thank-You Email Confirmation Dialog */}
+        <AlertDialog open={thankYouEmailDialogOpen} onOpenChange={setThankYouEmailDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <Mail className="h-5 w-5 text-emerald-500" />
+                Send Thank-You Email?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2">
+                <p>
+                  Would you like to send a thank-you email to the customer
+                  for completing their appointment?
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  The email will include the appointment summary and a warm
+                  thank-you message from your business.
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+              <AlertDialogCancel
+                onClick={() => handleThankYouEmailConfirm(false)}
+                disabled={updateAppointmentMutation.isPending}
+              >
+                No, Just Mark Completed
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => handleThankYouEmailConfirm(true)}
+                disabled={updateAppointmentMutation.isPending || sendThankYouEmailMutation.isPending}
+                className="bg-emerald-500 hover:bg-emerald-600"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Yes, Send Thank-You
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

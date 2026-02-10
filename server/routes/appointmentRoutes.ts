@@ -6,6 +6,7 @@ import {
   appointments,
   appointmentReminders,
   emailContacts,
+  companies,
   createAppointmentSchema,
   updateAppointmentSchema,
   createAppointmentReminderSchema,
@@ -16,7 +17,7 @@ import { authenticateToken } from '../middleware/auth-middleware';
 import { requireRole } from '../middleware/auth-middleware';
 import { logActivity, computeChanges } from '../utils/activityLogger';
 import { v4 as uuidv4 } from 'uuid';
-import { cancelReminderRun, triggerRescheduleEmail } from '../lib/trigger';
+import { cancelReminderRun, triggerRescheduleEmail, triggerThankYouEmail } from '../lib/trigger';
 
 const router = Router();
 
@@ -835,5 +836,122 @@ router.post('/:id/send-reschedule-email', requireRole(['Owner', 'Administrator',
   }
 });
 
-export default router;
+// POST /api/appointments/:id/send-thank-you-email - Send thank-you email when appointment is completed
+router.post('/:id/send-thank-you-email', requireRole(['Owner', 'Administrator', 'Manager', 'User']), async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const user = (req as any).user;
+    const tenantId = user.tenantId;
 
+    // Fetch appointment with customer details
+    const appointment = await db
+      .select({
+        id: appointments.id,
+        title: appointments.title,
+        appointmentDate: appointments.appointmentDate,
+        duration: appointments.duration,
+        location: appointments.location,
+        status: appointments.status,
+        customerId: appointments.customerId,
+        customer: {
+          id: emailContacts.id,
+          email: emailContacts.email,
+          firstName: emailContacts.firstName,
+          lastName: emailContacts.lastName,
+        }
+      })
+      .from(appointments)
+      .leftJoin(emailContacts, eq(appointments.customerId, emailContacts.id))
+      .where(and(
+        eq(appointments.id, id),
+        eq(appointments.tenantId, tenantId)
+      ))
+      .limit(1);
+
+    if (appointment.length === 0) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+
+    const appt = appointment[0];
+
+    // Verify status is completed
+    if (appt.status !== 'completed') {
+      return res.status(400).json({
+        error: 'Thank-you emails can only be sent for completed appointments'
+      });
+    }
+
+    // Verify customer has email
+    if (!appt.customer?.email) {
+      return res.status(400).json({ error: 'Customer does not have an email address' });
+    }
+
+    // Fetch company name for the email
+    let companyName = 'Our Team';
+    try {
+      const companyResult = await db
+        .select({ name: companies.name })
+        .from(companies)
+        .where(eq(companies.tenantId, tenantId))
+        .limit(1);
+      if (companyResult[0]?.name) {
+        companyName = companyResult[0].name;
+      }
+    } catch (e) {
+      console.warn('[Thank You Email] Could not fetch company name:', e);
+    }
+
+    // Format date and time for email
+    const appointmentDate = new Date(appt.appointmentDate);
+    const formattedDate = appointmentDate.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    const formattedTime = appointmentDate.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    // Build customer name
+    const customerName = appt.customer.firstName
+      ? `${appt.customer.firstName}${appt.customer.lastName ? ' ' + appt.customer.lastName : ''}`
+      : 'Valued Customer';
+
+    // Trigger the thank-you email via Trigger.dev
+    const result = await triggerThankYouEmail({
+      appointmentId: appt.id,
+      customerId: appt.customer.id,
+      customerEmail: appt.customer.email,
+      customerName,
+      appointmentTitle: appt.title,
+      appointmentDate: formattedDate,
+      appointmentTime: formattedTime,
+      location: appt.location || undefined,
+      companyName,
+      tenantId,
+    });
+
+    if (!result.success) {
+      console.error('Failed to trigger thank-you email:', result.error);
+      return res.status(500).json({
+        error: 'Failed to send thank-you email',
+        details: result.error
+      });
+    }
+
+    console.log(`📧 Thank-you email triggered for appointment ${id}, runId: ${result.runId}`);
+
+    res.json({
+      message: 'Thank-you email sent successfully',
+      runId: result.runId
+    });
+  } catch (error) {
+    console.error('Failed to send thank-you email:', error);
+    res.status(500).json({ error: 'Failed to send thank-you email' });
+  }
+});
+
+export default router;

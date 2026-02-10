@@ -1,9 +1,17 @@
 #!/bin/bash
 
 # Start script for Authentik Services
+# Usage: ./start.sh [start|stop|restart]
 # Starts the Main Server (npm run dev) and the Webhook Server
-echo "🚀 Starting Authentik Services..."
-echo "=================================="
+
+# Check if command is provided
+if [ $# -eq 0 ]; then
+    echo "🚀 Starting Authentik Services..."
+    echo "=================================="
+    COMMAND="start"
+else
+    COMMAND="$1"
+fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -13,6 +21,10 @@ BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
+
+# Define services and their ports (global scope for stop_services)
+SERVICE_NAMES=("Main Server" "Webhook Server")
+SERVICE_PORTS=("5002" "3505")
 
 # Function to print colored output
 print_status() {
@@ -120,62 +132,6 @@ start_service() {
     fi
 }
 
-# Clean up any existing PID file
-rm -f /tmp/authentik_pids.txt
-
-# Define services and their ports
-# Define services and their ports
-SERVICE_NAMES=("Main Server" "Webhook Server")
-SERVICE_PORTS=("5002" "3505")
-
-print_status "Checking and cleaning up ports for all services..."
-
-# Check and kill processes on all required ports
-for ((i=0; i<${#SERVICE_NAMES[@]}; i++)); do
-    service="${SERVICE_NAMES[$i]}"
-    port="${SERVICE_PORTS[$i]}"
-    if check_port $port; then
-        kill_port_process $port "$service"
-    else
-        print_success "Port $port ($service) is available"
-    fi
-done
-
-print_success "All required ports are now available"
-echo ""
-
-# Set environment variables
-export NODE_ENV=${NODE_ENV:-development}
-export PORT=${PORT:-5002}
-export WEBHOOK_PORT=${WEBHOOK_PORT:-3505}
-
-print_status "Environment: $NODE_ENV"
-print_status "Starting services..."
-echo ""
-
-# Start services
-PROJECT_ROOT=$(pwd)
-
-# 1. Start Main Server (npm run dev equivalent)
-start_service "Main Server" "5002" "NODE_ENV=development PORT=5002 npx tsx server/index.ts" "$PROJECT_ROOT"
-if [ $? -eq 0 ]; then
-    print_port "Main Server: http://localhost:5002"
-fi
-
-# 2. Start Webhook Server (for Resend webhooks)
-if [ -d "$PROJECT_ROOT/server-hook" ]; then
-    start_service "Webhook Server" "3505" "NODE_ENV=development npx tsx index.ts" "$PROJECT_ROOT/server-hook"
-    if [ $? -eq 0 ]; then
-        print_port "Webhook Server: http://localhost:3505"
-    fi
-else
-    print_warning "Webhook Server directory (server-hook) not found, skipping..."
-fi
-
-echo ""
-print_success "All available services started successfully!"
-echo "=================================="
-
 # Function to cleanup background processes on exit
 cleanup() {
     print_status "Shutting down all services..."
@@ -198,13 +154,115 @@ cleanup() {
     exit 0
 }
 
-# Set up signal handlers
-trap cleanup SIGINT SIGTERM
+# Function to stop all services
+stop_services() {
+    print_status "Stopping all Authentik services..."
+    
+    # Kill processes on the defined ports
+    for ((i=0; i<${#SERVICE_NAMES[@]}; i++)); do
+        service="${SERVICE_NAMES[$i]}"
+        port="${SERVICE_PORTS[$i]}"
+        if check_port $port; then
+            kill_port_process $port "$service"
+        else
+            print_success "Port $port ($service) is already free"
+        fi
+    done
+    
+    # Also kill by process names
+    pkill -f "npx tsx server/index.ts" 2>/dev/null
+    pkill -f "npx tsx server-hook" 2>/dev/null
+    
+    print_success "All services stopped"
+}
 
-echo ""
-print_status "Services are running. Press Ctrl+C to stop all services."
-print_status "Active PIDs saved to /tmp/authentik_pids.txt"
-echo ""
+# Function to start all services
+start_services() {
+    echo "🚀 Starting Authentik Services..."
+    echo "=================================="
+    
+    # Clean up any existing PID file
+    rm -f /tmp/authentik_pids.txt
 
-# Wait for any process to exit or user interrupt
-wait
+    print_status "Checking and cleaning up ports for all services..."
+
+    # Check and kill processes on all required ports BEFORE starting
+    for ((i=0; i<${#SERVICE_NAMES[@]}; i++)); do
+        service="${SERVICE_NAMES[$i]}"
+        port="${SERVICE_PORTS[$i]}"
+        if check_port $port; then
+            kill_port_process $port "$service"
+        else
+            print_success "Port $port ($service) is available"
+        fi
+    done
+
+    print_success "All required ports are now available"
+    echo ""
+
+    # Set environment variables
+    export NODE_ENV=${NODE_ENV:-development}
+    export PORT=${PORT:-5002}
+    export WEBHOOK_PORT=${WEBHOOK_PORT:-3505}
+
+    print_status "Environment: $NODE_ENV"
+    print_status "Starting services..."
+    echo ""
+
+    # Start services
+    PROJECT_ROOT=$(pwd)
+
+    # 1. Start Main Server (npm run dev equivalent)
+    start_service "Main Server" "$PORT" "NODE_ENV=$NODE_ENV PORT=$PORT npx tsx server/index.ts" "$PROJECT_ROOT"
+    if [ $? -eq 0 ]; then
+        print_port "Main Server: http://localhost:5002"
+    fi
+
+    # 2. Start Webhook Server (for Resend webhooks)
+    if [ -d "$PROJECT_ROOT/server-hook" ]; then
+        start_service "Webhook Server" "$WEBHOOK_PORT" "NODE_ENV=$NODE_ENV WEBHOOK_PORT=$WEBHOOK_PORT npx tsx index.ts" "$PROJECT_ROOT/server-hook"
+        if [ $? -eq 0 ]; then
+            print_port "Webhook Server: http://localhost:3505"
+        fi
+    else
+        print_warning "Webhook Server directory (server-hook) not found, skipping..."
+    fi
+
+    echo ""
+    print_success "All available services started successfully!"
+    echo "=================================="
+
+    # Set up signal handlers
+    trap cleanup SIGINT SIGTERM
+
+    echo ""
+    print_status "Services are running. Press Ctrl+C to stop all services."
+    print_status "Active PIDs saved to /tmp/authentik_pids.txt"
+    echo ""
+
+    # Wait for any process to exit or user interrupt
+    wait
+}
+
+# Main command handling
+case "$COMMAND" in
+    "start")
+        start_services
+        ;;
+    "stop")
+        stop_services
+        ;;
+    "restart")
+        print_status "Restarting services..."
+        stop_services
+        sleep 2
+        start_services
+        ;;
+    *)
+        echo "Usage: $0 [start|stop|restart]"
+        echo "  start   - Start all services (kills existing processes on ports 5002 and 3505)"
+        echo "  stop    - Stop all running services"
+        echo "  restart - Restart all services"
+        exit 1
+        ;;
+esac

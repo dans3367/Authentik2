@@ -418,7 +418,7 @@ export class BirthdayWorker extends EventEmitter {
     let unsubscribeSection = '';
     if (params.unsubscribeToken && params.promotionContent) {
       // Use the main server's unsubscribe endpoint
-      const baseUrl = process.env.APP_URL || 'http://localhost:5000';
+      const baseUrl = process.env.APP_URL || 'http://localhost:5002';
       const unsubscribeUrl = `${baseUrl}/api/email/unsubscribe?token=${encodeURIComponent(params.unsubscribeToken)}&type=customer_engagement`;
       unsubscribeSection = `
         <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">

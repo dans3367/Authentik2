@@ -1,5 +1,6 @@
 import {
   betterAuthUser,
+  betterAuthAccount,
   subscriptionPlans,
   subscriptions,
   tenants,
@@ -436,16 +437,34 @@ export class DatabaseStorage implements IStorage {
         ? `${insertUser.firstName} ${insertUser.lastName}`
         : insertUser.firstName || insertUser.lastName || insertUser.email);
 
+    const userId = crypto.randomUUID();
     const [user] = await db
       .insert(betterAuthUser)
       .values({
         ...insertUser,
         name,
-        id: crypto.randomUUID(),
+        id: userId,
         createdAt: new Date(),
         updatedAt: new Date(),
       })
       .returning();
+
+    // Create Better Auth credential account so the user can log in with email/password
+    if ((insertUser as any).password) {
+      const { hashPassword } = await import('better-auth/crypto');
+      const hashedPassword = await hashPassword((insertUser as any).password);
+      await db.insert(betterAuthAccount).values({
+        id: crypto.randomUUID(),
+        accountId: userId,
+        providerId: "credential",
+        userId: userId,
+        password: hashedPassword,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      console.log(`✅ [Storage] Created credential account for user ${insertUser.email}`);
+    }
+
     return user;
   }
 
@@ -517,15 +536,33 @@ export class DatabaseStorage implements IStorage {
       ? `${userData.firstName} ${userData.lastName}`
       : userData.firstName || userData.lastName || userData.email;
 
+    const userId = crypto.randomUUID();
     const [user] = await db.insert(betterAuthUser).values({
       ...userData,
       name,
       tenantId,
-      id: crypto.randomUUID(),
+      id: userId,
       emailVerified: userData.emailVerified ?? true,
       createdAt: new Date(),
       updatedAt: new Date(),
     }).returning();
+
+    // Create Better Auth credential account so the user can log in with email/password
+    if (userData.password) {
+      const { hashPassword } = await import('better-auth/crypto');
+      const hashedPassword = await hashPassword(userData.password);
+      await db.insert(betterAuthAccount).values({
+        id: crypto.randomUUID(),
+        accountId: userId,
+        providerId: "credential",
+        userId: userId,
+        password: hashedPassword,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      console.log(`✅ [Storage] Created credential account for admin-created user ${userData.email}`);
+    }
+
     return user;
   }
 

@@ -3,7 +3,7 @@ import { db } from '../db';
 import { sql, eq, and } from 'drizzle-orm';
 import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, eCardSettings, emailActivity, tenants, emailSends, emailContent, companies, unsubscribeTokens, masterEmailDesign } from '@shared/schema';
 import { deleteImageFromR2 } from '../config/r2';
-import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant, requirePermission } from '../middleware/auth-middleware';
 import { authenticateInternalService, InternalServiceRequest } from '../middleware/internal-service-auth';
 import { type ContactFilters, type BouncedEmailFilters } from '@shared/schema';
 import { sanitizeString, sanitizeEmail } from '../utils/sanitization';
@@ -369,7 +369,7 @@ async function sendPromotionalEmailJob(payload: PromotionalEmailJobPayload): Pro
 export const emailManagementRoutes = Router();
 
 // Get email contacts
-emailManagementRoutes.get("/email-contacts", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.get("/email-contacts", authenticateToken, requireTenant, requirePermission('contacts.view'), async (req: any, res) => {
   try {
     const { page = 1, limit = 50, search, tags, lists, status, statsOnly } = req.query;
 
@@ -498,26 +498,26 @@ emailManagementRoutes.get("/email-contacts", authenticateToken, requireTenant, a
 });
 
 // List scheduled emails for a specific contact (timeline)
-emailManagementRoutes.get("/email-contacts/:id/scheduled", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.get("/email-contacts/:id/scheduled", authenticateToken, requireTenant, requirePermission('contacts.view'), async (req: any, res) => {
   // Scheduled email queue removed - email scheduling now handled by Trigger.dev
   // Return empty array for backwards compatibility
   res.json({ scheduled: [], message: 'Scheduled email queue migrated to Trigger.dev' });
 });
 
 // Update a scheduled email for a specific contact
-emailManagementRoutes.put("/email-contacts/:id/scheduled/:queueId", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.put("/email-contacts/:id/scheduled/:queueId", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
   // Scheduled email queue removed - email scheduling now handled by Trigger.dev
   res.status(501).json({ message: 'Scheduled email updates not available - use Trigger.dev dashboard' });
 });
 
 // Delete a scheduled email for a specific contact
-emailManagementRoutes.delete("/email-contacts/:id/scheduled/:queueId", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.delete("/email-contacts/:id/scheduled/:queueId", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
   // Scheduled email queue removed - email scheduling now handled by Trigger.dev
   res.status(501).json({ message: 'Scheduled email deletion not available - use Trigger.dev dashboard' });
 });
 
 // Get specific email contact
-emailManagementRoutes.get("/email-contacts/:id", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.get("/email-contacts/:id", authenticateToken, requireTenant, requirePermission('contacts.view'), async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -593,7 +593,7 @@ emailManagementRoutes.get("/email-contacts/:id", authenticateToken, requireTenan
 });
 
 // Get contact statistics
-emailManagementRoutes.get("/email-contacts/:id/stats", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.get("/email-contacts/:id/stats", authenticateToken, requireTenant, requirePermission('contacts.view'), async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -658,7 +658,7 @@ emailManagementRoutes.get("/email-contacts/:id/stats", authenticateToken, requir
 });
 
 // Create email contact with batch operations
-emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, requirePermission('contacts.create'), async (req: any, res) => {
   try {
     const { email, firstName, lastName, tags, lists, status, consentGiven, consentMethod, consentIpAddress, consentUserAgent, address, city, state, zipCode, country, phoneNumber } = req.body;
 
@@ -802,7 +802,7 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
 });
 
 // Update email contact
-emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
   try {
     const { id } = req.params;
     const { email, firstName, lastName, status, birthday, address, city, state, zipCode, country, phoneNumber } = req.body;
@@ -924,7 +924,7 @@ emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenan
 });
 
 // Delete email contact
-emailManagementRoutes.delete("/email-contacts/:id", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.delete("/email-contacts/:id", authenticateToken, requireTenant, requirePermission('contacts.delete'), async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -969,7 +969,7 @@ emailManagementRoutes.delete("/email-contacts/:id", authenticateToken, requireTe
 });
 
 // Bulk delete email contacts
-emailManagementRoutes.delete("/email-contacts", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.delete("/email-contacts", authenticateToken, requireTenant, requirePermission('contacts.delete'), async (req: any, res) => {
   try {
     const { contactIds, ids } = req.body;
 
@@ -1278,7 +1278,7 @@ emailManagementRoutes.get("/bounced-emails/stats", authenticateToken, requireTen
 });
 
 // Get contact tags
-emailManagementRoutes.get("/contact-tags", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.get("/contact-tags", authenticateToken, requireTenant, requirePermission('tags.view'), async (req: any, res) => {
   try {
     const tags = await db.query.contactTags.findMany({
       where: sql`${contactTags.tenantId} = ${req.user.tenantId}`,
@@ -1303,7 +1303,7 @@ emailManagementRoutes.get("/contact-tags", authenticateToken, requireTenant, asy
 });
 
 // Create contact tag
-emailManagementRoutes.post("/contact-tags", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.post("/contact-tags", authenticateToken, requireTenant, requirePermission('tags.create'), async (req: any, res) => {
   try {
     const { name, color, description } = req.body;
 
@@ -1332,7 +1332,7 @@ emailManagementRoutes.post("/contact-tags", authenticateToken, requireTenant, as
 });
 
 // Update contact tag
-emailManagementRoutes.put("/contact-tags/:id", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.put("/contact-tags/:id", authenticateToken, requireTenant, requirePermission('tags.edit'), async (req: any, res) => {
   try {
     const { id } = req.params;
     const { name, color, description } = req.body;
@@ -1374,7 +1374,7 @@ emailManagementRoutes.put("/contact-tags/:id", authenticateToken, requireTenant,
 });
 
 // Delete contact tag
-emailManagementRoutes.delete("/contact-tags/:id", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.delete("/contact-tags/:id", authenticateToken, requireTenant, requirePermission('tags.delete'), async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -1398,7 +1398,7 @@ emailManagementRoutes.delete("/contact-tags/:id", authenticateToken, requireTena
 });
 
 // Add contact to list
-emailManagementRoutes.post("/email-contacts/:contactId/lists/:listId", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.post("/email-contacts/:contactId/lists/:listId", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
   try {
     const { contactId, listId } = req.params;
 
@@ -1441,7 +1441,7 @@ emailManagementRoutes.post("/email-contacts/:contactId/lists/:listId", authentic
 });
 
 // Remove contact from list
-emailManagementRoutes.delete("/email-contacts/:contactId/lists/:listId", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.delete("/email-contacts/:contactId/lists/:listId", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
   try {
     const { contactId, listId } = req.params;
 
@@ -1476,7 +1476,7 @@ emailManagementRoutes.delete("/email-contacts/:contactId/lists/:listId", authent
 });
 
 // Schedule a single B2C email for a contact (Send Later)
-emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
   try {
     const { id } = req.params;
     const { subject, html, text, scheduleAt } = req.body || {};
@@ -1768,7 +1768,7 @@ emailManagementRoutes.post("/email-lists/:listId/contacts", authenticateToken, r
 });
 
 // Add tag to contact
-emailManagementRoutes.post("/email-contacts/:contactId/tags/:tagId", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.post("/email-contacts/:contactId/tags/:tagId", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
   try {
     const { contactId, tagId } = req.params;
 
@@ -1811,7 +1811,7 @@ emailManagementRoutes.post("/email-contacts/:contactId/tags/:tagId", authenticat
 });
 
 // Remove tag from contact
-emailManagementRoutes.delete("/email-contacts/:contactId/tags/:tagId", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.delete("/email-contacts/:contactId/tags/:tagId", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
   try {
     const { contactId, tagId } = req.params;
 
@@ -1890,7 +1890,7 @@ emailManagementRoutes.post("/contact-tags/:tagId/contacts", authenticateToken, r
 });
 
 // Get contact activity
-emailManagementRoutes.get("/email-contacts/:contactId/activity", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.get("/email-contacts/:contactId/activity", authenticateToken, requireTenant, requirePermission('contacts.view'), async (req: any, res) => {
   try {
     const { contactId } = req.params;
     const { page = 1, limit = 50, from, to } = req.query;
@@ -1993,7 +1993,7 @@ emailManagementRoutes.get("/email-contacts/:contactId/activity", authenticateTok
 });
 
 // Update contact's birthday email preference
-emailManagementRoutes.patch("/email-contacts/:contactId/birthday-email", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.patch("/email-contacts/:contactId/birthday-email", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
   try {
     const { contactId } = req.params;
     const { enabled } = req.body;
@@ -2039,7 +2039,7 @@ emailManagementRoutes.patch("/email-contacts/:contactId/birthday-email", authent
 });
 
 // Bulk update birthday email preferences
-emailManagementRoutes.patch("/email-contacts/birthday-email/bulk", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.patch("/email-contacts/birthday-email/bulk", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
   try {
     const { contactIds, enabled } = req.body;
 
@@ -2598,7 +2598,7 @@ emailManagementRoutes.put("/e-card-settings", authenticateToken, requireTenant, 
 });
 
 // Get master email design settings
-emailManagementRoutes.get("/master-email-design", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.get("/master-email-design", authenticateToken, requireTenant, requirePermission('emails.manage_design'), async (req: any, res) => {
   try {
     const design = await db.query.masterEmailDesign.findFirst({
       where: sql`${masterEmailDesign.tenantId} = ${req.user.tenantId}`,
@@ -2639,7 +2639,7 @@ emailManagementRoutes.get("/master-email-design", authenticateToken, requireTena
 });
 
 // Update master email design settings
-emailManagementRoutes.put("/master-email-design", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.put("/master-email-design", authenticateToken, requireTenant, requirePermission('emails.manage_design'), async (req: any, res) => {
   try {
     const {
       companyName,
@@ -2781,7 +2781,7 @@ emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken,
       { expiresIn: '30d' }
     );
 
-    const baseUrl = process.env.APP_URL || 'http://localhost:5000';
+    const baseUrl = process.env.APP_URL || 'http://localhost:5002';
     const profileUpdateUrl = `${baseUrl}/update-profile?token=${profileUpdateToken}`;
     const maskedToken = profileUpdateToken.length > 8
       ? `${profileUpdateToken.slice(0, 4)}...${profileUpdateToken.slice(-4)}`
@@ -3353,7 +3353,7 @@ emailManagementRoutes.post("/api/unsubscribe/birthday", async (req: any, res) =>
   }
 });
 // Send manual birthday cards to selected contacts
-emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateToken, async (req: any, res) => {
+emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
   try {
     const { contactIds } = req.body;
     const tenantId = req.user.tenantId;
@@ -3486,7 +3486,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
 
           // Build unsubscribe URL for List-Unsubscribe header
           const bdayUnsubUrl = unsubscribeToken
-            ? `${process.env.APP_URL || 'http://localhost:5000'}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
+            ? `${process.env.APP_URL || 'http://localhost:5002'}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
             : undefined;
 
           const birthdayResult = await enhancedEmailService.sendCustomEmail(
@@ -3648,7 +3648,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
 
         // Build unsubscribe URL for List-Unsubscribe header
         const combinedUnsubUrl = unsubscribeToken
-          ? `${process.env.APP_URL || 'http://localhost:5000'}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
+          ? `${process.env.APP_URL || 'http://localhost:5002'}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
           : undefined;
 
         // Send the birthday email
@@ -3947,7 +3947,7 @@ export function renderBirthdayTemplate(
     // Build unsubscribe section only if token exists AND email contains promotional content
     let unsubscribeSection = '';
     if (params.unsubscribeToken && params.promotionContent) {
-      const baseUrl = process.env.APP_URL || 'http://localhost:5000';
+      const baseUrl = process.env.APP_URL || 'http://localhost:5002';
       const unsubscribeUrl = `${baseUrl}/api/email/unsubscribe?token=${encodeURIComponent(params.unsubscribeToken)}&type=customer_engagement`;
       unsubscribeSection = `
         <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">
@@ -4068,7 +4068,7 @@ export function renderBirthdayTemplate(
   // Build unsubscribe section only if token exists AND email contains promotional content
   let unsubscribeSection = '';
   if (params.unsubscribeToken && params.promotionContent) {
-    const baseUrl = process.env.APP_URL || 'http://localhost:5000';
+    const baseUrl = process.env.APP_URL || 'http://localhost:5002';
     const unsubscribeUrl = `${baseUrl}/api/email/unsubscribe?token=${encodeURIComponent(params.unsubscribeToken)}&type=customer_engagement`;
     unsubscribeSection = `
       <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">
@@ -4105,7 +4105,7 @@ export function renderBirthdayTemplate(
 }
 
 // Send individual email to a contact
-emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
   try {
     const { id } = req.params;
     const { subject, content } = req.body;
