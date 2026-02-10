@@ -69,7 +69,7 @@ interface ExtendedUser {
   avatarUrl?: string | null;
 }
 
-const getNavigation = (userRole?: string, t?: any, canManageUsers?: boolean) => {
+const getNavigation = (userRole?: string, t?: any, canManageUsers?: boolean, maxShops?: number) => {
   const baseNavigation: any[] = [
     { name: t?.('navigation.dashboard') || "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: t?.('navigation.newsletter') || "Newsletter", href: "/newsletter", icon: Newspaper },
@@ -83,9 +83,12 @@ const getNavigation = (userRole?: string, t?: any, canManageUsers?: boolean) => 
     { name: t?.('navigation.segmentation') || "Segmentation", href: "/segmentation", icon: Target },
   ];
 
-  const managementChildren: any[] = [
-    { name: t?.('navigation.shops') || "Shops", href: "/shops", icon: Store },
-  ];
+  const managementChildren: any[] = [];
+
+  // Add Shops under Management only if plan allows shops (maxShops > 0)
+  if (maxShops === undefined || maxShops > 0) {
+    managementChildren.push({ name: t?.('navigation.shops') || "Shops", href: "/shops", icon: Store });
+  }
 
   // Add Users under Management only if plan allows user management AND role permits it
   if (canManageUsers && (userRole === "Owner" || userRole === "Administrator" || userRole === "Manager")) {
@@ -117,9 +120,9 @@ export function AppSidebar() {
   });
   
   // Fetch tenant plan data for all users
-  const { planName, canManageUsers } = useTenantPlan();
+  const { planName, canManageUsers, maxShops } = useTenantPlan();
 
-  const navigation = getNavigation(extendedUser?.role, t, canManageUsers);
+  const navigation = getNavigation(extendedUser?.role, t, canManageUsers, maxShops);
   const { state, isMobile, setOpenMobile } = useSidebar();
 
   const handleLogout = async () => {
@@ -379,7 +382,7 @@ export function AppSidebar() {
                     </div>
                     <div className="relative">
                       <Button 
-                        onClick={() => setLocation('/subscribe')}
+                        onClick={() => setLocation('/profile?tab=subscription')}
                         size="sm" 
                         className="relative overflow-hidden bg-gradient-to-r from-violet-600 via-purple-600 to-blue-600 hover:from-violet-500 hover:via-purple-500 hover:to-blue-500 text-white px-3 py-1.5 text-xs font-semibold rounded-md shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 group"
                       >

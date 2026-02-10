@@ -147,7 +147,7 @@ export default function ManagementRolesPermissions() {
                   Your current plan ({planName}) does not include roles & permissions management. Upgrade to Plus or Pro to customize role permissions.
                 </p>
                 <Button
-                  onClick={() => setLocation('/subscribe')}
+                  onClick={() => setLocation('/profile?tab=subscription')}
                   className="mt-6 bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white"
                 >
                   Upgrade Plan

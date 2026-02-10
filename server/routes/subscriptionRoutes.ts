@@ -540,6 +540,16 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
 
     if (!existingSubscription) {
       // No existing subscription — create one for the new plan
+      const startDate = new Date();
+      const isYearly = billingCycle === 'yearly';
+      const endDate = new Date(startDate);
+
+      if (isYearly) {
+        endDate.setFullYear(endDate.getFullYear() + 1);
+      } else {
+        endDate.setDate(endDate.getDate() + 30);
+      }
+
       await db.insert(subscriptions).values({
         tenantId,
         userId: req.user.id,
@@ -547,10 +557,10 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
         stripeSubscriptionId: `manual_${tenantId}_${Date.now()}`,
         stripeCustomerId: `manual_customer_${tenantId}`,
         status: 'active',
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        currentPeriodStart: startDate,
+        currentPeriodEnd: endDate,
         cancelAtPeriodEnd: false,
-        isYearly: billingCycle === 'yearly',
+        isYearly: isYearly,
       });
 
       return res.json({

@@ -201,18 +201,44 @@ export function AccountUsageCard() {
             limit={usage.emails.limit}
             periodLabel={usage.emails.periodLabel}
           />
-          <UsageMetric
-            icon={<Store className="h-4 w-4" />}
-            label={t('management.accountUsage.shops', 'Shops')}
-            current={usage.shops.current}
-            limit={usage.shops.limit}
-          />
-          <UsageMetric
-            icon={<Users className="h-4 w-4" />}
-            label={t('management.accountUsage.teamMembers', 'Team Members')}
-            current={usage.users.current}
-            limit={usage.users.limit}
-          />
+          {usage.shops.limit === 0 ? (
+            <div className="flex items-center justify-between py-1">
+              <div className="flex items-center gap-2">
+                <div className="text-muted-foreground"><Store className="h-4 w-4" /></div>
+                <span className="text-sm font-medium">{t('management.accountUsage.shops', 'Shops')}</span>
+              </div>
+              <Link href="/profile?tab=subscription" className="inline-flex items-center gap-1 text-xs text-primary font-medium hover:underline">
+                {t('common.upgrade', 'Upgrade')}
+                <ArrowUpRight className="h-3 w-3" />
+              </Link>
+            </div>
+          ) : (
+            <UsageMetric
+              icon={<Store className="h-4 w-4" />}
+              label={t('management.accountUsage.shops', 'Shops')}
+              current={usage.shops.current}
+              limit={usage.shops.limit}
+            />
+          )}
+          {usage.users.limit !== null && usage.users.limit <= 1 ? (
+            <div className="flex items-center justify-between py-1">
+              <div className="flex items-center gap-2">
+                <div className="text-muted-foreground"><Users className="h-4 w-4" /></div>
+                <span className="text-sm font-medium">{t('management.accountUsage.teamMembers', 'Team Members')}</span>
+              </div>
+              <Link href="/profile?tab=subscription" className="inline-flex items-center gap-1 text-xs text-primary font-medium hover:underline">
+                {t('common.upgrade', 'Upgrade')}
+                <ArrowUpRight className="h-3 w-3" />
+              </Link>
+            </div>
+          ) : (
+            <UsageMetric
+              icon={<Users className="h-4 w-4" />}
+              label={t('management.accountUsage.teamMembers', 'Team Members')}
+              current={usage.users.current}
+              limit={usage.users.limit}
+            />
+          )}
         </div>
 
         {/* Upgrade CTA */}

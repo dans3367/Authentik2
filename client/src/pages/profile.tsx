@@ -298,9 +298,28 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
 export default function ProfilePage() {
   const [location, setLocation] = useLocation();
   
-  // Get tab from URL query parameter
+  // Get tab from URL query parameter and keep it in sync
   const urlParams = new URLSearchParams(window.location.search);
   const tabFromUrl = urlParams.get('tab') || 'profile';
+  const [activeTab, setActiveTab] = useState(tabFromUrl);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab') || 'profile';
+    setActiveTab(tab);
+  }, [location]);
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    const params = new URLSearchParams(window.location.search);
+    if (value === 'profile') {
+      params.delete('tab');
+    } else {
+      params.set('tab', value);
+    }
+    const query = params.toString();
+    setLocation(`/profile${query ? `?${query}` : ''}`, { replace: true });
+  };
   const { user, isLoading: authLoading, isAuthenticated, isInitialized, refetch } = useReduxAuth();
   const { toast } = useToast();
 
@@ -674,7 +693,7 @@ export default function ProfilePage() {
           </DialogContent>
         </Dialog>
 
-        <Tabs defaultValue={tabFromUrl} className="space-y-8">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-8">
           <TabsList className="grid w-full grid-cols-6 h-auto">
             <TabsTrigger value="profile">{t('profile.tabs.profile')}</TabsTrigger>
             <TabsTrigger value="preferences">{t('profile.tabs.preferences')}</TabsTrigger>

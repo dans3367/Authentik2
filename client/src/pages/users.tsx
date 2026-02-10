@@ -189,7 +189,7 @@ export default function UsersPage() {
                   Your current plan ({planName}) does not include user management. Upgrade to Plus or Pro to add team members and manage roles.
                 </p>
                 <Button
-                  onClick={() => setLocation('/subscribe')}
+                  onClick={() => setLocation('/profile?tab=subscription')}
                   className="mt-6 bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white"
                 >
                   Upgrade Plan

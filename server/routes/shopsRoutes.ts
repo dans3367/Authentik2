@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { betterAuthUser, shops } from '@shared/schema';
-import { authenticateToken, requirePermission } from '../middleware/auth-middleware';
+import { authenticateToken, requirePermission, requireShopAccess } from '../middleware/auth-middleware';
 import { createShopSchema, updateShopSchema, type ShopFilters } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 import { storage } from '../storage';
@@ -10,8 +10,11 @@ import { logActivity, computeChanges, SHOP_TRACKED_FIELDS } from '../utils/activ
 
 export const shopsRoutes = Router();
 
+// Apply shop access gating to all routes — blocks plans with maxShops === 0
+shopsRoutes.use(authenticateToken, requireShopAccess);
+
 // Get all shops for the company
-shopsRoutes.get("/", authenticateToken, requirePermission('shops.view'), async (req: any, res) => {
+shopsRoutes.get("/", requirePermission('shops.view'), async (req: any, res) => {
   try {
     const { page = 1, limit = 50, search, status, managerId } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
@@ -130,7 +133,7 @@ shopsRoutes.get("/", authenticateToken, requirePermission('shops.view'), async (
 });
 
 // Get specific shop
-shopsRoutes.get("/:id", authenticateToken, requirePermission('shops.view'), async (req: any, res) => {
+shopsRoutes.get("/:id", requirePermission('shops.view'), async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -189,7 +192,7 @@ shopsRoutes.get("/:id", authenticateToken, requirePermission('shops.view'), asyn
 });
 
 // Create new shop
-shopsRoutes.post("/", authenticateToken, requirePermission('shops.create'), async (req: any, res) => {
+shopsRoutes.post("/", requirePermission('shops.create'), async (req: any, res) => {
   try {
     // Check shop limits before creating
     await storage.validateShopCreation(req.user.tenantId);
@@ -284,7 +287,7 @@ shopsRoutes.post("/", authenticateToken, requirePermission('shops.create'), asyn
 });
 
 // Update shop
-shopsRoutes.put("/:id", authenticateToken, requirePermission('shops.edit'), async (req: any, res) => {
+shopsRoutes.put("/:id", requirePermission('shops.edit'), async (req: any, res) => {
   try {
     const { id } = req.params;
     const validatedData = updateShopSchema.parse(req.body);
@@ -417,7 +420,7 @@ shopsRoutes.put("/:id", authenticateToken, requirePermission('shops.edit'), asyn
 });
 
 // Toggle shop status
-shopsRoutes.patch("/:id/toggle-status", authenticateToken, requirePermission('shops.toggle_status'), async (req: any, res) => {
+shopsRoutes.patch("/:id/toggle-status", requirePermission('shops.toggle_status'), async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -471,7 +474,7 @@ shopsRoutes.patch("/:id/toggle-status", authenticateToken, requirePermission('sh
 });
 
 // Delete shop
-shopsRoutes.delete("/:id", authenticateToken, requirePermission('shops.delete'), async (req: any, res) => {
+shopsRoutes.delete("/:id", requirePermission('shops.delete'), async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -515,7 +518,7 @@ shopsRoutes.delete("/:id", authenticateToken, requirePermission('shops.delete'),
 });
 
 // Get available managers for shop assignment
-shopsRoutes.get("/managers/list", authenticateToken, requirePermission('shops.view'), async (req: any, res) => {
+shopsRoutes.get("/managers/list", requirePermission('shops.view'), async (req: any, res) => {
   try {
     const managers = await db.query.betterAuthUser.findMany({
       where: sql`${betterAuthUser.tenantId} = ${req.user.tenantId} AND ${betterAuthUser.role} IN ('Manager', 'Administrator', 'Owner')`,
@@ -537,7 +540,7 @@ shopsRoutes.get("/managers/list", authenticateToken, requirePermission('shops.vi
 });
 
 // Get shop limits and current usage
-shopsRoutes.get("/limits", authenticateToken, requirePermission('shops.view'), async (req: any, res) => {
+shopsRoutes.get("/limits", requirePermission('shops.view'), async (req: any, res) => {
   try {
     const limits = await storage.checkShopLimits(req.user.tenantId);
     res.json(limits);
@@ -548,7 +551,7 @@ shopsRoutes.get("/limits", authenticateToken, requirePermission('shops.view'), a
 });
 
 // Get shop statistics
-shopsRoutes.get("/:id/stats", authenticateToken, requirePermission('shops.view'), async (req: any, res) => {
+shopsRoutes.get("/:id/stats", requirePermission('shops.view'), async (req: any, res) => {
   try {
     const { id } = req.params;
 

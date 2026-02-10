@@ -3,13 +3,65 @@ import { db } from './db';
 import { tenants, betterAuthUser, betterAuthAccount, companies, subscriptions, subscriptionPlans } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import crypto from 'crypto';
+import readline from 'readline';
 
 async function createFreeTenant() {
   try {
     console.log('🔄 Creating new tenant with Free plan...');
 
-    const email = 'ownerfree@example.com';
-    const password = 'password123';
+    let email = process.env.TENANT_EMAIL;
+    let password = process.env.TENANT_PASSWORD;
+
+    if (!email) {
+      if (process.env.CI) {
+        console.error('❌ Error: TENANT_EMAIL must be set in CI environment.');
+        process.exit(1);
+      }
+
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+      });
+
+      email = await new Promise((resolve) => {
+        rl.question('Enter email for new tenant: ', (answer: string) => {
+          rl.close();
+          resolve(answer.trim());
+        });
+      });
+    }
+
+    if (!email) {
+      console.error('❌ Email is required.');
+      process.exit(1);
+    }
+
+    if (!password) {
+      if (!process.env.CI) {
+        const rl = readline.createInterface({
+          input: process.stdin,
+          output: process.stdout,
+        });
+
+        const inputPassword = await new Promise<string>((resolve) => {
+          rl.question('Enter password (leave empty to generate random): ', (answer: string) => {
+            rl.close();
+            resolve(answer.trim());
+          });
+        });
+
+        if (inputPassword) {
+          password = inputPassword;
+        }
+      }
+    }
+
+    if (!password) {
+      password = crypto.randomBytes(16).toString('hex');
+      console.warn(`⚠️  Generated password: ${password}`);
+      console.warn('   Please save this password securely.');
+    }
+
     const companyName = 'Free Plan Demo Inc';
     const firstName = 'Free';
     const lastName = 'Owner';
@@ -103,7 +155,7 @@ async function createFreeTenant() {
 
     console.log(`\n🎉 Done! New Free plan tenant created:`);
     console.log(`   Email: ${email}`);
-    console.log(`   Password: ${password}`);
+    // Password output removed for security
     console.log(`   Company: ${companyName}`);
     console.log(`   Tenant ID: ${newTenant.id}`);
     console.log(`   Plan: Free`);
