@@ -2103,5 +2103,135 @@
       "tags": "Tags",
       "isActive": "Active"
     }
+  },
+  "emailCampaigns": {
+    "title": "Email Campaigns",
+    "subtitle": "Manage and track your marketing campaigns across all channels",
+    "createCampaign": "Create Campaign",
+    "stats": {
+      "totalCampaigns": "Total Campaigns",
+      "allCampaignsCreated": "All campaigns created",
+      "activeCampaigns": "Active Campaigns",
+      "currentlyRunning": "Currently running",
+      "draftCampaigns": "Draft Campaigns",
+      "inPreparation": "In preparation",
+      "completedCampaigns": "Completed",
+      "successfullyFinished": "Successfully finished"
+    },
+    "list": {
+      "title": "All Campaigns",
+      "subtitle": "Browse, filter, and manage your marketing campaigns",
+      "noCampaignsFound": "No campaigns found",
+      "createFirstCampaign": "Get started by creating your first marketing campaign.",
+      "noResults": "No matching campaigns",
+      "tryAdjustingFilters": "Try adjusting your search or filters",
+      "notScheduled": "Not scheduled",
+      "impressions": "Impressions",
+      "clicks": "Clicks",
+      "start": "Start",
+      "end": "End"
+    },
+    "filters": {
+      "searchPlaceholder": "Search campaigns...",
+      "allStatuses": "All Status",
+      "allTypes": "All Types",
+      "draft": "Draft",
+      "active": "Active",
+      "paused": "Paused",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "email": "Email",
+      "sms": "SMS",
+      "push": "Push",
+      "social": "Social"
+    },
+    "actions": {
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "deleteDialog": {
+      "title": "Delete Campaign",
+      "description": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "deleting": "Deleting..."
+    },
+    "toasts": {
+      "success": "Success",
+      "error": "Error",
+      "deleteSuccess": "Campaign deleted successfully.",
+      "deleteError": "Failed to delete campaign."
+    },
+    "errorState": {
+      "title": "Failed to load campaigns",
+      "defaultMessage": "An error occurred while fetching campaigns."
+    },
+    "edit": {
+      "title": "Edit Campaign",
+      "subtitle": "Update your marketing campaign details and settings",
+      "backToCampaigns": "Back to Campaigns",
+      "notFoundTitle": "Campaign not found",
+      "notFoundDescription": "The campaign you're trying to edit doesn't exist or has been deleted.",
+      "basicInfo": {
+        "title": "Basic Information",
+        "description": "Edit core details of your marketing campaign.",
+        "name": "Campaign Name",
+        "namePlaceholder": "Enter campaign name",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "Describe your campaign objectives and strategy",
+        "type": "Campaign Type",
+        "typePlaceholder": "Select campaign type",
+        "typeEmail": "Email Marketing",
+        "typeSms": "SMS Marketing",
+        "typePush": "Push Notifications",
+        "typeSocial": "Social Media",
+        "status": "Status",
+        "statusPlaceholder": "Select status"
+      },
+      "budget": {
+        "title": "Budget & Timeline",
+        "description": "Manage your campaign budget and schedule.",
+        "budget": "Budget",
+        "budgetPlaceholder": "0.00",
+        "currency": "Currency",
+        "currencyPlaceholder": "Select currency",
+        "startDate": "Start Date",
+        "startDatePlaceholder": "Pick a start date",
+        "endDate": "End Date",
+        "endDatePlaceholder": "Pick an end date"
+      },
+      "goals": {
+        "title": "Goals & Targeting",
+        "description": "Define your campaign goals and target audience.",
+        "goalsLabel": "Campaign Goals",
+        "goalsPlaceholder": "Enter a campaign goal",
+        "addGoal": "Add",
+        "targetAudience": "Target Audience",
+        "targetAudiencePlaceholder": "Describe your target audience demographics, interests, and characteristics",
+        "kpis": "Key Performance Indicators (KPIs)",
+        "kpisPlaceholder": "Define success metrics and KPIs for this campaign (e.g., conversion rate, ROI, engagement rate)"
+      },
+      "review": {
+        "title": "Review & Approval",
+        "description": "Configure approval workflow for this campaign.",
+        "requiresApproval": "Requires Reviewer Approval",
+        "requiresApprovalDescription": "This campaign will require approval from a manager before it can be activated.",
+        "selectReviewer": "Select Reviewer",
+        "selectReviewerPlaceholder": "Select a manager",
+        "loadingManagers": "Loading managers...",
+        "noManagers": "No managers available"
+      },
+      "actions": {
+        "cancel": "Cancel",
+        "saving": "Saving...",
+        "saveChanges": "Save Changes"
+      },
+      "toasts": {
+        "success": "Success",
+        "updateSuccess": "Campaign updated successfully.",
+        "error": "Error",
+        "updateError": "Failed to update campaign."
+      }
+    }
   }
 }

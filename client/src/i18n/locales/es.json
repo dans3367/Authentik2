@@ -2014,5 +2014,135 @@
         "updateError": "Error al actualizar el diseño de correo"
       }
     }
+  },
+  "emailCampaigns": {
+    "title": "Campañas de Email",
+    "subtitle": "Administra y monitorea tus campañas de marketing en todos los canales",
+    "createCampaign": "Crear Campaña",
+    "stats": {
+      "totalCampaigns": "Campañas Totales",
+      "allCampaignsCreated": "Todas las campañas creadas",
+      "activeCampaigns": "Campañas Activas",
+      "currentlyRunning": "En ejecución",
+      "draftCampaigns": "Borradores",
+      "inPreparation": "En preparación",
+      "completedCampaigns": "Completadas",
+      "successfullyFinished": "Finalizadas con éxito"
+    },
+    "list": {
+      "title": "Todas las Campañas",
+      "subtitle": "Explora, filtra y administra tus campañas de marketing",
+      "noCampaignsFound": "No se encontraron campañas",
+      "createFirstCampaign": "Comienza creando tu primera campaña de marketing.",
+      "noResults": "Sin campañas coincidentes",
+      "tryAdjustingFilters": "Intenta ajustar tu búsqueda o filtros",
+      "notScheduled": "Sin programar",
+      "impressions": "Impresiones",
+      "clicks": "Clics",
+      "start": "Inicio",
+      "end": "Fin"
+    },
+    "filters": {
+      "searchPlaceholder": "Buscar campañas...",
+      "allStatuses": "Todos los Estados",
+      "allTypes": "Todos los Tipos",
+      "draft": "Borrador",
+      "active": "Activa",
+      "paused": "Pausada",
+      "completed": "Completada",
+      "cancelled": "Cancelada",
+      "email": "Email",
+      "sms": "SMS",
+      "push": "Push",
+      "social": "Social"
+    },
+    "actions": {
+      "edit": "Editar",
+      "delete": "Eliminar"
+    },
+    "deleteDialog": {
+      "title": "Eliminar Campaña",
+      "description": "¿Estás seguro de que quieres eliminar \"{{name}}\"? Esta acción no se puede deshacer.",
+      "cancel": "Cancelar",
+      "delete": "Eliminar",
+      "deleting": "Eliminando..."
+    },
+    "toasts": {
+      "success": "Éxito",
+      "error": "Error",
+      "deleteSuccess": "Campaña eliminada exitosamente.",
+      "deleteError": "Error al eliminar campaña."
+    },
+    "errorState": {
+      "title": "Error al cargar campañas",
+      "defaultMessage": "Ocurrió un error al obtener las campañas."
+    },
+    "edit": {
+      "title": "Editar Campaña",
+      "subtitle": "Actualiza los detalles y configuración de tu campaña de marketing",
+      "backToCampaigns": "Volver a Campañas",
+      "notFoundTitle": "Campaña no encontrada",
+      "notFoundDescription": "La campaña que intentas editar no existe o ha sido eliminada.",
+      "basicInfo": {
+        "title": "Información Básica",
+        "description": "Edita los detalles principales de tu campaña de marketing.",
+        "name": "Nombre de Campaña",
+        "namePlaceholder": "Ingresa el nombre de la campaña",
+        "descriptionLabel": "Descripción",
+        "descriptionPlaceholder": "Describe los objetivos y estrategia de tu campaña",
+        "type": "Tipo de Campaña",
+        "typePlaceholder": "Seleccionar tipo de campaña",
+        "typeEmail": "Email Marketing",
+        "typeSms": "SMS Marketing",
+        "typePush": "Notificaciones Push",
+        "typeSocial": "Redes Sociales",
+        "status": "Estado",
+        "statusPlaceholder": "Seleccionar estado"
+      },
+      "budget": {
+        "title": "Presupuesto y Cronograma",
+        "description": "Administra el presupuesto y calendario de tu campaña.",
+        "budget": "Presupuesto",
+        "budgetPlaceholder": "0.00",
+        "currency": "Moneda",
+        "currencyPlaceholder": "Seleccionar moneda",
+        "startDate": "Fecha de Inicio",
+        "startDatePlaceholder": "Seleccionar fecha de inicio",
+        "endDate": "Fecha de Fin",
+        "endDatePlaceholder": "Seleccionar fecha de fin"
+      },
+      "goals": {
+        "title": "Objetivos y Segmentación",
+        "description": "Define los objetivos de tu campaña y audiencia objetivo.",
+        "goalsLabel": "Objetivos de Campaña",
+        "goalsPlaceholder": "Ingresa un objetivo de campaña",
+        "addGoal": "Agregar",
+        "targetAudience": "Audiencia Objetivo",
+        "targetAudiencePlaceholder": "Describe la demografía, intereses y características de tu audiencia objetivo",
+        "kpis": "Indicadores Clave de Rendimiento (KPIs)",
+        "kpisPlaceholder": "Define métricas de éxito y KPIs para esta campaña (ej., tasa de conversión, ROI, tasa de engagement)"
+      },
+      "review": {
+        "title": "Revisión y Aprobación",
+        "description": "Configura el flujo de aprobación para esta campaña.",
+        "requiresApproval": "Requiere Aprobación del Revisor",
+        "requiresApprovalDescription": "Esta campaña requerirá aprobación de un gerente antes de poder activarse.",
+        "selectReviewer": "Seleccionar Revisor",
+        "selectReviewerPlaceholder": "Seleccionar un gerente",
+        "loadingManagers": "Cargando gerentes...",
+        "noManagers": "No hay gerentes disponibles"
+      },
+      "actions": {
+        "cancel": "Cancelar",
+        "saving": "Guardando...",
+        "saveChanges": "Guardar Cambios"
+      },
+      "toasts": {
+        "success": "Éxito",
+        "updateSuccess": "Campaña actualizada exitosamente.",
+        "error": "Error",
+        "updateError": "Error al actualizar campaña."
+      }
+    }
   }
 }
