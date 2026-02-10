@@ -1916,6 +1916,7 @@
     },
     "tags": {
       "title": "Tags",
+      "subtitle": "Create, organize, and manage tags for your contacts",
       "newTag": "New Tag",
       "cancel": "Cancel",
       "name": "Name",
@@ -1929,10 +1930,41 @@
       "creating": "Creating...",
       "save": "Save",
       "saving": "Saving...",
-      "contacts": "Contacts",
+      "contact": "contact",
+      "contacts": "contacts",
       "actions": "Actions",
       "loading": "Loading...",
       "noTags": "No tags yet",
+      "searchPlaceholder": "Search tags...",
+      "editTag": "Edit tag",
+      "deleteTag": "Delete tag",
+      "noResults": "No tags found matching \"{{query}}\"",
+      "stats": {
+        "totalTags": "Total Tags",
+        "totalContacts": "Tagged Contacts",
+        "colors": "Colors Used"
+      },
+      "listTitle": "Your Tags",
+      "listDescription": "Assign tags to contacts for better organization and segmentation",
+      "empty": {
+        "title": "No tags yet",
+        "description": "Tags help you organize contacts into groups for better management and targeted campaigns.",
+        "createFirst": "Create Your First Tag"
+      },
+      "createDialog": {
+        "title": "Create New Tag",
+        "description": "Add a new tag to organize and segment your contacts."
+      },
+      "editDialog": {
+        "title": "Edit Tag",
+        "description": "Update this tag's name, color, or description."
+      },
+      "deleteDialog": {
+        "title": "Delete Tag",
+        "description": "Are you sure you want to delete \"{{name}}\"? This will remove the tag from all contacts. This action cannot be undone.",
+        "delete": "Delete",
+        "deleting": "Deleting..."
+      },
       "toasts": {
         "created": "Tag created",
         "updated": "Tag updated",

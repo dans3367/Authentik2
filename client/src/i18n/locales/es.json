@@ -1862,6 +1862,7 @@
     },
     "tags": {
       "title": "Etiquetas",
+      "subtitle": "Crea, organiza y gestiona etiquetas para tus contactos",
       "newTag": "Nueva Etiqueta",
       "cancel": "Cancelar",
       "name": "Nombre",
@@ -1875,10 +1876,41 @@
       "creating": "Creando...",
       "save": "Guardar",
       "saving": "Guardando...",
-      "contacts": "Contactos",
+      "contact": "contacto",
+      "contacts": "contactos",
       "actions": "Acciones",
       "loading": "Cargando...",
       "noTags": "Aún no hay etiquetas",
+      "searchPlaceholder": "Buscar etiquetas...",
+      "editTag": "Editar etiqueta",
+      "deleteTag": "Eliminar etiqueta",
+      "noResults": "No se encontraron etiquetas con \"{{query}}\"",
+      "stats": {
+        "totalTags": "Total de Etiquetas",
+        "totalContacts": "Contactos Etiquetados",
+        "colors": "Colores Usados"
+      },
+      "listTitle": "Tus Etiquetas",
+      "listDescription": "Asigna etiquetas a los contactos para una mejor organización y segmentación",
+      "empty": {
+        "title": "Aún no hay etiquetas",
+        "description": "Las etiquetas te ayudan a organizar contactos en grupos para una mejor gestión y campañas dirigidas.",
+        "createFirst": "Crea Tu Primera Etiqueta"
+      },
+      "createDialog": {
+        "title": "Crear Nueva Etiqueta",
+        "description": "Agrega una nueva etiqueta para organizar y segmentar tus contactos."
+      },
+      "editDialog": {
+        "title": "Editar Etiqueta",
+        "description": "Actualiza el nombre, color o descripción de esta etiqueta."
+      },
+      "deleteDialog": {
+        "title": "Eliminar Etiqueta",
+        "description": "¿Estás seguro de que quieres eliminar \"{{name}}\"? Esto eliminará la etiqueta de todos los contactos. Esta acción no se puede deshacer.",
+        "delete": "Eliminar",
+        "deleting": "Eliminando..."
+      },
       "toasts": {
         "created": "Etiqueta creada",
         "updated": "Etiqueta actualizada",
