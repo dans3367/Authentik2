@@ -115,7 +115,7 @@ export default function SegmentationPage() {
   ]);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all_types");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -164,7 +164,7 @@ export default function SegmentationPage() {
       const matchesSearch =
         list.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (list.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
-      const matchesType = typeFilter === "all" || list.type === typeFilter;
+      const matchesType = typeFilter === "all_types" || list.type === typeFilter;
       return matchesSearch && matchesType;
     });
   }, [lists, searchQuery, typeFilter]);
@@ -505,8 +505,8 @@ export default function SegmentationPage() {
                 <SelectValue placeholder={t("segmentation.filters.filterByType")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t("segmentation.filters.allTypes")}</SelectItem>
-                <SelectItem value="allCustomers">{t("segmentation.filters.allCustomers")}</SelectItem>
+                <SelectItem value="all_types">{t("segmentation.filters.allTypes")}</SelectItem>
+                <SelectItem value="all">{t("segmentation.filters.allCustomers")}</SelectItem>
                 <SelectItem value="selected">{t("segmentation.filters.selectedCustomers")}</SelectItem>
                 <SelectItem value="tags">{t("segmentation.filters.tagBased")}</SelectItem>
               </SelectContent>

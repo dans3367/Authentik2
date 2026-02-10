@@ -496,7 +496,7 @@ export default function EmailCampaignsPage() {
                     {/* Stats row: Budget & Performance */}
                     <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
                       <div className="flex items-center gap-1.5">
-                        {campaign.budget ? (
+                        {campaign.budget != null ? (
                           <>
                             <DollarSign className="h-3.5 w-3.5" />
                             <span className="font-medium">

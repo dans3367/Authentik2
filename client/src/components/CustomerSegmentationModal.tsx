@@ -259,7 +259,10 @@ export function CustomerSegmentationModal({
 
                 <div className="flex items-center justify-between px-1">
                   <p className="text-xs text-muted-foreground">
-                    {t("segmentation.segmentationModal.selectedCount", "{{selected}} of {{total}} customers selected", { selected: tempSelectedContacts.length, total: filteredContacts.length })}
+                    {t("segmentation.segmentationModal.selectedCount", "{{selected}} of {{total}} customers selected", {
+                      selected: filteredContacts.filter(c => tempSelectedContacts.includes(c.id)).length,
+                      total: filteredContacts.length
+                    })}
                   </p>
                   {tempSelectedContacts.length === contacts.length && contacts.length > 0 && (
                     <div className="flex items-center text-xs text-emerald-600 dark:text-emerald-400">
@@ -385,7 +388,10 @@ export function CustomerSegmentationModal({
                 </div>
 
                 <p className="text-xs text-muted-foreground px-1">
-                  {t("segmentation.segmentationModal.tagsSelectedCount", "{{selected}} of {{total}} tags selected", { selected: tempSelectedTags.length, total: filteredTags.length })}
+                  {t("segmentation.segmentationModal.tagsSelectedCount", "{{selected}} of {{total}} tags selected", {
+                    selected: filteredTags.filter(t => tempSelectedTags.includes(t.id)).length,
+                    total: filteredTags.length
+                  })}
                 </p>
 
                 <div className="flex-1 overflow-y-auto rounded-lg border bg-white/50 dark:bg-gray-900/30">
@@ -413,8 +419,8 @@ export function CustomerSegmentationModal({
                           <div
                             key={tag.id}
                             className={`flex items-center gap-3 p-3.5 rounded-lg border-2 cursor-pointer transition-all duration-200 ${isSelected
-                                ? 'border-indigo-400 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 shadow-sm'
-                                : 'border-border hover:border-muted-foreground/30 hover:bg-muted/30'
+                              ? 'border-indigo-400 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 shadow-sm'
+                              : 'border-border hover:border-muted-foreground/30 hover:bg-muted/30'
                               }`}
                             onClick={() => handleTagToggle(tag.id)}
                           >

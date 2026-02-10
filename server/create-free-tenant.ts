@@ -57,9 +57,13 @@ async function createFreeTenant() {
     }
 
     if (!password) {
+      if (process.env.CI) {
+        console.error('❌ Error: TENANT_PASSWORD must be set in CI environment.');
+        process.exit(1);
+      }
       password = crypto.randomBytes(16).toString('hex');
-      console.warn(`⚠️  Generated password: ${password}`);
-      console.warn('   Please save this password securely.');
+      console.warn('⚠️  Generated random password.');
+      console.warn('   The secret will not be printed to logs and should be saved securely.');
     }
 
     const companyName = 'Free Plan Demo Inc';

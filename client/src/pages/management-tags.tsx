@@ -156,8 +156,10 @@ export default function ManagementTags() {
 
   const updateMutation = useMutation({
     mutationFn: async () => {
-      if (!editingTag) return;
-      const payload: any = {
+      if (!editingTag) {
+        throw new Error("No tag selected for editing");
+      }
+      const payload = {
         name: editName.trim(),
         color: editColor,
         description: editDesc.trim() || null,

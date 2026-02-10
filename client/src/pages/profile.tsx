@@ -464,7 +464,7 @@ export default function ProfilePage() {
   // Upgrade subscription mutation
   const upgradeSubscriptionMutation = useMutation({
     mutationFn: async ({ planId, billingCycle }: { planId: string; billingCycle: 'monthly' | 'yearly' }) => {
-      return await apiRequest('POST', '/api/upgrade-subscription', { planId, billingCycle });
+      return await apiRequest('POST', '/api/subscription/upgrade-subscription', { planId, billingCycle });
     },
     onSuccess: () => {
       toast({
@@ -507,7 +507,7 @@ export default function ProfilePage() {
       setIsCheckingDowngrade(true);
       try {
         const response = await apiRequest('POST', '/api/subscription/check-downgrade', { planId });
-        const data = await response.json();
+        const data = await response.json() as DowngradeCheckResult;
         setDowngradeCheck(data);
         setPendingDowngrade({ planId, billingCycle });
         setDowngradeModalOpen(true);
