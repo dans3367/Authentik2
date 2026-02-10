@@ -95,9 +95,10 @@ interface SubscriptionManagementProps {
   plans: SubscriptionPlan[];
   onUpgrade: (planId: string, billingCycle: 'monthly' | 'yearly') => void;
   isUpgrading: boolean;
+  isCheckingDowngrade?: boolean;
 }
 
-const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }: SubscriptionManagementProps) => {
+const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading, isCheckingDowngrade }: SubscriptionManagementProps) => {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>(
     subscription?.isYearly ? 'yearly' : 'monthly'
   );
@@ -294,7 +295,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
                       className="w-full mb-4"
                       variant={isCurrent ? "outline" : isUpgrade ? "default" : "ghost"}
                       onClick={() => !isCurrent && onUpgrade(plan.id, billingCycle)}
-                      disabled={isCurrent || isUpgrading}
+                      disabled={isCurrent || isUpgrading || isCheckingDowngrade}
                     >
                       {isCurrent ? (
                         "Current Plan"
@@ -302,6 +303,11 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           Processing...
+                        </>
+                      ) : !isUpgrade && isCheckingDowngrade ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Checking...
                         </>
                       ) : isUpgrade ? (
                         "Upgrade to This Plan"

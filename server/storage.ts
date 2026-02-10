@@ -191,6 +191,10 @@ export interface IStorage {
   checkEmailLimits(tenantId: string): Promise<{ canSend: boolean; currentUsage: number; monthlyLimit: number | null; planName: string; remaining: number | null }>;
   validateEmailSending(tenantId: string, count?: number): Promise<void>;
 
+  // Downgrade soft-lock management
+  suspendExcessResources(tenantId: string, maxShops: number | null, maxUsers: number | null): Promise<{ suspendedShops: number; suspendedUsers: number }>;
+  restoreSuspendedResources(tenantId: string): Promise<{ restoredShops: number; restoredUsers: number }>;
+
   // Shop management
   getShop(id: string, tenantId: string): Promise<Shop | undefined>;
   getShopWithManager(id: string, tenantId: string): Promise<ShopWithManager | undefined>;
@@ -477,6 +481,9 @@ export class DatabaseStorage implements IStorage {
   async getAllUsers(tenantId: string, filters?: UserFilters): Promise<User[]> {
     const conditions = [eq(betterAuthUser.tenantId, tenantId)];
 
+    // Always exclude users suspended by downgrade from normal listing
+    conditions.push(or(eq(betterAuthUser.suspendedByDowngrade, false), isNull(betterAuthUser.suspendedByDowngrade))!);
+
     if (filters?.search) {
       const searchTerm = `%${filters.search}%`;
       conditions.push(
@@ -705,11 +712,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async checkUserLimits(tenantId: string): Promise<{ canAddUser: boolean; currentUsers: number; maxUsers: number | null; planName: string }> {
-    // Get current total user count for the tenant (count all users including inactive)
+    // Get current total user count for the tenant (exclude suspended-by-downgrade users)
     const userCountResult = await db
       .select({ count: count() })
       .from(betterAuthUser)
-      .where(eq(betterAuthUser.tenantId, tenantId));
+      .where(and(
+        eq(betterAuthUser.tenantId, tenantId),
+        or(
+          eq(betterAuthUser.suspendedByDowngrade, false),
+          isNull(betterAuthUser.suspendedByDowngrade)
+        )
+      ));
 
     const currentUsers = userCountResult[0]?.count || 0;
 
@@ -878,7 +891,13 @@ export class DatabaseStorage implements IStorage {
 
   // Enhanced shop limits and validation with tenant-specific overrides
   async checkShopLimits(tenantId: string): Promise<{ canAddShop: boolean; currentShops: number; maxShops: number | null; planName: string; isCustomLimit?: boolean; customLimitReason?: string; expiresAt?: Date }> {
-    const shopsResult = await db.select({ count: count() }).from(shops).where(eq(shops.tenantId, tenantId));
+    const shopsResult = await db.select({ count: count() }).from(shops).where(and(
+      eq(shops.tenantId, tenantId),
+      or(
+        eq(shops.suspendedByDowngrade, false),
+        isNull(shops.suspendedByDowngrade)
+      )
+    ));
     const currentShops = shopsResult[0]?.count || 0;
 
     // Check for active custom tenant limits first
@@ -1022,6 +1041,90 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  // Downgrade soft-lock: suspend excess resources when tenant downgrades
+  async suspendExcessResources(tenantId: string, maxShops: number | null, maxUsers: number | null): Promise<{ suspendedShops: number; suspendedUsers: number }> {
+    let suspendedShops = 0;
+    let suspendedUsers = 0;
+    const now = new Date();
+
+    // Suspend excess shops (LIFO — most recently created get suspended first)
+    if (maxShops !== null) {
+      const activeShops = await db.select({ id: shops.id })
+        .from(shops)
+        .where(and(
+          eq(shops.tenantId, tenantId),
+          or(eq(shops.suspendedByDowngrade, false), isNull(shops.suspendedByDowngrade))
+        ))
+        .orderBy(desc(shops.createdAt));
+
+      if (activeShops.length > maxShops) {
+        const shopsToSuspend = activeShops.slice(0, activeShops.length - maxShops);
+        const idsToSuspend = shopsToSuspend.map((s: { id: string }) => s.id);
+
+        await db.update(shops)
+          .set({ suspendedByDowngrade: true, suspendedAt: now, updatedAt: now })
+          .where(inArray(shops.id, idsToSuspend));
+
+        suspendedShops = idsToSuspend.length;
+      }
+    }
+
+    // Suspend excess users (LIFO — most recently created, excluding Owner role)
+    if (maxUsers !== null) {
+      const activeUsers = await db.select({ id: betterAuthUser.id })
+        .from(betterAuthUser)
+        .where(and(
+          eq(betterAuthUser.tenantId, tenantId),
+          ne(betterAuthUser.role, 'Owner'),
+          or(eq(betterAuthUser.suspendedByDowngrade, false), isNull(betterAuthUser.suspendedByDowngrade))
+        ))
+        .orderBy(desc(betterAuthUser.createdAt));
+
+      // maxUsers includes the Owner, so non-owner limit is maxUsers - 1
+      const nonOwnerLimit = Math.max(0, maxUsers - 1);
+      if (activeUsers.length > nonOwnerLimit) {
+        const usersToSuspend = activeUsers.slice(0, activeUsers.length - nonOwnerLimit);
+        const idsToSuspend = usersToSuspend.map((u: { id: string }) => u.id);
+
+        await db.update(betterAuthUser)
+          .set({ suspendedByDowngrade: true, suspendedAt: now, updatedAt: now })
+          .where(inArray(betterAuthUser.id, idsToSuspend));
+
+        suspendedUsers = idsToSuspend.length;
+      }
+    }
+
+    return { suspendedShops, suspendedUsers };
+  }
+
+  // Restore all soft-locked resources when tenant upgrades
+  async restoreSuspendedResources(tenantId: string): Promise<{ restoredShops: number; restoredUsers: number }> {
+    const now = new Date();
+
+    // Restore suspended shops
+    const shopResult = await db.update(shops)
+      .set({ suspendedByDowngrade: false, suspendedAt: null, updatedAt: now })
+      .where(and(
+        eq(shops.tenantId, tenantId),
+        eq(shops.suspendedByDowngrade, true)
+      ))
+      .returning({ id: shops.id });
+
+    // Restore suspended users
+    const userResult = await db.update(betterAuthUser)
+      .set({ suspendedByDowngrade: false, suspendedAt: null, updatedAt: now })
+      .where(and(
+        eq(betterAuthUser.tenantId, tenantId),
+        eq(betterAuthUser.suspendedByDowngrade, true)
+      ))
+      .returning({ id: betterAuthUser.id });
+
+    return {
+      restoredShops: shopResult.length,
+      restoredUsers: userResult.length
+    };
+  }
+
   // Log shop limit events for audit and analytics
   async logShopLimitEvent(tenantId: string, eventType: ShopLimitEventType, shopCount: number, limitValue?: number, metadata?: Record<string, any>): Promise<void> {
     try {
@@ -1152,6 +1255,8 @@ export class DatabaseStorage implements IStorage {
     if (filters?.status && filters.status !== 'all') {
       conditions.push(eq(shops.status, filters.status));
     }
+    // Exclude shops suspended by downgrade
+    conditions.push(or(eq(shops.suspendedByDowngrade, false), isNull(shops.suspendedByDowngrade))!);
     return await db.select().from(shops)
       .where(and(...conditions))
       .orderBy(desc(shops.createdAt)) as ShopWithManager[];

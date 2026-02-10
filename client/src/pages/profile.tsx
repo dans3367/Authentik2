@@ -119,14 +119,36 @@ const CheckoutForm = ({ planId, billingCycle }: CheckoutFormProps) => {
   );
 };
 
+interface DowngradeImpact {
+  resource: string;
+  current: number;
+  limit: number | null;
+  willSuspend: number;
+}
+
+interface DowngradeCheckResult {
+  canDowngrade: boolean;
+  impacts: DowngradeImpact[];
+  featureLosses: string[];
+  emailLimitChange: { current: number | null; new: number | null };
+  billing: {
+    currentPlan: string;
+    targetPlan: string;
+    currentPrice: string;
+    newPrice: string;
+    effectiveDate: string;
+  };
+}
+
 interface SubscriptionManagementProps {
   subscription: UserSubscriptionResponse['subscription'];
   plans: SubscriptionPlan[];
   onUpgrade: (planId: string, billingCycle: 'monthly' | 'yearly') => void;
   isUpgrading: boolean;
+  isCheckingDowngrade?: boolean;
 }
 
-const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }: SubscriptionManagementProps) => {
+const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading, isCheckingDowngrade }: SubscriptionManagementProps) => {
   const { t } = useLanguage();
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>(
     subscription?.isYearly ? 'yearly' : 'monthly'
@@ -246,13 +268,18 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
                   <Button
                     variant={isCurrent ? "outline" : "default"}
                     className="w-full"
-                    disabled={isCurrent || isUpgrading}
+                    disabled={isCurrent || isUpgrading || isCheckingDowngrade}
                     onClick={() => onUpgrade(plan.id, billingCycle)}
                   >
                     {isUpgrading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         {t('profile.subscription.processing')}
+                      </>
+                    ) : isDowngrade && isCheckingDowngrade ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        {t('profile.subscription.checking', 'Checking...')}
                       </>
                     ) : isCurrent ? (
                       t('profile.subscription.currentPlanButton')
@@ -297,7 +324,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading }:
 
 export default function ProfilePage() {
   const [location, setLocation] = useLocation();
-  
+
   // Get tab from URL query parameter and keep it in sync
   const urlParams = new URLSearchParams(window.location.search);
   const tabFromUrl = urlParams.get('tab') || 'profile';
@@ -461,8 +488,51 @@ export default function ProfilePage() {
     createSubscriptionMutation.mutate({ planId, billingCycle });
   };
 
-  const handleUpgrade = (planId: string, billingCycle: 'monthly' | 'yearly') => {
-    upgradeSubscriptionMutation.mutate({ planId, billingCycle });
+  // Downgrade confirmation state
+  const [downgradeModalOpen, setDowngradeModalOpen] = useState(false);
+  const [downgradeCheck, setDowngradeCheck] = useState<DowngradeCheckResult | null>(null);
+  const [pendingDowngrade, setPendingDowngrade] = useState<{ planId: string; billingCycle: 'monthly' | 'yearly' } | null>(null);
+  const [isCheckingDowngrade, setIsCheckingDowngrade] = useState(false);
+
+  const handleUpgrade = async (planId: string, billingCycle: 'monthly' | 'yearly') => {
+    // Determine if this is a downgrade
+    const targetPlan = plans?.find((p: SubscriptionPlan) => p.id === planId);
+    const currentPlan = userSubscription?.subscription?.plan;
+    const currentPrice = currentPlan ? parseFloat(currentPlan.price) : 0;
+    const targetPrice = targetPlan ? parseFloat(targetPlan.price) : 0;
+    const isDowngrade = targetPrice < currentPrice;
+
+    if (isDowngrade) {
+      // Call check-downgrade endpoint to get impact preview
+      setIsCheckingDowngrade(true);
+      try {
+        const response = await apiRequest('POST', '/api/subscription/check-downgrade', { planId });
+        const data = await response.json();
+        setDowngradeCheck(data);
+        setPendingDowngrade({ planId, billingCycle });
+        setDowngradeModalOpen(true);
+      } catch (error: any) {
+        toast({
+          title: t('profile.subscription.downgradeCheckError'),
+          description: error.message || t('profile.subscription.downgradeCheckErrorDescription'),
+          variant: 'destructive',
+        });
+      } finally {
+        setIsCheckingDowngrade(false);
+      }
+    } else {
+      // Direct upgrade
+      upgradeSubscriptionMutation.mutate({ planId, billingCycle });
+    }
+  };
+
+  const confirmDowngrade = () => {
+    if (pendingDowngrade) {
+      upgradeSubscriptionMutation.mutate(pendingDowngrade);
+      setDowngradeModalOpen(false);
+      setPendingDowngrade(null);
+      setDowngradeCheck(null);
+    }
   };
 
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -1393,6 +1463,7 @@ export default function ProfilePage() {
                       plans={plans || []}
                       onUpgrade={handleUpgrade}
                       isUpgrading={upgradeSubscriptionMutation.isPending}
+                      isCheckingDowngrade={isCheckingDowngrade}
                     />
                   ) : (
                     /* Show plan selection for new users */
@@ -1544,6 +1615,101 @@ export default function ProfilePage() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Downgrade Confirmation Dialog */}
+        <AlertDialog open={downgradeModalOpen} onOpenChange={(open) => {
+          setDowngradeModalOpen(open);
+          if (!open) {
+            setPendingDowngrade(null);
+            setDowngradeCheck(null);
+          }
+        }}>
+          <AlertDialogContent className="max-w-lg">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center space-x-2 text-amber-600">
+                <AlertTriangle className="w-5 h-5" />
+                <span>{t('profile.subscription.downgradeConfirmTitle')}</span>
+              </AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-4 text-left">
+                  <p>{t('profile.subscription.downgradeConfirmDescription', {
+                    currentPlan: downgradeCheck?.billing?.currentPlan || '',
+                    targetPlan: downgradeCheck?.billing?.targetPlan || '',
+                  })}</p>
+
+                  {/* Resource impacts */}
+                  {downgradeCheck?.impacts && downgradeCheck.impacts.length > 0 && (
+                    <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg p-3 space-y-2">
+                      <p className="font-medium text-amber-800 dark:text-amber-200 text-sm">
+                        {t('profile.subscription.resourcesWillBeSuspended')}
+                      </p>
+                      {downgradeCheck.impacts.map((impact: DowngradeImpact, idx: number) => (
+                        <p key={idx} className="text-sm text-amber-700 dark:text-amber-300">
+                          • {impact.willSuspend} {impact.resource} {t('profile.subscription.willBeSuspended')}
+                          <span className="text-xs ml-1">
+                            ({t('profile.subscription.currentCount', { count: impact.current })} → {t('profile.subscription.newLimit', { count: impact.limit ?? 0 })})
+                          </span>
+                        </p>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Feature losses */}
+                  {downgradeCheck?.featureLosses && downgradeCheck.featureLosses.length > 0 && (
+                    <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg p-3 space-y-1">
+                      <p className="font-medium text-red-800 dark:text-red-200 text-sm">
+                        {t('profile.subscription.featuresLost')}
+                      </p>
+                      {downgradeCheck.featureLosses.map((feature: string, idx: number) => (
+                        <p key={idx} className="text-sm text-red-700 dark:text-red-300">• {feature}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Email limit change */}
+                  {downgradeCheck?.emailLimitChange && downgradeCheck.emailLimitChange.current !== downgradeCheck.emailLimitChange.new && (
+                    <p className="text-sm text-muted-foreground">
+                      {t('profile.subscription.emailLimitChange', {
+                        current: downgradeCheck.emailLimitChange.current ?? t('profile.subscription.unlimited'),
+                        new: downgradeCheck.emailLimitChange.new ?? t('profile.subscription.unlimited'),
+                      })}
+                    </p>
+                  )}
+
+                  {/* Effective date */}
+                  {downgradeCheck?.billing?.effectiveDate && (
+                    <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-3">
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        <strong>{t('profile.subscription.effectiveDateLabel')}</strong>{' '}
+                        {t('profile.subscription.effectiveDateNote', {
+                          date: new Date(downgradeCheck.billing.effectiveDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }),
+                          currentPrice: downgradeCheck.billing.currentPrice,
+                          newPrice: downgradeCheck.billing.newPrice,
+                        })}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Data preservation assurance */}
+                  <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-3">
+                    <p className="text-sm text-green-800 dark:text-green-200">
+                      <strong>{t('profile.subscription.dataPreserved')}</strong> {t('profile.subscription.dataPreservedDescription')}
+                    </p>
+                  </div>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t('profile.subscription.cancelDowngrade')}</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDowngrade}
+                className="bg-amber-600 hover:bg-amber-700 focus:ring-amber-600"
+              >
+                {t('profile.subscription.confirmDowngrade')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Delete Account Confirmation Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

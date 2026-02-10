@@ -39,6 +39,9 @@ export const betterAuthUser = pgTable("better_auth_user", {
   subscriptionStartDate: timestamp("subscription_start_date"),
   subscriptionEndDate: timestamp("subscription_end_date"),
   trialEndsAt: timestamp("trial_ends_at"),
+  // Downgrade soft-lock fields
+  suspendedByDowngrade: boolean("suspended_by_downgrade").default(false),
+  suspendedAt: timestamp("suspended_at"),
 });
 
 export const betterAuthSession = pgTable("better_auth_session", {
@@ -149,6 +152,9 @@ export const shops = pgTable("shops", {
   socialMedia: text("social_media"), // JSON string of social media links
   settings: text("settings"), // JSON string of custom settings
   isActive: boolean("is_active").default(true),
+  // Downgrade soft-lock fields
+  suspendedByDowngrade: boolean("suspended_by_downgrade").default(false),
+  suspendedAt: timestamp("suspended_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -196,6 +202,10 @@ export const subscriptions = pgTable("subscriptions", {
   cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
   canceledAt: timestamp("canceled_at"),
   isYearly: boolean("is_yearly").default(false),
+  // Downgrade scheduling fields
+  downgradeTargetPlanId: varchar("downgrade_target_plan_id"),
+  downgradeScheduledAt: timestamp("downgrade_scheduled_at"),
+  previousPlanId: varchar("previous_plan_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
