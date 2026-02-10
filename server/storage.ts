@@ -184,6 +184,9 @@ export interface IStorage {
   getCurrentShopCount(tenantId: string): Promise<number>;
   getShopLimitEvents(tenantId: string, filters?: ShopLimitFilters): Promise<ShopLimitEvent[]>;
 
+  // Tenant plan (effective plan with feature flags)
+  getTenantPlan(tenantId: string): Promise<{ planName: string; maxUsers: number | null; maxShops: number | null; monthlyEmailLimit: number | null; allowUsersManagement: boolean; allowRolesManagement: boolean; subscriptionStatus: string | null }>;
+
   // Email limits
   checkEmailLimits(tenantId: string): Promise<{ canSend: boolean; currentUsage: number; monthlyLimit: number | null; planName: string; remaining: number | null }>;
   validateEmailSending(tenantId: string, count?: number): Promise<void>;
@@ -660,6 +663,47 @@ export class DatabaseStorage implements IStorage {
     return subscription;
   }
 
+  async getTenantPlan(tenantId: string): Promise<{ planName: string; maxUsers: number | null; maxShops: number | null; monthlyEmailLimit: number | null; allowUsersManagement: boolean; allowRolesManagement: boolean; subscriptionStatus: string | null }> {
+    const subscription = await this.getTenantSubscription(tenantId);
+
+    if (subscription) {
+      return {
+        planName: subscription.plan.displayName || subscription.plan.name,
+        maxUsers: subscription.plan.maxUsers,
+        maxShops: subscription.plan.maxShops,
+        monthlyEmailLimit: subscription.plan.monthlyEmailLimit,
+        allowUsersManagement: subscription.plan.allowUsersManagement ?? false,
+        allowRolesManagement: subscription.plan.allowRolesManagement ?? false,
+        subscriptionStatus: subscription.status,
+      };
+    }
+
+    // No subscription — return Free plan defaults
+    const freePlan = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.name, 'Free')).limit(1);
+    if (freePlan.length > 0) {
+      return {
+        planName: freePlan[0].displayName,
+        maxUsers: freePlan[0].maxUsers,
+        maxShops: freePlan[0].maxShops,
+        monthlyEmailLimit: freePlan[0].monthlyEmailLimit,
+        allowUsersManagement: freePlan[0].allowUsersManagement ?? false,
+        allowRolesManagement: freePlan[0].allowRolesManagement ?? false,
+        subscriptionStatus: null,
+      };
+    }
+
+    // Hardcoded Free fallback if no plan record exists
+    return {
+      planName: 'Free Plan',
+      maxUsers: 1,
+      maxShops: 0,
+      monthlyEmailLimit: 100,
+      allowUsersManagement: false,
+      allowRolesManagement: false,
+      subscriptionStatus: null,
+    };
+  }
+
   async checkUserLimits(tenantId: string): Promise<{ canAddUser: boolean; currentUsers: number; maxUsers: number | null; planName: string }> {
     // Get current total user count for the tenant (count all users including inactive)
     const userCountResult = await db
@@ -673,20 +717,20 @@ export class DatabaseStorage implements IStorage {
     const subscription = await this.getTenantSubscription(tenantId);
 
     if (!subscription) {
-      // No subscription found - use basic plan limits as default
-      const basicPlan = await db
+      // No subscription found - use Free plan limits as default
+      const freePlan = await db
         .select()
         .from(subscriptionPlans)
-        .where(eq(subscriptionPlans.name, 'Basic'))
+        .where(eq(subscriptionPlans.name, 'Free'))
         .limit(1);
 
-      const maxUsers = basicPlan[0]?.maxUsers || 5; // Default to 5 users for basic plan
+      const maxUsers = freePlan[0]?.maxUsers ?? 1; // Default to 1 user for Free plan
 
       return {
         canAddUser: currentUsers < maxUsers,
         currentUsers,
         maxUsers,
-        planName: 'Basic'
+        planName: 'Free'
       };
     }
 
@@ -871,10 +915,10 @@ export class DatabaseStorage implements IStorage {
 
     if (!subscription) {
       return {
-        canAddShop: currentShops < 5,
+        canAddShop: false,
         currentShops,
-        maxShops: 5,
-        planName: 'Default (Basic)',
+        maxShops: 0,
+        planName: 'Free Plan',
         isCustomLimit: false
       };
     }
@@ -936,8 +980,8 @@ export class DatabaseStorage implements IStorage {
       )
     });
 
-    let monthlyLimit: number | null = 200; // Default fallback
-    let planName = 'Basic (Default)';
+    let monthlyLimit: number | null = 100; // Default fallback (Free plan)
+    let planName = 'Free Plan';
 
     if (customLimit && customLimit.monthlyEmailLimit !== null && customLimit.monthlyEmailLimit !== undefined) {
       monthlyLimit = customLimit.monthlyEmailLimit;
@@ -946,11 +990,11 @@ export class DatabaseStorage implements IStorage {
       monthlyLimit = subscription.plan.monthlyEmailLimit;
       planName = subscription.plan.displayName;
     } else {
-      // No subscription and no custom limit -> check if there's a Basic plan in DB to get official limit
-      const basicPlan = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.name, 'Basic')).limit(1);
-      if (basicPlan.length > 0) {
-        monthlyLimit = basicPlan[0].monthlyEmailLimit;
-        planName = basicPlan[0].displayName;
+      // No subscription and no custom limit -> check if there's a Free plan in DB to get official limit
+      const freePlan = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.name, 'Free')).limit(1);
+      if (freePlan.length > 0) {
+        monthlyLimit = freePlan[0].monthlyEmailLimit;
+        planName = freePlan[0].displayName;
       }
     }
 

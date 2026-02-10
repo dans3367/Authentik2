@@ -161,6 +161,9 @@ export const subscriptionPlans = pgTable("subscription_plans", {
     isPopular: boolean("is_popular").default(false),
     isActive: boolean("is_active").default(true),
     sortOrder: integer("sort_order").default(0),
+    monthlyEmailLimit: integer("monthly_email_limit").default(100), // Default to Free plan limit
+    allowUsersManagement: boolean("allow_users_management").default(false), // Whether plan allows managing users
+    allowRolesManagement: boolean("allow_roles_management").default(false), // Whether plan allows managing roles/permissions
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
 });

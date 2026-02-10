@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 import { apiRequest } from "@/lib/queryClient";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useTenantPlan } from "@/hooks/useTenantPlan";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -128,6 +130,35 @@ export default function ManagementRolesPermissions() {
   const { toast } = useToast();
   const { user } = useReduxAuth();
   const queryClient = useQueryClient();
+  const { canManageRoles, planName } = useTenantPlan();
+  const [, setLocation] = useLocation();
+
+  // Check if plan allows roles management
+  if (!canManageRoles) {
+    return (
+      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+        <div className="max-w-4xl mx-auto">
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+            <CardContent className="p-8">
+              <div className="text-center">
+                <Shield className="mx-auto h-12 w-12 text-amber-500 dark:text-amber-400 mb-4" />
+                <h2 className="mt-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Upgrade Required</h2>
+                <p className="mt-2 text-gray-600 dark:text-gray-300">
+                  Your current plan ({planName}) does not include roles & permissions management. Upgrade to Plus or Pro to customize role permissions.
+                </p>
+                <Button
+                  onClick={() => setLocation('/subscribe')}
+                  className="mt-6 bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white"
+                >
+                  Upgrade Plan
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   // UI state
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});

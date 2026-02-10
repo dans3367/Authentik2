@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateToken, requireRole } from '../middleware/auth-middleware';
+import { authenticateToken, requireRole, requirePlanFeature } from '../middleware/auth-middleware';
 import { storage } from '../storage';
 import { db } from '../db';
 import { betterAuthUser, subscriptionPlans } from '@shared/schema';
@@ -103,7 +103,7 @@ userRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
 });
 
 // Get users for tenant
-userRoutes.get("/", authenticateToken, requireRole(['Owner', 'Administrator', 'Manager']), async (req: any, res) => {
+userRoutes.get("/", authenticateToken, requireRole(['Owner', 'Administrator', 'Manager']), requirePlanFeature('allowUsersManagement'), async (req: any, res) => {
   try {
     const { search, role, status, showInactive } = req.query;
 
@@ -126,7 +126,7 @@ userRoutes.get("/", authenticateToken, requireRole(['Owner', 'Administrator', 'M
 });
 
 // Create new user
-userRoutes.post("/", authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+userRoutes.post("/", authenticateToken, requireRole(['Owner', 'Administrator']), requirePlanFeature('allowUsersManagement'), async (req: any, res) => {
   try {
     const userData = {
       ...req.body,
@@ -146,7 +146,7 @@ userRoutes.post("/", authenticateToken, requireRole(['Owner', 'Administrator']),
 });
 
 // Get user statistics
-userRoutes.get("/stats", authenticateToken, requireRole(['Owner', 'Administrator', 'Manager']), async (req: any, res) => {
+userRoutes.get("/stats", authenticateToken, requireRole(['Owner', 'Administrator', 'Manager']), requirePlanFeature('allowUsersManagement'), async (req: any, res) => {
   try {
     const tenantId = req.user.tenantId;
 
@@ -184,7 +184,7 @@ userRoutes.get("/stats", authenticateToken, requireRole(['Owner', 'Administrator
 });
 
 // Get user limits and plan information
-userRoutes.get("/limits", authenticateToken, requireRole(['Owner', 'Administrator', 'Manager']), async (req: any, res) => {
+userRoutes.get("/limits", authenticateToken, requireRole(['Owner', 'Administrator', 'Manager']), requirePlanFeature('allowUsersManagement'), async (req: any, res) => {
   try {
     const limits = await storage.checkUserLimits(req.user.tenantId);
     res.json(limits);
@@ -195,7 +195,7 @@ userRoutes.get("/limits", authenticateToken, requireRole(['Owner', 'Administrato
 });
 
 // Update user (full update)
-userRoutes.put("/:userId", authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+userRoutes.put("/:userId", authenticateToken, requireRole(['Owner', 'Administrator']), requirePlanFeature('allowUsersManagement'), async (req: any, res) => {
   try {
     const { userId } = req.params;
     const { firstName, lastName, email, role, isActive } = req.body;
@@ -277,7 +277,7 @@ userRoutes.put("/:userId", authenticateToken, requireRole(['Owner', 'Administrat
 });
 
 // Update user status (active/inactive)
-userRoutes.patch("/:userId/status", authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+userRoutes.patch("/:userId/status", authenticateToken, requireRole(['Owner', 'Administrator']), requirePlanFeature('allowUsersManagement'), async (req: any, res) => {
   try {
     const { userId } = req.params;
     const { isActive } = req.body;
@@ -346,7 +346,7 @@ userRoutes.patch("/:userId/status", authenticateToken, requireRole(['Owner', 'Ad
 });
 
 // Delete user
-userRoutes.delete("/:userId", authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+userRoutes.delete("/:userId", authenticateToken, requireRole(['Owner', 'Administrator']), requirePlanFeature('allowUsersManagement'), async (req: any, res) => {
   try {
     const { userId } = req.params;
 

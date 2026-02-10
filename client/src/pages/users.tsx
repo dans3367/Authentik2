@@ -21,6 +21,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { createUserSchema, updateUserSchema, userRoles, nonOwnerRoles, type User, type CreateUserData, type UpdateUserData, type UserRole } from "@shared/schema";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useTenantPlan } from "@/hooks/useTenantPlan";
+import { useLocation } from "wouter";
 
 // Extended user type to include custom fields from Better Auth
 interface ExtendedUser {
@@ -92,6 +94,8 @@ export default function UsersPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
   const queryClient = useQueryClient();
+  const { canManageUsers, planName } = useTenantPlan();
+  const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<UserRole | "">("");
   const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "">("");
@@ -163,6 +167,33 @@ export default function UsersPage() {
                 <p className="mt-2 text-gray-600 dark:text-gray-300">
                   {t('users.accessDeniedMessage')}
                 </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if plan allows user management
+  if (!canManageUsers) {
+    return (
+      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+        <div className="max-w-4xl mx-auto">
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+            <CardContent className="p-8">
+              <div className="text-center">
+                <UsersIcon className="mx-auto h-12 w-12 text-amber-500 dark:text-amber-400 mb-4" />
+                <h2 className="mt-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Upgrade Required</h2>
+                <p className="mt-2 text-gray-600 dark:text-gray-300">
+                  Your current plan ({planName}) does not include user management. Upgrade to Plus or Pro to add team members and manage roles.
+                </p>
+                <Button
+                  onClick={() => setLocation('/subscribe')}
+                  className="mt-6 bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white"
+                >
+                  Upgrade Plan
+                </Button>
               </div>
             </CardContent>
           </Card>

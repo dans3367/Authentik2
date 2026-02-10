@@ -3,6 +3,7 @@ import { db } from '../db';
 import { sql, eq } from 'drizzle-orm';
 import { betterAuthUser, subscriptionPlans, forms, formResponses, companies, subscriptions, subscriptionPlanRelations, tenants } from '@shared/schema';
 import { authenticateToken, requireRole } from '../middleware/auth-middleware';
+import { storage } from '../storage';
 import Stripe from 'stripe';
 
 export const subscriptionRoutes = Router();
@@ -17,6 +18,7 @@ const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SEC
 subscriptionRoutes.get("/plans", async (req, res) => {
   try {
     const plans = await db.query.subscriptionPlans.findMany({
+      where: eq(subscriptionPlans.isActive, true),
       orderBy: sql`${subscriptionPlans.price} ASC`,
     });
 
@@ -24,6 +26,58 @@ subscriptionRoutes.get("/plans", async (req, res) => {
   } catch (error) {
     console.error('Get subscription plans error:', error);
     res.status(500).json({ message: 'Failed to get subscription plans' });
+  }
+});
+
+// Get current tenant's effective plan (accessible to all authenticated users)
+subscriptionRoutes.get("/tenant-plan", authenticateToken, async (req: any, res) => {
+  try {
+    if (!req.user || !req.user.tenantId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const tenantId = req.user.tenantId;
+    const plan = await storage.getTenantPlan(tenantId);
+
+    // Also fetch current usage for context
+    const [emailLimits, shopLimits, userLimits] = await Promise.all([
+      storage.checkEmailLimits(tenantId),
+      storage.checkShopLimits(tenantId),
+      storage.checkUserLimits(tenantId),
+    ]);
+
+    res.json({
+      plan: {
+        name: plan.planName,
+        maxUsers: plan.maxUsers,
+        maxShops: plan.maxShops,
+        monthlyEmailLimit: plan.monthlyEmailLimit,
+        allowUsersManagement: plan.allowUsersManagement,
+        allowRolesManagement: plan.allowRolesManagement,
+        subscriptionStatus: plan.subscriptionStatus,
+      },
+      usage: {
+        emails: {
+          current: emailLimits.currentUsage,
+          limit: emailLimits.monthlyLimit,
+          remaining: emailLimits.remaining,
+          canSend: emailLimits.canSend,
+        },
+        shops: {
+          current: shopLimits.currentShops,
+          limit: shopLimits.maxShops,
+          canAdd: shopLimits.canAddShop,
+        },
+        users: {
+          current: userLimits.currentUsers,
+          limit: userLimits.maxUsers,
+          canAdd: userLimits.canAddUser,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Get tenant plan error:', error);
+    res.status(500).json({ message: 'Failed to get tenant plan' });
   }
 });
 
@@ -153,7 +207,9 @@ subscriptionRoutes.get("/my-subscription", authenticateToken, async (req: any, r
 
     let subscriptionDetails = null;
 
-    if (subscription && stripe) {
+    const hasRealStripeId = subscription?.stripeSubscriptionId?.startsWith('sub_');
+
+    if (subscription && stripe && hasRealStripeId) {
       try {
         // Get subscription details from Stripe
         const stripeSubscription = await stripe.subscriptions.retrieve(subscription.stripeSubscriptionId);
@@ -187,6 +243,8 @@ subscriptionRoutes.get("/my-subscription", authenticateToken, async (req: any, r
         id: subscription.id,
         status: subscription.status,
         planId: subscription.planId,
+        plan: subscription.plan || null,
+        isYearly: subscription.isYearly || false,
         stripeCustomerId: subscription.stripeCustomerId,
         stripeSubscriptionId: subscription.stripeSubscriptionId,
         currentPeriodStart: subscription.currentPeriodStart,
@@ -426,6 +484,97 @@ subscriptionRoutes.post("/reactivate", authenticateToken, requireRole(["Owner"])
   } catch (error) {
     console.error('Reactivate subscription error:', error);
     res.status(500).json({ message: 'Failed to reactivate subscription' });
+  }
+});
+
+// Upgrade or downgrade subscription plan (Owner only)
+subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(["Owner"]), async (req: any, res) => {
+  try {
+    if (!req.user || !req.user.tenantId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const { planId, billingCycle } = req.body;
+    if (!planId) {
+      return res.status(400).json({ message: 'Plan ID is required' });
+    }
+
+    const tenantId = req.user.tenantId;
+
+    // Get the target plan
+    const targetPlan = await db.query.subscriptionPlans.findFirst({
+      where: eq(subscriptionPlans.id, planId),
+    });
+
+    if (!targetPlan) {
+      return res.status(404).json({ message: 'Plan not found' });
+    }
+
+    // Downgrade validation: check if current usage exceeds new plan limits
+    const [userLimits, shopLimits, emailLimits] = await Promise.all([
+      storage.checkUserLimits(tenantId),
+      storage.checkShopLimits(tenantId),
+      storage.checkEmailLimits(tenantId),
+    ]);
+
+    const warnings: string[] = [];
+
+    if (targetPlan.maxUsers !== null && userLimits.currentUsers > targetPlan.maxUsers) {
+      warnings.push(`You currently have ${userLimits.currentUsers} users but the ${targetPlan.displayName} allows only ${targetPlan.maxUsers}. You'll need to remove ${userLimits.currentUsers - targetPlan.maxUsers} user(s) first.`);
+    }
+
+    if (targetPlan.maxShops !== null && shopLimits.currentShops > targetPlan.maxShops) {
+      warnings.push(`You currently have ${shopLimits.currentShops} shops but the ${targetPlan.displayName} allows only ${targetPlan.maxShops}. You'll need to remove ${shopLimits.currentShops - targetPlan.maxShops} shop(s) first.`);
+    }
+
+    if (warnings.length > 0) {
+      return res.status(400).json({
+        message: 'Cannot downgrade: current usage exceeds new plan limits',
+        warnings,
+        canDowngrade: false,
+      });
+    }
+
+    // Get existing subscription
+    const existingSubscription = await storage.getTenantSubscription(tenantId);
+
+    if (!existingSubscription) {
+      // No existing subscription — create one for the new plan
+      await db.insert(subscriptions).values({
+        tenantId,
+        userId: req.user.id,
+        planId: targetPlan.id,
+        stripeSubscriptionId: `manual_${tenantId}_${Date.now()}`,
+        stripeCustomerId: `manual_customer_${tenantId}`,
+        status: 'active',
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        cancelAtPeriodEnd: false,
+        isYearly: billingCycle === 'yearly',
+      });
+
+      return res.json({
+        message: `Successfully subscribed to ${targetPlan.displayName}`,
+        plan: targetPlan.displayName,
+      });
+    }
+
+    // Update existing subscription's plan
+    await db.update(subscriptions)
+      .set({
+        planId: targetPlan.id,
+        isYearly: billingCycle === 'yearly',
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptions.id, existingSubscription.id));
+
+    res.json({
+      message: `Successfully changed to ${targetPlan.displayName}`,
+      plan: targetPlan.displayName,
+    });
+  } catch (error) {
+    console.error('Upgrade subscription error:', error);
+    res.status(500).json({ message: 'Failed to update subscription' });
   }
 });
 

@@ -59,6 +59,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useTenantPlan } from "@/hooks/useTenantPlan";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import {
@@ -314,6 +315,7 @@ export default function ShopsPage() {
   const [showLimitModal, setShowLimitModal] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canAddShops, maxShops, planName } = useTenantPlan();
 
   // Create a ref to hold the current search params
   const searchParamsRef = useRef({

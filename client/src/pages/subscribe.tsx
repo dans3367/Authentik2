@@ -432,7 +432,7 @@ export default function Subscribe() {
   // Upgrade subscription mutation (for existing users)
   const upgradeSubscriptionMutation = useMutation({
     mutationFn: async (data: { planId: string; billingCycle: 'monthly' | 'yearly' }) => {
-      const response = await apiRequest("POST", "/api/upgrade-subscription", data);
+      const response = await apiRequest("POST", "/api/subscription/upgrade-subscription", data);
       return response.json();
     },
     onSuccess: (data) => {
@@ -659,8 +659,10 @@ export default function Subscribe() {
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Processing...
                   </>
+                ) : parseFloat(plan.price) === 0 ? (
+                  'Get Started Free'
                 ) : (
-                  `Start Free Trial`
+                  'Start Free Trial'
                 )}
               </Button>
 
