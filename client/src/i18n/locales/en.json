@@ -1780,6 +1780,7 @@
     },
     "list": {
       "title": "Segment Lists",
+      "subtitle": "Organize your contacts into segments for targeted email campaigns",
       "noSegmentsFound": "No segments found",
       "tryAdjustingFilters": "Try adjusting your filters",
       "createFirstSegment": "Create your first segment to get started",
@@ -1836,6 +1837,41 @@
       "deleteSuccess": "Segment list deleted successfully",
       "deleteError": "Failed to delete segment list",
       "nameRequired": "Please enter a list name"
+    },
+    "segmentationModal": {
+      "title": "Customer Segmentation",
+      "description": "Choose how to target your audience for this segment",
+      "tabs": {
+        "all": "All Customers",
+        "selected": "Select Customers",
+        "tags": "Select by Tags"
+      },
+      "allTitle": "Send to All Customers",
+      "allDescription": "Your email will be sent to all active customers in your contact list",
+      "customerCount": "{{count}} customers",
+      "allSelectedHint": "All {{count}} contacts are selected. Uncheck any you don't want to include.",
+      "searchCustomers": "Search customers by name or email...",
+      "selectAll": "Select All",
+      "clearAll": "Clear All",
+      "selectedCount": "{{selected}} of {{total}} customers selected",
+      "allSelected": "All contacts selected",
+      "loadingContacts": "Loading contacts...",
+      "noSearchResults": "No customers found matching your search",
+      "noCustomers": "No customers available",
+      "more": "more",
+      "searchTags": "Search tags...",
+      "refreshTags": "Refresh tag counts",
+      "tagsSelectedCount": "{{selected}} of {{total}} tags selected",
+      "loadingTags": "Loading tags...",
+      "noTagsSearch": "No tags found matching your search",
+      "noTags": "No tags available",
+      "customer": "customer",
+      "customers": "customers",
+      "summaryAll": "All customers ({{count}} total)",
+      "summarySelected": "{{count}} selected customers",
+      "summaryTags": "{{count}} selected tags",
+      "cancel": "Cancel",
+      "save": "Save Selection"
     }
   },
   "management": {
