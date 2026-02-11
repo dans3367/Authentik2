@@ -918,7 +918,7 @@ roleRoutes.get("/users", authenticateToken, requireRole(['Owner', 'Administrator
 });
 
 // PATCH /api/roles/users/:userId/role - Update a user's role
-roleRoutes.patch("/users/:userId/role", authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+roleRoutes.patch("/users/:userId/role", authenticateToken, requireRole(['Owner', 'Administrator']), requirePlanFeature('allowRolesManagement'), async (req: any, res) => {
   try {
     const { userId } = req.params;
     const { role } = req.body;

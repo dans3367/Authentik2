@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ArrowLeft, Calendar, Clock, Mail, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Mail, AlertTriangle, Eye } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { TemplateSelector } from "@/components/TemplateSelector";
 
 export default function ScheduleContactEmailPage() {
@@ -19,6 +20,7 @@ export default function ScheduleContactEmailPage() {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [isUsingTemplate, setIsUsingTemplate] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   // Load contact for context and validation
   const { data: contactResp, isLoading: contactLoading, error: contactError } = useQuery({
@@ -40,6 +42,18 @@ export default function ScheduleContactEmailPage() {
     queryFn: async ({ queryKey }) => {
       const res = await apiRequest("GET", `/api/bounced-emails/check/${encodeURIComponent(String(queryKey[1]))}`);
       return res.json();
+    },
+  });
+
+  // Fetch master email design for preview wrapper
+  const { data: masterDesign } = useQuery({
+    queryKey: ["/api/master-email-design"],
+    queryFn: async () => {
+      const response = await fetch('/api/master-email-design', {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch email design');
+      return response.json();
     },
   });
 
@@ -147,7 +161,13 @@ export default function ScheduleContactEmailPage() {
                   Use Custom Message
                 </Button>
               )}
-              <TemplateSelector onSelect={handleTemplateSelect} channel="individual" />
+              {(subject || content) && (
+                <Button variant="outline" type="button" onClick={() => setShowPreview(true)}>
+                  <Eye className="w-4 h-4 mr-2" />
+                  Preview
+                </Button>
+              )}
+              <TemplateSelector onSelect={handleTemplateSelect} />
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -209,6 +229,118 @@ export default function ScheduleContactEmailPage() {
           </Button>
         </div>
       </div>
+
+      {/* Email Preview Dialog */}
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="w-5 h-5" />
+              Email Preview
+            </DialogTitle>
+            <DialogDescription>
+              Preview of the email that will be sent to {contact?.email}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto">
+            <div className="mx-auto p-4 sm:p-6 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl">
+              <div className="bg-white text-slate-900 shadow-2xl mx-auto rounded overflow-hidden max-w-[600px] w-full" style={{ fontFamily: masterDesign?.fontFamily || "Arial, sans-serif" }}>
+
+                {/* Simulated email header */}
+                <div className="border-b bg-gray-50 p-4 text-xs sm:text-sm text-gray-500">
+                  <div className="flex gap-2 mb-1">
+                    <span className="font-semibold text-right w-14">To:</span>
+                    <span className="text-gray-900">{contact?.email}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-right w-14">Subject:</span>
+                    <span className="text-gray-900 font-bold">{subject || "(no subject)"}</span>
+                  </div>
+                  {date && (
+                    <div className="flex gap-2 mt-1">
+                      <span className="font-semibold text-right w-14">Scheduled:</span>
+                      <span className="text-gray-900">
+                        {new Date(`${date}T${time || "00:00"}`).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Hero header from email design */}
+                <div
+                  className="p-8 text-center"
+                  style={{ backgroundColor: masterDesign?.primaryColor || "#3B82F6", color: "#ffffff" }}
+                >
+                  {masterDesign?.logoUrl ? (
+                    <img
+                      src={masterDesign.logoUrl}
+                      alt="Logo"
+                      className="h-12 mx-auto mb-4 object-contain"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  ) : (
+                    <div className="h-12 w-12 bg-white/20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                      <span className="text-xl font-bold opacity-80">{masterDesign?.companyName?.charAt(0) || "C"}</span>
+                    </div>
+                  )}
+                  <h1 className="text-2xl font-bold mb-2 tracking-tight">
+                    {masterDesign?.companyName || "Your Company"}
+                  </h1>
+                  {masterDesign?.headerText && (
+                    <p className="text-base opacity-95 max-w-sm mx-auto leading-normal">
+                      {masterDesign.headerText}
+                    </p>
+                  )}
+                </div>
+
+                {/* Email body content */}
+                <div className="p-8 flex-1">
+                  {isUsingTemplate ? (
+                    <div
+                      className="prose prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{ __html: content || "<p style='color:#94a3b8;'>No content yet...</p>" }}
+                    />
+                  ) : (
+                    <div className="prose prose-sm max-w-none whitespace-pre-wrap">
+                      {content || <span style={{ color: "#94a3b8" }}>No content yet...</span>}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer from email design */}
+                <div className="bg-slate-100 p-8 text-center border-t border-slate-200">
+                  {(masterDesign?.socialLinks?.facebook || masterDesign?.socialLinks?.twitter || masterDesign?.socialLinks?.instagram || masterDesign?.socialLinks?.linkedin) && (
+                    <div className="flex justify-center gap-6 mb-6">
+                      {masterDesign?.socialLinks?.facebook && (
+                        <span className="text-slate-400 text-sm">Facebook</span>
+                      )}
+                      {masterDesign?.socialLinks?.twitter && (
+                        <span className="text-slate-400 text-sm">Twitter</span>
+                      )}
+                      {masterDesign?.socialLinks?.instagram && (
+                        <span className="text-slate-400 text-sm">Instagram</span>
+                      )}
+                      {masterDesign?.socialLinks?.linkedin && (
+                        <span className="text-slate-400 text-sm">LinkedIn</span>
+                      )}
+                    </div>
+                  )}
+                  <div className="text-xs text-slate-500 space-y-2 max-w-xs mx-auto">
+                    <p>{masterDesign?.footerText || "\u00A9 2025 All rights reserved."}</p>
+                    <p className="text-slate-400">
+                      You are receiving this email because you signed up on our website.
+                      <br />
+                      <span className="underline cursor-pointer hover:text-slate-600">Unsubscribe</span>
+                    </p>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

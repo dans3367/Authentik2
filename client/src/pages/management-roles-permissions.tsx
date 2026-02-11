@@ -130,37 +130,10 @@ export default function ManagementRolesPermissions() {
   const { toast } = useToast();
   const { user } = useReduxAuth();
   const queryClient = useQueryClient();
-  const { canManageRoles, planName } = useTenantPlan();
+  const { canManageRoles, planName, isLoading: planLoading } = useTenantPlan();
   const [, setLocation] = useLocation();
 
-  // Check if plan allows roles management
-  if (!canManageRoles) {
-    return (
-      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
-        <div className="max-w-4xl mx-auto">
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
-            <CardContent className="p-8">
-              <div className="text-center">
-                <Shield className="mx-auto h-12 w-12 text-amber-500 dark:text-amber-400 mb-4" />
-                <h2 className="mt-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Upgrade Required</h2>
-                <p className="mt-2 text-gray-600 dark:text-gray-300">
-                  Your current plan ({planName}) does not include roles & permissions management. Upgrade to Plus or Pro to customize role permissions.
-                </p>
-                <Button
-                  onClick={() => setLocation('/profile?tab=subscription')}
-                  className="mt-6 bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white"
-                >
-                  Upgrade Plan
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  // UI state
+  // UI state - must be declared before any conditional returns
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [isEditing, setIsEditing] = useState(false);
@@ -300,6 +273,61 @@ export default function ManagementRolesPermissions() {
   const totalPermissions: number = rolesData?.totalPermissions || 0;
   const totalCategories: number = rolesData?.totalCategories || 0;
   const hasCustomPermissions: boolean = rolesData?.hasCustomPermissions || false;
+
+  // Check if plan data is loading
+  if (planLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-medium">
+            {t("management.rolesPermissions.title", "Roles & Permissions")}
+          </h2>
+        </div>
+        <div className="grid gap-4 md:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-6">
+                <div className="h-4 bg-muted rounded w-1/3 mb-2" />
+                <div className="h-3 bg-muted rounded w-1/2" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Check if plan allows roles management - after all hooks
+  if (!canManageRoles) {
+    return (
+      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+        <div className="max-w-4xl mx-auto">
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+            <CardContent className="p-8">
+              <div className="text-center">
+                <Shield className="mx-auto h-12 w-12 text-amber-500 dark:text-amber-400 mb-4" />
+                <h2 className="mt-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  {t('management.rolesPermissions.upgradeRequired', 'Upgrade Required')}
+                </h2>
+                <p className="mt-2 text-gray-600 dark:text-gray-300">
+                  {t('management.rolesPermissions.upgradeDescription', { 
+                    planName, 
+                    defaultValue: 'Your current plan ({{planName}}) does not include roles & permissions management. Upgrade to Plus or Pro to customize role permissions.' 
+                  })}
+                </p>
+                <Button
+                  onClick={() => setLocation('/profile?tab=subscription')}
+                  className="mt-6 bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white"
+                >
+                  {t('management.rolesPermissions.upgradePlan', 'Upgrade Plan')}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   // Filter categories by search term
   const filteredCategories = useMemo(() => {

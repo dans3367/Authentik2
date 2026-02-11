@@ -2,6 +2,7 @@ import { task, wait, logger } from "@trigger.dev/sdk/v3";
 import { Resend } from "resend";
 import { createHmac } from "crypto";
 import { z } from "zod";
+import { wrapInEmailDesign } from "./emailWrapper";
 
 // Initialize Resend for email sending
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -102,7 +103,7 @@ export const sendReminderTask = task({
     }
 
     const subject = `Reminder: ${data.appointmentTitle}`;
-    const html = generateReminderEmailHtml(data);
+    const html = await generateReminderEmailHtml(data);
 
     try {
       const { data: emailData, error } = await resend.emails.send({
@@ -198,7 +199,7 @@ export const scheduleReminderTask = task({
     }
 
     const subject = `Reminder: ${data.appointmentTitle}`;
-    const html = generateReminderEmailHtml(data);
+    const html = await generateReminderEmailHtml(data);
 
     try {
       const { data: emailData, error } = await resend.emails.send({
@@ -279,7 +280,7 @@ export const sendBulkRemindersTask = task({
       }
 
       const subject = `Reminder: ${reminder.appointmentTitle}`;
-      const html = generateReminderEmailHtml(reminder);
+      const html = await generateReminderEmailHtml(reminder);
 
       try {
         const { data: emailData, error } = await resend.emails.send({
@@ -341,9 +342,9 @@ export const sendBulkRemindersTask = task({
 });
 
 /**
- * Generate HTML for reminder email
+ * Generate HTML for reminder email wrapped in the master email design
  */
-function generateReminderEmailHtml(data: ReminderPayload): string {
+async function generateReminderEmailHtml(data: ReminderPayload): Promise<string> {
   const locationSection = data.location
     ? `<p style="margin: 0 0 10px 0;"><strong>Location:</strong> ${data.location}</p>`
     : "";
@@ -358,25 +359,15 @@ function generateReminderEmailHtml(data: ReminderPayload): string {
   const confirmUrl = `${baseUrl}/api/appointments/${data.appointmentId}/confirm`;
   const declineUrl = `${baseUrl}/api/appointments/${data.appointmentId}/decline`;
 
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">Appointment Reminder</h1>
-  </div>
-  
-  <div style="background-color: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+  const bodyContent = `
+    <h2 style="margin: 0 0 20px 0; color: #1f2937; font-size: 22px; text-align: center;">Appointment Reminder</h2>
+    
     <p style="margin: 0 0 20px 0;">Hi ${data.customerName},</p>
     
     <p style="margin: 0 0 20px 0;">This is a friendly reminder about your upcoming appointment:</p>
     
     <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-      <h2 style="margin: 0 0 15px 0; color: #1f2937; font-size: 18px;">${data.appointmentTitle}</h2>
+      <h3 style="margin: 0 0 15px 0; color: #1f2937; font-size: 18px;">${data.appointmentTitle}</h3>
       <p style="margin: 0 0 10px 0;"><strong>Date:</strong> ${data.appointmentDate}</p>
       <p style="margin: 0 0 10px 0;"><strong>Time:</strong> ${data.appointmentTime}</p>
       ${locationSection}
@@ -401,12 +392,7 @@ function generateReminderEmailHtml(data: ReminderPayload): string {
     <p style="margin: 20px 0 0 0; color: #6b7280; font-size: 14px;">
       If you need to reschedule or cancel, please contact us as soon as possible.
     </p>
-  </div>
-  
-  <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
-    <p style="margin: 0;">This is an automated reminder. Please do not reply to this email.</p>
-  </div>
-</body>
-</html>
-  `.trim();
+  `;
+
+  return wrapInEmailDesign(data.tenantId, bodyContent);
 }

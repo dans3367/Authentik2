@@ -84,21 +84,24 @@ export async function getHighlightStats(tenantId: string): Promise<HighlightStat
         lt(emailSends.sentAt, previousMonth.end)
       )),
 
-    // Newsletters sent (all time)
-    db.select({ count: count() })
-      .from(newsletters)
-      .where(and(
-        eq(newsletters.tenantId, tenantId),
-        eq(newsletters.status, 'sent')
-      )),
-
-    // Newsletters sent before this month
+    // Newsletters sent this month
     db.select({ count: count() })
       .from(newsletters)
       .where(and(
         eq(newsletters.tenantId, tenantId),
         eq(newsletters.status, 'sent'),
-        lt(newsletters.sentAt, currentMonth.start)
+        gte(newsletters.sentAt, currentMonth.start),
+        lt(newsletters.sentAt, currentMonth.end)
+      )),
+
+    // Newsletters sent previous month
+    db.select({ count: count() })
+      .from(newsletters)
+      .where(and(
+        eq(newsletters.tenantId, tenantId),
+        eq(newsletters.status, 'sent'),
+        gte(newsletters.sentAt, previousMonth.start),
+        lt(newsletters.sentAt, previousMonth.end)
       )),
 
     // Upcoming appointments (scheduled or confirmed, in the future)
@@ -120,9 +123,6 @@ export async function getHighlightStats(tenantId: string): Promise<HighlightStat
   const newslettersVal = newslettersSentCurrent[0]?.count ?? 0;
   const newslettersPrev = newslettersSentPrevious[0]?.count ?? 0;
 
-  // Newsletters sent this month = total - previous
-  const newslettersThisMonth = newslettersVal - newslettersPrev;
-
   const upcomingVal = upcomingAppointmentsCurrent[0]?.count ?? 0;
 
   return {
@@ -136,9 +136,7 @@ export async function getHighlightStats(tenantId: string): Promise<HighlightStat
     },
     newslettersSent: {
       value: newslettersVal,
-      change: newslettersPrev > 0
-        ? computeChange(newslettersThisMonth, newslettersPrev)
-        : null,
+      change: computeChange(newslettersVal, newslettersPrev),
     },
     upcomingAppointments: {
       value: upcomingVal,

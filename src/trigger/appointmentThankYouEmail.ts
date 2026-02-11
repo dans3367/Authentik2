@@ -2,6 +2,7 @@ import { task, logger } from "@trigger.dev/sdk/v3";
 import { Resend } from "resend";
 import { z } from "zod";
 import { createHmac } from "crypto";
+import { wrapInEmailDesign } from "./emailWrapper";
 
 // Initialize Resend for email sending
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -120,7 +121,7 @@ export const sendThankYouEmailTask = task({
         });
 
         const subject = `Thank You for Your Visit${data.companyName ? ` – ${data.companyName}` : ""}`;
-        const html = generateThankYouEmailHtml(data);
+        const html = await generateThankYouEmailHtml(data);
 
         try {
             const { data: emailData, error } = await resend.emails.send({
@@ -227,9 +228,9 @@ function escapeHtml(unsafe: string): string {
 }
 
 /**
- * Generate HTML for thank-you email
+ * Generate HTML for thank-you email wrapped in the master email design
  */
-function generateThankYouEmailHtml(data: ThankYouEmailPayload): string {
+async function generateThankYouEmailHtml(data: ThankYouEmailPayload): Promise<string> {
     const safeLocation = data.location ? escapeHtml(data.location) : "";
     const locationSection = safeLocation
         ? `<p style="margin: 0 0 10px 0;"><strong>Location:</strong> ${safeLocation}</p>`
@@ -241,25 +242,15 @@ function generateThankYouEmailHtml(data: ThankYouEmailPayload): string {
     const safeAppointmentDate = escapeHtml(data.appointmentDate);
     const safeAppointmentTime = escapeHtml(data.appointmentTime);
 
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">Thank You for Your Visit!</h1>
-  </div>
-  
-  <div style="background-color: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+    const bodyContent = `
+    <h2 style="margin: 0 0 20px 0; color: #065f46; font-size: 22px; text-align: center;">Thank You for Your Visit!</h2>
+    
     <p style="margin: 0 0 20px 0;">Hi ${safeCustomerName},</p>
     
     <p style="margin: 0 0 20px 0;">Thank you for visiting us! We truly appreciate your time and hope everything went well during your appointment.</p>
     
     <div style="background-color: #ecfdf5; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #10b981;">
-      <h2 style="margin: 0 0 15px 0; color: #065f46; font-size: 18px;">Appointment Summary</h2>
+      <h3 style="margin: 0 0 15px 0; color: #065f46; font-size: 18px;">Appointment Summary</h3>
       <p style="margin: 0 0 10px 0;"><strong>Service:</strong> ${safeAppointmentTitle}</p>
       <p style="margin: 0 0 10px 0;"><strong>Date:</strong> ${safeAppointmentDate}</p>
       <p style="margin: 0 0 10px 0;"><strong>Time:</strong> ${safeAppointmentTime}</p>
@@ -276,12 +267,7 @@ function generateThankYouEmailHtml(data: ThankYouEmailPayload): string {
       Warm regards,<br>
       <strong>${safeCompanyName}</strong>
     </p>
-  </div>
-  
-  <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
-    <p style="margin: 0;">This is an automated message. Please do not reply directly to this email.</p>
-  </div>
-</body>
-</html>
-  `.trim();
+  `;
+
+    return wrapInEmailDesign(data.tenantId, bodyContent);
 }

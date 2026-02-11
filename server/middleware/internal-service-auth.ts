@@ -131,7 +131,9 @@ export function authenticateInternalService(
   }
 
   // Verify HMAC signature
-  const isValid = verifyInternalSignature(req.body, requestTime, signature);
+  // For GET requests, req.body may be undefined - normalize to empty object
+  const bodyForVerification = req.body && Object.keys(req.body).length > 0 ? req.body : {};
+  const isValid = verifyInternalSignature(bodyForVerification, requestTime, signature);
 
   if (!isValid) {
     console.warn('🔐 [Internal Auth] Invalid signature for request:', {

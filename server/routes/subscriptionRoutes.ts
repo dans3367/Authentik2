@@ -589,6 +589,11 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
       return res.status(400).json({ message: 'Plan ID is required' });
     }
 
+    // Validate billingCycle parameter
+    if (billingCycle && billingCycle !== 'monthly' && billingCycle !== 'yearly') {
+      return res.status(400).json({ message: 'Invalid billing cycle. Must be "monthly" or "yearly"' });
+    }
+
     const tenantId = req.user.tenantId;
 
     // Get the target plan
@@ -609,9 +614,91 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
     const targetPrice = parseFloat(targetPlan.price);
     const isDowngrade = targetPrice < currentPrice;
     const isDowngradeToFree = targetPlan.name === 'Free' || targetPrice === 0;
+    const isUpgradeToPaid = targetPrice > currentPrice && targetPrice > 0;
+
+    // SECURITY: Prevent direct activation of paid plans without payment
+    if (isUpgradeToPaid) {
+      if (!stripe) {
+        return res.status(503).json({ 
+          message: 'Payment processing is not configured. Please contact support.' 
+        });
+      }
+
+      // For upgrades to paid plans, require Stripe Checkout
+      // Get or create Stripe customer
+      let stripeCustomerId = existingSubscription?.stripeCustomerId;
+      
+      if (!stripeCustomerId || stripeCustomerId.startsWith('manual_')) {
+        const customer = await stripe.customers.create({
+          email: req.user.email,
+          metadata: {
+            tenantId,
+            userId: req.user.id,
+          },
+        });
+        stripeCustomerId = customer.id;
+
+        // Update existing subscription with real Stripe customer ID
+        if (existingSubscription) {
+          await db.update(subscriptions)
+            .set({ stripeCustomerId })
+            .where(eq(subscriptions.id, existingSubscription.id));
+        }
+      }
+
+      // Create Stripe Checkout Session for the upgrade
+      const isYearly = billingCycle === 'yearly';
+      if (billingCycle && billingCycle !== 'monthly' && billingCycle !== 'yearly') {
+        return res.status(400).json({ message: 'Invalid billing cycle. Must be "monthly" or "yearly".' });
+      }
+      const priceAmount = Math.round(parseFloat(targetPlan.price) * 100); // Convert to cents
+
+      const session = await stripe.checkout.sessions.create({
+        customer: stripeCustomerId,
+        mode: 'subscription',
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: targetPlan.displayName,
+                description: `${targetPlan.displayName} Plan`,
+              },
+              unit_amount: priceAmount,
+              recurring: {
+                interval: isYearly ? 'year' : 'month',
+              },
+            },
+            quantity: 1,
+          },
+        ],
+        success_url: `${process.env.FRONTEND_URL || 'http://localhost:5000'}/settings/subscription?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5000'}/settings/subscription?canceled=true`,
+        metadata: {
+          tenantId,
+          userId: req.user.id,
+          planId: targetPlan.id,
+          billingCycle: isYearly ? 'yearly' : 'monthly',
+        },
+      });
+
+      return res.json({
+        requiresPayment: true,
+        checkoutUrl: session.url,
+        sessionId: session.id,
+        message: 'Please complete payment to activate your subscription',
+      });
+    }
 
     if (!existingSubscription) {
-      // No existing subscription — create one for the new plan
+      // No existing subscription — only allow Free plan without payment
+      if (targetPrice > 0) {
+        return res.status(400).json({ 
+          message: 'Payment required for paid plans. Please use the checkout flow.' 
+        });
+      }
+
       const startDate = new Date();
       const isYearly = billingCycle === 'yearly';
       const endDate = new Date(startDate);
@@ -641,8 +728,8 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
       });
     }
 
-    // === UPGRADE PATH ===
-    if (!isDowngrade) {
+    // === UPGRADE PATH (same price or lateral move) ===
+    if (!isDowngrade && !isUpgradeToPaid) {
       // Restore any previously suspended resources
       const restored = await storage.restoreSuspendedResources(tenantId);
 

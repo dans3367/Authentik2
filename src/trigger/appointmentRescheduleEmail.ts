@@ -2,6 +2,7 @@ import { task, logger } from "@trigger.dev/sdk/v3";
 import { Resend } from "resend";
 import { z } from "zod";
 import { createHmac } from "crypto";
+import { wrapInEmailDesign } from "./emailWrapper";
 
 // Initialize Resend for email sending
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -124,7 +125,7 @@ export const sendRescheduleEmailTask = task({
 
         const statusText = data.status === "cancelled" ? "cancelled" : "missed";
         const subject = `We'd Love to See You - Reschedule Your Appointment`;
-        const html = generateRescheduleEmailHtml(data, statusText);
+        const html = await generateRescheduleEmailHtml(data, statusText);
 
         try {
             const { data: emailData, error } = await resend.emails.send({
@@ -223,9 +224,9 @@ export const sendRescheduleEmailTask = task({
 });
 
 /**
- * Generate HTML for reschedule invitation email
+ * Generate HTML for reschedule invitation email wrapped in the master email design
  */
-function generateRescheduleEmailHtml(data: RescheduleEmailPayload, statusText: string): string {
+async function generateRescheduleEmailHtml(data: RescheduleEmailPayload, statusText: string): Promise<string> {
     const locationSection = data.location
         ? `<p style="margin: 0 0 10px 0;"><strong>Location:</strong> ${data.location}</p>`
         : "";
@@ -247,19 +248,9 @@ function generateRescheduleEmailHtml(data: RescheduleEmailPayload, statusText: s
         ? "We noticed that your appointment was cancelled."
         : "We're sorry we missed you at your recent appointment.";
 
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">We'd Love to Reschedule</h1>
-  </div>
-  
-  <div style="background-color: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+    const bodyContent = `
+    <h2 style="margin: 0 0 20px 0; color: #92400e; font-size: 22px; text-align: center;">We'd Love to Reschedule</h2>
+    
     <p style="margin: 0 0 20px 0;">Hi ${data.customerName},</p>
     
     <p style="margin: 0 0 20px 0;">${statusMessage}</p>
@@ -267,7 +258,7 @@ function generateRescheduleEmailHtml(data: RescheduleEmailPayload, statusText: s
     <p style="margin: 0 0 20px 0;">We understand that life gets busy, and we'd love the opportunity to see you again. Here are the details of your ${statusText} appointment:</p>
     
     <div style="background-color: #fef3c7; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #f59e0b;">
-      <h2 style="margin: 0 0 15px 0; color: #92400e; font-size: 18px;">${data.appointmentTitle}</h2>
+      <h3 style="margin: 0 0 15px 0; color: #92400e; font-size: 18px;">${data.appointmentTitle}</h3>
       <p style="margin: 0 0 10px 0;"><strong>Date:</strong> ${data.appointmentDate}</p>
       <p style="margin: 0 0 10px 0;"><strong>Time:</strong> ${data.appointmentTime}</p>
       ${locationSection}
@@ -282,17 +273,7 @@ function generateRescheduleEmailHtml(data: RescheduleEmailPayload, statusText: s
     <p style="margin: 20px 0 0 0; color: #6b7280; font-size: 14px;">
       We value your time and look forward to serving you. If you have any questions or need assistance, please don't hesitate to reach out.
     </p>
-    
-    <p style="margin: 20px 0 0 0; color: #6b7280; font-size: 14px;">
-      Thank you for your understanding,<br>
-      <strong>Your Appointment Team</strong>
-    </p>
-  </div>
-  
-  <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
-    <p style="margin: 0;">This is an automated message. Please do not reply directly to this email.</p>
-  </div>
-</body>
-</html>
-  `.trim();
+  `;
+
+    return wrapInEmailDesign(data.tenantId, bodyContent);
 }

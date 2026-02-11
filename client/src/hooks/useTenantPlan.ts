@@ -37,6 +37,9 @@ export function useTenantPlan() {
     retry: 1,
   });
 
+  // Don't apply restrictive defaults during loading or error states
+  const hasData = !isLoading && !error && data;
+
   return {
     plan: data?.plan ?? null,
     usage: data?.usage ?? null,
@@ -44,13 +47,13 @@ export function useTenantPlan() {
     error,
     refetch,
 
-    // Convenience booleans
+    // Convenience booleans - only apply restrictive defaults when data is loaded
     planName: data?.plan?.name ?? "Free Plan",
-    canManageUsers: data?.plan?.allowUsersManagement ?? false,
-    canManageRoles: data?.plan?.allowRolesManagement ?? false,
-    canAddShops: data?.usage?.shops?.canAdd ?? false,
-    canSendEmails: data?.usage?.emails?.canSend ?? false,
-    canAddUsers: data?.usage?.users?.canAdd ?? false,
+    canManageUsers: hasData ? (data.plan?.allowUsersManagement ?? false) : true,
+    canManageRoles: hasData ? (data.plan?.allowRolesManagement ?? false) : true,
+    canAddShops: hasData ? (data.usage?.shops?.canAdd ?? false) : true,
+    canSendEmails: hasData ? (data.usage?.emails?.canSend ?? false) : true,
+    canAddUsers: hasData ? (data.usage?.users?.canAdd ?? false) : true,
     emailsRemaining: data?.usage?.emails?.remaining ?? 0,
     maxShops: data?.plan?.maxShops ?? 0,
     maxUsers: data?.plan?.maxUsers ?? 1,

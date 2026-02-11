@@ -280,7 +280,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
     const countEmojis = (text: string): number => {
       try {
         // Prefer modern Unicode property escape when available
-        const re = /\p{Extended_Pictographic}/gu;
+        const re = new RegExp('\\p{Extended_Pictographic}', 'gu');
         return (text.match(re) || []).length;
       } catch {
         // Fallback broad ranges covering most emoji blocks
@@ -317,7 +317,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
     if (!open) return;
 
     // Check if this is a custom card (starts with 'custom-' or has customImage flag from parent)
-    const isCustomCard = initialThemeId && (initialThemeId.startsWith('custom-') || initialData?.customImage === true);
+    const isCustomCard = initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-')) || initialData?.customImage === true;
 
     // Don't run this effect for custom cards - they manage their own images
     if (isCustomCard) {
@@ -1891,7 +1891,12 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                             disabled={loadingMore}
                           >
                             <ChevronRight className="w-4 h-4 mr-1" />
-                            {t('ecards.designer.loadMore', { count: (totalPages - currentPage) > 0 ? Math.min(15, totalResults - unsplashImages.length) : t('ecards.designer.noMore') })}
+                            {(() => {
+                              const remaining = totalResults - unsplashImages.length;
+                              return remaining > 0
+                                ? t('ecards.designer.loadMore', { count: Math.min(15, remaining) })
+                                : t('ecards.designer.noMore');
+                            })()}
                           </Button>
                         )}
 

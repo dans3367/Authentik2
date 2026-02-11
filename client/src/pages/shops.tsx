@@ -713,7 +713,7 @@ export default function ShopsPage() {
                 <Store className="mx-auto h-12 w-12 text-amber-500 dark:text-amber-400 mb-4" />
                 <h2 className="mt-4 text-lg font-semibold text-gray-900 dark:text-gray-100">{t('shops.upgradeRequired', 'Upgrade Required')}</h2>
                 <p className="mt-2 text-gray-600 dark:text-gray-300">
-                  {t('shops.upgradeDescription', `Your current plan (${planName}) does not include shops. Upgrade to Plus or Pro to create and manage shops.`)}
+                  {t('shops.upgradeDescription', { planName, defaultValue: 'Your current plan ({{planName}}) does not include shops. Upgrade to Plus or Pro to create and manage shops.' })}
                 </p>
                 <Button
                   onClick={() => setLocation('/profile?tab=subscription')}

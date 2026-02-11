@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
-import { betterAuthUser, campaigns, emailTemplates, mailingLists, emails, emailStatistics, createCampaignSchema, updateCampaignSchema } from '@shared/schema';
+import { betterAuthUser, campaigns, createCampaignSchema, updateCampaignSchema } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 
 export const campaignRoutes = Router();
@@ -209,11 +209,11 @@ campaignRoutes.get("/campaign-stats", authenticateToken, requireTenant, async (r
   }
 });
 
-// Get managers list
+// Get eligible reviewers (all users except Employee role)
 campaignRoutes.get("/managers", authenticateToken, requireTenant, async (req: any, res) => {
   try {
-    const managers = await db.query.betterAuthUser.findMany({
-      where: sql`${betterAuthUser.role} IN ('Manager', 'Administrator', 'Owner') AND ${betterAuthUser.tenantId} = ${req.user.tenantId}`,
+    const reviewers = await db.query.betterAuthUser.findMany({
+      where: sql`${betterAuthUser.role} != 'Employee' AND ${betterAuthUser.tenantId} = ${req.user.tenantId}`,
       columns: {
         id: true,
         email: true,
@@ -224,10 +224,10 @@ campaignRoutes.get("/managers", authenticateToken, requireTenant, async (req: an
       orderBy: sql`${betterAuthUser.firstName} ASC`,
     });
 
-    res.json(managers);
+    res.json({ managers: reviewers });
   } catch (error) {
-    console.error('Get managers error:', error);
-    res.status(500).json({ message: 'Failed to get managers' });
+    console.error('Get reviewers error:', error);
+    res.status(500).json({ message: 'Failed to get reviewers' });
   }
 });
 
