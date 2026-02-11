@@ -8,6 +8,7 @@ const MAX_TOTAL_SIZE = 40 * 1024 * 1024; // 40MB total (after base64 this is the
 const MAX_FILES = 10;
 
 // Allowed MIME types for email attachments
+// Note: SVG and XML types are excluded due to XSS/XXE security risks
 const ALLOWED_MIME_TYPES = [
   // Documents
   'application/pdf',
@@ -21,18 +22,16 @@ const ALLOWED_MIME_TYPES = [
   'text/plain',
   'text/csv',
   'text/html',
-  // Images
+  // Images (raster only - no SVG due to XSS risk)
   'image/jpeg',
   'image/png',
   'image/gif',
   'image/webp',
-  'image/svg+xml',
   // Archives
   'application/zip',
   'application/x-zip-compressed',
   // Other
   'application/json',
-  'application/xml',
 ];
 
 const storage = multer.memoryStorage();

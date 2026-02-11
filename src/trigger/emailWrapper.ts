@@ -17,6 +17,73 @@ export interface EmailDesign {
 }
 
 /**
+ * Sanitize CSS color value to prevent CSS injection.
+ * Only allows valid hex colors, RGB(A), HSL(A), and named colors.
+ * Rejects any value containing semicolons, url(), or other injection vectors.
+ */
+function sanitizeColor(color: string | undefined | null, fallback: string = '#3B82F6'): string {
+  if (!color) return fallback;
+
+  const normalized = color.trim().toLowerCase();
+
+  // Reject any value containing dangerous characters or patterns
+  if (
+    normalized.includes(';') ||
+    normalized.includes('url(') ||
+    normalized.includes('expression(') ||
+    normalized.includes('import') ||
+    normalized.includes('@') ||
+    normalized.includes('\\') ||
+    normalized.includes('<') ||
+    normalized.includes('>')
+  ) {
+    logger.warn(`Rejected potentially malicious color value: ${color}`);
+    return fallback;
+  }
+
+  // Validate hex colors (#RGB, #RRGGBB, #RRGGBBAA)
+  const hexPattern = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/;
+  if (hexPattern.test(normalized)) {
+    return normalized;
+  }
+
+  // Validate RGB/RGBA
+  const rgbPattern = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(,\s*(0|1|0?\.\d+)\s*)?\)$/;
+  const rgbMatch = normalized.match(rgbPattern);
+  if (rgbMatch) {
+    const [, r, g, b] = rgbMatch;
+    if (parseInt(r) <= 255 && parseInt(g) <= 255 && parseInt(b) <= 255) {
+      return normalized;
+    }
+  }
+
+  // Validate HSL/HSLA
+  const hslPattern = /^hsla?\(\s*(\d{1,3})\s*,\s*(\d{1,3})%\s*,\s*(\d{1,3})%\s*(,\s*(0|1|0?\.\d+)\s*)?\)$/;
+  const hslMatch = normalized.match(hslPattern);
+  if (hslMatch) {
+    const [, h, s, l] = hslMatch;
+    if (parseInt(h) <= 360 && parseInt(s) <= 100 && parseInt(l) <= 100) {
+      return normalized;
+    }
+  }
+
+  // Whitelist of safe CSS named colors
+  const namedColors = [
+    'black', 'white', 'red', 'green', 'blue', 'yellow', 'orange', 'purple',
+    'pink', 'brown', 'gray', 'grey', 'cyan', 'magenta', 'lime', 'navy',
+    'teal', 'aqua', 'maroon', 'olive', 'silver', 'fuchsia', 'transparent'
+  ];
+
+  if (namedColors.includes(normalized)) {
+    return normalized;
+  }
+
+  // If no valid pattern matched, return fallback
+  logger.warn(`Invalid color format rejected: ${color}`);
+  return fallback;
+}
+
+/**
  * Sanitize font family to prevent CSS injection.
  * Only allows known safe font stacks.
  */
@@ -145,7 +212,12 @@ export async function wrapInEmailDesign(tenantId: string, bodyContent: string): 
  * Build the full HTML email using the design settings and body content
  */
 function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
+  // Sanitize all user-controlled values
   const fontFamily = sanitizeFontFamily(design.fontFamily);
+  const sanitizedPrimaryColor = sanitizeColor(design.primaryColor, '#3B82F6');
+  const sanitizedSecondaryColor = sanitizeColor(design.secondaryColor, '#1E40AF');
+  const sanitizedAccentColor = sanitizeColor(design.accentColor, '#10B981');
+  
   const safeCompanyName = escapeHtml(design.companyName || '');
   const safeHeaderText = design.headerText ? escapeHtml(design.headerText) : null;
   const safeFooterText = design.footerText ? escapeHtml(design.footerText) : null;
@@ -185,7 +257,7 @@ function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
   }
 
   // Build logo/header section
-  const logoSection = design.logoUrl
+  const logoSection = design.logoUrl && isValidHttpUrl(design.logoUrl)
     ? `<img src="${escapeHtml(design.logoUrl)}" alt="${safeCompanyName}" style="height: 48px; width: auto; margin-bottom: 20px; object-fit: contain;" />`
     : safeCompanyName
       ? `<div style="height: 48px; width: 48px; background-color: rgba(255,255,255,0.2); border-radius: 50%; margin: 0 auto 16px auto; line-height: 48px; font-size: 20px; font-weight: bold; color: #ffffff; text-align: center;">${escapeHtml((design.companyName || 'C').charAt(0))}</div>`
@@ -201,7 +273,7 @@ function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
     <div style="max-width: 600px; margin: 0 auto; background: white;">
       
       <!-- Hero Header -->
-      <div style="padding: 40px 32px; text-align: center; background-color: ${design.primaryColor}; color: #ffffff;">
+      <div style="padding: 40px 32px; text-align: center; background-color: ${sanitizedPrimaryColor}; color: #ffffff;">
         ${logoSection}
         ${safeCompanyName ? `
           <h1 style="margin: 0 0 10px 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em; color: #ffffff;">

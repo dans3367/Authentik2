@@ -115,13 +115,7 @@ export const scheduleContactEmailTask = task({
       if (error) {
         logger.error("Resend API returned error", { error });
         await notifyBackend(data, 'failed', error.message);
-        return {
-          success: false,
-          to: data.to,
-          subject: data.subject,
-          error: error.message,
-          contactId: data.contactId,
-        };
+        throw new Error(error.message);
       }
 
       logger.info("Scheduled email sent successfully", {

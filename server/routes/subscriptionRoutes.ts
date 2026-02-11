@@ -670,25 +670,13 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
         });
       }
 
-      const priceAmount = Math.round(targetPrice * 100); // Convert to cents
-
       const session = await stripe.checkout.sessions.create({
         customer: stripeCustomerId,
         mode: 'subscription',
         payment_method_types: ['card'],
         line_items: [
           {
-            price_data: {
-              currency: 'usd',
-              product_data: {
-                name: targetPlan.displayName,
-                description: `${targetPlan.displayName} Plan`,
-              },
-              unit_amount: priceAmount,
-              recurring: {
-                interval: isYearly ? 'year' : 'month',
-              },
-            },
+            price: stripePriceId,
             quantity: 1,
           },
         ],

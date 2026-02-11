@@ -117,18 +117,26 @@ function escapeHtml(str: string): string {
 /**
  * Replace template placeholders (e.g. {{first_name}}, {{company_name}}) with actual contact/company data.
  * Handles both HTML body and subject lines.
+ * All substituted values are HTML-escaped to prevent injection attacks.
  */
 function replaceEmailPlaceholders(
   text: string,
   contact: { firstName?: string | null; lastName?: string | null; email?: string | null },
   companyName?: string,
 ): string {
+  // HTML-escape all values before substitution to prevent injection
+  const escapedFirstName = sanitizeEmailHtml(contact.firstName || '');
+  const escapedLastName = sanitizeEmailHtml(contact.lastName || '');
+  const escapedFullName = sanitizeEmailHtml(`${contact.firstName || ''} ${contact.lastName || ''}`.trim());
+  const escapedEmail = sanitizeEmailHtml(contact.email || '');
+  const escapedCompanyName = sanitizeEmailHtml(companyName || '');
+
   return text
-    .replace(/\{\{\s*first_name\s*\}\}/gi, contact.firstName || '')
-    .replace(/\{\{\s*last_name\s*\}\}/gi, contact.lastName || '')
-    .replace(/\{\{\s*full_name\s*\}\}/gi, `${contact.firstName || ''} ${contact.lastName || ''}`.trim())
-    .replace(/\{\{\s*email\s*\}\}/gi, contact.email || '')
-    .replace(/\{\{\s*company_name\s*\}\}/gi, companyName || '');
+    .replace(/\{\{\s*first_name\s*\}\}/gi, escapedFirstName)
+    .replace(/\{\{\s*last_name\s*\}\}/gi, escapedLastName)
+    .replace(/\{\{\s*full_name\s*\}\}/gi, escapedFullName)
+    .replace(/\{\{\s*email\s*\}\}/gi, escapedEmail)
+    .replace(/\{\{\s*company_name\s*\}\}/gi, escapedCompanyName);
 }
 
 function sanitizeFontFamily(fontFamily: string | undefined | null): string {
@@ -1883,7 +1891,9 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
         id: emailTrackingId,
         tenantId,
         recipientEmail: String(contact.email),
-        recipientName: contact.name || null,
+        recipientName: contact.firstName && contact.lastName 
+          ? `${contact.firstName} ${contact.lastName}` 
+          : contact.firstName || contact.lastName || null,
         senderEmail: 'admin@zendwise.com',
         senderName: design.displayCompanyName || null,
         subject: sanitizeString(resolvedSubject) || 'No Subject',

@@ -803,7 +803,7 @@ export default function ECardsPage() {
   };
 
   // Helper function to get parent holiday ID from theme variant ID
-  const getParentHolidayId = (themeId: string): string | null => {
+  const getParentHolidayId = (themeId: string): string => {
     // Check each holiday theme array to find which one contains this theme ID
     if (valentineThemes.some(t => t.id === themeId)) return 'valentine';
     if (stPatrickThemes.some(t => t.id === themeId)) return 'stpatrick';
@@ -2200,11 +2200,11 @@ export default function ECardsPage() {
                 if (existing) {
                   // Update existing card
                   return prev.map(c => c.id === designerThemeId 
-                    ? { ...c, name: cardName, sendDate, data: themeData } 
+                    ? { ...c, name: cardName, sendDate, data: themeData, active: c.active } 
                     : c);
                 } else {
                   // Add new card
-                  return [...prev, { id: designerThemeId, name: cardName, sendDate, data: themeData }];
+                  return [...prev, { id: designerThemeId, name: cardName, sendDate, data: themeData, active: true }];
                 }
               });
 

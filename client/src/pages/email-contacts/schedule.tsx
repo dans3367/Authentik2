@@ -324,10 +324,19 @@ export default function ScheduleContactEmailPage() {
                     ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20"
                     : "border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"
                 }`}
+                tabIndex={0}
+                role="button"
+                aria-label="Upload attachments. Drop files here or press Enter to browse"
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    fileInputRef.current?.click();
+                  }
+                }}
               >
                 <Paperclip className="w-5 h-5 mx-auto mb-1 text-gray-400" />
                 <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -456,24 +465,7 @@ export default function ScheduleContactEmailPage() {
                     <div className="flex gap-2 mt-1">
                       <span className="font-semibold text-right w-14">Scheduled:</span>
                       <span className="text-gray-900">
-                        {(() => {
-                          try {
-                            const scheduledDate = new Date(`${date}T${time || "00:00"}`);
-                            // Format with the user-selected timezone
-                            return scheduledDate.toLocaleString(undefined, {
-                              timeZone: timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                              hour: 'numeric',
-                              minute: '2-digit',
-                              hour12: true
-                            });
-                          } catch (e) {
-                            // Fallback if timezone is invalid
-                            return new Date(`${date}T${time || "00:00"}`).toLocaleString();
-                          }
-                        })()}
+                        {`${date} ${time || "00:00"} (${timezone || Intl.DateTimeFormat().resolvedOptions().timeZone})`}
                       </span>
                     </div>
                   )}

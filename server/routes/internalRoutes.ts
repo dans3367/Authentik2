@@ -3,7 +3,7 @@ import { db } from '../db';
 import { emailActivity, emailSends, emailContent, emailContacts, masterEmailDesign, companies } from '@shared/schema';
 import { authenticateInternalService, InternalServiceRequest } from '../middleware/internal-service-auth';
 import crypto from 'crypto';
-import { sql, eq } from 'drizzle-orm';
+import { sql, eq, and } from 'drizzle-orm';
 
 const router = Router();
 
@@ -403,11 +403,24 @@ router.post(
         occurredAt: new Date(),
       });
 
-      // Update contact's lastActivity timestamp
+      // Update contact's lastActivity timestamp (scoped by tenant)
       try {
-        await db.update(emailContacts)
+        const updateResult = await db.update(emailContacts)
           .set({ lastActivity: new Date(), updatedAt: new Date() })
-          .where(eq(emailContacts.id, contactId));
+          .where(
+            and(
+              eq(emailContacts.id, contactId),
+              eq(emailContacts.tenantId, tenantId)
+            )
+          );
+
+        // Validate that the contact was actually updated
+        if (updateResult.rowCount === 0) {
+          console.warn(
+            `⚠️ [Internal API] Contact update failed - no rows updated. ` +
+            `Contact ${contactId} may not exist or does not belong to tenant ${tenantId}`
+          );
+        }
       } catch (contactUpdateError) {
         console.warn(`⚠️ [Internal API] Failed to update contact lastActivity:`, contactUpdateError);
       }
