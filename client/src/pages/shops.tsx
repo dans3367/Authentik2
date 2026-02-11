@@ -59,6 +59,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useTenantPlan } from "@/hooks/useTenantPlan";
+import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import {
@@ -313,7 +315,9 @@ export default function ShopsPage() {
   const [deleteShopId, setDeleteShopId] = useState<string | null>(null);
   const [showLimitModal, setShowLimitModal] = useState(false);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const { canAddShops, maxShops, planName } = useTenantPlan();
 
   // Create a ref to hold the current search params
   const searchParamsRef = useRef({
@@ -697,6 +701,33 @@ export default function ShopsPage() {
     const cats = new Set((data?.shops || []).map(shop => shop.category).filter(Boolean));
     return Array.from(cats);
   }, [data?.shops]);
+
+  // Show upgrade prompt for plans that don't include shops (e.g. Free plan)
+  if (maxShops === 0) {
+    return (
+      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+        <div className="max-w-4xl mx-auto">
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+            <CardContent className="p-8">
+              <div className="text-center">
+                <Store className="mx-auto h-12 w-12 text-amber-500 dark:text-amber-400 mb-4" />
+                <h2 className="mt-4 text-lg font-semibold text-gray-900 dark:text-gray-100">{t('shops.upgradeRequired', 'Upgrade Required')}</h2>
+                <p className="mt-2 text-gray-600 dark:text-gray-300">
+                  {t('shops.upgradeDescription', `Your current plan (${planName}) does not include shops. Upgrade to Plus or Pro to create and manage shops.`)}
+                </p>
+                <Button
+                  onClick={() => setLocation('/profile?tab=subscription')}
+                  className="mt-6 bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white"
+                >
+                  {t('common.upgradePlan', 'Upgrade Plan')}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
@@ -1088,11 +1119,7 @@ export default function ShopsPage() {
                 <Button
                   onClick={() => {
                     setShowLimitModal(false);
-                    // TODO: Add navigation to upgrade page when available
-                    toast({
-                      title: t('shops.limitDialog.upgradePlan'),
-                      description: t('shops.limitDialog.upgradeMessage'),
-                    });
+                    setLocation('/profile?tab=subscription');
                   }}
                   className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
                 >

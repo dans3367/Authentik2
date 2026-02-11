@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateToken, requireRole } from '../middleware/auth-middleware';
+import { authenticateToken, requireRole, requirePlanFeature } from '../middleware/auth-middleware';
 import { db } from '../db';
 import { betterAuthUser, rolePermissions } from '@shared/schema';
 import { sql, eq, and } from 'drizzle-orm';
@@ -690,7 +690,7 @@ function mergePermissions(
 }
 
 // GET /api/roles - Get all roles with their permissions and user counts
-roleRoutes.get("/", authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+roleRoutes.get("/", authenticateToken, requireRole(['Owner', 'Administrator']), requirePlanFeature('allowRolesManagement'), async (req: any, res) => {
   try {
     const tenantId = req.user.tenantId;
 
@@ -765,7 +765,7 @@ roleRoutes.get("/", authenticateToken, requireRole(['Owner', 'Administrator']), 
 });
 
 // PUT /api/roles/permissions - Save custom permissions for a role (Owner only)
-roleRoutes.put("/permissions", authenticateToken, requireRole(['Owner']), async (req: any, res) => {
+roleRoutes.put("/permissions", authenticateToken, requireRole(['Owner']), requirePlanFeature('allowRolesManagement'), async (req: any, res) => {
   try {
     const tenantId = req.user.tenantId;
     const { role, permissions } = req.body;
@@ -823,7 +823,7 @@ roleRoutes.put("/permissions", authenticateToken, requireRole(['Owner']), async 
 });
 
 // POST /api/roles/permissions/reset - Reset a role's permissions to defaults (Owner only)
-roleRoutes.post("/permissions/reset", authenticateToken, requireRole(['Owner']), async (req: any, res) => {
+roleRoutes.post("/permissions/reset", authenticateToken, requireRole(['Owner']), requirePlanFeature('allowRolesManagement'), async (req: any, res) => {
   try {
     const tenantId = req.user.tenantId;
     const { role } = req.body;
@@ -855,7 +855,7 @@ roleRoutes.post("/permissions/reset", authenticateToken, requireRole(['Owner']),
 });
 
 // POST /api/roles/permissions/reset-all - Reset ALL role permissions to defaults (Owner only)
-roleRoutes.post("/permissions/reset-all", authenticateToken, requireRole(['Owner']), async (req: any, res) => {
+roleRoutes.post("/permissions/reset-all", authenticateToken, requireRole(['Owner']), requirePlanFeature('allowRolesManagement'), async (req: any, res) => {
   try {
     const tenantId = req.user.tenantId;
 
@@ -877,7 +877,7 @@ roleRoutes.post("/permissions/reset-all", authenticateToken, requireRole(['Owner
 });
 
 // GET /api/roles/users - Get users grouped by role
-roleRoutes.get("/users", authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+roleRoutes.get("/users", authenticateToken, requireRole(['Owner', 'Administrator']), requirePlanFeature('allowRolesManagement'), async (req: any, res) => {
   try {
     const tenantId = req.user.tenantId;
 

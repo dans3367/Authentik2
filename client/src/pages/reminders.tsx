@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -23,7 +23,7 @@ import {
   Users,
   Mail,
   Calendar,
-  Settings,
+
   Filter,
   Plus,
   Trash2,
@@ -120,7 +120,7 @@ export default function RemindersPage() {
   const { t } = useTranslation();
   const { user } = useReduxAuth();
   const userTimezone = user?.timezone || 'America/Chicago';
-  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+
   const [appointmentsTab, setAppointmentsTab] = useState<"upcoming" | "past">("upcoming");
 
   // Set breadcrumbs in header
@@ -1552,15 +1552,7 @@ export default function RemindersPage() {
                 {t('reminders.pageSubtitle')}
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-10 w-10 rounded-lg hover:bg-muted/50 transition-colors shadow-sm"
-              aria-label="Settings"
-              onClick={() => setSettingsModalOpen(true)}
-            >
-              <Settings className="h-5 w-5" />
-            </Button>
+
           </div>
         </div>
 
@@ -4288,79 +4280,7 @@ export default function RemindersPage() {
           </SheetContent>
         </Sheet>
 
-        {/* Settings Modal */}
-        <Dialog open={settingsModalOpen} onOpenChange={setSettingsModalOpen}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                {t('reminders.settings.title')}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-base font-medium">{t('reminders.settings.enableAutomatic')}</Label>
-                    <p className="text-sm text-gray-600">
-                      {t('reminders.settings.enableAutomaticDescription')}
-                    </p>
-                  </div>
-                  <Switch />
-                </div>
 
-                <Separator />
-
-                <div className="space-y-4">
-                  <Label className="text-base font-medium">{t('reminders.settings.defaultSettings')}</Label>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-sm">{t('reminders.settings.sendReminder')}</Label>
-                      <Select defaultValue="24h">
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="24h">{t('reminders.settings.24hBefore')}</SelectItem>
-                          <SelectItem value="1h">{t('reminders.settings.1hBefore')}</SelectItem>
-                          <SelectItem value="30m">{t('reminders.settings.30mBefore')}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">{t('reminders.settings.reminderMethod')}</Label>
-                      <Select defaultValue="email">
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="email">{t('reminders.settings.email')}</SelectItem>
-                          <SelectItem value="sms">{t('reminders.settings.sms')}</SelectItem>
-                          <SelectItem value="both">{t('reminders.settings.both')}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-4">
-                  <Label className="text-base font-medium">{t('reminders.settings.emailTemplate')}</Label>
-                  <Textarea
-                    placeholder={t('reminders.settings.emailTemplatePlaceholder')}
-                    rows={4}
-                  />
-                  <p className="text-xs text-gray-500">
-                    {t('reminders.settings.availableVariables')}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
 
         {/* Reschedule Email Confirmation Dialog */}
         <AlertDialog open={rescheduleEmailDialogOpen} onOpenChange={setRescheduleEmailDialogOpen}>

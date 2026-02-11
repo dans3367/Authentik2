@@ -1244,7 +1244,24 @@
       "storage": "almacenamiento",
       "support": "soporte",
       "needHelp": "¿Necesitas ayuda para elegir?",
-      "contactSupport": "Contacta a nuestro equipo de soporte"
+      "contactSupport": "Contacta a nuestro equipo de soporte",
+      "downgradeConfirmTitle": "Confirmar Reducción de Plan",
+      "downgradeConfirmDescription": "Estás a punto de cambiar de {{currentPlan}} a {{targetPlan}}. Por favor revisa los siguientes cambios:",
+      "resourcesWillBeSuspended": "Los siguientes recursos serán suspendidos:",
+      "willBeSuspended": "serán suspendidos",
+      "currentCount": "actualmente {{count}}",
+      "newLimit": "límite: {{count}}",
+      "featuresLost": "Perderás acceso a:",
+      "emailLimitChange": "Límite mensual de correos: {{current}} → {{new}}",
+      "unlimited": "Ilimitado",
+      "dataPreserved": "¡Tus datos están seguros!",
+      "dataPreservedDescription": "Los recursos suspendidos nunca se eliminan. Si actualizas tu plan en el futuro, todos tus datos serán restaurados automáticamente.",
+      "cancelDowngrade": "Mantener Plan Actual",
+      "confirmDowngrade": "Confirmar Reducción",
+      "downgradeCheckError": "Error al Verificar Reducción",
+      "downgradeCheckErrorDescription": "No se pudo verificar la elegibilidad de reducción. Por favor intenta de nuevo.",
+      "effectiveDateLabel": "¿Cuándo entra en efecto?",
+      "effectiveDateNote": "Tu plan cambiará el {{date}}. Continuarás con tu plan actual (${{currentPrice}}) hasta entonces, después se te cobrará ${{newPrice}}."
     },
     "danger": {
       "title": "Zona de Peligro",
@@ -1726,6 +1743,7 @@
     },
     "list": {
       "title": "Listas de Segmentos",
+      "subtitle": "Organiza tus contactos en segmentos para campañas de email dirigidas",
       "noSegmentsFound": "No se encontraron segmentos",
       "tryAdjustingFilters": "Intenta ajustar tus filtros",
       "createFirstSegment": "Crea tu primer segmento para comenzar",
@@ -1782,6 +1800,41 @@
       "deleteSuccess": "Lista de segmentos eliminada exitosamente",
       "deleteError": "Error al eliminar lista de segmentos",
       "nameRequired": "Por favor ingresa un nombre para la lista"
+    },
+    "segmentationModal": {
+      "title": "Segmentación de Clientes",
+      "description": "Elige cómo segmentar tu audiencia para este grupo",
+      "tabs": {
+        "all": "Todos los Clientes",
+        "selected": "Seleccionar Clientes",
+        "tags": "Seleccionar por Etiquetas"
+      },
+      "allTitle": "Enviar a Todos los Clientes",
+      "allDescription": "Tu correo se enviará a todos los clientes activos en tu lista de contactos",
+      "customerCount": "{{count}} clientes",
+      "allSelectedHint": "Los {{count}} contactos están seleccionados. Desmarca los que no quieras incluir.",
+      "searchCustomers": "Buscar clientes por nombre o correo...",
+      "selectAll": "Seleccionar Todos",
+      "clearAll": "Limpiar Todo",
+      "selectedCount": "{{selected}} de {{total}} clientes seleccionados",
+      "allSelected": "Todos los contactos seleccionados",
+      "loadingContacts": "Cargando contactos...",
+      "noSearchResults": "No se encontraron clientes con tu búsqueda",
+      "noCustomers": "No hay clientes disponibles",
+      "more": "más",
+      "searchTags": "Buscar etiquetas...",
+      "refreshTags": "Actualizar conteo de etiquetas",
+      "tagsSelectedCount": "{{selected}} de {{total}} etiquetas seleccionadas",
+      "loadingTags": "Cargando etiquetas...",
+      "noTagsSearch": "No se encontraron etiquetas con tu búsqueda",
+      "noTags": "No hay etiquetas disponibles",
+      "customer": "cliente",
+      "customers": "clientes",
+      "summaryAll": "Todos los clientes ({{count}} en total)",
+      "summarySelected": "{{count}} clientes seleccionados",
+      "summaryTags": "{{count}} etiquetas seleccionadas",
+      "cancel": "Cancelar",
+      "save": "Guardar Selección"
     }
   },
   "management": {
@@ -1862,6 +1915,7 @@
     },
     "tags": {
       "title": "Etiquetas",
+      "subtitle": "Crea, organiza y gestiona etiquetas para tus contactos",
       "newTag": "Nueva Etiqueta",
       "cancel": "Cancelar",
       "name": "Nombre",
@@ -1875,10 +1929,41 @@
       "creating": "Creando...",
       "save": "Guardar",
       "saving": "Guardando...",
-      "contacts": "Contactos",
+      "contact": "contacto",
+      "contacts": "contactos",
       "actions": "Acciones",
       "loading": "Cargando...",
       "noTags": "Aún no hay etiquetas",
+      "searchPlaceholder": "Buscar etiquetas...",
+      "editTag": "Editar etiqueta",
+      "deleteTag": "Eliminar etiqueta",
+      "noResults": "No se encontraron etiquetas con \"{{query}}\"",
+      "stats": {
+        "totalTags": "Total de Etiquetas",
+        "totalContacts": "Contactos Etiquetados",
+        "colors": "Colores Usados"
+      },
+      "listTitle": "Tus Etiquetas",
+      "listDescription": "Asigna etiquetas a los contactos para una mejor organización y segmentación",
+      "empty": {
+        "title": "Aún no hay etiquetas",
+        "description": "Las etiquetas te ayudan a organizar contactos en grupos para una mejor gestión y campañas dirigidas.",
+        "createFirst": "Crea Tu Primera Etiqueta"
+      },
+      "createDialog": {
+        "title": "Crear Nueva Etiqueta",
+        "description": "Agrega una nueva etiqueta para organizar y segmentar tus contactos."
+      },
+      "editDialog": {
+        "title": "Editar Etiqueta",
+        "description": "Actualiza el nombre, color o descripción de esta etiqueta."
+      },
+      "deleteDialog": {
+        "title": "Eliminar Etiqueta",
+        "description": "¿Estás seguro de que quieres eliminar \"{{name}}\"? Esto eliminará la etiqueta de todos los contactos. Esta acción no se puede deshacer.",
+        "delete": "Eliminar",
+        "deleting": "Eliminando..."
+      },
       "toasts": {
         "created": "Etiqueta creada",
         "updated": "Etiqueta actualizada",
@@ -1944,6 +2029,136 @@
         "updated": "Diseño maestro de correo actualizado exitosamente",
         "error": "Error",
         "updateError": "Error al actualizar el diseño de correo"
+      }
+    }
+  },
+  "emailCampaigns": {
+    "title": "Campañas de Email",
+    "subtitle": "Administra y monitorea tus campañas de marketing en todos los canales",
+    "createCampaign": "Crear Campaña",
+    "stats": {
+      "totalCampaigns": "Campañas Totales",
+      "allCampaignsCreated": "Todas las campañas creadas",
+      "activeCampaigns": "Campañas Activas",
+      "currentlyRunning": "En ejecución",
+      "draftCampaigns": "Borradores",
+      "inPreparation": "En preparación",
+      "completedCampaigns": "Completadas",
+      "successfullyFinished": "Finalizadas con éxito"
+    },
+    "list": {
+      "title": "Todas las Campañas",
+      "subtitle": "Explora, filtra y administra tus campañas de marketing",
+      "noCampaignsFound": "No se encontraron campañas",
+      "createFirstCampaign": "Comienza creando tu primera campaña de marketing.",
+      "noResults": "Sin campañas coincidentes",
+      "tryAdjustingFilters": "Intenta ajustar tu búsqueda o filtros",
+      "notScheduled": "Sin programar",
+      "impressions": "Impresiones",
+      "clicks": "Clics",
+      "start": "Inicio",
+      "end": "Fin"
+    },
+    "filters": {
+      "searchPlaceholder": "Buscar campañas...",
+      "allStatuses": "Todos los Estados",
+      "allTypes": "Todos los Tipos",
+      "draft": "Borrador",
+      "active": "Activa",
+      "paused": "Pausada",
+      "completed": "Completada",
+      "cancelled": "Cancelada",
+      "email": "Email",
+      "sms": "SMS",
+      "push": "Push",
+      "social": "Social"
+    },
+    "actions": {
+      "edit": "Editar",
+      "delete": "Eliminar"
+    },
+    "deleteDialog": {
+      "title": "Eliminar Campaña",
+      "description": "¿Estás seguro de que quieres eliminar \"{{name}}\"? Esta acción no se puede deshacer.",
+      "cancel": "Cancelar",
+      "delete": "Eliminar",
+      "deleting": "Eliminando..."
+    },
+    "toasts": {
+      "success": "Éxito",
+      "error": "Error",
+      "deleteSuccess": "Campaña eliminada exitosamente.",
+      "deleteError": "Error al eliminar campaña."
+    },
+    "errorState": {
+      "title": "Error al cargar campañas",
+      "defaultMessage": "Ocurrió un error al obtener las campañas."
+    },
+    "edit": {
+      "title": "Editar Campaña",
+      "subtitle": "Actualiza los detalles y configuración de tu campaña de marketing",
+      "backToCampaigns": "Volver a Campañas",
+      "notFoundTitle": "Campaña no encontrada",
+      "notFoundDescription": "La campaña que intentas editar no existe o ha sido eliminada.",
+      "basicInfo": {
+        "title": "Información Básica",
+        "description": "Edita los detalles principales de tu campaña de marketing.",
+        "name": "Nombre de Campaña",
+        "namePlaceholder": "Ingresa el nombre de la campaña",
+        "descriptionLabel": "Descripción",
+        "descriptionPlaceholder": "Describe los objetivos y estrategia de tu campaña",
+        "type": "Tipo de Campaña",
+        "typePlaceholder": "Seleccionar tipo de campaña",
+        "typeEmail": "Email Marketing",
+        "typeSms": "SMS Marketing",
+        "typePush": "Notificaciones Push",
+        "typeSocial": "Redes Sociales",
+        "status": "Estado",
+        "statusPlaceholder": "Seleccionar estado"
+      },
+      "budget": {
+        "title": "Presupuesto y Cronograma",
+        "description": "Administra el presupuesto y calendario de tu campaña.",
+        "budget": "Presupuesto",
+        "budgetPlaceholder": "0.00",
+        "currency": "Moneda",
+        "currencyPlaceholder": "Seleccionar moneda",
+        "startDate": "Fecha de Inicio",
+        "startDatePlaceholder": "Seleccionar fecha de inicio",
+        "endDate": "Fecha de Fin",
+        "endDatePlaceholder": "Seleccionar fecha de fin"
+      },
+      "goals": {
+        "title": "Objetivos y Segmentación",
+        "description": "Define los objetivos de tu campaña y audiencia objetivo.",
+        "goalsLabel": "Objetivos de Campaña",
+        "goalsPlaceholder": "Ingresa un objetivo de campaña",
+        "addGoal": "Agregar",
+        "targetAudience": "Audiencia Objetivo",
+        "targetAudiencePlaceholder": "Describe la demografía, intereses y características de tu audiencia objetivo",
+        "kpis": "Indicadores Clave de Rendimiento (KPIs)",
+        "kpisPlaceholder": "Define métricas de éxito y KPIs para esta campaña (ej., tasa de conversión, ROI, tasa de engagement)"
+      },
+      "review": {
+        "title": "Revisión y Aprobación",
+        "description": "Configura el flujo de aprobación para esta campaña.",
+        "requiresApproval": "Requiere Aprobación del Revisor",
+        "requiresApprovalDescription": "Esta campaña requerirá aprobación de un gerente antes de poder activarse.",
+        "selectReviewer": "Seleccionar Revisor",
+        "selectReviewerPlaceholder": "Seleccionar un gerente",
+        "loadingManagers": "Cargando gerentes...",
+        "noManagers": "No hay gerentes disponibles"
+      },
+      "actions": {
+        "cancel": "Cancelar",
+        "saving": "Guardando...",
+        "saveChanges": "Guardar Cambios"
+      },
+      "toasts": {
+        "success": "Éxito",
+        "updateSuccess": "Campaña actualizada exitosamente.",
+        "error": "Error",
+        "updateError": "Error al actualizar campaña."
       }
     }
   }

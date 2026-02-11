@@ -192,7 +192,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
 
     // Determine if this should use custom image based on initialData
     const hasCustomImageData = initialData?.customImage === true && initialData?.imageUrl;
-    const isCustomTheme = initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'));
+    const isCustomTheme = initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-')) || initialData?.customImage === true;
 
     console.log('🎨 [Card Designer] Initializing with:', {
       initialThemeId,
@@ -316,8 +316,8 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
   useEffect(() => {
     if (!open) return;
 
-    // Check if this is a custom card (starts with 'custom-')
-    const isCustomCard = initialThemeId && initialThemeId.startsWith('custom-');
+    // Check if this is a custom card (starts with 'custom-' or has customImage flag from parent)
+    const isCustomCard = initialThemeId && (initialThemeId.startsWith('custom-') || initialData?.customImage === true);
 
     // Don't run this effect for custom cards - they manage their own images
     if (isCustomCard) {
@@ -356,7 +356,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
         setImageError(false);
       }
     }
-  }, [initialThemeId, open]);
+  }, [initialThemeId, open, initialData?.customImage]);
 
   // Persist draft locally so switching themes won't lose text
   useEffect(() => {
@@ -879,7 +879,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
 
   // Reset functionality
   const handleReset = () => {
-    const isCustomTheme = initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'));
+    const isCustomTheme = initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-')) || customImage;
     const resetMessage = isCustomTheme
       ? "Are you sure you want to reset the card? This will clear all content including the image, title, message, and signature."
       : "Are you sure you want to reset the text? This will clear the title, message, and signature.";

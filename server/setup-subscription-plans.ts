@@ -1,63 +1,59 @@
-import dotenv from 'dotenv';
-
-// Load environment variables BEFORE importing db
-dotenv.config();
-
+import './config';
 import { db } from './db';
 import { subscriptionPlans } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 
-// Default subscription plans with shop limits
+// Subscription plans: Free, Plus, Pro
 const defaultPlans = [
   {
-    name: 'Basic',
-    displayName: 'Basic Plan',
-    description: 'Perfect for small businesses getting started',
-    price: '29.99',
-    yearlyPrice: '299.99',
-    stripePriceId: 'price_basic_monthly', // Replace with actual Stripe price ID
-    stripeYearlyPriceId: 'price_basic_yearly', // Replace with actual Stripe price ID
+    name: 'Free',
+    displayName: 'Free Plan',
+    description: 'Get started with the essentials — single user, single login',
+    price: '0.00',
+    yearlyPrice: '0.00',
+    stripePriceId: 'price_1Sz4wQFKvavhLWPgJVSuidDp',
+    stripeYearlyPriceId: 'price_1Sz4wQFKvavhLWPgOkRA34yt',
     features: [
-      'Up to 5 shops',
-      'Up to 10 users',
+      '1 user (Owner only)',
+      '100 emails/month',
+      'No shops',
       'Basic email support',
-      '10GB storage',
-      'Standard analytics',
-      '200 emails/month'
     ],
-    maxUsers: 10,
+    maxUsers: 1,
     maxProjects: null,
-    maxShops: 5, // Basic plan: 5 shops
-    storageLimit: 10,
-    monthlyEmailLimit: 200,
+    maxShops: 0,
+    storageLimit: 5,
+    monthlyEmailLimit: 100,
+    allowUsersManagement: false,
+    allowRolesManagement: false,
     supportLevel: 'email',
-    trialDays: 14,
+    trialDays: 0,
     isPopular: false,
     isActive: true,
     sortOrder: 1
   },
   {
-    name: 'Professional',
-    displayName: 'Professional Plan',
-    description: 'Ideal for growing businesses with multiple locations',
-    price: '79.99',
-    yearlyPrice: '799.99',
-    stripePriceId: 'price_pro_monthly', // Replace with actual Stripe price ID
-    stripeYearlyPriceId: 'price_pro_yearly', // Replace with actual Stripe price ID
+    name: 'Plus',
+    displayName: 'Plus Plan',
+    description: 'For growing businesses — add team members and shops',
+    price: '49.00',
+    yearlyPrice: '470.40',
+    stripePriceId: 'price_1Sz4wQFKvavhLWPgiMUztAdb',
+    stripeYearlyPriceId: 'price_1Sz4wQFKvavhLWPgrvvuxhHj',
     features: [
-      'Up to 10 shops',
-      'Up to 25 users',
+      'Up to 3 users',
+      '500 emails/month',
+      'Up to 3 shops',
+      'User & role management',
       'Priority email support',
-      '50GB storage',
-      'Advanced analytics',
-      'Custom branding',
-      '500 emails/month'
     ],
-    maxUsers: 25,
+    maxUsers: 3,
     maxProjects: null,
-    maxShops: 10, // Mid tier: 10 shops
-    storageLimit: 50,
+    maxShops: 3,
+    storageLimit: 25,
     monthlyEmailLimit: 500,
+    allowUsersManagement: true,
+    allowRolesManagement: true,
     supportLevel: 'priority',
     trialDays: 14,
     isPopular: true,
@@ -65,28 +61,28 @@ const defaultPlans = [
     sortOrder: 2
   },
   {
-    name: 'Enterprise',
-    displayName: 'Enterprise Plan',
-    description: 'For large organizations with extensive needs',
-    price: '199.99',
-    yearlyPrice: '1999.99',
-    stripePriceId: 'price_enterprise_monthly', // Replace with actual Stripe price ID
-    stripeYearlyPriceId: 'price_enterprise_yearly', // Replace with actual Stripe price ID
+    name: 'Pro',
+    displayName: 'Pro Plan',
+    description: 'For established businesses — full power with more capacity',
+    price: '79.00',
+    yearlyPrice: '758.40',
+    stripePriceId: 'price_1Sz4wRFKvavhLWPg1vogU8PN',
+    stripeYearlyPriceId: 'price_1Sz4wSFKvavhLWPgT92tDeuL',
     features: [
-      'Up to 20 shops',
-      'Unlimited users',
+      'Up to 20 users',
+      '1,000 emails/month',
+      'Up to 10 shops',
+      'User & role management',
       'Dedicated support',
-      '200GB storage',
-      'Premium analytics',
-      'Custom integrations',
-      'White-label options',
-      '1000 emails/month'
+      'Advanced analytics',
     ],
-    maxUsers: null, // Unlimited
+    maxUsers: 20,
     maxProjects: null,
-    maxShops: 20, // Advanced: 20 shops
-    storageLimit: 200,
+    maxShops: 10,
+    storageLimit: 100,
     monthlyEmailLimit: 1000,
+    allowUsersManagement: true,
+    allowRolesManagement: true,
     supportLevel: 'dedicated',
     trialDays: 14,
     isPopular: false,
@@ -139,6 +135,8 @@ async function setupSubscriptionPlans() {
             maxShops: plan.maxShops,
             storageLimit: plan.storageLimit,
             monthlyEmailLimit: plan.monthlyEmailLimit,
+            allowUsersManagement: plan.allowUsersManagement,
+            allowRolesManagement: plan.allowRolesManagement,
             supportLevel: plan.supportLevel,
             trialDays: plan.trialDays,
             isPopular: plan.isPopular,
@@ -151,6 +149,18 @@ async function setupSubscriptionPlans() {
         console.log(`Creating new plan '${plan.name}'...`);
         // Create new plan
         await db.insert(subscriptionPlans).values(plan);
+      }
+    }
+
+    // Deactivate old plans that are not part of the new system
+    const validPlanNames = defaultPlans.map(p => p.name);
+    const allExistingPlans = await db.query.subscriptionPlans.findMany();
+    for (const plan of allExistingPlans) {
+      if (!validPlanNames.includes(plan.name) && plan.isActive) {
+        console.log(`Deactivating old plan '${plan.name}'...`);
+        await db.update(subscriptionPlans)
+          .set({ isActive: false, updatedAt: new Date() })
+          .where(eq(subscriptionPlans.id, plan.id));
       }
     }
 

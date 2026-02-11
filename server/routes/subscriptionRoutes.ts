@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq } from 'drizzle-orm';
-import { betterAuthUser, subscriptionPlans, forms, formResponses, companies, subscriptions, subscriptionPlanRelations, tenants } from '@shared/schema';
+import { betterAuthUser, subscriptionPlans, forms, formResponses, companies, subscriptions, subscriptionPlanRelations, tenants, shopLimitEvents, shops } from '@shared/schema';
 import { authenticateToken, requireRole } from '../middleware/auth-middleware';
+import { storage } from '../storage';
 import Stripe from 'stripe';
 
 export const subscriptionRoutes = Router();
@@ -17,6 +18,7 @@ const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SEC
 subscriptionRoutes.get("/plans", async (req, res) => {
   try {
     const plans = await db.query.subscriptionPlans.findMany({
+      where: eq(subscriptionPlans.isActive, true),
       orderBy: sql`${subscriptionPlans.price} ASC`,
     });
 
@@ -24,6 +26,58 @@ subscriptionRoutes.get("/plans", async (req, res) => {
   } catch (error) {
     console.error('Get subscription plans error:', error);
     res.status(500).json({ message: 'Failed to get subscription plans' });
+  }
+});
+
+// Get current tenant's effective plan (accessible to all authenticated users)
+subscriptionRoutes.get("/tenant-plan", authenticateToken, async (req: any, res) => {
+  try {
+    if (!req.user || !req.user.tenantId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const tenantId = req.user.tenantId;
+    const plan = await storage.getTenantPlan(tenantId);
+
+    // Also fetch current usage for context
+    const [emailLimits, shopLimits, userLimits] = await Promise.all([
+      storage.checkEmailLimits(tenantId),
+      storage.checkShopLimits(tenantId),
+      storage.checkUserLimits(tenantId),
+    ]);
+
+    res.json({
+      plan: {
+        name: plan.planName,
+        maxUsers: plan.maxUsers,
+        maxShops: plan.maxShops,
+        monthlyEmailLimit: plan.monthlyEmailLimit,
+        allowUsersManagement: plan.allowUsersManagement,
+        allowRolesManagement: plan.allowRolesManagement,
+        subscriptionStatus: plan.subscriptionStatus,
+      },
+      usage: {
+        emails: {
+          current: emailLimits.currentUsage,
+          limit: emailLimits.monthlyLimit,
+          remaining: emailLimits.remaining,
+          canSend: emailLimits.canSend,
+        },
+        shops: {
+          current: shopLimits.currentShops,
+          limit: shopLimits.maxShops,
+          canAdd: shopLimits.canAddShop,
+        },
+        users: {
+          current: userLimits.currentUsers,
+          limit: userLimits.maxUsers,
+          canAdd: userLimits.canAddUser,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Get tenant plan error:', error);
+    res.status(500).json({ message: 'Failed to get tenant plan' });
   }
 });
 
@@ -153,10 +207,12 @@ subscriptionRoutes.get("/my-subscription", authenticateToken, async (req: any, r
 
     let subscriptionDetails = null;
 
-    if (subscription && stripe) {
+    const hasRealStripeId = subscription?.stripeSubscriptionId?.startsWith('sub_');
+
+    if (subscription && stripe && hasRealStripeId) {
       try {
         // Get subscription details from Stripe
-        const stripeSubscription = await stripe.subscriptions.retrieve(subscription.stripeSubscriptionId);
+        const stripeSubscription = await stripe.subscriptions.retrieve(subscription.stripeSubscriptionId) as any;
 
         subscriptionDetails = {
           id: stripeSubscription.id,
@@ -187,6 +243,8 @@ subscriptionRoutes.get("/my-subscription", authenticateToken, async (req: any, r
         id: subscription.id,
         status: subscription.status,
         planId: subscription.planId,
+        plan: subscription.plan || null,
+        isYearly: subscription.isYearly || false,
         stripeCustomerId: subscription.stripeCustomerId,
         stripeSubscriptionId: subscription.stripeSubscriptionId,
         currentPeriodStart: subscription.currentPeriodStart,
@@ -429,6 +487,297 @@ subscriptionRoutes.post("/reactivate", authenticateToken, requireRole(["Owner"])
   }
 });
 
+// Pre-flight check for downgrade impact
+subscriptionRoutes.post("/check-downgrade", authenticateToken, requireRole(["Owner"]), async (req: any, res) => {
+  try {
+    if (!req.user || !req.user.tenantId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const { planId } = req.body;
+    if (!planId) {
+      return res.status(400).json({ message: 'Plan ID is required' });
+    }
+
+    const tenantId = req.user.tenantId;
+
+    // Get the target plan
+    const targetPlan = await db.query.subscriptionPlans.findFirst({
+      where: eq(subscriptionPlans.id, planId),
+    });
+
+    if (!targetPlan) {
+      return res.status(404).json({ message: 'Plan not found' });
+    }
+
+    // Get current usage and subscription in parallel
+    const [userLimits, shopLimits, emailLimits, currentSubscription] = await Promise.all([
+      storage.checkUserLimits(tenantId),
+      storage.checkShopLimits(tenantId),
+      storage.checkEmailLimits(tenantId),
+      storage.getTenantSubscription(tenantId),
+    ]);
+    const currentPlan = currentSubscription?.plan;
+
+    // Calculate impacts (resources that will be suspended)
+    const impacts: Array<{ resource: string; current: number; limit: number | null; willSuspend: number }> = [];
+
+    if (targetPlan.maxShops !== null && shopLimits.currentShops > targetPlan.maxShops) {
+      impacts.push({
+        resource: 'shops',
+        current: shopLimits.currentShops,
+        limit: targetPlan.maxShops,
+        willSuspend: shopLimits.currentShops - targetPlan.maxShops,
+      });
+    }
+
+    if (targetPlan.maxUsers !== null && userLimits.currentUsers > targetPlan.maxUsers) {
+      impacts.push({
+        resource: 'users',
+        current: userLimits.currentUsers,
+        limit: targetPlan.maxUsers,
+        willSuspend: userLimits.currentUsers - targetPlan.maxUsers,
+      });
+    }
+
+    // Determine feature losses
+    const featureLosses: string[] = [];
+    if (currentPlan?.allowUsersManagement && !targetPlan.allowUsersManagement) {
+      featureLosses.push('User management');
+    }
+    if (currentPlan?.allowRolesManagement && !targetPlan.allowRolesManagement) {
+      featureLosses.push('Role & permission management');
+    }
+
+    // Email limit change
+    const emailLimitChange = {
+      current: emailLimits.monthlyLimit,
+      new: targetPlan.monthlyEmailLimit,
+    };
+
+    // Billing info
+    const billing = {
+      currentPlan: currentPlan?.displayName || 'No Plan',
+      targetPlan: targetPlan.displayName,
+      currentPrice: currentPlan?.price || '0.00',
+      newPrice: targetPlan.price,
+      effectiveDate: currentSubscription?.currentPeriodEnd?.toISOString() || new Date().toISOString(),
+    };
+
+    res.json({
+      canDowngrade: true,
+      impacts,
+      featureLosses,
+      emailLimitChange,
+      billing,
+    });
+  } catch (error) {
+    console.error('Check downgrade error:', error);
+    res.status(500).json({ message: 'Failed to check downgrade eligibility' });
+  }
+});
+
+// Upgrade or downgrade subscription plan (Owner only)
+subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(["Owner"]), async (req: any, res) => {
+  try {
+    if (!req.user || !req.user.tenantId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const { planId, billingCycle } = req.body;
+    if (!planId) {
+      return res.status(400).json({ message: 'Plan ID is required' });
+    }
+
+    const tenantId = req.user.tenantId;
+
+    // Get the target plan
+    const targetPlan = await db.query.subscriptionPlans.findFirst({
+      where: eq(subscriptionPlans.id, planId),
+    });
+
+    if (!targetPlan) {
+      return res.status(404).json({ message: 'Plan not found' });
+    }
+
+    // Get existing subscription
+    const existingSubscription = await storage.getTenantSubscription(tenantId);
+    const currentPlan = existingSubscription?.plan;
+
+    // Determine if this is an upgrade or downgrade
+    const currentPrice = currentPlan ? parseFloat(currentPlan.price) : 0;
+    const targetPrice = parseFloat(targetPlan.price);
+    const isDowngrade = targetPrice < currentPrice;
+    const isDowngradeToFree = targetPlan.name === 'Free' || targetPrice === 0;
+
+    if (!existingSubscription) {
+      // No existing subscription — create one for the new plan
+      const startDate = new Date();
+      const isYearly = billingCycle === 'yearly';
+      const endDate = new Date(startDate);
+
+      if (isYearly) {
+        endDate.setFullYear(endDate.getFullYear() + 1);
+      } else {
+        endDate.setDate(endDate.getDate() + 30);
+      }
+
+      await db.insert(subscriptions).values({
+        tenantId,
+        userId: req.user.id,
+        planId: targetPlan.id,
+        stripeSubscriptionId: `manual_${tenantId}_${Date.now()}`,
+        stripeCustomerId: `manual_customer_${tenantId}`,
+        status: 'active',
+        currentPeriodStart: startDate,
+        currentPeriodEnd: endDate,
+        cancelAtPeriodEnd: false,
+        isYearly: isYearly,
+      });
+
+      return res.json({
+        message: `Successfully subscribed to ${targetPlan.displayName}`,
+        plan: targetPlan.displayName,
+      });
+    }
+
+    // === UPGRADE PATH ===
+    if (!isDowngrade) {
+      // Restore any previously suspended resources
+      const restored = await storage.restoreSuspendedResources(tenantId);
+
+      // Update subscription plan immediately
+      const upgradeStart = new Date();
+      const upgradeEnd = new Date(upgradeStart);
+      if (billingCycle === 'yearly') {
+        upgradeEnd.setFullYear(upgradeEnd.getFullYear() + 1);
+      } else {
+        upgradeEnd.setDate(upgradeEnd.getDate() + 30);
+      }
+
+      await db.update(subscriptions)
+        .set({
+          planId: targetPlan.id,
+          previousPlanId: existingSubscription.planId,
+          isYearly: billingCycle === 'yearly',
+          currentPeriodStart: upgradeStart,
+          currentPeriodEnd: upgradeEnd,
+          downgradeTargetPlanId: null,
+          downgradeScheduledAt: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(subscriptions.id, existingSubscription.id));
+
+      // Log audit event
+      try {
+        await storage.logShopLimitEvent(
+          tenantId,
+          'limit_increased' as any,
+          restored.restoredShops,
+          targetPlan.maxShops ?? undefined,
+          {
+            eventType: 'plan_upgrade',
+            previousPlan: currentPlan?.displayName,
+            newPlan: targetPlan.displayName,
+            restoredShops: restored.restoredShops,
+            restoredUsers: restored.restoredUsers,
+          }
+        );
+      } catch (auditError) {
+        console.error('Failed to log upgrade audit event:', auditError);
+      }
+
+      return res.json({
+        message: `Successfully upgraded to ${targetPlan.displayName}`,
+        plan: targetPlan.displayName,
+        restoredShops: restored.restoredShops,
+        restoredUsers: restored.restoredUsers,
+      });
+    }
+
+    // === DOWNGRADE PATH ===
+
+    // Suspend excess resources
+    const suspended = await storage.suspendExcessResources(
+      tenantId,
+      targetPlan.maxShops,
+      targetPlan.maxUsers,
+    );
+
+    // Update subscription plan
+    const downgradeStart = new Date();
+    const downgradeEnd = new Date(downgradeStart);
+    if (billingCycle === 'yearly') {
+      downgradeEnd.setFullYear(downgradeEnd.getFullYear() + 1);
+    } else {
+      downgradeEnd.setDate(downgradeEnd.getDate() + 30);
+    }
+
+    await db.update(subscriptions)
+      .set({
+        planId: targetPlan.id,
+        previousPlanId: existingSubscription.planId,
+        isYearly: billingCycle === 'yearly',
+        currentPeriodStart: downgradeStart,
+        currentPeriodEnd: downgradeEnd,
+        downgradeTargetPlanId: null,
+        downgradeScheduledAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptions.id, existingSubscription.id));
+
+    // For downgrade to Free: cancel the Stripe subscription at period end
+    if (isDowngradeToFree && stripe && existingSubscription.stripeSubscriptionId && !existingSubscription.stripeSubscriptionId.startsWith('manual_')) {
+      try {
+        await stripe.subscriptions.update(existingSubscription.stripeSubscriptionId, {
+          cancel_at_period_end: true,
+        });
+
+        await db.update(subscriptions)
+          .set({
+            cancelAtPeriodEnd: true,
+            canceledAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(subscriptions.id, existingSubscription.id));
+      } catch (stripeError) {
+        console.error('Failed to cancel Stripe subscription for Free downgrade:', stripeError);
+        // Non-blocking: the plan change still goes through
+      }
+    }
+
+    // Log audit event
+    try {
+      await storage.logShopLimitEvent(
+        tenantId,
+        'limit_exceeded' as any,
+        suspended.suspendedShops,
+        targetPlan.maxShops ?? undefined,
+        {
+          eventType: 'plan_downgrade',
+          previousPlan: currentPlan?.displayName,
+          newPlan: targetPlan.displayName,
+          suspendedShops: suspended.suspendedShops,
+          suspendedUsers: suspended.suspendedUsers,
+          isDowngradeToFree,
+        }
+      );
+    } catch (auditError) {
+      console.error('Failed to log downgrade audit event:', auditError);
+    }
+
+    res.json({
+      message: `Successfully downgraded to ${targetPlan.displayName}`,
+      plan: targetPlan.displayName,
+      suspendedShops: suspended.suspendedShops,
+      suspendedUsers: suspended.suspendedUsers,
+    });
+  } catch (error) {
+    console.error('Upgrade subscription error:', error);
+    res.status(500).json({ message: 'Failed to update subscription' });
+  }
+});
+
 // Get subscription usage
 subscriptionRoutes.get("/usage", authenticateToken, requireRole(["Owner"]), async (req: any, res) => {
   try {
@@ -534,7 +883,11 @@ async function handleCheckoutSessionCompleted(session: any) {
     }
 
     // Get subscription from Stripe
-    const subscription = await stripe.subscriptions.retrieve(session.subscription);
+    if (!stripe) {
+      console.error('Stripe is not initialized');
+      return;
+    }
+    const subscription = await stripe.subscriptions.retrieve(session.subscription) as any;
 
     // Create or update subscription in database
     await db.insert(db.subscriptions).values({
@@ -621,6 +974,10 @@ async function handleSubscriptionDeleted(subscription: any) {
 
 async function handlePaymentSucceeded(invoice: any) {
   try {
+    if (!stripe) {
+      console.error('Stripe is not initialized');
+      return;
+    }
     const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
 
     const dbSubscription = await db.query.subscriptions.findFirst({
@@ -647,6 +1004,10 @@ async function handlePaymentSucceeded(invoice: any) {
 
 async function handlePaymentFailed(invoice: any) {
   try {
+    if (!stripe) {
+      console.error('Stripe is not initialized');
+      return;
+    }
     const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
 
     const dbSubscription = await db.query.subscriptions.findFirst({

@@ -157,7 +157,24 @@
       "startYearlyPlan": "Start Yearly Plan",
       "startMonthlyPlan": "Start Monthly Plan",
       "needHelpChoosing": "Need help choosing?",
-      "contactSupportTeam": "Contact our support team"
+      "contactSupportTeam": "Contact our support team",
+      "downgradeConfirmTitle": "Confirm Plan Downgrade",
+      "downgradeConfirmDescription": "You are about to downgrade from {{currentPlan}} to {{targetPlan}}. Please review the following changes:",
+      "resourcesWillBeSuspended": "The following resources will be suspended:",
+      "willBeSuspended": "will be suspended",
+      "currentCount": "currently {{count}}",
+      "newLimit": "limit: {{count}}",
+      "featuresLost": "You will lose access to:",
+      "emailLimitChange": "Monthly email limit: {{current}} → {{new}}",
+      "unlimited": "Unlimited",
+      "dataPreserved": "Your data is safe!",
+      "dataPreservedDescription": "Suspended resources are never deleted. If you upgrade again in the future, all your data will be automatically restored.",
+      "cancelDowngrade": "Keep Current Plan",
+      "confirmDowngrade": "Confirm Downgrade",
+      "downgradeCheckError": "Downgrade Check Failed",
+      "downgradeCheckErrorDescription": "Unable to check downgrade eligibility. Please try again.",
+      "effectiveDateLabel": "When does this take effect?",
+      "effectiveDateNote": "Your plan will change on {{date}}. You'll continue on your current plan (${{currentPrice}}) until then, after which you'll be billed ${{newPrice}}."
     },
     "profileTab": {
       "title": "Personal Information",
@@ -1780,6 +1797,7 @@
     },
     "list": {
       "title": "Segment Lists",
+      "subtitle": "Organize your contacts into segments for targeted email campaigns",
       "noSegmentsFound": "No segments found",
       "tryAdjustingFilters": "Try adjusting your filters",
       "createFirstSegment": "Create your first segment to get started",
@@ -1836,6 +1854,41 @@
       "deleteSuccess": "Segment list deleted successfully",
       "deleteError": "Failed to delete segment list",
       "nameRequired": "Please enter a list name"
+    },
+    "segmentationModal": {
+      "title": "Customer Segmentation",
+      "description": "Choose how to target your audience for this segment",
+      "tabs": {
+        "all": "All Customers",
+        "selected": "Select Customers",
+        "tags": "Select by Tags"
+      },
+      "allTitle": "Send to All Customers",
+      "allDescription": "Your email will be sent to all active customers in your contact list",
+      "customerCount": "{{count}} customers",
+      "allSelectedHint": "All {{count}} contacts are selected. Uncheck any you don't want to include.",
+      "searchCustomers": "Search customers by name or email...",
+      "selectAll": "Select All",
+      "clearAll": "Clear All",
+      "selectedCount": "{{selected}} of {{total}} customers selected",
+      "allSelected": "All contacts selected",
+      "loadingContacts": "Loading contacts...",
+      "noSearchResults": "No customers found matching your search",
+      "noCustomers": "No customers available",
+      "more": "more",
+      "searchTags": "Search tags...",
+      "refreshTags": "Refresh tag counts",
+      "tagsSelectedCount": "{{selected}} of {{total}} tags selected",
+      "loadingTags": "Loading tags...",
+      "noTagsSearch": "No tags found matching your search",
+      "noTags": "No tags available",
+      "customer": "customer",
+      "customers": "customers",
+      "summaryAll": "All customers ({{count}} total)",
+      "summarySelected": "{{count}} selected customers",
+      "summaryTags": "{{count}} selected tags",
+      "cancel": "Cancel",
+      "save": "Save Selection"
     }
   },
   "management": {
@@ -1916,6 +1969,7 @@
     },
     "tags": {
       "title": "Tags",
+      "subtitle": "Create, organize, and manage tags for your contacts",
       "newTag": "New Tag",
       "cancel": "Cancel",
       "name": "Name",
@@ -1929,10 +1983,41 @@
       "creating": "Creating...",
       "save": "Save",
       "saving": "Saving...",
-      "contacts": "Contacts",
+      "contact": "contact",
+      "contacts": "contacts",
       "actions": "Actions",
       "loading": "Loading...",
       "noTags": "No tags yet",
+      "searchPlaceholder": "Search tags...",
+      "editTag": "Edit tag",
+      "deleteTag": "Delete tag",
+      "noResults": "No tags found matching \"{{query}}\"",
+      "stats": {
+        "totalTags": "Total Tags",
+        "totalContacts": "Tagged Contacts",
+        "colors": "Colors Used"
+      },
+      "listTitle": "Your Tags",
+      "listDescription": "Assign tags to contacts for better organization and segmentation",
+      "empty": {
+        "title": "No tags yet",
+        "description": "Tags help you organize contacts into groups for better management and targeted campaigns.",
+        "createFirst": "Create Your First Tag"
+      },
+      "createDialog": {
+        "title": "Create New Tag",
+        "description": "Add a new tag to organize and segment your contacts."
+      },
+      "editDialog": {
+        "title": "Edit Tag",
+        "description": "Update this tag's name, color, or description."
+      },
+      "deleteDialog": {
+        "title": "Delete Tag",
+        "description": "Are you sure you want to delete \"{{name}}\"? This will remove the tag from all contacts. This action cannot be undone.",
+        "delete": "Delete",
+        "deleting": "Deleting..."
+      },
       "toasts": {
         "created": "Tag created",
         "updated": "Tag updated",
@@ -2034,6 +2119,136 @@
       "managerId": "Manager",
       "tags": "Tags",
       "isActive": "Active"
+    }
+  },
+  "emailCampaigns": {
+    "title": "Email Campaigns",
+    "subtitle": "Manage and track your marketing campaigns across all channels",
+    "createCampaign": "Create Campaign",
+    "stats": {
+      "totalCampaigns": "Total Campaigns",
+      "allCampaignsCreated": "All campaigns created",
+      "activeCampaigns": "Active Campaigns",
+      "currentlyRunning": "Currently running",
+      "draftCampaigns": "Draft Campaigns",
+      "inPreparation": "In preparation",
+      "completedCampaigns": "Completed",
+      "successfullyFinished": "Successfully finished"
+    },
+    "list": {
+      "title": "All Campaigns",
+      "subtitle": "Browse, filter, and manage your marketing campaigns",
+      "noCampaignsFound": "No campaigns found",
+      "createFirstCampaign": "Get started by creating your first marketing campaign.",
+      "noResults": "No matching campaigns",
+      "tryAdjustingFilters": "Try adjusting your search or filters",
+      "notScheduled": "Not scheduled",
+      "impressions": "Impressions",
+      "clicks": "Clicks",
+      "start": "Start",
+      "end": "End"
+    },
+    "filters": {
+      "searchPlaceholder": "Search campaigns...",
+      "allStatuses": "All Status",
+      "allTypes": "All Types",
+      "draft": "Draft",
+      "active": "Active",
+      "paused": "Paused",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "email": "Email",
+      "sms": "SMS",
+      "push": "Push",
+      "social": "Social"
+    },
+    "actions": {
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "deleteDialog": {
+      "title": "Delete Campaign",
+      "description": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "deleting": "Deleting..."
+    },
+    "toasts": {
+      "success": "Success",
+      "error": "Error",
+      "deleteSuccess": "Campaign deleted successfully.",
+      "deleteError": "Failed to delete campaign."
+    },
+    "errorState": {
+      "title": "Failed to load campaigns",
+      "defaultMessage": "An error occurred while fetching campaigns."
+    },
+    "edit": {
+      "title": "Edit Campaign",
+      "subtitle": "Update your marketing campaign details and settings",
+      "backToCampaigns": "Back to Campaigns",
+      "notFoundTitle": "Campaign not found",
+      "notFoundDescription": "The campaign you're trying to edit doesn't exist or has been deleted.",
+      "basicInfo": {
+        "title": "Basic Information",
+        "description": "Edit core details of your marketing campaign.",
+        "name": "Campaign Name",
+        "namePlaceholder": "Enter campaign name",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "Describe your campaign objectives and strategy",
+        "type": "Campaign Type",
+        "typePlaceholder": "Select campaign type",
+        "typeEmail": "Email Marketing",
+        "typeSms": "SMS Marketing",
+        "typePush": "Push Notifications",
+        "typeSocial": "Social Media",
+        "status": "Status",
+        "statusPlaceholder": "Select status"
+      },
+      "budget": {
+        "title": "Budget & Timeline",
+        "description": "Manage your campaign budget and schedule.",
+        "budget": "Budget",
+        "budgetPlaceholder": "0.00",
+        "currency": "Currency",
+        "currencyPlaceholder": "Select currency",
+        "startDate": "Start Date",
+        "startDatePlaceholder": "Pick a start date",
+        "endDate": "End Date",
+        "endDatePlaceholder": "Pick an end date"
+      },
+      "goals": {
+        "title": "Goals & Targeting",
+        "description": "Define your campaign goals and target audience.",
+        "goalsLabel": "Campaign Goals",
+        "goalsPlaceholder": "Enter a campaign goal",
+        "addGoal": "Add",
+        "targetAudience": "Target Audience",
+        "targetAudiencePlaceholder": "Describe your target audience demographics, interests, and characteristics",
+        "kpis": "Key Performance Indicators (KPIs)",
+        "kpisPlaceholder": "Define success metrics and KPIs for this campaign (e.g., conversion rate, ROI, engagement rate)"
+      },
+      "review": {
+        "title": "Review & Approval",
+        "description": "Configure approval workflow for this campaign.",
+        "requiresApproval": "Requires Reviewer Approval",
+        "requiresApprovalDescription": "This campaign will require approval from a manager before it can be activated.",
+        "selectReviewer": "Select Reviewer",
+        "selectReviewerPlaceholder": "Select a manager",
+        "loadingManagers": "Loading managers...",
+        "noManagers": "No managers available"
+      },
+      "actions": {
+        "cancel": "Cancel",
+        "saving": "Saving...",
+        "saveChanges": "Save Changes"
+      },
+      "toasts": {
+        "success": "Success",
+        "updateSuccess": "Campaign updated successfully.",
+        "error": "Error",
+        "updateError": "Failed to update campaign."
+      }
     }
   }
 }

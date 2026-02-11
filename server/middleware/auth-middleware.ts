@@ -3,6 +3,7 @@ import { db } from '../db';
 import { betterAuthSession, betterAuthUser, tenants, rolePermissions } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { auth } from '../auth';
+import { storage } from '../storage';
 
 // Better Auth session-based authentication middleware
 export interface AuthUser {
@@ -410,4 +411,64 @@ export const requireValidTenant = async (req: AuthRequest, res: Response, next: 
   });
 
   next();
+};
+
+// Shop access gating middleware
+// Blocks access when the tenant's plan has maxShops === 0 (e.g. Free plan)
+export const requireShopAccess = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!req.user || !req.user.tenantId) {
+    return res.status(401).json({ message: 'Authentication required' });
+  }
+
+  try {
+    const plan = await storage.getTenantPlan(req.user.tenantId);
+
+    if (plan.maxShops === 0) {
+      return res.status(403).json({
+        message: `Your current plan (${plan.planName}) does not include shops. Please upgrade to access this feature.`,
+        upgradeRequired: true,
+        currentPlan: plan.planName,
+        feature: 'shops',
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error('Shop access check error:', error);
+    return res.status(500).json({ message: 'Failed to verify plan features' });
+  }
+};
+
+// Plan-based feature gating middleware
+// Checks the tenant's subscription plan and blocks access if the feature is not available.
+// Usage: requirePlanFeature('allowUsersManagement') or requirePlanFeature('allowRolesManagement')
+export const requirePlanFeature = (feature: 'allowUsersManagement' | 'allowRolesManagement') => {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    if (!req.user.tenantId) {
+      return res.status(400).json({ message: 'Tenant ID is required' });
+    }
+
+    try {
+      const plan = await storage.getTenantPlan(req.user.tenantId);
+
+      if (!plan[feature]) {
+        const featureLabel = feature === 'allowUsersManagement' ? 'user management' : 'roles & permissions management';
+        return res.status(403).json({
+          message: `Your current plan (${plan.planName}) does not include ${featureLabel}. Please upgrade to access this feature.`,
+          upgradeRequired: true,
+          currentPlan: plan.planName,
+          feature,
+        });
+      }
+
+      next();
+    } catch (error) {
+      console.error('Plan feature check error:', error);
+      return res.status(500).json({ message: 'Failed to verify plan features' });
+    }
+  };
 };

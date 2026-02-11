@@ -1,15 +1,16 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
 import {
   Users,
   Plus,
@@ -18,13 +19,14 @@ import {
   Edit,
   Trash2,
   Tag,
-  Mail,
   List,
   UserCheck,
   Target,
   Copy,
-  Eye,
   LayoutDashboard,
+  AlertTriangle,
+  BarChart3,
+  Calendar,
 } from "lucide-react";
 import {
   Dialog,
@@ -62,17 +64,58 @@ interface SegmentStats {
   averageListSize: number;
 }
 
+// --- Helper functions ---
+
+function getTypeIcon(type: string) {
+  switch (type) {
+    case "all":
+      return <Users className="h-4 w-4" />;
+    case "selected":
+      return <UserCheck className="h-4 w-4" />;
+    case "tags":
+      return <Tag className="h-4 w-4" />;
+    default:
+      return <List className="h-4 w-4" />;
+  }
+}
+
+function getTypeBadgeClasses(type: string) {
+  switch (type) {
+    case "all":
+      return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300";
+    case "selected":
+      return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300";
+    case "tags":
+      return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300";
+    default:
+      return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+  }
+}
+
+function getTypeBorderAccent(type: string) {
+  switch (type) {
+    case "all":
+      return "border-l-blue-500";
+    case "selected":
+      return "border-l-emerald-500";
+    case "tags":
+      return "border-l-purple-500";
+    default:
+      return "border-l-gray-400";
+  }
+}
+
 export default function SegmentationPage() {
   const { t } = useTranslation();
 
   // Set breadcrumbs in header
   useSetBreadcrumbs([
-    { label: t('navigation.dashboard'), href: "/", icon: LayoutDashboard },
-    { label: t('segmentation.title'), icon: Target }
+    { label: t("navigation.dashboard"), href: "/", icon: LayoutDashboard },
+    { label: t("segmentation.title"), icon: Target },
   ]);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all_types");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -116,15 +159,18 @@ export default function SegmentationPage() {
   };
 
   // Filter lists
-  const filteredLists = lists.filter((list) => {
-    const matchesSearch =
-      list.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (list.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
-    const matchesType = typeFilter === "all" || list.type === typeFilter;
-    return matchesSearch && matchesType;
-  });
+  const filteredLists = useMemo(() => {
+    return lists.filter((list) => {
+      const matchesSearch =
+        list.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (list.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
+      const matchesType = typeFilter === "all_types" || list.type === typeFilter;
+      return matchesSearch && matchesType;
+    });
+  }, [lists, searchQuery, typeFilter]);
 
-  // Create mutation
+  // --- Mutations ---
+
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const response = await apiRequest("POST", "/api/segment-lists", data);
@@ -134,22 +180,21 @@ export default function SegmentationPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/segment-lists"] });
       queryClient.invalidateQueries({ queryKey: ["/api/segment-lists-stats"] });
       toast({
-        title: t('segmentation.toasts.success'),
-        description: t('segmentation.toasts.createSuccess'),
+        title: t("segmentation.toasts.success"),
+        description: t("segmentation.toasts.createSuccess"),
       });
       setIsCreateModalOpen(false);
       resetForm();
     },
     onError: (error: any) => {
       toast({
-        title: t('segmentation.toasts.error'),
-        description: error.message || t('segmentation.toasts.createError'),
+        title: t("segmentation.toasts.error"),
+        description: error.message || t("segmentation.toasts.createError"),
         variant: "destructive",
       });
     },
   });
 
-  // Update mutation
   const updateMutation = useMutation({
     mutationFn: async (data: { id: string } & typeof formData) => {
       const response = await apiRequest("PATCH", `/api/segment-lists/${data.id}`, data);
@@ -159,22 +204,21 @@ export default function SegmentationPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/segment-lists"] });
       queryClient.invalidateQueries({ queryKey: ["/api/segment-lists-stats"] });
       toast({
-        title: t('segmentation.toasts.success'),
-        description: t('segmentation.toasts.updateSuccess'),
+        title: t("segmentation.toasts.success"),
+        description: t("segmentation.toasts.updateSuccess"),
       });
       setIsEditModalOpen(false);
       resetForm();
     },
     onError: (error: any) => {
       toast({
-        title: t('segmentation.toasts.error'),
-        description: error.message || t('segmentation.toasts.updateError'),
+        title: t("segmentation.toasts.error"),
+        description: error.message || t("segmentation.toasts.updateError"),
         variant: "destructive",
       });
     },
   });
 
-  // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const response = await apiRequest("DELETE", `/api/segment-lists/${id}`);
@@ -184,20 +228,22 @@ export default function SegmentationPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/segment-lists"] });
       queryClient.invalidateQueries({ queryKey: ["/api/segment-lists-stats"] });
       toast({
-        title: t('segmentation.toasts.success'),
-        description: t('segmentation.toasts.deleteSuccess'),
+        title: t("segmentation.toasts.success"),
+        description: t("segmentation.toasts.deleteSuccess"),
       });
       setIsDeleteModalOpen(false);
       setSelectedList(null);
     },
     onError: (error: any) => {
       toast({
-        title: t('segmentation.toasts.error'),
-        description: error.message || t('segmentation.toasts.deleteError'),
+        title: t("segmentation.toasts.error"),
+        description: error.message || t("segmentation.toasts.deleteError"),
         variant: "destructive",
       });
     },
   });
+
+  // --- Handlers ---
 
   const resetForm = () => {
     setFormData({
@@ -246,8 +292,8 @@ export default function SegmentationPage() {
   const handleSubmitCreate = () => {
     if (!formData.name.trim()) {
       toast({
-        title: t('segmentation.toasts.error'),
-        description: t('segmentation.toasts.nameRequired'),
+        title: t("segmentation.toasts.error"),
+        description: t("segmentation.toasts.nameRequired"),
         variant: "destructive",
       });
       return;
@@ -258,8 +304,8 @@ export default function SegmentationPage() {
   const handleSubmitEdit = () => {
     if (!formData.name.trim()) {
       toast({
-        title: t('segmentation.toasts.error'),
-        description: t('segmentation.toasts.nameRequired'),
+        title: t("segmentation.toasts.error"),
+        description: t("segmentation.toasts.nameRequired"),
         variant: "destructive",
       });
       return;
@@ -282,320 +328,542 @@ export default function SegmentationPage() {
     });
   };
 
-  const getTypeIcon = (type: string) => {
+  const getTypeLabel = (type: string) => {
     switch (type) {
       case "all":
-        return <Users className="h-4 w-4" />;
+        return t("segmentation.filters.allCustomers");
       case "selected":
-        return <UserCheck className="h-4 w-4" />;
+        return t("segmentation.list.selected", "Selected");
       case "tags":
-        return <Tag className="h-4 w-4" />;
+        return t("segmentation.list.tags", "Tags");
       default:
-        return <List className="h-4 w-4" />;
+        return type;
     }
   };
 
-  const getTypeBadgeColor = (type: string) => {
-    switch (type) {
-      case "all":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
-      case "selected":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-      case "tags":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
-    }
-  };
+  // --- Loading Skeleton ---
+  if (listsLoading) {
+    return (
+      <div className="container mx-auto p-4 lg:p-6 space-y-6">
+        {/* Header skeleton */}
+        <div className="flex items-center justify-between bg-card p-6 rounded-xl border shadow-sm animate-pulse">
+          <div>
+            <div className="h-7 w-48 bg-muted rounded mb-2" />
+            <div className="h-4 w-72 bg-muted rounded" />
+          </div>
+          <div className="h-10 w-36 bg-muted rounded" />
+        </div>
+
+        {/* Stat cards skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-5">
+                <div className="h-4 bg-muted rounded w-1/3 mb-3" />
+                <div className="h-7 bg-muted rounded w-1/2 mb-1" />
+                <div className="h-3 bg-muted rounded w-2/3" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* List skeleton */}
+        <Card className="animate-pulse">
+          <CardContent className="p-6">
+            <div className="h-9 bg-muted rounded w-full max-w-sm mb-5" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-40 bg-muted rounded-lg" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto p-4 lg:p-6 space-y-6 lg:space-y-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
-            {t('segmentation.title')}
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            {t('segmentation.subtitle')}
-          </p>
+    <div className="container mx-auto p-4 lg:p-6 space-y-6">
+      {/* ── Hero Header ── */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card p-6 rounded-xl border shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg text-indigo-600 dark:text-indigo-400">
+            <Target className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-foreground">
+              {t("segmentation.title")}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {t("segmentation.subtitle")}
+            </p>
+          </div>
         </div>
-        <Button onClick={handleCreate}>
-          <Plus className="h-4 w-4 mr-2" />
-          {t('segmentation.createSegment')}
+
+        <Button onClick={handleCreate} className="shrink-0">
+          <Plus className="h-4 w-4 mr-1.5" />
+          {t("segmentation.createSegment")}
         </Button>
       </div>
 
-      {/* Segments List */}
+      {/* ── Stat Cards ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300 hover:shadow-md">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  {t("segmentation.stats.totalSegments")}
+                </p>
+                <p className="text-2xl font-bold mt-1 text-foreground">
+                  {stats.totalLists}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {t("segmentation.stats.activeSegmentLists")}
+                </p>
+              </div>
+              <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+                <Target className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300 hover:shadow-md">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  {t("segmentation.stats.totalContacts")}
+                </p>
+                <p className="text-2xl font-bold mt-1 text-foreground">
+                  {stats.totalContacts}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {t("segmentation.stats.acrossAllSegments")}
+                </p>
+              </div>
+              <div className="p-2.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                <Users className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300 hover:shadow-md">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  {t("segmentation.stats.avgSegmentSize")}
+                </p>
+                <p className="text-2xl font-bold mt-1 text-foreground">
+                  {stats.averageListSize}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {t("segmentation.stats.contactsPerSegment")}
+                </p>
+              </div>
+              <div className="p-2.5 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                <BarChart3 className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Segments List ── */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="h-5 w-5" />
-            {t('segmentation.list.title')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardHeader className="pb-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-base">
+                {t("segmentation.list.title")}
+              </CardTitle>
+              <CardDescription className="mt-0.5">
+                {t(
+                  "segmentation.list.subtitle",
+                  "Organize your contacts into segments for targeted email campaigns"
+                )}
+              </CardDescription>
+            </div>
+          </div>
+
           {/* Filters and Search */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row gap-3 mt-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder={t('segmentation.filters.searchPlaceholder')}
+                placeholder={t("segmentation.filters.searchPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-9 h-9 text-sm"
               />
             </div>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-full sm:w-[200px]">
-                <SelectValue placeholder={t('segmentation.filters.filterByType')} />
+              <SelectTrigger className="w-full sm:w-[200px] h-9 text-sm">
+                <SelectValue placeholder={t("segmentation.filters.filterByType")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t('segmentation.filters.allTypes')}</SelectItem>
-                <SelectItem value="allCustomers">{t('segmentation.filters.allCustomers')}</SelectItem>
-                <SelectItem value="selected">{t('segmentation.filters.selectedCustomers')}</SelectItem>
-                <SelectItem value="tags">{t('segmentation.filters.tagBased')}</SelectItem>
+                <SelectItem value="all_types">{t("segmentation.filters.allTypes")}</SelectItem>
+                <SelectItem value="all">{t("segmentation.filters.allCustomers")}</SelectItem>
+                <SelectItem value="selected">{t("segmentation.filters.selectedCustomers")}</SelectItem>
+                <SelectItem value="tags">{t("segmentation.filters.tagBased")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
+        </CardHeader>
 
-          {/* Segments Content */}
-          {listsLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <CardContent className="pt-0">
+          {filteredLists.length === 0 && lists.length === 0 ? (
+            /* Empty state */
+            <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+              <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-full mb-4">
+                <Target className="h-10 w-10 text-indigo-500 dark:text-indigo-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-1">
+                {t("segmentation.list.noSegmentsFound")}
+              </h3>
+              <p className="text-sm text-muted-foreground max-w-sm mb-6">
+                {t("segmentation.list.createFirstSegment")}
+              </p>
+              <Button onClick={handleCreate}>
+                <Plus className="h-4 w-4 mr-1.5" />
+                {t("segmentation.createSegment")}
+              </Button>
             </div>
           ) : filteredLists.length === 0 ? (
-            <div className="text-center py-12">
-              <Target className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                {t('segmentation.list.noSegmentsFound')}
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
-                {searchQuery || typeFilter !== "all"
-                  ? t('segmentation.list.tryAdjustingFilters')
-                  : t('segmentation.list.createFirstSegment')}
+            /* No search results */
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Search className="h-8 w-8 text-muted-foreground mb-3" />
+              <p className="text-sm font-medium text-foreground mb-1">
+                {t("segmentation.list.noSegmentsFound")}
               </p>
-              {!searchQuery && typeFilter === "all" && (
-                <Button onClick={handleCreate} className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  {t('segmentation.createSegment')}
-                </Button>
-              )}
+              <p className="text-sm text-muted-foreground">
+                {t("segmentation.list.tryAdjustingFilters")}
+              </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
+            /* Segment cards */
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {filteredLists.map((list) => (
-                <Card key={list.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="space-y-4">
-                      {/* Header with name and type */}
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-lg text-gray-900 dark:text-white mb-1">
-                            {list.name}
-                          </h3>
-                          <Badge className={`gap-1 ${getTypeBadgeColor(list.type)}`}>
-                            {getTypeIcon(list.type)}
-                            {list.type === "all"
-                              ? t('segmentation.filters.allCustomers')
-                              : list.type === "selected"
-                              ? t('segmentation.list.selected')
-                              : t('segmentation.list.tags')}
-                          </Badge>
-                        </div>
-                      </div>
-
-                      {/* Description */}
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        {list.description ? (
-                          <p className="line-clamp-2">{list.description}</p>
-                        ) : (
-                          <p className="text-gray-400 italic">{t('segmentation.list.noDescription')}</p>
-                        )}
-                      </div>
-
-                      {/* Stats */}
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
-                          <Users className="h-4 w-4" />
-                          <span>{list.contactCount} {t('segmentation.list.contacts')}</span>
-                        </div>
-                        <div className="text-gray-500 dark:text-gray-500">
-                          {new Date(list.createdAt).toLocaleDateString()}
-                        </div>
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex items-center gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(list)}
-                          className="flex-1"
+                <div
+                  key={list.id}
+                  className={`group relative rounded-lg border border-l-4 ${getTypeBorderAccent(
+                    list.type
+                  )} bg-white/50 dark:bg-gray-800/30 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200`}
+                >
+                  <div className="p-5 space-y-3">
+                    {/* Header with name and type */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-base text-foreground truncate mb-1.5">
+                          {list.name}
+                        </h3>
+                        <Badge
+                          variant="secondary"
+                          className={`gap-1 text-[11px] font-medium ${getTypeBadgeClasses(
+                            list.type
+                          )}`}
                         >
-                          <Edit className="h-4 w-4 mr-1" />
-                          {t('segmentation.actions.edit')}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDuplicate(list)}
-                          className="flex-1"
-                        >
-                          <Copy className="h-4 w-4 mr-1" />
-                          {t('segmentation.actions.duplicate')}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelete(list)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                          {getTypeIcon(list.type)}
+                          {getTypeLabel(list.type)}
+                        </Badge>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+
+                    {/* Description */}
+                    <div className="text-sm text-muted-foreground min-h-[2.5rem]">
+                      {list.description ? (
+                        <p className="line-clamp-2">{list.description}</p>
+                      ) : (
+                        <p className="italic opacity-60">
+                          {t("segmentation.list.noDescription")}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Stats row */}
+                    <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+                      <div className="flex items-center gap-1.5">
+                        <Users className="h-3.5 w-3.5" />
+                        <span className="font-medium">
+                          {list.contactCount}{" "}
+                          {t("segmentation.list.contacts")}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5" />
+                        <span>{new Date(list.createdAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(list)}
+                        className="flex-1 h-8 text-xs hover:bg-muted"
+                      >
+                        <Edit className="h-3.5 w-3.5 mr-1" />
+                        {t("segmentation.actions.edit")}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDuplicate(list)}
+                        className="flex-1 h-8 text-xs hover:bg-muted"
+                      >
+                        <Copy className="h-3.5 w-3.5 mr-1" />
+                        {t("segmentation.actions.duplicate")}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(list)}
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-red-50 dark:hover:bg-red-950/50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Create Modal */}
+      {/* ──────── CREATE DIALOG ──────── */}
       <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{t('segmentation.createModal.title')}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="p-1.5 bg-indigo-50 dark:bg-indigo-900/20 rounded-md">
+                <Plus className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              {t("segmentation.createModal.title")}
+            </DialogTitle>
             <DialogDescription>
-              {t('segmentation.createModal.description')}
+              {t("segmentation.createModal.description")}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+
+          <div className="space-y-5 py-2">
             <div className="space-y-2">
-              <Label htmlFor="name">{t('segmentation.createModal.nameLabel')}</Label>
+              <Label htmlFor="name">{t("segmentation.createModal.nameLabel")}</Label>
               <Input
                 id="name"
-                placeholder={t('segmentation.createModal.namePlaceholder')}
+                placeholder={t("segmentation.createModal.namePlaceholder")}
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                autoFocus
               />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="description">{t('segmentation.createModal.descriptionLabel')}</Label>
+              <Label htmlFor="description">{t("segmentation.createModal.descriptionLabel")}</Label>
               <Textarea
                 id="description"
-                placeholder={t('segmentation.createModal.descriptionPlaceholder')}
+                placeholder={t("segmentation.createModal.descriptionPlaceholder")}
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
                 rows={3}
               />
             </div>
+
+            <Separator />
+
             <div className="space-y-2">
-              <Label>{t('segmentation.createModal.segmentCriteria')}</Label>
+              <Label>{t("segmentation.createModal.segmentCriteria")}</Label>
               <Button
                 type="button"
                 variant="outline"
-                className="w-full justify-start"
+                className="w-full justify-start h-10 text-sm"
                 onClick={() => setIsSegmentationModalOpen(true)}
               >
-                <Filter className="h-4 w-4 mr-2" />
+                <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
                 {formData.type === "all"
-                  ? t('segmentation.filters.allCustomers')
+                  ? t("segmentation.filters.allCustomers")
                   : formData.type === "selected"
-                  ? t('segmentation.createModal.selectedCustomers', { count: formData.selectedContactIds.length })
-                  : t('segmentation.createModal.selectedTags', { count: formData.selectedTagIds.length })}
+                    ? t("segmentation.createModal.selectedCustomers", {
+                      count: formData.selectedContactIds.length,
+                    })
+                    : t("segmentation.createModal.selectedTags", {
+                      count: formData.selectedTagIds.length,
+                    })}
               </Button>
+
+              {/* Visual summary of selection */}
+              {formData.type !== "all" && (
+                <div className="flex items-center gap-2 p-2.5 rounded-md bg-muted/50 border text-xs text-muted-foreground">
+                  {getTypeIcon(formData.type)}
+                  <span className="font-medium">
+                    {formData.type === "selected"
+                      ? `${formData.selectedContactIds.length} ${t("segmentation.list.contacts")}`
+                      : `${formData.selectedTagIds.length} ${t("segmentation.list.tags")}`}
+                  </span>
+                  <Badge variant="secondary" className={`ml-auto text-[10px] ${getTypeBadgeClasses(formData.type)}`}>
+                    {getTypeLabel(formData.type)}
+                  </Badge>
+                </div>
+              )}
             </div>
           </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>
-              {t('segmentation.createModal.cancel')}
+              {t("segmentation.createModal.cancel")}
             </Button>
             <Button onClick={handleSubmitCreate} disabled={createMutation.isPending}>
-              {createMutation.isPending ? t('segmentation.createModal.creating') : t('segmentation.createModal.create')}
+              {createMutation.isPending
+                ? t("segmentation.createModal.creating")
+                : t("segmentation.createModal.create")}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Modal */}
+      {/* ──────── EDIT DIALOG ──────── */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{t('segmentation.editModal.title')}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="p-1.5 bg-amber-50 dark:bg-amber-900/20 rounded-md">
+                <Edit className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              </div>
+              {t("segmentation.editModal.title")}
+            </DialogTitle>
             <DialogDescription>
-              {t('segmentation.editModal.description')}
+              {t("segmentation.editModal.description")}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+
+          <div className="space-y-5 py-2">
             <div className="space-y-2">
-              <Label htmlFor="edit-name">{t('segmentation.editModal.nameLabel')}</Label>
+              <Label htmlFor="edit-name">{t("segmentation.editModal.nameLabel")}</Label>
               <Input
                 id="edit-name"
-                placeholder={t('segmentation.editModal.namePlaceholder')}
+                placeholder={t("segmentation.editModal.namePlaceholder")}
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                autoFocus
               />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="edit-description">{t('segmentation.editModal.descriptionLabel')}</Label>
+              <Label htmlFor="edit-description">{t("segmentation.editModal.descriptionLabel")}</Label>
               <Textarea
                 id="edit-description"
-                placeholder={t('segmentation.editModal.descriptionPlaceholder')}
+                placeholder={t("segmentation.editModal.descriptionPlaceholder")}
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
                 rows={3}
               />
             </div>
+
+            <Separator />
+
             <div className="space-y-2">
-              <Label>{t('segmentation.editModal.segmentCriteria')}</Label>
+              <Label>{t("segmentation.editModal.segmentCriteria")}</Label>
               <Button
                 type="button"
                 variant="outline"
-                className="w-full justify-start"
+                className="w-full justify-start h-10 text-sm"
                 onClick={() => setIsSegmentationModalOpen(true)}
               >
-                <Filter className="h-4 w-4 mr-2" />
+                <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
                 {formData.type === "all"
-                  ? t('segmentation.filters.allCustomers')
+                  ? t("segmentation.filters.allCustomers")
                   : formData.type === "selected"
-                  ? t('segmentation.createModal.selectedCustomers', { count: formData.selectedContactIds.length })
-                  : t('segmentation.createModal.selectedTags', { count: formData.selectedTagIds.length })}
+                    ? t("segmentation.createModal.selectedCustomers", {
+                      count: formData.selectedContactIds.length,
+                    })
+                    : t("segmentation.createModal.selectedTags", {
+                      count: formData.selectedTagIds.length,
+                    })}
               </Button>
+
+              {/* Visual summary of selection */}
+              {formData.type !== "all" && (
+                <div className="flex items-center gap-2 p-2.5 rounded-md bg-muted/50 border text-xs text-muted-foreground">
+                  {getTypeIcon(formData.type)}
+                  <span className="font-medium">
+                    {formData.type === "selected"
+                      ? `${formData.selectedContactIds.length} ${t("segmentation.list.contacts")}`
+                      : `${formData.selectedTagIds.length} ${t("segmentation.list.tags")}`}
+                  </span>
+                  <Badge variant="secondary" className={`ml-auto text-[10px] ${getTypeBadgeClasses(formData.type)}`}>
+                    {getTypeLabel(formData.type)}
+                  </Badge>
+                </div>
+              )}
             </div>
           </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
-              {t('segmentation.editModal.cancel')}
+              {t("segmentation.editModal.cancel")}
             </Button>
             <Button onClick={handleSubmitEdit} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? t('segmentation.editModal.saving') : t('segmentation.editModal.save')}
+              {updateMutation.isPending
+                ? t("segmentation.editModal.saving")
+                : t("segmentation.editModal.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Modal */}
+      {/* ──────── DELETE CONFIRMATION DIALOG ──────── */}
       <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
-            <DialogTitle>{t('segmentation.deleteModal.title')}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="p-1.5 bg-red-50 dark:bg-red-900/20 rounded-md">
+                <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+              </div>
+              {t("segmentation.deleteModal.title")}
+            </DialogTitle>
             <DialogDescription>
-              {t('segmentation.deleteModal.description', { name: selectedList?.name })}
+              {t("segmentation.deleteModal.description", {
+                name: selectedList?.name,
+              })}
             </DialogDescription>
           </DialogHeader>
+
+          {/* Segment preview in delete dialog */}
+          {selectedList && (
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border my-2">
+              <div className="flex items-center gap-2">
+                {getTypeIcon(selectedList.type)}
+                <span className="text-sm font-medium">{selectedList.name}</span>
+              </div>
+              <div className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Users className="h-3.5 w-3.5" />
+                {selectedList.contactCount} {t("segmentation.list.contacts")}
+              </div>
+            </div>
+          )}
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)}>
-              {t('segmentation.deleteModal.cancel')}
+              {t("segmentation.deleteModal.cancel")}
             </Button>
             <Button
               variant="destructive"
               onClick={() => selectedList && deleteMutation.mutate(selectedList.id)}
               disabled={deleteMutation.isPending}
             >
-              {deleteMutation.isPending ? t('segmentation.deleteModal.deleting') : t('segmentation.deleteModal.delete')}
+              {deleteMutation.isPending
+                ? t("segmentation.deleteModal.deleting")
+                : t("segmentation.deleteModal.delete")}
             </Button>
           </DialogFooter>
         </DialogContent>

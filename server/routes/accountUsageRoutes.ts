@@ -68,7 +68,7 @@ accountUsageRoutes.get('/', authenticateToken, requirePermission('account_usage.
         currentPeriodStart: periodStart,
         currentPeriodEnd: periodEnd
       } : {
-        planName: 'Basic (Free)',
+        planName: 'Free Plan',
         status: 'active',
         currentPeriodStart: periodStart,
         currentPeriodEnd: periodEnd
