@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -8,12 +8,29 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ArrowLeft, Calendar, Clock, Mail, AlertTriangle, Eye } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Mail, AlertTriangle, Eye, Paperclip, X, FileText, Image, FileSpreadsheet, File } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { TemplateSelector } from "@/components/TemplateSelector";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TIMEZONE_OPTIONS } from "@/utils/appointment-utils";
 import { useToast } from "@/hooks/use-toast";
+
+// 40MB total limit (including base64 overhead ~33%)
+const MAX_TOTAL_RAW_SIZE = 30 * 1024 * 1024; // 30MB raw = ~40MB after base64
+const MAX_FILES = 10;
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getFileIcon(type: string) {
+  if (type.startsWith("image/")) return Image;
+  if (type.includes("spreadsheet") || type.includes("excel") || type === "text/csv") return FileSpreadsheet;
+  if (type.includes("pdf") || type.includes("word") || type.includes("document") || type === "text/plain") return FileText;
+  return File;
+}
 
 export default function ScheduleContactEmailPage() {
   const { id } = useParams();
@@ -25,7 +42,60 @@ export default function ScheduleContactEmailPage() {
   const [isUsingTemplate, setIsUsingTemplate] = useState(false);
   const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Chicago");
   const [showPreview, setShowPreview] = useState(false);
+  const [attachments, setAttachments] = useState<globalThis.File[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const totalAttachmentSize = attachments.reduce((sum, f) => sum + f.size, 0);
+  const estimatedBase64Size = Math.ceil(totalAttachmentSize / 3) * 4;
+
+  const addFiles = useCallback((files: FileList | globalThis.File[]) => {
+    const newFiles = Array.from(files);
+    setAttachments((prev) => {
+      const combined = [...prev, ...newFiles];
+      if (combined.length > MAX_FILES) {
+        toast({
+          title: "Too many files",
+          description: `Maximum ${MAX_FILES} attachments allowed.`,
+          variant: "destructive",
+        });
+        return prev;
+      }
+      const newTotal = combined.reduce((s, f) => s + f.size, 0);
+      if (newTotal > MAX_TOTAL_RAW_SIZE) {
+        toast({
+          title: "Attachments too large",
+          description: `Total size (${formatFileSize(newTotal)}) exceeds the ~30MB limit (40MB after encoding).`,
+          variant: "destructive",
+        });
+        return prev;
+      }
+      return combined;
+    });
+  }, [toast]);
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (e.dataTransfer.files.length > 0) {
+      addFiles(e.dataTransfer.files);
+    }
+  }, [addFiles]);
 
   // Load contact for context and validation
   const { data: contactResp, isLoading: contactLoading, error: contactError } = useQuery({
@@ -77,14 +147,40 @@ export default function ScheduleContactEmailPage() {
 
   const scheduleMutation = useMutation({
     mutationFn: async () => {
-      // Send raw date + time + timezone to the backend for proper UTC conversion
-      return apiRequest("POST", `/api/email-contacts/${id}/schedule`, {
-        subject,
-        html: content,
-        date,
-        time: time || "00:00",
-        timezone,
-      }).then((r) => r.json());
+      if (attachments.length > 0) {
+        // Use FormData for multipart/form-data when attachments are present
+        const formData = new FormData();
+        formData.append("subject", subject);
+        formData.append("html", content);
+        formData.append("date", date);
+        formData.append("time", time || "00:00");
+        formData.append("timezone", timezone);
+        attachments.forEach((file) => {
+          formData.append("attachments", file);
+        });
+
+        const response = await fetch(`/api/email-contacts/${id}/schedule`, {
+          method: "POST",
+          credentials: "include",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.message || `Failed to schedule email (${response.status})`);
+        }
+
+        return response.json();
+      } else {
+        // Use JSON when no attachments (standard path)
+        return apiRequest("POST", `/api/email-contacts/${id}/schedule`, {
+          subject,
+          html: content,
+          date,
+          time: time || "00:00",
+          timezone,
+        }).then((r) => r.json());
+      }
     },
     onSuccess: () => {
       toast({
@@ -216,6 +312,70 @@ export default function ScheduleContactEmailPage() {
                   placeholder="Write your email..."
                   className="mt-2 min-h-[220px]"
                 />
+              )}
+            </div>
+
+            {/* Attachments */}
+            <div>
+              <Label>Attachments</Label>
+              <div
+                className={`mt-2 border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
+                  isDragOver
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20"
+                    : "border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"
+                }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Paperclip className="w-5 h-5 mx-auto mb-1 text-gray-400" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Drop files here or <span className="text-blue-600 dark:text-blue-400 font-medium">browse</span>
+                </p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  Max {MAX_FILES} files, 40MB total (PDF, images, docs, spreadsheets, etc.)
+                </p>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files) addFiles(e.target.files);
+                  e.target.value = "";
+                }}
+                disabled={scheduleMutation.isPending}
+              />
+
+              {attachments.length > 0 && (
+                <div className="space-y-1.5 mt-2">
+                  {attachments.map((file, idx) => {
+                    const Icon = getFileIcon(file.type);
+                    return (
+                      <div
+                        key={`${file.name}-${idx}`}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-800 rounded-md text-sm"
+                      >
+                        <Icon className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                        <span className="truncate flex-1 text-gray-700 dark:text-gray-300">{file.name}</span>
+                        <span className="text-xs text-gray-400 flex-shrink-0">{formatFileSize(file.size)}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); removeAttachment(idx); }}
+                          className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
+                          disabled={scheduleMutation.isPending}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                    {attachments.length} file{attachments.length !== 1 ? "s" : ""} &middot; {formatFileSize(totalAttachmentSize)} raw &middot; ~{formatFileSize(estimatedBase64Size)} encoded
+                  </p>
+                </div>
               )}
             </div>
           </CardContent>

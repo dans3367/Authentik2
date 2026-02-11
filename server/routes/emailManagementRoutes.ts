@@ -13,6 +13,7 @@ import { enhancedEmailService } from '../emailService';
 import crypto from 'crypto';
 import { logActivity, computeChanges, allowedActivityTypes } from '../utils/activityLogger';
 import xss from 'xss';
+import { emailAttachmentUpload, validateAttachmentSize, filesToBase64Attachments, handleEmailAttachmentError } from '../middleware/emailAttachmentUpload';
 
 // Sanitize HTML content for emails - allows safe formatting tags, strips scripts and event handlers
 export function sanitizeEmailHtml(html: string): string {
@@ -1562,12 +1563,36 @@ emailManagementRoutes.delete("/email-contacts/:contactId/lists/:listId", authent
   }
 });
 
-// Schedule a single B2C email for a contact (Send Later)
-emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
+// Schedule a single B2C email for a contact (Send Later) - supports both JSON and multipart/form-data with attachments
+emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, requireTenant, requirePermission('contacts.edit'), (req: any, res: any, next: any) => {
+  // Only run multer for multipart/form-data requests (when attachments are present)
+  const contentType = req.headers['content-type'] || '';
+  if (contentType.includes('multipart/form-data')) {
+    emailAttachmentUpload(req, res, (err: any) => {
+      if (err) {
+        return res.status(400).json({ message: handleEmailAttachmentError(err) });
+      }
+      next();
+    });
+  } else {
+    next();
+  }
+}, async (req: any, res) => {
   try {
     const { id } = req.params;
     const { subject, html, text, date, time, timezone, scheduleAt } = req.body || {};
     const tenantId = req.user.tenantId;
+
+    // Process attachments if present
+    const uploadedFiles = (req.files as Express.Multer.File[]) || [];
+    const sizeCheck = validateAttachmentSize(uploadedFiles);
+    if (!sizeCheck.valid) {
+      return res.status(400).json({ message: sizeCheck.error });
+    }
+    const base64Attachments = filesToBase64Attachments(uploadedFiles);
+    if (base64Attachments.length > 0) {
+      console.log(`📎 [ScheduleEmail] ${base64Attachments.length} attachment(s) included, total raw size: ${uploadedFiles.reduce((s, f) => s + f.size, 0)} bytes`);
+    }
 
     console.log(`📅 [ScheduleEmail] Starting email schedule request for contact ${id}, tenant ${tenantId}`);
 
@@ -1881,6 +1906,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
         tenantId,
         scheduledBy: req.user.id,
         emailTrackingId,
+        ...(base64Attachments.length > 0 && { attachments: base64Attachments }),
       });
 
       if (!result.success) {
@@ -4309,12 +4335,37 @@ export function renderBirthdayTemplate(
   </html>`;
 }
 
-// Send individual email to a contact
-emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
+// Send individual email to a contact (supports both JSON and multipart/form-data with attachments)
+emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireTenant, requirePermission('contacts.edit'), (req: any, res: any, next: any) => {
+  // Only run multer for multipart/form-data requests (when attachments are present)
+  const contentType = req.headers['content-type'] || '';
+  if (contentType.includes('multipart/form-data')) {
+    emailAttachmentUpload(req, res, (err: any) => {
+      if (err) {
+        return res.status(400).json({ message: handleEmailAttachmentError(err) });
+      }
+      next();
+    });
+  } else {
+    next();
+  }
+}, async (req: any, res) => {
   try {
     const { id } = req.params;
-    const { subject, content } = req.body;
     const tenantId = req.user.tenantId;
+
+    const { subject, content } = req.body;
+
+    // Process attachments if present
+    const uploadedFiles = (req.files as Express.Multer.File[]) || [];
+    const sizeCheck = validateAttachmentSize(uploadedFiles);
+    if (!sizeCheck.valid) {
+      return res.status(400).json({ message: sizeCheck.error });
+    }
+    const base64Attachments = filesToBase64Attachments(uploadedFiles);
+    if (base64Attachments.length > 0) {
+      console.log(`📎 [SendEmail] ${base64Attachments.length} attachment(s) included, total raw size: ${uploadedFiles.reduce((s, f) => s + f.size, 0)} bytes`);
+    }
 
     console.log(`📧 [SendEmail] Starting individual email send for contact ${id}, tenant ${tenantId}`);
 
@@ -4531,7 +4582,8 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
           tenantId: tenantId,
           sentBy: req.user.id,
           emailTrackingId: emailTrackingId, // Pass tracking ID so task can update email_sends with actual Resend ID
-        }
+        },
+        ...(base64Attachments.length > 0 && { attachments: base64Attachments }),
       });
       console.log(`📧 [SendEmail] Triggered send-email task, runId: ${handle.id}, trackingId: ${emailTrackingId}`);
       result = { success: true, runId: handle.id };
