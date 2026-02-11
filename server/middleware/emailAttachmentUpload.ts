@@ -8,7 +8,7 @@ const MAX_TOTAL_SIZE = 40 * 1024 * 1024; // 40MB total (after base64 this is the
 const MAX_FILES = 10;
 
 // Allowed MIME types for email attachments
-// Note: SVG and XML types are excluded due to XSS/XXE security risks
+// Note: HTML, SVG and XML types are excluded due to XSS/XXE security risks
 const ALLOWED_MIME_TYPES = [
   // Documents
   'application/pdf',
@@ -21,7 +21,6 @@ const ALLOWED_MIME_TYPES = [
   // Text
   'text/plain',
   'text/csv',
-  'text/html',
   // Images (raster only - no SVG due to XSS risk)
   'image/jpeg',
   'image/png',
@@ -38,7 +37,7 @@ const storage = multer.memoryStorage();
 
 const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-    cb(new Error(`File type "${file.mimetype}" is not allowed. Supported types: PDF, Word, Excel, PowerPoint, images, text, CSV, ZIP.`));
+    cb(new Error(`File type "${file.mimetype}" is not allowed. Supported types: PDF, Word, Excel, PowerPoint, images, text (excluding HTML), CSV, ZIP.`));
     return;
   }
   cb(null, true);

@@ -690,8 +690,8 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
                       type="button"
                       onClick={() => handleSelectPreset(preset)}
                       className={`relative flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all hover:shadow-sm ${selectedPreset === preset.id
-                          ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-400 ring-1 ring-blue-500 dark:ring-blue-400"
-                          : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-400 ring-1 ring-blue-500 dark:ring-blue-400"
+                        : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
                         }`}
                     >
                       {selectedPreset === preset.id && (
@@ -796,6 +796,7 @@ export default function TemplatesPage() {
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const { toast } = useToast();
@@ -813,9 +814,13 @@ export default function TemplatesPage() {
   });
 
   // Load templates and stats on component mount and when filters change
-  const loadTemplates = async () => {
+  const loadTemplates = async (isInitial = false) => {
     try {
-      setLoading(true);
+      if (isInitial) {
+        setLoading(true);
+      } else {
+        setIsSearching(true);
+      }
       setError(null);
       const result = await fetchTemplates({
         page: pagination.page,
@@ -836,6 +841,7 @@ export default function TemplatesPage() {
       });
     } finally {
       setLoading(false);
+      setIsSearching(false);
     }
   };
 
@@ -852,7 +858,7 @@ export default function TemplatesPage() {
   useEffect(() => {
     // Only reload if we're on the templates page (not a subpage)
     if (location === '/templates') {
-      loadTemplates();
+      loadTemplates(true);
       loadStats();
     }
   }, [location]);
@@ -1073,7 +1079,13 @@ export default function TemplatesPage() {
               </div>
             </div>
           </div>
-          <div className="p-6">
+          <div className="p-6 relative" style={{ minHeight: '200px' }}>
+            {/* Subtle top-bar indicator for search/filter reloads */}
+            {isSearching && (
+              <div className="absolute top-0 left-0 right-0 h-0.5 overflow-hidden z-10">
+                <div className="h-full bg-blue-500 animate-pulse" />
+              </div>
+            )}
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-center space-y-3">
@@ -1088,7 +1100,7 @@ export default function TemplatesPage() {
                   <p className="text-sm text-red-700 dark:text-red-300">
                     {error}
                   </p>
-                  <Button variant="outline" onClick={() => loadTemplates()}>
+                  <Button variant="outline" onClick={() => loadTemplates(true)}>
                     {t('templatesPage.error.tryAgain')}
                   </Button>
                 </CardContent>
@@ -1117,7 +1129,7 @@ export default function TemplatesPage() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              <div className={`grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 transition-opacity duration-150 ${isSearching ? 'opacity-60' : 'opacity-100'}`}>
                 {filteredTemplates.map((template) => (
                   <TemplateCard
                     key={template.id}

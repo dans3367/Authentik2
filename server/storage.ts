@@ -1058,7 +1058,7 @@ export class DatabaseStorage implements IStorage {
         .orderBy(desc(shops.createdAt));
 
       if (activeShops.length > maxShops) {
-        const shopsToSuspend = activeShops.slice(-(activeShops.length - maxShops));
+        const shopsToSuspend = activeShops.slice(0, activeShops.length - maxShops);
         const idsToSuspend = shopsToSuspend.map((s: { id: string }) => s.id);
 
         await db.update(shops)

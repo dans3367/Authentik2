@@ -166,7 +166,7 @@ export default function SendEmailModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!subject.trim()) {
       toast({
         title: "Validation Error",
@@ -175,7 +175,7 @@ export default function SendEmailModal({
       });
       return;
     }
-    
+
     if (!content.trim()) {
       toast({
         title: "Validation Error",
@@ -220,7 +220,7 @@ export default function SendEmailModal({
               )}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="subject">Subject</Label>
@@ -233,7 +233,7 @@ export default function SendEmailModal({
                 required
               />
             </div>
-            
+
             <div className="grid gap-2">
               <Label htmlFor="content">Content</Label>
               <Textarea
@@ -255,11 +255,10 @@ export default function SendEmailModal({
             <div className="grid gap-2">
               <Label>Attachments</Label>
               <div
-                className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
-                  isDragOver
+                className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${isDragOver
                     ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20"
                     : "border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"
-                }`}
+                  }`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
@@ -278,6 +277,7 @@ export default function SendEmailModal({
                 type="file"
                 multiple
                 className="hidden"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.zip,.json,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,text/csv,image/jpeg,image/png,image/gif,image/webp,application/zip,application/x-zip-compressed,application/json"
                 onChange={(e) => {
                   if (e.target.files) addFiles(e.target.files);
                   e.target.value = "";
@@ -315,7 +315,7 @@ export default function SendEmailModal({
               )}
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button
               type="button"

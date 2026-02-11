@@ -412,10 +412,11 @@ router.post(
               eq(emailContacts.id, contactId),
               eq(emailContacts.tenantId, tenantId)
             )
-          );
+          )
+          .returning({ id: emailContacts.id });
 
         // Validate that the contact was actually updated
-        if (updateResult.rowCount === 0) {
+        if (updateResult.length === 0) {
           console.warn(
             `⚠️ [Internal API] Contact update failed - no rows updated. ` +
             `Contact ${contactId} may not exist or does not belong to tenant ${tenantId}`

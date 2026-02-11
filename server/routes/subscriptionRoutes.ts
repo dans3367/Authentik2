@@ -611,35 +611,47 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
 
     // Determine effective price based on billing cycle
     const isYearly = billingCycle === 'yearly';
-    const targetPrice = isYearly && targetPlan.yearlyPrice 
-      ? parseFloat(targetPlan.yearlyPrice) 
+    const targetPrice = isYearly && targetPlan.yearlyPrice
+      ? parseFloat(targetPlan.yearlyPrice)
       : parseFloat(targetPlan.price);
-    
+
     // Get current price based on existing subscription's billing cycle
     const currentIsYearly = existingSubscription?.isYearly || false;
-    const currentPrice = currentPlan 
-      ? (currentIsYearly && currentPlan.yearlyPrice 
-          ? parseFloat(currentPlan.yearlyPrice) 
-          : parseFloat(currentPlan.price))
+    const currentPrice = currentPlan
+      ? (currentIsYearly && currentPlan.yearlyPrice
+        ? parseFloat(currentPlan.yearlyPrice)
+        : parseFloat(currentPlan.price))
       : 0;
 
     // Determine if this is an upgrade or downgrade
     const isDowngrade = targetPrice < currentPrice;
     const isDowngradeToFree = targetPlan.name === 'Free' || targetPrice === 0;
-    const isUpgradeToPaid = targetPrice > currentPrice && targetPrice > 0;
+
+    // SECURITY: Require payment flow for any paid plan unless the user already has a valid, active Stripe subscription for THIS plan and billing cycle.
+    // This prevents lateral moves between different paid plans of the same price or re-activation of cancelled plans without payment.
+    const hasActiveStripeSubscription =
+      existingSubscription &&
+      existingSubscription.status === 'active' &&
+      existingSubscription.stripeSubscriptionId &&
+      !existingSubscription.stripeSubscriptionId.startsWith('manual_') &&
+      existingSubscription.planId === targetPlan.id &&
+      existingSubscription.isYearly === isYearly;
+
+    // We require checkout if it's a price upgrade OR if they don't have an active Stripe sub for this specific plan/cycle
+    const isUpgradeToPaid = targetPrice > 0 && (targetPrice > currentPrice || !hasActiveStripeSubscription);
 
     // SECURITY: Prevent direct activation of paid plans without payment
     if (isUpgradeToPaid) {
       if (!stripe) {
-        return res.status(503).json({ 
-          message: 'Payment processing is not configured. Please contact support.' 
+        return res.status(503).json({
+          message: 'Payment processing is not configured. Please contact support.'
         });
       }
 
       // For upgrades to paid plans, require Stripe Checkout
       // Get or create Stripe customer
       let stripeCustomerId = existingSubscription?.stripeCustomerId;
-      
+
       if (!stripeCustomerId || stripeCustomerId.startsWith('manual_')) {
         const customer = await stripe.customers.create({
           email: req.user.email,
@@ -665,8 +677,8 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
         : targetPlan.stripePriceId;
 
       if (!stripePriceId) {
-        return res.status(400).json({ 
-          message: `No Stripe price configured for ${isYearly ? 'yearly' : 'monthly'} billing on this plan.` 
+        return res.status(400).json({
+          message: `No Stripe price configured for ${isYearly ? 'yearly' : 'monthly'} billing on this plan.`
         });
       }
 
@@ -701,8 +713,8 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
     if (!existingSubscription) {
       // No existing subscription — only allow Free plan without payment
       if (targetPrice > 0) {
-        return res.status(400).json({ 
-          message: 'Payment required for paid plans. Please use the checkout flow.' 
+        return res.status(400).json({
+          message: 'Payment required for paid plans. Please use the checkout flow.'
         });
       }
 

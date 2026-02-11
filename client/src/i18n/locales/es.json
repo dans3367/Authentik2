@@ -453,6 +453,7 @@
     },
     "filters": {
       "searchPlaceholder": "Buscar clientes...",
+      "searchTemplates": "Buscar plantillas...",
       "allStatuses": "Todos los Estados",
       "active": "Activo",
       "unsubscribed": "Desuscrito",

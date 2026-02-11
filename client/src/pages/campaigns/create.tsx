@@ -43,10 +43,10 @@ export default function CreateCampaignPage() {
   });
 
   // Fetch eligible reviewers (all users except Employee role)
-  const { data: reviewersData, isLoading: reviewersLoading } = useQuery({
-    queryKey: ['/api/managers'],
+  const { data: reviewersData, isLoading: reviewersLoading } = useQuery<{ managers: User[] }>({
+    queryKey: ['/api/campaigns/managers'],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/managers');
+      const response = await apiRequest('GET', '/api/campaigns/managers');
       return await response.json();
     },
     staleTime: 60_000,

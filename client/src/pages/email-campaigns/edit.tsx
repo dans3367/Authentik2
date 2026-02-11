@@ -109,16 +109,16 @@ export default function EditCampaignPage() {
   });
 
   // Fetch eligible reviewers (all users except Employee role)
-  const { data: reviewersData, isLoading: reviewersLoading } = useQuery({
-    queryKey: ["/api/managers"],
-    queryFn: async ({ queryKey }) => {
-      const res = await apiRequest("GET", queryKey[0]);
+  const { data: reviewersData, isLoading: reviewersLoading } = useQuery<{ managers: User[] }>({
+    queryKey: ["/api/campaigns/managers"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/campaigns/managers");
       return res.json();
     },
     staleTime: 60_000,
   });
 
-  const reviewers = (reviewersData as any)?.managers || [];
+  const reviewers = reviewersData?.managers || [];
 
   const form = useForm<CreateCampaignData>({
     resolver: zodResolver(createCampaignSchema),

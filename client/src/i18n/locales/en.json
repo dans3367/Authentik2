@@ -508,6 +508,7 @@
     },
     "filters": {
       "searchPlaceholder": "Search customers...",
+      "searchTemplates": "Search templates...",
       "allStatuses": "All Statuses",
       "active": "active",
       "inactive": "inactive",

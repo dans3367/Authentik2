@@ -1732,9 +1732,22 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
         const localMs = Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute, local.second);
         const offsetMs = localMs - targetMs;
 
-        scheduleDate = new Date(estimate - offsetMs);
+        let resultTs = estimate - offsetMs;
 
-        console.log(`📅 [ScheduleEmail] Timezone conversion: ${naiveDatetime} in ${userTimezone} → ${scheduleDate.toISOString()} UTC (offset: ${offsetMs / 60000}min)`);
+        // Second pass: verify and correct if we landed on the other side of a DST transition
+        // This handles edge cases where the initial estimate and the target time are on opposite sides of a DST shift
+        const local2 = getLocalParts(resultTs);
+        const localMs2 = Date.UTC(local2.year, local2.month - 1, local2.day, local2.hour, local2.minute, local2.second);
+        const offsetMs2 = localMs2 - targetMs;
+
+        if (offsetMs2 !== 0) {
+          console.log(`📅 [ScheduleEmail] DST transition detected, applying ${offsetMs2 / 60000}min correction`);
+          resultTs -= offsetMs2;
+        }
+
+        scheduleDate = new Date(resultTs);
+
+        console.log(`📅 [ScheduleEmail] Timezone conversion: ${naiveDatetime} in ${userTimezone} → ${scheduleDate.toISOString()} UTC (total offset: ${(offsetMs + offsetMs2) / 60000}min)`);
       } catch (tzError) {
         console.error(`📅 [ScheduleEmail] Timezone conversion failed:`, tzError);
         return res.status(400).json({ message: `Invalid timezone: ${userTimezone}` });
@@ -1891,8 +1904,8 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
         id: emailTrackingId,
         tenantId,
         recipientEmail: String(contact.email),
-        recipientName: contact.firstName && contact.lastName 
-          ? `${contact.firstName} ${contact.lastName}` 
+        recipientName: contact.firstName && contact.lastName
+          ? `${contact.firstName} ${contact.lastName}`
           : contact.firstName || contact.lastName || null,
         senderEmail: 'admin@zendwise.com',
         senderName: design.displayCompanyName || null,
