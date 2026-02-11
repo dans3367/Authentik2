@@ -429,31 +429,6 @@ export default function ManagementRolesPermissions() {
     }
   };
 
-  // Count pending changes
-  const pendingChangeCount = useMemo(() => {
-    if (!editingRole) return 0;
-    const role = roles.find((r) => r.name === editingRole);
-    if (!role) return 0;
-    return Object.keys(pendingChanges).filter(
-      (k) => pendingChanges[k] !== role.permissions[k]
-    ).length;
-  }, [pendingChanges, editingRole, roles]);
-
-  // Determine which roles the current user can assign
-  const assignableRoles = useMemo(() => {
-    if (isOwner) return ["Owner", "Administrator", "Manager", "Employee"];
-    if (isAdmin) return ["Administrator", "Manager", "Employee"];
-    return [];
-  }, [isOwner, isAdmin]);
-
-  // Permission count per role
-  const getPermissionCount = useCallback(
-    (role: Role) => {
-      return Object.values(role.permissions).filter(Boolean).length;
-    },
-    []
-  );
-
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center py-12">

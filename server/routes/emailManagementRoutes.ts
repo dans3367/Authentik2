@@ -113,6 +113,23 @@ function escapeHtml(str: string): string {
   });
 }
 
+/**
+ * Replace template placeholders (e.g. {{first_name}}, {{company_name}}) with actual contact/company data.
+ * Handles both HTML body and subject lines.
+ */
+function replaceEmailPlaceholders(
+  text: string,
+  contact: { firstName?: string | null; lastName?: string | null; email?: string | null },
+  companyName?: string,
+): string {
+  return text
+    .replace(/\{\{\s*first_name\s*\}\}/gi, contact.firstName || '')
+    .replace(/\{\{\s*last_name\s*\}\}/gi, contact.lastName || '')
+    .replace(/\{\{\s*full_name\s*\}\}/gi, `${contact.firstName || ''} ${contact.lastName || ''}`.trim())
+    .replace(/\{\{\s*email\s*\}\}/gi, contact.email || '')
+    .replace(/\{\{\s*company_name\s*\}\}/gi, companyName || '');
+}
+
 function sanitizeFontFamily(fontFamily: string | undefined | null): string {
   if (!fontFamily) return 'Arial, sans-serif';
 
@@ -1744,9 +1761,13 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       }
     }
 
+    // Replace template placeholders (e.g. {{first_name}}, {{company_name}}) with actual contact data
+    const resolvedHtml = replaceEmailPlaceholders(html, contact, companyName);
+    const resolvedSubject = replaceEmailPlaceholders(String(subject), contact, companyName);
+
     // Format content as HTML using master email design (same as send-email route)
     // Sanitize user-provided HTML content to prevent XSS
-    const sanitizedHtml = sanitizeEmailHtml(html);
+    const sanitizedHtml = sanitizeEmailHtml(resolvedHtml);
     // Escape text fields to prevent XSS in display names and text content
     const safeDisplayCompanyName = escapeHtml(design.displayCompanyName || '');
     const safeHeaderText = design.headerText ? escapeHtml(design.headerText) : null;
@@ -1818,7 +1839,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
         recipientName: contact.name || null,
         senderEmail: 'admin@zendwise.com',
         senderName: design.displayCompanyName || null,
-        subject: sanitizeString(String(subject)) || 'No Subject',
+        subject: sanitizeString(resolvedSubject) || 'No Subject',
         emailType: 'scheduled',
         provider: 'resend',
         status: 'pending',
@@ -1829,7 +1850,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       await db.insert(emailContent).values({
         emailSendId: emailTrackingId,
         htmlContent: themedHtml,
-        textContent: text ? String(text) : null,
+        textContent: text ? replaceEmailPlaceholders(String(text), contact, companyName) : null,
         metadata: JSON.stringify({
           scheduledFor: scheduleDate.toISOString(),
           timezone: userTimezone,
@@ -1847,13 +1868,13 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
     try {
       const { triggerScheduleContactEmail } = await import('../lib/trigger');
 
-      console.log(`📅 [ScheduleEmail] Scheduling email to ${maskEmail(String(contact.email))} for ${scheduleDate.toISOString()} (${userTimezone}), subject: "${subject}"`);
+      console.log(`📅 [ScheduleEmail] Scheduling email to ${maskEmail(String(contact.email))} for ${scheduleDate.toISOString()} (${userTimezone}), subject: "${resolvedSubject}"`);
 
       const result = await triggerScheduleContactEmail({
         to: String(contact.email),
-        subject: sanitizeString(String(subject)) || 'No Subject',
+        subject: sanitizeString(resolvedSubject) || 'No Subject',
         html: themedHtml,
-        text: text ? String(text) : undefined,
+        text: text ? replaceEmailPlaceholders(String(text), contact, companyName) : undefined,
         scheduledForUTC: scheduleDate.toISOString(),
         timezone: userTimezone,
         contactId: id,
@@ -1876,7 +1897,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
           contactId: id,
           activityType: 'scheduled',
           activityData: JSON.stringify({
-            subject: sanitizeString(String(subject)) || 'No Subject',
+            subject: sanitizeString(resolvedSubject) || 'No Subject',
             scheduledFor: scheduleDate.toISOString(),
             timezone: userTimezone,
             scheduledBy: req.user.id,
@@ -4429,6 +4450,10 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       }
     }
 
+    // Replace template placeholders (e.g. {{first_name}}, {{company_name}}) with actual contact data
+    const resolvedContent = replaceEmailPlaceholders(content, contact, companyName);
+    const resolvedSubject = replaceEmailPlaceholders(subject, contact, companyName);
+
     // Format content as HTML using master email design
     const htmlContent = `
       <!DOCTYPE html>
@@ -4462,7 +4487,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
             <!-- Body Content -->
             <div style="padding: 64px 48px; min-height: 200px;">
               <div style="font-size: 16px; line-height: 1.625; color: #334155;">
-                ${sanitizeEmailHtml(content.replace(/\n/g, '<br>'))}
+                ${sanitizeEmailHtml(resolvedContent.replace(/\n/g, '<br>'))}
               </div>
             </div>
 
@@ -4497,9 +4522,9 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       const { sendEmailTask } = await import('../../src/trigger/email');
       const handle = await sendEmailTask.trigger({
         to: contact.email,
-        subject: subject,
+        subject: resolvedSubject,
         html: htmlContent,
-        text: content,
+        text: resolvedContent,
         metadata: {
           type: 'individual_contact_email',
           contactId: contact.id,
@@ -4520,7 +4545,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
           activityData: JSON.stringify({
             source: 'individual_send',
             sentBy: req.user.id,
-            subject: subject,
+            subject: resolvedSubject,
             recipient: contact.email,
             recipientName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || undefined,
             from: design.displayCompanyName || 'Manager',
@@ -4551,12 +4576,12 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
         entityId: emailActivityId || undefined,
         entityName: `Email to ${contact.email}`,
         activityType: 'sent',
-        description: `Sent direct email "${subject}" to ${contact.firstName || ''} ${contact.lastName || ''} (${contact.email})`.trim(),
+        description: `Sent direct email "${resolvedSubject}" to ${contact.firstName || ''} ${contact.lastName || ''} (${contact.email})`.trim(),
         metadata: {
           emailActivityId: emailActivityId,
           contactId: contact.id,
           contactEmail: contact.email,
-          emailSubject: subject,
+          emailSubject: resolvedSubject,
           triggerRunId: result?.runId
         },
         req
@@ -4576,7 +4601,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
         recipientName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email,
         senderEmail: 'admin@zendwise.com', // Default sender or configured one
         senderName: design.displayCompanyName || 'Manager',
-        subject: subject,
+        subject: resolvedSubject,
         emailType: 'individual',
         provider: 'resend',
         providerMessageId: null, // Will be updated by Trigger task with actual Resend email ID

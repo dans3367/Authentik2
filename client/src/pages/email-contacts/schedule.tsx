@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { TemplateSelector } from "@/components/TemplateSelector";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TIMEZONE_OPTIONS } from "@/utils/appointment-utils";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ScheduleContactEmailPage() {
   const { id } = useParams();
@@ -24,6 +25,7 @@ export default function ScheduleContactEmailPage() {
   const [isUsingTemplate, setIsUsingTemplate] = useState(false);
   const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Chicago");
   const [showPreview, setShowPreview] = useState(false);
+  const { toast } = useToast();
 
   // Load contact for context and validation
   const { data: contactResp, isLoading: contactLoading, error: contactError } = useQuery({
@@ -85,7 +87,18 @@ export default function ScheduleContactEmailPage() {
       }).then((r) => r.json());
     },
     onSuccess: () => {
+      toast({
+        title: "Email Scheduled",
+        description: `Your email has been scheduled for ${date} at ${time || "00:00"} (${timezone}).`,
+      });
       navigate(`/email-contacts/view/${id}`);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Scheduling Failed",
+        description: error?.message || "Failed to schedule email. Please try again.",
+        variant: "destructive",
+      });
     },
   });
 
