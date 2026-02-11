@@ -274,6 +274,50 @@ export default function ManagementRolesPermissions() {
   const totalCategories: number = rolesData?.totalCategories || 0;
   const hasCustomPermissions: boolean = rolesData?.hasCustomPermissions || false;
 
+  // All hooks must be declared before any early returns
+  // Filter categories by search term
+  const filteredCategories = useMemo(() => {
+    if (!searchTerm.trim()) return permissionCategories || [];
+    const lower = searchTerm.toLowerCase();
+    return (permissionCategories || [])
+      .map((cat) => ({
+        ...cat,
+        permissions: cat.permissions.filter(
+          (p) =>
+            p.label.toLowerCase().includes(lower) ||
+            p.description.toLowerCase().includes(lower) ||
+            p.key.toLowerCase().includes(lower) ||
+            cat.label.toLowerCase().includes(lower)
+        ),
+      }))
+      .filter((cat) => cat.permissions.length > 0);
+  }, [permissionCategories, searchTerm]);
+
+  // Count pending changes
+  const pendingChangeCount = useMemo(() => {
+    if (!editingRole) return 0;
+    const role = roles.find((r) => r.name === editingRole);
+    if (!role) return 0;
+    return Object.keys(pendingChanges).filter(
+      (k) => pendingChanges[k] !== role.permissions[k]
+    ).length;
+  }, [pendingChanges, editingRole, roles]);
+
+  // Determine which roles the current user can assign
+  const assignableRoles = useMemo(() => {
+    if (isOwner) return ["Owner", "Administrator", "Manager", "Employee"];
+    if (isAdmin) return ["Administrator", "Manager", "Employee"];
+    return [];
+  }, [isOwner, isAdmin]);
+
+  // Permission count per role
+  const getPermissionCount = useCallback(
+    (role: Role) => {
+      return Object.values(role.permissions).filter(Boolean).length;
+    },
+    []
+  );
+
   // Check if plan data is loading
   if (planLoading) {
     return (
@@ -328,24 +372,6 @@ export default function ManagementRolesPermissions() {
       </div>
     );
   }
-
-  // Filter categories by search term
-  const filteredCategories = useMemo(() => {
-    if (!searchTerm.trim()) return permissionCategories;
-    const lower = searchTerm.toLowerCase();
-    return permissionCategories
-      .map((cat) => ({
-        ...cat,
-        permissions: cat.permissions.filter(
-          (p) =>
-            p.label.toLowerCase().includes(lower) ||
-            p.description.toLowerCase().includes(lower) ||
-            p.key.toLowerCase().includes(lower) ||
-            cat.label.toLowerCase().includes(lower)
-        ),
-      }))
-      .filter((cat) => cat.permissions.length > 0);
-  }, [permissionCategories, searchTerm]);
 
   const toggleCategory = (key: string) => {
     setExpandedCategories((prev) => ({ ...prev, [key]: !prev[key] }));

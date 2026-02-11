@@ -369,4 +369,58 @@ router.get(
   }
 );
 
+/**
+ * Internal endpoint for logging email activity (sent/failed) from Trigger.dev tasks
+ * Called after a scheduled email is sent or fails, to update the contact timeline
+ */
+router.post(
+  '/log-email-activity',
+  authenticateInternalService,
+  async (req: InternalServiceRequest, res) => {
+    try {
+      const { tenantId, contactId, activityType, activityData } = req.body;
+
+      if (!tenantId || !contactId || !activityType) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required fields: tenantId, contactId, activityType',
+        });
+      }
+
+      const allowedTypes = ['sent', 'failed', 'delivered', 'bounced', 'opened', 'clicked'];
+      if (!allowedTypes.includes(activityType)) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid activityType. Allowed: ${allowedTypes.join(', ')}`,
+        });
+      }
+
+      await db.insert(emailActivity).values({
+        tenantId,
+        contactId,
+        activityType,
+        activityData: typeof activityData === 'string' ? activityData : JSON.stringify(activityData),
+        occurredAt: new Date(),
+      });
+
+      // Update contact's lastActivity timestamp
+      try {
+        await db.update(emailContacts)
+          .set({ lastActivity: new Date(), updatedAt: new Date() })
+          .where(eq(emailContacts.id, contactId));
+      } catch (contactUpdateError) {
+        console.warn(`⚠️ [Internal API] Failed to update contact lastActivity:`, contactUpdateError);
+      }
+
+      console.log(`✅ [Internal API] Logged email_activity: ${activityType} for contact ${contactId}`);
+
+      return res.json({ success: true, activityType, contactId });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ [Internal API] Error logging email activity:', errorMessage);
+      return res.status(500).json({ success: false, error: errorMessage });
+    }
+  }
+);
+
 export default router;

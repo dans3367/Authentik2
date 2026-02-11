@@ -1808,6 +1808,41 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
         </body>
       </html>`;
 
+    // Create email_sends record for tracking (status: pending until actually sent)
+    const emailTrackingId = crypto.randomUUID();
+    try {
+      await db.insert(emailSends).values({
+        id: emailTrackingId,
+        tenantId,
+        recipientEmail: String(contact.email),
+        recipientName: contact.name || null,
+        senderEmail: 'admin@zendwise.com',
+        senderName: design.displayCompanyName || null,
+        subject: sanitizeString(String(subject)) || 'No Subject',
+        emailType: 'scheduled',
+        provider: 'resend',
+        status: 'pending',
+        contactId: id,
+        sentAt: null,
+      });
+
+      await db.insert(emailContent).values({
+        emailSendId: emailTrackingId,
+        htmlContent: themedHtml,
+        textContent: text ? String(text) : null,
+        metadata: JSON.stringify({
+          scheduledFor: scheduleDate.toISOString(),
+          timezone: userTimezone,
+          scheduledBy: req.user.id,
+        }),
+      });
+
+      console.log(`📅 [ScheduleEmail] Created email_sends tracking record: ${emailTrackingId}`);
+    } catch (trackingError) {
+      console.error(`⚠️ [ScheduleEmail] Failed to create email_sends tracking record:`, trackingError);
+      // Continue anyway — the email will still be sent, just without tracking
+    }
+
     // Schedule via Trigger.dev using the dedicated schedule-contact-email task
     try {
       const { triggerScheduleContactEmail } = await import('../lib/trigger');
@@ -1824,6 +1859,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
         contactId: id,
         tenantId,
         scheduledBy: req.user.id,
+        emailTrackingId,
       });
 
       if (!result.success) {

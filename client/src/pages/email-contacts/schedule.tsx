@@ -283,7 +283,24 @@ export default function ScheduleContactEmailPage() {
                     <div className="flex gap-2 mt-1">
                       <span className="font-semibold text-right w-14">Scheduled:</span>
                       <span className="text-gray-900">
-                        {new Date(`${date}T${time || "00:00"}`).toLocaleString()}
+                        {(() => {
+                          try {
+                            const scheduledDate = new Date(`${date}T${time || "00:00"}`);
+                            // Format with the user-selected timezone
+                            return scheduledDate.toLocaleString(undefined, {
+                              timeZone: timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true
+                            });
+                          } catch (e) {
+                            // Fallback if timezone is invalid
+                            return new Date(`${date}T${time || "00:00"}`).toLocaleString();
+                          }
+                        })()}
                       </span>
                     </div>
                   )}

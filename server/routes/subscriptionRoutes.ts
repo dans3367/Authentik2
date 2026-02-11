@@ -609,11 +609,6 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
     const existingSubscription = await storage.getTenantSubscription(tenantId);
     const currentPlan = existingSubscription?.plan;
 
-    // Validate billing cycle
-    if (billingCycle && billingCycle !== 'monthly' && billingCycle !== 'yearly') {
-      return res.status(400).json({ message: 'Invalid billing cycle. Must be "monthly" or "yearly".' });
-    }
-
     // Determine effective price based on billing cycle
     const isYearly = billingCycle === 'yearly';
     const targetPrice = isYearly && targetPlan.yearlyPrice 
