@@ -5,6 +5,13 @@ import { z } from "zod";
 // Initialize Resend for email sending
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+// Schema for email attachment (base64 encoded)
+const emailAttachmentSchema = z.object({
+  filename: z.string(),
+  content: z.string(), // base64 encoded
+  contentType: z.string(),
+});
+
 // Schema for single email payload
 const emailPayloadSchema = z.object({
   to: z.union([z.string().email(), z.array(z.string().email())]),
@@ -16,6 +23,7 @@ const emailPayloadSchema = z.object({
   headers: z.record(z.string()).optional(),
   metadata: z.record(z.any()).optional(),
   scheduledFor: z.string().optional(),
+  attachments: z.array(emailAttachmentSchema).optional(),
 });
 
 export type EmailPayload = z.infer<typeof emailPayloadSchema>;
@@ -113,6 +121,13 @@ export const sendEmailTask = task({
     }
 
     try {
+      // Build Resend attachments from base64 data
+      const resendAttachments = data.attachments?.map(att => ({
+        filename: att.filename,
+        content: Buffer.from(att.content, 'base64'),
+        content_type: att.contentType,
+      }));
+
       const { data: emailData, error } = await resend.emails.send({
         from: data.from || process.env.EMAIL_FROM || "admin@zendwise.com",
         to: recipients,
@@ -125,6 +140,7 @@ export const sendEmailTask = task({
           name,
           value: String(value),
         })) : undefined,
+        ...(resendAttachments && resendAttachments.length > 0 && { attachments: resendAttachments }),
       });
 
       if (error) {

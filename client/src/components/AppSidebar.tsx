@@ -109,16 +109,6 @@ export function AppSidebar() {
   // Cast user to extended type to access custom fields
   const extendedUser = user as ExtendedUser | null;
   
-  // Debug logging for user role
-  console.log('🔍 [AppSidebar] User data:', { 
-    user: extendedUser ? { 
-      id: extendedUser.id, 
-      email: extendedUser.email, 
-      role: extendedUser.role, 
-      name: extendedUser.name 
-    } : null 
-  });
-  
   // Fetch tenant plan data for all users
   const { planName, canManageUsers, maxShops } = useTenantPlan();
 

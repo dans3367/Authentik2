@@ -508,6 +508,7 @@
     },
     "filters": {
       "searchPlaceholder": "Search customers...",
+      "searchTemplates": "Search templates...",
       "allStatuses": "All Statuses",
       "active": "active",
       "inactive": "inactive",
@@ -1146,6 +1147,9 @@
       "noUsersFound": "No users found",
       "tryAdjustingFilters": "Try adjusting your filters"
     },
+    "upgradeRequired": "Upgrade Required",
+    "upgradeDescription": "Your current plan ({{planName}}) does not include user management. Upgrade to Plus or Pro to add team members and manage roles.",
+    "upgradePlan": "Upgrade Plan",
     "toasts": {
       "userCreated": "User created successfully",
       "userUpdated": "User updated successfully",
@@ -1906,6 +1910,9 @@
       "subtitle": "View role hierarchy, permissions, and manage user role assignments",
       "accessDenied": "Access Denied",
       "accessDeniedDesc": "You need Owner or Administrator access to manage roles and permissions.",
+      "upgradeRequired": "Upgrade Required",
+      "upgradeDescription": "Your current plan ({{planName}}) does not include roles & permissions management. Upgrade to Plus or Pro to customize role permissions.",
+      "upgradePlan": "Upgrade Plan",
       "level": "Level",
       "user": "user",
       "users": "users",
@@ -2234,9 +2241,9 @@
         "requiresApproval": "Requires Reviewer Approval",
         "requiresApprovalDescription": "This campaign will require approval from a manager before it can be activated.",
         "selectReviewer": "Select Reviewer",
-        "selectReviewerPlaceholder": "Select a manager",
-        "loadingManagers": "Loading managers...",
-        "noManagers": "No managers available"
+        "selectReviewerPlaceholder": "Select a reviewer",
+        "loadingReviewers": "Loading reviewers...",
+        "noReviewers": "No reviewers available"
       },
       "actions": {
         "cancel": "Cancel",

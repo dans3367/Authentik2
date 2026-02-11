@@ -108,17 +108,17 @@ export default function EditCampaignPage() {
     },
   });
 
-  // Fetch managers for reviewer dropdown
-  const { data: managersData, isLoading: managersLoading } = useQuery({
-    queryKey: ["/api/managers"],
-    queryFn: async ({ queryKey }) => {
-      const res = await apiRequest("GET", queryKey[0]);
+  // Fetch eligible reviewers (all users except Employee role)
+  const { data: reviewersData, isLoading: reviewersLoading } = useQuery<{ managers: User[] }>({
+    queryKey: ["/api/campaigns/managers"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/campaigns/managers");
       return res.json();
     },
     staleTime: 60_000,
   });
 
-  const managers = (managersData as any)?.managers || [];
+  const reviewers = reviewersData?.managers || [];
 
   const form = useForm<CreateCampaignData>({
     resolver: zodResolver(createCampaignSchema),
@@ -705,26 +705,26 @@ export default function EditCampaignPage() {
                           <SelectTrigger>
                             <SelectValue
                               placeholder={
-                                managersLoading
-                                  ? t("emailCampaigns.edit.review.loadingManagers")
+                                reviewersLoading
+                                  ? t("emailCampaigns.edit.review.loadingReviewers")
                                   : t("emailCampaigns.edit.review.selectReviewerPlaceholder")
                               }
                             />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {managersLoading ? (
+                          {reviewersLoading ? (
                             <SelectItem value="loading" disabled>
-                              {t("emailCampaigns.edit.review.loadingManagers")}
+                              {t("emailCampaigns.edit.review.loadingReviewers")}
                             </SelectItem>
-                          ) : managers.length === 0 ? (
-                            <SelectItem value="no-managers" disabled>
-                              {t("emailCampaigns.edit.review.noManagers")}
+                          ) : reviewers.length === 0 ? (
+                            <SelectItem value="no-reviewers" disabled>
+                              {t("emailCampaigns.edit.review.noReviewers")}
                             </SelectItem>
                           ) : (
-                            managers.map((manager: User) => (
-                              <SelectItem key={manager.id} value={manager.id}>
-                                {manager.firstName} {manager.lastName} - {manager.email} ({manager.role})
+                            reviewers.map((reviewer: User) => (
+                              <SelectItem key={reviewer.id} value={reviewer.id}>
+                                {reviewer.firstName} {reviewer.lastName} - {reviewer.email} ({reviewer.role})
                               </SelectItem>
                             ))
                           )}

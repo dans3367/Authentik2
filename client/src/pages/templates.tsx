@@ -37,6 +37,7 @@ import {
   Copy,
   Eye,
   Filter,
+  Loader2,
   Monitor,
   MoreVertical,
   Plus,
@@ -283,6 +284,7 @@ interface TemplateCardProps {
   onDuplicate: (template: Template) => void;
   onDelete: (id: string) => void;
   onEdit: (template: Template) => void;
+  isDeleting?: boolean;
 }
 
 function getChannelBadgeClasses(channel: TemplateChannel) {
@@ -302,13 +304,21 @@ function getChannelBadgeClasses(channel: TemplateChannel) {
   }
 }
 
-function TemplateCard({ template, masterDesign, onToggleFavorite, onDuplicate, onDelete, onEdit }: TemplateCardProps) {
+function TemplateCard({ template, masterDesign, onToggleFavorite, onDuplicate, onDelete, onEdit, isDeleting }: TemplateCardProps) {
   const { t } = useTranslation();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
 
   return (
-    <Card className="h-full flex flex-col">
+    <Card className={`h-full flex flex-col relative overflow-hidden transition-opacity duration-300 ${isDeleting ? 'opacity-60 pointer-events-none' : ''}`}>
+      {isDeleting && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-slate-900/60 backdrop-blur-[2px] rounded-lg">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="h-6 w-6 animate-spin text-red-500" />
+            <span className="text-xs font-medium text-red-600 dark:text-red-400">{t('templatesPage.actions.deleting', 'Deleting…')}</span>
+          </div>
+        </div>
+      )}
       <CardHeader className="flex-1">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-2">
@@ -439,9 +449,8 @@ function TemplateCard({ template, masterDesign, onToggleFavorite, onDuplicate, o
 
               {/* Email preview canvas */}
               <div className="flex-1 overflow-y-auto">
-                <div className={`transition-all duration-300 mx-auto p-4 sm:p-6 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl ${
-                  previewDevice === "mobile" ? "max-w-[400px]" : "w-full"
-                }`}>
+                <div className={`transition-all duration-300 mx-auto p-4 sm:p-6 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl ${previewDevice === "mobile" ? "max-w-[400px]" : "w-full"
+                  }`}>
                   <div className="bg-white text-slate-900 shadow-2xl mx-auto rounded overflow-hidden max-w-[600px] w-full" style={{ fontFamily: masterDesign?.fontFamily || "Arial, sans-serif" }}>
 
                     {/* Simulated email header */}
@@ -680,11 +689,10 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
                       key={preset.id}
                       type="button"
                       onClick={() => handleSelectPreset(preset)}
-                      className={`relative flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all hover:shadow-sm ${
-                        selectedPreset === preset.id
-                          ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-400 ring-1 ring-blue-500 dark:ring-blue-400"
-                          : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
-                      }`}
+                      className={`relative flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all hover:shadow-sm ${selectedPreset === preset.id
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-400 ring-1 ring-blue-500 dark:ring-blue-400"
+                        : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                        }`}
                     >
                       {selectedPreset === preset.id && (
                         <CheckCircle className="absolute top-2 right-2 h-4 w-4 text-blue-500 dark:text-blue-400" />
@@ -788,7 +796,9 @@ export default function TemplatesPage() {
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
 
@@ -804,9 +814,13 @@ export default function TemplatesPage() {
   });
 
   // Load templates and stats on component mount and when filters change
-  const loadTemplates = async () => {
+  const loadTemplates = async (isInitial = false) => {
     try {
-      setLoading(true);
+      if (isInitial) {
+        setLoading(true);
+      } else {
+        setIsSearching(true);
+      }
       setError(null);
       const result = await fetchTemplates({
         page: pagination.page,
@@ -827,6 +841,7 @@ export default function TemplatesPage() {
       });
     } finally {
       setLoading(false);
+      setIsSearching(false);
     }
   };
 
@@ -843,7 +858,7 @@ export default function TemplatesPage() {
   useEffect(() => {
     // Only reload if we're on the templates page (not a subpage)
     if (location === '/templates') {
-      loadTemplates();
+      loadTemplates(true);
       loadStats();
     }
   }, [location]);
@@ -877,7 +892,7 @@ export default function TemplatesPage() {
 
   const handleDeleteTemplate = async (id: string) => {
     const template = templates.find((item) => item.id === id);
-    if (!template) return;
+    if (!template || deletingId) return;
 
     const confirmed = window.confirm(
       `Delete "${template.name}"? This action cannot be undone.`
@@ -888,9 +903,16 @@ export default function TemplatesPage() {
     }
 
     try {
+      setDeletingId(id);
       await deleteTemplate(id);
-      await loadTemplates();
-      await loadStats();
+
+      // Remove the template from local state in-place (no full reload)
+      setTemplates((prev) => prev.filter((t) => t.id !== id));
+      setPagination((prev) => ({ ...prev, total: Math.max(0, prev.total - 1) }));
+
+      // Refresh stats silently in the background
+      loadStats();
+
       toast({
         title: t('templatesPage.toasts.templateDeleted'),
         description: t('templatesPage.toasts.templateDeletedDesc', { name: template.name }),
@@ -901,6 +923,8 @@ export default function TemplatesPage() {
         description: t('templatesPage.toasts.deleteError'),
         variant: "destructive",
       });
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -1055,7 +1079,13 @@ export default function TemplatesPage() {
               </div>
             </div>
           </div>
-          <div className="p-6">
+          <div className="p-6 relative" style={{ minHeight: '200px' }}>
+            {/* Subtle top-bar indicator for search/filter reloads */}
+            {isSearching && (
+              <div className="absolute top-0 left-0 right-0 h-0.5 overflow-hidden z-10">
+                <div className="h-full bg-blue-500 animate-pulse" />
+              </div>
+            )}
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-center space-y-3">
@@ -1070,7 +1100,7 @@ export default function TemplatesPage() {
                   <p className="text-sm text-red-700 dark:text-red-300">
                     {error}
                   </p>
-                  <Button variant="outline" onClick={() => loadTemplates()}>
+                  <Button variant="outline" onClick={() => loadTemplates(true)}>
                     {t('templatesPage.error.tryAgain')}
                   </Button>
                 </CardContent>
@@ -1099,7 +1129,7 @@ export default function TemplatesPage() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              <div className={`grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 transition-opacity duration-150 ${isSearching ? 'opacity-60' : 'opacity-100'}`}>
                 {filteredTemplates.map((template) => (
                   <TemplateCard
                     key={template.id}
@@ -1109,6 +1139,7 @@ export default function TemplatesPage() {
                     onDuplicate={handleDuplicateTemplate}
                     onDelete={handleDeleteTemplate}
                     onEdit={handleEditTemplate}
+                    isDeleting={deletingId === template.id}
                   />
                 ))}
               </div>

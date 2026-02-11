@@ -7,6 +7,7 @@ import type { sendReminderTask, scheduleReminderTask, sendBulkRemindersTask, Rem
 import type { sendRescheduleEmailTask, RescheduleEmailPayload } from "../../src/trigger/appointmentRescheduleEmail";
 import type { sendThankYouEmailTask, ThankYouEmailPayload } from "../../src/trigger/appointmentThankYouEmail";
 import type { requestBdayEmailTask, RequestBdayEmailPayload } from "../../src/trigger/requestBdayEmail";
+import type { scheduleContactEmailTask, ScheduleContactEmailPayload } from "../../src/trigger/scheduleContactEmail";
 
 /**
  * Log a task to the trigger_tasks table for local tracking
@@ -582,6 +583,69 @@ export async function triggerThankYouEmail(payload: ThankYouEmailPayload): Promi
       tenantId: payload.tenantId,
       relatedType: 'email',
       relatedId: payload.appointmentId,
+    });
+
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+}
+
+/**
+ * Trigger a scheduled contact email via Trigger.dev
+ * The task will wait until the scheduled UTC time before sending via Resend
+ */
+export async function triggerScheduleContactEmail(payload: ScheduleContactEmailPayload): Promise<{
+  success: boolean;
+  runId?: string;
+  taskLogId?: string;
+  error?: string;
+}> {
+  const taskId = "schedule-contact-email";
+  let taskLogId: string | null = null;
+
+  try {
+    const handle = await tasks.trigger<typeof scheduleContactEmailTask>(taskId, payload, {
+      tags: [
+        `tenant_${payload.tenantId}`,
+        `contact_${payload.contactId}`,
+        "scheduled-email",
+      ],
+    });
+
+    console.log(`📅 [Trigger.dev] Triggered ${taskId} for ${payload.scheduledForUTC}, runId: ${handle.id}`);
+
+    // Log to trigger_tasks table
+    taskLogId = await logTriggerTask({
+      taskId,
+      runId: handle.id,
+      payload,
+      status: 'triggered',
+      tenantId: payload.tenantId,
+      relatedType: 'scheduled_email',
+      relatedId: payload.contactId,
+      scheduledFor: new Date(payload.scheduledForUTC),
+    });
+
+    return {
+      success: true,
+      runId: handle.id,
+      taskLogId: taskLogId || undefined,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error(`📅 [Trigger.dev] Failed to trigger ${taskId}:`, errorMessage);
+
+    // Log failed attempt
+    await logTriggerTask({
+      taskId,
+      payload,
+      status: 'failed',
+      tenantId: payload.tenantId,
+      relatedType: 'scheduled_email',
+      relatedId: payload.contactId,
+      scheduledFor: new Date(payload.scheduledForUTC),
     });
 
     return {

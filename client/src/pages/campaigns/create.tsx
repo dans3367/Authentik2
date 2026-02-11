@@ -42,17 +42,17 @@ export default function CreateCampaignPage() {
     },
   });
 
-  // Fetch managers for the reviewer dropdown
-  const { data: managersData, isLoading: managersLoading } = useQuery({
-    queryKey: ['/api/managers'],
+  // Fetch eligible reviewers (all users except Employee role)
+  const { data: reviewersData, isLoading: reviewersLoading } = useQuery<{ managers: User[] }>({
+    queryKey: ['/api/campaigns/managers'],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/managers');
+      const response = await apiRequest('GET', '/api/campaigns/managers');
       return await response.json();
     },
     staleTime: 60_000,
   });
 
-  const managers = managersData?.managers || [];
+  const reviewers = reviewersData?.managers || [];
 
   const createCampaignMutation = useMutation({
     mutationFn: async (data: CreateCampaignData) => {
@@ -303,13 +303,9 @@ export default function CreateCampaignPage() {
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
                           <Calendar
-                            mode="single"
                             selected={field.value}
                             onSelect={field.onChange}
-                            disabled={(date) =>
-                              date < new Date(new Date().setHours(0, 0, 0, 0))
-                            }
-                            initialFocus
+                            disabled={{ before: new Date(new Date().setHours(0, 0, 0, 0)) }}
                           />
                         </PopoverContent>
                       </Popover>
@@ -345,13 +341,9 @@ export default function CreateCampaignPage() {
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
                           <Calendar
-                            mode="single"
                             selected={field.value}
                             onSelect={field.onChange}
-                            disabled={(date) =>
-                              date < new Date(new Date().setHours(0, 0, 0, 0))
-                            }
-                            initialFocus
+                            disabled={{ before: new Date(new Date().setHours(0, 0, 0, 0)) }}
                           />
                         </PopoverContent>
                       </Popover>
@@ -488,18 +480,18 @@ export default function CreateCampaignPage() {
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder={managersLoading ? "Loading managers..." : "Select a manager"} />
+                            <SelectValue placeholder={reviewersLoading ? "Loading reviewers..." : "Select a reviewer"} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {managersLoading ? (
-                            <SelectItem value="loading" disabled>Loading managers...</SelectItem>
-                          ) : managers.length === 0 ? (
-                            <SelectItem value="no-managers" disabled>No managers available</SelectItem>
+                          {reviewersLoading ? (
+                            <SelectItem value="loading" disabled>Loading reviewers...</SelectItem>
+                          ) : reviewers.length === 0 ? (
+                            <SelectItem value="no-reviewers" disabled>No reviewers available</SelectItem>
                           ) : (
-                            managers.map((manager: User) => (
-                              <SelectItem key={manager.id} value={manager.id}>
-                                {manager.firstName} {manager.lastName} - {manager.email} ({manager.role})
+                            reviewers.map((reviewer: User) => (
+                              <SelectItem key={reviewer.id} value={reviewer.id}>
+                                {reviewer.firstName} {reviewer.lastName} - {reviewer.email} ({reviewer.role})
                               </SelectItem>
                             ))
                           )}

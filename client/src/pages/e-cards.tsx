@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -324,6 +324,7 @@ export default function ECardsPage() {
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [templateSearchQuery, setTemplateSearchQuery] = useState("");
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [birthdayModalOpen, setBirthdayModalOpen] = useState(false);
@@ -332,6 +333,10 @@ export default function ECardsPage() {
   const [designerOpen, setDesignerOpen] = useState(false);
   const [designerThemeId, setDesignerThemeId] = useState<string | null>(null);
   const [description, setDescription] = useState<string>("");
+
+  // Ref to preserve scroll position during template search
+  const scrollPositionRef = useRef<number>(0);
+  const isSearchingRef = useRef<boolean>(false);
 
   // State for real-time custom theme preview
   const [customThemePreview, setCustomThemePreview] = useState<CustomThemeData | null>(null);
@@ -391,6 +396,17 @@ export default function ECardsPage() {
       console.warn('Failed to save custom cards:', error);
     }
   }, [customCards]);
+
+  // Preserve scroll position during template search
+  useEffect(() => {
+    if (isSearchingRef.current) {
+      // Restore scroll position after render
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollPositionRef.current);
+        isSearchingRef.current = false;
+      });
+    }
+  }, [templateSearchQuery]);
 
   // Reset modal state when location changes (prevents frozen modal on navigation back)
   useEffect(() => {
@@ -803,7 +819,7 @@ export default function ECardsPage() {
   };
 
   // Helper function to get parent holiday ID from theme variant ID
-  const getParentHolidayId = (themeId: string): string | null => {
+  const getParentHolidayId = (themeId: string): string => {
     // Check each holiday theme array to find which one contains this theme ID
     if (valentineThemes.some(t => t.id === themeId)) return 'valentine';
     if (stPatrickThemes.some(t => t.id === themeId)) return 'stpatrick';
@@ -812,6 +828,27 @@ export default function ECardsPage() {
     if (independenceThemes.some(t => t.id === themeId)) return 'independence';
     // If it's already a parent holiday ID or not found, return the original ID
     return themeId;
+  };
+
+  // Helper function to filter themes by search query
+  const filterThemesBySearch = <T extends { id: string; name: string }>(themes: T[]): T[] => {
+    if (!templateSearchQuery.trim()) return themes;
+    const query = templateSearchQuery.toLowerCase();
+    return themes.filter(theme => 
+      theme.name.toLowerCase().includes(query) || 
+      theme.id.toLowerCase().includes(query)
+    );
+  };
+
+  // Helper function to filter custom cards by search query
+  const filterCustomCardsBySearch = <T extends { id: string; name: string; data: CustomThemeData }>(cards: T[]): T[] => {
+    if (!templateSearchQuery.trim()) return cards;
+    const query = templateSearchQuery.toLowerCase();
+    return cards.filter(card => 
+      card.name.toLowerCase().includes(query) ||
+      card.data.title?.toLowerCase().includes(query) ||
+      card.id.toLowerCase().includes(query)
+    );
   };
 
   // Handler for toggling holiday disabled state
@@ -1488,6 +1525,32 @@ export default function ECardsPage() {
                 </Button>
               </div>
 
+              {/* Templates Search */}
+              <div className="relative flex-1 max-w-sm mb-6">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder={t('ecards.filters.searchTemplates')}
+                  value={templateSearchQuery}
+                  onChange={(e) => {
+                    // Capture current scroll position before state update
+                    scrollPositionRef.current = window.scrollY;
+                    isSearchingRef.current = true;
+                    setTemplateSearchQuery(e.target.value);
+                  }}
+                  className="pl-10"
+                  onKeyDown={(e) => {
+                    // Prevent page scroll when typing in search
+                    if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', ' '].includes(e.key)) {
+                      e.preventDefault();
+                    }
+                  }}
+                  onWheel={(e) => {
+                    // Prevent page scroll when mouse wheel is used over search input
+                    e.stopPropagation();
+                  }}
+                />
+              </div>
+
               <div>
                 {/* Valentines Row */}
                 {((cardFilter === "active" && !disabledHolidays.includes('valentine')) || 
@@ -1495,7 +1558,7 @@ export default function ECardsPage() {
                 <div className="mt-6">
                   <Label className="text-sm">{t('ecards.sectionLabels.valentinesDay')}</Label>
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
-                    {valentineThemes.map((theme) => {
+                    {filterThemesBySearch(valentineThemes).map((theme) => {
                       const themeId = theme.id;
                       const isSelected = (birthdaySettings?.emailTemplate === themeId) && (() => {
                         try {
@@ -1588,7 +1651,7 @@ export default function ECardsPage() {
                 <div className="mt-6">
                   <Label className="text-sm">{t('ecards.sectionLabels.stPatricksDay')}</Label>
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
-                    {stPatrickThemes.map((theme) => {
+                    {filterThemesBySearch(stPatrickThemes).map((theme) => {
                       const themeId = theme.id;
                       const isSelected = (birthdaySettings?.emailTemplate === themeId) && (() => {
                         try {
@@ -1680,7 +1743,7 @@ export default function ECardsPage() {
                 <div className="mt-6">
                   <Label className="text-sm">{t('ecards.sectionLabels.newYearsDay')}</Label>
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
-                    {newYearThemes.map((theme) => {
+                    {filterThemesBySearch(newYearThemes).map((theme) => {
                       const themeId = theme.id;
                       const isSelected = (birthdaySettings?.emailTemplate === themeId) && (() => {
                         try {
@@ -1772,7 +1835,7 @@ export default function ECardsPage() {
                 <div className="mt-6">
                   <Label className="text-sm">{t('ecards.sectionLabels.easter')}</Label>
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
-                    {easterThemes.map((theme) => {
+                    {filterThemesBySearch(easterThemes).map((theme) => {
                       const themeId = theme.id;
                       const isSelected = (birthdaySettings?.emailTemplate === themeId) && (() => {
                         try {
@@ -1864,7 +1927,7 @@ export default function ECardsPage() {
                 <div className="mt-6">
                   <Label className="text-sm">{t('ecards.sectionLabels.independenceDay')}</Label>
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
-                    {independenceThemes.map((theme) => {
+                    {filterThemesBySearch(independenceThemes).map((theme) => {
                       const themeId = theme.id;
                       const isSelected = (birthdaySettings?.emailTemplate === themeId) && (() => {
                         try {
@@ -1988,7 +2051,7 @@ export default function ECardsPage() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                      {customCards.map((card) => {
+                      {filterCustomCardsBySearch(customCards.filter(c => c.active !== false)).map((card) => {
                         const isSelected = birthdaySettings?.emailTemplate === card.id;
                         return (
                           <div
@@ -2075,7 +2138,7 @@ export default function ECardsPage() {
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-4">
-                        {customCards.filter(card => card.active === false).map((card) => (
+                        {filterCustomCardsBySearch(customCards.filter(card => card.active === false)).map((card) => (
                           <div
                             key={card.id}
                             className="relative rounded-xl border p-3 border-gray-200 hover:border-gray-300 opacity-60"
@@ -2200,11 +2263,11 @@ export default function ECardsPage() {
                 if (existing) {
                   // Update existing card
                   return prev.map(c => c.id === designerThemeId 
-                    ? { ...c, name: cardName, sendDate, data: themeData } 
+                    ? { ...c, name: cardName, sendDate, data: themeData, active: c.active } 
                     : c);
                 } else {
                   // Add new card
-                  return [...prev, { id: designerThemeId, name: cardName, sendDate, data: themeData }];
+                  return [...prev, { id: designerThemeId, name: cardName, sendDate, data: themeData, active: true }];
                 }
               });
 

@@ -7,7 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Search, Star } from "lucide-react";
+import { FileText, Search, Star, Filter } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Template {
   id: string;
@@ -28,18 +35,29 @@ interface TemplateSelectorProps {
   channel?: string; // Filter by channel (e.g., 'individual')
 }
 
+const channelFilterOptions = [
+  { value: "all", label: "All Channels" },
+  { value: "individual", label: "Individual Email" },
+  { value: "promotional", label: "Promotional" },
+  { value: "newsletter", label: "Newsletter" },
+  { value: "transactional", label: "Transactional" },
+  { value: "single-purpose", label: "Single Purpose" },
+];
+
 export function TemplateSelector({ onSelect, trigger, channel }: TemplateSelectorProps) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [channelFilter, setChannelFilter] = useState<string>(channel || "all");
 
-  // Fetch templates
+  // Fetch templates (all channels, filter client-side or via API)
+  const activeChannel = channelFilter === "all" ? undefined : channelFilter;
   const { data, isLoading } = useQuery({
-    queryKey: ["/api/templates", { search: searchTerm, channel, limit: 100 }],
+    queryKey: ["/api/templates", { search: searchTerm, channel: activeChannel, limit: 100 }],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchTerm) params.append("search", searchTerm);
-      if (channel) params.append("channel", channel);
+      if (activeChannel) params.append("channel", activeChannel);
       params.append("limit", "100");
       
       const res = await apiRequest("GET", `/api/templates?${params.toString()}`);
@@ -102,15 +120,30 @@ export function TemplateSelector({ onSelect, trigger, channel }: TemplateSelecto
         </div>
 
         <div className="px-6 flex-1 overflow-hidden flex flex-col gap-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              placeholder="Search templates..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+          {/* Search & Channel Filter */}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                placeholder="Search templates..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={channelFilter} onValueChange={setChannelFilter}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="w-3.5 h-3.5 mr-1.5 text-gray-400" />
+                <SelectValue placeholder="Channel" />
+              </SelectTrigger>
+              <SelectContent>
+                {channelFilterOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Templates List */}

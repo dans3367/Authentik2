@@ -673,7 +673,7 @@ export class DatabaseStorage implements IStorage {
   async getTenantPlan(tenantId: string): Promise<{ planName: string; maxUsers: number | null; maxShops: number | null; monthlyEmailLimit: number | null; allowUsersManagement: boolean; allowRolesManagement: boolean; subscriptionStatus: string | null }> {
     const subscription = await this.getTenantSubscription(tenantId);
 
-    if (subscription) {
+    if (subscription?.plan) {
       return {
         planName: subscription.plan.displayName || subscription.plan.name,
         maxUsers: subscription.plan.maxUsers,

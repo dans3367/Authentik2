@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, and } from 'drizzle-orm';
-import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, eCardSettings, emailActivity, tenants, emailSends, emailContent, companies, unsubscribeTokens, masterEmailDesign } from '@shared/schema';
+import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, eCardSettings, emailActivity, tenants, emailSends, emailContent, companies, unsubscribeTokens, masterEmailDesign, triggerTasks } from '@shared/schema';
 import { deleteImageFromR2 } from '../config/r2';
 import { authenticateToken, requireTenant, requirePermission } from '../middleware/auth-middleware';
 import { authenticateInternalService, InternalServiceRequest } from '../middleware/internal-service-auth';
@@ -13,6 +13,7 @@ import { enhancedEmailService } from '../emailService';
 import crypto from 'crypto';
 import { logActivity, computeChanges, allowedActivityTypes } from '../utils/activityLogger';
 import xss from 'xss';
+import { emailAttachmentUpload, validateAttachmentSize, filesToBase64Attachments, handleEmailAttachmentError } from '../middleware/emailAttachmentUpload';
 
 // Sanitize HTML content for emails - allows safe formatting tags, strips scripts and event handlers
 export function sanitizeEmailHtml(html: string): string {
@@ -111,6 +112,31 @@ function escapeHtml(str: string): string {
         return c;
     }
   });
+}
+
+/**
+ * Replace template placeholders (e.g. {{first_name}}, {{company_name}}) with actual contact/company data.
+ * Handles both HTML body and subject lines.
+ * All substituted values are HTML-escaped to prevent injection attacks.
+ */
+function replaceEmailPlaceholders(
+  text: string,
+  contact: { firstName?: string | null; lastName?: string | null; email?: string | null },
+  companyName?: string,
+): string {
+  // HTML-escape all values before substitution to prevent injection
+  const escapedFirstName = sanitizeEmailHtml(contact.firstName || '');
+  const escapedLastName = sanitizeEmailHtml(contact.lastName || '');
+  const escapedFullName = sanitizeEmailHtml(`${contact.firstName || ''} ${contact.lastName || ''}`.trim());
+  const escapedEmail = sanitizeEmailHtml(contact.email || '');
+  const escapedCompanyName = sanitizeEmailHtml(companyName || '');
+
+  return text
+    .replace(/\{\{\s*first_name\s*\}\}/gi, escapedFirstName)
+    .replace(/\{\{\s*last_name\s*\}\}/gi, escapedLastName)
+    .replace(/\{\{\s*full_name\s*\}\}/gi, escapedFullName)
+    .replace(/\{\{\s*email\s*\}\}/gi, escapedEmail)
+    .replace(/\{\{\s*company_name\s*\}\}/gi, escapedCompanyName);
 }
 
 function sanitizeFontFamily(fontFamily: string | undefined | null): string {
@@ -499,21 +525,107 @@ emailManagementRoutes.get("/email-contacts", authenticateToken, requireTenant, r
 
 // List scheduled emails for a specific contact (timeline)
 emailManagementRoutes.get("/email-contacts/:id/scheduled", authenticateToken, requireTenant, requirePermission('contacts.view'), async (req: any, res) => {
-  // Scheduled email queue removed - email scheduling now handled by Trigger.dev
-  // Return empty array for backwards compatibility
-  res.json({ scheduled: [], message: 'Scheduled email queue migrated to Trigger.dev' });
+  try {
+    const { id } = req.params;
+    const tenantId = req.user.tenantId;
+
+    // Query trigger_tasks for scheduled emails related to this contact
+    const tasks = await db.query.triggerTasks.findMany({
+      where: sql`${triggerTasks.tenantId} = ${tenantId}
+        AND ${triggerTasks.relatedId} = ${id}
+        AND ${triggerTasks.relatedType} = 'scheduled_email'
+        AND ${triggerTasks.status} IN ('pending', 'triggered', 'running')`,
+      orderBy: sql`${triggerTasks.scheduledFor} ASC`,
+    });
+
+    const scheduled = tasks.map((t: any) => {
+      let payload: any = {};
+      try {
+        payload = typeof t.payload === 'string' ? JSON.parse(t.payload) : t.payload || {};
+      } catch { /* ignore parse errors */ }
+
+      return {
+        id: t.runId || t.id,
+        to: payload.to ? [payload.to] : [],
+        subject: payload.subject || '',
+        status: t.status,
+        scheduledAt: t.scheduledFor?.toISOString() || payload.scheduledForUTC || '',
+        createdAt: t.createdAt?.toISOString() || '',
+        providerId: t.runId,
+        metadata: {
+          timezone: payload.timezone,
+          scheduledBy: payload.scheduledBy,
+          taskLogId: t.id,
+        },
+        html: payload.html,
+      };
+    });
+
+    res.json({ scheduled });
+  } catch (error) {
+    console.error('❌ [ScheduledEmails] Failed to list scheduled emails:', error);
+    res.status(500).json({ message: 'Failed to list scheduled emails' });
+  }
 });
 
 // Update a scheduled email for a specific contact
 emailManagementRoutes.put("/email-contacts/:id/scheduled/:queueId", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
-  // Scheduled email queue removed - email scheduling now handled by Trigger.dev
-  res.status(501).json({ message: 'Scheduled email updates not available - use Trigger.dev dashboard' });
+  // Scheduled email updates require cancelling the existing run and creating a new one
+  res.status(501).json({ message: 'To update a scheduled email, cancel it and create a new one' });
 });
 
-// Delete a scheduled email for a specific contact
+// Delete (cancel) a scheduled email for a specific contact
 emailManagementRoutes.delete("/email-contacts/:id/scheduled/:queueId", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
-  // Scheduled email queue removed - email scheduling now handled by Trigger.dev
-  res.status(501).json({ message: 'Scheduled email deletion not available - use Trigger.dev dashboard' });
+  try {
+    const { queueId, id: relatedId } = req.params;
+    const tenantId = req.user.tenantId;
+
+    // queueId could be a runId (run_xxx) or a trigger_tasks id
+    const { cancelReminderRun, updateTriggerTaskStatus } = await import('../lib/trigger');
+
+    // Find the trigger_tasks record, ensuring it belongs to both the tenant AND the contact
+    // Try by runId first, then by id
+    const task = await db.query.triggerTasks.findFirst({
+      where: sql`(${triggerTasks.runId} = ${queueId} OR ${triggerTasks.id} = ${queueId})
+        AND ${triggerTasks.tenantId} = ${tenantId}
+        AND ${triggerTasks.relatedId} = ${relatedId}`,
+    });
+
+    if (!task) {
+      return res.status(404).json({
+        message: 'Scheduled email not found for this contact'
+      });
+    }
+
+    // After finding the task, verify contact ownership
+    const contact = await db.query.emailContacts.findFirst({
+      where: sql`${emailContacts.id} = ${relatedId} AND ${emailContacts.tenantId} = ${tenantId}`,
+    });
+
+    if (!contact) {
+      return res.status(404).json({ message: 'Contact not found or access denied' });
+    }
+
+    // Try to cancel the Trigger.dev run if it's a run ID
+    if (queueId.startsWith('run_') || task.runId) {
+      const runIdToCancel = task.runId || queueId;
+      const cancelResult = await cancelReminderRun(runIdToCancel);
+      if (!cancelResult.success) {
+        console.warn(`⚠️ [ScheduledEmails] Could not cancel run ${runIdToCancel}: ${cancelResult.error}`);
+      }
+    }
+
+    // Update the trigger_tasks record to cancelled status
+    await updateTriggerTaskStatus({
+      id: task.id,
+      status: 'cancelled',
+    });
+
+    res.json({ message: 'Scheduled email cancelled', id: queueId });
+  } catch (error) {
+    console.error('❌ [ScheduledEmails] Failed to cancel scheduled email:', error);
+    res.status(500).json({ message: 'Failed to cancel scheduled email' });
+  }
 });
 
 // Get specific email contact
@@ -1475,18 +1587,48 @@ emailManagementRoutes.delete("/email-contacts/:contactId/lists/:listId", authent
   }
 });
 
-// Schedule a single B2C email for a contact (Send Later)
-emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
+// Schedule a single B2C email for a contact (Send Later) - supports both JSON and multipart/form-data with attachments
+emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, requireTenant, requirePermission('contacts.edit'), (req: any, res: any, next: any) => {
+  // Only run multer for multipart/form-data requests (when attachments are present)
+  const contentType = req.headers['content-type'] || '';
+  if (contentType.includes('multipart/form-data')) {
+    emailAttachmentUpload(req, res, (err: any) => {
+      if (err) {
+        return res.status(400).json({ message: handleEmailAttachmentError(err) });
+      }
+      next();
+    });
+  } else {
+    next();
+  }
+}, async (req: any, res) => {
   try {
     const { id } = req.params;
-    const { subject, html, text, scheduleAt } = req.body || {};
+    const { subject, html, text, date, time, timezone, scheduleAt } = req.body || {};
     const tenantId = req.user.tenantId;
+
+    // Process attachments if present
+    const uploadedFiles = (req.files as Express.Multer.File[]) || [];
+    const sizeCheck = validateAttachmentSize(uploadedFiles);
+    if (!sizeCheck.valid) {
+      return res.status(400).json({ message: sizeCheck.error });
+    }
+    const base64Attachments = filesToBase64Attachments(uploadedFiles);
+    if (base64Attachments.length > 0) {
+      console.log(`📎 [ScheduleEmail] ${base64Attachments.length} attachment(s) included, total raw size: ${uploadedFiles.reduce((s, f) => s + f.size, 0)} bytes`);
+    }
 
     console.log(`📅 [ScheduleEmail] Starting email schedule request for contact ${id}, tenant ${tenantId}`);
 
-    if (!subject || !html || !scheduleAt) {
-      console.log(`📅 [ScheduleEmail] Validation failed: missing required fields`);
-      return res.status(400).json({ message: 'subject, html and scheduleAt are required' });
+    // Support both new format (date+time+timezone) and legacy format (scheduleAt)
+    if (!subject || !html) {
+      console.log(`📅 [ScheduleEmail] Validation failed: missing subject or html`);
+      return res.status(400).json({ message: 'subject and html are required' });
+    }
+
+    if (!date && !scheduleAt) {
+      console.log(`📅 [ScheduleEmail] Validation failed: missing date or scheduleAt`);
+      return res.status(400).json({ message: 'date (with time and timezone) or scheduleAt is required' });
     }
 
     const contact = await db.query.emailContacts.findFirst({
@@ -1537,12 +1679,39 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       }
     }
 
-    const scheduleDate = new Date(scheduleAt);
+    // Convert date + time + timezone to UTC
+    // The frontend sends raw date (YYYY-MM-DD), time (HH:MM), and IANA timezone string
+    let scheduleDate: Date;
+
+    if (date) {
+      // New format: date + time + timezone → convert to UTC
+      // Validate timezone is present - do not silently default
+      if (!timezone) {
+        console.log(`📅 [ScheduleEmail] Validation failed: timezone required when using date+time format`);
+        return res.status(400).json({
+          message: 'Timezone required when scheduling via date+time. Please provide a valid IANA timezone (e.g., America/New_York)'
+        });
+      }
+
+      // Convert local date + time + timezone to UTC
+      try {
+        const { fromZonedTime } = await import('date-fns-tz');
+        scheduleDate = fromZonedTime(`${date}T${time || '00:00'}:00`, timezone);
+        console.log(`📅 [ScheduleEmail] Timezone conversion: ${date} ${time || '00:00'} in ${timezone} → ${scheduleDate.toISOString()} UTC`);
+      } catch (tzError) {
+        console.error(`📅 [ScheduleEmail] Timezone conversion failed:`, tzError);
+        return res.status(400).json({ message: `Invalid timezone: ${timezone}` });
+      }
+    } else {
+      // Legacy format: scheduleAt is already an ISO string
+      scheduleDate = new Date(scheduleAt);
+    }
+
     if (isNaN(scheduleDate.getTime())) {
-      return res.status(400).json({ message: 'Invalid scheduleAt date' });
+      return res.status(400).json({ message: 'Invalid schedule date' });
     }
     if (scheduleDate.getTime() < Date.now() + 30 * 1000) {
-      return res.status(400).json({ message: 'scheduleAt must be at least 30 seconds in the future' });
+      return res.status(400).json({ message: 'Schedule time must be at least 30 seconds in the future' });
     }
 
     // Get company info for footer label (no fallback if missing)
@@ -1610,9 +1779,13 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       }
     }
 
+    // Replace template placeholders (e.g. {{first_name}}, {{company_name}}) with actual contact data
+    const resolvedHtml = replaceEmailPlaceholders(html, contact, companyName);
+    const resolvedSubject = replaceEmailPlaceholders(String(subject), contact, companyName);
+
     // Format content as HTML using master email design (same as send-email route)
     // Sanitize user-provided HTML content to prevent XSS
-    const sanitizedHtml = sanitizeEmailHtml(html);
+    const sanitizedHtml = sanitizeEmailHtml(resolvedHtml);
     // Escape text fields to prevent XSS in display names and text content
     const safeDisplayCompanyName = escapeHtml(design.displayCompanyName || '');
     const safeHeaderText = design.headerText ? escapeHtml(design.headerText) : null;
@@ -1674,47 +1847,97 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
         </body>
       </html>`;
 
-    // Schedule via Trigger.dev
+    // Schedule via Trigger.dev using the dedicated schedule-contact-email task
     try {
-      console.log(`📅 [ScheduleEmail] Scheduling email to ${maskEmail(String(contact.email))} for ${scheduleDate.toISOString()}, subject: "${subject}"`);
-      const { scheduleEmailTask } = await import('../../src/trigger/email');
-      const payload: Parameters<typeof scheduleEmailTask.trigger>[0] = {
-        to: String(contact.email),
-        subject: sanitizeString(String(subject)) || 'No Subject',
-        html: themedHtml,
-        scheduledFor: scheduleDate.toISOString(),
-        metadata: {
-          type: 'b2c',
-          contactId: id,
-          tenantId: req.user.tenantId,
-          scheduledBy: req.user.id,
-        },
-      };
-      if (text) payload.text = String(text);
-      const handle = await scheduleEmailTask.trigger(payload);
-      console.log(`✅ [ScheduleEmail] Email scheduled successfully for ${maskEmail(String(contact.email))}, runId: ${handle.id}`);
+      const { triggerScheduleContactEmail } = await import('../lib/trigger');
+      const emailTrackingId = crypto.randomUUID();
 
-      // Log scheduled activity
+      console.log(`📅 [ScheduleEmail] Scheduling email to ${maskEmail(String(contact.email))} for ${scheduleDate.toISOString()} (${timezone}), subject: "${resolvedSubject}"`);
+
+      const result = await triggerScheduleContactEmail({
+        to: String(contact.email),
+        subject: sanitizeString(resolvedSubject) || 'No Subject',
+        html: themedHtml,
+        text: text ? replaceEmailPlaceholders(String(text), contact, companyName) : undefined,
+        scheduledForUTC: scheduleDate.toISOString(),
+        timezone: timezone,
+        contactId: id,
+        tenantId,
+        scheduledBy: req.user.id,
+        emailTrackingId,
+        ...(base64Attachments.length > 0 && { attachments: base64Attachments }),
+      });
+
+      if (!result.success) {
+        console.error(`❌ [ScheduleEmail] Failed to trigger schedule task: ${result.error}`);
+        return res.status(503).json({ message: 'Email scheduling service unavailable', error: result.error });
+      }
+
+      console.log(`✅ [ScheduleEmail] Email scheduled successfully, runId: ${result.runId}`);
+
+      // Create tracking records AFTER successful scheduling
       try {
+        await db.insert(emailSends).values({
+          id: emailTrackingId,
+          tenantId,
+          recipientEmail: String(contact.email),
+          recipientName: contact.firstName && contact.lastName
+            ? `${contact.firstName} ${contact.lastName}`
+            : contact.firstName || contact.lastName || null,
+          senderEmail: 'admin@zendwise.com',
+          senderName: design.displayCompanyName || null,
+          subject: sanitizeString(resolvedSubject) || 'No Subject',
+          emailType: 'scheduled',
+          provider: 'resend',
+          status: 'pending',
+          contactId: id,
+          sentAt: null,
+        });
+
+        await db.insert(emailContent).values({
+          emailSendId: emailTrackingId,
+          htmlContent: themedHtml,
+          textContent: text ? replaceEmailPlaceholders(String(text), contact, companyName) : null,
+          metadata: JSON.stringify({
+            scheduledFor: scheduleDate.toISOString(),
+            timezone: timezone,
+            scheduledBy: req.user.id,
+            runId: result.runId,
+            taskLogId: result.taskLogId,
+          }),
+        });
+
         await db.insert(emailActivity).values({
-          tenantId: req.user.tenantId,
+          tenantId,
           contactId: id,
           activityType: 'scheduled',
           activityData: JSON.stringify({
-            subject: sanitizeString(String(subject)) || 'No Subject',
+            subject: sanitizeString(resolvedSubject) || 'No Subject',
             scheduledFor: scheduleDate.toISOString(),
+            timezone,
             scheduledBy: req.user.id,
-            runId: handle.id
+            runId: result.runId,
+            taskLogId: result.taskLogId,
           }),
           occurredAt: new Date(),
         });
-      } catch (logError) {
-        console.error(`⚠️ [ScheduleEmail] Failed to log scheduled activity:`, logError);
+
+        console.log(`📅 [ScheduleEmail] Created tracking records: ${emailTrackingId}`);
+      } catch (trackingError) {
+        console.error(`⚠️ [ScheduleEmail] Failed to create tracking records:`, trackingError);
+        // Email is still scheduled, just without local tracking
       }
 
-      return res.status(201).json({ message: 'Email scheduled via Trigger.dev', runId: handle.id, contactId: id, scheduleAt: scheduleDate.toISOString() });
-    } catch (importError) {
-      console.error(`❌ [ScheduleEmail] Failed to schedule email for ${maskEmail(String(contact.email))}:`, importError);
+      return res.status(201).json({
+        message: 'Email scheduled via Trigger.dev',
+        runId: result.runId,
+        taskLogId: result.taskLogId,
+        contactId: id,
+        scheduleAt: scheduleDate.toISOString(),
+        timezone,
+      });
+    } catch (fatalError) {
+      console.error(`❌ [ScheduleEmail] Fatal scheduling error:`, fatalError);
       return res.status(503).json({ message: 'Email scheduling service unavailable' });
     }
   } catch (error) {
@@ -4104,12 +4327,37 @@ export function renderBirthdayTemplate(
   </html>`;
 }
 
-// Send individual email to a contact
-emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
+// Send individual email to a contact (supports both JSON and multipart/form-data with attachments)
+emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireTenant, requirePermission('contacts.edit'), (req: any, res: any, next: any) => {
+  // Only run multer for multipart/form-data requests (when attachments are present)
+  const contentType = req.headers['content-type'] || '';
+  if (contentType.includes('multipart/form-data')) {
+    emailAttachmentUpload(req, res, (err: any) => {
+      if (err) {
+        return res.status(400).json({ message: handleEmailAttachmentError(err) });
+      }
+      next();
+    });
+  } else {
+    next();
+  }
+}, async (req: any, res) => {
   try {
     const { id } = req.params;
-    const { subject, content } = req.body;
     const tenantId = req.user.tenantId;
+
+    const { subject, content } = req.body;
+
+    // Process attachments if present
+    const uploadedFiles = (req.files as Express.Multer.File[]) || [];
+    const sizeCheck = validateAttachmentSize(uploadedFiles);
+    if (!sizeCheck.valid) {
+      return res.status(400).json({ message: sizeCheck.error });
+    }
+    const base64Attachments = filesToBase64Attachments(uploadedFiles);
+    if (base64Attachments.length > 0) {
+      console.log(`📎 [SendEmail] ${base64Attachments.length} attachment(s) included, total raw size: ${uploadedFiles.reduce((s, f) => s + f.size, 0)} bytes`);
+    }
 
     console.log(`📧 [SendEmail] Starting individual email send for contact ${id}, tenant ${tenantId}`);
 
@@ -4245,6 +4493,10 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       }
     }
 
+    // Replace template placeholders (e.g. {{first_name}}, {{company_name}}) with actual contact data
+    const resolvedContent = replaceEmailPlaceholders(content, contact, companyName);
+    const resolvedSubject = replaceEmailPlaceholders(subject, contact, companyName);
+
     // Format content as HTML using master email design
     const htmlContent = `
       <!DOCTYPE html>
@@ -4278,7 +4530,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
             <!-- Body Content -->
             <div style="padding: 64px 48px; min-height: 200px;">
               <div style="font-size: 16px; line-height: 1.625; color: #334155;">
-                ${sanitizeEmailHtml(content.replace(/\n/g, '<br>'))}
+                ${sanitizeEmailHtml(resolvedContent.replace(/\n/g, '<br>'))}
               </div>
             </div>
 
@@ -4313,16 +4565,17 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       const { sendEmailTask } = await import('../../src/trigger/email');
       const handle = await sendEmailTask.trigger({
         to: contact.email,
-        subject: subject,
+        subject: resolvedSubject,
         html: htmlContent,
-        text: content,
+        text: resolvedContent,
         metadata: {
           type: 'individual_contact_email',
           contactId: contact.id,
           tenantId: tenantId,
           sentBy: req.user.id,
           emailTrackingId: emailTrackingId, // Pass tracking ID so task can update email_sends with actual Resend ID
-        }
+        },
+        ...(base64Attachments.length > 0 && { attachments: base64Attachments }),
       });
       console.log(`📧 [SendEmail] Triggered send-email task, runId: ${handle.id}, trackingId: ${emailTrackingId}`);
       result = { success: true, runId: handle.id };
@@ -4336,7 +4589,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
           activityData: JSON.stringify({
             source: 'individual_send',
             sentBy: req.user.id,
-            subject: subject,
+            subject: resolvedSubject,
             recipient: contact.email,
             recipientName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || undefined,
             from: design.displayCompanyName || 'Manager',
@@ -4367,12 +4620,12 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
         entityId: emailActivityId || undefined,
         entityName: `Email to ${contact.email}`,
         activityType: 'sent',
-        description: `Sent direct email "${subject}" to ${contact.firstName || ''} ${contact.lastName || ''} (${contact.email})`.trim(),
+        description: `Sent direct email "${resolvedSubject}" to ${contact.firstName || ''} ${contact.lastName || ''} (${contact.email})`.trim(),
         metadata: {
           emailActivityId: emailActivityId,
           contactId: contact.id,
           contactEmail: contact.email,
-          emailSubject: subject,
+          emailSubject: resolvedSubject,
           triggerRunId: result?.runId
         },
         req
@@ -4392,7 +4645,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
         recipientName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email,
         senderEmail: 'admin@zendwise.com', // Default sender or configured one
         senderName: design.displayCompanyName || 'Manager',
-        subject: subject,
+        subject: resolvedSubject,
         emailType: 'individual',
         provider: 'resend',
         providerMessageId: null, // Will be updated by Trigger task with actual Resend email ID

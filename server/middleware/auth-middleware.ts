@@ -22,14 +22,11 @@ export interface AuthRequest extends Request {
 
 // Better Auth session verification middleware
 export const authenticateToken = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  console.log('🔐 [Auth] authenticateToken triggered for:', req.path);
   try {
     // Use Better Auth's built-in session verification
     const session = await auth.api.getSession({
       headers: req.headers as any
     });
-
-    console.log('🔍 [Auth] Session result:', !!session, session?.user?.id);
 
     if (!session) {
       return res.status(401).json({ message: 'No authentication token provided' });
@@ -41,7 +38,6 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     });
 
     if (!userRecord) {
-      console.log('❌ [Auth] User not found in database:', session.user.id);
       return res.status(401).json({ message: 'User not found' });
     }
 
@@ -64,7 +60,6 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     let finalTenantId = userRecord.tenantId;
 
     if (!userRecord.tenantId || placeholderTenantIds.includes(userRecord.tenantId)) {
-      console.log('⚠️  [Auth] WARNING: User has placeholder/missing tenant ID:', userRecord.tenantId, 'Email:', userRecord.email);
       // We no longer provide a fallback. This will likely cause downstream failures if the route requires a tenant,
       // which is the intended stricter behavior.
     }
@@ -81,12 +76,6 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     };
 
     req.user = authUser;
-    console.log('🔍 [Auth] Set req.user:', {
-      id: authUser.id,
-      email: authUser.email,
-      role: authUser.role,
-      tenantId: authUser.tenantId
-    });
     next();
   } catch (error) {
     console.error('Authentication middleware error:', error);
@@ -96,11 +85,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
 
 export const requireRole = (requiredRole: string | string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
-    console.log('🔍 [Role] requireRole middleware called, required:', requiredRole);
-    console.log('🔍 [Role] req.user exists:', !!req.user, 'role:', req.user?.role);
-
     if (!req.user) {
-      console.error('❌ [Role] req.user is undefined in requireRole!');
       return res.status(401).json({ message: 'Authentication required' });
     }
 
@@ -331,13 +316,6 @@ export const requireTenant = (req: AuthRequest, res: Response, next: NextFunctio
   (req as any).tenantId = req.user.tenantId;
   (req as any).userId = req.user.id;
 
-  console.log('✅ Tenant validation passed:', {
-    userId: req.user.id,
-    email: req.user.email,
-    tenantId: req.user.tenantId,
-    role: req.user.role
-  });
-
   next();
 };
 
@@ -402,13 +380,6 @@ export const requireValidTenant = async (req: AuthRequest, res: Response, next: 
   // Add tenant context to request for easier access in route handlers
   (req as any).tenantId = req.user.tenantId;
   (req as any).userId = req.user.id;
-
-  console.log('✅ Advanced tenant validation passed:', {
-    userId: req.user.id,
-    email: req.user.email,
-    tenantId: req.user.tenantId,
-    role: req.user.role
-  });
 
   next();
 };

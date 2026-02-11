@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { emailActivity, emailSends, emailContent, emailContacts } from '@shared/schema';
+import { emailActivity, emailSends, emailContent, emailContacts, masterEmailDesign, companies } from '@shared/schema';
 import { authenticateInternalService, InternalServiceRequest } from '../middleware/internal-service-auth';
 import crypto from 'crypto';
-import { sql, eq } from 'drizzle-orm';
+import { sql, eq, and } from 'drizzle-orm';
 
 const router = Router();
 
@@ -316,6 +316,123 @@ router.post(
         success: false,
         error: errorMessage,
       });
+    }
+  }
+);
+
+/**
+ * Internal endpoint for fetching master email design settings for a tenant
+ * Called by Trigger.dev tasks to wrap outgoing emails in the tenant's branded template
+ */
+router.get(
+  '/email-design/:tenantId',
+  authenticateInternalService,
+  async (req: InternalServiceRequest, res) => {
+    try {
+      const { tenantId } = req.params;
+
+      if (!tenantId) {
+        return res.status(400).json({ success: false, error: 'Missing tenantId' });
+      }
+
+      // Fetch master email design
+      const emailDesign = await db.query.masterEmailDesign.findFirst({
+        where: sql`${masterEmailDesign.tenantId} = ${tenantId}`,
+      });
+
+      // Fetch company info for fallbacks
+      const company = await db.query.companies.findFirst({
+        where: eq(companies.tenantId, tenantId),
+      });
+
+      const companyName = (company?.name || '').trim();
+
+      return res.json({
+        success: true,
+        design: {
+          primaryColor: emailDesign?.primaryColor || '#3B82F6',
+          secondaryColor: emailDesign?.secondaryColor || '#1E40AF',
+          accentColor: emailDesign?.accentColor || '#10B981',
+          fontFamily: emailDesign?.fontFamily || 'Arial, sans-serif',
+          logoUrl: emailDesign?.logoUrl || company?.logoUrl || null,
+          headerText: emailDesign?.headerText || null,
+          footerText: emailDesign?.footerText || (companyName ? `© ${new Date().getFullYear()} ${companyName}. All rights reserved.` : ''),
+          socialLinks: emailDesign?.socialLinks || null,
+          companyName: emailDesign?.companyName || companyName,
+        },
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ [Internal API] Error fetching email design:', errorMessage);
+      return res.status(500).json({ success: false, error: errorMessage });
+    }
+  }
+);
+
+/**
+ * Internal endpoint for logging email activity (sent/failed) from Trigger.dev tasks
+ * Called after a scheduled email is sent or fails, to update the contact timeline
+ */
+router.post(
+  '/log-email-activity',
+  authenticateInternalService,
+  async (req: InternalServiceRequest, res) => {
+    try {
+      const { tenantId, contactId, activityType, activityData } = req.body;
+
+      if (!tenantId || !contactId || !activityType) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required fields: tenantId, contactId, activityType',
+        });
+      }
+
+      const allowedTypes = ['sent', 'failed', 'delivered', 'bounced', 'opened', 'clicked'];
+      if (!allowedTypes.includes(activityType)) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid activityType. Allowed: ${allowedTypes.join(', ')}`,
+        });
+      }
+
+      await db.insert(emailActivity).values({
+        tenantId,
+        contactId,
+        activityType,
+        activityData: typeof activityData === 'string' ? activityData : JSON.stringify(activityData),
+        occurredAt: new Date(),
+      });
+
+      // Update contact's lastActivity timestamp (scoped by tenant)
+      try {
+        const updateResult = await db.update(emailContacts)
+          .set({ lastActivity: new Date(), updatedAt: new Date() })
+          .where(
+            and(
+              eq(emailContacts.id, contactId),
+              eq(emailContacts.tenantId, tenantId)
+            )
+          )
+          .returning({ id: emailContacts.id });
+
+        // Validate that the contact was actually updated
+        if (updateResult.length === 0) {
+          console.warn(
+            `⚠️ [Internal API] Contact update failed - no rows updated. ` +
+            `Contact ${contactId} may not exist or does not belong to tenant ${tenantId}`
+          );
+        }
+      } catch (contactUpdateError) {
+        console.warn(`⚠️ [Internal API] Failed to update contact lastActivity:`, contactUpdateError);
+      }
+
+      console.log(`✅ [Internal API] Logged email_activity: ${activityType} for contact ${contactId}`);
+
+      return res.json({ success: true, activityType, contactId });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ [Internal API] Error logging email activity:', errorMessage);
+      return res.status(500).json({ success: false, error: errorMessage });
     }
   }
 );

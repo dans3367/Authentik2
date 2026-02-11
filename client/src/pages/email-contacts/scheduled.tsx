@@ -187,7 +187,7 @@ export default function ScheduledEmailsTimelinePage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <Label>Message Content</Label>
-                <TemplateSelector onSelect={handleTemplateSelect} channel="individual" />
+                <TemplateSelector onSelect={handleTemplateSelect} />
               </div>
               <div>
                 <Label>Subject</Label>

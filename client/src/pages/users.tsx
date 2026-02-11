@@ -88,7 +88,6 @@ function getRoleTranslationKey(role: string): string {
 }
 
 export default function UsersPage() {
-  console.log("🔍 [UsersPage] Component rendered");
   const { user, isLoading: authLoading } = useReduxAuth();
   const currentUser = user as ExtendedUser | null;
   const { toast } = useToast();
@@ -119,90 +118,8 @@ export default function UsersPage() {
   const [showEditConfirmDialog, setShowEditConfirmDialog] = useState(false);
   const [initialEditValues, setInitialEditValues] = useState<UpdateUserData | null>(null);
 
-  // Check authentication first
-  if (authLoading) {
-    return (
-      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
-        <div className="max-w-7xl mx-auto">
-          <div className="space-y-6">
-            <div className="mb-8">
-              <div className="flex items-center space-x-4">
-                <UsersIcon className="text-blue-600 dark:text-blue-500 w-8 h-8" />
-                <div>
-                  <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-                    {t('users.title')}
-                  </h1>
-                  <p className="text-gray-600 dark:text-gray-400 mt-1">
-                    {t('users.loadingSubtitle')}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="grid gap-4">
-              {[1, 2, 3].map((i) => (
-                <Card key={i} className="animate-pulse bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
-                  <CardContent className="p-6">
-                    <div className="h-4 bg-muted rounded w-1/3 mb-2"></div>
-                    <div className="h-3 bg-muted rounded w-1/2"></div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Check if current user has permission to access this page
-  if (!currentUser || (currentUser.role !== 'Owner' && currentUser.role !== 'Administrator' && currentUser.role !== 'Manager')) {
-    return (
-      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
-        <div className="max-w-4xl mx-auto">
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
-            <CardContent className="p-8">
-              <div className="text-center">
-                <Shield className="mx-auto h-12 w-12 text-red-500 dark:text-red-400 mb-4" />
-                <h2 className="mt-4 text-lg font-semibold text-gray-900 dark:text-gray-100">{t('users.accessDenied')}</h2>
-                <p className="mt-2 text-gray-600 dark:text-gray-300">
-                  {t('users.accessDeniedMessage')}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  // Check if plan allows user management
-  if (!canManageUsers) {
-    return (
-      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
-        <div className="max-w-4xl mx-auto">
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
-            <CardContent className="p-8">
-              <div className="text-center">
-                <UsersIcon className="mx-auto h-12 w-12 text-amber-500 dark:text-amber-400 mb-4" />
-                <h2 className="mt-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Upgrade Required</h2>
-                <p className="mt-2 text-gray-600 dark:text-gray-300">
-                  Your current plan ({planName}) does not include user management. Upgrade to Plus or Pro to add team members and manage roles.
-                </p>
-                <Button
-                  onClick={() => setLocation('/profile?tab=subscription')}
-                  className="mt-6 bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white"
-                >
-                  Upgrade Plan
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  const isAdmin = currentUser.role === 'Owner' || currentUser.role === 'Administrator';
+  const isAdmin = currentUser?.role === 'Owner' || currentUser?.role === 'Administrator';
+  const hasAccess = currentUser && (currentUser.role === 'Owner' || currentUser.role === 'Administrator' || currentUser.role === 'Manager');
 
   // Fetch users with stable query key - no search params in key
   const { data: usersData, isLoading: usersLoading, isFetching, refetch } = useQuery({
@@ -223,7 +140,7 @@ export default function UsersPage() {
       }
       return response.json();
     },
-    enabled: !!currentUser,
+    enabled: !!currentUser && !!hasAccess && canManageUsers,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -232,6 +149,8 @@ export default function UsersPage() {
 
   // Debounced search effect
   useEffect(() => {
+    if (!currentUser || !hasAccess || !canManageUsers) return;
+    
     setIsSearching(true);
     
     const timer = setTimeout(() => {
@@ -245,7 +164,7 @@ export default function UsersPage() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchTerm, roleFilter, statusFilter, showInactive, refetch]);
+  }, [searchTerm, roleFilter, statusFilter, showInactive, refetch, currentUser, hasAccess, canManageUsers]);
 
   // Fetch user statistics
   const { data: statsData } = useQuery({
@@ -253,13 +172,12 @@ export default function UsersPage() {
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/users/stats');
       if (!response.ok) {
-        throw new Error('Failed to fetch user stats');
+        throw new Error('Failed to fetch user statistics');
       }
       return response.json();
     },
-    enabled: !!currentUser,
-    staleTime: 60000,
-    refetchOnWindowFocus: false,
+    enabled: !!currentUser && !!hasAccess && canManageUsers,
+    staleTime: 5 * 60 * 1000,
   });
 
   // Fetch user limits
@@ -272,7 +190,7 @@ export default function UsersPage() {
       }
       return response.json();
     },
-    enabled: !!currentUser,
+    enabled: !!currentUser && !!hasAccess && canManageUsers,
     staleTime: 0, // Set to 0 to always fetch fresh data
     refetchOnWindowFocus: false,
   });
@@ -439,6 +357,94 @@ export default function UsersPage() {
       });
     },
   });
+
+  // Check authentication first
+  if (authLoading) {
+    return (
+      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+        <div className="max-w-7xl mx-auto">
+          <div className="space-y-6">
+            <div className="mb-8">
+              <div className="flex items-center space-x-4">
+                <UsersIcon className="text-blue-600 dark:text-blue-500 w-8 h-8" />
+                <div>
+                  <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
+                    {t('users.title')}
+                  </h1>
+                  <p className="text-gray-600 dark:text-gray-400 mt-1">
+                    {t('users.loadingSubtitle')}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-4">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="animate-pulse bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+                  <CardContent className="p-6">
+                    <div className="h-4 bg-muted rounded w-1/3 mb-2"></div>
+                    <div className="h-3 bg-muted rounded w-1/2"></div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if current user has permission to access this page
+  if (!currentUser || (currentUser.role !== 'Owner' && currentUser.role !== 'Administrator' && currentUser.role !== 'Manager')) {
+    return (
+      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+        <div className="max-w-4xl mx-auto">
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+            <CardContent className="p-8">
+              <div className="text-center">
+                <Shield className="mx-auto h-12 w-12 text-red-500 dark:text-red-400 mb-4" />
+                <h2 className="mt-4 text-lg font-semibold text-gray-900 dark:text-gray-100">{t('users.accessDenied')}</h2>
+                <p className="mt-2 text-gray-600 dark:text-gray-300">
+                  {t('users.accessDeniedMessage')}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if plan allows user management
+  if (!canManageUsers) {
+    return (
+      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+        <div className="max-w-4xl mx-auto">
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+            <CardContent className="p-8">
+              <div className="text-center">
+                <UsersIcon className="mx-auto h-12 w-12 text-amber-500 dark:text-amber-400 mb-4" />
+                <h2 className="mt-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  {t('users.upgradeRequired', 'Upgrade Required')}
+                </h2>
+                <p className="mt-2 text-gray-600 dark:text-gray-300">
+                  {t('users.upgradeDescription', { 
+                    planName, 
+                    defaultValue: 'Your current plan ({{planName}}) does not include user management. Upgrade to Plus or Pro to add team members and manage roles.' 
+                  })}
+                </p>
+                <Button
+                  onClick={() => setLocation('/profile?tab=subscription')}
+                  className="mt-6 bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white"
+                >
+                  {t('users.upgradePlan', 'Upgrade Plan')}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   const handleCreateUser = (data: CreateUserData) => {
     createUserMutation.mutate(data);

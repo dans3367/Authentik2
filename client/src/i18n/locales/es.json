@@ -453,6 +453,7 @@
     },
     "filters": {
       "searchPlaceholder": "Buscar clientes...",
+      "searchTemplates": "Buscar plantillas...",
       "allStatuses": "Todos los Estados",
       "active": "Activo",
       "unsubscribed": "Desuscrito",
@@ -936,6 +937,9 @@
       "noUsersFound": "No se encontraron usuarios",
       "tryAdjustingFilters": "Intenta ajustar tus filtros"
     },
+    "upgradeRequired": "Actualización Requerida",
+    "upgradeDescription": "Tu plan actual ({{planName}}) no incluye gestión de usuarios. Actualiza a Plus o Pro para agregar miembros del equipo y gestionar roles.",
+    "upgradePlan": "Actualizar Plan",
     "toasts": {
       "userCreated": "Usuario creado exitosamente",
       "userUpdated": "Usuario actualizado exitosamente",
@@ -1852,6 +1856,9 @@
       "subtitle": "Ver jerarquía de roles, permisos y gestionar asignaciones de roles de usuarios",
       "accessDenied": "Acceso Denegado",
       "accessDeniedDesc": "Necesitas acceso de Propietario o Administrador para gestionar roles y permisos.",
+      "upgradeRequired": "Actualización Requerida",
+      "upgradeDescription": "Tu plan actual ({{planName}}) no incluye gestión de roles y permisos. Actualiza a Plus o Pro para personalizar permisos de roles.",
+      "upgradePlan": "Actualizar Plan",
       "level": "Nivel",
       "user": "usuario",
       "users": "usuarios",
@@ -2145,9 +2152,9 @@
         "requiresApproval": "Requiere Aprobación del Revisor",
         "requiresApprovalDescription": "Esta campaña requerirá aprobación de un gerente antes de poder activarse.",
         "selectReviewer": "Seleccionar Revisor",
-        "selectReviewerPlaceholder": "Seleccionar un gerente",
-        "loadingManagers": "Cargando gerentes...",
-        "noManagers": "No hay gerentes disponibles"
+        "selectReviewerPlaceholder": "Seleccionar un revisor",
+        "loadingReviewers": "Cargando revisores...",
+        "noReviewers": "No hay revisores disponibles"
       },
       "actions": {
         "cancel": "Cancelar",

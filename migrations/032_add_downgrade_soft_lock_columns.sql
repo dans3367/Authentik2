@@ -11,6 +11,7 @@ ALTER TABLE "better_auth_user" ADD COLUMN IF NOT EXISTS suspended_by_downgrade B
 ALTER TABLE "better_auth_user" ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMP;
 
 -- Add downgrade scheduling columns to subscriptions table
+-- These columns enable future scheduled downgrade functionality
 ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS downgrade_target_plan_id VARCHAR;
 ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS downgrade_scheduled_at TIMESTAMP;
 ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS previous_plan_id VARCHAR;
