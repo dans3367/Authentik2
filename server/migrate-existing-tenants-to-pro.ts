@@ -44,7 +44,7 @@ async function migrateExistingTenantsToPro() {
     // 3. Create Pro subscriptions for each tenant
     const now = new Date();
     const periodEnd = new Date(now);
-    periodEnd.setFullYear(periodEnd.getFullYear() + 10); // Far future end date for migrated tenants
+    periodEnd.setFullYear(periodEnd.getFullYear() + 1); // 1 year end date for migrated tenants
 
     for (const tenant of tenantsWithoutSubscription) {
       // Find the owner of this tenant to use as the userId

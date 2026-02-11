@@ -141,7 +141,7 @@ async function createFreeTenant() {
 
     const now = new Date();
     const periodEnd = new Date(now);
-    periodEnd.setFullYear(periodEnd.getFullYear() + 10);
+    periodEnd.setFullYear(periodEnd.getFullYear() + 1);
 
     await db.insert(subscriptions).values({
       tenantId: newTenant.id,

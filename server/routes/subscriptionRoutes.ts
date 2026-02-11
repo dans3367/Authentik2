@@ -647,11 +647,21 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
       const restored = await storage.restoreSuspendedResources(tenantId);
 
       // Update subscription plan immediately
+      const upgradeStart = new Date();
+      const upgradeEnd = new Date(upgradeStart);
+      if (billingCycle === 'yearly') {
+        upgradeEnd.setFullYear(upgradeEnd.getFullYear() + 1);
+      } else {
+        upgradeEnd.setDate(upgradeEnd.getDate() + 30);
+      }
+
       await db.update(subscriptions)
         .set({
           planId: targetPlan.id,
           previousPlanId: existingSubscription.planId,
           isYearly: billingCycle === 'yearly',
+          currentPeriodStart: upgradeStart,
+          currentPeriodEnd: upgradeEnd,
           downgradeTargetPlanId: null,
           downgradeScheduledAt: null,
           updatedAt: new Date(),
@@ -695,11 +705,21 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
     );
 
     // Update subscription plan
+    const downgradeStart = new Date();
+    const downgradeEnd = new Date(downgradeStart);
+    if (billingCycle === 'yearly') {
+      downgradeEnd.setFullYear(downgradeEnd.getFullYear() + 1);
+    } else {
+      downgradeEnd.setDate(downgradeEnd.getDate() + 30);
+    }
+
     await db.update(subscriptions)
       .set({
         planId: targetPlan.id,
         previousPlanId: existingSubscription.planId,
         isYearly: billingCycle === 'yearly',
+        currentPeriodStart: downgradeStart,
+        currentPeriodEnd: downgradeEnd,
         downgradeTargetPlanId: null,
         downgradeScheduledAt: null,
         updatedAt: new Date(),
