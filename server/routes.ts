@@ -44,6 +44,7 @@ import { activityRoutes } from "./routes/activityRoutes";
 import { accountUsageRoutes } from "./routes/accountUsageRoutes";
 import { roleRoutes } from "./routes/roleRoutes";
 import internalRoutes from "./routes/internalRoutes";
+import { statsRoutes } from "./routes/statsRoutes";
 
 // Import middleware
 import { authRateLimiter, apiRateLimiter, jwtTokenRateLimiter } from "./middleware/security";
@@ -92,6 +93,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", segmentListRoutes);
   app.use("/api/activity-logs", authenticateToken, requireTenant, activityRoutes);
   app.use("/api/account-usage", accountUsageRoutes);
+  app.use("/api/stats", statsRoutes);
 
   // Newsletter stats endpoint
   app.get("/api/newsletter-stats", authenticateToken, requireTenant, async (req: any, res) => {

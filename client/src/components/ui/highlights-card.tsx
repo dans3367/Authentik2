@@ -1,30 +1,49 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MoreHorizontal, TrendingUp, TrendingDown, Store, Facebook, Instagram } from "lucide-react";
+import { MoreHorizontal, TrendingUp, TrendingDown, Users, Mail, Newspaper, CalendarCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useDashboardHighlights, type StatMetric } from "@/hooks/useStats";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function ChangeBadge({ change }: { change: number | null }) {
+  if (change === null) return null;
+  const isPositive = change >= 0;
+  return (
+    <div className={`flex items-center gap-1 text-xs ${
+      isPositive ? 'text-green-600' : 'text-red-600'
+    }`}>
+      {isPositive ? (
+        <TrendingUp className="w-3 h-3" />
+      ) : (
+        <TrendingDown className="w-3 h-3" />
+      )}
+      <span>{isPositive ? '+' : ''}{change}%</span>
+    </div>
+  );
+}
 
 export function HighlightsCard() {
-  // Mock data matching the reference image
-  const salesData = {
-    total: "$295.7k",
-    growth: "+2.7%",
-    metronic: 65, // percentage for progress bar
-    bundle: 25, // percentage  
-    metronicNest: 10, // percentage
-  };
+  const { data, isLoading } = useDashboardHighlights();
 
-  const channelData = [
-    { name: "Summer Sale", icon: Store, amount: "200", change: "650", isPositive: true },
-    { name: "Winter Tire Benefits", icon: Facebook, amount: "750", change: "700", isPositive: false },
-    { name: "How to save on gas", icon: Instagram, amount: "20", change: "550", isPositive: true },
-    { name: "Tire safety", icon: () => (
-      <div className="w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-xs font-bold">G</div>
-    ), amount: "550", change: "250", isPositive: true },
+  const metrics: { label: string; icon: React.ElementType; metric: StatMetric | undefined }[] = [
+    { label: "Total Contacts", icon: Users, metric: data?.totalContacts },
+    { label: "Emails Sent", icon: Mail, metric: data?.emailsSentThisMonth },
+    { label: "Newsletters Sent", icon: Newspaper, metric: data?.newslettersSent },
+    { label: "Upcoming Appointments", icon: CalendarCheck, metric: data?.upcomingAppointments },
   ];
+
+  // Compute progress bar from contacts growth
+  const totalContacts = data?.totalContacts?.value ?? 0;
+  const emailsSent = data?.emailsSentThisMonth?.value ?? 0;
+  const newslettersSent = data?.newslettersSent?.value ?? 0;
+  const total = totalContacts + emailsSent + newslettersSent || 1;
+  const contactsPct = Math.round((totalContacts / total) * 100);
+  const emailsPct = Math.round((emailsSent / total) * 100);
+  const newslettersPct = 100 - contactsPct - emailsPct;
 
   return (
     <Card className="bg-white dark:bg-gray-800 rounded-xl h-full">
@@ -46,80 +65,94 @@ export function HighlightsCard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* All Time Sales Section */}
+        {/* Summary Section */}
         <div>
           <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
-            All Newsletter Stats
+            Total Contacts
           </h3>
           
           {/* Large Number Display with Growth */}
           <div className="flex items-center gap-2 mb-4">
-            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {salesData.total}
-            </div>
-            <div className="text-sm font-medium text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded">
-              {salesData.growth}
-            </div>
+            {isLoading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {totalContacts.toLocaleString()}
+                </div>
+                {data?.totalContacts?.change !== null && data?.totalContacts?.change !== undefined && (
+                  <div className={`text-sm font-medium px-2 py-1 rounded ${
+                    data.totalContacts.change >= 0
+                      ? 'text-green-600 bg-green-50 dark:bg-green-900/20'
+                      : 'text-red-600 bg-red-50 dark:bg-red-900/20'
+                  }`}>
+                    {data.totalContacts.change >= 0 ? '+' : ''}{data.totalContacts.change}%
+                  </div>
+                )}
+              </>
+            )}
           </div>
           
           {/* Progress Bar */}
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-3">
-            <div className="flex h-2 rounded-full overflow-hidden">
-              <div 
-                className="bg-green-500 h-full" 
-                style={{ width: `${salesData.metronic}%` }}
-              ></div>
-              <div 
-                className="bg-red-500 h-full" 
-                style={{ width: `${salesData.bundle}%` }}
-              ></div>
-              <div 
-                className="bg-purple-500 h-full" 
-                style={{ width: `${salesData.metronicNest}%` }}
-              ></div>
+          {isLoading ? (
+            <Skeleton className="h-2 w-full rounded-full mb-3" />
+          ) : (
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-3">
+              <div className="flex h-2 rounded-full overflow-hidden">
+                <div 
+                  className="bg-blue-500 h-full transition-all" 
+                  style={{ width: `${contactsPct}%` }}
+                ></div>
+                <div 
+                  className="bg-green-500 h-full transition-all" 
+                  style={{ width: `${emailsPct}%` }}
+                ></div>
+                <div 
+                  className="bg-purple-500 h-full transition-all" 
+                  style={{ width: `${newslettersPct}%` }}
+                ></div>
+              </div>
             </div>
-          </div>
+          )}
           
           {/* Legend */}
           <div className="flex items-center gap-4 text-xs">
             <div className="flex items-center gap-1">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              <span className="text-gray-600 dark:text-gray-400">Contacts</span>
+            </div>
+            <div className="flex items-center gap-1">
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span className="text-gray-600 dark:text-gray-400">Success</span>
+              <span className="text-gray-600 dark:text-gray-400">Emails</span>
             </div>
             <div className="flex items-center gap-1">
-            <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-              <span className="text-gray-600 dark:text-gray-400">In Progress</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-              <span className="text-gray-600 dark:text-gray-400">Error</span>
+              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+              <span className="text-gray-600 dark:text-gray-400">Newsletters</span>
             </div>
           </div>
         </div>
 
-        {/* Channel Performance List */}
+        {/* Metrics List */}
         <div className="space-y-3">
-          {channelData.map((channel, index) => (
+          {metrics.map((item, index) => (
             <div key={index} className="flex items-center justify-between">
               <div className="flex items-center gap-3">
+                <item.icon className="w-4 h-4 text-gray-400" />
                 <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                  {channel.name}
+                  {item.label}
                 </span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                  {channel.amount}
-                </span>
-                <div className={`flex items-center gap-1 text-xs ${
-                  channel.isPositive ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {channel.isPositive ? (
-                    <TrendingUp className="w-3 h-3" />
-                  ) : (
-                    <TrendingDown className="w-3 h-3" />
-                  )}
-                  <span>{channel.change}</span>
-                </div>
+                {isLoading ? (
+                  <Skeleton className="h-4 w-12" />
+                ) : (
+                  <>
+                    <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                      {(item.metric?.value ?? 0).toLocaleString()}
+                    </span>
+                    <ChangeBadge change={item.metric?.change ?? null} />
+                  </>
+                )}
               </div>
             </div>
           ))}
