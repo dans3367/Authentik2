@@ -609,9 +609,26 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
     const existingSubscription = await storage.getTenantSubscription(tenantId);
     const currentPlan = existingSubscription?.plan;
 
+    // Validate billing cycle
+    if (billingCycle && billingCycle !== 'monthly' && billingCycle !== 'yearly') {
+      return res.status(400).json({ message: 'Invalid billing cycle. Must be "monthly" or "yearly".' });
+    }
+
+    // Determine effective price based on billing cycle
+    const isYearly = billingCycle === 'yearly';
+    const targetPrice = isYearly && targetPlan.yearlyPrice 
+      ? parseFloat(targetPlan.yearlyPrice) 
+      : parseFloat(targetPlan.price);
+    
+    // Get current price based on existing subscription's billing cycle
+    const currentIsYearly = existingSubscription?.isYearly || false;
+    const currentPrice = currentPlan 
+      ? (currentIsYearly && currentPlan.yearlyPrice 
+          ? parseFloat(currentPlan.yearlyPrice) 
+          : parseFloat(currentPlan.price))
+      : 0;
+
     // Determine if this is an upgrade or downgrade
-    const currentPrice = currentPlan ? parseFloat(currentPlan.price) : 0;
-    const targetPrice = parseFloat(targetPlan.price);
     const isDowngrade = targetPrice < currentPrice;
     const isDowngradeToFree = targetPlan.name === 'Free' || targetPrice === 0;
     const isUpgradeToPaid = targetPrice > currentPrice && targetPrice > 0;
@@ -647,11 +664,18 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
       }
 
       // Create Stripe Checkout Session for the upgrade
-      const isYearly = billingCycle === 'yearly';
-      if (billingCycle && billingCycle !== 'monthly' && billingCycle !== 'yearly') {
-        return res.status(400).json({ message: 'Invalid billing cycle. Must be "monthly" or "yearly".' });
+      // Get the appropriate Stripe price ID based on billing cycle
+      const stripePriceId = isYearly && targetPlan.stripeYearlyPriceId
+        ? targetPlan.stripeYearlyPriceId
+        : targetPlan.stripePriceId;
+
+      if (!stripePriceId) {
+        return res.status(400).json({ 
+          message: `No Stripe price configured for ${isYearly ? 'yearly' : 'monthly'} billing on this plan.` 
+        });
       }
-      const priceAmount = Math.round(parseFloat(targetPlan.price) * 100); // Convert to cents
+
+      const priceAmount = Math.round(targetPrice * 100); // Convert to cents
 
       const session = await stripe.checkout.sessions.create({
         customer: stripeCustomerId,

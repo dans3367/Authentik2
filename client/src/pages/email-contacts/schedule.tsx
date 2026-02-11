@@ -11,6 +11,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ArrowLeft, Calendar, Clock, Mail, AlertTriangle, Eye } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { TemplateSelector } from "@/components/TemplateSelector";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TIMEZONE_OPTIONS } from "@/utils/appointment-utils";
 
 export default function ScheduleContactEmailPage() {
   const { id } = useParams();
@@ -20,6 +22,7 @@ export default function ScheduleContactEmailPage() {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [isUsingTemplate, setIsUsingTemplate] = useState(false);
+  const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Chicago");
   const [showPreview, setShowPreview] = useState(false);
 
   // Load contact for context and validation
@@ -72,12 +75,13 @@ export default function ScheduleContactEmailPage() {
 
   const scheduleMutation = useMutation({
     mutationFn: async () => {
-      // Build ISO datetime from date + time
-      const dt = new Date(`${date}T${time || "00:00"}`);
+      // Send raw date + time + timezone to the backend for proper UTC conversion
       return apiRequest("POST", `/api/email-contacts/${id}/schedule`, {
         subject,
         html: content,
-        scheduleAt: dt.toISOString(),
+        date,
+        time: time || "00:00",
+        timezone,
       }).then((r) => r.json());
     },
     onSuccess: () => {
@@ -208,14 +212,32 @@ export default function ScheduleContactEmailPage() {
           <CardHeader>
             <CardTitle>Schedule</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <Label>Date</Label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-2" />
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label>Date</Label>
+                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-2" />
+              </div>
+              <div>
+                <Label>Time</Label>
+                <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="mt-2" />
+              </div>
             </div>
             <div>
-              <Label>Time</Label>
-              <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="mt-2" />
+              <Label>Timezone</Label>
+              <Select value={timezone} onValueChange={setTimezone}>
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder="Select timezone" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  {TIMEZONE_OPTIONS.map(tz => (
+                    <SelectItem key={tz.value} value={tz.value}>{tz.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500 mt-1">
+                The email will be sent at the scheduled time in this timezone
+              </p>
             </div>
           </CardContent>
         </Card>
