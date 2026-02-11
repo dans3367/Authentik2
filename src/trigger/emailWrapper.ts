@@ -149,7 +149,8 @@ export async function fetchEmailDesign(tenantId: string): Promise<EmailDesign | 
   }
 
   const timestamp = Date.now();
-  const signaturePayload = `${timestamp}.{}`;
+  const body = {};
+  const signaturePayload = `${timestamp}.${JSON.stringify(body)}`;
   const signature = createHmac('sha256', secret).update(signaturePayload).digest('hex');
 
   try {
@@ -217,7 +218,7 @@ function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
   const sanitizedPrimaryColor = sanitizeColor(design.primaryColor, '#3B82F6');
   const sanitizedSecondaryColor = sanitizeColor(design.secondaryColor, '#1E40AF');
   const sanitizedAccentColor = sanitizeColor(design.accentColor, '#10B981');
-  
+
   const safeCompanyName = escapeHtml(design.companyName || '');
   const safeHeaderText = design.headerText ? escapeHtml(design.headerText) : null;
   const safeFooterText = design.footerText ? escapeHtml(design.footerText) : null;

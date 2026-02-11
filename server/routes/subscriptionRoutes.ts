@@ -305,7 +305,7 @@ subscriptionRoutes.post("/create-checkout-session", authenticateToken, requireRo
     // Create Stripe customer if doesn't exist
     if (!customerId) {
       const customer = await stripe.customers.create({
-        email: req.user.email,
+        email: company.companyEmail || req.user.email,
         name: company.name,
         metadata: {
           companyId: company.id,
@@ -596,6 +596,11 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
 
     const tenantId = req.user.tenantId;
 
+    // Get company details
+    const company = await db.query.companies.findFirst({
+      where: eq(companies.tenantId, tenantId),
+    });
+
     // Get the target plan
     const targetPlan = await db.query.subscriptionPlans.findFirst({
       where: eq(subscriptionPlans.id, planId),
@@ -627,17 +632,40 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
     const isDowngrade = targetPrice < currentPrice;
     const isDowngradeToFree = targetPlan.name === 'Free' || targetPrice === 0;
 
-    // SECURITY: Require payment flow for any paid plan unless the user already has a valid, active Stripe subscription for THIS plan and billing cycle.
-    // This prevents lateral moves between different paid plans of the same price or re-activation of cancelled plans without payment.
-    const hasActiveStripeSubscription =
-      existingSubscription &&
+    // SECURITY: Require payment flow for any paid plan unless the user has a valid, active Stripe subscription
+    // that's verified with Stripe directly. This prevents lateral moves between paid plans or re-activation
+    // of cancelled plans without payment verification.
+    let hasActiveStripeSubscription = false;
+
+    if (existingSubscription &&
       existingSubscription.status === 'active' &&
       existingSubscription.stripeSubscriptionId &&
       !existingSubscription.stripeSubscriptionId.startsWith('manual_') &&
       existingSubscription.planId === targetPlan.id &&
-      existingSubscription.isYearly === isYearly;
+      existingSubscription.isYearly === isYearly) {
 
-    // We require checkout if it's a price upgrade OR if they don't have an active Stripe sub for this specific plan/cycle
+      // Verify the Stripe subscription is actually active with Stripe
+      if (stripe) {
+        try {
+          const stripeSubscription = await stripe.subscriptions.retrieve(existingSubscription.stripeSubscriptionId);
+          hasActiveStripeSubscription = stripeSubscription.status === 'active';
+
+          // Additional security: check if subscription is in good standing (not past due, canceled, etc.)
+          if (stripeSubscription.status !== 'active') {
+            console.warn(`Security: Stripe subscription ${existingSubscription.stripeSubscriptionId} has status ${stripeSubscription.status}, requiring payment`);
+          }
+        } catch (stripeError) {
+          console.warn(`Security: Failed to verify Stripe subscription ${existingSubscription.stripeSubscriptionId}, requiring payment:`, stripeError);
+          // If we can't verify with Stripe, require payment
+          hasActiveStripeSubscription = false;
+        }
+      } else {
+        // No Stripe configured - only allow free plans
+        hasActiveStripeSubscription = false;
+      }
+    }
+
+    // We require checkout if it's a price upgrade OR if they don't have an active Stripe sub verified with Stripe
     const isUpgradeToPaid = targetPrice > 0 && (targetPrice > currentPrice || !hasActiveStripeSubscription);
 
     // SECURITY: Prevent direct activation of paid plans without payment
@@ -654,7 +682,7 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
 
       if (!stripeCustomerId || stripeCustomerId.startsWith('manual_')) {
         const customer = await stripe.customers.create({
-          email: req.user.email,
+          email: company?.companyEmail || req.user.email,
           metadata: {
             tenantId,
             userId: req.user.id,
@@ -671,10 +699,7 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
       }
 
       // Create Stripe Checkout Session for the upgrade
-      // Get the appropriate Stripe price ID based on billing cycle
-      const stripePriceId = isYearly && targetPlan.stripeYearlyPriceId
-        ? targetPlan.stripeYearlyPriceId
-        : targetPlan.stripePriceId;
+      const stripePriceId = isYearly ? targetPlan.stripeYearlyPriceId : targetPlan.stripePriceId;
 
       if (!stripePriceId) {
         return res.status(400).json({
@@ -748,6 +773,9 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
     }
 
     // === UPGRADE PATH (same price or lateral move) ===
+    // SECURITY NOTE: This path is now only reachable when hasActiveStripeSubscription === true,
+    // which means the user has a verified active Stripe subscription for this EXACT plan and billing cycle.
+    // This prevents lateral moves between different paid plans without payment verification.
     if (!isDowngrade && !isUpgradeToPaid) {
       // Restore any previously suspended resources
       const restored = await storage.restoreSuspendedResources(tenantId);

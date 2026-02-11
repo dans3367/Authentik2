@@ -597,11 +597,13 @@ emailManagementRoutes.delete("/email-contacts/:id/scheduled/:queueId", authentic
       });
     }
 
-    // Verify the task belongs to the specified contact before canceling
-    if (task.relatedId !== relatedId) {
-      return res.status(403).json({
-        message: 'Cannot cancel scheduled email for a different contact'
-      });
+    // After finding the task, verify contact ownership
+    const contact = await db.query.emailContacts.findFirst({
+      where: sql`${emailContacts.id} = ${relatedId} AND ${emailContacts.tenantId} = ${tenantId}`,
+    });
+
+    if (!contact) {
+      return res.status(404).json({ message: 'Contact not found or access denied' });
     }
 
     // Try to cancel the Trigger.dev run if it's a run ID
@@ -1691,66 +1693,14 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
         });
       }
 
-      const userTimezone = timezone;
-      const timeStr = time || '00:00';
-      const naiveDatetime = `${date}T${timeStr}:00`;
-
-      // Use Intl.DateTimeFormat to resolve the timezone offset for the given datetime
-      // This correctly handles DST transitions
+      // Convert local date + time + timezone to UTC
       try {
-        // Create a formatter that outputs the parts in the target timezone
-        const formatter = new Intl.DateTimeFormat('en-US', {
-          timeZone: userTimezone,
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: false,
-        });
-
-        // Parse the naive datetime components
-        const [datePart, timePart] = naiveDatetime.split('T');
-        const [year, month, day] = datePart.split('-').map(Number);
-        const [hours, minutes, seconds] = timePart.split(':').map(Number);
-
-        // Binary search for the UTC timestamp that corresponds to the given local time in the target timezone
-        // Start with a rough estimate using the naive date as UTC
-        let estimate = new Date(naiveDatetime + 'Z').getTime();
-
-        // Get what that estimate looks like in the target timezone
-        const getLocalParts = (ts: number) => {
-          const parts = formatter.formatToParts(new Date(ts));
-          const get = (type: string) => parseInt(parts.find(p => p.type === type)?.value || '0');
-          return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour'), minute: get('minute'), second: get('second') };
-        };
-
-        // Adjust: find the offset between our estimate's local representation and the target
-        const local = getLocalParts(estimate);
-        const targetMs = Date.UTC(year, month - 1, day, hours, minutes, seconds || 0);
-        const localMs = Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute, local.second);
-        const offsetMs = localMs - targetMs;
-
-        let resultTs = estimate - offsetMs;
-
-        // Second pass: verify and correct if we landed on the other side of a DST transition
-        // This handles edge cases where the initial estimate and the target time are on opposite sides of a DST shift
-        const local2 = getLocalParts(resultTs);
-        const localMs2 = Date.UTC(local2.year, local2.month - 1, local2.day, local2.hour, local2.minute, local2.second);
-        const offsetMs2 = localMs2 - targetMs;
-
-        if (offsetMs2 !== 0) {
-          console.log(`📅 [ScheduleEmail] DST transition detected, applying ${offsetMs2 / 60000}min correction`);
-          resultTs -= offsetMs2;
-        }
-
-        scheduleDate = new Date(resultTs);
-
-        console.log(`📅 [ScheduleEmail] Timezone conversion: ${naiveDatetime} in ${userTimezone} → ${scheduleDate.toISOString()} UTC (total offset: ${(offsetMs + offsetMs2) / 60000}min)`);
+        const { fromZonedTime } = await import('date-fns-tz');
+        scheduleDate = fromZonedTime(`${date}T${time || '00:00'}:00`, timezone);
+        console.log(`📅 [ScheduleEmail] Timezone conversion: ${date} ${time || '00:00'} in ${timezone} → ${scheduleDate.toISOString()} UTC`);
       } catch (tzError) {
         console.error(`📅 [ScheduleEmail] Timezone conversion failed:`, tzError);
-        return res.status(400).json({ message: `Invalid timezone: ${userTimezone}` });
+        return res.status(400).json({ message: `Invalid timezone: ${timezone}` });
       }
     } else {
       // Legacy format: scheduleAt is already an ISO string
@@ -1897,46 +1847,10 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
         </body>
       </html>`;
 
-    // Create email_sends record for tracking (status: pending until actually sent)
-    const emailTrackingId = crypto.randomUUID();
-    try {
-      await db.insert(emailSends).values({
-        id: emailTrackingId,
-        tenantId,
-        recipientEmail: String(contact.email),
-        recipientName: contact.firstName && contact.lastName
-          ? `${contact.firstName} ${contact.lastName}`
-          : contact.firstName || contact.lastName || null,
-        senderEmail: 'admin@zendwise.com',
-        senderName: design.displayCompanyName || null,
-        subject: sanitizeString(resolvedSubject) || 'No Subject',
-        emailType: 'scheduled',
-        provider: 'resend',
-        status: 'pending',
-        contactId: id,
-        sentAt: null,
-      });
-
-      await db.insert(emailContent).values({
-        emailSendId: emailTrackingId,
-        htmlContent: themedHtml,
-        textContent: text ? replaceEmailPlaceholders(String(text), contact, companyName) : null,
-        metadata: JSON.stringify({
-          scheduledFor: scheduleDate.toISOString(),
-          timezone: timezone,
-          scheduledBy: req.user.id,
-        }),
-      });
-
-      console.log(`📅 [ScheduleEmail] Created email_sends tracking record: ${emailTrackingId}`);
-    } catch (trackingError) {
-      console.error(`⚠️ [ScheduleEmail] Failed to create email_sends tracking record:`, trackingError);
-      // Continue anyway — the email will still be sent, just without tracking
-    }
-
     // Schedule via Trigger.dev using the dedicated schedule-contact-email task
     try {
       const { triggerScheduleContactEmail } = await import('../lib/trigger');
+      const emailTrackingId = crypto.randomUUID();
 
       console.log(`📅 [ScheduleEmail] Scheduling email to ${maskEmail(String(contact.email))} for ${scheduleDate.toISOString()} (${timezone}), subject: "${resolvedSubject}"`);
 
@@ -1959,10 +1873,40 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
         return res.status(503).json({ message: 'Email scheduling service unavailable', error: result.error });
       }
 
-      console.log(`✅ [ScheduleEmail] Email scheduled successfully for ${maskEmail(String(contact.email))}, runId: ${result.runId}`);
+      console.log(`✅ [ScheduleEmail] Email scheduled successfully, runId: ${result.runId}`);
 
-      // Log scheduled activity
+      // Create tracking records AFTER successful scheduling
       try {
+        await db.insert(emailSends).values({
+          id: emailTrackingId,
+          tenantId,
+          recipientEmail: String(contact.email),
+          recipientName: contact.firstName && contact.lastName
+            ? `${contact.firstName} ${contact.lastName}`
+            : contact.firstName || contact.lastName || null,
+          senderEmail: 'admin@zendwise.com',
+          senderName: design.displayCompanyName || null,
+          subject: sanitizeString(resolvedSubject) || 'No Subject',
+          emailType: 'scheduled',
+          provider: 'resend',
+          status: 'pending',
+          contactId: id,
+          sentAt: null,
+        });
+
+        await db.insert(emailContent).values({
+          emailSendId: emailTrackingId,
+          htmlContent: themedHtml,
+          textContent: text ? replaceEmailPlaceholders(String(text), contact, companyName) : null,
+          metadata: JSON.stringify({
+            scheduledFor: scheduleDate.toISOString(),
+            timezone: timezone,
+            scheduledBy: req.user.id,
+            runId: result.runId,
+            taskLogId: result.taskLogId,
+          }),
+        });
+
         await db.insert(emailActivity).values({
           tenantId,
           contactId: id,
@@ -1970,15 +1914,18 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
           activityData: JSON.stringify({
             subject: sanitizeString(resolvedSubject) || 'No Subject',
             scheduledFor: scheduleDate.toISOString(),
-            timezone: timezone,
+            timezone,
             scheduledBy: req.user.id,
             runId: result.runId,
             taskLogId: result.taskLogId,
           }),
           occurredAt: new Date(),
         });
-      } catch (logError) {
-        console.error(`⚠️ [ScheduleEmail] Failed to log scheduled activity:`, logError);
+
+        console.log(`📅 [ScheduleEmail] Created tracking records: ${emailTrackingId}`);
+      } catch (trackingError) {
+        console.error(`⚠️ [ScheduleEmail] Failed to create tracking records:`, trackingError);
+        // Email is still scheduled, just without local tracking
       }
 
       return res.status(201).json({
@@ -1987,10 +1934,10 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
         taskLogId: result.taskLogId,
         contactId: id,
         scheduleAt: scheduleDate.toISOString(),
-        timezone: timezone,
+        timezone,
       });
-    } catch (importError) {
-      console.error(`❌ [ScheduleEmail] Failed to schedule email for ${maskEmail(String(contact.email))}:`, importError);
+    } catch (fatalError) {
+      console.error(`❌ [ScheduleEmail] Fatal scheduling error:`, fatalError);
       return res.status(503).json({ message: 'Email scheduling service unavailable' });
     }
   } catch (error) {

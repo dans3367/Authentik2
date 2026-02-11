@@ -177,93 +177,75 @@ async function notifyBackend(
     return;
   }
 
-  // 1. Update email_sends record via internal API (only for sent/failed, not 'sending')
-  if (data.emailTrackingId && status !== 'sending') {
-    try {
-      const body: Record<string, any> = {
-        emailTrackingId: data.emailTrackingId,
-        status,
-      };
-      if (providerMessageId) {
-        body.providerMessageId = providerMessageId;
-      }
-
-      const { timestamp, signature } = await signInternal(body, secret);
-
-      const response = await fetch(`${apiUrl}/api/internal/update-email-send`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-internal-service': 'trigger.dev',
-          'x-internal-timestamp': timestamp.toString(),
-          'x-internal-signature': signature,
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        logger.warn("Failed to update email_sends via internal API", {
-          httpStatus: response.status,
-          emailTrackingId: data.emailTrackingId,
-        });
-      } else {
-        logger.info("Updated email_sends record", {
-          emailTrackingId: data.emailTrackingId,
-          status,
-          providerMessageId,
-        });
-      }
-    } catch (notifyError) {
-      logger.warn("Error updating email_sends", {
-        error: notifyError instanceof Error ? notifyError.message : 'Unknown error',
-      });
+  // 1. Update email_sends record via internal API
+  if (data.emailTrackingId) {
+    const body: Record<string, any> = {
+      emailTrackingId: data.emailTrackingId,
+      status: status === 'sending' ? 'pending' : status,
+    };
+    if (providerMessageId) {
+      body.providerMessageId = providerMessageId;
     }
+
+    const { timestamp, signature } = await signInternal(body, secret);
+
+    const response = await fetch(`${apiUrl}/api/internal/update-email-send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-service': 'trigger.dev',
+        'x-internal-timestamp': timestamp.toString(),
+        'x-internal-signature': signature,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Internal API error updating email_sends: ${response.status}`);
+    }
+
+    logger.info("Updated email_sends record", {
+      emailTrackingId: data.emailTrackingId,
+      status,
+      providerMessageId,
+    });
   }
 
   // 2. Log email_activity for sent/failed (so it shows in the contact timeline)
   if (status === 'sent' || status === 'failed') {
-    try {
-      const activityBody: Record<string, any> = {
-        tenantId: data.tenantId,
-        contactId: data.contactId,
-        activityType: status,
-        activityData: JSON.stringify({
-          type: 'scheduled-email',
-          subject: data.subject,
-          to: data.to,
-          scheduledFor: data.scheduledForUTC,
-          timezone: data.timezone,
-          providerMessageId: providerMessageId || null,
-          emailTrackingId: data.emailTrackingId || null,
-          error: errorMessage || null,
-        }),
-      };
+    const activityBody: Record<string, any> = {
+      tenantId: data.tenantId,
+      contactId: data.contactId,
+      activityType: status,
+      activityData: JSON.stringify({
+        type: 'scheduled-email',
+        subject: data.subject,
+        to: data.to,
+        scheduledFor: data.scheduledForUTC,
+        timezone: data.timezone,
+        providerMessageId: providerMessageId || null,
+        emailTrackingId: data.emailTrackingId || null,
+        error: errorMessage || null,
+      }),
+    };
 
-      const { timestamp, signature } = await signInternal(activityBody, secret);
+    const { timestamp, signature } = await signInternal(activityBody, secret);
 
-      const response = await fetch(`${apiUrl}/api/internal/log-email-activity`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-internal-service': 'trigger.dev',
-          'x-internal-timestamp': timestamp.toString(),
-          'x-internal-signature': signature,
-        },
-        body: JSON.stringify(activityBody),
-      });
+    const response = await fetch(`${apiUrl}/api/internal/log-email-activity`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-service': 'trigger.dev',
+        'x-internal-timestamp': timestamp.toString(),
+        'x-internal-signature': signature,
+      },
+      body: JSON.stringify(activityBody),
+    });
 
-      if (!response.ok) {
-        logger.warn("Failed to log email_activity via internal API", {
-          httpStatus: response.status,
-          contactId: data.contactId,
-        });
-      } else {
-        logger.info("Logged email_activity", { contactId: data.contactId, status });
-      }
-    } catch (activityError) {
-      logger.warn("Error logging email_activity", {
-        error: activityError instanceof Error ? activityError.message : 'Unknown error',
-      });
+    if (!response.ok) {
+      throw new Error(`Internal API error logging activity: ${response.status}`);
     }
+
+    logger.info("Logged email_activity", { contactId: data.contactId, status });
   }
 }
