@@ -569,33 +569,47 @@ emailManagementRoutes.put("/email-contacts/:id/scheduled/:queueId", authenticate
 // Delete (cancel) a scheduled email for a specific contact
 emailManagementRoutes.delete("/email-contacts/:id/scheduled/:queueId", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
   try {
-    const { queueId } = req.params;
+    const { queueId, id: relatedId } = req.params;
     const tenantId = req.user.tenantId;
 
     // queueId could be a runId (run_xxx) or a trigger_tasks id
     const { cancelReminderRun, updateTriggerTaskStatus } = await import('../lib/trigger');
 
-    // Try to cancel the Trigger.dev run if it's a run ID
-    if (queueId.startsWith('run_')) {
-      const cancelResult = await cancelReminderRun(queueId);
-      if (!cancelResult.success) {
-        console.warn(`⚠️ [ScheduledEmails] Could not cancel run ${queueId}: ${cancelResult.error}`);
-      }
-    }
-
-    // Also update the trigger_tasks record
+    // Find the trigger_tasks record, ensuring it belongs to both the tenant AND the contact
     // Try by runId first, then by id
     const task = await db.query.triggerTasks.findFirst({
       where: sql`(${triggerTasks.runId} = ${queueId} OR ${triggerTasks.id} = ${queueId})
-        AND ${triggerTasks.tenantId} = ${tenantId}`,
+        AND ${triggerTasks.tenantId} = ${tenantId}
+        AND ${triggerTasks.relatedId} = ${relatedId}`,
     });
 
-    if (task) {
-      await updateTriggerTaskStatus({
-        id: task.id,
-        status: 'cancelled',
+    if (!task) {
+      return res.status(404).json({
+        message: 'Scheduled email not found for this contact'
       });
     }
+
+    // Verify the task belongs to the specified contact before canceling
+    if (task.relatedId !== relatedId) {
+      return res.status(403).json({
+        message: 'Cannot cancel scheduled email for a different contact'
+      });
+    }
+
+    // Try to cancel the Trigger.dev run if it's a run ID
+    if (queueId.startsWith('run_') || task.runId) {
+      const runIdToCancel = task.runId || queueId;
+      const cancelResult = await cancelReminderRun(runIdToCancel);
+      if (!cancelResult.success) {
+        console.warn(`⚠️ [ScheduledEmails] Could not cancel run ${runIdToCancel}: ${cancelResult.error}`);
+      }
+    }
+
+    // Update the trigger_tasks record to cancelled status
+    await updateTriggerTaskStatus({
+      id: task.id,
+      status: 'cancelled',
+    });
 
     res.json({ message: 'Scheduled email cancelled', id: queueId });
   } catch (error) {
@@ -1658,10 +1672,18 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
     // Convert date + time + timezone to UTC
     // The frontend sends raw date (YYYY-MM-DD), time (HH:MM), and IANA timezone string
     let scheduleDate: Date;
-    const userTimezone = timezone || 'America/Chicago';
 
     if (date) {
       // New format: date + time + timezone → convert to UTC
+      // Validate timezone is present - do not silently default
+      if (!timezone) {
+        console.log(`📅 [ScheduleEmail] Validation failed: timezone required when using date+time format`);
+        return res.status(400).json({
+          message: 'Timezone required when scheduling via date+time. Please provide a valid IANA timezone (e.g., America/New_York)'
+        });
+      }
+
+      const userTimezone = timezone;
       const timeStr = time || '00:00';
       const naiveDatetime = `${date}T${timeStr}:00`;
 
@@ -1878,7 +1900,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
         textContent: text ? replaceEmailPlaceholders(String(text), contact, companyName) : null,
         metadata: JSON.stringify({
           scheduledFor: scheduleDate.toISOString(),
-          timezone: userTimezone,
+          timezone: timezone,
           scheduledBy: req.user.id,
         }),
       });
@@ -1893,7 +1915,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
     try {
       const { triggerScheduleContactEmail } = await import('../lib/trigger');
 
-      console.log(`📅 [ScheduleEmail] Scheduling email to ${maskEmail(String(contact.email))} for ${scheduleDate.toISOString()} (${userTimezone}), subject: "${resolvedSubject}"`);
+      console.log(`📅 [ScheduleEmail] Scheduling email to ${maskEmail(String(contact.email))} for ${scheduleDate.toISOString()} (${timezone}), subject: "${resolvedSubject}"`);
 
       const result = await triggerScheduleContactEmail({
         to: String(contact.email),
@@ -1901,7 +1923,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
         html: themedHtml,
         text: text ? replaceEmailPlaceholders(String(text), contact, companyName) : undefined,
         scheduledForUTC: scheduleDate.toISOString(),
-        timezone: userTimezone,
+        timezone: timezone,
         contactId: id,
         tenantId,
         scheduledBy: req.user.id,
@@ -1925,7 +1947,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
           activityData: JSON.stringify({
             subject: sanitizeString(resolvedSubject) || 'No Subject',
             scheduledFor: scheduleDate.toISOString(),
-            timezone: userTimezone,
+            timezone: timezone,
             scheduledBy: req.user.id,
             runId: result.runId,
             taskLogId: result.taskLogId,
@@ -1942,7 +1964,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
         taskLogId: result.taskLogId,
         contactId: id,
         scheduleAt: scheduleDate.toISOString(),
-        timezone: userTimezone,
+        timezone: timezone,
       });
     } catch (importError) {
       console.error(`❌ [ScheduleEmail] Failed to schedule email for ${maskEmail(String(contact.email))}:`, importError);
