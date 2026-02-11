@@ -14,6 +14,7 @@ import crypto from 'crypto';
 import { logActivity, computeChanges, allowedActivityTypes } from '../utils/activityLogger';
 import xss from 'xss';
 import { emailAttachmentUpload, validateAttachmentSize, filesToBase64Attachments, handleEmailAttachmentError } from '../middleware/emailAttachmentUpload';
+import { fromZonedTime } from 'date-fns-tz';
 
 // Sanitize HTML content for emails - allows safe formatting tags, strips scripts and event handlers
 export function sanitizeEmailHtml(html: string): string {
@@ -125,11 +126,11 @@ function replaceEmailPlaceholders(
   companyName?: string,
 ): string {
   // HTML-escape all values before substitution to prevent injection
-  const escapedFirstName = sanitizeEmailHtml(contact.firstName || '');
-  const escapedLastName = sanitizeEmailHtml(contact.lastName || '');
-  const escapedFullName = sanitizeEmailHtml(`${contact.firstName || ''} ${contact.lastName || ''}`.trim());
-  const escapedEmail = sanitizeEmailHtml(contact.email || '');
-  const escapedCompanyName = sanitizeEmailHtml(companyName || '');
+  const escapedFirstName = escapeHtml(contact.firstName || '');
+  const escapedLastName = escapeHtml(contact.lastName || '');
+  const escapedFullName = escapeHtml(`${contact.firstName || ''} ${contact.lastName || ''}`.trim());
+  const escapedEmail = escapeHtml(contact.email || '');
+  const escapedCompanyName = escapeHtml(companyName || '');
 
   return text
     .replace(/\{\{\s*first_name\s*\}\}/gi, escapedFirstName)
@@ -604,6 +605,12 @@ emailManagementRoutes.delete("/email-contacts/:id/scheduled/:queueId", authentic
 
     if (!contact) {
       return res.status(404).json({ message: 'Contact not found or access denied' });
+    }
+
+    // Verify contact ownership - prevent same-tenant users from canceling each other's scheduled emails
+    const isAdminOrOwner = ['Administrator', 'Owner'].includes(req.user.role || '');
+    if (contact.addedByUserId && contact.addedByUserId !== req.user.id && !isAdminOrOwner) {
+      return res.status(403).json({ message: 'You can only cancel scheduled emails for contacts you added' });
     }
 
     // Try to cancel the Trigger.dev run if it's a run ID
@@ -1695,7 +1702,6 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
 
       // Convert local date + time + timezone to UTC
       try {
-        const { fromZonedTime } = await import('date-fns-tz');
         scheduleDate = fromZonedTime(`${date}T${time || '00:00'}:00`, timezone);
         console.log(`📅 [ScheduleEmail] Timezone conversion: ${date} ${time || '00:00'} in ${timezone} → ${scheduleDate.toISOString()} UTC`);
       } catch (tzError) {

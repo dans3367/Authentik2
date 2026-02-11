@@ -26,21 +26,6 @@ function sanitizeColor(color: string | undefined | null, fallback: string = '#3B
 
   const normalized = color.trim().toLowerCase();
 
-  // Reject any value containing dangerous characters or patterns
-  if (
-    normalized.includes(';') ||
-    normalized.includes('url(') ||
-    normalized.includes('expression(') ||
-    normalized.includes('import') ||
-    normalized.includes('@') ||
-    normalized.includes('\\') ||
-    normalized.includes('<') ||
-    normalized.includes('>')
-  ) {
-    logger.warn(`Rejected potentially malicious color value: ${color}`);
-    return fallback;
-  }
-
   // Validate hex colors (#RGB, #RRGGBB, #RRGGBBAA)
   const hexPattern = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/;
   if (hexPattern.test(normalized)) {

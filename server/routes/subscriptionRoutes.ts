@@ -640,11 +640,11 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
     if (existingSubscription &&
       existingSubscription.status === 'active' &&
       existingSubscription.stripeSubscriptionId &&
-      !existingSubscription.stripeSubscriptionId.startsWith('manual_') &&
-      existingSubscription.planId === targetPlan.id &&
-      existingSubscription.isYearly === isYearly) {
+      !existingSubscription.stripeSubscriptionId.startsWith('manual_')) {
 
       // Verify the Stripe subscription is actually active with Stripe
+      // SECURITY: This check now applies to ANY existing Stripe subscription, not just same-plan changes
+      // This prevents bypass via lateral moves (e.g., monthly->yearly on cancelled subscriptions)
       if (stripe) {
         try {
           const stripeSubscription = await stripe.subscriptions.retrieve(existingSubscription.stripeSubscriptionId);

@@ -34,9 +34,10 @@ interface RichTextEditorProps {
   businessName?: string;
   occasionType?: string;
   defaultTitle?: string;
+  onEditorReady?: (editor: any) => void;
 }
 
-export default function RichTextEditor({ value, onChange, placeholder = "Start typing your message...", className = "", customerInfo, businessName, occasionType, defaultTitle }: RichTextEditorProps) {
+export default function RichTextEditor({ value, onChange, placeholder = "Start typing your message...", className = "", customerInfo, businessName, occasionType, defaultTitle, onEditorReady }: RichTextEditorProps) {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -317,6 +318,12 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
       editor.commands.setContent(value);
     }
   }, [value, editor]);
+
+  useEffect(() => {
+    if (editor && onEditorReady) {
+      onEditorReady(editor);
+    }
+  }, [editor, onEditorReady]);
 
   // Handle context menu on editor
   useEffect(() => {

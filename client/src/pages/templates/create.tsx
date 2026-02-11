@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useRef, useMemo } from "react";
 import { SINGLE_PURPOSE_PRESETS, type SinglePurposePreset } from "@/config/templatePresets";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
@@ -175,6 +175,7 @@ export default function CreateTemplatePage() {
   const [showPreview, setShowPreview] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+  const editorRef = useRef<any>(null);
 
   const handleSelectPreset = (preset: SinglePurposePreset) => {
     setSelectedPreset(preset.id);
@@ -414,7 +415,11 @@ export default function CreateTemplatePage() {
                         key={v.key}
                         type="button"
                         onClick={() => {
-                          setContent((prev) => prev + `{{${v.key}}}`);
+                          if (editorRef.current) {
+                            editorRef.current.chain().focus().insertContent(`{{${v.key}}}`).run();
+                          } else {
+                            setContent((prev) => prev + `{{${v.key}}}`);
+                          }
                         }}
                         className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer"
                         title={`Insert {{${v.key}}}`}
@@ -428,7 +433,11 @@ export default function CreateTemplatePage() {
                   <button
                     type="button"
                     onClick={() => {
-                      setContent((prev) => prev + CONTACT_CARD_TEMPLATE);
+                      if (editorRef.current) {
+                        editorRef.current.chain().focus().insertContent(CONTACT_CARD_TEMPLATE).run();
+                      } else {
+                        setContent((prev) => prev + CONTACT_CARD_TEMPLATE);
+                      }
                     }}
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors cursor-pointer"
                     title="Insert formatted contact card block"
@@ -443,6 +452,7 @@ export default function CreateTemplatePage() {
                   onChange={setContent}
                   placeholder={t('templatesPage.createTemplatePage.contentPlaceholder')}
                   className="min-h-[300px]"
+                  onEditorReady={(editor) => { editorRef.current = editor; }}
                 />
                 <p className="text-xs text-muted-foreground">
                   {t('templatesPage.createTemplatePage.contentHelp')}
