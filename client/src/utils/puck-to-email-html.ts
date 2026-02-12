@@ -152,7 +152,12 @@ function nodeToEmailHtml(node: Node): string {
 
   // Map semantic tags for email
   const emailTag = mapTagForEmail(tag);
-  const styleAttr = inlineStyles.length > 0 ? ` style="${inlineStyles.join('; ')}"` : '';
+
+  // Replace double quotes with single quotes in style values to prevent
+  // breaking the HTML style="..." attribute (e.g. font-family computed values
+  // contain "system-ui" which prematurely closes the attribute).
+  const joinedStyles = inlineStyles.join('; ').replace(/"/g, "'");
+  const styleAttr = joinedStyles.length > 0 ? ` style="${joinedStyles}"` : '';
 
   // Preserve important HTML attributes for email rendering
   let extraAttrs = '';

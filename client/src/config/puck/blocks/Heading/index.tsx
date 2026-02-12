@@ -76,11 +76,18 @@ const HeadingInternal: ComponentConfig<HeadingProps> = {
     return (
       <Section>
         <Tag style={{ 
+          display: "flex",
           fontSize: sizeMap[size],
           fontWeight: 700,
           margin: 0,
           textAlign: align,
-          width: "100%"
+          width: "100%",
+          justifyContent:
+            align === "center"
+              ? "center"
+              : align === "right"
+              ? "flex-end"
+              : "flex-start",
         }}>
           {text}
         </Tag>

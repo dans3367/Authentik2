@@ -298,54 +298,21 @@ const ProductShowcaseInner: ComponentConfig<ProductShowcaseProps> = {
                             padding: "24px 24px 24px 0",
                           }}
                         >
-                          {/*
-                            Image wrapper table — provides border-radius clipping.
-                            border-radius on <img> is unreliable in Outlook,
-                            so we use a wrapping td with overflow:hidden.
-                          */}
-                          <table
-                            role="presentation"
-                            cellPadding={0}
-                            cellSpacing={0}
-                            border={0}
+                          <img
+                            src={imageUrl}
+                            alt={imageAlt}
                             width={imageColWidth - 24}
                             style={{
+                              display: "block",
                               width: `${imageColWidth - 24}px`,
-                              borderCollapse: "separate" as const,
-                              borderSpacing: 0,
+                              height: "auto",
+                              maxWidth: "100%",
+                              border: 0,
                               borderRadius: `${imgRadius}px`,
-                              overflow: "hidden",
+                              outline: "none",
+                              textDecoration: "none",
                             }}
-                          >
-                            <tbody>
-                              <tr>
-                                <td
-                                  style={{
-                                    padding: 0,
-                                    borderRadius: `${imgRadius}px`,
-                                    overflow: "hidden",
-                                    lineHeight: 0,
-                                    fontSize: 0,
-                                  }}
-                                >
-                                  <img
-                                    src={imageUrl}
-                                    alt={imageAlt}
-                                    width={imageColWidth - 24}
-                                    style={{
-                                      display: "block",
-                                      width: `${imageColWidth - 24}px`,
-                                      height: "auto",
-                                      border: 0,
-                                      outline: "none",
-                                      textDecoration: "none",
-                                      borderRadius: `${imgRadius}px`,
-                                    }}
-                                  />
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
+                          />
                         </td>
                       </tr>
                     </tbody>
