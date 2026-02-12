@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Puck, Render } from "@measured/puck";
 import config, { initialData } from "@/config/puck";
 import { UserData } from "@/config/puck/types";
-import { Monitor, Tablet, Smartphone, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
+import { Monitor, Tablet, Smartphone, ZoomIn, ZoomOut, RotateCcw, Mail } from "lucide-react";
+import { SendPreviewDialog } from "@/components/SendPreviewDialog";
+import { extractPuckEmailHtml } from "@/utils/puck-to-email-html";
 
 export default function NewsletterCreatePage() {
   const [data, setData] = useState<UserData>(initialData);
@@ -10,6 +12,13 @@ export default function NewsletterCreatePage() {
   const [isEdit, setIsEdit] = useState(true);
   const [viewport, setViewport] = useState<"mobile" | "tablet" | "desktop">("desktop");
   const [zoom, setZoom] = useState(100);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewSubject, setPreviewSubject] = useState("Newsletter Preview");
+  const previewRef = useRef<HTMLDivElement>(null);
+
+  const getHtmlContent = useCallback(() => {
+    return extractPuckEmailHtml();
+  }, []);
 
   useEffect(() => {
     setIsClient(true);
@@ -223,6 +232,26 @@ export default function NewsletterCreatePage() {
                     </button>
                   </div>
                   <button
+                    onClick={() => setPreviewOpen(true)}
+                    style={{
+                      padding: "8px 16px",
+                      marginRight: "8px",
+                      background: "#7c3aed",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "4px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      fontSize: "14px",
+                    }}
+                    data-testid="button-send-preview"
+                  >
+                    <Mail size={16} />
+                    Send Preview
+                  </button>
+                  <button
                     onClick={() => setIsEdit(false)}
                     style={{
                       padding: "8px 16px",
@@ -242,6 +271,12 @@ export default function NewsletterCreatePage() {
             }}
           />
         </div>
+        <SendPreviewDialog
+          open={previewOpen}
+          onOpenChange={setPreviewOpen}
+          getHtmlContent={getHtmlContent}
+          subject={data.root?.props?.title || "Newsletter Preview"}
+        />
       </>
     );
   }

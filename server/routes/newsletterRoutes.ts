@@ -96,6 +96,75 @@ async function getNewsletterRecipients(newsletter: any, tenantId: string) {
   }
 }
 
+// Get preview recipients (all tenant users: owners, admins, managers, employees)
+newsletterRoutes.get("/preview-recipients", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    console.log('[Newsletter Preview] Fetching preview recipients for tenant:', tenantId);
+
+    // Get all tenant users from betterAuthUser (all roles)
+    const users = await db
+      .select({
+        id: betterAuthUser.id,
+        email: betterAuthUser.email,
+        firstName: betterAuthUser.firstName,
+        lastName: betterAuthUser.lastName,
+        name: betterAuthUser.name,
+        role: betterAuthUser.role,
+      })
+      .from(betterAuthUser)
+      .where(eq(betterAuthUser.tenantId, tenantId));
+
+    console.log(`[Newsletter Preview] Found ${users.length} users for tenant ${tenantId}`);
+
+    const recipients = users.map(u => ({
+      id: u.id,
+      email: u.email,
+      name: u.name || [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email,
+      role: u.role || 'Employee',
+      type: 'user' as const,
+    }));
+
+    res.json({ recipients });
+  } catch (error) {
+    console.error('Get preview recipients error:', error);
+    res.status(500).json({ message: 'Failed to get preview recipients' });
+  }
+});
+
+// Send preview email via Trigger.dev + Resend
+newsletterRoutes.post("/send-preview", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { to, subject, html } = req.body;
+
+    if (!to || !subject || !html) {
+      return res.status(400).json({ message: 'Missing required fields: to, subject, html' });
+    }
+
+    // Trigger the preview email task via Trigger.dev
+    const { sendNewsletterPreviewTask } = await import('../../src/trigger/newsletterPreview');
+
+    const handle = await sendNewsletterPreviewTask.trigger({
+      to,
+      subject,
+      html,
+      tenantId: req.user.tenantId,
+      requestedBy: req.user.email,
+    });
+
+    console.log(`[Newsletter Preview] Triggered send-newsletter-preview task (run: ${handle.id}) to ${to}`);
+
+    res.json({
+      message: 'Preview email queued successfully',
+      to,
+      runId: handle.id,
+    });
+  } catch (error) {
+    console.error('Send preview email error:', error);
+    res.status(500).json({ message: 'Failed to queue preview email' });
+  }
+});
+
 // Get all newsletters
 newsletterRoutes.get("/", authenticateToken, requireTenant, async (req: any, res) => {
   try {
