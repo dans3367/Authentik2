@@ -170,7 +170,7 @@ function nodeToEmailHtml(node: Node): string {
   if (alt) extraAttrs += ` alt="${alt}"`;
 
   // Table-specific attributes — critical for email clients (especially Outlook)
-  if (tag === 'table' || tag === 'td' || tag === 'th' || tag === 'tr') {
+  if (['table', 'td', 'th', 'tr', 'col', 'colgroup', 'tbody', 'thead', 'tfoot'].includes(tag)) {
     const tableAttrs = ['cellpadding', 'cellspacing', 'border', 'role', 'width', 'height', 'align', 'valign', 'bgcolor', 'colspan', 'rowspan'];
     for (const attr of tableAttrs) {
       const val = el.getAttribute(attr);
@@ -187,7 +187,7 @@ function nodeToEmailHtml(node: Node): string {
   }
 
   // Self-closing tags
-  if (['img', 'br', 'hr'].includes(emailTag)) {
+  if (['img', 'br', 'hr', 'col'].includes(emailTag)) {
     return `<${emailTag}${styleAttr}${extraAttrs} />`;
   }
 
@@ -196,7 +196,7 @@ function nodeToEmailHtml(node: Node): string {
 
 function mapTagForEmail(tag: string): string {
   // Keep semantic tags, map others to safe email equivalents
-  const safe = ['h1','h2','h3','h4','h5','h6','p','a','img','br','hr','span','strong','em','b','i','u','ul','ol','li','table','tr','td','th','thead','tbody','blockquote'];
+  const safe = ['h1','h2','h3','h4','h5','h6','p','a','img','br','hr','span','strong','em','b','i','u','ul','ol','li','table','tr','td','th','thead','tbody','tfoot','colgroup','col','blockquote'];
   if (safe.includes(tag)) return tag;
   return 'div';
 }
