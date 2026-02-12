@@ -86,9 +86,9 @@ export function UpcomingBirthdaysCard() {
 
   if (isLoading) {
     return (
-      <Card className="bg-white/80 dark:bg-gray-900/60 backdrop-blur rounded-2xl h-full border border-gray-100/80 dark:border-gray-800/60 shadow-sm">
-        <CardHeader className="pb-4 border-b border-gray-100/70 dark:border-gray-800/60">
-          <CardTitle className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+      <Card className="h-full">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-xl font-bold flex items-center gap-2">
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-pink-50 dark:bg-pink-900/30">
               <CakeIcon className="h-5 w-5 text-pink-500" />
             </span>
@@ -97,7 +97,7 @@ export function UpcomingBirthdaysCard() {
         </CardHeader>
         <CardContent className="pt-6">
           <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-300"></div>
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
           </div>
         </CardContent>
       </Card>
@@ -105,10 +105,10 @@ export function UpcomingBirthdaysCard() {
   }
 
   return (
-    <Card className="bg-white/80 dark:bg-gray-900/60 backdrop-blur rounded-2xl h-full border border-gray-100/80 dark:border-gray-800/60 shadow-sm hover:shadow-md transition-shadow">
-      <CardHeader className="pb-4 border-b border-gray-100/70 dark:border-gray-800/60">
+    <Card className="h-full">
+      <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+          <CardTitle className="text-xl font-bold flex items-center gap-2">
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-pink-50 dark:bg-pink-900/30">
               <CakeIcon className="h-5 w-5 text-pink-500" />
             </span>
@@ -118,7 +118,7 @@ export function UpcomingBirthdaysCard() {
             variant="ghost"
             size="sm"
             onClick={() => setLocation('/birthdays')}
-            className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 rounded-full"
+            className="text-sm text-primary hover:text-primary/80 rounded-full"
           >
             View All
             <ChevronRight className="h-4 w-4 ml-1" />
@@ -128,8 +128,8 @@ export function UpcomingBirthdaysCard() {
       <CardContent className="pt-6">
         {upcomingBirthdays.length === 0 ? (
           <div className="text-center py-8">
-            <CakeIcon className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+            <CakeIcon className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground mb-2">
               No birthdays in the next 30 days
             </p>
             <Button
@@ -143,7 +143,7 @@ export function UpcomingBirthdaysCard() {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 mb-3">
+            <div className="flex items-center justify-between text-sm text-muted-foreground mb-3">
               <span>{upcomingBirthdays.length} upcoming</span>
               <span>Next 30 days</span>
             </div>
@@ -167,13 +167,13 @@ export function UpcomingBirthdaysCard() {
                   <div
                     key={contact.id}
                     onClick={() => setLocation(`/email-contacts/view/${contact.id}`)}
-                    className="flex items-center justify-between p-3 bg-gray-50/80 dark:bg-gray-800/60 rounded-xl cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-transparent hover:border-gray-200/80 dark:hover:border-gray-700/60"
+                    className="flex items-center justify-between p-3 bg-muted/40 rounded-xl cursor-pointer hover:bg-muted transition-colors"
                   >
                     <div className="flex-1">
-                      <p className="font-medium text-gray-900 dark:text-gray-100">
+                      <p className="font-medium text-foreground">
                         {getContactName(contact)}
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                      <p className="text-xs text-muted-foreground">
                         {contact.birthday && (() => {
                           // Parse date to display month/day
                           const [, month, day] = contact.birthday.split('-').map(Number);
@@ -191,7 +191,7 @@ export function UpcomingBirthdaysCard() {
                     ) : contact.birthdayEmailEnabled ? (
                       <CheckCircle className="h-4 w-4 text-green-500 ml-2" />
                     ) : (
-                      <XCircle className="h-4 w-4 text-red-500 ml-2" />
+                      <XCircle className="h-4 w-4 text-destructive ml-2" />
                     )}
                   </div>
                 );

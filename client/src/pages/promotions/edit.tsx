@@ -56,7 +56,19 @@ export default function EditPromotionPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
+  // If route doesn't match, redirect to promotions list
+  if (!match) {
+    setLocation('/promotions');
+    return null;
+  }
+
   const promotionId = params?.id;
+
+  // If no promotion ID, redirect
+  if (!promotionId) {
+    setLocation('/promotions');
+    return null;
+  }
 
   // Debug logging
   console.log('🔍 Edit page - Route match:', { match, params, promotionId });
@@ -87,17 +99,27 @@ export default function EditPromotionPage() {
   });
   const [isCodeSectionOpen, setIsCodeSectionOpen] = useState(false);
 
+  // Get options with translations
+  const promotionTypeOptions = getPromotionTypeOptions(t);
+  const targetAudienceOptions = getTargetAudienceOptions(t);
+  const codeFormatOptions = getCodeFormatOptions(t);
+
   // Fetch promotion data
   const { data: promotion, isLoading, error } = useQuery({
     queryKey: [`/api/promotions/${promotionId}`],
     queryFn: async () => {
       console.log('🔍 Fetching promotion with ID:', promotionId);
       const res = await apiRequest('GET', `/api/promotions/${promotionId}`);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: 'Failed to fetch promotion' }));
+        throw new Error(errorData.message || 'Failed to fetch promotion');
+      }
       const json = await res.json();
       console.log('🔍 Promotion data received (JSON):', json);
       return json;
     },
     enabled: !!promotionId,
+    retry: 1,
   });
 
   console.log('🔍 Query state:', { promotion, isLoading, error, enabled: !!promotionId });

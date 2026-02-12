@@ -72,6 +72,15 @@ interface CardDesignerDialogProps {
 
 export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initialData, onSave, onPreviewChange, onMakeActive, isCurrentlyActive, senderName, customerInfo, businessName, holidayId, isHolidayDisabled, onToggleHoliday, customCardActive, onToggleCustomCardActive, customCardToggleLoading = false, selectedPromotions = [], onPromotionsChange, hidePromotionsTab = false, hideTabs = false, hideDescription = false, themeMetadataById = {} }: CardDesignerDialogProps) {
   const { t } = useTranslation();
+
+  // Detect custom card mode: custom- prefixed IDs (new cards) OR UUID-based IDs from API
+  // UUID cards have cardName/sendDate in initialData and their themeId is not in themeMetadataById
+  const isCustomCardMode = Boolean(
+    initialThemeId === 'custom' ||
+    (initialThemeId && initialThemeId.startsWith('custom-')) ||
+    (initialData?.cardName) ||
+    (initialThemeId && initialData?.customImage === true && !themeMetadataById[initialThemeId])
+  );
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [description, setDescription] = useState(initialData?.description ?? "");
   const [message, setMessage] = useState(initialData?.message ?? "");
@@ -91,9 +100,8 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
   const [emojiCount, setEmojiCount] = useState<number>(0);
   // Initialize customImage properly based on whether this is a custom card with an image
   const [customImage, setCustomImage] = useState<boolean>(() => {
-    const isCustomCard = initialThemeId && initialThemeId.startsWith('custom-');
-    // If it's a custom card and has an imageUrl, it's a custom image
-    if (isCustomCard && initialData?.imageUrl) return true;
+    // If it's a custom card (custom- prefix or UUID from API) and has an imageUrl, it's a custom image
+    if (isCustomCardMode && initialData?.imageUrl) return true;
     // Otherwise use the explicit customImage flag if provided
     return initialData?.customImage ?? false;
   });
@@ -160,25 +168,36 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
-  // Track whether we've initialized for the current open session
+  // Track whether we've initialized for the current open session and which themeId was used
   const hasInitializedRef = useRef(false);
+  const initializedThemeIdRef = useRef<string | null | undefined>(null);
 
   // Initialize state on open
   useEffect(() => {
     if (!open) {
       // Reset the initialization flag when modal closes
       hasInitializedRef.current = false;
+      initializedThemeIdRef.current = null;
       return;
     }
 
+    // Allow re-initialization if the themeId changed (handles React batching race condition
+    // where dialog opens with stale data before designerThemeId state update propagates)
+    const themeIdChanged = hasInitializedRef.current && initializedThemeIdRef.current !== initialThemeId;
+    
     // Only initialize once per open session to prevent resets during editing
-    if (hasInitializedRef.current) {
+    if (hasInitializedRef.current && !themeIdChanged) {
       console.log('🔒 [Card Designer] Already initialized, skipping reset to preserve user edits');
       return;
     }
+    
+    if (themeIdChanged) {
+      console.log('🔄 [Card Designer] ThemeId changed from', initializedThemeIdRef.current, 'to', initialThemeId, '- re-initializing');
+    }
 
-    console.log('🎬 [Card Designer] First initialization for this session');
+    console.log('🎬 [Card Designer] First initialization for this session, themeId:', initialThemeId);
     hasInitializedRef.current = true;
+    initializedThemeIdRef.current = initialThemeId;
     setTitle(initialData?.title ?? "");
     setDescription(initialData?.description ?? "");
     setMessage(initialData?.message ?? "");
@@ -192,7 +211,8 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
 
     // Determine if this should use custom image based on initialData
     const hasCustomImageData = initialData?.customImage === true && initialData?.imageUrl;
-    const isCustomTheme = initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-')) || initialData?.customImage === true;
+    // Also detect UUID-based custom cards from the API (not 'custom-' prefixed but not a known default theme)
+    const isCustomTheme = initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-')) || initialData?.customImage === true || (initialThemeId && initialData?.imageUrl && !themeMetadataById[initialThemeId]);
 
     console.log('🎨 [Card Designer] Initializing with:', {
       initialThemeId,
@@ -316,8 +336,10 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
   useEffect(() => {
     if (!open) return;
 
-    // Check if this is a custom card (starts with 'custom-' or has customImage flag from parent)
-    const isCustomCard = initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-')) || initialData?.customImage === true;
+    // Check if this is a custom card (starts with 'custom-', has customImage flag, or has imageUrl with a non-theme ID)
+    // Cards from the API have UUID IDs, not 'custom-' prefixed, so we also check if the themeId
+    // is NOT a known default theme (i.e., not in themeMetadataById) and has an imageUrl
+    const isCustomCard = initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-')) || initialData?.customImage === true || (initialThemeId && initialData?.imageUrl && !themeMetadataById[initialThemeId]);
 
     // Don't run this effect for custom cards - they manage their own images
     if (isCustomCard) {
@@ -356,7 +378,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
         setImageError(false);
       }
     }
-  }, [initialThemeId, open, initialData?.customImage]);
+  }, [initialThemeId, open, initialData?.customImage, initialData?.imageUrl]);
 
   // Persist draft locally so switching themes won't lose text
   useEffect(() => {
@@ -879,7 +901,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
 
   // Reset functionality
   const handleReset = () => {
-    const isCustomTheme = initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-')) || customImage;
+    const isCustomTheme = isCustomCardMode || customImage;
     const resetMessage = isCustomTheme
       ? "Are you sure you want to reset the card? This will clear all content including the image, title, message, and signature."
       : "Are you sure you want to reset the text? This will clear the title, message, and signature.";
@@ -924,8 +946,8 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
   };
 
   const handleSave = () => {
-    // Validate required fields for custom cards
-    if (initialThemeId && initialThemeId.startsWith('custom-')) {
+    // Validate required fields for custom cards (both custom- prefixed and UUID-based from API)
+    if (isCustomCardMode) {
       if (!cardName.trim()) {
         alert(t('ecards.designer.cardNameRequired'));
         return;
@@ -986,7 +1008,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
           </DialogHeader>
 
           {/* Card Name, Send Date, and Occasion Type - Only for custom cards */}
-          {initialThemeId && initialThemeId.startsWith('custom-') && (
+          {isCustomCardMode && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
               <div className="space-y-2">
                 <label htmlFor="cardName" className="text-sm font-medium text-gray-700">
@@ -1271,7 +1293,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                         </DropdownMenuItem>
                         <DropdownMenuItem className="text-red-600" onClick={handleReset}>
                           <RefreshCw className="w-4 h-4 mr-2" />
-                          {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) ? t('ecards.designer.resetCard') : t('ecards.designer.resetText')}
+                          {isCustomCardMode ? t('ecards.designer.resetCard') : t('ecards.designer.resetText')}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -1383,7 +1405,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
               />
 
               {/* Holiday Enable/Disable Checkbox - Only show for holiday themes */}
-              {holidayId && onToggleHoliday && !initialThemeId?.startsWith('custom-') && (
+              {holidayId && onToggleHoliday && !isCustomCardMode && (
                 <div className="flex items-center space-x-2 py-3 border-t">
                   <Checkbox
                     id="enable-holiday-card"
@@ -1604,7 +1626,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                           </DropdownMenuItem>
                           <DropdownMenuItem className="text-red-600" onClick={handleReset}>
                             <RefreshCw className="w-4 h-4 mr-2" />
-                            {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) ? t('ecards.designer.resetCard') : t('ecards.designer.resetText')}
+                            {isCustomCardMode ? t('ecards.designer.resetCard') : t('ecards.designer.resetText')}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -1704,7 +1726,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                 />
 
                 {/* Holiday Enable/Disable Checkbox - Only show for holiday themes */}
-                {holidayId && onToggleHoliday && !initialThemeId?.startsWith('custom-') && (
+                {holidayId && onToggleHoliday && !isCustomCardMode && (
                   <div className="flex items-center space-x-2 py-3 border-t">
                     <Checkbox
                       id="enable-holiday-card"

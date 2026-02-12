@@ -121,16 +121,16 @@ export function UpcomingAppointmentsCard() {
 
   if (isLoading) {
     return (
-      <Card className="bg-white dark:bg-gray-800 rounded-xl h-full shadow-sm border border-gray-100 dark:border-gray-700">
-        <CardHeader className="pb-4 border-b border-gray-100 dark:border-gray-700">
-          <CardTitle className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
-            <Calendar className="h-6 w-6 text-blue-500" />
+      <Card className="h-full">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-xl font-bold flex items-center gap-3">
+            <Calendar className="h-6 w-6 text-primary" />
             Upcoming Schedule
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-300"></div>
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
           </div>
         </CardContent>
       </Card>
@@ -138,11 +138,11 @@ export function UpcomingAppointmentsCard() {
   }
 
   return (
-    <Card className="bg-white dark:bg-gray-800 rounded-xl h-full shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-      <CardHeader className="pb-4 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
+    <Card className="h-full">
+      <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
-            <Calendar className="h-6 w-6 text-blue-500" />
+          <CardTitle className="text-xl font-bold flex items-center gap-3">
+            <Calendar className="h-6 w-6 text-primary" />
             Upcoming Schedule
           </CardTitle>
         </div>
@@ -150,8 +150,8 @@ export function UpcomingAppointmentsCard() {
       <CardContent className="p-6">
         {upcomingAppointments.length === 0 ? (
           <div className="text-center py-8">
-            <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+            <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground mb-6">
               No appointments scheduled for the next 7 days
             </p>
           </div>
@@ -173,11 +173,11 @@ export function UpcomingAppointmentsCard() {
                   }}
                 >
                   {/* Date Box */}
-                  <div className="flex flex-col items-center justify-center w-16 h-16 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-600 group-hover:border-blue-200 transition-colors">
-                    <span className="text-[10px] font-bold text-red-500 uppercase tracking-wide leading-none mb-1">
+                  <div className="flex flex-col items-center justify-center w-16 h-16 bg-muted/40 rounded-xl border border-border group-hover:border-primary/50 transition-colors">
+                    <span className="text-[10px] font-bold text-destructive uppercase tracking-wide leading-none mb-1">
                       {getMonthName(appointment.appointmentDate)}
                     </span>
-                    <span className="text-2xl font-bold text-gray-900 dark:text-white leading-none">
+                    <span className="text-2xl font-bold text-foreground leading-none">
                       {getDayNumber(appointment.appointmentDate)}
                     </span>
                   </div>
@@ -185,14 +185,14 @@ export function UpcomingAppointmentsCard() {
                   {/* Details */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-3 mb-1">
-                      <h3 className="text-base font-bold text-gray-900 dark:text-white truncate group-hover:text-blue-600 transition-colors">
+                      <h3 className="text-base font-bold text-foreground truncate group-hover:text-primary transition-colors">
                         {appointment.title}
                       </h3>
-                      <Badge className={`${getStatusColor(appointment.status)} text-xs px-2 py-0.5 rounded-full capitalize whitespace-nowrap`}>
+                      <Badge className={`${getStatusColor(appointment.status)} text-xs px-2 py-0.5 rounded-full capitalize whitespace-nowrap border-0`}>
                         {appointment.status.replace('_', ' ')}
                       </Badge>
                     </div>
-                    <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 truncate">
+                    <div className="flex items-center text-sm text-muted-foreground truncate">
                       <Clock className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
                       {formatTime(appointment.appointmentDate)}
                       <span className="mx-2 flex-shrink-0">•</span>
@@ -208,7 +208,7 @@ export function UpcomingAppointmentsCard() {
 
         <Button
           variant="ghost"
-          className="w-full mt-8 border-2 border-dashed border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 py-6 h-auto text-base font-medium rounded-xl"
+          className="w-full mt-8 border-2 border-dashed border-primary/20 text-primary hover:bg-primary/10 hover:border-primary/30 py-6 h-auto text-base font-medium rounded-xl"
           onClick={() => setLocation("/reminders")}
         >
           <CalendarClock className="h-5 w-5 mr-2" />
@@ -234,19 +234,19 @@ export function UpcomingAppointmentsCard() {
               <div className="mt-6 space-y-6">
                 {/* Customer Information */}
                 <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <User className="h-4 w-4" />
                     Customer
                   </h3>
-                  <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
+                  <div className="bg-muted/40 p-4 rounded-lg space-y-2">
                     <div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Name</p>
-                      <p className="font-medium">{getCustomerName(selectedAppointment.customer)}</p>
+                      <p className="text-xs text-muted-foreground">Name</p>
+                      <p className="font-medium text-foreground">{getCustomerName(selectedAppointment.customer)}</p>
                     </div>
                     {selectedAppointment.customer?.email && (
                       <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Email</p>
-                        <p className="text-sm flex items-center gap-1">
+                        <p className="text-xs text-muted-foreground">Email</p>
+                        <p className="text-sm flex items-center gap-1 text-foreground">
                           <Mail className="h-3 w-3" />
                           {selectedAppointment.customer.email}
                         </p>
@@ -257,24 +257,24 @@ export function UpcomingAppointmentsCard() {
 
                 {/* Appointment Details */}
                 <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     Details
                   </h3>
-                  <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-3">
+                  <div className="bg-muted/40 p-4 rounded-lg space-y-3">
                     <div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Title</p>
-                      <p className="font-medium">{selectedAppointment.title}</p>
+                      <p className="text-xs text-muted-foreground">Title</p>
+                      <p className="font-medium text-foreground">{selectedAppointment.title}</p>
                     </div>
                     {selectedAppointment.description && (
                       <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Description</p>
-                        <p className="text-sm">{selectedAppointment.description}</p>
+                        <p className="text-xs text-muted-foreground">Description</p>
+                        <p className="text-sm text-foreground">{selectedAppointment.description}</p>
                       </div>
                     )}
                     <div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Date & Time</p>
-                      <p className="text-sm font-medium flex items-center gap-1">
+                      <p className="text-xs text-muted-foreground">Date & Time</p>
+                      <p className="text-sm font-medium flex items-center gap-1 text-foreground">
                         <Clock className="h-3 w-3" />
                         {formatFullDateTime(selectedAppointment.appointmentDate)}
                       </p>
@@ -282,15 +282,15 @@ export function UpcomingAppointmentsCard() {
                     <div className="grid grid-cols-2 gap-3">
                       {selectedAppointment.duration && (
                         <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Duration</p>
-                          <p className="text-sm flex items-center gap-1">
+                          <p className="text-xs text-muted-foreground">Duration</p>
+                          <p className="text-sm flex items-center gap-1 text-foreground">
                             <Timer className="h-3 w-3" />
                             {selectedAppointment.duration} min
                           </p>
                         </div>
                       )}
                       <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Status</p>
+                        <p className="text-xs text-muted-foreground">Status</p>
                         <Badge className={getStatusColor(selectedAppointment.status)}>
                           {selectedAppointment.status.replace('_', ' ')}
                         </Badge>
@@ -298,8 +298,8 @@ export function UpcomingAppointmentsCard() {
                     </div>
                     {selectedAppointment.location && (
                       <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Location</p>
-                        <p className="text-sm flex items-center gap-1">
+                        <p className="text-xs text-muted-foreground">Location</p>
+                        <p className="text-sm flex items-center gap-1 text-foreground">
                           <MapPin className="h-3 w-3" />
                           {selectedAppointment.location}
                         </p>
