@@ -297,7 +297,9 @@ function formatOperatingHours(raw: string | undefined | null): string {
     };
 
     const fmt = (t: string) => {
+      if (!t || !t.includes(':')) return t;
       const [h, m] = t.split(':').map(Number);
+      if (Number.isNaN(h) || Number.isNaN(m)) return t;
       const suffix = h >= 12 ? 'PM' : 'AM';
       const h12 = h % 12 || 12;
       return m === 0 ? `${h12}${suffix}` : `${h12}:${String(m).padStart(2, '0')}${suffix}`;
@@ -993,9 +995,8 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
 
           {/* Email preview canvas */}
           <div className="flex-1 overflow-y-auto">
-            <div className={`transition-all duration-300 mx-auto p-4 sm:p-6 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl ${
-              previewDevice === "mobile" ? "max-w-[400px]" : "w-full"
-            }`}>
+            <div className={`transition-all duration-300 mx-auto p-4 sm:p-6 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl ${previewDevice === "mobile" ? "max-w-[400px]" : "w-full"
+              }`}>
               <div className="bg-white text-slate-900 shadow-2xl mx-auto rounded overflow-hidden max-w-[600px] w-full" style={{ fontFamily: masterDesign?.fontFamily || "Arial, sans-serif" }}>
 
                 {/* Simulated email header */}
@@ -1183,32 +1184,32 @@ export default function TemplatesPage() {
 
   const handleToggleFavorite = async (id: string) => {
     if (togglingFavoriteId) return; // Prevent multiple simultaneous toggles
-    
+
     setTogglingFavoriteId(id);
-    
+
     // Optimistically update the UI
     const previousTemplates = [...templates];
     const previousStats = stats ? { ...stats } : null;
-    
-    setTemplates(prevTemplates => 
-      prevTemplates.map(t => 
+
+    setTemplates(prevTemplates =>
+      prevTemplates.map(t =>
         t.id === id ? { ...t, isFavorite: !t.isFavorite } : t
       )
     );
-    
+
     // Update stats optimistically
     if (stats) {
       const template = templates.find(t => t.id === id);
       if (template) {
         setStats({
           ...stats,
-          favoriteTemplates: template.isFavorite 
-            ? stats.favoriteTemplates - 1 
+          favoriteTemplates: template.isFavorite
+            ? stats.favoriteTemplates - 1
             : stats.favoriteTemplates + 1
         });
       }
     }
-    
+
     try {
       await toggleTemplateFavorite(id);
     } catch (error) {
@@ -1217,7 +1218,7 @@ export default function TemplatesPage() {
       if (previousStats) {
         setStats(previousStats);
       }
-      
+
       toast({
         title: t('templatesPage.toasts.error'),
         description: t('templatesPage.toasts.favoriteError'),
