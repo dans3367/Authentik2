@@ -137,6 +137,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
+
   // Initialize state on open
   useEffect(() => {
     if (!open) return;
@@ -225,6 +226,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     // Reset change tracking
     setHasUnsavedChanges(false);
 
+
   }, [open, initialThemeId, initialData]);
 
   // Emoji count: compute based on plain text extracted from the rich text HTML
@@ -270,9 +272,27 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     }
   }, [open]); // Only depend on open, not other props
 
-  // If theme changes while open and no custom image chosen, update to theme's default image
+  // If theme changes while open and no custom image chosen, update to theme's default image.
+  //
+  // RACE CONDITION FIX: When the dialog opens, both this effect and the init effect
+  // fire in the same React commit phase. The init effect correctly calls setImageUrl()
+  // and setCustomImage(), but those state updates aren't flushed yet — this effect
+  // still reads stale closure values (imageUrl=null, customImage=false) and clears the
+  // image. Using a ref to track whether open was already true in the PREVIOUS render
+  // lets us skip this effect on the initial open→true transition.
+  const prevOpenRef = useRef(false);
   useEffect(() => {
+    const wasOpen = prevOpenRef.current;
+    prevOpenRef.current = open;
+
     if (!open) return;
+
+    // On the transition from closed→open, skip: the init effect handles initial state.
+    // This avoids reading stale state from the same commit phase.
+    if (!wasOpen) {
+      console.log('🔒 [Card Designer] Skipping theme change effect on initial open (wasOpen=false)');
+      return;
+    }
 
     // Check if this is a custom card (starts with 'custom-')
     const isCustomCard = initialThemeId && initialThemeId.startsWith('custom-');
