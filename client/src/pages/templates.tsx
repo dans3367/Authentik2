@@ -344,6 +344,7 @@ interface TemplateCardProps {
   onDelete: (id: string) => void;
   onEdit: (template: Template) => void;
   isDeleting?: boolean;
+  isTogglingFavorite?: boolean;
 }
 
 function getChannelBadgeClasses(channel: TemplateChannel) {
@@ -363,7 +364,7 @@ function getChannelBadgeClasses(channel: TemplateChannel) {
   }
 }
 
-function TemplateCard({ template, masterDesign, onToggleFavorite, onDuplicate, onDelete, onEdit, isDeleting }: TemplateCardProps) {
+function TemplateCard({ template, masterDesign, onToggleFavorite, onDuplicate, onDelete, onEdit, isDeleting, isTogglingFavorite }: TemplateCardProps) {
   const { t } = useTranslation();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
@@ -403,8 +404,11 @@ function TemplateCard({ template, masterDesign, onToggleFavorite, onDuplicate, o
               size="icon"
               className="h-9 w-9"
               onClick={() => onToggleFavorite(template.id)}
+              disabled={isTogglingFavorite}
             >
-              {template.isFavorite ? (
+              {isTogglingFavorite ? (
+                <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+              ) : template.isFavorite ? (
                 <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
               ) : (
                 <StarOff className="h-5 w-5 text-gray-400" />
@@ -1099,6 +1103,7 @@ export default function TemplatesPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [togglingFavoriteId, setTogglingFavoriteId] = useState<string | null>(null);
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
 
@@ -1177,16 +1182,49 @@ export default function TemplatesPage() {
 
 
   const handleToggleFavorite = async (id: string) => {
+    if (togglingFavoriteId) return; // Prevent multiple simultaneous toggles
+    
+    setTogglingFavoriteId(id);
+    
+    // Optimistically update the UI
+    const previousTemplates = [...templates];
+    const previousStats = stats ? { ...stats } : null;
+    
+    setTemplates(prevTemplates => 
+      prevTemplates.map(t => 
+        t.id === id ? { ...t, isFavorite: !t.isFavorite } : t
+      )
+    );
+    
+    // Update stats optimistically
+    if (stats) {
+      const template = templates.find(t => t.id === id);
+      if (template) {
+        setStats({
+          ...stats,
+          favoriteTemplates: template.isFavorite 
+            ? stats.favoriteTemplates - 1 
+            : stats.favoriteTemplates + 1
+        });
+      }
+    }
+    
     try {
       await toggleTemplateFavorite(id);
-      await loadTemplates();
-      await loadStats();
     } catch (error) {
+      // Revert on error
+      setTemplates(previousTemplates);
+      if (previousStats) {
+        setStats(previousStats);
+      }
+      
       toast({
         title: t('templatesPage.toasts.error'),
         description: t('templatesPage.toasts.favoriteError'),
         variant: "destructive",
       });
+    } finally {
+      setTogglingFavoriteId(null);
     }
   };
 
@@ -1440,6 +1478,7 @@ export default function TemplatesPage() {
                     onDelete={handleDeleteTemplate}
                     onEdit={handleEditTemplate}
                     isDeleting={deletingId === template.id}
+                    isTogglingFavorite={togglingFavoriteId === template.id}
                   />
                 ))}
               </div>

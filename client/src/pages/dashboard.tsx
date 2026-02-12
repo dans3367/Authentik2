@@ -38,10 +38,9 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-800">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {/* Page Header */}
-        <div className="space-y-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-slate-900 dark:to-gray-950">
+      <div className="max-w-7xl mx-auto p-6 space-y-8">
+        <div className="rounded-2xl border border-gray-100/80 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/60 backdrop-blur px-6 py-5 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
@@ -54,29 +53,20 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Add minimal spacer after the header section */}
-        <div className="h-3"></div>
-
-        {/* Newsletter Creation and Highlights Cards */}
-        <div className="flex flex-col lg:flex-row gap-6 max-w-7xl w-full">
-          {/* Swift Setup - Wider */}
-          <div className="flex-[2]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          <div className="lg:col-span-8">
             <NewsletterCard />
           </div>
-
-          {/* Highlights - Narrower */}
-          <div className="flex-[1]">
+          <div className="lg:col-span-4">
             <HighlightsCard />
           </div>
         </div>
 
-        {/* Upcoming Birthdays + Appointments */}
-        {/* Upcoming Birthdays + Appointments */}
-        <div className="flex flex-col lg:flex-row gap-6 max-w-7xl w-full">
-          <div className="flex-[2]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          <div className="lg:col-span-8">
             <UpcomingBirthdaysCard />
           </div>
-          <div className="flex-[1]">
+          <div className="lg:col-span-4">
             <UpcomingAppointmentsCard />
           </div>
         </div>

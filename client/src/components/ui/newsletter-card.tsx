@@ -11,32 +11,28 @@ export function NewsletterCard() {
   };
 
   return (
-    <Card className="bg-white dark:bg-gray-800 rounded-xl h-full">
+    <Card className="bg-white/80 dark:bg-gray-900/60 backdrop-blur rounded-2xl h-full border border-gray-100/80 dark:border-gray-800/60 shadow-sm hover:shadow-md transition-shadow">
       <CardContent className="p-8">
         <div className="text-center space-y-6 flex flex-col justify-center h-full">
-          {/* Illustration */}
-          <div>
+          <div className="mx-auto w-24 h-24 rounded-2xl bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-blue-900/40 dark:via-gray-900 dark:to-purple-900/30 flex items-center justify-center ring-1 ring-gray-100/80 dark:ring-gray-800/60">
             <img 
               src={NewsletterIllustration} 
               alt="Newsletter Illustration" 
-              className="w-32 h-32 mx-auto"
+              className="w-14 h-14"
             />
           </div>
           
-          {/* Title */}
           <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
-          Let’s Build Your First Newsletter
+            Let’s Build Your First Newsletter
           </h2>
           
-          {/* Description */}
           <p className="text-gray-600 dark:text-gray-400 leading-relaxed max-w-md mx-auto">
-          With just a few steps, you can design and send professional newsletters that reach your audience directly in their inbox.
+            With just a few steps, you can design and send professional newsletters that reach your audience directly in their inbox.
           </p>
           
-          {/* Button */}
           <Button
             onClick={handleCreateNewsletter}
-            className="bg-black hover:bg-gray-800 text-white px-8 py-3 rounded-lg font-medium transition-colors duration-200 mx-auto"
+            className="bg-gradient-to-r from-gray-900 to-gray-800 hover:from-gray-800 hover:to-gray-700 dark:from-white dark:to-gray-200 dark:text-gray-900 text-white px-8 py-3 rounded-lg font-medium transition-all duration-200 mx-auto shadow-sm hover:shadow"
             size="lg"
           >
             Create Newsletter
