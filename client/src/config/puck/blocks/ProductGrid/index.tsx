@@ -193,120 +193,102 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
     return (
       <Section>
         {/*
-          Outer wrapper constrains to email content width.
-          Inner table uses table-layout:fixed + colgroup for
-          guaranteed column/spacer widths across all email clients.
+          Outer table uses fixed pixel width for email client compatibility.
+          No colgroup (stripped by Gmail/Yahoo) or table-layout:fixed (unsupported).
+          Column widths enforced via width attributes on every <td>.
         */}
-        <div style={{ maxWidth: "100%", margin: "0 auto" }}>
-          <table
-            role="presentation"
-            cellPadding={0}
-            cellSpacing={0}
-            border={0}
-            width="100%"
-            style={{
-              width: "100%",
-              maxWidth: `${containerWidth}px`,
-              borderCollapse: "collapse" as const,
-              tableLayout: "fixed" as const,
-            }}
-          >
-            {/* Explicit col widths: product | gap | product | gap | product */}
-            <colgroup>
-              {Array.from({ length: cols }).flatMap((_, i) => {
-                const colEls: React.ReactNode[] = [];
-                if (i > 0) {
-                  colEls.push(
-                    <col key={`gc-${i}`} width={cellGap} style={{ width: `${cellGap}px` }} />
-                  );
-                }
-                colEls.push(
-                  <col key={`cc-${i}`} width={cellWidth} style={{ width: `${cellWidth}px` }} />
-                );
-                return colEls;
-              })}
-            </colgroup>
-            <tbody>
-              {rows.flatMap((row, rowIdx) => {
-                const totalCols = cols + (cols - 1);
-                const trs: React.ReactNode[] = [];
+        <table
+          role="presentation"
+          cellPadding={0}
+          cellSpacing={0}
+          border={0}
+          width={containerWidth}
+          style={{
+            width: `${containerWidth}px`,
+            borderCollapse: "collapse" as const,
+          }}
+        >
+          <tbody>
+            {rows.flatMap((row, rowIdx) => {
+              const totalCols = cols + (cols - 1);
+              const trs: React.ReactNode[] = [];
 
-                trs.push(
-                  <tr key={`r-${rowIdx}`}>
-                    {row.flatMap((product, colIdx) => {
-                      const cells: React.ReactNode[] = [];
-                      if (colIdx > 0) {
-                        cells.push(
-                          <td
-                            key={`g-${rowIdx}-${colIdx}`}
-                            width={cellGap}
-                            style={{
-                              width: `${cellGap}px`,
-                              fontSize: "1px",
-                              lineHeight: "1px",
-                              msoLineHeightRule: "exactly",
-                            } as React.CSSProperties}
-                          >
-                            {"\u00A0"}
-                          </td>
-                        );
-                      }
+              trs.push(
+                <tr key={`r-${rowIdx}`}>
+                  {row.flatMap((product, colIdx) => {
+                    const cells: React.ReactNode[] = [];
+                    if (colIdx > 0) {
                       cells.push(
                         <td
-                          key={`c-${rowIdx}-${colIdx}`}
-                          width={cellWidth}
-                          valign="top"
+                          key={`g-${rowIdx}-${colIdx}`}
+                          width={cellGap}
                           style={{
-                            width: `${cellWidth}px`,
-                            verticalAlign: "top",
+                            width: `${cellGap}px`,
+                            minWidth: `${cellGap}px`,
+                            maxWidth: `${cellGap}px`,
+                            fontSize: "1px",
+                            lineHeight: "1px",
                           }}
                         >
-                          {renderCard(product)}
+                          {"\u00A0"}
                         </td>
                       );
-                      return cells;
-                    })}
-                    {/* Fill incomplete rows */}
-                    {row.length < cols &&
-                      Array.from({ length: cols - row.length }).flatMap((_, i) => [
-                        <td
-                          key={`eg-${rowIdx}-${i}`}
-                          width={cellGap}
-                          style={{ width: `${cellGap}px` }}
-                        />,
-                        <td
-                          key={`ec-${rowIdx}-${i}`}
-                          width={cellWidth}
-                          style={{ width: `${cellWidth}px` }}
-                        />,
-                      ])}
+                    }
+                    cells.push(
+                      <td
+                        key={`c-${rowIdx}-${colIdx}`}
+                        width={cellWidth}
+                        valign="top"
+                        style={{
+                          width: `${cellWidth}px`,
+                          verticalAlign: "top",
+                        }}
+                      >
+                        {renderCard(product)}
+                      </td>
+                    );
+                    return cells;
+                  })}
+                  {/* Fill incomplete rows */}
+                  {row.length < cols &&
+                    Array.from({ length: cols - row.length }).flatMap((_, i) => [
+                      <td
+                        key={`eg-${rowIdx}-${i}`}
+                        width={cellGap}
+                        style={{ width: `${cellGap}px` }}
+                      />,
+                      <td
+                        key={`ec-${rowIdx}-${i}`}
+                        width={cellWidth}
+                        style={{ width: `${cellWidth}px` }}
+                      />,
+                    ])}
+                </tr>
+              );
+
+              // Row spacer
+              if (rowIdx < rows.length - 1) {
+                trs.push(
+                  <tr key={`rg-${rowIdx}`}>
+                    <td
+                      colSpan={totalCols}
+                      height={cellGap}
+                      style={{
+                        height: `${cellGap}px`,
+                        fontSize: "1px",
+                        lineHeight: "1px",
+                      }}
+                    >
+                      {"\u00A0"}
+                    </td>
                   </tr>
                 );
+              }
 
-                // Row spacer
-                if (rowIdx < rows.length - 1) {
-                  trs.push(
-                    <tr key={`rg-${rowIdx}`}>
-                      <td
-                        colSpan={totalCols}
-                        style={{
-                          height: `${cellGap}px`,
-                          fontSize: "1px",
-                          lineHeight: "1px",
-                          msoLineHeightRule: "exactly",
-                        } as React.CSSProperties}
-                      >
-                        {"\u00A0"}
-                      </td>
-                    </tr>
-                  );
-                }
-
-                return trs;
-              })}
-            </tbody>
-          </table>
-        </div>
+              return trs;
+            })}
+          </tbody>
+        </table>
       </Section>
     );
   },

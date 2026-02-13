@@ -167,6 +167,22 @@ function nodeToEmailHtml(node: Node): string {
   // The element's explicit inline style attribute (set via React style prop)
   const existingStyle = el.getAttribute('style');
 
+  // ── Space / Spacer → table-based spacer for email ──
+  // Detected via data-email-spacer attribute (set by the Space Puck component).
+  // Email clients collapse divs with height styles, so we emit a table-based spacer.
+  const spacerDir = el.getAttribute('data-email-spacer');
+  if (spacerDir) {
+    console.log('[puck-to-email-html] Spacer detected:', spacerDir, 'size:', el.getAttribute('data-email-spacer-size'));
+    const size = parseInt(el.getAttribute('data-email-spacer-size') || '24', 10);
+    const isHz = spacerDir === 'horizontal';
+    const w = isHz ? `${size}` : '100%';
+    const hAttr = isHz ? '' : ` height="${size}"`;
+    const wAttr = isHz ? ` width="${size}"` : '';
+    const hStyle = isHz ? '' : `height: ${size}px; `;
+    const wStyle = isHz ? `width: ${size}px; ` : '';
+    return `<table width="${w}" cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse: collapse;"><tbody><tr><td${hAttr}${wAttr} style="${hStyle}${wStyle}line-height: ${size}px; font-size: 1px; mso-line-height-rule: exactly;">&nbsp;</td></tr></tbody></table>`;
+  }
+
   // ── Flex container → table conversion for email ──
   // Puck's Flex component applies inline flex styles (justify-content, flex-direction,
   // gap, flex-wrap) on its Items slot div. Email clients don't support flexbox, so we
@@ -194,7 +210,9 @@ function nodeToEmailHtml(node: Node): string {
     const hasTextAlign = /text-align/i.test(existingStyle);
     const hasVisibleBorder = /border[^:]*:\s*[1-9]/i.test(existingStyle);
     const hasPadding = /padding[^:]*:[^;]*[1-9]/i.test(existingStyle);
-    if (!hasBackground && !hasBgImage && !hasTextAlign && !hasVisibleBorder && !hasPadding) return childrenHtml;
+    const hasHeight = /(?:^|;)\s*height\s*:[^;]*[1-9]/i.test(existingStyle);
+    const hasWidth = /(?:^|;)\s*width\s*:[^;]*[1-9]/i.test(existingStyle);
+    if (!hasBackground && !hasBgImage && !hasTextAlign && !hasVisibleBorder && !hasPadding && !hasHeight && !hasWidth) return childrenHtml;
   }
 
   // Only use the explicit inline style attribute for styling — do NOT dump
@@ -208,6 +226,11 @@ function nodeToEmailHtml(node: Node): string {
     for (const rule of parsed) {
       const colonIdx = rule.indexOf(':');
       if (colonIdx > 0) {
+        // Strip CSS properties that email clients don't support
+        const prop = rule.substring(0, colonIdx).trim().toLowerCase();
+        const val = rule.substring(colonIdx + 1).trim().toLowerCase();
+        if (prop === 'display' && /^(flex|inline-flex|grid|inline-grid)$/i.test(val)) continue;
+        if (/^(flex-direction|flex-wrap|flex-grow|flex-shrink|flex-basis|justify-content|align-items|align-self|gap|order)$/.test(prop)) continue;
         inlineStyles.push(rule);
       }
     }
