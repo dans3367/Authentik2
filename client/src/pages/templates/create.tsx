@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useRef, useMemo } from "react";
 import { SINGLE_PURPOSE_PRESETS, type SinglePurposePreset } from "@/config/templatePresets";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
@@ -75,6 +75,21 @@ interface CreateTemplatePayload {
 function hasContent(html: string): boolean {
   const text = html.replace(/<[^>]*>/g, '').trim();
   return text.length > 0;
+}
+
+function appendIntoLastBlock(prev: string, token: string): string {
+  // Regex matches closing block tags: p, div, h1-h6, li, blockquote, pre
+  const closingBlockRegex = /<\/(p|div|h[1-6]|li|blockquote|pre)>\s*$/i;
+  const match = prev.match(closingBlockRegex);
+
+  if (match && match.index !== undefined) {
+    // Insert token before the closing tag to stay inside the block
+    return prev.slice(0, match.index) + token + prev.slice(match.index);
+  }
+
+  // Fallback: if no closing block found, wrap in a new paragraph
+  // This ensures valid HTML structure even if the previous content was empty or malformed
+  return prev ? (prev + `<p>${token}</p>`) : `<p>${token}</p>`;
 }
 
 const TEMPLATE_VARIABLES = [
@@ -175,6 +190,7 @@ export default function CreateTemplatePage() {
   const [showPreview, setShowPreview] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+  const editorRef = useRef<any>(null);
 
   const handleSelectPreset = (preset: SinglePurposePreset) => {
     setSelectedPreset(preset.id);
@@ -344,11 +360,10 @@ export default function CreateTemplatePage() {
                         key={preset.id}
                         type="button"
                         onClick={() => handleSelectPreset(preset)}
-                        className={`relative flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all hover:shadow-sm ${
-                          selectedPreset === preset.id
+                        className={`relative flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all hover:shadow-sm ${selectedPreset === preset.id
                             ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-400 ring-1 ring-blue-500 dark:ring-blue-400"
                             : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
-                        }`}
+                          }`}
                       >
                         {selectedPreset === preset.id && (
                           <CheckCircle className="absolute top-2 right-2 h-4 w-4 text-blue-500 dark:text-blue-400" />
@@ -414,7 +429,11 @@ export default function CreateTemplatePage() {
                         key={v.key}
                         type="button"
                         onClick={() => {
-                          setContent((prev) => prev + `{{${v.key}}}`);
+                          if (editorRef.current) {
+                            editorRef.current.chain().focus().insertContent(`{{${v.key}}}`).run();
+                          } else {
+                            setContent((prev) => appendIntoLastBlock(prev, `{{${v.key}}}`));
+                          }
                         }}
                         className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer"
                         title={`Insert {{${v.key}}}`}
@@ -428,7 +447,11 @@ export default function CreateTemplatePage() {
                   <button
                     type="button"
                     onClick={() => {
-                      setContent((prev) => prev + CONTACT_CARD_TEMPLATE);
+                      if (editorRef.current) {
+                        editorRef.current.chain().focus().insertContent(CONTACT_CARD_TEMPLATE).run();
+                      } else {
+                        setContent((prev) => prev + CONTACT_CARD_TEMPLATE);
+                      }
                     }}
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors cursor-pointer"
                     title="Insert formatted contact card block"
@@ -443,6 +466,7 @@ export default function CreateTemplatePage() {
                   onChange={setContent}
                   placeholder={t('templatesPage.createTemplatePage.contentPlaceholder')}
                   className="min-h-[300px]"
+                  onEditorReady={(editor) => { editorRef.current = editor; }}
                 />
                 <p className="text-xs text-muted-foreground">
                   {t('templatesPage.createTemplatePage.contentHelp')}
@@ -582,9 +606,8 @@ export default function CreateTemplatePage() {
 
           {/* Email preview canvas */}
           <div className="flex-1 overflow-y-auto">
-            <div className={`transition-all duration-300 mx-auto p-4 sm:p-6 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl ${
-              previewDevice === "mobile" ? "max-w-[400px]" : "w-full"
-            }`}>
+            <div className={`transition-all duration-300 mx-auto p-4 sm:p-6 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl ${previewDevice === "mobile" ? "max-w-[400px]" : "w-full"
+              }`}>
               <div className="bg-white text-slate-900 shadow-2xl mx-auto rounded overflow-hidden max-w-[600px] w-full" style={{ fontFamily: masterDesign?.fontFamily || "Arial, sans-serif" }}>
 
                 {/* Simulated email header */}

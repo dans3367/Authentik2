@@ -10,6 +10,8 @@ export interface EmailDesign {
   accentColor: string;
   fontFamily: string;
   logoUrl: string | null;
+  logoSize: string | null;
+  showCompanyName: string | null;
   headerText: string | null;
   footerText: string | null;
   socialLinks: string | null;
@@ -25,21 +27,6 @@ function sanitizeColor(color: string | undefined | null, fallback: string = '#3B
   if (!color) return fallback;
 
   const normalized = color.trim().toLowerCase();
-
-  // Reject any value containing dangerous characters or patterns
-  if (
-    normalized.includes(';') ||
-    normalized.includes('url(') ||
-    normalized.includes('expression(') ||
-    normalized.includes('import') ||
-    normalized.includes('@') ||
-    normalized.includes('\\') ||
-    normalized.includes('<') ||
-    normalized.includes('>')
-  ) {
-    logger.warn(`Rejected potentially malicious color value: ${color}`);
-    return fallback;
-  }
 
   // Validate hex colors (#RGB, #RRGGBB, #RRGGBBAA)
   const hexPattern = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/;
@@ -199,6 +186,8 @@ export async function wrapInEmailDesign(tenantId: string, bodyContent: string): 
       accentColor: '#10B981',
       fontFamily: 'Arial, sans-serif',
       logoUrl: null,
+      logoSize: null,
+      showCompanyName: 'true',
       headerText: null,
       footerText: '',
       socialLinks: null,
@@ -258,8 +247,10 @@ function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
   }
 
   // Build logo/header section
+  const logoSizeMap: Record<string, string> = { small: '64px', medium: '96px', large: '128px', xlarge: '160px' };
+  const logoHeight = logoSizeMap[design.logoSize || 'medium'] || '48px';
   const logoSection = design.logoUrl && isValidHttpUrl(design.logoUrl)
-    ? `<img src="${escapeHtml(design.logoUrl)}" alt="${safeCompanyName}" style="height: 48px; width: auto; margin-bottom: 20px; object-fit: contain;" />`
+    ? `<img src="${escapeHtml(design.logoUrl)}" alt="${safeCompanyName}" style="display: block; height: ${logoHeight}; width: auto; margin: 0 auto 20px auto; object-fit: contain;" />`
     : safeCompanyName
       ? `<div style="height: 48px; width: 48px; background-color: rgba(255,255,255,0.2); border-radius: 50%; margin: 0 auto 16px auto; line-height: 48px; font-size: 20px; font-weight: bold; color: #ffffff; text-align: center;">${escapeHtml((design.companyName || 'C').charAt(0))}</div>`
       : '';
@@ -276,7 +267,7 @@ function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
       <!-- Hero Header -->
       <div style="padding: 40px 32px; text-align: center; background-color: ${sanitizedPrimaryColor}; color: #ffffff;">
         ${logoSection}
-        ${safeCompanyName ? `
+        ${safeCompanyName && (design.showCompanyName ?? 'true') === 'true' ? `
           <h1 style="margin: 0 0 10px 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em; color: #ffffff;">
             ${safeCompanyName}
           </h1>
@@ -289,7 +280,7 @@ function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
       </div>
 
       <!-- Body Content -->
-      <div style="padding: 48px 40px; min-height: 200px;">
+      <div style="padding: 24px 20px; min-height: 200px;">
         <div style="font-size: 16px; line-height: 1.625; color: #334155;">
           ${bodyContent}
         </div>

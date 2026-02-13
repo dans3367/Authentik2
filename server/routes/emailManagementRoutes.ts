@@ -14,6 +14,7 @@ import crypto from 'crypto';
 import { logActivity, computeChanges, allowedActivityTypes } from '../utils/activityLogger';
 import xss from 'xss';
 import { emailAttachmentUpload, validateAttachmentSize, filesToBase64Attachments, handleEmailAttachmentError } from '../middleware/emailAttachmentUpload';
+import { fromZonedTime } from 'date-fns-tz';
 
 // Sanitize HTML content for emails - allows safe formatting tags, strips scripts and event handlers
 export function sanitizeEmailHtml(html: string): string {
@@ -125,11 +126,11 @@ function replaceEmailPlaceholders(
   companyName?: string,
 ): string {
   // HTML-escape all values before substitution to prevent injection
-  const escapedFirstName = sanitizeEmailHtml(contact.firstName || '');
-  const escapedLastName = sanitizeEmailHtml(contact.lastName || '');
-  const escapedFullName = sanitizeEmailHtml(`${contact.firstName || ''} ${contact.lastName || ''}`.trim());
-  const escapedEmail = sanitizeEmailHtml(contact.email || '');
-  const escapedCompanyName = sanitizeEmailHtml(companyName || '');
+  const escapedFirstName = escapeHtml(contact.firstName || '');
+  const escapedLastName = escapeHtml(contact.lastName || '');
+  const escapedFullName = escapeHtml(`${contact.firstName || ''} ${contact.lastName || ''}`.trim());
+  const escapedEmail = escapeHtml(contact.email || '');
+  const escapedCompanyName = escapeHtml(companyName || '');
 
   return text
     .replace(/\{\{\s*first_name\s*\}\}/gi, escapedFirstName)
@@ -604,6 +605,12 @@ emailManagementRoutes.delete("/email-contacts/:id/scheduled/:queueId", authentic
 
     if (!contact) {
       return res.status(404).json({ message: 'Contact not found or access denied' });
+    }
+
+    // Verify contact ownership - prevent same-tenant users from canceling each other's scheduled emails
+    const isAdminOrOwner = ['Administrator', 'Owner'].includes(req.user.role || '');
+    if (contact.addedByUserId && contact.addedByUserId !== req.user.id && !isAdminOrOwner) {
+      return res.status(403).json({ message: 'You can only cancel scheduled emails for contacts you added' });
     }
 
     // Try to cancel the Trigger.dev run if it's a run ID
@@ -1695,7 +1702,6 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
 
       // Convert local date + time + timezone to UTC
       try {
-        const { fromZonedTime } = await import('date-fns-tz');
         scheduleDate = fromZonedTime(`${date}T${time || '00:00'}:00`, timezone);
         console.log(`📅 [ScheduleEmail] Timezone conversion: ${date} ${time || '00:00'} in ${timezone} → ${scheduleDate.toISOString()} UTC`);
       } catch (tzError) {
@@ -2840,6 +2846,8 @@ emailManagementRoutes.get("/master-email-design", authenticateToken, requireTena
         tenantId: req.user.tenantId,
         companyName: company?.name || '',
         logoUrl: company?.logoUrl || null,
+        logoSize: 'medium',
+        showCompanyName: 'true',
         primaryColor: '#3B82F6',
         secondaryColor: '#1E40AF',
         accentColor: '#10B981',
@@ -2867,6 +2875,8 @@ emailManagementRoutes.put("/master-email-design", authenticateToken, requireTena
     const {
       companyName,
       logoUrl,
+      logoSize,
+      showCompanyName,
       primaryColor,
       secondaryColor,
       accentColor,
@@ -2876,7 +2886,7 @@ emailManagementRoutes.put("/master-email-design", authenticateToken, requireTena
       socialLinks,
     } = req.body;
 
-    console.log('🎨 [Master Email Design PUT] Received:', { companyName, logoUrl, headerText, primaryColor, tenantId: req.user.tenantId });
+    console.log('🎨 [Master Email Design PUT] Received:', { companyName, logoUrl, logoSize, headerText, primaryColor, tenantId: req.user.tenantId });
 
     // Check if design already exists
     const existingDesign = await db.query.masterEmailDesign.findFirst({
@@ -2910,6 +2920,8 @@ emailManagementRoutes.put("/master-email-design", authenticateToken, requireTena
       const updateSet: Record<string, unknown> = {
         companyName: companyName ?? existingDesign.companyName,
         logoUrl: logoUrl !== undefined ? logoUrl : existingDesign.logoUrl,
+        logoSize: logoSize !== undefined ? logoSize : existingDesign.logoSize,
+        showCompanyName: showCompanyName !== undefined ? showCompanyName : existingDesign.showCompanyName,
         primaryColor: primaryColor ?? existingDesign.primaryColor,
         secondaryColor: secondaryColor ?? existingDesign.secondaryColor,
         accentColor: accentColor ?? existingDesign.accentColor,
@@ -2934,6 +2946,8 @@ emailManagementRoutes.put("/master-email-design", authenticateToken, requireTena
           tenantId: req.user.tenantId,
           companyName: companyName || '',
           logoUrl: logoUrl || null,
+          logoSize: logoSize || 'medium',
+          showCompanyName: showCompanyName || 'true',
           primaryColor: primaryColor || '#3B82F6',
           secondaryColor: secondaryColor || '#1E40AF',
           accentColor: accentColor || '#10B981',
@@ -3053,8 +3067,8 @@ emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken,
           tenantId: req.user.tenantId,
           activityType: 'sent',
           activityData: JSON.stringify({
-            type: 'birthday_invitation',
-            runId: result.runId,
+            recipientName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || null,
+            senderEmail: 'admin@zendwise.com',
             source: 'manual_birthday_invitation',
           }),
           occurredAt: new Date(),

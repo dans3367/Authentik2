@@ -29,11 +29,14 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 
 interface MasterEmailDesign {
   id: string;
   companyName: string;
   logoUrl?: string;
+  logoSize?: string;
+  showCompanyName?: string;
   primaryColor: string;
   secondaryColor: string;
   accentColor: string;
@@ -50,7 +53,7 @@ interface MasterEmailDesign {
 }
 
 const PRESET_COLORS = [
-  "#EF4444", "#EC4899", "#A855F7", "#6366F1", "#3B82F6",
+  "#FFFFFF", "#EF4444", "#EC4899", "#A855F7", "#6366F1", "#3B82F6",
   "#0EA5E9", "#06B6D4", "#14B8A6", "#22C55E", "#84CC16",
   "#FACC15", "#F59E0B", "#F97316", "#EA580C", "#8B5E3C",
   "#64748B", "#111827", "#10B981", "#9333EA", "#2563EB",
@@ -164,8 +167,8 @@ function ColorPicker({
             key={c}
             onClick={() => onChange(c)}
             disabled={disabled}
-            className={`w-6 h-6 rounded-full border border-transparent hover:scale-110 transition-transform ${color.toLowerCase() === c.toLowerCase() ? "ring-2 ring-primary ring-offset-2" : ""
-              }`}
+            className={`w-6 h-6 rounded-full hover:scale-110 transition-transform ${color.toLowerCase() === c.toLowerCase() ? "ring-2 ring-primary ring-offset-2" : ""
+              } ${c === "#FFFFFF" ? "border border-gray-300" : "border border-transparent"}`}
             style={{ backgroundColor: c }}
             aria-label={`Select color ${c}`}
             type="button"
@@ -247,9 +250,10 @@ export default function ManagementEmailDesign() {
       }
       return response.json();
     },
-    onSuccess: async () => {
+    onSuccess: (data) => {
+      qc.setQueryData(["/api/master-email-design"], data);
+      setDraft(data);
       setHasChanges(false);
-      await qc.invalidateQueries({ queryKey: ["/api/master-email-design"] });
       toast({
         title: t('management.emailDesign.toasts.updated') || "Design saved successfully",
         description: "Your master email template has been updated."
@@ -378,6 +382,16 @@ export default function ManagementEmailDesign() {
                         onChange={(e) => updateField("companyName", e.target.value)}
                         placeholder="e.g. Acme Corp"
                       />
+                      <div className="flex items-center justify-between pt-1">
+                        <Label htmlFor="showCompanyName" className="text-sm font-normal text-muted-foreground cursor-pointer">
+                          Show company name in email header
+                        </Label>
+                        <Switch
+                          id="showCompanyName"
+                          checked={(draft.showCompanyName ?? 'true') === 'true'}
+                          onCheckedChange={(checked) => updateField("showCompanyName", checked ? 'true' : 'false')}
+                        />
+                      </div>
                     </div>
                     <div className="space-y-2.5">
                       <Label htmlFor="logoUrl">{t('management.emailDesign.brandInfo.logoUrl')}</Label>
@@ -395,6 +409,31 @@ export default function ManagementEmailDesign() {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">Recommended height: 48px</p>
+                      <div className="space-y-2 pt-1">
+                        <Label>Logo Size</Label>
+                        <div className="flex gap-2">
+                          {([
+                            { value: 'small', label: 'Small', px: '64px' },
+                            { value: 'medium', label: 'Medium', px: '96px' },
+                            { value: 'large', label: 'Large', px: '128px' },
+                            { value: 'xlarge', label: 'X-Large', px: '160px' },
+                          ] as const).map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => updateField("logoSize", opt.value)}
+                              className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                                (draft.logoSize || 'medium') === opt.value
+                                  ? 'bg-primary text-primary-foreground border-primary'
+                                  : 'bg-background hover:bg-muted border-input'
+                              }`}
+                            >
+                              <div className="font-medium">{opt.label}</div>
+                              <div className="text-[10px] opacity-70">{opt.px}</div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </AccordionContent>
                 </AccordionItem>
@@ -604,7 +643,8 @@ export default function ManagementEmailDesign() {
                       <img
                         src={draft.logoUrl}
                         alt="Logo"
-                        className="h-12 mx-auto mb-4 object-contain"
+                        className="mx-auto mb-4 object-contain"
+                        style={{ height: ({ small: '64px', medium: '96px', large: '128px', xlarge: '160px' } as Record<string, string>)[draft.logoSize || 'medium'] || '96px' }}
                         onError={(e) => { e.currentTarget.style.display = "none"; }}
                       />
                     ) : (
@@ -613,7 +653,7 @@ export default function ManagementEmailDesign() {
                       </div>
                     )}
                     <h1 className="text-2xl font-bold mb-2 tracking-tight">
-                      {draft.companyName || "Your Company"}
+                      {(draft.showCompanyName ?? 'true') === 'true' ? (draft.companyName || "Your Company") : ""}
                     </h1>
                     {draft.headerText && (
                       <p className="text-base opacity-95 max-w-sm mx-auto leading-normal">

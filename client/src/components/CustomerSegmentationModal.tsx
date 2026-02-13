@@ -108,14 +108,15 @@ export function CustomerSegmentationModal({
   useEffect(() => {
     if (
       activeTab === 'selected' &&
-      tempSelectedContacts.length === 0 &&
-      contacts.length > 0 &&
-      !hasAutoInitialized.current
+      !hasAutoInitialized.current &&
+      contacts.length > 0
     ) {
-      setTempSelectedContacts(contacts.map(contact => contact.id));
       hasAutoInitialized.current = true;
+      if (tempSelectedContacts.length === 0) {
+        setTempSelectedContacts(contacts.map(contact => contact.id));
+      }
     }
-  }, [activeTab, contacts, tempSelectedContacts.length]);
+  }, [activeTab, contacts]);
 
   const handleContactToggle = (contactId: string) => {
     setTempSelectedContacts(prev =>
@@ -309,6 +310,7 @@ export function CustomerSegmentationModal({
                                   : prev.filter((id) => id !== contact.id)
                               );
                             }}
+                            onClick={(e) => e.stopPropagation()}
                             className="cursor-pointer"
                           />
                           <div className="flex-1 min-w-0">

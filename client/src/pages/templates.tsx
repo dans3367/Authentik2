@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { SINGLE_PURPOSE_PRESETS, type SinglePurposePreset } from "@/config/templatePresets";
 import { useLocation } from "wouter";
@@ -34,19 +34,26 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   CheckCircle,
+  Clock,
   Copy,
+  CreditCard,
   Eye,
   Filter,
   Loader2,
+  Mail,
+  MapPin,
   Monitor,
   MoreVertical,
+  Phone,
   Plus,
   Search,
   Smartphone,
   Sparkles,
   Star,
   StarOff,
+  Tag,
   Trash2,
+  User,
   LayoutDashboard,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -268,12 +275,66 @@ function hasContent(html: string): boolean {
   return text.length > 0;
 }
 
+const TEMPLATE_VARIABLES = [
+  { key: 'first_name', icon: User, labelKey: 'ecards.editor.firstName' },
+  { key: 'last_name', icon: User, labelKey: 'ecards.editor.lastName' },
+  { key: 'email', icon: Mail, labelKey: 'ecards.editor.emailVar' },
+  { key: 'phone', icon: Phone, labelKey: 'ecards.editor.phone' },
+  { key: 'address', icon: MapPin, labelKey: 'ecards.editor.address' },
+  { key: 'office_hours', icon: Clock, labelKey: 'ecards.editor.officeHours' },
+] as const;
+
+const CONTACT_CARD_TEMPLATE = `<p><strong>{{company_name}}</strong></p><p>✉ {{email}}</p><p>☎ {{phone}}</p><p>📍 {{address}}</p>`;
+
+function formatOperatingHours(raw: string | undefined | null): string {
+  if (!raw) return 'Mon–Fri 9AM–5PM';
+  try {
+    const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const dayOrder = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const dayAbbr: Record<string, string> = {
+      monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu',
+      friday: 'Fri', saturday: 'Sat', sunday: 'Sun',
+    };
+
+    const fmt = (t: string) => {
+      if (!t || !t.includes(':')) return t;
+      const [h, m] = t.split(':').map(Number);
+      if (Number.isNaN(h) || Number.isNaN(m)) return t;
+      const suffix = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      return m === 0 ? `${h12}${suffix}` : `${h12}:${String(m).padStart(2, '0')}${suffix}`;
+    };
+
+    const groups: { days: string[]; hours: string }[] = [];
+    for (const day of dayOrder) {
+      const info = data[day];
+      const hours = info?.closed ? 'Closed' : info?.open && info?.close ? `${fmt(info.open)}\u2013${fmt(info.close)}` : null;
+      if (!hours) continue;
+      const last = groups[groups.length - 1];
+      if (last && last.hours === hours) {
+        last.days.push(dayAbbr[day]);
+      } else {
+        groups.push({ days: [dayAbbr[day]], hours });
+      }
+    }
+
+    return groups.map(g => {
+      const label = g.days.length > 2
+        ? `${g.days[0]}\u2013${g.days[g.days.length - 1]}`
+        : g.days.join(', ');
+      return `${label}: ${g.hours}`;
+    }).join(' | ');
+  } catch {
+    return String(raw);
+  }
+}
+
 interface CreateTemplatePayload {
   name: string;
   channel: TemplateChannel;
   category: TemplateCategory;
   subjectLine: string;
-  content: string;
+  body: string;
   tags: string[];
 }
 
@@ -285,6 +346,7 @@ interface TemplateCardProps {
   onDelete: (id: string) => void;
   onEdit: (template: Template) => void;
   isDeleting?: boolean;
+  isTogglingFavorite?: boolean;
 }
 
 function getChannelBadgeClasses(channel: TemplateChannel) {
@@ -304,7 +366,7 @@ function getChannelBadgeClasses(channel: TemplateChannel) {
   }
 }
 
-function TemplateCard({ template, masterDesign, onToggleFavorite, onDuplicate, onDelete, onEdit, isDeleting }: TemplateCardProps) {
+function TemplateCard({ template, masterDesign, onToggleFavorite, onDuplicate, onDelete, onEdit, isDeleting, isTogglingFavorite }: TemplateCardProps) {
   const { t } = useTranslation();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
@@ -344,8 +406,11 @@ function TemplateCard({ template, masterDesign, onToggleFavorite, onDuplicate, o
               size="icon"
               className="h-9 w-9"
               onClick={() => onToggleFavorite(template.id)}
+              disabled={isTogglingFavorite}
             >
-              {template.isFavorite ? (
+              {isTogglingFavorite ? (
+                <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+              ) : template.isFavorite ? (
                 <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
               ) : (
                 <StarOff className="h-5 w-5 text-gray-400" />
@@ -556,6 +621,61 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
   const [content, setContent] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+  const editorRef = useRef<any>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
+
+  const { data: masterDesign } = useQuery({
+    queryKey: ["/api/master-email-design", "edit-preview"],
+    queryFn: async () => {
+      const response = await fetch('/api/master-email-design', {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch email design');
+      return response.json();
+    },
+  });
+
+  const { data: companyData } = useQuery({
+    queryKey: ["/api/company", "edit-preview"],
+    queryFn: async () => {
+      const response = await fetch('/api/company', {
+        credentials: 'include',
+      });
+      if (!response.ok) return null;
+      return response.json();
+    },
+  });
+
+  const { data: shopsData } = useQuery({
+    queryKey: ["/api/shops", "edit-preview"],
+    queryFn: async () => {
+      const response = await fetch('/api/shops?limit=1', {
+        credentials: 'include',
+      });
+      if (!response.ok) return null;
+      return response.json();
+    },
+  });
+
+  const replaceVariables = useMemo(() => {
+    const firstShop = shopsData?.shops?.[0];
+    const variableMap: Record<string, string> = {
+      first_name: 'John',
+      last_name: 'Doe',
+      email: companyData?.companyEmail || 'john.doe@example.com',
+      phone: companyData?.phone || '(555) 123-4567',
+      address: companyData?.address || '123 Main St',
+      office_hours: formatOperatingHours(firstShop?.operatingHours),
+      company_name: companyData?.name || masterDesign?.companyName || 'Your Company',
+    };
+
+    return (text: string) => {
+      return text.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+        return variableMap[key] ?? match;
+      });
+    };
+  }, [companyData, shopsData, masterDesign]);
 
   // Initialize form when template changes
   useEffect(() => {
@@ -620,7 +740,7 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
       channel,
       category,
       subjectLine: subjectLine.trim(),
-      content: content.trim(),
+      body: content.trim(),
       tags,
     });
 
@@ -744,11 +864,58 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
 
             <div className="grid gap-2">
               <Label htmlFor="edit-template-content">{t('templatesPage.editDialog.content')}</Label>
+
+              {/* Variable quick-insert bar */}
+              <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-50 dark:bg-slate-900/50 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 mr-1">
+                  <Tag className="w-3.5 h-3.5" />
+                  <span>{t('ecards.editor.insertPlaceholders')}:</span>
+                </div>
+                {TEMPLATE_VARIABLES.map((v) => {
+                  const Icon = v.icon;
+                  return (
+                    <button
+                      key={v.key}
+                      type="button"
+                      onClick={() => {
+                        if (editorRef.current) {
+                          editorRef.current.chain().focus().insertContent(`{{${v.key}}}`).run();
+                        } else {
+                          setContent((prev) => prev + `{{${v.key}}}`);
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer"
+                      title={`Insert {{${v.key}}}`}
+                    >
+                      <Icon className="w-3 h-3" />
+                      {t(v.labelKey, v.key)}
+                      <span className="text-blue-400 dark:text-blue-500 font-mono text-[10px]">{`{{${v.key}}}`}</span>
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (editorRef.current) {
+                      editorRef.current.chain().focus().insertContent(CONTACT_CARD_TEMPLATE).run();
+                    } else {
+                      setContent((prev) => prev + CONTACT_CARD_TEMPLATE);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors cursor-pointer"
+                  title="Insert formatted contact card block"
+                >
+                  <CreditCard className="w-3 h-3" />
+                  {t('ecards.editor.contactCard', 'Contact Card')}
+                </button>
+              </div>
+
               <RichTextEditor
                 value={content}
                 onChange={setContent}
                 placeholder={t('templatesPage.editDialog.contentPlaceholder')}
                 className="min-h-[200px]"
+                onEditorReady={(editor) => { editorRef.current = editor; }}
               />
               <p className="text-xs text-muted-foreground">
                 {t('templatesPage.editDialog.contentHelp')}
@@ -770,10 +937,148 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
             <Button type="button" variant="outline" onClick={handleCancel}>
               {t('templatesPage.editDialog.cancel')}
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowPreview(true)}
+              disabled={!hasContent(content)}
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              {t('templatesPage.createTemplatePage.preview')}
+            </Button>
             <Button type="submit">{t('templatesPage.editDialog.saveChanges')}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
+
+      {/* Preview Dialog */}
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="w-5 h-5" />
+              {t('templatesPage.createTemplatePage.preview')} — {name || t('templatesPage.editDialog.templateNamePlaceholder')}
+            </DialogTitle>
+            <DialogDescription>
+              {t('templatesPage.createTemplatePage.emailThemeDescription')}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Device toggle */}
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-muted-foreground">Preview:</span>
+              <div className="flex bg-muted/50 p-1 rounded-md">
+                <Button
+                  variant={previewDevice === "desktop" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-7 px-3 text-xs"
+                  onClick={() => setPreviewDevice("desktop")}
+                  type="button"
+                >
+                  <Monitor className="w-3.5 h-3.5 mr-1.5" />
+                  Desktop
+                </Button>
+                <Button
+                  variant={previewDevice === "mobile" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-7 px-3 text-xs"
+                  onClick={() => setPreviewDevice("mobile")}
+                  type="button"
+                >
+                  <Smartphone className="w-3.5 h-3.5 mr-1.5" />
+                  Mobile
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Email preview canvas */}
+          <div className="flex-1 overflow-y-auto">
+            <div className={`transition-all duration-300 mx-auto p-4 sm:p-6 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl ${previewDevice === "mobile" ? "max-w-[400px]" : "w-full"
+              }`}>
+              <div className="bg-white text-slate-900 shadow-2xl mx-auto rounded overflow-hidden max-w-[600px] w-full" style={{ fontFamily: masterDesign?.fontFamily || "Arial, sans-serif" }}>
+
+                {/* Simulated email header */}
+                <div className="border-b bg-gray-50 p-4 text-xs sm:text-sm text-gray-500">
+                  <div className="flex gap-2 mb-1">
+                    <span className="font-semibold text-right w-14">To:</span>
+                    <span className="text-gray-900">customer@example.com</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-right w-14">Subject:</span>
+                    <span className="text-gray-900 font-bold">{replaceVariables(subjectLine) || "(no subject)"}</span>
+                  </div>
+                </div>
+
+                {/* Hero header from email design */}
+                <div
+                  className="p-8 text-center"
+                  style={{ backgroundColor: masterDesign?.primaryColor || "#3B82F6", color: "#ffffff" }}
+                >
+                  {masterDesign?.logoUrl ? (
+                    <img
+                      src={masterDesign.logoUrl}
+                      alt="Logo"
+                      className="h-12 mx-auto mb-4 object-contain"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  ) : (
+                    <div className="h-12 w-12 bg-white/20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                      <span className="text-xl font-bold opacity-80">{masterDesign?.companyName?.charAt(0) || "C"}</span>
+                    </div>
+                  )}
+                  <h1 className="text-2xl font-bold mb-2 tracking-tight">
+                    {masterDesign?.companyName || "Your Company"}
+                  </h1>
+                  {masterDesign?.headerText && (
+                    <p className="text-base opacity-95 max-w-sm mx-auto leading-normal">
+                      {masterDesign.headerText}
+                    </p>
+                  )}
+                </div>
+
+                {/* Template body content */}
+                <div className="p-8 flex-1">
+                  <div
+                    className="prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: replaceVariables(content) || "<p style='color:#94a3b8;'>Your template content will appear here...</p>" }}
+                  />
+                </div>
+
+                {/* Footer from email design */}
+                <div className="bg-slate-100 p-8 text-center border-t border-slate-200">
+                  {(masterDesign?.socialLinks?.facebook || masterDesign?.socialLinks?.twitter || masterDesign?.socialLinks?.instagram || masterDesign?.socialLinks?.linkedin) && (
+                    <div className="flex justify-center gap-6 mb-6">
+                      {masterDesign?.socialLinks?.facebook && (
+                        <span className="text-slate-400 text-sm">Facebook</span>
+                      )}
+                      {masterDesign?.socialLinks?.twitter && (
+                        <span className="text-slate-400 text-sm">Twitter</span>
+                      )}
+                      {masterDesign?.socialLinks?.instagram && (
+                        <span className="text-slate-400 text-sm">Instagram</span>
+                      )}
+                      {masterDesign?.socialLinks?.linkedin && (
+                        <span className="text-slate-400 text-sm">LinkedIn</span>
+                      )}
+                    </div>
+                  )}
+                  <div className="text-xs text-slate-500 space-y-2 max-w-xs mx-auto">
+                    <p>{masterDesign?.footerText || "© 2025 All rights reserved."}</p>
+                    <p className="text-slate-400">
+                      You are receiving this email because you signed up on our website.
+                      <br />
+                      <span className="underline cursor-pointer hover:text-slate-600">Unsubscribe</span>
+                    </p>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
@@ -799,6 +1104,7 @@ export default function TemplatesPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [togglingFavoriteId, setTogglingFavoriteId] = useState<string | null>(null);
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
 
@@ -877,16 +1183,49 @@ export default function TemplatesPage() {
 
 
   const handleToggleFavorite = async (id: string) => {
+    if (togglingFavoriteId) return; // Prevent multiple simultaneous toggles
+
+    setTogglingFavoriteId(id);
+
+    // Optimistically update the UI
+    const previousTemplates = [...templates];
+    const previousStats = stats ? { ...stats } : null;
+
+    setTemplates(prevTemplates =>
+      prevTemplates.map(t =>
+        t.id === id ? { ...t, isFavorite: !t.isFavorite } : t
+      )
+    );
+
+    // Update stats optimistically
+    if (stats) {
+      const template = templates.find(t => t.id === id);
+      if (template) {
+        setStats({
+          ...stats,
+          favoriteTemplates: template.isFavorite
+            ? stats.favoriteTemplates - 1
+            : stats.favoriteTemplates + 1
+        });
+      }
+    }
+
     try {
       await toggleTemplateFavorite(id);
-      await loadTemplates();
-      await loadStats();
     } catch (error) {
+      // Revert on error
+      setTemplates(previousTemplates);
+      if (previousStats) {
+        setStats(previousStats);
+      }
+
       toast({
         title: t('templatesPage.toasts.error'),
         description: t('templatesPage.toasts.favoriteError'),
         variant: "destructive",
       });
+    } finally {
+      setTogglingFavoriteId(null);
     }
   };
 
@@ -957,7 +1296,7 @@ export default function TemplatesPage() {
         channel: payload.channel,
         category: payload.category,
         subjectLine: payload.subjectLine,
-        content: payload.content,
+        body: payload.body,
         tags: payload.tags,
       });
 
@@ -1140,6 +1479,7 @@ export default function TemplatesPage() {
                     onDelete={handleDeleteTemplate}
                     onEdit={handleEditTemplate}
                     isDeleting={deletingId === template.id}
+                    isTogglingFavorite={togglingFavoriteId === template.id}
                   />
                 ))}
               </div>

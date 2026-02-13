@@ -9,6 +9,7 @@ import { Stats } from "./blocks/Stats";
 import { Text } from "./blocks/Text";
 import { Space } from "./blocks/Space";
 import { ProductGrid } from "./blocks/ProductGrid";
+import { ProductShowcase } from "./blocks/ProductShowcase";
 
 import Root from "./root";
 import { UserConfig } from "./types";
@@ -29,7 +30,7 @@ export const config: UserConfig = {
     },
     content: {
       title: "Content",
-      components: ["ProductGrid"],
+      components: ["ProductGrid", "ProductShowcase"],
     },
     other: {
       title: "Other",
@@ -48,6 +49,7 @@ export const config: UserConfig = {
     Text,
     Space,
     ProductGrid,
+    ProductShowcase,
   },
 };
 

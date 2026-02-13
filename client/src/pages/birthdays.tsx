@@ -131,10 +131,10 @@ export default function BirthdaysPage() {
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
   const { t, currentLanguage } = useLanguage();
-  
+
   // Use Better Auth session to get external token - call this before useAuth to maintain consistent hook order
   const { data: session } = useSession();
-  
+
   const { user: currentUser } = useAuth();
 
   // Query to get external service token when authenticated
@@ -361,16 +361,16 @@ export default function BirthdaysPage() {
     onSuccess: (updatedSettings) => {
       console.log('✅ [Birthday Settings] Update success, updating cache with:', updatedSettings);
       console.log('📌 [Birthday Settings] New emailTemplate should be:', updatedSettings?.emailTemplate);
-      
+
       toast({
         title: "Success",
         description: "Birthday settings updated successfully",
       });
-      
+
       // Update the query cache immediately with the server response (now returns settings directly)
       queryClient.setQueryData(['/api/birthday-settings'], updatedSettings);
       console.log('💾 [Birthday Settings] Cache updated');
-      
+
       // Force a re-render by invalidating the query
       queryClient.invalidateQueries({ queryKey: ['/api/birthday-settings'] });
       console.log('🔄 [Birthday Settings] Query invalidated, will refetch');
@@ -490,11 +490,11 @@ export default function BirthdaysPage() {
 
   // Memoized initial data for CardDesignerDialog to prevent re-render loops
   const cardDesignerInitialData = useMemo(() => {
-    // Load persistent draft first
-    try {
-      const raw = localStorage.getItem('birthdayCardDesignerDraft');
-      if (raw) return JSON.parse(raw);
-    } catch { }
+    // NOTE: We intentionally do NOT load from localStorage here.
+    // The localStorage draft uses a non-theme-specific key, so loading it
+    // would contaminate data across themes (e.g. opening "custom" could
+    // receive stale data from "default"). The server-saved customThemeData
+    // is the source of truth.
 
     // Parse existing customThemeData and load theme-specific data
     if (birthdaySettings?.customThemeData) {
@@ -974,20 +974,20 @@ export default function BirthdaysPage() {
     if (!contact.birthday) return false;
     // Parse the stored birthday to get month and day
     const [, month, day] = contact.birthday.split('-').map(Number);
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
-    
+
     // Create birthday date for this year
     const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
     thisYearBirthday.setHours(0, 0, 0, 0);
-    
+
     // If birthday already passed this year, use next year
-    const nextBirthday = thisYearBirthday < today 
+    const nextBirthday = thisYearBirthday < today
       ? new Date(today.getFullYear() + 1, month - 1, day)
       : thisYearBirthday;
     nextBirthday.setHours(0, 0, 0, 0);
-    
+
     const daysUntilBirthday = Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     return daysUntilBirthday >= 0 && daysUntilBirthday <= 30;
   }).sort((a, b) => {
@@ -998,7 +998,7 @@ export default function BirthdaysPage() {
       today.setHours(0, 0, 0, 0);
       const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
       thisYearBirthday.setHours(0, 0, 0, 0);
-      const nextBirthday = thisYearBirthday < today 
+      const nextBirthday = thisYearBirthday < today
         ? new Date(today.getFullYear() + 1, month - 1, day)
         : thisYearBirthday;
       nextBirthday.setHours(0, 0, 0, 0);
@@ -1519,7 +1519,7 @@ export default function BirthdaysPage() {
                 customThemeData: JSON.stringify(updatedThemeData),
                 senderName: birthdaySettings?.senderName || company?.name || 'Your Company',
               };
-              
+
               console.log('🎨 [Birthday Cards] Custom theme payload:', payload);
               updateSettingsMutation.mutate(payload);
             } else if (isDefaultTheme && (hasTextCustomizations || data.message !== (birthdaySettings?.customMessage || ''))) {
@@ -1534,7 +1534,7 @@ export default function BirthdaysPage() {
                 customThemeData: JSON.stringify(updatedThemeData), // Save theme-specific data
                 senderName: birthdaySettings?.senderName || company?.name || 'Your Company',
               };
-              
+
               console.log('🎨 [Birthday Cards] Default theme with customizations payload:', payload);
               updateSettingsMutation.mutate(payload);
             } else {
@@ -1548,7 +1548,7 @@ export default function BirthdaysPage() {
                 customMessage: data.message,
                 senderName: birthdaySettings?.senderName || company?.name || 'Your Company',
               };
-              
+
               console.log('🎨 [Birthday Cards] Default theme payload:', payload);
               updateSettingsMutation.mutate(payload);
             }
@@ -1559,7 +1559,7 @@ export default function BirthdaysPage() {
           isCurrentlyActive={(() => {
             const currentTemplate = birthdaySettings?.emailTemplate || 'default';
             const selectedTheme = designerThemeId || 'default';
-            
+
             console.log('🎯 [Theme Active Check]', {
               currentTemplate,
               selectedTheme,
@@ -1671,17 +1671,17 @@ export default function BirthdaysPage() {
                           today.setHours(0, 0, 0, 0);
                           const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
                           thisYearBirthday.setHours(0, 0, 0, 0);
-                          const nextBirthday = thisYearBirthday < today 
+                          const nextBirthday = thisYearBirthday < today
                             ? new Date(today.getFullYear() + 1, month - 1, day)
                             : thisYearBirthday;
                           nextBirthday.setHours(0, 0, 0, 0);
                           return Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                         };
                         const daysUntil = contact.birthday ? getDaysUntil(contact.birthday) : 0;
-                        
+
                         return (
-                          <div 
-                            key={contact.id} 
+                          <div
+                            key={contact.id}
                             onClick={() => setLocation(`/email-contacts/view/${contact.id}`)}
                             className="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                           >
@@ -1926,7 +1926,7 @@ export default function BirthdaysPage() {
                             )}
                           </TableCell>
 
-                        
+
                           <TableCell>
                             {!contact.birthday && (
                               <Button
@@ -1941,7 +1941,7 @@ export default function BirthdaysPage() {
                               </Button>
                             )}
                           </TableCell>
-</TableRow>
+                        </TableRow>
                       ))}
                     </TableBody>
                   </Table>
