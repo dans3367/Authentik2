@@ -10,6 +10,8 @@ export interface EmailDesign {
   accentColor: string;
   fontFamily: string;
   logoUrl: string | null;
+  logoSize: string | null;
+  showCompanyName: string | null;
   headerText: string | null;
   footerText: string | null;
   socialLinks: string | null;
@@ -184,6 +186,8 @@ export async function wrapInEmailDesign(tenantId: string, bodyContent: string): 
       accentColor: '#10B981',
       fontFamily: 'Arial, sans-serif',
       logoUrl: null,
+      logoSize: null,
+      showCompanyName: 'true',
       headerText: null,
       footerText: '',
       socialLinks: null,
@@ -243,8 +247,10 @@ function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
   }
 
   // Build logo/header section
+  const logoSizeMap: Record<string, string> = { small: '64px', medium: '96px', large: '128px', xlarge: '160px' };
+  const logoHeight = logoSizeMap[design.logoSize || 'medium'] || '48px';
   const logoSection = design.logoUrl && isValidHttpUrl(design.logoUrl)
-    ? `<img src="${escapeHtml(design.logoUrl)}" alt="${safeCompanyName}" style="height: 48px; width: auto; margin-bottom: 20px; object-fit: contain;" />`
+    ? `<img src="${escapeHtml(design.logoUrl)}" alt="${safeCompanyName}" style="height: ${logoHeight}; width: auto; margin-bottom: 20px; object-fit: contain;" />`
     : safeCompanyName
       ? `<div style="height: 48px; width: 48px; background-color: rgba(255,255,255,0.2); border-radius: 50%; margin: 0 auto 16px auto; line-height: 48px; font-size: 20px; font-weight: bold; color: #ffffff; text-align: center;">${escapeHtml((design.companyName || 'C').charAt(0))}</div>`
       : '';
@@ -261,7 +267,7 @@ function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
       <!-- Hero Header -->
       <div style="padding: 40px 32px; text-align: center; background-color: ${sanitizedPrimaryColor}; color: #ffffff;">
         ${logoSection}
-        ${safeCompanyName ? `
+        ${safeCompanyName && (design.showCompanyName ?? 'true') === 'true' ? `
           <h1 style="margin: 0 0 10px 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em; color: #ffffff;">
             ${safeCompanyName}
           </h1>

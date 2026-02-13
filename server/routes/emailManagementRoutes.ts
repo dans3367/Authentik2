@@ -2846,6 +2846,8 @@ emailManagementRoutes.get("/master-email-design", authenticateToken, requireTena
         tenantId: req.user.tenantId,
         companyName: company?.name || '',
         logoUrl: company?.logoUrl || null,
+        logoSize: 'medium',
+        showCompanyName: 'true',
         primaryColor: '#3B82F6',
         secondaryColor: '#1E40AF',
         accentColor: '#10B981',
@@ -2873,6 +2875,8 @@ emailManagementRoutes.put("/master-email-design", authenticateToken, requireTena
     const {
       companyName,
       logoUrl,
+      logoSize,
+      showCompanyName,
       primaryColor,
       secondaryColor,
       accentColor,
@@ -2882,7 +2886,7 @@ emailManagementRoutes.put("/master-email-design", authenticateToken, requireTena
       socialLinks,
     } = req.body;
 
-    console.log('🎨 [Master Email Design PUT] Received:', { companyName, logoUrl, headerText, primaryColor, tenantId: req.user.tenantId });
+    console.log('🎨 [Master Email Design PUT] Received:', { companyName, logoUrl, logoSize, headerText, primaryColor, tenantId: req.user.tenantId });
 
     // Check if design already exists
     const existingDesign = await db.query.masterEmailDesign.findFirst({
@@ -2916,6 +2920,8 @@ emailManagementRoutes.put("/master-email-design", authenticateToken, requireTena
       const updateSet: Record<string, unknown> = {
         companyName: companyName ?? existingDesign.companyName,
         logoUrl: logoUrl !== undefined ? logoUrl : existingDesign.logoUrl,
+        logoSize: logoSize !== undefined ? logoSize : existingDesign.logoSize,
+        showCompanyName: showCompanyName !== undefined ? showCompanyName : existingDesign.showCompanyName,
         primaryColor: primaryColor ?? existingDesign.primaryColor,
         secondaryColor: secondaryColor ?? existingDesign.secondaryColor,
         accentColor: accentColor ?? existingDesign.accentColor,
@@ -2940,6 +2946,8 @@ emailManagementRoutes.put("/master-email-design", authenticateToken, requireTena
           tenantId: req.user.tenantId,
           companyName: companyName || '',
           logoUrl: logoUrl || null,
+          logoSize: logoSize || 'medium',
+          showCompanyName: showCompanyName || 'true',
           primaryColor: primaryColor || '#3B82F6',
           secondaryColor: secondaryColor || '#1E40AF',
           accentColor: accentColor || '#10B981',

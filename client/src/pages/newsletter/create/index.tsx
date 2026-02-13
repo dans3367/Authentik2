@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Puck, Render } from "@measured/puck";
+import { useState, useEffect, useCallback } from "react";
+import { Puck } from "@measured/puck";
+import { useQuery } from "@tanstack/react-query";
 import config, { initialData } from "@/config/puck";
 import { UserData } from "@/config/puck/types";
-import { Monitor, Tablet, Smartphone, ZoomIn, ZoomOut, RotateCcw, Mail } from "lucide-react";
+import { Monitor, Tablet, Smartphone, ZoomIn, ZoomOut, Mail } from "lucide-react";
 import { SendPreviewDialog } from "@/components/SendPreviewDialog";
 import { extractPuckEmailHtml } from "@/utils/puck-to-email-html";
+import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
 
 export default function NewsletterCreatePage() {
   const [data, setData] = useState<UserData>(initialData);
@@ -13,8 +15,31 @@ export default function NewsletterCreatePage() {
   const [viewport, setViewport] = useState<"mobile" | "tablet" | "desktop">("desktop");
   const [zoom, setZoom] = useState(100);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewSubject, setPreviewSubject] = useState("Newsletter Preview");
-  const previewRef = useRef<HTMLDivElement>(null);
+  // Stores the email-safe HTML captured from the editor DOM before switching to preview
+  const [previewHtml, setPreviewHtml] = useState<string>("");
+  const [previewViewport, setPreviewViewport] = useState<"mobile" | "tablet" | "desktop">("desktop");
+
+  // Fetch the tenant's master email design (same as Management > Email Design)
+  const { data: emailDesign } = useQuery<{
+    companyName: string;
+    logoUrl?: string;
+    logoSize?: string;
+    showCompanyName?: string;
+    primaryColor: string;
+    secondaryColor: string;
+    accentColor: string;
+    fontFamily: string;
+    headerText?: string;
+    footerText?: string;
+    socialLinks?: { facebook?: string; twitter?: string; instagram?: string; linkedin?: string };
+  }>({
+    queryKey: ["/api/master-email-design"],
+    queryFn: async () => {
+      const response = await fetch('/api/master-email-design', { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch email design');
+      return response.json();
+    },
+  });
 
   const getHtmlContent = useCallback(() => {
     return extractPuckEmailHtml();
@@ -22,7 +47,7 @@ export default function NewsletterCreatePage() {
 
   useEffect(() => {
     setIsClient(true);
-    
+
     // Try to load saved data from localStorage
     const savedData = localStorage.getItem("newsletter-puck-data");
     if (savedData) {
@@ -89,29 +114,138 @@ export default function NewsletterCreatePage() {
               enabled: false,
             }}
             overrides={{
-              preview: ({ children }: { children: React.ReactNode }) => (
-                <div style={{
-                  width: "100%",
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "flex-start",
-                  padding: viewport !== "desktop" ? "20px" : "0",
-                  background: viewport !== "desktop" ? "#f5f5f5" : "transparent",
-                  overflow: "auto",
-                }}>
+              preview: ({ children }: { children: React.ReactNode }) => {
+                const primaryColor = emailDesign?.primaryColor || '#3B82F6';
+                const companyName = emailDesign?.companyName || '';
+                const logoUrl = emailDesign?.logoUrl;
+                const headerText = emailDesign?.headerText;
+                const footerText = emailDesign?.footerText || '';
+                const socialLinks = emailDesign?.socialLinks;
+                const fontFamily = emailDesign?.fontFamily || 'Arial, Helvetica, sans-serif';
+                const logoSizeMap: Record<string, string> = { small: '64px', medium: '96px', large: '128px', xlarge: '160px' };
+                const logoHeight = logoSizeMap[emailDesign?.logoSize || 'medium'] || '48px';
+                const showName = (emailDesign?.showCompanyName ?? 'true') === 'true';
+
+                return (
                   <div style={{
-                    width: viewport === "desktop" ? "100%" : viewportWidths[viewport],
-                    maxWidth: viewport === "desktop" ? "100%" : viewportWidths[viewport],
-                    boxShadow: viewport !== "desktop" ? "0 0 0 1px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.1)" : "none",
-                    background: "#fff",
-                    transform: `scale(${zoom / 100})`,
-                    transformOrigin: "top center",
-                    transition: "transform 0.2s ease-out",
+                    width: "100%",
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "flex-start",
+                    padding: viewport !== "desktop" ? "20px" : "0",
+                    background: viewport !== "desktop" ? "#f5f5f5" : "#f7fafc",
+                    overflow: "auto",
                   }}>
-                    {children}
+                    <div style={{
+                      width: viewport === "desktop" ? "100%" : viewportWidths[viewport],
+                      maxWidth: viewport === "desktop" ? "620px" : viewportWidths[viewport],
+                      boxShadow: "0 0 0 1px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08)",
+                      background: "#fff",
+                      transform: `scale(${zoom / 100})`,
+                      transformOrigin: "top center",
+                      transition: "transform 0.2s ease-out",
+                      margin: "0 auto",
+                      fontFamily,
+                    }}>
+                      {/* Branded email header from master email design */}
+                      <div style={{
+                        padding: "40px 32px",
+                        textAlign: "center",
+                        backgroundColor: primaryColor,
+                        color: "#ffffff",
+                      }}>
+                        {logoUrl ? (
+                          <img
+                            src={logoUrl}
+                            alt={companyName}
+                            style={{ height: logoHeight, width: "auto", marginBottom: "20px", objectFit: "contain" }}
+                          />
+                        ) : companyName ? (
+                          <div style={{
+                            height: "48px",
+                            width: "48px",
+                            backgroundColor: "rgba(255,255,255,0.2)",
+                            borderRadius: "50%",
+                            margin: "0 auto 16px auto",
+                            lineHeight: "48px",
+                            fontSize: "20px",
+                            fontWeight: "bold",
+                            color: "#ffffff",
+                            textAlign: "center",
+                          }}>
+                            {companyName.charAt(0)}
+                          </div>
+                        ) : null}
+                        {companyName && showName && (
+                          <h1 style={{
+                            margin: "0 0 10px 0",
+                            fontSize: "24px",
+                            fontWeight: "bold",
+                            letterSpacing: "-0.025em",
+                            color: "#ffffff",
+                            fontFamily,
+                          }}>
+                            {companyName}
+                          </h1>
+                        )}
+                        {headerText && (
+                          <p style={{
+                            margin: "0 auto",
+                            fontSize: "16px",
+                            opacity: 0.95,
+                            maxWidth: "400px",
+                            lineHeight: "1.5",
+                            color: "#ffffff",
+                          }}>
+                            {headerText}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Puck editor content */}
+                      <div style={{ padding: "48px 40px", minHeight: "200px" }}>
+                        <div style={{ fontSize: "16px", lineHeight: "1.625", color: "#334155" }}>
+                          {children}
+                        </div>
+                      </div>
+
+                      {/* Branded email footer from master email design */}
+                      <div style={{
+                        backgroundColor: "#f8fafc",
+                        padding: "32px",
+                        textAlign: "center",
+                        borderTop: "1px solid #e2e8f0",
+                        color: "#64748b",
+                      }}>
+                        {socialLinks && (socialLinks.facebook || socialLinks.twitter || socialLinks.instagram || socialLinks.linkedin) && (
+                          <div style={{ marginBottom: "24px" }}>
+                            {[
+                              socialLinks.facebook && "Facebook",
+                              socialLinks.twitter && "Twitter",
+                              socialLinks.instagram && "Instagram",
+                              socialLinks.linkedin && "LinkedIn",
+                            ].filter(Boolean).map((name, i, arr) => (
+                              <span key={name} style={{ color: "#64748b", fontSize: "13px", fontWeight: 500 }}>
+                                {name}{i < arr.length - 1 ? " | " : ""}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {footerText && (
+                          <p style={{ margin: "0 0 16px 0", fontSize: "12px", lineHeight: "1.5", color: "#64748b" }}>
+                            {footerText}
+                          </p>
+                        )}
+                        {companyName && (
+                          <div style={{ fontSize: "12px", lineHeight: "1.5", color: "#94a3b8" }}>
+                            <p style={{ margin: 0 }}>Sent via {companyName}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ),
+                );
+              },
               headerActions: ({ children }: { children: React.ReactNode }) => (
                 <>
                   <div style={{ display: "flex", gap: "4px", marginRight: "8px" }}>
@@ -234,17 +368,21 @@ export default function NewsletterCreatePage() {
                   <button
                     onClick={() => setPreviewOpen(true)}
                     style={{
-                      padding: "8px 16px",
+                      padding: "4px 12px",
                       marginRight: "8px",
                       background: "#7c3aed",
                       color: "white",
-                      border: "none",
+                      border: "1px solid #7c3aed",
                       borderRadius: "4px",
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
-                      gap: "6px",
-                      fontSize: "14px",
+                      gap: "4px",
+                      fontSize: "12px",
+                      fontWeight: 500,
+                      height: "32px",
+                      boxSizing: "border-box",
+                      whiteSpace: "nowrap",
                     }}
                     data-testid="button-send-preview"
                   >
@@ -252,7 +390,23 @@ export default function NewsletterCreatePage() {
                     Send Preview
                   </button>
                   <button
-                    onClick={() => setIsEdit(false)}
+                    onClick={() => {
+                      // Capture email-safe HTML from the live editor DOM before unmounting it
+                      const bodyHtml = extractPuckEmailHtml();
+                      const fullHtml = wrapInEmailPreview(bodyHtml, {
+                        companyName: emailDesign?.companyName || '',
+                        primaryColor: emailDesign?.primaryColor,
+                        logoUrl: emailDesign?.logoUrl,
+                        logoSize: emailDesign?.logoSize,
+                        showCompanyName: emailDesign?.showCompanyName,
+                        headerText: emailDesign?.headerText,
+                        footerText: emailDesign?.footerText,
+                        fontFamily: emailDesign?.fontFamily,
+                        socialLinks: emailDesign?.socialLinks,
+                      });
+                      setPreviewHtml(fullHtml);
+                      setIsEdit(false);
+                    }}
                     style={{
                       padding: "8px 16px",
                       marginRight: "8px",
@@ -281,43 +435,121 @@ export default function NewsletterCreatePage() {
     );
   }
 
+  // ── Preview mode: render email-safe HTML inside a sandboxed iframe ──
+  const previewViewportWidths: Record<string, string> = {
+    mobile: "360px",
+    tablet: "768px",
+    desktop: "620px",
+  };
+
   return (
-    <div>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#f0f0f0" }}>
+      {/* Toolbar */}
       <div
         style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
           background: "white",
           borderBottom: "1px solid #e5e7eb",
-          padding: "16px",
+          padding: "12px 16px",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          zIndex: 1000,
+          flexShrink: 0,
         }}
       >
         <h1 style={{ margin: 0, fontSize: "18px", fontWeight: 600 }}>
-          Newsletter Preview
+          Email Preview
         </h1>
-        <button
-          onClick={() => setIsEdit(true)}
-          style={{
-            padding: "8px 16px",
-            background: "#2563eb",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
-          data-testid="button-edit"
-        >
-          Back to Editor
-        </button>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          {/* Viewport switcher */}
+          {(["mobile", "tablet", "desktop"] as const).map((vp) => {
+            const Icon = vp === "mobile" ? Smartphone : vp === "tablet" ? Tablet : Monitor;
+            const label = vp === "mobile" ? "360px" : vp === "tablet" ? "768px" : "620px";
+            return (
+              <button
+                key={vp}
+                onClick={() => setPreviewViewport(vp)}
+                style={{
+                  padding: "6px 10px",
+                  background: previewViewport === vp ? "#2563eb" : "#fff",
+                  color: previewViewport === vp ? "#fff" : "#000",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  fontSize: "12px",
+                }}
+              >
+                <Icon size={14} />
+                {label}
+              </button>
+            );
+          })}
+          <button
+            onClick={() => setIsEdit(true)}
+            style={{
+              padding: "8px 16px",
+              background: "#2563eb",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+              marginLeft: "8px",
+            }}
+            data-testid="button-edit"
+          >
+            Back to Editor
+          </button>
+        </div>
       </div>
-      <div style={{ paddingTop: "64px" }}>
-        <Render config={config} data={data} />
+
+      {/* Email preview iframe */}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "flex-start",
+          padding: "24px",
+          overflow: "auto",
+        }}
+      >
+        <div
+          style={{
+            width: previewViewportWidths[previewViewport],
+            maxWidth: "100%",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06)",
+            borderRadius: "8px",
+            overflow: "hidden",
+            background: "#fff",
+          }}
+        >
+          <iframe
+            srcDoc={previewHtml}
+            title="Email Preview"
+            sandbox="allow-same-origin"
+            style={{
+              width: "100%",
+              height: "100%",
+              minHeight: "600px",
+              border: "none",
+              display: "block",
+            }}
+            onLoad={(e) => {
+              // Auto-resize iframe to fit content
+              const iframe = e.currentTarget;
+              try {
+                const doc = iframe.contentDocument;
+                if (doc?.body) {
+                  iframe.style.height = doc.body.scrollHeight + "px";
+                }
+              } catch {
+                // sandbox may block access in some cases
+              }
+            }}
+          />
+        </div>
       </div>
     </div>
   );
