@@ -40,6 +40,7 @@ interface RichTextEditorProps {
 export default function RichTextEditor({ value, onChange, placeholder = "Start typing your message...", className = "", customerInfo, businessName, occasionType, defaultTitle, onEditorReady }: RichTextEditorProps) {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const editorReadyCalledRef = useRef(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isImproving, setIsImproving] = useState(false);
   const [isEmojifying, setIsEmojifying] = useState(false);
@@ -320,8 +321,9 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
   }, [value, editor]);
 
   useEffect(() => {
-    if (editor && onEditorReady) {
+    if (editor && onEditorReady && !editorReadyCalledRef.current) {
       onEditorReady(editor);
+      editorReadyCalledRef.current = true;
     }
   }, [editor, onEditorReady]);
 

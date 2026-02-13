@@ -37,27 +37,45 @@ export const sendNewsletterPreviewTask = task({
     });
 
     try {
-      // Wrap the raw content in the tenant's branded email template
-      const wrappedHtml = await wrapInEmailDesign(data.tenantId, data.html);
+      // Sanitize the raw HTML before wrapping in the tenant's branded email template
+      const { sanitizeEmailHtml } = await import("../../server/routes/emailManagementRoutes");
+      const sanitizedHtml = sanitizeEmailHtml(data.html);
+      const wrappedHtml = await wrapInEmailDesign(data.tenantId, sanitizedHtml);
 
       // Add a preview banner at the top so recipients know it's a test
-      const finalHtml = wrappedHtml.replace(
-        '<!-- Hero Header -->',
-        `<!-- Preview Banner -->
+      const previewBanner = `<!-- Preview Banner -->
       <div style="background-color: #fef3c7; border-bottom: 2px solid #f59e0b; padding: 12px 24px; text-align: center;">
         <span style="color: #92400e; font-size: 13px; font-weight: 600; font-family: Arial, sans-serif;">
           &#9888; This is a preview email — not sent to your subscribers
         </span>
       </div>
-      <!-- Hero Header -->`
-      );
+      <!-- Hero Header -->`;
+      const heroMarker = "<!-- Hero Header -->";
+      let finalHtml: string;
+
+      if (wrappedHtml.includes(heroMarker)) {
+        finalHtml = wrappedHtml.replace(heroMarker, previewBanner);
+      } else {
+        logger.warn("Preview banner marker not found in wrapped HTML; using fallback insertion", {
+          tenantId: data.tenantId,
+        });
+
+        const bodyMatch = wrappedHtml.match(/<body[^>]*>/i);
+
+        if (bodyMatch) {
+          const bodyTag = bodyMatch[0];
+          finalHtml = wrappedHtml.replace(bodyTag, `${bodyTag}${previewBanner}`);
+        } else {
+          finalHtml = `${previewBanner}${wrappedHtml}`;
+        }
+      }
 
       const { data: emailData, error } = await resend.emails.send({
         from: process.env.EMAIL_FROM || "admin@zendwise.com",
         to: data.to,
         subject: `[Preview] ${data.subject}`,
         html: finalHtml,
-        text: data.html.replace(/<[^>]*>/g, ""),
+        text: sanitizedHtml.replace(/<[^>]*>/g, ""),
         tags: [
           { name: "type", value: "newsletter-preview" },
           { name: "tenantId", value: data.tenantId },

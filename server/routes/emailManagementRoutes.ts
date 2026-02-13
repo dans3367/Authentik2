@@ -607,10 +607,18 @@ emailManagementRoutes.delete("/email-contacts/:id/scheduled/:queueId", authentic
       return res.status(404).json({ message: 'Contact not found or access denied' });
     }
 
-    // Verify contact ownership - prevent same-tenant users from canceling each other's scheduled emails
+    // Verify scheduled email ownership (not contact ownership)
     const isAdminOrOwner = ['Administrator', 'Owner'].includes(req.user.role || '');
-    if (contact.addedByUserId && contact.addedByUserId !== req.user.id && !isAdminOrOwner) {
-      return res.status(403).json({ message: 'You can only cancel scheduled emails for contacts you added' });
+    let scheduledByUserId: string | null = null;
+    try {
+      const taskPayload = typeof task.payload === 'string' ? JSON.parse(task.payload) : task.payload;
+      scheduledByUserId = taskPayload?.scheduledBy || null;
+    } catch {
+      scheduledByUserId = null;
+    }
+
+    if (!isAdminOrOwner && scheduledByUserId && scheduledByUserId !== req.user.id) {
+      return res.status(403).json({ message: 'You can only cancel scheduled emails you created' });
     }
 
     // Try to cancel the Trigger.dev run if it's a run ID

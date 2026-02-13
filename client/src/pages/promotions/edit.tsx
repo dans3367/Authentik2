@@ -56,22 +56,7 @@ export default function EditPromotionPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
-  // If route doesn't match, redirect to promotions list
-  if (!match) {
-    setLocation('/promotions');
-    return null;
-  }
-
   const promotionId = params?.id;
-
-  // If no promotion ID, redirect
-  if (!promotionId) {
-    setLocation('/promotions');
-    return null;
-  }
-
-  // Debug logging
-  console.log('🔍 Edit page - Route match:', { match, params, promotionId });
 
   const [formData, setFormData] = useState({
     title: '',
@@ -123,6 +108,13 @@ export default function EditPromotionPage() {
   });
 
   console.log('🔍 Query state:', { promotion, isLoading, error, enabled: !!promotionId });
+
+  // Route guard - must be after all hooks
+  useEffect(() => {
+    if (!match || !promotionId) {
+      setLocation('/promotions');
+    }
+  }, [match, promotionId, setLocation]);
 
   // Populate form when promotion data loads
   useEffect(() => {
@@ -271,6 +263,11 @@ export default function EditPromotionPage() {
   const handleCancel = () => {
     setLocation('/promotions');
   };
+
+  // Early return for invalid routes (after hooks)
+  if (!match || !promotionId) {
+    return null;
+  }
 
   if (isLoading) {
     return (

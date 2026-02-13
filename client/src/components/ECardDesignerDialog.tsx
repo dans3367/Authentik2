@@ -339,7 +339,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
     // Check if this is a custom card (starts with 'custom-', has customImage flag, or has imageUrl with a non-theme ID)
     // Cards from the API have UUID IDs, not 'custom-' prefixed, so we also check if the themeId
     // is NOT a known default theme (i.e., not in themeMetadataById) and has an imageUrl
-    const isCustomCard = initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-')) || initialData?.customImage === true || (initialThemeId && initialData?.imageUrl && !themeMetadataById[initialThemeId]);
+    const isCustomCard = isCustomCardMode;
 
     // Don't run this effect for custom cards - they manage their own images
     if (isCustomCard) {

@@ -10,7 +10,6 @@
  *  - Ensures all styles are inline
  */
 
-const PUCK_ATTRS_RE = /\s(data-[\w-]+|aria-[\w-]+|class|tabindex|draggable|contenteditable)="[^"]*"/gi;
 const CSS_VAR_RE = /var\(--[\w-]+(?:,\s*([^)]+))?\)/g;
 const EMPTY_STYLE_RE = /\sstyle=""/g;
 
@@ -85,7 +84,7 @@ function nodeToEmailHtml(node: Node): string {
   ];
 
   // Table-family tags should not get display styles — email clients handle them natively
-  const isTableElement = ['table','tr','td','th','tbody','thead','tfoot'].includes(tag);
+  const isTableElement = ['table', 'tr', 'td', 'th', 'tbody', 'thead', 'tfoot'].includes(tag);
 
   // Properties where the computed value resolves to pixels but we want the
   // original CSS value (e.g. "100%" or "33%"). These will be picked up from
@@ -172,7 +171,7 @@ function nodeToEmailHtml(node: Node): string {
   const src = tag === 'img' ? el.getAttribute('src') : null;
   const alt = tag === 'img' ? el.getAttribute('alt') : null;
   if (src) extraAttrs += ` src="${src}"`;
-  if (alt) extraAttrs += ` alt="${alt}"`;
+  if (alt !== null) extraAttrs += ` alt="${alt}"`;
 
   // Table-specific attributes — critical for email clients (especially Outlook)
   if (['table', 'td', 'th', 'tr', 'col', 'colgroup', 'tbody', 'thead', 'tfoot'].includes(tag)) {
@@ -201,7 +200,7 @@ function nodeToEmailHtml(node: Node): string {
 
 function mapTagForEmail(tag: string): string {
   // Keep semantic tags, map others to safe email equivalents
-  const safe = ['h1','h2','h3','h4','h5','h6','p','a','img','br','hr','span','strong','em','b','i','u','ul','ol','li','table','tr','td','th','thead','tbody','tfoot','colgroup','col','blockquote'];
+  const safe = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'a', 'img', 'br', 'hr', 'span', 'strong', 'em', 'b', 'i', 'u', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th', 'thead', 'tbody', 'tfoot', 'colgroup', 'col', 'blockquote'];
   if (safe.includes(tag)) return tag;
   return 'div';
 }
@@ -227,13 +226,18 @@ export function extractPuckEmailHtml(): string {
 
   // Fallback: find the scaled content wrapper inside the editor
   if (!previewEl) {
-    const scaled = document.querySelector('[style*="transform"]');
+    // Try to find the scaled preview wrapper - narrow scope to likely editor containers
+    const scaled = document.querySelector('[data-puck-editor] [style*="transform"], .puck-editor [style*="transform"]');
     if (scaled?.parentElement) {
       previewEl = scaled.parentElement as HTMLElement;
+      console.warn('extractPuckEmailHtml: using transform fallback selector');
     }
   }
 
-  if (!previewEl) return '';
+  if (!previewEl) {
+    console.warn('[puck-to-email-html] No Puck preview element found. Tried selectors:', selectors);
+    return '';
+  }
 
   // Walk the DOM and produce clean email HTML
   let bodyHtml = '';
@@ -243,7 +247,6 @@ export function extractPuckEmailHtml(): string {
 
   // Clean up any remaining artifacts
   bodyHtml = bodyHtml
-    .replace(PUCK_ATTRS_RE, '')
     .replace(EMPTY_STYLE_RE, '')
     .replace(/\s{2,}/g, ' ')
     .trim();

@@ -21,6 +21,21 @@ export type HeroProps = {
 // Email content area: 600px wrapper - 80px body padding = 520px
 const CONTAINER_WIDTH = 520;
 
+const getSafeHref = (href: string) => {
+  const trimmed = href?.trim();
+  if (!trimmed) {
+    return "#";
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? trimmed : "#";
+  } catch {
+    const lower = trimmed.toLowerCase();
+    return lower.startsWith("http://") || lower.startsWith("https://") ? trimmed : "#";
+  }
+};
+
 export const Hero: ComponentConfig<HeroProps> = {
   fields: {
     title: { type: "text", contentEditable: true },
@@ -107,9 +122,10 @@ export const Hero: ComponentConfig<HeroProps> = {
     const renderButton = (btn: HeroProps["buttons"][number], idx: number) => (
       <a
         key={idx}
-        href={btn.href}
+        href={getSafeHref(btn.href)}
         style={btn.variant === "secondary" ? secondaryBtn : primaryBtn}
         target="_blank"
+        rel="noopener noreferrer"
       >
         {btn.label}
       </a>

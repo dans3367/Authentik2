@@ -81,15 +81,16 @@ function appendIntoLastBlock(prev: string, token: string): string {
   // Regex matches closing block tags: p, div, h1-h6, li, blockquote, pre
   const closingBlockRegex = /<\/(p|div|h[1-6]|li|blockquote|pre)>\s*$/i;
   const match = prev.match(closingBlockRegex);
+  const wrappedToken = `<p>${token}</p>`;
 
   if (match && match.index !== undefined) {
-    // Insert token before the closing tag to stay inside the block
-    return prev.slice(0, match.index) + token + prev.slice(match.index);
+    // Append after the closing tag to keep the last block intact
+    return prev + wrappedToken;
   }
 
   // Fallback: if no closing block found, wrap in a new paragraph
   // This ensures valid HTML structure even if the previous content was empty or malformed
-  return prev ? (prev + `<p>${token}</p>`) : `<p>${token}</p>`;
+  return prev ? (prev + wrappedToken) : wrappedToken;
 }
 
 const TEMPLATE_VARIABLES = [

@@ -5,6 +5,7 @@ import { authenticateToken, requireTenant } from '../middleware/auth-middleware'
 import { authenticateInternalService } from '../middleware/internal-service-auth';
 import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, betterAuthUser, emailContacts, contactTagAssignments, bouncedEmails, unsubscribeTokens } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
+import { sanitizeEmailHtml } from './emailManagementRoutes';
 import { emailService, enhancedEmailService } from '../emailService';
 // Temporal service removed - now using server-node proxy
 import crypto from 'crypto';
@@ -100,6 +101,7 @@ async function getNewsletterRecipients(newsletter: any, tenantId: string) {
 newsletterRoutes.get("/preview-recipients", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const tenantId = req.user.tenantId;
+    const limit = 1000; // Reasonable limit to prevent large responses
     console.log('[Newsletter Preview] Fetching preview recipients for tenant:', tenantId);
 
     // Get all tenant users from betterAuthUser (all roles)
@@ -113,11 +115,15 @@ newsletterRoutes.get("/preview-recipients", authenticateToken, requireTenant, as
         role: betterAuthUser.role,
       })
       .from(betterAuthUser)
-      .where(eq(betterAuthUser.tenantId, tenantId));
+      .where(eq(betterAuthUser.tenantId, tenantId))
+      .limit(limit + 1); // Fetch one extra to detect if there are more
 
-    console.log(`[Newsletter Preview] Found ${users.length} users for tenant ${tenantId}`);
+    const hasMore = users.length > limit;
+    const limitedUsers = hasMore ? users.slice(0, limit) : users;
 
-    const recipients = users.map(u => ({
+    console.log(`[Newsletter Preview] Found ${limitedUsers.length} users for tenant ${tenantId}${hasMore ? ' (truncated)' : ''}`);
+
+    const recipients = limitedUsers.map(u => ({
       id: u.id,
       email: u.email,
       name: u.name || [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email,
@@ -125,7 +131,11 @@ newsletterRoutes.get("/preview-recipients", authenticateToken, requireTenant, as
       type: 'user' as const,
     }));
 
-    res.json({ recipients });
+    res.json({ 
+      recipients, 
+      total: hasMore ? `${limit}+` : recipients.length,
+      truncated: hasMore 
+    });
   } catch (error) {
     console.error('Get preview recipients error:', error);
     res.status(500).json({ message: 'Failed to get preview recipients' });
@@ -141,13 +151,29 @@ newsletterRoutes.post("/send-preview", authenticateToken, requireTenant, async (
       return res.status(400).json({ message: 'Missing required fields: to, subject, html' });
     }
 
+    const normalizedTo = String(to).trim().toLowerCase();
+    const tenantUser = await db.query.betterAuthUser.findFirst({
+      where: and(
+        eq(betterAuthUser.tenantId, req.user.tenantId),
+        sql`lower(${betterAuthUser.email}) = ${normalizedTo}`
+      ),
+      columns: { id: true },
+    });
+
+    if (!tenantUser) {
+      return res.status(403).json({
+        message: 'Preview emails can only be sent to users within your organization.',
+      });
+    }
+
     // Trigger the preview email task via Trigger.dev
     const { sendNewsletterPreviewTask } = await import('../../src/trigger/newsletterPreview');
 
+    const sanitizedHtml = sanitizeEmailHtml(html);
     const handle = await sendNewsletterPreviewTask.trigger({
-      to,
+      to: normalizedTo,
       subject,
-      html,
+      html: sanitizedHtml,
       tenantId: req.user.tenantId,
       requestedBy: req.user.email,
     });

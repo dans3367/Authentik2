@@ -652,9 +652,11 @@ export default function ManagementEmailDesign() {
                         <span className="text-xl font-bold opacity-80">{draft.companyName?.charAt(0) || "C"}</span>
                       </div>
                     )}
-                    <h1 className="text-2xl font-bold mb-2 tracking-tight">
-                      {(draft.showCompanyName ?? 'true') === 'true' ? (draft.companyName || "Your Company") : ""}
-                    </h1>
+                    {(draft.showCompanyName ?? 'true') === 'true' && (
+                      <h1 className="text-2xl font-bold mb-2 tracking-tight">
+                        {draft.companyName || "Your Company"}
+                      </h1>
+                    )}
                     {draft.headerText && (
                       <p className="text-base opacity-95 max-w-sm mx-auto leading-normal">
                         {draft.headerText}

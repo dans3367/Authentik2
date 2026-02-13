@@ -3,6 +3,26 @@ import { ComponentConfig } from "@measured/puck";
 import { Section } from "../../components/Section";
 import { withLayout, WithLayout } from "../../components/Layout";
 
+const isSafeImageUrl = (value: string) => {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+const isSafeCtaUrl = (value: string) => {
+  if (!value) return false;
+  try {
+    const url = new URL(value, "https://example.com");
+    return url.protocol === "http:" || url.protocol === "https:" || url.protocol === "mailto:";
+  } catch {
+    return false;
+  }
+};
+
 export type ProductShowcaseProps = WithLayout<{
   title: string;
   description: string;
@@ -128,6 +148,10 @@ const ProductShowcaseInner: ComponentConfig<ProductShowcaseProps> = {
     imageBorderRadius,
     puck,
   }) => {
+    const safeImageUrl = isSafeImageUrl(imageUrl)
+      ? imageUrl
+      : "https://via.placeholder.com/260x280/d4c4a8/d4c4a8?text=+";
+    const safeCtaUrl = isSafeCtaUrl(ctaUrl) ? ctaUrl : "#";
     const bgColor = backgroundColor || "#333333";
     const txtColor = textColor || "#ffffff";
     const linkColor = ctaColor || "#ffffff";
@@ -257,8 +281,9 @@ const ProductShowcaseInner: ComponentConfig<ProductShowcaseProps> = {
                             }}
                           >
                             <a
-                              href={ctaUrl || "#"}
+                              href={safeCtaUrl}
                               target="_blank"
+                              rel="noopener noreferrer"
                               style={{
                                 fontSize: "15px",
                                 fontWeight: 700,
@@ -299,7 +324,7 @@ const ProductShowcaseInner: ComponentConfig<ProductShowcaseProps> = {
                           }}
                         >
                           <img
-                            src={imageUrl}
+                            src={safeImageUrl}
                             alt={imageAlt}
                             width={imageColWidth - 24}
                             style={{

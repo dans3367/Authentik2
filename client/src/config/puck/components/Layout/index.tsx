@@ -106,10 +106,18 @@ export function withLayout<
         ...componentConfig.defaultProps?.layout,
       },
     },
-    resolveFields: (_, params) => {
+    resolveFields: (data, params) => {
+      // First resolve inner component fields (if it has its own resolveFields)
+      const innerResolved = componentConfig.resolveFields
+        ? componentConfig.resolveFields(data, { ...params, fields: { ...componentConfig.fields, layout: layoutField } })
+        : { ...componentConfig.fields };
+
+      // Remove layout from inner resolved (we'll add it back with proper config)
+      const { layout: _ignored, ...resolvedWithoutLayout } = innerResolved as any;
+
       if (params.parent?.type === "Grid") {
         return {
-          ...componentConfig.fields,
+          ...resolvedWithoutLayout,
           layout: {
             ...layoutField,
             objectFields: {
@@ -122,7 +130,7 @@ export function withLayout<
       }
       if (params.parent?.type === "Flex") {
         return {
-          ...componentConfig.fields,
+          ...resolvedWithoutLayout,
           layout: {
             ...layoutField,
             objectFields: {
@@ -134,7 +142,7 @@ export function withLayout<
       }
 
       return {
-        ...componentConfig.fields,
+        ...resolvedWithoutLayout,
         layout: {
           ...layoutField,
           objectFields: {
