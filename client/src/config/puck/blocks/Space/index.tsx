@@ -1,4 +1,4 @@
-import { ComponentConfig } from "@measured/puck";
+import { ComponentConfig } from "@puckeditor/core";
 import { spacingOptions } from "../../options";
 import { getClassNameFactory } from "../../lib/get-class-name-factory";
 
@@ -36,7 +36,7 @@ export const Space: ComponentConfig<SpaceProps> = {
     return (
       <div
         ref={puck.dragRef}
-        className={getClassName(direction ? { [direction]: direction } : {})}
+        className={getClassName(direction ? { [direction]: true } : {})}
         style={{ "--size": size } as any}
       />
     );

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Puck } from "@measured/puck";
+import { Puck } from "@puckeditor/core";
 import { useQuery } from "@tanstack/react-query";
 import config, { initialData } from "@/config/puck";
 import { UserData } from "@/config/puck/types";

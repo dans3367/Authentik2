@@ -1,4 +1,4 @@
-import { Config, Data } from "@measured/puck";
+import { Config, Data } from "@puckeditor/core";
 import { ButtonProps } from "./blocks/Button";
 import { CardProps } from "./blocks/Card";
 import { GridProps } from "./blocks/Grid";

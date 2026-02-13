@@ -1,4 +1,4 @@
-import { DefaultRootProps } from "@measured/puck";
+import { DefaultRootProps } from "@puckeditor/core";
 
 export type RootProps = DefaultRootProps;
 

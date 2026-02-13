@@ -3,7 +3,7 @@ import {
   ComponentConfig,
   DefaultComponentProps,
   ObjectField,
-} from "@measured/puck";
+} from "@puckeditor/core";
 import { spacingOptions } from "../../options";
 import { getClassNameFactory } from "../../lib/get-class-name-factory";
 import styles from "./styles.module.css";
