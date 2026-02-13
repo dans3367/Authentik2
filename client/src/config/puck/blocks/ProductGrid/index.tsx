@@ -17,6 +17,7 @@ export type ProductGridProps = WithLayout<{
 }>;
 
 const ProductGridInner: ComponentConfig<ProductGridProps> = {
+  label: "Product Grid",
   fields: {
     products: {
       type: "array",

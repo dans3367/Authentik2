@@ -56,6 +56,79 @@ function getExplicitTextAlign(el: HTMLElement): string | null {
 }
 
 /**
+ * Convert a Flex container div (with inline flex styles) into table-based HTML for email.
+ * Reads justify-content, flex-direction, and gap from the inline style and produces
+ * a table with proper align attributes that email clients support.
+ */
+function convertFlexToTable(el: HTMLElement, styleStr: string): string {
+  // Parse flex properties from inline style
+  const justifyMatch = styleStr.match(/justify-content\s*:\s*([\w-]+)/i);
+  const directionMatch = styleStr.match(/flex-direction\s*:\s*([\w-]+)/i);
+  const gapMatch = styleStr.match(/gap\s*:\s*(\d+)/i);
+
+  const justify = justifyMatch ? justifyMatch[1].toLowerCase() : 'start';
+  const direction = directionMatch ? directionMatch[1].toLowerCase() : 'row';
+  const gap = gapMatch ? parseInt(gapMatch[1], 10) : 0;
+
+  // Map justify-content to HTML align attribute
+  const alignMap: Record<string, string> = {
+    start: 'left',
+    'flex-start': 'left',
+    center: 'center',
+    end: 'right',
+    'flex-end': 'right',
+    'space-between': 'center',
+    'space-around': 'center',
+    'space-evenly': 'center',
+  };
+  const align = alignMap[justify] || 'left';
+
+  // Collect child elements (skip text-only whitespace nodes)
+  const children: HTMLElement[] = [];
+  for (const child of Array.from(el.childNodes)) {
+    if (child.nodeType === Node.ELEMENT_NODE) {
+      children.push(child as HTMLElement);
+    } else if (child.nodeType === Node.TEXT_NODE && child.textContent?.trim()) {
+      // Wrap text nodes in a span to preserve them
+      const wrapper = document.createElement('span');
+      wrapper.textContent = child.textContent;
+      children.push(wrapper);
+    }
+  }
+
+  if (children.length === 0) return '';
+
+  // Convert each child to email HTML
+  const childHtmls = children.map(child => nodeToEmailHtml(child));
+
+  if (direction === 'column') {
+    // Column layout: stack items vertically in separate rows
+    const rows = childHtmls
+      .filter(h => h.trim())
+      .map((html, i) => {
+        const paddingTop = i > 0 && gap > 0 ? ` style="padding-top: ${gap}px;"` : '';
+        return `<tr><td align="${align}"${paddingTop}>${html}</td></tr>`;
+      })
+      .join('');
+    return `<table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse: collapse;"><tbody>${rows}</tbody></table>`;
+  }
+
+  // Row layout: place items side-by-side in table cells
+  const cells: string[] = [];
+  const nonEmptyHtmls = childHtmls.filter(h => h.trim());
+
+  for (let i = 0; i < nonEmptyHtmls.length; i++) {
+    if (i > 0 && gap > 0) {
+      // Spacer cell for gap
+      cells.push(`<td style="width: ${gap}px; font-size: 0; line-height: 0;">&nbsp;</td>`);
+    }
+    cells.push(`<td align="${align}" valign="top" style="vertical-align: top;">${nonEmptyHtmls[i]}</td>`);
+  }
+
+  return `<table cellpadding="0" cellspacing="0" border="0" role="presentation" align="${align}" style="border-collapse: collapse;"><tbody><tr>${cells.join('')}</tr></tbody></table>`;
+}
+
+/**
  * Walk the DOM tree and produce clean inline-styled HTML suitable for email clients.
  */
 function nodeToEmailHtml(node: Node): string {
@@ -84,6 +157,14 @@ function nodeToEmailHtml(node: Node): string {
 
   // The element's explicit inline style attribute (set via React style prop)
   const existingStyle = el.getAttribute('style');
+
+  // ── Flex container → table conversion for email ──
+  // Puck's Flex component applies inline flex styles (justify-content, flex-direction,
+  // gap, flex-wrap) on its Items slot div. Email clients don't support flexbox, so we
+  // convert this into a table-based layout before the generic div-unwrapping logic runs.
+  if (tag === 'div' && existingStyle && /justify-content/i.test(existingStyle)) {
+    return convertFlexToTable(el, existingStyle);
+  }
 
   // Build children HTML first — needed for potential unwrapping
   let childrenHtml = '';
