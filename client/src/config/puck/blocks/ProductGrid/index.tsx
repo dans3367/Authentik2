@@ -103,6 +103,7 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
           {/* Product image */}
           <tr>
             <td
+              align="center"
               style={{
                 padding: 0,
                 backgroundColor: "#f5f5f5",

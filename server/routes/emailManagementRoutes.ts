@@ -21,7 +21,7 @@ export function sanitizeEmailHtml(html: string): string {
   return xss(html, {
     whiteList: {
       // Text formatting
-      p: ['style', 'class'],
+      p: ['style', 'class', 'align'],
       br: [],
       strong: ['style'],
       b: ['style'],
@@ -31,12 +31,12 @@ export function sanitizeEmailHtml(html: string): string {
       s: ['style'],
       strike: ['style'],
       // Headings
-      h1: ['style', 'class'],
-      h2: ['style', 'class'],
-      h3: ['style', 'class'],
-      h4: ['style', 'class'],
-      h5: ['style', 'class'],
-      h6: ['style', 'class'],
+      h1: ['style', 'class', 'align'],
+      h2: ['style', 'class', 'align'],
+      h3: ['style', 'class', 'align'],
+      h4: ['style', 'class', 'align'],
+      h5: ['style', 'class', 'align'],
+      h6: ['style', 'class', 'align'],
       // Links and images
       a: ['href', 'title', 'target', 'style', 'class'],
       img: ['src', 'alt', 'title', 'width', 'height', 'style', 'class'],
@@ -45,17 +45,17 @@ export function sanitizeEmailHtml(html: string): string {
       ol: ['style', 'class'],
       li: ['style', 'class'],
       // Layout
-      div: ['style', 'class'],
+      div: ['style', 'class', 'align'],
       span: ['style', 'class'],
       blockquote: ['style', 'class'],
       pre: ['style', 'class'],
       code: ['style', 'class'],
       // Tables (common in emails)
-      table: ['style', 'class', 'width', 'border', 'cellpadding', 'cellspacing'],
+      table: ['style', 'class', 'width', 'border', 'cellpadding', 'cellspacing', 'align', 'role'],
       thead: ['style', 'class'],
       tbody: ['style', 'class'],
       tr: ['style', 'class'],
-      th: ['style', 'class', 'colspan', 'rowspan', 'width'],
+      th: ['style', 'class', 'colspan', 'rowspan', 'width', 'valign', 'align'],
       td: ['style', 'class', 'colspan', 'rowspan', 'width', 'valign', 'align'],
       // Misc
       hr: ['style'],

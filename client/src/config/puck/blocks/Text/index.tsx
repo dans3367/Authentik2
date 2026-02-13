@@ -54,26 +54,32 @@ const TextInner: ComponentConfig<TextProps> = {
   render: ({ align, color, text, size, maxWidth }) => {
     return (
       <Section maxWidth={maxWidth}>
-        <span
-          style={{
-            color:
-              color === "default" ? "inherit" : "var(--puck-color-grey-05)",
-            display: "flex",
-            textAlign: align,
-            width: "100%",
-            fontSize: size === "m" ? "20px" : "16px",
-            fontWeight: 300,
-            maxWidth,
-            justifyContent:
-              align === "center"
-                ? "center"
-                : align === "right"
-                ? "flex-end"
-                : "flex-start",
-          }}
+        <table
+          width="100%"
+          cellPadding={0}
+          cellSpacing={0}
+          border={0}
+          role="presentation"
+          style={{ borderCollapse: "collapse" as const }}
         >
-          {text}
-        </span>
+          <tbody>
+            <tr>
+              <td
+                {...(align !== "left" ? { align } : {})}
+                style={{
+                  ...(align !== "left" ? { textAlign: align } : {}),
+                  color:
+                    color === "default" ? "inherit" : "var(--puck-color-grey-05)",
+                  fontSize: size === "m" ? "20px" : "16px",
+                  fontWeight: 300,
+                  maxWidth,
+                }}
+              >
+                {text}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </Section>
     );
   },

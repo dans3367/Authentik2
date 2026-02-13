@@ -75,22 +75,33 @@ const HeadingInternal: ComponentConfig<HeadingProps> = {
     
     return (
       <Section>
-        <Tag style={{ 
-          display: "flex",
-          fontSize: sizeMap[size],
-          fontWeight: 700,
-          margin: 0,
-          textAlign: align,
-          width: "100%",
-          justifyContent:
-            align === "center"
-              ? "center"
-              : align === "right"
-              ? "flex-end"
-              : "flex-start",
-        }}>
-          {text}
-        </Tag>
+        <table
+          width="100%"
+          cellPadding={0}
+          cellSpacing={0}
+          border={0}
+          role="presentation"
+          style={{ borderCollapse: "collapse" as const }}
+        >
+          <tbody>
+            <tr>
+              <td
+                {...(align !== "left" ? { align } : {})}
+                style={align !== "left" ? { textAlign: align } : undefined}
+              >
+                <Tag
+                  style={{
+                    fontSize: sizeMap[size],
+                    fontWeight: 700,
+                    margin: 0,
+                  }}
+                >
+                  {text}
+                </Tag>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </Section>
     );
   },

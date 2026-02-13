@@ -40,6 +40,22 @@ function resolveCssVars(styleStr: string): string {
 }
 
 /**
+ * Extract text-align value from an element's explicit inline style attribute only.
+ * Returns 'left', 'center', or 'right' if found, null otherwise.
+ * This avoids using getComputedStyle which returns the default 'start' for every element.
+ */
+function getExplicitTextAlign(el: HTMLElement): string | null {
+  const style = el.getAttribute('style');
+  if (!style) return null;
+  const match = style.match(/text-align\s*:\s*(left|center|right|start|end)/i);
+  if (!match) return null;
+  const val = match[1].toLowerCase();
+  if (val === 'start') return 'left';
+  if (val === 'end') return 'right';
+  return val;
+}
+
+/**
  * Walk the DOM tree and produce clean inline-styled HTML suitable for email clients.
  */
 function nodeToEmailHtml(node: Node): string {
@@ -66,87 +82,45 @@ function nodeToEmailHtml(node: Node): string {
   // Skip script/style tags
   if (tag === 'script' || tag === 'style' || tag === 'svg') return '';
 
-  // Collect computed inline styles
-  const computed = window.getComputedStyle(el);
-  const inlineStyles: string[] = [];
-
-  // Key style properties that matter for email rendering
-  const emailProps = [
-    'color', 'background-color', 'background-image',
-    'font-size', 'font-weight', 'font-family', 'font-style',
-    'text-align', 'text-decoration', 'line-height', 'letter-spacing',
-    'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
-    'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
-    'border', 'border-top', 'border-right', 'border-bottom', 'border-left',
-    'border-collapse', 'border-radius',
-    'width', 'max-width', 'min-width', 'height',
-    'display', 'vertical-align', 'table-layout', 'box-sizing',
-  ];
-
-  // Table-family tags should not get display styles — email clients handle them natively
-  const isTableElement = ['table', 'tr', 'td', 'th', 'tbody', 'thead', 'tfoot'].includes(tag);
-
-  // Properties where the computed value resolves to pixels but we want the
-  // original CSS value (e.g. "100%" or "33%"). These will be picked up from
-  // the inline style attribute merge below instead.
-  const skipComputedProps = new Set(['width', 'max-width', 'min-width', 'height']);
-
-  for (const prop of emailProps) {
-    // Skip width/height from computed styles — use inline style values instead
-    if (skipComputedProps.has(prop)) continue;
-
-    const val = computed.getPropertyValue(prop);
-    if (val && val !== 'none' && val !== 'normal' && val !== '0px' && val !== 'auto' && val !== 'rgba(0, 0, 0, 0)') {
-      // Skip display for native table elements
-      if (prop === 'display' && isTableElement) continue;
-
-      // Convert flex/grid display to block for email
-      if (prop === 'display') {
-        if (val === 'flex' || val === 'grid' || val === 'inline-flex') {
-          inlineStyles.push('display: block');
-          continue;
-        }
-        if (val === 'inline-block' || val === 'inline') {
-          inlineStyles.push(`display: ${val}`);
-          continue;
-        }
-      }
-      inlineStyles.push(`${prop}: ${resolveCssVars(val)}`);
-    }
-  }
-
-  // Resolve the existing inline style attribute too (has priority)
+  // The element's explicit inline style attribute (set via React style prop)
   const existingStyle = el.getAttribute('style');
-  if (existingStyle) {
-    const resolved = resolveCssVars(existingStyle);
-    // Merge: existing inline styles override computed ones
-    const existingParsed = resolved.split(';').filter(Boolean).map(s => s.trim());
-    for (const rule of existingParsed) {
-      const colonIdx = rule.indexOf(':');
-      if (colonIdx > 0) {
-        const prop = rule.substring(0, colonIdx).trim();
-        // Remove any computed version of this prop
-        const idx = inlineStyles.findIndex(s => s.startsWith(prop + ':'));
-        if (idx >= 0) inlineStyles.splice(idx, 1);
-        inlineStyles.push(rule);
-      }
-    }
-  }
 
-  // Build children HTML
+  // Build children HTML first — needed for potential unwrapping
   let childrenHtml = '';
   for (const child of Array.from(el.childNodes)) {
     childrenHtml += nodeToEmailHtml(child);
   }
 
-  // For divs that are just Puck wrappers with no meaningful styles, unwrap them
-  const isPuckWrapper = tag === 'div' && (
-    el.getAttribute('data-puck-component') !== null ||
-    el.getAttribute('data-rfd-draggable-id') !== null
-  );
+  // Unwrap ALL divs unless they carry visually meaningful styles.
+  // Puck's editor wraps each component in divs with inline styles like display:flex,
+  // the Layout HOC adds padding divs, and Section adds max-width divs. None of these
+  // are useful in email — our components use table-based layout for alignment.
+  // Only keep a div if it has a background-color, background-image, or text-align
+  // that the user explicitly set (e.g. Hero background, colored sections).
+  if (tag === 'div') {
+    if (!existingStyle) return childrenHtml;
+    // Only keep divs with visually meaningful styles
+    const hasBackground = /background-color\s*:\s*(?!transparent|rgba\(0,\s*0,\s*0,\s*0\))/i.test(existingStyle);
+    const hasBgImage = /background-image\s*:\s*(?!none)/i.test(existingStyle);
+    const hasTextAlign = /text-align/i.test(existingStyle);
+    const hasVisibleBorder = /border[^:]*:\s*[1-9]/i.test(existingStyle);
+    if (!hasBackground && !hasBgImage && !hasTextAlign && !hasVisibleBorder) return childrenHtml;
+  }
 
-  if (isPuckWrapper && !existingStyle) {
-    return childrenHtml;
+  // Only use the explicit inline style attribute for styling — do NOT dump
+  // computed styles from CSS classes onto every element. Computed styles cause
+  // massive bloat (border:0px, box-sizing, etc.) and can override child alignment.
+  const inlineStyles: string[] = [];
+
+  if (existingStyle) {
+    const resolved = resolveCssVars(existingStyle);
+    const parsed = resolved.split(';').filter(Boolean).map(s => s.trim());
+    for (const rule of parsed) {
+      const colonIdx = rule.indexOf(':');
+      if (colonIdx > 0) {
+        inlineStyles.push(rule);
+      }
+    }
   }
 
   // Map semantic tags for email
@@ -180,6 +154,24 @@ function nodeToEmailHtml(node: Node): string {
       const val = el.getAttribute(attr);
       if (val !== null) extraAttrs += ` ${attr}="${val}"`;
     }
+    // Synthesize align on td/th from explicit inline text-align if no align attr exists
+    if ((tag === 'td' || tag === 'th') && !el.getAttribute('align')) {
+      const explicitTA = getExplicitTextAlign(el);
+      if (explicitTA) extraAttrs += ` align="${explicitTA}"`;
+    }
+  }
+
+  // Preserve or synthesize align attribute on block-level elements (h1-h6, p, div).
+  // Email clients reliably support this legacy HTML attribute even when CSS text-align
+  // is stripped. If the element doesn't have an explicit align attribute, derive it
+  // from the collected text-align inline style value.
+  if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'div'].includes(tag)) {
+    let alignVal = el.getAttribute('align');
+    if (!alignVal) {
+      // Synthesize from explicit inline text-align (not computed default)
+      alignVal = getExplicitTextAlign(el);
+    }
+    if (alignVal) extraAttrs += ` align="${alignVal}"`;
   }
 
   // Image width/height attributes (needed for Outlook)

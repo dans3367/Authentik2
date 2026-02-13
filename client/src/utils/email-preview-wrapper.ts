@@ -235,11 +235,13 @@ export function wrapInEmailPreview(
     </div>
 
     <!-- Body Content -->
-    <div style="padding:24px 20px;min-height:200px;">
-      <div style="font-size:16px;line-height:1.625;color:#334155;">
-        ${safeBodyContent}
-      </div>
-    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+      <tr>
+        <td style="padding:24px 20px;font-size:16px;line-height:1.625;color:#334155;">
+          ${safeBodyContent}
+        </td>
+      </tr>
+    </table>
 
     <!-- Footer -->
     <div style="background-color:#f8fafc;padding:32px;text-align:center;border-top:1px solid #e2e8f0;color:#64748b;">
