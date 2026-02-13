@@ -186,7 +186,7 @@ export function wrapInEmailPreview(
 
   const logoSection = sanitizedLogoUrl
     ? `<img src="${esc(sanitizedLogoUrl)}" alt="${companyName}" style="display:block;height:${logoHeight};width:auto;margin:0 auto 20px auto;object-fit:contain;" />`
-    : companyName
+    : (companyName && showName)
       ? `<div style="height:48px;width:48px;background-color:rgba(255,255,255,0.2);border-radius:50%;margin:0 auto 16px auto;line-height:48px;font-size:20px;font-weight:bold;color:#ffffff;text-align:center;">${esc(d.companyName.charAt(0))}</div>`
       : '';
 
@@ -245,7 +245,7 @@ export function wrapInEmailPreview(
     <div style="background-color:#f8fafc;padding:32px;text-align:center;border-top:1px solid #e2e8f0;color:#64748b;">
       ${socialLinksHtml}
       ${footerText ? `<p style="margin:0 0 16px 0;font-size:12px;line-height:1.5;color:#64748b;">${footerText}</p>` : ''}
-      ${companyName ? `<div style="font-size:12px;line-height:1.5;color:#94a3b8;"><p style="margin:0;">Sent via ${companyName}</p></div>` : ''}
+      ${companyName && showName ? `<div style="font-size:12px;line-height:1.5;color:#94a3b8;"><p style="margin:0;">Sent via ${companyName}</p></div>` : ''}
     </div>
 
   </div>

@@ -48,15 +48,8 @@ export default function NewsletterCreatePage() {
   useEffect(() => {
     setIsClient(true);
 
-    // Try to load saved data from localStorage
-    const savedData = localStorage.getItem("newsletter-puck-data");
-    if (savedData) {
-      try {
-        setData(JSON.parse(savedData));
-      } catch (e) {
-        console.error("Failed to parse saved data", e);
-      }
-    }
+    // Always start with a clean canvas for new newsletters
+    localStorage.removeItem("newsletter-puck-data");
   }, []);
 
   useEffect(() => {
@@ -160,7 +153,7 @@ export default function NewsletterCreatePage() {
                             alt={companyName}
                             style={{ height: logoHeight, width: "auto", marginBottom: "20px", objectFit: "contain", display: "block", margin: "0 auto 20px auto" }}
                           />
-                        ) : companyName ? (
+                        ) : (companyName && showName) ? (
                           <div style={{
                             height: "48px",
                             width: "48px",
@@ -236,7 +229,7 @@ export default function NewsletterCreatePage() {
                             {footerText}
                           </p>
                         )}
-                        {companyName && (
+                        {companyName && showName && (
                           <div style={{ fontSize: "12px", lineHeight: "1.5", color: "#94a3b8" }}>
                             <p style={{ margin: 0 }}>Sent via {companyName}</p>
                           </div>

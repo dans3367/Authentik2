@@ -211,6 +211,7 @@ function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
   const safeCompanyName = escapeHtml(design.companyName || '');
   const safeHeaderText = design.headerText ? escapeHtml(design.headerText) : null;
   const safeFooterText = design.footerText ? escapeHtml(design.footerText) : null;
+  const showCompanyName = (design.showCompanyName ?? 'true') === 'true';
 
   // Build social links HTML
   let socialLinksHtml = '';
@@ -251,7 +252,7 @@ function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
   const logoHeight = logoSizeMap[design.logoSize || 'medium'] || '48px';
   const logoSection = design.logoUrl && isValidHttpUrl(design.logoUrl)
     ? `<img src="${escapeHtml(design.logoUrl)}" alt="${safeCompanyName}" style="display: block; height: ${logoHeight}; width: auto; margin: 0 auto 20px auto; object-fit: contain;" />`
-    : safeCompanyName
+    : (safeCompanyName && showCompanyName)
       ? `<div style="height: 48px; width: 48px; background-color: rgba(255,255,255,0.2); border-radius: 50%; margin: 0 auto 16px auto; line-height: 48px; font-size: 20px; font-weight: bold; color: #ffffff; text-align: center;">${escapeHtml((design.companyName || 'C').charAt(0))}</div>`
       : '';
 
@@ -267,7 +268,7 @@ function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
       <!-- Hero Header -->
       <div style="padding: 40px 32px; text-align: center; background-color: ${sanitizedPrimaryColor}; color: #ffffff;">
         ${logoSection}
-        ${safeCompanyName && (design.showCompanyName ?? 'true') === 'true' ? `
+        ${safeCompanyName && showCompanyName ? `
           <h1 style="margin: 0 0 10px 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em; color: #ffffff;">
             ${safeCompanyName}
           </h1>
@@ -295,7 +296,7 @@ function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
           <p style="margin: 0 0 16px 0; font-size: 12px; line-height: 1.5; color: #64748b;">${safeFooterText}</p>
         ` : ''}
         
-        ${safeCompanyName ? `
+        ${safeCompanyName && (design.showCompanyName ?? 'true') === 'true' ? `
           <div style="font-size: 12px; line-height: 1.5; color: #94a3b8;">
             <p style="margin: 0;">
               Sent via ${safeCompanyName}

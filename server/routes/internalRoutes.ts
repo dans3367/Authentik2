@@ -355,6 +355,8 @@ router.get(
           accentColor: emailDesign?.accentColor || '#10B981',
           fontFamily: emailDesign?.fontFamily || 'Arial, sans-serif',
           logoUrl: emailDesign?.logoUrl || company?.logoUrl || null,
+          logoSize: emailDesign?.logoSize || 'medium',
+          showCompanyName: emailDesign?.showCompanyName || 'true',
           headerText: emailDesign?.headerText || null,
           footerText: emailDesign?.footerText || (companyName ? `© ${new Date().getFullYear()} ${companyName}. All rights reserved.` : ''),
           socialLinks: emailDesign?.socialLinks || null,
