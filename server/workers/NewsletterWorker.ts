@@ -3,6 +3,7 @@ import { db } from '../db';
 import { newsletters, emailContacts, bouncedEmails } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { enhancedEmailService } from '../emailService';
+import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
 
 export interface NewsletterJob {
   id: string;
@@ -293,6 +294,9 @@ export class NewsletterWorker extends EventEmitter {
       // Update total count after filtering
       progress.total = validRecipients.length;
 
+      // Wrap newsletter content in the branded email design template once for all recipients
+      const wrappedHtml = await wrapNewsletterContent(job.tenantId, job.content);
+
       // Process recipients in batches
       const batches = this.createBatches(validRecipients, job.batchSize);
       progress.totalBatches = batches.length;
@@ -303,7 +307,7 @@ export class NewsletterWorker extends EventEmitter {
         }
 
         progress.currentBatch = i + 1;
-        await this.processBatch(job, batches[i], progress, i + 1, batches.length);
+        await this.processBatch(job, batches[i], progress, i + 1, batches.length, wrappedHtml);
 
         // Add delay between batches (except for the last batch)
         if (i < batches.length - 1 && this.config.delayBetweenBatches > 0) {
@@ -393,7 +397,8 @@ export class NewsletterWorker extends EventEmitter {
     batch: NewsletterJob['recipients'],
     progress: JobProgress,
     batchNumber: number,
-    totalBatches: number
+    totalBatches: number,
+    wrappedHtml: string
   ): Promise<void> {
     console.log(`📮 [NewsletterWorker] Processing batch ${batchNumber}/${totalBatches} with ${batch.length} recipients`);
 
@@ -401,7 +406,7 @@ export class NewsletterWorker extends EventEmitter {
     const emails = batch.map(recipient => ({
       to: recipient.email,
       subject: job.subject,
-      html: job.content,
+      html: wrappedHtml,
       text: job.content.replace(/<[^>]*>/g, ''), // Strip HTML for text version
       metadata: {
         type: 'newsletter',

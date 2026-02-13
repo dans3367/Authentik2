@@ -103,6 +103,7 @@ export default function NewsletterCreatePage() {
           <Puck
             config={config}
             data={data}
+            onChange={setData}
             onPublish={handlePublish}
             headerPath="/newsletter/create"
             iframe={{
@@ -250,7 +251,7 @@ export default function NewsletterCreatePage() {
                       <table width="100%" cellPadding={0} cellSpacing={0} style={{ borderCollapse: "collapse" as const }}>
                         <tbody>
                           <tr>
-                            <td style={{ padding: "24px 20px", fontSize: "16px", lineHeight: "1.625", color: "#334155" }}>
+                            <td style={{ padding: 0, fontSize: "16px", lineHeight: "1.625", color: "#334155" }}>
                               {children}
                             </td>
                           </tr>

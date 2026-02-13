@@ -28,7 +28,7 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
         price: { type: "text", label: "Price" },
       },
       defaultItemProps: {
-        image: "https://via.placeholder.com/400x400/f5f5f5/cccccc?text=Product+Image",
+        image: "https://placehold.co/400x400/f5f5f5/999999?text=Product+Image",
         title: "Product Name",
         description: "Product description goes here.",
         price: "$99.99",
@@ -40,19 +40,19 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
   defaultProps: {
     products: [
       {
-        image: "https://via.placeholder.com/400x400/f5f5f5/cccccc?text=Headphones",
+        image: "https://placehold.co/400x400/f5f5f5/999999?text=Headphones",
         title: "AeroSound Pro Headphones",
         description: "Premium noise-canceling audio with comfortable memory foam earcups.",
         price: "$199.99",
       },
       {
-        image: "https://via.placeholder.com/400x400/f5f5f5/cccccc?text=Serum",
+        image: "https://placehold.co/400x400/f5f5f5/999999?text=Serum",
         title: "Botanical Facial Serum",
         description: "Hydrating and anti-aging formula with natural plant extracts.",
         price: "$45.50",
       },
       {
-        image: "https://via.placeholder.com/400x400/f5f5f5/cccccc?text=Coffee+Maker",
+        image: "https://placehold.co/400x400/f5f5f5/999999?text=Coffee+Maker",
         title: "MiniBrew Portable Espresso",
         description: "Enjoy rich, cafe-style espresso anywhere, anytime.",
         price: "$89.00",
@@ -70,8 +70,8 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
       rows.push(products.slice(i, i + cols));
     }
 
-    // Email content area: 600px wrapper - 80px body padding = 520px
-    const containerWidth = 520;
+    // Email content area: 600px email wrapper, 24px Section padding each side
+    const containerWidth = 552;
     const cellWidth = Math.floor((containerWidth - cellGap * (cols - 1)) / cols);
 
     // Product card — pure table layout for email client compatibility
@@ -197,15 +197,16 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
           Inner table uses table-layout:fixed + colgroup for
           guaranteed column/spacer widths across all email clients.
         */}
-        <div style={{ width: `${containerWidth}px`, maxWidth: "100%", margin: "0 auto" }}>
+        <div style={{ maxWidth: "100%", margin: "0 auto" }}>
           <table
             role="presentation"
             cellPadding={0}
             cellSpacing={0}
             border={0}
-            width={containerWidth}
+            width="100%"
             style={{
-              width: `${containerWidth}px`,
+              width: "100%",
+              maxWidth: `${containerWidth}px`,
               borderCollapse: "collapse" as const,
               tableLayout: "fixed" as const,
             }}

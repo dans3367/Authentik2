@@ -319,7 +319,7 @@ function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
       <!-- Body Content -->
       <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
         <tr>
-          <td style="padding: 24px 20px; font-size: 16px; line-height: 1.625; color: #334155;">
+          <td style="padding: 0; font-size: 16px; line-height: 1.625; color: #334155;">
             ${bodyContent}
           </td>
         </tr>

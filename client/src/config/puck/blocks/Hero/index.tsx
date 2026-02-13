@@ -18,8 +18,8 @@ export type HeroProps = {
   }[];
 };
 
-// Email content area: 600px wrapper - 80px body padding = 520px
-const CONTAINER_WIDTH = 520;
+// Email content area: 600px email wrapper, 24px Section padding each side
+const CONTAINER_WIDTH = 552;
 
 const getSafeHref = (href: string) => {
   const trimmed = href?.trim();

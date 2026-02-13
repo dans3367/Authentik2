@@ -28,8 +28,8 @@ const AUTO_SIZES: Record<string, number> = {
   xlarge: 320,
 };
 
-// Email content area: 600px wrapper - 80px body padding = 520px
-const CONTAINER_WIDTH = 520;
+// Email content area: 600px email wrapper, 24px Section padding each side
+const CONTAINER_WIDTH = 552;
 
 const ImageInner: ComponentConfig<ImageProps> = {
   fields: {
@@ -38,7 +38,7 @@ const ImageInner: ComponentConfig<ImageProps> = {
       label: "Images",
       getItemSummary: (item, i) => item.alt || `Image #${(i ?? 0) + 1}`,
       defaultItemProps: {
-        src: "https://via.placeholder.com/520x300/e2e8f0/64748b?text=Image",
+        src: "https://placehold.co/520x300/e2e8f0/64748b?text=Image",
         alt: "Image",
       },
       arrayFields: {
@@ -84,7 +84,7 @@ const ImageInner: ComponentConfig<ImageProps> = {
   defaultProps: {
     images: [
       {
-        src: "https://via.placeholder.com/520x300/e2e8f0/64748b?text=Your+Image",
+        src: "https://placehold.co/520x300/e2e8f0/64748b?text=Your+Image",
         alt: "Image",
       },
     ],
@@ -219,4 +219,4 @@ const ImageInner: ComponentConfig<ImageProps> = {
   },
 };
 
-export const Image = withLayout(ImageInner);
+export const ImageBlock = withLayout(ImageInner);

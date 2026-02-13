@@ -10,7 +10,7 @@ import { Text } from "./blocks/Text";
 import { Space } from "./blocks/Space";
 import { ProductGrid } from "./blocks/ProductGrid";
 import { ProductShowcase } from "./blocks/ProductShowcase";
-import { Image } from "./blocks/Image";
+import { ImageBlock } from "./blocks/Image";
 
 import Root from "./root";
 import { UserConfig } from "./types";
@@ -51,7 +51,7 @@ export const config: UserConfig = {
     Space,
     ProductGrid,
     ProductShowcase,
-    Image,
+    Image: ImageBlock,
   },
 };
 

@@ -7,6 +7,7 @@ import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema,
 import { sanitizeString } from '../utils/sanitization';
 import { sanitizeEmailHtml } from './emailManagementRoutes';
 import { emailService, enhancedEmailService } from '../emailService';
+import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
 // Temporal service removed - now using server-node proxy
 import crypto from 'crypto';
 
@@ -711,7 +712,8 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
     // If test email is provided, send test email
     if (testEmail) {
       try {
-        await emailService.sendCustomEmail(testEmail, newsletter.subject, newsletter.content, 'test');
+        const wrappedTestHtml = await wrapNewsletterContent(req.user.tenantId, newsletter.content);
+        await emailService.sendCustomEmail(testEmail, newsletter.subject, wrappedTestHtml, 'test');
         res.json({
           message: 'Test newsletter sent successfully',
           testEmail,
@@ -895,11 +897,14 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
           tokenMap.set(r.id, unsub.token);
         }
 
+        // Wrap newsletter content in the branded email design template
+        const wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content);
+
         // Prepare emails for batch sending (append unsubscribe link)
         const emails = allowedRecipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => {
           const token = tokenMap.get(contact.id)!;
           const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(token)}&type=newsletters`;
-          const html = `${newsletter.content}
+          const html = `${wrappedContent}
             <div style="padding: 16px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
               <p style="margin: 0; font-size: 12px; color: #94a3b8;">
                 <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
@@ -1050,10 +1055,13 @@ newsletterRoutes.post('/:id/send-single', authenticateInternalService, async (re
     }
     const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(unsub.token)}&type=newsletters`;
 
+    // Wrap newsletter content in the branded email design template
+    const wrappedSingleContent = await wrapNewsletterContent(tenantId, content);
+
     const email = {
       to: recipient.email,
       subject: subject,
-      html: `${content}
+      html: `${wrappedSingleContent}
         <div style="padding: 16px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
           <p style="margin: 0; font-size: 12px; color: #94a3b8;">
             <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>

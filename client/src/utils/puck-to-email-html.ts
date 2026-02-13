@@ -183,10 +183,9 @@ function nodeToEmailHtml(node: Node): string {
 
   // Unwrap ALL divs unless they carry visually meaningful styles.
   // Puck's editor wraps each component in divs with inline styles like display:flex,
-  // the Layout HOC adds padding divs, and Section adds max-width divs. None of these
-  // are useful in email — our components use table-based layout for alignment.
-  // Only keep a div if it has a background-color, background-image, or text-align
-  // that the user explicitly set (e.g. Hero background, colored sections).
+  // the Layout HOC adds padding divs, and Section adds max-width divs.
+  // Keep a div if it has background-color, background-image, text-align, border,
+  // or non-zero padding (Section horizontal padding, Layout vertical padding).
   if (tag === 'div') {
     if (!existingStyle) return childrenHtml;
     // Only keep divs with visually meaningful styles
@@ -194,7 +193,8 @@ function nodeToEmailHtml(node: Node): string {
     const hasBgImage = /background-image\s*:\s*(?!none)/i.test(existingStyle);
     const hasTextAlign = /text-align/i.test(existingStyle);
     const hasVisibleBorder = /border[^:]*:\s*[1-9]/i.test(existingStyle);
-    if (!hasBackground && !hasBgImage && !hasTextAlign && !hasVisibleBorder) return childrenHtml;
+    const hasPadding = /padding[^:]*:[^;]*[1-9]/i.test(existingStyle);
+    if (!hasBackground && !hasBgImage && !hasTextAlign && !hasVisibleBorder && !hasPadding) return childrenHtml;
   }
 
   // Only use the explicit inline style attribute for styling — do NOT dump
