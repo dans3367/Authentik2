@@ -115,12 +115,14 @@ const ImageInner: ComponentConfig<ImageProps> = {
     return _rest;
   },
   render: ({ images, align, sizing, autoSize, width, height, gap, borderRadius, caption }) => {
-    const count = images.length || 1;
+    if (!images || images.length === 0) return <Section>{""}</Section>;
+
+    const count = images.length;
     const cellGap = gap ?? 12;
     const totalGap = cellGap * (count - 1);
 
     const getImgWidth = () => {
-      if (sizing === "fill") return Math.floor((CONTAINER_WIDTH - totalGap) / count);
+      if (sizing === "fill") return Math.max(1, Math.floor((CONTAINER_WIDTH - totalGap) / images.length));
       if (sizing === "preset") return AUTO_SIZES[autoSize ?? "xlarge"];
       if (sizing === "fixed") return Math.min(width ?? 520, CONTAINER_WIDTH);
       return undefined; // auto

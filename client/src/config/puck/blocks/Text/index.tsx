@@ -69,7 +69,7 @@ const TextInner: ComponentConfig<TextProps> = {
                 style={{
                   ...(align !== "left" ? { textAlign: align } : {}),
                   color:
-                    color === "default" ? "inherit" : "var(--puck-color-grey-05)",
+                    color === "default" ? "inherit" : "#6b7280",
                   fontSize: size === "m" ? "20px" : "16px",
                   fontWeight: 300,
                   maxWidth,

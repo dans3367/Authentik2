@@ -9,6 +9,9 @@ const getClassName = getClassNameFactory("Section", styles);
  * padding. Email clients strip CSS classes, so the horizontal padding must
  * be set as inline styles — but only on the outermost Section to avoid
  * double-padding when components are nested (e.g. Text inside Flex).
+ *
+ * Style precedence: the `style` prop always wins over the default
+ * horizontal padding so callers can override `paddingLeft` / `paddingRight`.
  */
 const SectionNestingCtx = createContext(false);
 
@@ -16,6 +19,8 @@ export type SectionProps = {
   className?: string;
   children: ReactNode;
   maxWidth?: string;
+  /** Inline styles merged on top of the default horizontal padding, so any
+   *  `paddingLeft` / `paddingRight` values here take precedence. */
   style?: CSSProperties;
 };
 
@@ -28,10 +33,10 @@ export const Section = forwardRef<HTMLDivElement, SectionProps>(
         <div
           className={`${getClassName()}${className ? ` ${className}` : ""}`}
           style={{
-            ...style,
             ...(isNested
               ? {}
               : { paddingLeft: "24px", paddingRight: "24px" }),
+            ...style,
           }}
           ref={ref}
         >

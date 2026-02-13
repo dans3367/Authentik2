@@ -31,8 +31,7 @@ const getSafeHref = (href: string) => {
     const parsed = new URL(trimmed);
     return parsed.protocol === "http:" || parsed.protocol === "https:" ? trimmed : "#";
   } catch {
-    const lower = trimmed.toLowerCase();
-    return lower.startsWith("http://") || lower.startsWith("https://") ? trimmed : "#";
+    return "#";
   }
 };
 

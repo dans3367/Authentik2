@@ -90,6 +90,39 @@ export { Layout };
 export function withLayout<
   ThisComponentConfig extends ComponentConfig<any> = ComponentConfig
 >(componentConfig: ThisComponentConfig): ThisComponentConfig {
+  // Pre-compute resolved field configs for each parent context so that
+  // resolveFields returns stable references. Creating new objects on every
+  // call caused Puck to re-render the fields panel on each keystroke,
+  // making contentEditable / textarea inputs lose focus.
+  const { layout: _baseIgnored, ...baseFieldsWithoutLayout } =
+    componentConfig.fields as any;
+
+  const gridLayoutField = {
+    ...layoutField,
+    objectFields: {
+      spanCol: layoutField.objectFields.spanCol,
+      spanRow: layoutField.objectFields.spanRow,
+      padding: layoutField.objectFields.padding,
+    },
+  };
+  const flexLayoutField = {
+    ...layoutField,
+    objectFields: {
+      grow: layoutField.objectFields.grow,
+      padding: layoutField.objectFields.padding,
+    },
+  };
+  const defaultLayoutField = {
+    ...layoutField,
+    objectFields: {
+      padding: layoutField.objectFields.padding,
+    },
+  };
+
+  const cachedGridFields = { ...baseFieldsWithoutLayout, layout: gridLayoutField };
+  const cachedFlexFields = { ...baseFieldsWithoutLayout, layout: flexLayoutField };
+  const cachedDefaultFields = { ...baseFieldsWithoutLayout, layout: defaultLayoutField };
+
   return {
     ...componentConfig,
     fields: {
@@ -106,50 +139,32 @@ export function withLayout<
         ...componentConfig.defaultProps?.layout,
       },
     },
-    resolveFields: async (data, params) => {
-      // First resolve inner component fields (if it has its own resolveFields)
-      const innerResolved = componentConfig.resolveFields
-        ? await componentConfig.resolveFields(data, { ...params, fields: { ...componentConfig.fields, layout: layoutField } })
-        : { ...componentConfig.fields };
+    resolveFields: (data, params) => {
+      // If the inner component has its own resolveFields, delegate to it
+      if (componentConfig.resolveFields) {
+        const innerResolved = componentConfig.resolveFields(data, {
+          ...params,
+          fields: { ...componentConfig.fields, layout: layoutField },
+        }) as any;
 
-      // Remove layout from inner resolved (we'll add it back with proper config)
-      const { layout: _ignored, ...resolvedWithoutLayout } = innerResolved as any;
+        // Handle async resolveFields
+        const attach = (resolved: any) => {
+          const { layout: _ignored, ...rest } = resolved;
+          if (params.parent?.type === "Grid") return { ...rest, layout: gridLayoutField };
+          if (params.parent?.type === "Flex") return { ...rest, layout: flexLayoutField };
+          return { ...rest, layout: defaultLayoutField };
+        };
 
-      if (params.parent?.type === "Grid") {
-        return {
-          ...resolvedWithoutLayout,
-          layout: {
-            ...layoutField,
-            objectFields: {
-              spanCol: layoutField.objectFields.spanCol,
-              spanRow: layoutField.objectFields.spanRow,
-              padding: layoutField.objectFields.padding,
-            },
-          },
-        };
-      }
-      if (params.parent?.type === "Flex") {
-        return {
-          ...resolvedWithoutLayout,
-          layout: {
-            ...layoutField,
-            objectFields: {
-              grow: layoutField.objectFields.grow,
-              padding: layoutField.objectFields.padding,
-            },
-          },
-        };
+        if (innerResolved && typeof innerResolved.then === "function") {
+          return innerResolved.then(attach);
+        }
+        return attach(innerResolved);
       }
 
-      return {
-        ...resolvedWithoutLayout,
-        layout: {
-          ...layoutField,
-          objectFields: {
-            padding: layoutField.objectFields.padding,
-          },
-        },
-      };
+      // Return pre-computed stable references — no new objects created
+      if (params.parent?.type === "Grid") return cachedGridFields;
+      if (params.parent?.type === "Flex") return cachedFlexFields;
+      return cachedDefaultFields;
     },
     inline: true,
     render: (props) => (

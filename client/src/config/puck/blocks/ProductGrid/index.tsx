@@ -255,13 +255,29 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
                       <td
                         key={`eg-${rowIdx}-${i}`}
                         width={cellGap}
-                        style={{ width: `${cellGap}px` }}
-                      />,
+                        style={{
+                          width: `${cellGap}px`,
+                          minWidth: `${cellGap}px`,
+                          maxWidth: `${cellGap}px`,
+                          fontSize: "1px",
+                          lineHeight: "1px",
+                        }}
+                      >
+                        {"\u00A0"}
+                      </td>,
                       <td
                         key={`ec-${rowIdx}-${i}`}
                         width={cellWidth}
-                        style={{ width: `${cellWidth}px` }}
-                      />,
+                        style={{
+                          width: `${cellWidth}px`,
+                          minWidth: `${cellWidth}px`,
+                          maxWidth: `${cellWidth}px`,
+                          fontSize: "1px",
+                          lineHeight: "1px",
+                        }}
+                      >
+                        {"\u00A0"}
+                      </td>,
                     ])}
                 </tr>
               );
