@@ -16,7 +16,11 @@ import {
   Layout,
   Globe,
   Mail,
-  ShieldAlert
+  ShieldAlert,
+  ImageIcon,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -34,8 +38,11 @@ import { Switch } from "@/components/ui/switch";
 interface MasterEmailDesign {
   id: string;
   companyName: string;
+  headerMode?: string;
   logoUrl?: string;
   logoSize?: string;
+  logoAlignment?: string;
+  bannerUrl?: string;
   showCompanyName?: string;
   primaryColor: string;
   secondaryColor: string;
@@ -393,48 +400,135 @@ export default function ManagementEmailDesign() {
                         />
                       </div>
                     </div>
+
+                    <Separator />
+
+                    {/* Header Mode Toggle */}
                     <div className="space-y-2.5">
-                      <Label htmlFor="logoUrl">{t('management.emailDesign.brandInfo.logoUrl')}</Label>
+                      <Label>Email Header Style</Label>
                       <div className="flex gap-2">
-                        <Input
-                          id="logoUrl"
-                          value={draft.logoUrl || ""}
-                          onChange={(e) => updateField("logoUrl", e.target.value)}
-                          placeholder="https://..."
-                        />
-                        {draft.logoUrl && (
-                          <div className="w-10 h-10 rounded border bg-white p-1 flex items-center justify-center shrink-0">
-                            <img src={draft.logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
+                        {([
+                          { value: 'logo', label: 'Logo', icon: Layout },
+                          { value: 'banner', label: 'Banner', icon: ImageIcon },
+                        ] as const).map((opt) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => updateField("headerMode", opt.value)}
+                            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-sm rounded-md border transition-colors ${
+                              (draft.headerMode || 'logo') === opt.value
+                                ? 'bg-primary text-primary-foreground border-primary'
+                                : 'bg-background hover:bg-muted border-input'
+                            }`}
+                          >
+                            <opt.icon className="w-4 h-4" />
+                            <span className="font-medium">{opt.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {(draft.headerMode || 'logo') === 'banner'
+                          ? 'Full-width banner image replaces the logo in the email header.'
+                          : 'Display your logo centered in the email header.'}
+                      </p>
+                    </div>
+
+                    {/* Logo fields — shown when headerMode is 'logo' */}
+                    {(draft.headerMode || 'logo') === 'logo' && (
+                      <div className="space-y-2.5">
+                        <Label htmlFor="logoUrl">{t('management.emailDesign.brandInfo.logoUrl')}</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="logoUrl"
+                            value={draft.logoUrl || ""}
+                            onChange={(e) => updateField("logoUrl", e.target.value)}
+                            placeholder="https://..."
+                          />
+                          {draft.logoUrl && (
+                            <div className="w-10 h-10 rounded border bg-white p-1 flex items-center justify-center shrink-0">
+                              <img src={draft.logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">Recommended height: 128px</p>
+                        <div className="space-y-2 pt-1">
+                          <Label>Logo Size</Label>
+                          <div className="flex gap-2">
+                            {([
+                              { value: 'small', label: 'Small', px: '64px' },
+                              { value: 'medium', label: 'Medium', px: '96px' },
+                              { value: 'large', label: 'Large', px: '128px' },
+                              { value: 'xlarge', label: 'X-Large', px: '160px' },
+                            ] as const).map((opt) => (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => updateField("logoSize", opt.value)}
+                                className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                                  (draft.logoSize || 'medium') === opt.value
+                                    ? 'bg-primary text-primary-foreground border-primary'
+                                    : 'bg-background hover:bg-muted border-input'
+                                }`}
+                              >
+                                <div className="font-medium">{opt.label}</div>
+                                <div className="text-[10px] opacity-70">{opt.px}</div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="space-y-2 pt-1">
+                          <Label>Logo Alignment</Label>
+                          <div className="flex gap-2">
+                            {([
+                              { value: 'left', label: 'Left', icon: AlignLeft },
+                              { value: 'center', label: 'Center', icon: AlignCenter },
+                              { value: 'right', label: 'Right', icon: AlignRight },
+                            ] as const).map((opt) => (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => updateField("logoAlignment", opt.value)}
+                                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-md border transition-colors ${
+                                  (draft.logoAlignment || 'center') === opt.value
+                                    ? 'bg-primary text-primary-foreground border-primary'
+                                    : 'bg-background hover:bg-muted border-input'
+                                }`}
+                              >
+                                <opt.icon className="w-4 h-4" />
+                                <span className="font-medium">{opt.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Banner fields — shown when headerMode is 'banner' */}
+                    {(draft.headerMode || 'logo') === 'banner' && (
+                      <div className="space-y-2.5">
+                        <Label htmlFor="bannerUrl">Banner Image URL</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="bannerUrl"
+                            value={draft.bannerUrl || ""}
+                            onChange={(e) => updateField("bannerUrl", e.target.value)}
+                            placeholder="https://..."
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground">Recommended size: 600 x 200px. The image will span the full width of the email.</p>
+                        {draft.bannerUrl && (
+                          <div className="mt-2 rounded-md border overflow-hidden bg-white">
+                            <img
+                              src={draft.bannerUrl}
+                              alt="Banner preview"
+                              className="w-full h-auto object-cover"
+                              style={{ maxHeight: '120px' }}
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
                           </div>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground">Recommended height: 48px</p>
-                      <div className="space-y-2 pt-1">
-                        <Label>Logo Size</Label>
-                        <div className="flex gap-2">
-                          {([
-                            { value: 'small', label: 'Small', px: '64px' },
-                            { value: 'medium', label: 'Medium', px: '96px' },
-                            { value: 'large', label: 'Large', px: '128px' },
-                            { value: 'xlarge', label: 'X-Large', px: '160px' },
-                          ] as const).map((opt) => (
-                            <button
-                              key={opt.value}
-                              type="button"
-                              onClick={() => updateField("logoSize", opt.value)}
-                              className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
-                                (draft.logoSize || 'medium') === opt.value
-                                  ? 'bg-primary text-primary-foreground border-primary'
-                                  : 'bg-background hover:bg-muted border-input'
-                              }`}
-                            >
-                              <div className="font-medium">{opt.label}</div>
-                              <div className="text-[10px] opacity-70">{opt.px}</div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
+                    )}
                   </AccordionContent>
                 </AccordionItem>
 
@@ -635,34 +729,80 @@ export default function ManagementEmailDesign() {
                 <div className="min-h-[500px] flex flex-col" style={{ fontFamily: draft.fontFamily }}>
 
                   {/* HERO HEADER */}
-                  <div
-                    className="p-8 text-center"
-                    style={{ backgroundColor: draft.primaryColor, color: "#ffffff" }}
-                  >
-                    {draft.logoUrl ? (
+                  {(draft.headerMode || 'logo') === 'banner' && draft.bannerUrl ? (
+                    <div>
                       <img
-                        src={draft.logoUrl}
-                        alt="Logo"
-                        className="mx-auto mb-4 object-contain"
-                        style={{ height: ({ small: '64px', medium: '96px', large: '128px', xlarge: '160px' } as Record<string, string>)[draft.logoSize || 'medium'] || '96px' }}
+                        src={draft.bannerUrl}
+                        alt="Email banner"
+                        style={{ display: 'block', width: '100%', height: 'auto' }}
                         onError={(e) => { e.currentTarget.style.display = "none"; }}
                       />
-                    ) : (
-                      <div className="h-12 w-12 bg-white/20 rounded-full mx-auto mb-4 flex items-center justify-center">
-                        <span className="text-xl font-bold opacity-80">{draft.companyName?.charAt(0) || "C"}</span>
-                      </div>
-                    )}
-                    {(draft.showCompanyName ?? 'true') === 'true' && (
-                      <h1 className="text-2xl font-bold mb-2 tracking-tight">
-                        {draft.companyName || "Your Company"}
-                      </h1>
-                    )}
-                    {draft.headerText && (
-                      <p className="text-base opacity-95 max-w-sm mx-auto leading-normal">
-                        {draft.headerText}
-                      </p>
-                    )}
-                  </div>
+                      {((draft.showCompanyName ?? 'true') === 'true' || draft.headerText) && (
+                        <div
+                          className="px-8 py-4 text-center"
+                          style={{ backgroundColor: draft.primaryColor, color: "#ffffff" }}
+                        >
+                          {(draft.showCompanyName ?? 'true') === 'true' && (
+                            <h1 className="text-2xl font-bold mb-1 tracking-tight">
+                              {draft.companyName || "Your Company"}
+                            </h1>
+                          )}
+                          {draft.headerText && (
+                            <p className="text-base opacity-95 max-w-sm mx-auto leading-normal">
+                              {draft.headerText}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div
+                      className="p-8"
+                      style={{
+                        backgroundColor: draft.primaryColor,
+                        color: "#ffffff",
+                        textAlign: (draft.logoAlignment as 'left' | 'center' | 'right') || 'center',
+                      }}
+                    >
+                      {draft.logoUrl ? (
+                        <img
+                          src={draft.logoUrl}
+                          alt="Logo"
+                          className="mb-4 object-contain"
+                          style={{
+                            height: ({ small: '64px', medium: '96px', large: '128px', xlarge: '160px' } as Record<string, string>)[draft.logoSize || 'medium'] || '96px',
+                            display: 'block',
+                            marginLeft: (draft.logoAlignment || 'center') === 'center' ? 'auto' : (draft.logoAlignment === 'right' ? 'auto' : '0'),
+                            marginRight: (draft.logoAlignment || 'center') === 'center' ? 'auto' : (draft.logoAlignment === 'right' ? '0' : 'auto'),
+                          }}
+                          onError={(e) => { e.currentTarget.style.display = "none"; }}
+                        />
+                      ) : (
+                        <div
+                          className="h-12 w-12 bg-white/20 rounded-full mb-4 flex items-center justify-center"
+                          style={{
+                            marginLeft: (draft.logoAlignment || 'center') === 'center' ? 'auto' : (draft.logoAlignment === 'right' ? 'auto' : '0'),
+                            marginRight: (draft.logoAlignment || 'center') === 'center' ? 'auto' : (draft.logoAlignment === 'right' ? '0' : 'auto'),
+                          }}
+                        >
+                          <span className="text-xl font-bold opacity-80">{draft.companyName?.charAt(0) || "C"}</span>
+                        </div>
+                      )}
+                      {(draft.showCompanyName ?? 'true') === 'true' && (
+                        <h1 className="text-2xl font-bold mb-2 tracking-tight">
+                          {draft.companyName || "Your Company"}
+                        </h1>
+                      )}
+                      {draft.headerText && (
+                        <p className="text-base opacity-95 max-w-sm leading-normal" style={{
+                          marginLeft: (draft.logoAlignment || 'center') === 'center' ? 'auto' : (draft.logoAlignment === 'right' ? 'auto' : '0'),
+                          marginRight: (draft.logoAlignment || 'center') === 'center' ? 'auto' : (draft.logoAlignment === 'right' ? '0' : 'auto'),
+                        }}>
+                          {draft.headerText}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* BODY CONTENT */}
                   <div className="p-8 flex-1">

@@ -7,10 +7,13 @@
 export interface PreviewEmailDesign {
   primaryColor?: string;
   companyName?: string;
+  headerMode?: string;
   headerText?: string;
   footerText?: string;
   logoUrl?: string;
   logoSize?: string;
+  logoAlignment?: string;
+  bannerUrl?: string;
   showCompanyName?: string;
   fontFamily?: string;
   socialLinks?: {
@@ -24,10 +27,13 @@ export interface PreviewEmailDesign {
 const DEFAULT_DESIGN: Required<Omit<PreviewEmailDesign, 'socialLinks'>> & { socialLinks?: PreviewEmailDesign['socialLinks'] } = {
   primaryColor: '#3B82F6',
   companyName: '',
+  headerMode: 'logo',
   headerText: '',
   footerText: '',
   logoUrl: '',
   logoSize: 'medium',
+  logoAlignment: 'center',
+  bannerUrl: '',
   showCompanyName: 'true',
   fontFamily: 'Arial, Helvetica, sans-serif',
   socialLinks: undefined,
@@ -183,11 +189,17 @@ export function wrapInEmailPreview(
     : (d.showCompanyName ?? 'true') === 'true';
   const safeBodyContent = sanitizeBodyContent(bodyContent);
   const sanitizedLogoUrl = d.logoUrl && isValidHttpUrl(d.logoUrl) ? d.logoUrl : '';
+  const sanitizedBannerUrl = d.bannerUrl && isValidHttpUrl(d.bannerUrl) ? d.bannerUrl : '';
+  const headerMode = d.headerMode || 'logo';
+  const useBanner = headerMode === 'banner' && !!sanitizedBannerUrl;
+  const logoAlign = d.logoAlignment || 'center';
+  const logoML = logoAlign === 'center' ? 'auto' : logoAlign === 'right' ? 'auto' : '0';
+  const logoMR = logoAlign === 'center' ? 'auto' : logoAlign === 'right' ? '0' : 'auto';
 
   const logoSection = sanitizedLogoUrl
-    ? `<img src="${esc(sanitizedLogoUrl)}" alt="${companyName}" style="display:block;height:${logoHeight};width:auto;margin:0 auto 20px auto;object-fit:contain;" />`
+    ? `<img src="${esc(sanitizedLogoUrl)}" alt="${companyName}" style="display:block;height:${logoHeight};width:auto;margin:0 ${logoMR} 20px ${logoML};object-fit:contain;" />`
     : (companyName && showName)
-      ? `<div style="height:48px;width:48px;background-color:rgba(255,255,255,0.2);border-radius:50%;margin:0 auto 16px auto;line-height:48px;font-size:20px;font-weight:bold;color:#ffffff;text-align:center;">${esc(d.companyName.charAt(0))}</div>`
+      ? `<div style="height:48px;width:48px;background-color:rgba(255,255,255,0.2);border-radius:50%;margin:0 ${logoMR} 16px ${logoML};line-height:48px;font-size:20px;font-weight:bold;color:#ffffff;text-align:center;">${esc(d.companyName.charAt(0))}</div>`
       : '';
 
   // Build social links HTML
@@ -228,11 +240,21 @@ export function wrapInEmailPreview(
   <div style="max-width:600px;margin:0 auto;background:white;">
 
     <!-- Hero Header -->
-    <div style="padding:40px 32px;text-align:center;background-color:${primaryColor};color:#ffffff;">
-      ${logoSection}
-      ${companyName && showName ? `<h1 style="margin:0 0 10px 0;font-size:24px;font-weight:bold;letter-spacing:-0.025em;color:#ffffff;">${companyName}</h1>` : ''}
+    ${useBanner ? `
+    <img src="${esc(sanitizedBannerUrl)}" alt="${companyName}" style="display:block;width:100%;height:auto;border:0;outline:none;" />
+    ${(companyName && showName) || headerText ? `
+    <div style="padding:16px 32px;text-align:center;background-color:${primaryColor};color:#ffffff;">
+      ${companyName && showName ? `<h1 style="margin:0 0 4px 0;font-size:24px;font-weight:bold;letter-spacing:-0.025em;color:#ffffff;">${companyName}</h1>` : ''}
       ${headerText ? `<p style="margin:0 auto;font-size:16px;opacity:0.95;max-width:400px;line-height:1.5;color:#ffffff;">${headerText}</p>` : ''}
     </div>
+    ` : ''}
+    ` : `
+    <div style="padding:40px 32px;text-align:${logoAlign};background-color:${primaryColor};color:#ffffff;">
+      ${logoSection}
+      ${companyName && showName ? `<h1 style="margin:0 0 10px 0;font-size:24px;font-weight:bold;letter-spacing:-0.025em;color:#ffffff;">${companyName}</h1>` : ''}
+      ${headerText ? `<p style="margin:0 ${logoMR} 0 ${logoML};font-size:16px;opacity:0.95;max-width:400px;line-height:1.5;color:#ffffff;">${headerText}</p>` : ''}
+    </div>
+    `}
 
     <!-- Body Content -->
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">

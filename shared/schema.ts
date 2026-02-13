@@ -1779,8 +1779,11 @@ export const masterEmailDesign = pgTable("master_email_design", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().unique().references(() => tenants.id, { onDelete: 'cascade' }),
   companyName: text("company_name").default(''),
+  headerMode: text("header_mode").default('logo'), // 'logo' | 'banner'
   logoUrl: text("logo_url"),
   logoSize: text("logo_size").default('medium'), // small | medium | large | xlarge
+  logoAlignment: text("logo_alignment").default('center'), // left | center | right
+  bannerUrl: text("banner_url"),
   showCompanyName: text("show_company_name").default('true'), // 'true' | 'false'
   primaryColor: text("primary_color").default('#3B82F6'),
   secondaryColor: text("secondary_color").default('#1E40AF'),

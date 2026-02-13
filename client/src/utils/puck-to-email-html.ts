@@ -64,11 +64,20 @@ function convertFlexToTable(el: HTMLElement, styleStr: string): string {
   // Parse flex properties from inline style
   const justifyMatch = styleStr.match(/justify-content\s*:\s*([\w-]+)/i);
   const directionMatch = styleStr.match(/flex-direction\s*:\s*([\w-]+)/i);
-  const gapMatch = styleStr.match(/gap\s*:\s*(\d+)/i);
+  const gapMatch = styleStr.match(/gap\s*:\s*(\d+(?:\.\d+)?)\s*(px|rem|em|%|[a-z]*)/i);
 
   const justify = justifyMatch ? justifyMatch[1].toLowerCase() : 'start';
   const direction = directionMatch ? directionMatch[1].toLowerCase() : 'row';
-  const gap = gapMatch ? parseInt(gapMatch[1], 10) : 0;
+  // Parse gap value — assume px for unitless or px; skip non-px units (treat as 0 for now)
+  let gap = 0;
+  if (gapMatch) {
+    const value = parseFloat(gapMatch[1]);
+    const unit = (gapMatch[2] || '').toLowerCase();
+    if (unit === '' || unit === 'px') {
+      gap = value;
+    }
+    // Non-px units (rem, em, %) are not reliably convertible — default to 0
+  }
 
   // Map justify-content to HTML align attribute
   const alignMap: Record<string, string> = {

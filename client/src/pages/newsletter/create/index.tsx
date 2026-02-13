@@ -3,7 +3,7 @@ import { Puck } from "@puckeditor/core";
 import { useQuery } from "@tanstack/react-query";
 import config, { initialData } from "@/config/puck";
 import { UserData } from "@/config/puck/types";
-import { Monitor, Tablet, Smartphone, ZoomIn, ZoomOut, Mail } from "lucide-react";
+import { Monitor, Smartphone, ZoomIn, ZoomOut, Mail } from "lucide-react";
 import { SendPreviewDialog } from "@/components/SendPreviewDialog";
 import { extractPuckEmailHtml } from "@/utils/puck-to-email-html";
 import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
@@ -12,18 +12,21 @@ export default function NewsletterCreatePage() {
   const [data, setData] = useState<UserData>(initialData);
   const [isClient, setIsClient] = useState(false);
   const [isEdit, setIsEdit] = useState(true);
-  const [viewport, setViewport] = useState<"mobile" | "tablet" | "desktop">("desktop");
+  const [viewport, setViewport] = useState<"mobile" | "desktop">("desktop");
   const [zoom, setZoom] = useState(100);
   const [previewOpen, setPreviewOpen] = useState(false);
   // Stores the email-safe HTML captured from the editor DOM before switching to preview
   const [previewHtml, setPreviewHtml] = useState<string>("");
-  const [previewViewport, setPreviewViewport] = useState<"mobile" | "tablet" | "desktop">("desktop");
+  const [previewViewport, setPreviewViewport] = useState<"mobile" | "desktop">("desktop");
 
   // Fetch the tenant's master email design (same as Management > Email Design)
   const { data: emailDesign } = useQuery<{
     companyName: string;
+    headerMode?: string;
     logoUrl?: string;
     logoSize?: string;
+    logoAlignment?: string;
+    bannerUrl?: string;
     showCompanyName?: string;
     primaryColor: string;
     secondaryColor: string;
@@ -90,7 +93,6 @@ export default function NewsletterCreatePage() {
 
   const viewportWidths = {
     mobile: "360px",
-    tablet: "768px",
     desktop: "100%",
   };
 
@@ -118,6 +120,12 @@ export default function NewsletterCreatePage() {
                 const logoSizeMap: Record<string, string> = { small: '64px', medium: '96px', large: '128px', xlarge: '160px' };
                 const logoHeight = logoSizeMap[emailDesign?.logoSize || 'medium'] || '48px';
                 const showName = (emailDesign?.showCompanyName ?? 'true') === 'true';
+                const headerMode = emailDesign?.headerMode || 'logo';
+                const bannerUrl = emailDesign?.bannerUrl;
+                const useBanner = headerMode === 'banner' && !!bannerUrl;
+                const logoAlign = (emailDesign?.logoAlignment || 'center') as 'left' | 'center' | 'right';
+                const logoML = logoAlign === 'center' ? 'auto' : logoAlign === 'right' ? 'auto' : '0';
+                const logoMR = logoAlign === 'center' ? 'auto' : logoAlign === 'right' ? '0' : 'auto';
 
                 return (
                   <div style={{
@@ -141,59 +149,102 @@ export default function NewsletterCreatePage() {
                       fontFamily,
                     }}>
                       {/* Branded email header from master email design */}
-                      <div style={{
-                        padding: "40px 32px",
-                        textAlign: "center",
-                        backgroundColor: primaryColor,
-                        color: "#ffffff",
-                      }}>
-                        {logoUrl ? (
+                      {useBanner ? (
+                        <>
                           <img
-                            src={logoUrl}
+                            src={bannerUrl}
                             alt={companyName}
-                            style={{ height: logoHeight, width: "auto", marginBottom: "20px", objectFit: "contain", display: "block", margin: "0 auto 20px auto" }}
+                            style={{ display: "block", width: "100%", height: "auto", border: 0 }}
                           />
-                        ) : (companyName && showName) ? (
-                          <div style={{
-                            height: "48px",
-                            width: "48px",
-                            backgroundColor: "rgba(255,255,255,0.2)",
-                            borderRadius: "50%",
-                            margin: "0 auto 16px auto",
-                            lineHeight: "48px",
-                            fontSize: "20px",
-                            fontWeight: "bold",
-                            color: "#ffffff",
-                            textAlign: "center",
-                          }}>
-                            {companyName.charAt(0)}
-                          </div>
-                        ) : null}
-                        {companyName && showName && (
-                          <h1 style={{
-                            margin: "0 0 10px 0",
-                            fontSize: "24px",
-                            fontWeight: "bold",
-                            letterSpacing: "-0.025em",
-                            color: "#ffffff",
-                            fontFamily,
-                          }}>
-                            {companyName}
-                          </h1>
-                        )}
-                        {headerText && (
-                          <p style={{
-                            margin: "0 auto",
-                            fontSize: "16px",
-                            opacity: 0.95,
-                            maxWidth: "400px",
-                            lineHeight: "1.5",
-                            color: "#ffffff",
-                          }}>
-                            {headerText}
-                          </p>
-                        )}
-                      </div>
+                          {(showName && companyName || headerText) && (
+                            <div style={{
+                              padding: "16px 32px",
+                              textAlign: "center",
+                              backgroundColor: primaryColor,
+                              color: "#ffffff",
+                            }}>
+                              {companyName && showName && (
+                                <h1 style={{
+                                  margin: "0 0 4px 0",
+                                  fontSize: "24px",
+                                  fontWeight: "bold",
+                                  letterSpacing: "-0.025em",
+                                  color: "#ffffff",
+                                  fontFamily,
+                                }}>
+                                  {companyName}
+                                </h1>
+                              )}
+                              {headerText && (
+                                <p style={{
+                                  margin: "0 auto",
+                                  fontSize: "16px",
+                                  opacity: 0.95,
+                                  maxWidth: "400px",
+                                  lineHeight: "1.5",
+                                  color: "#ffffff",
+                                }}>
+                                  {headerText}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div style={{
+                          padding: "40px 32px",
+                          textAlign: logoAlign,
+                          backgroundColor: primaryColor,
+                          color: "#ffffff",
+                        }}>
+                          {logoUrl ? (
+                            <img
+                              src={logoUrl}
+                              alt={companyName}
+                              style={{ height: logoHeight, width: "auto", objectFit: "contain", display: "block", margin: `0 ${logoMR} 20px ${logoML}` }}
+                            />
+                          ) : (companyName && showName) ? (
+                            <div style={{
+                              height: "48px",
+                              width: "48px",
+                              backgroundColor: "rgba(255,255,255,0.2)",
+                              borderRadius: "50%",
+                              margin: `0 ${logoMR} 16px ${logoML}`,
+                              lineHeight: "48px",
+                              fontSize: "20px",
+                              fontWeight: "bold",
+                              color: "#ffffff",
+                              textAlign: "center",
+                            }}>
+                              {companyName.charAt(0)}
+                            </div>
+                          ) : null}
+                          {companyName && showName && (
+                            <h1 style={{
+                              margin: "0 0 10px 0",
+                              fontSize: "24px",
+                              fontWeight: "bold",
+                              letterSpacing: "-0.025em",
+                              color: "#ffffff",
+                              fontFamily,
+                            }}>
+                              {companyName}
+                            </h1>
+                          )}
+                          {headerText && (
+                            <p style={{
+                              margin: `0 ${logoMR} 0 ${logoML}`,
+                              fontSize: "16px",
+                              opacity: 0.95,
+                              maxWidth: "400px",
+                              lineHeight: "1.5",
+                              color: "#ffffff",
+                            }}>
+                              {headerText}
+                            </p>
+                          )}
+                        </div>
+                      )}
 
                       {/* Puck editor content */}
                       <table width="100%" cellPadding={0} cellSpacing={0} style={{ borderCollapse: "collapse" as const }}>
@@ -264,25 +315,6 @@ export default function NewsletterCreatePage() {
                     >
                       <Smartphone size={16} />
                       <span style={{ fontSize: "12px" }}>360px</span>
-                    </button>
-                    <button
-                      onClick={() => setViewport("tablet")}
-                      style={{
-                        padding: "8px",
-                        background: viewport === "tablet" ? "#2563eb" : "#fff",
-                        color: viewport === "tablet" ? "#fff" : "#000",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "4px",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "4px",
-                      }}
-                      title="Tablet view"
-                      data-testid="viewport-tablet"
-                    >
-                      <Tablet size={16} />
-                      <span style={{ fontSize: "12px" }}>768px</span>
                     </button>
                     <button
                       onClick={() => setViewport("desktop")}
@@ -392,9 +424,12 @@ export default function NewsletterCreatePage() {
                       const bodyHtml = extractPuckEmailHtml();
                       const fullHtml = wrapInEmailPreview(bodyHtml, {
                         companyName: emailDesign?.companyName || '',
+                        headerMode: emailDesign?.headerMode,
                         primaryColor: emailDesign?.primaryColor,
                         logoUrl: emailDesign?.logoUrl,
                         logoSize: emailDesign?.logoSize,
+                        logoAlignment: emailDesign?.logoAlignment,
+                        bannerUrl: emailDesign?.bannerUrl,
                         showCompanyName: emailDesign?.showCompanyName,
                         headerText: emailDesign?.headerText,
                         footerText: emailDesign?.footerText,
@@ -435,7 +470,6 @@ export default function NewsletterCreatePage() {
   // ── Preview mode: render email-safe HTML inside a sandboxed iframe ──
   const previewViewportWidths: Record<string, string> = {
     mobile: "360px",
-    tablet: "768px",
     desktop: "620px",
   };
 
@@ -458,9 +492,9 @@ export default function NewsletterCreatePage() {
         </h1>
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           {/* Viewport switcher */}
-          {(["mobile", "tablet", "desktop"] as const).map((vp) => {
-            const Icon = vp === "mobile" ? Smartphone : vp === "tablet" ? Tablet : Monitor;
-            const label = vp === "mobile" ? "360px" : vp === "tablet" ? "768px" : "620px";
+          {(["mobile", "desktop"] as const).map((vp) => {
+            const Icon = vp === "mobile" ? Smartphone : Monitor;
+            const label = vp === "mobile" ? "360px" : "620px";
             return (
               <button
                 key={vp}

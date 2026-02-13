@@ -156,7 +156,7 @@ const ImageInner: ComponentConfig<ImageProps> = {
       );
 
       return item.href ? (
-        <a key={idx} href={item.href} target="_blank" style={{ textDecoration: "none" }}>
+        <a key={idx} href={item.href} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
           {imgEl}
         </a>
       ) : (

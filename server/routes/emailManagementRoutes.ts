@@ -608,17 +608,33 @@ emailManagementRoutes.delete("/email-contacts/:id/scheduled/:queueId", authentic
     }
 
     // Verify scheduled email ownership (not contact ownership)
+    // Fail closed: if we can't determine who scheduled the email, only admins/owners may cancel
     const isAdminOrOwner = ['Administrator', 'Owner'].includes(req.user.role || '');
     let scheduledByUserId: string | null = null;
     try {
       const taskPayload = typeof task.payload === 'string' ? JSON.parse(task.payload) : task.payload;
-      scheduledByUserId = taskPayload?.scheduledBy || null;
+      // Try primary field first, then fall back to legacy fields
+      scheduledByUserId = taskPayload?.scheduledBy
+        ?? taskPayload?.owner
+        ?? taskPayload?.createdBy
+        ?? null;
     } catch {
       scheduledByUserId = null;
     }
 
-    if (!isAdminOrOwner && scheduledByUserId && scheduledByUserId !== req.user.id) {
-      return res.status(403).json({ message: 'You can only cancel scheduled emails you created' });
+    // Fail-closed: non-admin/non-owner users are blocked when scheduledBy is
+    // missing (legacy task) or when it doesn't match the requesting user.
+    if (!isAdminOrOwner) {
+      if (!scheduledByUserId) {
+        return res.status(403).json({
+          message: 'Cannot determine the original scheduler — admin or owner approval is required to cancel this email',
+        });
+      }
+      if (scheduledByUserId !== req.user.id) {
+        return res.status(403).json({
+          message: 'You can only cancel scheduled emails you created',
+        });
+      }
     }
 
     // Try to cancel the Trigger.dev run if it's a run ID
@@ -2853,8 +2869,11 @@ emailManagementRoutes.get("/master-email-design", authenticateToken, requireTena
         id: '',
         tenantId: req.user.tenantId,
         companyName: company?.name || '',
+        headerMode: 'logo',
         logoUrl: company?.logoUrl || null,
         logoSize: 'medium',
+        logoAlignment: 'center',
+        bannerUrl: null,
         showCompanyName: 'true',
         primaryColor: '#3B82F6',
         secondaryColor: '#1E40AF',
@@ -2882,8 +2901,11 @@ emailManagementRoutes.put("/master-email-design", authenticateToken, requireTena
   try {
     const {
       companyName,
+      headerMode,
       logoUrl,
       logoSize,
+      logoAlignment,
+      bannerUrl,
       showCompanyName,
       primaryColor,
       secondaryColor,
@@ -2894,7 +2916,7 @@ emailManagementRoutes.put("/master-email-design", authenticateToken, requireTena
       socialLinks,
     } = req.body;
 
-    console.log('🎨 [Master Email Design PUT] Received:', { companyName, logoUrl, logoSize, headerText, primaryColor, tenantId: req.user.tenantId });
+    console.log('🎨 [Master Email Design PUT] Received:', { companyName, headerMode, logoUrl, logoSize, logoAlignment, bannerUrl, headerText, primaryColor, tenantId: req.user.tenantId });
 
     // Check if design already exists
     const existingDesign = await db.query.masterEmailDesign.findFirst({
@@ -2927,8 +2949,11 @@ emailManagementRoutes.put("/master-email-design", authenticateToken, requireTena
       // Update existing design
       const updateSet: Record<string, unknown> = {
         companyName: companyName ?? existingDesign.companyName,
+        headerMode: headerMode !== undefined ? headerMode : existingDesign.headerMode,
         logoUrl: logoUrl !== undefined ? logoUrl : existingDesign.logoUrl,
         logoSize: logoSize !== undefined ? logoSize : existingDesign.logoSize,
+        logoAlignment: logoAlignment !== undefined ? logoAlignment : existingDesign.logoAlignment,
+        bannerUrl: bannerUrl !== undefined ? bannerUrl : existingDesign.bannerUrl,
         showCompanyName: showCompanyName !== undefined ? showCompanyName : existingDesign.showCompanyName,
         primaryColor: primaryColor ?? existingDesign.primaryColor,
         secondaryColor: secondaryColor ?? existingDesign.secondaryColor,
@@ -2953,8 +2978,11 @@ emailManagementRoutes.put("/master-email-design", authenticateToken, requireTena
         .values({
           tenantId: req.user.tenantId,
           companyName: companyName || '',
+          headerMode: headerMode || 'logo',
           logoUrl: logoUrl || null,
           logoSize: logoSize || 'medium',
+          logoAlignment: logoAlignment || 'center',
+          bannerUrl: bannerUrl || null,
           showCompanyName: showCompanyName || 'true',
           primaryColor: primaryColor || '#3B82F6',
           secondaryColor: secondaryColor || '#1E40AF',
