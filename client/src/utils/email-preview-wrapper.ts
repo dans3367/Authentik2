@@ -72,7 +72,7 @@ export function wrapInEmailPreview(
   const showName = (d.showCompanyName ?? 'true') === 'true';
 
   const logoSection = d.logoUrl
-    ? `<img src="${esc(d.logoUrl)}" alt="${companyName}" style="height:${logoHeight};width:auto;margin-bottom:20px;object-fit:contain;" />`
+    ? `<img src="${esc(d.logoUrl)}" alt="${companyName}" style="display:block;height:${logoHeight};width:auto;margin:0 auto 20px auto;object-fit:contain;" />`
     : companyName
       ? `<div style="height:48px;width:48px;background-color:rgba(255,255,255,0.2);border-radius:50%;margin:0 auto 16px auto;line-height:48px;font-size:20px;font-weight:bold;color:#ffffff;text-align:center;">${esc(d.companyName.charAt(0))}</div>`
       : '';
@@ -114,7 +114,7 @@ export function wrapInEmailPreview(
     </div>
 
     <!-- Body Content -->
-    <div style="padding:48px 40px;min-height:200px;">
+    <div style="padding:24px 20px;min-height:200px;">
       <div style="font-size:16px;line-height:1.625;color:#334155;">
         ${bodyContent}
       </div>

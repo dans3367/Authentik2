@@ -250,9 +250,10 @@ export default function ManagementEmailDesign() {
       }
       return response.json();
     },
-    onSuccess: async () => {
+    onSuccess: (data) => {
+      qc.setQueryData(["/api/master-email-design"], data);
+      setDraft(data);
       setHasChanges(false);
-      await qc.invalidateQueries({ queryKey: ["/api/master-email-design"] });
       toast({
         title: t('management.emailDesign.toasts.updated') || "Design saved successfully",
         description: "Your master email template has been updated."

@@ -250,7 +250,7 @@ function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
   const logoSizeMap: Record<string, string> = { small: '64px', medium: '96px', large: '128px', xlarge: '160px' };
   const logoHeight = logoSizeMap[design.logoSize || 'medium'] || '48px';
   const logoSection = design.logoUrl && isValidHttpUrl(design.logoUrl)
-    ? `<img src="${escapeHtml(design.logoUrl)}" alt="${safeCompanyName}" style="height: ${logoHeight}; width: auto; margin-bottom: 20px; object-fit: contain;" />`
+    ? `<img src="${escapeHtml(design.logoUrl)}" alt="${safeCompanyName}" style="display: block; height: ${logoHeight}; width: auto; margin: 0 auto 20px auto; object-fit: contain;" />`
     : safeCompanyName
       ? `<div style="height: 48px; width: 48px; background-color: rgba(255,255,255,0.2); border-radius: 50%; margin: 0 auto 16px auto; line-height: 48px; font-size: 20px; font-weight: bold; color: #ffffff; text-align: center;">${escapeHtml((design.companyName || 'C').charAt(0))}</div>`
       : '';
@@ -280,7 +280,7 @@ function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
       </div>
 
       <!-- Body Content -->
-      <div style="padding: 48px 40px; min-height: 200px;">
+      <div style="padding: 24px 20px; min-height: 200px;">
         <div style="font-size: 16px; line-height: 1.625; color: #334155;">
           ${bodyContent}
         </div>

@@ -42,14 +42,14 @@ export const sendNewsletterPreviewTask = task({
 
       // Add a preview banner at the top so recipients know it's a test
       const finalHtml = wrappedHtml.replace(
-        '<!-- Body Content -->',
+        '<!-- Hero Header -->',
         `<!-- Preview Banner -->
       <div style="background-color: #fef3c7; border-bottom: 2px solid #f59e0b; padding: 12px 24px; text-align: center;">
         <span style="color: #92400e; font-size: 13px; font-weight: 600; font-family: Arial, sans-serif;">
           &#9888; This is a preview email — not sent to your subscribers
         </span>
       </div>
-      <!-- Body Content -->`
+      <!-- Hero Header -->`
       );
 
       const { data: emailData, error } = await resend.emails.send({

@@ -158,7 +158,7 @@ export default function NewsletterCreatePage() {
                           <img
                             src={logoUrl}
                             alt={companyName}
-                            style={{ height: logoHeight, width: "auto", marginBottom: "20px", objectFit: "contain" }}
+                            style={{ height: logoHeight, width: "auto", marginBottom: "20px", objectFit: "contain", display: "block", margin: "0 auto 20px auto" }}
                           />
                         ) : companyName ? (
                           <div style={{
@@ -203,7 +203,7 @@ export default function NewsletterCreatePage() {
                       </div>
 
                       {/* Puck editor content */}
-                      <div style={{ padding: "48px 40px", minHeight: "200px" }}>
+                      <div style={{ padding: "24px 20px", minHeight: "200px" }}>
                         <div style={{ fontSize: "16px", lineHeight: "1.625", color: "#334155" }}>
                           {children}
                         </div>
