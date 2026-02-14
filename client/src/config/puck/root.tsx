@@ -54,11 +54,11 @@ export const Root = {
         style={{
           display: "flex",
           flexDirection: "column",
-          minHeight: "100vh",
+          minHeight: "auto",
           backgroundColor: backgroundColor || "#ffffff",
         }}
       >
-        <DropZone zone="default-zone" style={{ flexGrow: 1 }} />
+        <DropZone zone="default-zone" style={{ paddingBottom: "25px" }} />
       </div>
     );
   },
