@@ -171,10 +171,12 @@ newsletterRoutes.post("/send-preview", authenticateToken, requireTenant, async (
     const { sendNewsletterPreviewTask } = await import('../../src/trigger/newsletterPreview');
 
     const sanitizedHtml = sanitizeEmailHtml(html);
+    const wrappedHtml = await wrapNewsletterContent(req.user.tenantId, sanitizedHtml);
     const handle = await sendNewsletterPreviewTask.trigger({
       to: normalizedTo,
       subject,
       html: sanitizedHtml,
+      wrappedHtml,
       tenantId: req.user.tenantId,
       requestedBy: req.user.email,
     });

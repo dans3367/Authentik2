@@ -9,6 +9,7 @@ const previewPayloadSchema = z.object({
   to: z.string().email(),
   subject: z.string(),
   html: z.string(),
+  wrappedHtml: z.string().optional(),
   tenantId: z.string(),
   requestedBy: z.string().optional(),
 });
@@ -37,7 +38,7 @@ export const sendNewsletterPreviewTask = task({
     });
 
     try {
-      const wrappedHtml = await wrapInEmailDesign(data.tenantId, data.html);
+      const wrappedHtml = data.wrappedHtml || await wrapInEmailDesign(data.tenantId, data.html);
 
       // Add a preview banner at the top so recipients know it's a test
       const previewBanner = `<!-- Preview Banner -->
