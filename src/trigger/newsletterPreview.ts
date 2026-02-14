@@ -37,10 +37,7 @@ export const sendNewsletterPreviewTask = task({
     });
 
     try {
-      // Sanitize the raw HTML before wrapping in the tenant's branded email template
-      const { sanitizeEmailHtml } = await import("../../server/routes/emailManagementRoutes");
-      const sanitizedHtml = sanitizeEmailHtml(data.html);
-      const wrappedHtml = await wrapInEmailDesign(data.tenantId, sanitizedHtml);
+      const wrappedHtml = await wrapInEmailDesign(data.tenantId, data.html);
 
       // Add a preview banner at the top so recipients know it's a test
       const previewBanner = `<!-- Preview Banner -->
@@ -75,7 +72,7 @@ export const sendNewsletterPreviewTask = task({
         to: data.to,
         subject: `[Preview] ${data.subject}`,
         html: finalHtml,
-        text: sanitizedHtml.replace(/<[^>]*>/g, ""),
+        text: data.html.replace(/<[^>]*>/g, ""),
         tags: [
           { name: "type", value: "newsletter-preview" },
           { name: "tenantId", value: data.tenantId },

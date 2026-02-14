@@ -262,7 +262,7 @@ function nodeToEmailHtml(node: Node): string {
 
   // Table-specific attributes — critical for email clients (especially Outlook)
   if (['table', 'td', 'th', 'tr', 'col', 'colgroup', 'tbody', 'thead', 'tfoot'].includes(tag)) {
-    const tableAttrs = ['cellpadding', 'cellspacing', 'border', 'role', 'width', 'height', 'align', 'valign', 'bgcolor', 'colspan', 'rowspan'];
+    const tableAttrs = ['cellpadding', 'cellspacing', 'border', 'role', 'width', 'height', 'align', 'valign', 'bgcolor', 'background', 'colspan', 'rowspan'];
     for (const attr of tableAttrs) {
       const val = el.getAttribute(attr);
       if (val !== null) extraAttrs += ` ${attr}="${val}"`;
@@ -271,6 +271,17 @@ function nodeToEmailHtml(node: Node): string {
     if ((tag === 'td' || tag === 'th') && !el.getAttribute('align')) {
       const explicitTA = getExplicitTextAlign(el);
       if (explicitTA) extraAttrs += ` align="${explicitTA}"`;
+    }
+    // Synthesize background attribute from CSS background-image for email clients
+    // that don't support CSS background-image (notably Outlook)
+    if ((tag === 'td' || tag === 'th') && !el.getAttribute('background') && existingStyle) {
+      const bgImgMatch = existingStyle.match(/background-image\s*:\s*url\(\s*["']?([^"')]+)["']?\s*\)/i);
+      if (bgImgMatch && bgImgMatch[1]) {
+        const bgUrl = bgImgMatch[1].trim();
+        if (bgUrl.startsWith('http://') || bgUrl.startsWith('https://')) {
+          extraAttrs += ` background="${bgUrl}"`;
+        }
+      }
     }
   }
 

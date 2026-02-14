@@ -56,3 +56,7 @@ The application adopts a monorepo architecture, separating client, server, and s
 -   **@heroicons/react**: Icons for UI components.
 -   **Temporal**: For workflow orchestration in the Go email tracking microservice.
 -   **@measured/puck**: Visual page builder for drag-and-drop newsletter creation.
+-   **xss**: HTML sanitization for email content, configured with `css: false` to preserve email-critical CSS properties, and pre-processing to convert `url("...")` to `url('...')` before parsing to prevent attribute truncation.
+
+## Recent Changes
+- **2026-02-14**: Fixed critical bug where `background-image` CSS in newsletter emails was being truncated by xss sanitizer due to double-quote handling in `url()` values. Added pre-processing step to convert double quotes to single quotes before xss parsing. Added `background` HTML attribute synthesis from CSS `background-image` in `nodeToEmailHtml` for Outlook compatibility. Fixed dangling `sanitizedHtml` reference in `newsletterPreview.ts` after removing redundant double sanitization. Added email-compatible Testimonial component with table layouts for Puck editor.
