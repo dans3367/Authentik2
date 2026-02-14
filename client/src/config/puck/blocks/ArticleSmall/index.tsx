@@ -75,17 +75,15 @@ export const ArticleSmall: ComponentConfig<ArticleSmallProps> = {
   render: ({ label, title, description, linkText, linkHref, linkColor, image, imagePosition, borderRadius }) => {
     const color = linkColor || "#4f46e5";
     const radius = borderRadius ?? 8;
-    const imgWidth = Math.floor((CONTAINER_WIDTH - GAP) * 0.4);
-    const textWidth = CONTAINER_WIDTH - GAP - imgWidth;
 
     const textCell = (
       <td
-        width={textWidth}
         valign="top"
         style={{
-          width: `${textWidth}px`,
           verticalAlign: "top",
           fontFamily: "Arial, Helvetica, sans-serif",
+          paddingRight: imagePosition === "right" ? `${GAP}px` : "0",
+          paddingLeft: imagePosition === "left" ? `${GAP}px` : "0",
         }}
       >
         {label && (
@@ -152,25 +150,12 @@ export const ArticleSmall: ComponentConfig<ArticleSmallProps> = {
       </td>
     );
 
-    const gapCell = (
-      <td
-        width={GAP}
-        style={{
-          width: `${GAP}px`,
-          fontSize: "1px",
-          lineHeight: "1px",
-        }}
-      >
-        {"\u00A0"}
-      </td>
-    );
-
     const imageCell = (
       <td
-        width={imgWidth}
+        width="40%"
         valign="top"
         style={{
-          width: `${imgWidth}px`,
+          width: "40%",
           verticalAlign: "top",
         }}
       >
@@ -178,10 +163,9 @@ export const ArticleSmall: ComponentConfig<ArticleSmallProps> = {
           <img
             src={image.url}
             alt={image.alt || title}
-            width={imgWidth}
             style={{
               display: "block",
-              width: `${imgWidth}px`,
+              width: "100%",
               height: "auto",
               maxWidth: "100%",
               border: 0,
@@ -196,17 +180,17 @@ export const ArticleSmall: ComponentConfig<ArticleSmallProps> = {
 
     return (
       <Section>
-        <div style={{ width: `${CONTAINER_WIDTH}px`, maxWidth: "100%", margin: "0 auto" }}>
+        <div style={{ maxWidth: `${CONTAINER_WIDTH}px`, width: "100%", margin: "0 auto" }}>
           <table
             role="presentation"
             cellPadding={0}
             cellSpacing={0}
             border={0}
-            width={CONTAINER_WIDTH}
+            width="100%"
             style={{
-              width: `${CONTAINER_WIDTH}px`,
+              width: "100%",
+              maxWidth: `${CONTAINER_WIDTH}px`,
               borderCollapse: "collapse" as const,
-              tableLayout: "fixed" as const,
             }}
           >
             <tbody>
@@ -214,13 +198,11 @@ export const ArticleSmall: ComponentConfig<ArticleSmallProps> = {
                 {imagePosition === "left" ? (
                   <>
                     {imageCell}
-                    {gapCell}
                     {textCell}
                   </>
                 ) : (
                   <>
                     {textCell}
-                    {gapCell}
                     {imageCell}
                   </>
                 )}
