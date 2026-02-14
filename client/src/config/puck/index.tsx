@@ -12,6 +12,7 @@ import { ProductGrid } from "./blocks/ProductGrid";
 import { ProductShowcase } from "./blocks/ProductShowcase";
 import { ImageBlock } from "./blocks/Image";
 import { Testimonial } from "./blocks/Testimonial";
+import { FeaturedArticle } from "./blocks/FeaturedArticle";
 
 import Root from "./root";
 import { UserConfig } from "./types";
@@ -36,7 +37,7 @@ export const config: UserConfig = {
     },
     other: {
       title: "Other",
-      components: ["Card", "Hero", "Logos", "Stats", "Testimonial"],
+      components: ["Card", "Hero", "Logos", "Stats", "Testimonial", "FeaturedArticle"],
     },
   },
   components: {
@@ -54,6 +55,7 @@ export const config: UserConfig = {
     ProductShowcase,
     Image: ImageBlock,
     Testimonial,
+    FeaturedArticle,
   },
 };
 
