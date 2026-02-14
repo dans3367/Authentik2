@@ -340,14 +340,16 @@ export default function NewsletterCreatePage() {
             {/* Branded email header from master email design */}
             {useBanner ? (
               <>
-                <img
-                  src={bannerUrl}
-                  alt={companyName}
-                  style={{ display: "block", width: "100%", height: "auto", border: 0 }}
-                />
+                <div style={{ padding: "0 24px" }}>
+                  <img
+                    src={bannerUrl}
+                    alt={companyName}
+                    style={{ display: "block", width: "100%", height: "auto", border: 0 }}
+                  />
+                </div>
                 {(showName && companyName || headerText) && (
                   <div style={{
-                    padding: "16px 32px",
+                    padding: "16px 24px",
                     textAlign: "center",
                     backgroundColor: primaryColor,
                     color: "#ffffff",
@@ -381,7 +383,7 @@ export default function NewsletterCreatePage() {
               </>
             ) : (
               <div style={{
-                padding: "40px 32px",
+                padding: "40px 24px",
                 textAlign: logoAlign,
                 backgroundColor: primaryColor,
                 color: "#ffffff",

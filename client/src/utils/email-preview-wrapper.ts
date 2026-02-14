@@ -241,15 +241,17 @@ export function wrapInEmailPreview(
 
     <!-- Hero Header -->
     ${useBanner ? `
-    <img src="${esc(sanitizedBannerUrl)}" alt="${companyName}" style="display:block;width:100%;height:auto;border:0;outline:none;" />
+    <div style="padding:0 24px;">
+      <img src="${esc(sanitizedBannerUrl)}" alt="${companyName}" style="display:block;width:100%;height:auto;border:0;outline:none;" />
+    </div>
     ${(companyName && showName) || headerText ? `
-    <div style="padding:16px 32px;text-align:center;background-color:${primaryColor};color:#ffffff;">
+    <div style="padding:16px 24px;text-align:center;background-color:${primaryColor};color:#ffffff;">
       ${companyName && showName ? `<h1 style="margin:0 0 4px 0;font-size:24px;font-weight:bold;letter-spacing:-0.025em;color:#ffffff;">${companyName}</h1>` : ''}
       ${headerText ? `<p style="margin:0 auto;font-size:16px;opacity:0.95;max-width:400px;line-height:1.5;color:#ffffff;">${headerText}</p>` : ''}
     </div>
     ` : ''}
     ` : `
-    <div style="padding:40px 32px;text-align:${logoAlign};background-color:${primaryColor};color:#ffffff;">
+    <div style="padding:40px 24px;text-align:${logoAlign};background-color:${primaryColor};color:#ffffff;">
       ${logoSection}
       ${companyName && showName ? `<h1 style="margin:0 0 10px 0;font-size:24px;font-weight:bold;letter-spacing:-0.025em;color:#ffffff;">${companyName}</h1>` : ''}
       ${headerText ? `<p style="margin:0 ${logoMR} 0 ${logoML};font-size:16px;opacity:0.95;max-width:400px;line-height:1.5;color:#ffffff;">${headerText}</p>` : ''}

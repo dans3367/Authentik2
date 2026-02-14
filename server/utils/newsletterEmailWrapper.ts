@@ -175,15 +175,17 @@ export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: 
 
       <!-- Hero Header -->
       ${useBanner ? `
-      <img src="${escapeHtml(design.bannerUrl!)}" alt="${safeCompanyName}" style="display: block; width: 100%; height: auto; border: 0; outline: none;" />
+      <div style="padding: 0 24px;">
+        <img src="${escapeHtml(design.bannerUrl!)}" alt="${safeCompanyName}" style="display: block; width: 100%; height: auto; border: 0; outline: none;" />
+      </div>
       ${(safeCompanyName && showName) || safeHeaderText ? `
-      <div style="padding: 16px 32px; text-align: center; background-color: ${primaryColor}; color: #ffffff;">
+      <div style="padding: 16px 24px; text-align: center; background-color: ${primaryColor}; color: #ffffff;">
         ${safeCompanyName && showName ? `<h1 style="margin: 0 0 4px 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em; color: #ffffff;">${safeCompanyName}</h1>` : ''}
         ${safeHeaderText ? `<p style="margin: 0 auto; font-size: 16px; opacity: 0.95; max-width: 400px; line-height: 1.5; color: #ffffff;">${safeHeaderText}</p>` : ''}
       </div>
       ` : ''}
       ` : `
-      <div style="padding: 40px 32px; text-align: ${logoAlign}; background-color: ${primaryColor}; color: #ffffff;">
+      <div style="padding: 40px 24px; text-align: ${logoAlign}; background-color: ${primaryColor}; color: #ffffff;">
         ${logoSection}
         ${safeCompanyName && showName ? `<h1 style="margin: 0 0 10px 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em; color: #ffffff;">${safeCompanyName}</h1>` : ''}
         ${safeHeaderText ? `<p style="margin: 0 ${logoMR} 0 ${logoML}; font-size: 16px; opacity: 0.95; max-width: 400px; line-height: 1.5; color: #ffffff;">${safeHeaderText}</p>` : ''}
