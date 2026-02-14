@@ -241,9 +241,7 @@ export function wrapInEmailPreview(
 
     <!-- Hero Header -->
     ${useBanner ? `
-    <div style="padding:0 24px;">
-      <img src="${esc(sanitizedBannerUrl)}" alt="${companyName}" style="display:block;width:100%;height:auto;border:0;outline:none;" />
-    </div>
+    <img src="${esc(sanitizedBannerUrl)}" alt="${companyName}" style="display:block;width:100%;height:auto;border:0;outline:none;" />
     ${(companyName && showName) || headerText ? `
     <div style="padding:16px 24px;text-align:center;background-color:${primaryColor};color:#ffffff;">
       ${companyName && showName ? `<h1 style="margin:0 0 4px 0;font-size:24px;font-weight:bold;letter-spacing:-0.025em;color:#ffffff;">${companyName}</h1>` : ''}

@@ -340,13 +340,11 @@ export default function NewsletterCreatePage() {
             {/* Branded email header from master email design */}
             {useBanner ? (
               <>
-                <div style={{ padding: "0 24px" }}>
-                  <img
-                    src={bannerUrl}
-                    alt={companyName}
-                    style={{ display: "block", width: "100%", height: "auto", border: 0 }}
-                  />
-                </div>
+                <img
+                  src={bannerUrl}
+                  alt={companyName}
+                  style={{ display: "block", width: "100%", height: "auto", border: 0 }}
+                />
                 {(showName && companyName || headerText) && (
                   <div style={{
                     padding: "16px 24px",

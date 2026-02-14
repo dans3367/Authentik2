@@ -175,9 +175,7 @@ export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: 
 
       <!-- Hero Header -->
       ${useBanner ? `
-      <div style="padding: 0 24px;">
-        <img src="${escapeHtml(design.bannerUrl!)}" alt="${safeCompanyName}" style="display: block; width: 100%; height: auto; border: 0; outline: none;" />
-      </div>
+      <img src="${escapeHtml(design.bannerUrl!)}" alt="${safeCompanyName}" style="display: block; width: 100%; height: auto; border: 0; outline: none;" />
       ${(safeCompanyName && showName) || safeHeaderText ? `
       <div style="padding: 16px 24px; text-align: center; background-color: ${primaryColor}; color: #ffffff;">
         ${safeCompanyName && showName ? `<h1 style="margin: 0 0 4px 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em; color: #ffffff;">${safeCompanyName}</h1>` : ''}
