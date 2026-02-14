@@ -13,6 +13,7 @@ import { ProductShowcase } from "./blocks/ProductShowcase";
 import { ImageBlock } from "./blocks/Image";
 import { Testimonial } from "./blocks/Testimonial";
 import { FeaturedArticle } from "./blocks/FeaturedArticle";
+import { ArticleSmall } from "./blocks/ArticleSmall";
 
 import Root from "./root";
 import { UserConfig } from "./types";
@@ -37,7 +38,7 @@ export const config: UserConfig = {
     },
     other: {
       title: "Other",
-      components: ["Card", "Hero", "Logos", "Stats", "Testimonial", "FeaturedArticle"],
+      components: ["Card", "Hero", "Logos", "Stats", "Testimonial", "FeaturedArticle", "ArticleSmall"],
     },
   },
   components: {
@@ -56,6 +57,7 @@ export const config: UserConfig = {
     Image: ImageBlock,
     Testimonial,
     FeaturedArticle,
+    ArticleSmall,
   },
 };
 

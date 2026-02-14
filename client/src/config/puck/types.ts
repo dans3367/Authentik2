@@ -14,6 +14,7 @@ import { ProductShowcaseProps } from "./blocks/ProductShowcase";
 import { ImageProps } from "./blocks/Image";
 import { TestimonialProps } from "./blocks/Testimonial";
 import { FeaturedArticleProps } from "./blocks/FeaturedArticle";
+import { ArticleSmallProps } from "./blocks/ArticleSmall";
 
 import { RootProps } from "./root";
 
@@ -35,6 +36,7 @@ export type Components = {
   Image: ImageProps;
   Testimonial: TestimonialProps;
   FeaturedArticle: FeaturedArticleProps;
+  ArticleSmall: ArticleSmallProps;
 };
 
 export type UserConfig = Config<{
