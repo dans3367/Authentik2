@@ -140,7 +140,7 @@ export function UpcomingAppointmentsCard() {
   return (
     <Card className="h-full">
       <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-xl font-bold flex items-center gap-3">
             <Calendar className="h-6 w-6 text-primary" />
             Upcoming Schedule
@@ -207,9 +207,10 @@ export function UpcomingAppointmentsCard() {
         )}
 
         <Button
-          variant="ghost"
-          className="w-full mt-8 border-2 border-dashed border-primary/20 text-primary hover:bg-primary/10 hover:border-primary/30 py-6 h-auto text-base font-medium rounded-xl"
+          variant="outline"
+          className="w-full mt-8 border-2 border-dashed border-border py-6 h-auto text-base font-medium rounded-md"
           onClick={() => setLocation("/reminders")}
+          data-testid="button-schedule-appointment"
         >
           <CalendarClock className="h-5 w-5 mr-2" />
           Schedule New Appointment

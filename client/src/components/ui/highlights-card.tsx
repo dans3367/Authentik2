@@ -47,7 +47,7 @@ export function HighlightsCard() {
   return (
     <Card className="h-full">
       <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-xl font-bold">
             Highlights
           </CardTitle>

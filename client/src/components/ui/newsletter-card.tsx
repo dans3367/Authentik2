@@ -32,8 +32,9 @@ export function NewsletterCard() {
 
           <Button
             onClick={handleCreateNewsletter}
-            className="px-8 py-3 h-auto text-base font-medium mx-auto shadow-sm"
             size="lg"
+            className="mx-auto"
+            data-testid="button-create-newsletter"
           >
             Create Newsletter
           </Button>

@@ -45,15 +45,15 @@ function AppHeader() {
     return (
       <>
         {/* Minimal header with exit button */}
-        <header className="flex h-16 shrink-0 items-center justify-end gap-2 border-b px-4 bg-white dark:bg-gray-900">
+        <header className="flex h-16 shrink-0 items-center justify-end gap-2 border-b px-4 bg-background">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setShowExitDialog(true)}
-            className="h-9 w-9 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             title={location.startsWith('/forms/') ? "Exit to Forms" : "Exit to Newsletters"}
+            data-testid="button-exit-editor"
           >
-            <X className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+            <X className="h-5 w-5 text-muted-foreground" />
           </Button>
         </header>
         
@@ -97,18 +97,18 @@ function AppHeader() {
               return (
                 <div key={index} className="flex items-center gap-1">
                   {index > 0 && (
-                    <ChevronRight className="h-4 w-4 text-gray-400" />
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   )}
                   {item.href && !isLast ? (
                     <Link 
                       href={item.href}
-                      className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                      className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
                     >
                       {Icon && <Icon className="h-4 w-4" />}
                       <span className="text-sm font-medium">{item.label}</span>
                     </Link>
                   ) : (
-                    <div className="flex items-center gap-1.5 text-gray-900 dark:text-white">
+                    <div className="flex items-center gap-1.5 text-foreground">
                       {Icon && <Icon className="h-4 w-4" />}
                       <span className="text-sm font-medium">{item.label}</span>
                     </div>
@@ -122,11 +122,11 @@ function AppHeader() {
         <>
           <Separator orientation="vertical" className="h-6 mx-2" />
           <div className="flex flex-col justify-center">
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-white leading-tight">
+            <h1 className="text-lg font-semibold text-foreground leading-tight">
               {title}
             </h1>
             {subtitle && (
-              <p className="text-sm text-gray-500 dark:text-gray-400 leading-tight">
+              <p className="text-sm text-muted-foreground leading-tight">
                 {subtitle}
               </p>
             )}
@@ -140,30 +140,31 @@ function AppHeader() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           title="Quick Actions"
+          data-testid="button-quick-actions"
         >
-          <Zap className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+          <Zap className="h-5 w-5 text-muted-foreground" />
         </Button>
         
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           title="Invite Users"
+          data-testid="button-invite-users"
         >
-          <UserPlus className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+          <UserPlus className="h-5 w-5 text-muted-foreground" />
         </Button>
         
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
+          className="relative"
           title="Notifications"
+          data-testid="button-notifications"
         >
-          <Bell className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+          <Bell className="h-5 w-5 text-muted-foreground" />
           {/* Optional notification badge */}
-          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-gray-900" />
+          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-background" />
         </Button>
       </div>
     </header>

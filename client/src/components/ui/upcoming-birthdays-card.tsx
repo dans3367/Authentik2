@@ -107,7 +107,7 @@ export function UpcomingBirthdaysCard() {
   return (
     <Card className="h-full">
       <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-xl font-bold flex items-center gap-2">
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-pink-50 dark:bg-pink-900/30">
               <CakeIcon className="h-5 w-5 text-pink-500" />
@@ -118,7 +118,8 @@ export function UpcomingBirthdaysCard() {
             variant="ghost"
             size="sm"
             onClick={() => setLocation('/birthdays')}
-            className="text-sm text-primary hover:text-primary/80 rounded-full"
+            className="text-sm rounded-full"
+            data-testid="button-view-all-birthdays"
           >
             View All
             <ChevronRight className="h-4 w-4 ml-1" />
