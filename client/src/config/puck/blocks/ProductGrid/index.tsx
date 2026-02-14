@@ -204,12 +204,7 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
 
                 trs.push(
                   <tr key={`r-${rowIdx}`}>
-                    {row.map((product, colIdx) => {
-                      const isFirst = colIdx === 0;
-                      const isLast = colIdx === row.length - 1;
-                      const pl = isFirst ? 0 : halfGap;
-                      const pr = isLast ? 0 : halfGap;
-                      return (
+                    {row.map((product, colIdx) => (
                         <td
                           key={`c-${rowIdx}-${colIdx}`}
                           width={cellPercent}
@@ -217,16 +212,15 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
                           style={{
                             width: cellPercent,
                             verticalAlign: "top",
-                            paddingLeft: `${pl}px`,
-                            paddingRight: `${pr}px`,
+                            paddingLeft: `${halfGap}px`,
+                            paddingRight: `${halfGap}px`,
                             paddingTop: 0,
                             paddingBottom: 0,
                           }}
                         >
                           {renderCard(product)}
                         </td>
-                      );
-                    })}
+                    ))}
                     {row.length < cols &&
                       Array.from({ length: cols - row.length }).map((_, i) => (
                         <td
