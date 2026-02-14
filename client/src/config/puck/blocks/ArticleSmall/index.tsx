@@ -75,21 +75,13 @@ export const ArticleSmall: ComponentConfig<ArticleSmallProps> = {
   render: ({ label, title, description, linkText, linkHref, linkColor, image, imagePosition, borderRadius }) => {
     const color = linkColor || "#4f46e5";
     const radius = borderRadius ?? 8;
-    const imgMaxWidth = Math.floor(CONTAINER_WIDTH * 0.4);
-    const textMaxWidth = CONTAINER_WIDTH - GAP - imgMaxWidth;
 
-    const textColumn = (
-      <div
-        dir="ltr"
+    const textCell = (
+      <td
+        valign="top"
         style={{
-          display: "inline-block",
           verticalAlign: "top",
-          width: "100%",
-          maxWidth: `${textMaxWidth}px`,
-          fontSize: "16px",
-          textAlign: "left" as const,
           fontFamily: "Arial, Helvetica, sans-serif",
-          boxSizing: "border-box" as const,
           paddingRight: imagePosition === "right" ? `${GAP}px` : "0",
           paddingLeft: imagePosition === "left" ? `${GAP}px` : "0",
         }}
@@ -155,18 +147,16 @@ export const ArticleSmall: ComponentConfig<ArticleSmallProps> = {
         >
           {linkText}
         </a>
-      </div>
+      </td>
     );
 
-    const imageColumn = (
-      <div
-        dir="ltr"
+    const imageCell = (
+      <td
+        width="40%"
+        valign="top"
         style={{
-          display: "inline-block",
+          width: "40%",
           verticalAlign: "top",
-          width: "100%",
-          maxWidth: `${imgMaxWidth}px`,
-          fontSize: "0",
         }}
       >
         {image?.url && (
@@ -185,23 +175,40 @@ export const ArticleSmall: ComponentConfig<ArticleSmallProps> = {
             }}
           />
         )}
-      </div>
+      </td>
     );
 
     return (
       <Section>
-        <div
-          dir={imagePosition === "left" ? "rtl" : "ltr"}
-          style={{
-            maxWidth: `${CONTAINER_WIDTH}px`,
-            width: "100%",
-            margin: "0 auto",
-            fontSize: "0",
-            textAlign: imagePosition === "left" ? ("right" as const) : ("left" as const),
-          }}
-        >
-          {textColumn}
-          {imageColumn}
+        <div style={{ maxWidth: `${CONTAINER_WIDTH}px`, width: "100%", margin: "0 auto" }}>
+          <table
+            role="presentation"
+            cellPadding={0}
+            cellSpacing={0}
+            border={0}
+            width="100%"
+            style={{
+              width: "100%",
+              maxWidth: `${CONTAINER_WIDTH}px`,
+              borderCollapse: "collapse" as const,
+            }}
+          >
+            <tbody>
+              <tr>
+                {imagePosition === "left" ? (
+                  <>
+                    {imageCell}
+                    {textCell}
+                  </>
+                ) : (
+                  <>
+                    {textCell}
+                    {imageCell}
+                  </>
+                )}
+              </tr>
+            </tbody>
+          </table>
         </div>
       </Section>
     );
