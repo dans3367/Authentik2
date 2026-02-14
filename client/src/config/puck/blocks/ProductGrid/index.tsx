@@ -64,14 +64,14 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
   render: ({ products, columns, gap }) => {
     const cols = Math.max(1, Math.min(4, Math.round(columns ?? 3)));
     const cellGap = Math.max(0, gap ?? 24);
-    const halfGap = Math.round(cellGap / 2);
+    const numGaps = cols - 1;
+    const gapPct = numGaps > 0 ? Math.round((cellGap / 552) * 1000) / 10 : 0;
+    const contentPct = Math.floor(((100 - numGaps * gapPct) / cols) * 10) / 10;
 
     const rows: Product[][] = [];
     for (let i = 0; i < products.length; i += cols) {
       rows.push(products.slice(i, i + cols));
     }
-
-    const cellPercent = `${Math.floor(100 / cols)}%`;
 
     const renderCard = (product: Product) => (
       <table
@@ -200,41 +200,78 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
           >
             <tbody>
               {rows.flatMap((row, rowIdx) => {
+                const totalCols = row.length + Math.max(0, row.length - 1);
                 const trs: React.ReactNode[] = [];
 
                 trs.push(
                   <tr key={`r-${rowIdx}`}>
-                    {row.map((product, colIdx) => (
+                    {row.flatMap((product, colIdx) => {
+                      const cells: React.ReactNode[] = [];
+                      if (colIdx > 0) {
+                        cells.push(
+                          <td
+                            key={`g-${rowIdx}-${colIdx}`}
+                            width={`${gapPct}%`}
+                            style={{
+                              width: `${gapPct}%`,
+                              fontSize: "1px",
+                              lineHeight: "1px",
+                              padding: 0,
+                            }}
+                          >
+                            {"\u00A0"}
+                          </td>
+                        );
+                      }
+                      cells.push(
                         <td
                           key={`c-${rowIdx}-${colIdx}`}
-                          width={cellPercent}
+                          width={`${contentPct}%`}
                           valign="top"
                           style={{
-                            width: cellPercent,
+                            width: `${contentPct}%`,
                             verticalAlign: "top",
-                            paddingLeft: `${halfGap}px`,
-                            paddingRight: `${halfGap}px`,
-                            paddingTop: 0,
-                            paddingBottom: 0,
+                            padding: 0,
                           }}
                         >
                           {renderCard(product)}
                         </td>
-                    ))}
+                      );
+                      return cells;
+                    })}
                     {row.length < cols &&
-                      Array.from({ length: cols - row.length }).map((_, i) => (
-                        <td
-                          key={`ec-${rowIdx}-${i}`}
-                          width={cellPercent}
-                          style={{
-                            width: cellPercent,
-                            fontSize: "1px",
-                            lineHeight: "1px",
-                          }}
-                        >
-                          {"\u00A0"}
-                        </td>
-                      ))}
+                      Array.from({ length: cols - row.length }).flatMap((_, i) => {
+                        const cells: React.ReactNode[] = [];
+                        cells.push(
+                          <td
+                            key={`eg-${rowIdx}-${i}`}
+                            width={`${gapPct}%`}
+                            style={{
+                              width: `${gapPct}%`,
+                              fontSize: "1px",
+                              lineHeight: "1px",
+                              padding: 0,
+                            }}
+                          >
+                            {"\u00A0"}
+                          </td>
+                        );
+                        cells.push(
+                          <td
+                            key={`ec-${rowIdx}-${i}`}
+                            width={`${contentPct}%`}
+                            style={{
+                              width: `${contentPct}%`,
+                              fontSize: "1px",
+                              lineHeight: "1px",
+                              padding: 0,
+                            }}
+                          >
+                            {"\u00A0"}
+                          </td>
+                        );
+                        return cells;
+                      })}
                   </tr>
                 );
 
@@ -242,12 +279,13 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
                   trs.push(
                     <tr key={`rg-${rowIdx}`}>
                       <td
-                        colSpan={cols}
+                        colSpan={totalCols}
                         height={cellGap}
                         style={{
                           height: `${cellGap}px`,
                           fontSize: "1px",
                           lineHeight: "1px",
+                          padding: 0,
                         }}
                       >
                         {"\u00A0"}
