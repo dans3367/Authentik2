@@ -64,6 +64,7 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
   render: ({ products, columns, gap }) => {
     const cols = Math.max(1, Math.min(4, Math.round(columns ?? 3)));
     const cellGap = Math.max(0, gap ?? 24);
+    const halfGap = Math.round(cellGap / 2);
 
     const rows: Product[][] = [];
     for (let i = 0; i < products.length; i += cols) {
@@ -193,35 +194,22 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
             width="100%"
             style={{
               width: "100%",
+              tableLayout: "fixed" as const,
               borderCollapse: "collapse" as const,
             }}
           >
             <tbody>
               {rows.flatMap((row, rowIdx) => {
-                const totalCols = cols + (cols - 1);
                 const trs: React.ReactNode[] = [];
 
                 trs.push(
                   <tr key={`r-${rowIdx}`}>
-                    {row.flatMap((product, colIdx) => {
-                      const cells: React.ReactNode[] = [];
-                      if (colIdx > 0) {
-                        cells.push(
-                          <td
-                            key={`g-${rowIdx}-${colIdx}`}
-                            style={{
-                              width: `${cellGap}px`,
-                              minWidth: `${cellGap}px`,
-                              maxWidth: `${cellGap}px`,
-                              fontSize: "1px",
-                              lineHeight: "1px",
-                            }}
-                          >
-                            {"\u00A0"}
-                          </td>
-                        );
-                      }
-                      cells.push(
+                    {row.map((product, colIdx) => {
+                      const isFirst = colIdx === 0;
+                      const isLast = colIdx === row.length - 1;
+                      const pl = isFirst ? 0 : halfGap;
+                      const pr = isLast ? 0 : halfGap;
+                      return (
                         <td
                           key={`c-${rowIdx}-${colIdx}`}
                           width={cellPercent}
@@ -229,25 +217,18 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
                           style={{
                             width: cellPercent,
                             verticalAlign: "top",
+                            paddingLeft: `${pl}px`,
+                            paddingRight: `${pr}px`,
+                            paddingTop: 0,
+                            paddingBottom: 0,
                           }}
                         >
                           {renderCard(product)}
                         </td>
                       );
-                      return cells;
                     })}
                     {row.length < cols &&
-                      Array.from({ length: cols - row.length }).flatMap((_, i) => [
-                        <td
-                          key={`eg-${rowIdx}-${i}`}
-                          style={{
-                            width: `${cellGap}px`,
-                            fontSize: "1px",
-                            lineHeight: "1px",
-                          }}
-                        >
-                          {"\u00A0"}
-                        </td>,
+                      Array.from({ length: cols - row.length }).map((_, i) => (
                         <td
                           key={`ec-${rowIdx}-${i}`}
                           width={cellPercent}
@@ -258,8 +239,8 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
                           }}
                         >
                           {"\u00A0"}
-                        </td>,
-                      ])}
+                        </td>
+                      ))}
                   </tr>
                 );
 
@@ -267,7 +248,7 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
                   trs.push(
                     <tr key={`rg-${rowIdx}`}>
                       <td
-                        colSpan={totalCols}
+                        colSpan={cols}
                         height={cellGap}
                         style={{
                           height: `${cellGap}px`,
