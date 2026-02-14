@@ -492,6 +492,7 @@ export const newsletters = pgTable("newsletters", {
   title: text("title").notNull(),
   subject: text("subject").notNull(),
   content: text("content").notNull(), // HTML content of the newsletter
+  puckData: text("puck_data"), // JSON string of Puck editor state for re-editing
   status: text("status").notNull().default('draft'), // draft, scheduled, sent
   scheduledAt: timestamp("scheduled_at"),
   sentAt: timestamp("sent_at"),
@@ -1555,6 +1556,7 @@ export const createNewsletterSchema = z.object({
   title: z.string().min(1, "Title is required"),
   subject: z.string().min(1, "Subject is required"),
   content: z.string().min(1, "Content is required"),
+  puckData: z.string().optional(),
   // On create, disallow setting status to "sent"; use the send endpoint instead
   status: z.enum(['draft', 'scheduled']).default('draft'),
   scheduledAt: z.date().optional(),
@@ -1567,6 +1569,7 @@ export const updateNewsletterSchema = z.object({
   title: z.string().min(1, "Title is required").optional(),
   subject: z.string().min(1, "Subject is required").optional(),
   content: z.string().min(1, "Content is required").optional(),
+  puckData: z.string().optional(),
   status: z.enum(['draft', 'scheduled', 'sent']).optional(),
   scheduledAt: z.date().optional(),
   sentAt: z.date().optional(),

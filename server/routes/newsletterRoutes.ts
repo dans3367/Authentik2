@@ -268,7 +268,7 @@ newsletterRoutes.get("/:id", authenticateToken, requireTenant, async (req: any, 
 newsletterRoutes.post("/", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const validatedData = createNewsletterSchema.parse(req.body);
-    const { title, subject, content, scheduledAt, status } = validatedData;
+    const { title, subject, content, puckData, scheduledAt, status } = validatedData;
 
     const sanitizedTitle = sanitizeString(title);
     const sanitizedSubject = sanitizeString(subject);
@@ -290,6 +290,7 @@ newsletterRoutes.post("/", authenticateToken, requireTenant, async (req: any, re
       title: sanitizedTitle,
       subject: sanitizedSubject,
       content,
+      puckData: puckData || null,
       scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
       status: status || 'draft',
       recipientType: 'all',
@@ -311,7 +312,7 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, 
   try {
     const { id } = req.params;
     const validatedData = updateNewsletterSchema.parse(req.body);
-    const { title, subject, content, scheduledAt, status } = validatedData;
+    const { title, subject, content, puckData, scheduledAt, status } = validatedData;
 
     const newsletter = await db.query.newsletters.findFirst({
       where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId}`,
@@ -340,6 +341,9 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, 
       updateData.content = content;
     }
 
+    if (puckData !== undefined) {
+      updateData.puckData = puckData;
+    }
 
     if (scheduledAt !== undefined) {
       updateData.scheduledAt = scheduledAt ? new Date(scheduledAt) : null;

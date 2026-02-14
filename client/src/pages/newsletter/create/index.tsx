@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Puck } from "@puckeditor/core";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import config, { initialData } from "@/config/puck";
 import { UserData } from "@/config/puck/types";
-import { Monitor, Smartphone, ZoomIn, ZoomOut, Mail } from "lucide-react";
+import { Monitor, Smartphone, ZoomIn, ZoomOut, Mail, Save, ArrowLeft, Loader2, X } from "lucide-react";
 import { SendPreviewDialog } from "@/components/SendPreviewDialog";
 import { extractPuckEmailHtml } from "@/utils/puck-to-email-html";
 import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
-import { useLocation } from "wouter";
+import { useLocation, useParams } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,17 +21,19 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-const AUTOSAVE_KEY = "newsletter-draft-autosave";
-const AUTOSAVE_INTERVAL = 7000;
+const AUTOSAVE_INTERVAL = 20000;
 
 export default function NewsletterCreatePage() {
+  const params = useParams<{ id?: string }>();
+  const editId = params?.id;
+  const isEditMode = !!editId;
+
   const [data, setData] = useState<UserData>(initialData);
   const [isClient, setIsClient] = useState(false);
   const [isEdit, setIsEdit] = useState(true);
   const [viewport, setViewport] = useState<"mobile" | "desktop">("desktop");
   const [zoom, setZoom] = useState(100);
   const [previewOpen, setPreviewOpen] = useState(false);
-  // Stores the email-safe HTML captured from the editor DOM before switching to preview
   const [previewHtml, setPreviewHtml] = useState<string>("");
   const [previewViewport, setPreviewViewport] = useState<"mobile" | "desktop">("desktop");
   const [, setLocation] = useLocation();
@@ -37,8 +41,45 @@ export default function NewsletterCreatePage() {
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
   const dataRef = useRef<UserData>(data);
+  const [justSaved, setJustSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [newsletterId, setNewsletterId] = useState<string | null>(editId || null);
+  const [title, setTitle] = useState("");
+  const [subject, setSubject] = useState("");
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   useEffect(() => { dataRef.current = data; }, [data]);
+
+  // Load existing newsletter when editing
+  const { data: existingNewsletter, isLoading: isLoadingNewsletter } = useQuery({
+    queryKey: ['/api/newsletters', editId],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/newsletters/${editId}`);
+      return response.json();
+    },
+    enabled: isEditMode,
+  });
+
+  // Populate state from existing newsletter
+  useEffect(() => {
+    if (existingNewsletter?.newsletter) {
+      const nl = existingNewsletter.newsletter;
+      setTitle(nl.title || "");
+      setSubject(nl.subject || "");
+      setNewsletterId(nl.id);
+      if (nl.puckData) {
+        try {
+          const parsed = JSON.parse(nl.puckData);
+          setData(parsed);
+        } catch {
+          // puckData was invalid JSON, start fresh
+        }
+      }
+    }
+  }, [existingNewsletter]);
 
   // Fetch the tenant's master email design (same as Management > Email Design)
   const { data: emailDesign } = useQuery<{
@@ -69,23 +110,72 @@ export default function NewsletterCreatePage() {
     return extractPuckEmailHtml();
   }, []);
 
+  // Save newsletter to database (create or update)
+  const saveToDatabase = useCallback(async (status: 'draft' | 'scheduled' = 'draft') => {
+    const htmlContent = extractPuckEmailHtml();
+    const puckDataJson = JSON.stringify(dataRef.current);
+    const currentTitle = title.trim() || "Untitled Newsletter";
+    const currentSubject = subject.trim() || currentTitle;
+
+    setIsSaving(true);
+    try {
+      if (newsletterId) {
+        // Update existing
+        const response = await apiRequest('PUT', `/api/newsletters/${newsletterId}`, {
+          title: currentTitle,
+          subject: currentSubject,
+          content: htmlContent,
+          puckData: puckDataJson,
+          status,
+        });
+        const result = await response.json();
+        setHasUnsavedChanges(false);
+        setJustSaved(true);
+        setTimeout(() => setJustSaved(false), 4000);
+        queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
+        return result;
+      } else {
+        // Create new
+        const response = await apiRequest('POST', '/api/newsletters', {
+          title: currentTitle,
+          subject: currentSubject,
+          content: htmlContent,
+          puckData: puckDataJson,
+          status,
+        });
+        const result = await response.json();
+        setNewsletterId(result.id);
+        setHasUnsavedChanges(false);
+        setJustSaved(true);
+        setTimeout(() => setJustSaved(false), 4000);
+        queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
+        return result;
+      }
+    } catch (error: any) {
+      toast({
+        title: "Save Failed",
+        description: error.message || "Failed to save newsletter",
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setIsSaving(false);
+    }
+  }, [newsletterId, title, subject, toast, queryClient]);
+
+  const handleSaveDraft = useCallback(async () => {
+    try {
+      await saveToDatabase('draft');
+      toast({ title: "Draft Saved", description: "Newsletter draft saved successfully." });
+    } catch {
+      // Error already handled in saveToDatabase
+    }
+  }, [saveToDatabase, toast]);
+
   useEffect(() => {
     setIsClient(true);
-
-    // Always start with a clean canvas for new newsletters
-    localStorage.removeItem("newsletter-puck-data");
-
-    // Restore auto-saved draft if available
-    const saved = localStorage.getItem(AUTOSAVE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setData(parsed);
-        setHasUnsavedChanges(true);
-      } catch {
-        localStorage.removeItem(AUTOSAVE_KEY);
-      }
-    }
   }, []);
 
   useEffect(() => {
@@ -100,14 +190,18 @@ export default function NewsletterCreatePage() {
     };
   }, [viewport, isClient]);
 
-  // Auto-save to localStorage every 7 seconds
+  // Auto-save to database periodically
   useEffect(() => {
     if (!hasUnsavedChanges) return;
-    const interval = setInterval(() => {
-      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(dataRef.current));
+    const interval = setInterval(async () => {
+      try {
+        await saveToDatabase('draft');
+      } catch {
+        // Silent fail on auto-save
+      }
     }, AUTOSAVE_INTERVAL);
     return () => clearInterval(interval);
-  }, [hasUnsavedChanges]);
+  }, [hasUnsavedChanges, saveToDatabase]);
 
   // Warn on browser close / refresh
   useEffect(() => {
@@ -154,14 +248,16 @@ export default function NewsletterCreatePage() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [hasUnsavedChanges]);
 
-  const handlePublish = async (data: UserData) => {
-    // Save to localStorage
-    localStorage.setItem("newsletter-puck-data", JSON.stringify(data));
-    localStorage.removeItem(AUTOSAVE_KEY);
-    setHasUnsavedChanges(false);
-    setData(data);
-    setIsEdit(false);
-    alert("Newsletter published successfully!");
+  const handlePublish = async (publishData: UserData) => {
+    setData(publishData);
+    dataRef.current = publishData;
+    try {
+      await saveToDatabase('draft');
+      toast({ title: "Newsletter Saved", description: "Your newsletter has been saved." });
+      setLocation('/newsletter');
+    } catch {
+      // Error handled in saveToDatabase
+    }
   };
 
   const handleDataChange = useCallback((newData: UserData) => {
@@ -170,7 +266,6 @@ export default function NewsletterCreatePage() {
   }, []);
 
   const handleConfirmExit = useCallback(() => {
-    localStorage.removeItem(AUTOSAVE_KEY);
     setHasUnsavedChanges(false);
     setShowExitDialog(false);
     const nav = pendingNavigation;
@@ -390,6 +485,19 @@ export default function NewsletterCreatePage() {
     },
     headerActions: ({ children }: { children: React.ReactNode }) => (
       <>
+        <div style={{ display: "flex", marginRight: "auto", alignItems: "center", minWidth: 0, flex: 1 }}>
+          <span
+            style={{
+              fontSize: "11px",
+              fontWeight: 500,
+              color: justSaved ? "#22c55e" : isSaving ? "#3b82f6" : "#9ca3af",
+              whiteSpace: "nowrap",
+              transition: "color 0.3s ease",
+            }}
+          >
+            {isSaving ? "Saving..." : justSaved ? "Saved" : hasUnsavedChanges ? "Unsaved changes" : ""}
+          </span>
+        </div>
         <div style={{ display: "flex", gap: "4px", marginRight: "8px" }}>
           <button
             onClick={() => setViewport("mobile")}
@@ -513,6 +621,32 @@ export default function NewsletterCreatePage() {
           Send Preview
         </button>
         <button
+          onClick={handleSaveDraft}
+          disabled={isSaving}
+          style={{
+            padding: "4px 12px",
+            marginRight: "8px",
+            background: "#059669",
+            color: "white",
+            border: "1px solid #059669",
+            borderRadius: "4px",
+            cursor: isSaving ? "not-allowed" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+            fontSize: "12px",
+            fontWeight: 500,
+            height: "32px",
+            boxSizing: "border-box",
+            whiteSpace: "nowrap",
+            opacity: isSaving ? 0.7 : 1,
+          }}
+          data-testid="button-save-draft"
+        >
+          {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+          Save Draft
+        </button>
+        <button
           onClick={() => {
             const bodyHtml = extractPuckEmailHtml();
             const fullHtml = wrapInEmailPreview(bodyHtml, {
@@ -547,10 +681,14 @@ export default function NewsletterCreatePage() {
         {children}
       </>
     ),
-  }), [emailDesign, viewport, zoom, handleZoomIn, handleZoomOut, handleZoomReset]);
+  }), [emailDesign, viewport, zoom, handleZoomIn, handleZoomOut, handleZoomReset, justSaved, title, subject, hasUnsavedChanges, isSaving, handleSaveDraft]);
 
-  if (!isClient) {
-    return null;
+  if (!isClient || (isEditMode && isLoadingNewsletter)) {
+    return (
+      <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Loader2 size={32} className="animate-spin text-blue-500" />
+      </div>
+    );
   }
 
   const exitDialog = (
@@ -574,21 +712,100 @@ export default function NewsletterCreatePage() {
     return (
       <>
         <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-          <Puck
-            config={config}
-            data={data}
-            onChange={handleDataChange}
-            onPublish={handlePublish}
-            headerPath="/newsletter/create"
-            iframe={iframeConfig}
-            overrides={puckOverrides}
-          />
+          {/* Top bar with close X */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            height: "40px",
+            padding: "0 12px",
+            borderBottom: "1px solid #e5e7eb",
+            background: "#fff",
+            flexShrink: 0,
+          }}>
+            {isEditingTitle ? (
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={title}
+                onChange={(e) => { setTitle(e.target.value); setHasUnsavedChanges(true); }}
+                onBlur={() => setIsEditingTitle(false)}
+                onKeyDown={(e) => { if (e.key === 'Enter') setIsEditingTitle(false); if (e.key === 'Escape') setIsEditingTitle(false); }}
+                autoFocus
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "#374151",
+                  border: "1px solid #d1d5db",
+                  borderRadius: "4px",
+                  padding: "2px 8px",
+                  outline: "none",
+                  background: "#f9fafb",
+                  minWidth: "200px",
+                }}
+              />
+            ) : (
+              <span
+                onClick={() => setIsEditingTitle(true)}
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: title ? "#374151" : "#9ca3af",
+                  cursor: "pointer",
+                  padding: "2px 4px",
+                  borderRadius: "4px",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                title="Click to edit title"
+              >
+                {title || "Untitled Newsletter"}
+              </span>
+            )}
+            <button
+              onClick={() => {
+                if (hasUnsavedChanges) {
+                  setPendingNavigation('/newsletter');
+                  setShowExitDialog(true);
+                } else {
+                  setLocation('/newsletter');
+                }
+              }}
+              style={{
+                padding: "4px",
+                background: "transparent",
+                border: "none",
+                borderRadius: "4px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#6b7280",
+                marginLeft: "auto",
+              }}
+              title="Close editor"
+              data-testid="button-close"
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; e.currentTarget.style.color = '#111827'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#6b7280'; }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <Puck
+              config={config}
+              data={data}
+              onChange={handleDataChange}
+              onPublish={handlePublish}
+              iframe={iframeConfig}
+              overrides={puckOverrides}
+            />
+          </div>
         </div>
         <SendPreviewDialog
           open={previewOpen}
           onOpenChange={setPreviewOpen}
           getHtmlContent={getHtmlContent}
-          subject={data.root?.props?.title || "Newsletter Preview"}
+          subject={subject || data.root?.props?.title || "Newsletter Preview"}
         />
         {exitDialog}
       </>
