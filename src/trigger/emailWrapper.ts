@@ -9,8 +9,11 @@ export interface EmailDesign {
   secondaryColor: string;
   accentColor: string;
   fontFamily: string;
+  headerMode: string | null;
   logoUrl: string | null;
   logoSize: string | null;
+  logoAlignment: string | null;
+  bannerUrl: string | null;
   showCompanyName: string | null;
   headerText: string | null;
   footerText: string | null;
@@ -185,8 +188,11 @@ export async function wrapInEmailDesign(tenantId: string, bodyContent: string): 
       secondaryColor: '#1E40AF',
       accentColor: '#10B981',
       fontFamily: 'Arial, sans-serif',
+      headerMode: 'logo',
       logoUrl: null,
       logoSize: null,
+      logoAlignment: 'center',
+      bannerUrl: null,
       showCompanyName: 'true',
       headerText: null,
       footerText: '',
@@ -211,6 +217,7 @@ function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
   const safeCompanyName = escapeHtml(design.companyName || '');
   const safeHeaderText = design.headerText ? escapeHtml(design.headerText) : null;
   const safeFooterText = design.footerText ? escapeHtml(design.footerText) : null;
+  const showCompanyName = (design.showCompanyName ?? 'true') === 'true';
 
   // Build social links HTML
   let socialLinksHtml = '';
@@ -246,14 +253,26 @@ function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
     }
   }
 
-  // Build logo/header section
+  // Determine header mode
+  const headerMode = design.headerMode || 'logo';
+  const useBanner = headerMode === 'banner' && design.bannerUrl && isValidHttpUrl(design.bannerUrl);
+
+  // Build logo/header section (used when headerMode is 'logo')
   const logoSizeMap: Record<string, string> = { small: '64px', medium: '96px', large: '128px', xlarge: '160px' };
   const logoHeight = logoSizeMap[design.logoSize || 'medium'] || '48px';
+  const logoAlign = design.logoAlignment || 'center';
+  const logoMarginLeft = logoAlign === 'center' ? 'auto' : logoAlign === 'right' ? 'auto' : '0';
+  const logoMarginRight = logoAlign === 'center' ? 'auto' : logoAlign === 'right' ? '0' : 'auto';
   const logoSection = design.logoUrl && isValidHttpUrl(design.logoUrl)
-    ? `<img src="${escapeHtml(design.logoUrl)}" alt="${safeCompanyName}" style="display: block; height: ${logoHeight}; width: auto; margin: 0 auto 20px auto; object-fit: contain;" />`
-    : safeCompanyName
-      ? `<div style="height: 48px; width: 48px; background-color: rgba(255,255,255,0.2); border-radius: 50%; margin: 0 auto 16px auto; line-height: 48px; font-size: 20px; font-weight: bold; color: #ffffff; text-align: center;">${escapeHtml((design.companyName || 'C').charAt(0))}</div>`
+    ? `<img src="${escapeHtml(design.logoUrl)}" alt="${safeCompanyName}" style="display: block; height: ${logoHeight}; width: auto; margin: 0 ${logoMarginRight} 20px ${logoMarginLeft}; object-fit: contain;" />`
+    : (safeCompanyName && showCompanyName)
+      ? `<div style="height: 48px; width: 48px; background-color: rgba(255,255,255,0.2); border-radius: 50%; margin: 0 ${logoMarginRight} 16px ${logoMarginLeft}; line-height: 48px; font-size: 20px; font-weight: bold; color: #ffffff; text-align: center;">${escapeHtml((design.companyName || 'C').charAt(0))}</div>`
       : '';
+
+  // Build banner section (used when headerMode is 'banner')
+  const bannerSection = useBanner
+    ? `<img src="${escapeHtml(design.bannerUrl!)}" alt="${safeCompanyName}" style="display: block; width: 100%; height: auto; border: 0; outline: none;" />`
+    : '';
 
   return `<!DOCTYPE html>
 <html>
@@ -265,10 +284,12 @@ function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
     <div style="max-width: 600px; margin: 0 auto; background: white;">
       
       <!-- Hero Header -->
-      <div style="padding: 40px 32px; text-align: center; background-color: ${sanitizedPrimaryColor}; color: #ffffff;">
-        ${logoSection}
-        ${safeCompanyName && (design.showCompanyName ?? 'true') === 'true' ? `
-          <h1 style="margin: 0 0 10px 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em; color: #ffffff;">
+      ${useBanner ? `
+      ${bannerSection}
+      ${(safeCompanyName && showCompanyName) || safeHeaderText ? `
+      <div style="padding: 16px 32px; text-align: center; background-color: ${sanitizedPrimaryColor}; color: #ffffff;">
+        ${safeCompanyName && showCompanyName ? `
+          <h1 style="margin: 0 0 4px 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em; color: #ffffff;">
             ${safeCompanyName}
           </h1>
         ` : ''}
@@ -278,13 +299,31 @@ function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
           </p>
         ` : ''}
       </div>
+      ` : ''}
+      ` : `
+      <div style="padding: 40px 32px; text-align: ${logoAlign}; background-color: ${sanitizedPrimaryColor}; color: #ffffff;">
+        ${logoSection}
+        ${safeCompanyName && showCompanyName ? `
+          <h1 style="margin: 0 0 10px 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em; color: #ffffff;">
+            ${safeCompanyName}
+          </h1>
+        ` : ''}
+        ${safeHeaderText ? `
+          <p style="margin: 0 ${logoMarginRight} 0 ${logoMarginLeft}; font-size: 16px; opacity: 0.95; max-width: 400px; line-height: 1.5; color: #ffffff;">
+            ${safeHeaderText}
+          </p>
+        ` : ''}
+      </div>
+      `}
 
       <!-- Body Content -->
-      <div style="padding: 24px 20px; min-height: 200px;">
-        <div style="font-size: 16px; line-height: 1.625; color: #334155;">
-          ${bodyContent}
-        </div>
-      </div>
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 0; font-size: 16px; line-height: 1.625; color: #334155;">
+            ${bodyContent}
+          </td>
+        </tr>
+      </table>
 
       <!-- Footer -->
       <div style="background-color: #f8fafc; padding: 32px; text-align: center; border-top: 1px solid #e2e8f0; color: #64748b;">
@@ -295,7 +334,7 @@ function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
           <p style="margin: 0 0 16px 0; font-size: 12px; line-height: 1.5; color: #64748b;">${safeFooterText}</p>
         ` : ''}
         
-        ${safeCompanyName ? `
+        ${safeCompanyName && (design.showCompanyName ?? 'true') === 'true' ? `
           <div style="font-size: 12px; line-height: 1.5; color: #94a3b8;">
             <p style="margin: 0;">
               Sent via ${safeCompanyName}

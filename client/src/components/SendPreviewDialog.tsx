@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Send, Mail, Search, Loader2, User, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,14 @@ export function SendPreviewDialog({
   const [search, setSearch] = useState("");
   const [selectedEmail, setSelectedEmail] = useState("");
   const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setSearch("");
+      setSelectedEmail("");
+      setSending(false);
+    }
+  }, [open]);
 
   const { data, isLoading } = useQuery<{ recipients: PreviewRecipient[] }>({
     queryKey: ["/api/newsletters/preview-recipients"],

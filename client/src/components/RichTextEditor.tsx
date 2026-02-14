@@ -40,6 +40,12 @@ interface RichTextEditorProps {
 export default function RichTextEditor({ value, onChange, placeholder = "Start typing your message...", className = "", customerInfo, businessName, occasionType, defaultTitle, onEditorReady }: RichTextEditorProps) {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const editorReadyCalledRef = useRef(false);
+  // Keep a stable ref to the latest onEditorReady callback so the
+  // once-per-mount effect below always invokes the most recent version
+  // without needing it in the dependency array (useEffectEvent pattern).
+  const onEditorReadyRef = useRef(onEditorReady);
+  onEditorReadyRef.current = onEditorReady;
   const [isGenerating, setIsGenerating] = useState(false);
   const [isImproving, setIsImproving] = useState(false);
   const [isEmojifying, setIsEmojifying] = useState(false);
@@ -319,11 +325,15 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
     }
   }, [value, editor]);
 
+  // Fire onEditorReady exactly once per mount when the editor instance
+  // becomes available.  Uses onEditorReadyRef so a newer callback identity
+  // from the parent is still respected without re-triggering the effect.
   useEffect(() => {
-    if (editor && onEditorReady) {
-      onEditorReady(editor);
+    if (editor && onEditorReadyRef.current && !editorReadyCalledRef.current) {
+      onEditorReadyRef.current(editor);
+      editorReadyCalledRef.current = true;
     }
-  }, [editor, onEditorReady]);
+  }, [editor]);
 
   // Handle context menu on editor
   useEffect(() => {

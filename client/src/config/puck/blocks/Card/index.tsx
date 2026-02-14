@@ -1,5 +1,5 @@
 import { ReactElement, ComponentType } from "react";
-import { ComponentConfig } from "@measured/puck";
+import { ComponentConfig } from "@puckeditor/core";
 import styles from "./styles.module.css";
 import { getClassNameFactory } from "../../lib/get-class-name-factory";
 import {
@@ -97,7 +97,7 @@ const CardInner: ComponentConfig<CardProps> = {
     const IconComponent = icon ? iconMap[icon] : null;
 
     return (
-      <div className={getClassName({ [mode]: mode })}>
+      <div className={getClassName({ [mode]: true })}>
         <div className={getClassName("inner")}>
           <div className={getClassName("icon")}>
             {IconComponent && <IconComponent />}

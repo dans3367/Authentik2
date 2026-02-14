@@ -1,5 +1,5 @@
 import React from "react";
-import { ComponentConfig } from "@measured/puck";
+import { ComponentConfig } from "@puckeditor/core";
 import { Section } from "../../components/Section";
 import { withLayout, WithLayout } from "../../components/Layout";
 
@@ -17,6 +17,7 @@ export type ProductGridProps = WithLayout<{
 }>;
 
 const ProductGridInner: ComponentConfig<ProductGridProps> = {
+  label: "Product Grid",
   fields: {
     products: {
       type: "array",
@@ -27,7 +28,7 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
         price: { type: "text", label: "Price" },
       },
       defaultItemProps: {
-        image: "https://via.placeholder.com/400x400/f5f5f5/cccccc?text=Product+Image",
+        image: "https://placehold.co/400x400/f5f5f5/999999?text=Product+Image",
         title: "Product Name",
         description: "Product description goes here.",
         price: "$99.99",
@@ -39,19 +40,19 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
   defaultProps: {
     products: [
       {
-        image: "https://via.placeholder.com/400x400/f5f5f5/cccccc?text=Headphones",
+        image: "https://placehold.co/400x400/f5f5f5/999999?text=Headphones",
         title: "AeroSound Pro Headphones",
         description: "Premium noise-canceling audio with comfortable memory foam earcups.",
         price: "$199.99",
       },
       {
-        image: "https://via.placeholder.com/400x400/f5f5f5/cccccc?text=Serum",
+        image: "https://placehold.co/400x400/f5f5f5/999999?text=Serum",
         title: "Botanical Facial Serum",
         description: "Hydrating and anti-aging formula with natural plant extracts.",
         price: "$45.50",
       },
       {
-        image: "https://via.placeholder.com/400x400/f5f5f5/cccccc?text=Coffee+Maker",
+        image: "https://placehold.co/400x400/f5f5f5/999999?text=Coffee+Maker",
         title: "MiniBrew Portable Espresso",
         description: "Enjoy rich, cafe-style espresso anywhere, anytime.",
         price: "$89.00",
@@ -69,8 +70,8 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
       rows.push(products.slice(i, i + cols));
     }
 
-    // Email content area: 600px wrapper - 80px body padding = 520px
-    const containerWidth = 520;
+    // Email content area: 600px email wrapper, 24px Section padding each side
+    const containerWidth = 552;
     const cellWidth = Math.floor((containerWidth - cellGap * (cols - 1)) / cols);
 
     // Product card — pure table layout for email client compatibility
@@ -103,6 +104,7 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
           {/* Product image */}
           <tr>
             <td
+              align="center"
               style={{
                 padding: 0,
                 backgroundColor: "#f5f5f5",
@@ -191,119 +193,118 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
     return (
       <Section>
         {/*
-          Outer wrapper constrains to email content width.
-          Inner table uses table-layout:fixed + colgroup for
-          guaranteed column/spacer widths across all email clients.
+          Outer table uses fixed pixel width for email client compatibility.
+          No colgroup (stripped by Gmail/Yahoo) or table-layout:fixed (unsupported).
+          Column widths enforced via width attributes on every <td>.
         */}
-        <div style={{ width: `${containerWidth}px`, maxWidth: "100%", margin: "0 auto" }}>
-          <table
-            role="presentation"
-            cellPadding={0}
-            cellSpacing={0}
-            border={0}
-            width={containerWidth}
-            style={{
-              width: `${containerWidth}px`,
-              borderCollapse: "collapse" as const,
-              tableLayout: "fixed" as const,
-            }}
-          >
-            {/* Explicit col widths: product | gap | product | gap | product */}
-            <colgroup>
-              {Array.from({ length: cols }).flatMap((_, i) => {
-                const colEls: React.ReactNode[] = [];
-                if (i > 0) {
-                  colEls.push(
-                    <col key={`gc-${i}`} width={cellGap} style={{ width: `${cellGap}px` }} />
-                  );
-                }
-                colEls.push(
-                  <col key={`cc-${i}`} width={cellWidth} style={{ width: `${cellWidth}px` }} />
-                );
-                return colEls;
-              })}
-            </colgroup>
-            <tbody>
-              {rows.flatMap((row, rowIdx) => {
-                const totalCols = cols + (cols - 1);
-                const trs: React.ReactNode[] = [];
+        <table
+          role="presentation"
+          cellPadding={0}
+          cellSpacing={0}
+          border={0}
+          width={containerWidth}
+          style={{
+            width: `${containerWidth}px`,
+            borderCollapse: "collapse" as const,
+          }}
+        >
+          <tbody>
+            {rows.flatMap((row, rowIdx) => {
+              const totalCols = cols + (cols - 1);
+              const trs: React.ReactNode[] = [];
 
-                trs.push(
-                  <tr key={`r-${rowIdx}`}>
-                    {row.flatMap((product, colIdx) => {
-                      const cells: React.ReactNode[] = [];
-                      if (colIdx > 0) {
-                        cells.push(
-                          <td
-                            key={`g-${rowIdx}-${colIdx}`}
-                            width={cellGap}
-                            style={{
-                              width: `${cellGap}px`,
-                              fontSize: "1px",
-                              lineHeight: "1px",
-                              msoLineHeightRule: "exactly",
-                            } as React.CSSProperties}
-                          >
-                            {"\u00A0"}
-                          </td>
-                        );
-                      }
+              trs.push(
+                <tr key={`r-${rowIdx}`}>
+                  {row.flatMap((product, colIdx) => {
+                    const cells: React.ReactNode[] = [];
+                    if (colIdx > 0) {
                       cells.push(
                         <td
-                          key={`c-${rowIdx}-${colIdx}`}
-                          width={cellWidth}
-                          valign="top"
+                          key={`g-${rowIdx}-${colIdx}`}
+                          width={cellGap}
                           style={{
-                            width: `${cellWidth}px`,
-                            verticalAlign: "top",
+                            width: `${cellGap}px`,
+                            minWidth: `${cellGap}px`,
+                            maxWidth: `${cellGap}px`,
+                            fontSize: "1px",
+                            lineHeight: "1px",
                           }}
                         >
-                          {renderCard(product)}
+                          {"\u00A0"}
                         </td>
                       );
-                      return cells;
-                    })}
-                    {/* Fill incomplete rows */}
-                    {row.length < cols &&
-                      Array.from({ length: cols - row.length }).flatMap((_, i) => [
-                        <td
-                          key={`eg-${rowIdx}-${i}`}
-                          width={cellGap}
-                          style={{ width: `${cellGap}px` }}
-                        />,
-                        <td
-                          key={`ec-${rowIdx}-${i}`}
-                          width={cellWidth}
-                          style={{ width: `${cellWidth}px` }}
-                        />,
-                      ])}
-                  </tr>
-                );
-
-                // Row spacer
-                if (rowIdx < rows.length - 1) {
-                  trs.push(
-                    <tr key={`rg-${rowIdx}`}>
+                    }
+                    cells.push(
                       <td
-                        colSpan={totalCols}
+                        key={`c-${rowIdx}-${colIdx}`}
+                        width={cellWidth}
+                        valign="top"
                         style={{
-                          height: `${cellGap}px`,
+                          width: `${cellWidth}px`,
+                          verticalAlign: "top",
+                        }}
+                      >
+                        {renderCard(product)}
+                      </td>
+                    );
+                    return cells;
+                  })}
+                  {/* Fill incomplete rows */}
+                  {row.length < cols &&
+                    Array.from({ length: cols - row.length }).flatMap((_, i) => [
+                      <td
+                        key={`eg-${rowIdx}-${i}`}
+                        width={cellGap}
+                        style={{
+                          width: `${cellGap}px`,
+                          minWidth: `${cellGap}px`,
+                          maxWidth: `${cellGap}px`,
                           fontSize: "1px",
                           lineHeight: "1px",
-                          msoLineHeightRule: "exactly",
-                        } as React.CSSProperties}
+                        }}
                       >
                         {"\u00A0"}
-                      </td>
-                    </tr>
-                  );
-                }
+                      </td>,
+                      <td
+                        key={`ec-${rowIdx}-${i}`}
+                        width={cellWidth}
+                        style={{
+                          width: `${cellWidth}px`,
+                          minWidth: `${cellWidth}px`,
+                          maxWidth: `${cellWidth}px`,
+                          fontSize: "1px",
+                          lineHeight: "1px",
+                        }}
+                      >
+                        {"\u00A0"}
+                      </td>,
+                    ])}
+                </tr>
+              );
 
-                return trs;
-              })}
-            </tbody>
-          </table>
-        </div>
+              // Row spacer
+              if (rowIdx < rows.length - 1) {
+                trs.push(
+                  <tr key={`rg-${rowIdx}`}>
+                    <td
+                      colSpan={totalCols}
+                      height={cellGap}
+                      style={{
+                        height: `${cellGap}px`,
+                        fontSize: "1px",
+                        lineHeight: "1px",
+                      }}
+                    >
+                      {"\u00A0"}
+                    </td>
+                  </tr>
+                );
+              }
+
+              return trs;
+            })}
+          </tbody>
+        </table>
       </Section>
     );
   },

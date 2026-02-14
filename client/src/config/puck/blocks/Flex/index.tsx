@@ -1,4 +1,4 @@
-import { ComponentConfig, Slot } from "@measured/puck";
+import { ComponentConfig, Slot } from "@puckeditor/core";
 import styles from "./styles.module.css";
 import { getClassNameFactory } from "../../lib/get-class-name-factory";
 import { Section } from "../../components/Section";
@@ -61,18 +61,44 @@ const FlexInternal: ComponentConfig<FlexProps> = {
     items: [],
   },
   render: ({ justifyContent, direction, gap, wrap, items: Items }) => {
+    // Map justifyContent to HTML align attribute values
+    const alignMap: Record<string, "left" | "center" | "right"> = {
+      start: "left",
+      center: "center",
+      end: "right",
+    };
+    const tdAlign = alignMap[justifyContent] || "left";
+
     return (
-      <Section style={{ height: "100%" }}>
-        <Items
-          className={getClassName()}
-          style={{
-            justifyContent,
-            flexDirection: direction,
-            gap,
-            flexWrap: wrap,
-          }}
-          disallow={["Hero", "Stats"]}
-        />
+      <Section>
+        <table
+          width="100%"
+          cellPadding={0}
+          cellSpacing={0}
+          border={0}
+          role="presentation"
+          style={{ borderCollapse: "collapse" as const }}
+        >
+          <tbody>
+            <tr>
+              <td
+                align={tdAlign}
+                style={{ textAlign: tdAlign }}
+              >
+                <Items
+                  className={getClassName()}
+                  style={{
+                    justifyContent,
+                    flexDirection: direction,
+                    gap,
+                    flexWrap: wrap,
+                  }}
+                  disallow={["Hero", "Stats"]}
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </Section>
     );
   },

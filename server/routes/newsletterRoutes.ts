@@ -5,7 +5,9 @@ import { authenticateToken, requireTenant } from '../middleware/auth-middleware'
 import { authenticateInternalService } from '../middleware/internal-service-auth';
 import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, betterAuthUser, emailContacts, contactTagAssignments, bouncedEmails, unsubscribeTokens } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
+import { sanitizeEmailHtml } from './emailManagementRoutes';
 import { emailService, enhancedEmailService } from '../emailService';
+import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
 // Temporal service removed - now using server-node proxy
 import crypto from 'crypto';
 
@@ -100,6 +102,7 @@ async function getNewsletterRecipients(newsletter: any, tenantId: string) {
 newsletterRoutes.get("/preview-recipients", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const tenantId = req.user.tenantId;
+    const limit = 1000; // Reasonable limit to prevent large responses
     console.log('[Newsletter Preview] Fetching preview recipients for tenant:', tenantId);
 
     // Get all tenant users from betterAuthUser (all roles)
@@ -113,11 +116,15 @@ newsletterRoutes.get("/preview-recipients", authenticateToken, requireTenant, as
         role: betterAuthUser.role,
       })
       .from(betterAuthUser)
-      .where(eq(betterAuthUser.tenantId, tenantId));
+      .where(eq(betterAuthUser.tenantId, tenantId))
+      .limit(limit + 1); // Fetch one extra to detect if there are more
 
-    console.log(`[Newsletter Preview] Found ${users.length} users for tenant ${tenantId}`);
+    const hasMore = users.length > limit;
+    const limitedUsers = hasMore ? users.slice(0, limit) : users;
 
-    const recipients = users.map(u => ({
+    console.log(`[Newsletter Preview] Found ${limitedUsers.length} users for tenant ${tenantId}${hasMore ? ' (truncated)' : ''}`);
+
+    const recipients = limitedUsers.map(u => ({
       id: u.id,
       email: u.email,
       name: u.name || [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email,
@@ -125,7 +132,11 @@ newsletterRoutes.get("/preview-recipients", authenticateToken, requireTenant, as
       type: 'user' as const,
     }));
 
-    res.json({ recipients });
+    res.json({ 
+      recipients, 
+      total: hasMore ? `${limit}+` : recipients.length,
+      truncated: hasMore 
+    });
   } catch (error) {
     console.error('Get preview recipients error:', error);
     res.status(500).json({ message: 'Failed to get preview recipients' });
@@ -141,13 +152,29 @@ newsletterRoutes.post("/send-preview", authenticateToken, requireTenant, async (
       return res.status(400).json({ message: 'Missing required fields: to, subject, html' });
     }
 
+    const normalizedTo = String(to).trim().toLowerCase();
+    const tenantUser = await db.query.betterAuthUser.findFirst({
+      where: and(
+        eq(betterAuthUser.tenantId, req.user.tenantId),
+        sql`lower(${betterAuthUser.email}) = ${normalizedTo}`
+      ),
+      columns: { id: true },
+    });
+
+    if (!tenantUser) {
+      return res.status(403).json({
+        message: 'Preview emails can only be sent to users within your organization.',
+      });
+    }
+
     // Trigger the preview email task via Trigger.dev
     const { sendNewsletterPreviewTask } = await import('../../src/trigger/newsletterPreview');
 
+    const sanitizedHtml = sanitizeEmailHtml(html);
     const handle = await sendNewsletterPreviewTask.trigger({
-      to,
+      to: normalizedTo,
       subject,
-      html,
+      html: sanitizedHtml,
       tenantId: req.user.tenantId,
       requestedBy: req.user.email,
     });
@@ -241,7 +268,7 @@ newsletterRoutes.get("/:id", authenticateToken, requireTenant, async (req: any, 
 newsletterRoutes.post("/", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const validatedData = createNewsletterSchema.parse(req.body);
-    const { title, subject, content, scheduledAt, status } = validatedData;
+    const { title, subject, content, puckData, scheduledAt, status } = validatedData;
 
     const sanitizedTitle = sanitizeString(title);
     const sanitizedSubject = sanitizeString(subject);
@@ -263,6 +290,7 @@ newsletterRoutes.post("/", authenticateToken, requireTenant, async (req: any, re
       title: sanitizedTitle,
       subject: sanitizedSubject,
       content,
+      puckData: puckData || null,
       scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
       status: status || 'draft',
       recipientType: 'all',
@@ -284,7 +312,7 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, 
   try {
     const { id } = req.params;
     const validatedData = updateNewsletterSchema.parse(req.body);
-    const { title, subject, content, scheduledAt, status } = validatedData;
+    const { title, subject, content, puckData, scheduledAt, status } = validatedData;
 
     const newsletter = await db.query.newsletters.findFirst({
       where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId}`,
@@ -313,6 +341,9 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, 
       updateData.content = content;
     }
 
+    if (puckData !== undefined) {
+      updateData.puckData = puckData;
+    }
 
     if (scheduledAt !== undefined) {
       updateData.scheduledAt = scheduledAt ? new Date(scheduledAt) : null;
@@ -685,7 +716,8 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
     // If test email is provided, send test email
     if (testEmail) {
       try {
-        await emailService.sendCustomEmail(testEmail, newsletter.subject, newsletter.content, 'test');
+        const wrappedTestHtml = await wrapNewsletterContent(req.user.tenantId, newsletter.content);
+        await emailService.sendCustomEmail(testEmail, newsletter.subject, wrappedTestHtml, 'test');
         res.json({
           message: 'Test newsletter sent successfully',
           testEmail,
@@ -869,11 +901,14 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
           tokenMap.set(r.id, unsub.token);
         }
 
+        // Wrap newsletter content in the branded email design template
+        const wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content);
+
         // Prepare emails for batch sending (append unsubscribe link)
         const emails = allowedRecipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => {
           const token = tokenMap.get(contact.id)!;
           const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(token)}&type=newsletters`;
-          const html = `${newsletter.content}
+          const html = `${wrappedContent}
             <div style="padding: 16px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
               <p style="margin: 0; font-size: 12px; color: #94a3b8;">
                 <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
@@ -1024,10 +1059,13 @@ newsletterRoutes.post('/:id/send-single', authenticateInternalService, async (re
     }
     const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(unsub.token)}&type=newsletters`;
 
+    // Wrap newsletter content in the branded email design template
+    const wrappedSingleContent = await wrapNewsletterContent(tenantId, content);
+
     const email = {
       to: recipient.email,
       subject: subject,
-      html: `${content}
+      html: `${wrappedSingleContent}
         <div style="padding: 16px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
           <p style="margin: 0; font-size: 12px; color: #94a3b8;">
             <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>

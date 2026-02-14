@@ -51,7 +51,7 @@ function AppHeader() {
             size="icon"
             onClick={() => setShowExitDialog(true)}
             className="h-9 w-9 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            title="Exit to Forms"
+            title={location.startsWith('/forms/') ? "Exit to Forms" : "Exit to Newsletters"}
           >
             <X className="h-5 w-5 text-gray-600 dark:text-gray-400" />
           </Button>
@@ -71,7 +71,7 @@ function AppHeader() {
               <AlertDialogAction
                 onClick={() => {
                   setShowExitDialog(false);
-                  setLocation('/forms');
+                  setLocation(location.startsWith('/forms/') ? '/forms' : '/newsletter');
                 }}
               >
                 Exit
@@ -360,10 +360,14 @@ useEffect(() => {
     return <>{children}</>;
   }
 
+  const hideSidebar = location === '/newsletter/create' || 
+                     location.startsWith('/newsletter/edit/') || 
+                     location.startsWith('/forms/');
+
   return (
     <PageTitleProvider>
-      <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarOpenChange}>
-        <AppSidebar />
+      <SidebarProvider open={hideSidebar ? false : sidebarOpen} onOpenChange={handleSidebarOpenChange}>
+        {!hideSidebar && <AppSidebar />}
         <SidebarInset>
           <AppHeader />
           <div className="flex flex-1 flex-col">

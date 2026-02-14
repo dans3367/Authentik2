@@ -242,6 +242,8 @@ function Router() {
           <Route path="/verify-email" component={VerifyEmailPage} />
           <Route path="/update-profile" component={UpdateProfilePage} />
           <Route path="/confirm-appointment/:id" component={ConfirmAppointmentPage} />
+          <Route path="/newsletter/create/:id" component={NewsletterCreatePage} />
+          <Route path="/newsletter/create" component={NewsletterCreatePage} />
 
           {/* Routes that should be wrapped in AppLayout */}
           {isAuthenticated && isEmailVerified === true ? (
@@ -252,8 +254,8 @@ function Router() {
                   <Route path="/dashboard" component={Dashboard} />
                   <Route path="/newsletter" component={NewsletterPage} />
                   <Route path="/newsletters" component={NewsletterPage} />
-                  <Route path="/newsletter/create" component={NewsletterCreatePage} />
                   <Route path="/newsletter/edit/:id" component={NewsletterEditPage} />
+                  <Route path="/newsletters/:id/edit" component={NewsletterEditPage} />
                   <Route path="/newsletters/:id" component={NewsletterViewPage} />
                   <Route path="/promotions" component={PromotionsPage} />
                   <Route path="/promotions/create" component={CreatePromotionPage} />

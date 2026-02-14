@@ -492,6 +492,7 @@ export const newsletters = pgTable("newsletters", {
   title: text("title").notNull(),
   subject: text("subject").notNull(),
   content: text("content").notNull(), // HTML content of the newsletter
+  puckData: text("puck_data"), // JSON string of Puck editor state for re-editing
   status: text("status").notNull().default('draft'), // draft, scheduled, sent
   scheduledAt: timestamp("scheduled_at"),
   sentAt: timestamp("sent_at"),
@@ -1555,6 +1556,7 @@ export const createNewsletterSchema = z.object({
   title: z.string().min(1, "Title is required"),
   subject: z.string().min(1, "Subject is required"),
   content: z.string().min(1, "Content is required"),
+  puckData: z.string().optional(),
   // On create, disallow setting status to "sent"; use the send endpoint instead
   status: z.enum(['draft', 'scheduled']).default('draft'),
   scheduledAt: z.date().optional(),
@@ -1567,6 +1569,7 @@ export const updateNewsletterSchema = z.object({
   title: z.string().min(1, "Title is required").optional(),
   subject: z.string().min(1, "Subject is required").optional(),
   content: z.string().min(1, "Content is required").optional(),
+  puckData: z.string().optional(),
   status: z.enum(['draft', 'scheduled', 'sent']).optional(),
   scheduledAt: z.date().optional(),
   sentAt: z.date().optional(),
@@ -1779,8 +1782,11 @@ export const masterEmailDesign = pgTable("master_email_design", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().unique().references(() => tenants.id, { onDelete: 'cascade' }),
   companyName: text("company_name").default(''),
+  headerMode: text("header_mode").default('logo'), // 'logo' | 'banner'
   logoUrl: text("logo_url"),
   logoSize: text("logo_size").default('medium'), // small | medium | large | xlarge
+  logoAlignment: text("logo_alignment").default('center'), // left | center | right
+  bannerUrl: text("banner_url"),
   showCompanyName: text("show_company_name").default('true'), // 'true' | 'false'
   primaryColor: text("primary_color").default('#3B82F6'),
   secondaryColor: text("secondary_color").default('#1E40AF'),

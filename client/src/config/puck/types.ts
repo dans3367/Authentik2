@@ -1,4 +1,4 @@
-import { Config, Data } from "@measured/puck";
+import { Config, Data } from "@puckeditor/core";
 import { ButtonProps } from "./blocks/Button";
 import { CardProps } from "./blocks/Card";
 import { GridProps } from "./blocks/Grid";
@@ -11,6 +11,7 @@ import { TextProps } from "./blocks/Text";
 import { SpaceProps } from "./blocks/Space";
 import { ProductGridProps } from "./blocks/ProductGrid";
 import { ProductShowcaseProps } from "./blocks/ProductShowcase";
+import { ImageProps } from "./blocks/Image";
 
 import { RootProps } from "./root";
 
@@ -29,6 +30,7 @@ export type Components = {
   Space: SpaceProps;
   ProductGrid: ProductGridProps;
   ProductShowcase: ProductShowcaseProps;
+  Image: ImageProps;
 };
 
 export type UserConfig = Config<{

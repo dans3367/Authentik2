@@ -1,5 +1,5 @@
 import React from "react";
-import { ComponentConfig } from "@measured/puck";
+import { ComponentConfig } from "@puckeditor/core";
 import { Section } from "../../components/Section";
 
 export type HeroProps = {
@@ -18,8 +18,22 @@ export type HeroProps = {
   }[];
 };
 
-// Email content area: 600px wrapper - 80px body padding = 520px
-const CONTAINER_WIDTH = 520;
+// Email content area: 600px email wrapper, 24px Section padding each side
+const CONTAINER_WIDTH = 552;
+
+const getSafeHref = (href: string) => {
+  const trimmed = href?.trim();
+  if (!trimmed) {
+    return "#";
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? trimmed : "#";
+  } catch {
+    return "#";
+  }
+};
 
 export const Hero: ComponentConfig<HeroProps> = {
   fields: {
@@ -76,7 +90,7 @@ export const Hero: ComponentConfig<HeroProps> = {
     padding: "64px",
   },
   render: ({ align, title, description, buttons, padding, image }) => {
-    const textAlign = (align === "center" ? "center" : "left") as React.CSSProperties["textAlign"];
+    const textAlign = align === "center" ? "center" : "left";
     const padPx = padding || "64px";
     const hasInlineImage = align !== "center" && image?.mode === "inline" && image?.url;
     const hasBgImage = image?.mode === "background" && image?.url;
@@ -107,9 +121,10 @@ export const Hero: ComponentConfig<HeroProps> = {
     const renderButton = (btn: HeroProps["buttons"][number], idx: number) => (
       <a
         key={idx}
-        href={btn.href}
+        href={getSafeHref(btn.href)}
         style={btn.variant === "secondary" ? secondaryBtn : primaryBtn}
         target="_blank"
+        rel="noopener noreferrer"
       >
         {btn.label}
       </a>
@@ -138,6 +153,7 @@ export const Hero: ComponentConfig<HeroProps> = {
               <tr>
                 <td
                   width={CONTAINER_WIDTH}
+                  align={textAlign as "left" | "center"}
                   style={{
                     width: `${CONTAINER_WIDTH}px`,
                     padding: `${padPx} 0`,
@@ -171,6 +187,7 @@ export const Hero: ComponentConfig<HeroProps> = {
                         <td
                           width={contentWidth}
                           valign="middle"
+                          align={textAlign as "left" | "center"}
                           style={{
                             width: `${contentWidth}px`,
                             verticalAlign: "middle",
@@ -179,6 +196,7 @@ export const Hero: ComponentConfig<HeroProps> = {
                         >
                           {/* Title */}
                           <h1
+                            {...{ align: textAlign } as any}
                             style={{
                               margin: 0,
                               padding: 0,
@@ -188,6 +206,7 @@ export const Hero: ComponentConfig<HeroProps> = {
                               color: hasBgImage ? "#ffffff" : "#0f0f0f",
                               fontFamily: "Arial, Helvetica, sans-serif",
                               letterSpacing: "-0.02em",
+                              textAlign,
                             }}
                           >
                             {title}
@@ -195,6 +214,7 @@ export const Hero: ComponentConfig<HeroProps> = {
 
                           {/* Description */}
                           <p
+                            {...{ align: textAlign } as any}
                             style={{
                               margin: "16px 0 0 0",
                               padding: 0,
@@ -203,6 +223,7 @@ export const Hero: ComponentConfig<HeroProps> = {
                               color: hasBgImage ? "rgba(255,255,255,0.85)" : "#6b7280",
                               fontFamily: "Arial, Helvetica, sans-serif",
                               fontWeight: 400,
+                              textAlign,
                             }}
                           >
                             {description}

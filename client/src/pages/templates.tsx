@@ -298,8 +298,13 @@ function formatOperatingHours(raw: string | undefined | null): string {
 
     const fmt = (t: string) => {
       if (!t || !t.includes(':')) return t;
-      const [h, m] = t.split(':').map(Number);
-      if (Number.isNaN(h) || Number.isNaN(m)) return t;
+      const parts = t.split(':');
+      if (parts.length !== 2) return t;
+      const [hRaw, mRaw] = parts;
+      if (!/^\d+$/.test(hRaw) || !/^\d+$/.test(mRaw)) return t;
+      const h = Number(hRaw);
+      const m = Number(mRaw);
+      if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || h > 23 || m < 0 || m > 59) return t;
       const suffix = h >= 12 ? 'PM' : 'AM';
       const h12 = h % 12 || 12;
       return m === 0 ? `${h12}${suffix}` : `${h12}:${String(m).padStart(2, '0')}${suffix}`;
