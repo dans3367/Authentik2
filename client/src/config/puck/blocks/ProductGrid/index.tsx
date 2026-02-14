@@ -62,7 +62,10 @@ const ProductGridInner: ComponentConfig<ProductGridProps> = {
     gap: 24,
   },
   render: ({ products, columns, gap }) => {
-    const cols = Math.max(1, Math.min(4, Math.round(columns ?? 3)));
+    const isMobile = typeof document !== "undefined" &&
+      document.body?.dataset?.puckViewport === "mobile";
+    const requestedCols = Math.max(1, Math.min(4, Math.round(columns ?? 3)));
+    const cols = isMobile && requestedCols > 2 ? 2 : requestedCols;
     const cellGap = Math.max(0, gap ?? 24);
     const numGaps = cols - 1;
     const gapPct = numGaps > 0 ? Math.round((cellGap / 552) * 1000) / 10 : 0;
