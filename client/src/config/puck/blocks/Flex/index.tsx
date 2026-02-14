@@ -93,7 +93,7 @@ const FlexInternal: ComponentConfig<FlexProps> = {
                     gap,
                     flexWrap: wrap,
                   }}
-                  disallow={["Hero", "Stats"]}
+                  disallow={["Hero", "Stats", "ProductGrid", "ProductShowcase"]}
                 />
               </td>
             </tr>

@@ -38,7 +38,7 @@ export const GridInternal: ComponentConfig<GridProps> = {
     return (
       <Section>
         <Items
-          disallow={["Hero", "Stats"]}
+          disallow={["Hero", "Stats", "ProductGrid", "ProductShowcase"]}
           className={getClassName()}
           style={{
             gap,
