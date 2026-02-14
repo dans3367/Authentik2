@@ -52,13 +52,13 @@ You can test the theme API directly:
 
 ```bash
 # Update theme to dark
-curl -X PATCH http://localhost:5002/api/auth/theme \
+curl -X PATCH http://localhost:5000/api/auth/theme \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -d '{"theme": "dark"}'
 
 # Check current user data
-curl -X GET http://localhost:5002/api/auth/me \
+curl -X GET http://localhost:5000/api/auth/me \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 

@@ -42,7 +42,7 @@ async function updateNewsletterStatusInternal(
   status: string,
   stats: { sentCount: number; failedCount: number; totalCount: number }
 ): Promise<void> {
-  const apiUrl = process.env.API_URL || "http://localhost:5002";
+  const apiUrl = process.env.API_URL || "http://localhost:5000";
   const secret = process.env.INTERNAL_SERVICE_SECRET;
 
   if (!secret) {
@@ -81,7 +81,7 @@ async function updateNewsletterStatusInternal(
  * Check if an email is suppressed (bounced/unsubscribed)
  */
 async function getSuppressionList(tenantId: string): Promise<Set<string>> {
-  const apiUrl = process.env.API_URL || "http://localhost:5002";
+  const apiUrl = process.env.API_URL || "http://localhost:5000";
   const secret = process.env.INTERNAL_SERVICE_SECRET;
 
   if (!secret) {

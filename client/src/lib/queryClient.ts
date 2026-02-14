@@ -45,7 +45,7 @@ export async function apiRequest(
       }
       
       // If accessing via IP address, point directly to the API server port
-      const apiPort = import.meta.env.VITE_API_PORT || '5002';
+      const apiPort = import.meta.env.VITE_API_PORT || '5000';
       return `${protocol}//${hostname}:${apiPort}`;
     }
     

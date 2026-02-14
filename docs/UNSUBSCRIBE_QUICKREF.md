@@ -54,7 +54,7 @@ Expected response:
 ### Test Unsubscribe Page
 ```bash
 # Via proxy (production path)
-curl "http://localhost:5002/api/unsubscribe/birthday?token=YOUR_TOKEN"
+curl "http://localhost:5000/api/unsubscribe/birthday?token=YOUR_TOKEN"
 
 # Direct to cardprocessor-go
 curl "http://localhost:5004/api/unsubscribe/birthday?token=YOUR_TOKEN"

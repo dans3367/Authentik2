@@ -30,7 +30,7 @@ async function logEmailActivity(params: {
     activityData: object;
     webhookId: string;
 }): Promise<{ success: boolean; error?: string }> {
-    const apiUrl = process.env.API_URL || "http://localhost:5002";
+    const apiUrl = process.env.API_URL || "http://localhost:5000";
     const timestamp = Date.now();
     const body = {
         tenantId: params.tenantId,

@@ -1,4 +1,4 @@
-[Error] Fetch API cannot load http://localhost:5002/api/my-subscription due to access control checks.
+[Error] Fetch API cannot load http://localhost:5000/api/my-subscription due to access control checks.
 	(anonymous function) (queryClient.ts:26)
 	apiRequest (queryClient.ts:19)
 	(anonymous function) (queryClient.ts:45)
@@ -52,7 +52,7 @@
 	workLoop (chunk-RPCDYKBN.js:197)
 	flushWork (chunk-RPCDYKBN.js:176)
 	performWorkUntilDeadline (chunk-RPCDYKBN.js:384)
-[Error] Fetch API cannot load http://localhost:5002/api/shops due to access control checks.
+[Error] Fetch API cannot load http://localhost:5000/api/shops due to access control checks.
 	(anonymous function) (queryClient.ts:26)
 	apiRequest (queryClient.ts:19)
 	(anonymous function) (shops.tsx:207)
@@ -91,7 +91,7 @@
 	(anonymous function) (queryClient.ts:38)
 	run (@tanstack_react-query.js:507)
 	(anonymous function) (@tanstack_react-query.js:532)
-[Error] Fetch API cannot load http://localhost:5002/api/my-subscription due to access control checks.
+[Error] Fetch API cannot load http://localhost:5000/api/my-subscription due to access control checks.
 	(anonymous function) (queryClient.ts:26)
 	apiRequest (queryClient.ts:19)
 	(anonymous function) (queryClient.ts:45)
@@ -105,7 +105,7 @@
 	queryFn (shops.tsx:190)
 	run (@tanstack_react-query.js:507)
 	(anonymous function) (@tanstack_react-query.js:532)
-[Error] Fetch API cannot load http://localhost:5002/api/shops due to access control checks.
+[Error] Fetch API cannot load http://localhost:5000/api/shops due to access control checks.
 	(anonymous function) (queryClient.ts:26)
 	apiRequest (queryClient.ts:19)
 	(anonymous function) (shops.tsx:207)

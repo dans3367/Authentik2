@@ -192,7 +192,7 @@ Each sent email includes:
 
 ### Environment Variables
 - `CARDPROCESSOR_URL`: URL for cardprocessor service (default: `http://localhost:8082`)
-- `APP_URL`: Base URL for unsubscribe links (default: `http://localhost:5002`)
+- `APP_URL`: Base URL for unsubscribe links (default: `http://localhost:5000`)
 
 ### Birthday Settings
 Configure via the Birthday Settings page:

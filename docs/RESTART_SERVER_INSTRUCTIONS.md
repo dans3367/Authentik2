@@ -41,7 +41,7 @@ npm run dev
 
 After restart, test with curl:
 ```bash
-curl -X POST http://localhost:5002/api/email-contacts/send-birthday-card \
+curl -X POST http://localhost:5000/api/email-contacts/send-birthday-card \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -d '{"contactIds": ["test-id"]}'

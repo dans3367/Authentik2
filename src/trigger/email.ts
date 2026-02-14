@@ -76,7 +76,7 @@ export const sendEmailTask = task({
       subject: data.subject,
     });
 
-    const apiUrl = process.env.API_URL || 'http://localhost:5002';
+    const apiUrl = process.env.API_URL || 'http://localhost:5000';
     const secret = process.env.INTERNAL_SERVICE_SECRET;
 
     async function updateEmailSendStatus(update: { emailTrackingId: string; providerMessageId?: string; status: 'sent' | 'failed' }) {
@@ -399,7 +399,7 @@ export const schedulePromotionalEmailTask = task({
     }
 
     // Call the internal API endpoint to execute the email send with database logging
-    const apiUrl = process.env.API_URL || 'http://localhost:5002';
+    const apiUrl = process.env.API_URL || 'http://localhost:5000';
     const secret = process.env.INTERNAL_SERVICE_SECRET;
 
     if (!secret) {

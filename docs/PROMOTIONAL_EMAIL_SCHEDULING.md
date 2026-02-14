@@ -70,7 +70,7 @@ The internal API endpoint is secured using HMAC signature verification:
 
 ```bash
 # Required for Trigger.dev task to call back to server
-API_URL=http://localhost:5002  # or your production URL
+API_URL=http://localhost:5000  # or your production URL
 INTERNAL_SERVICE_SECRET=your-secret-key
 
 # Required for email sending

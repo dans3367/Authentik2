@@ -16,7 +16,7 @@ async function updateReminderStatusInternal(
   status: 'pending' | 'sent' | 'failed' | 'cancelled',
   errorMessage?: string
 ): Promise<void> {
-  const apiUrl = process.env.API_URL || 'http://localhost:5002';
+  const apiUrl = process.env.API_URL || 'http://localhost:5000';
   const secret = process.env.INTERNAL_SERVICE_SECRET;
 
   if (!secret) {
@@ -355,7 +355,7 @@ async function generateReminderEmailHtml(data: ReminderPayload): Promise<string>
       </div>`
     : "";
 
-  const baseUrl = process.env.API_URL || 'http://localhost:5002';
+  const baseUrl = process.env.API_URL || 'http://localhost:5000';
   const confirmUrl = `${baseUrl}/api/appointments/${data.appointmentId}/confirm`;
   const declineUrl = `${baseUrl}/api/appointments/${data.appointmentId}/decline`;
 

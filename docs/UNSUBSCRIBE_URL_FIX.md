@@ -5,7 +5,7 @@ The unsubscribe links were pointing to incorrect endpoints, causing "Cannot GET 
 
 ## Problem
 - BirthdayWorker was using `http://localhost:5004/api/unsubscribe/birthday` (wrong port)
-- Cardprocessor-go templates were using `http://localhost:5002/api/unsubscribe/birthday` (wrong port)
+- Cardprocessor-go templates were using `http://localhost:5000/api/unsubscribe/birthday` (wrong port)
 - Both should point to the main server at `http://localhost:3502/api/unsubscribe/birthday`
 
 ## ✅ **Fixed Files**
@@ -38,7 +38,7 @@ const tokenResponse = await fetch(`${cardprocessorUrl}/api/birthday-unsubscribe-
 
 #### **Before:**
 ```go
-unsubscribeUrl := fmt.Sprintf("http://localhost:5002/api/unsubscribe/birthday?token=%s", params.UnsubscribeToken)
+unsubscribeUrl := fmt.Sprintf("http://localhost:5000/api/unsubscribe/birthday?token=%s", params.UnsubscribeToken)
 ```
 
 #### **After:**

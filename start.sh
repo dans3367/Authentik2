@@ -24,7 +24,7 @@ NC='\033[0m' # No Color
 
 # Define services and their ports (global scope for stop_services)
 SERVICE_NAMES=("Main Server" "Webhook Server")
-SERVICE_PORTS=("5002" "3505")
+SERVICE_PORTS=("5000" "3505")
 
 # Function to print colored output
 print_status() {
@@ -202,7 +202,7 @@ start_services() {
 
     # Set environment variables
     export NODE_ENV=${NODE_ENV:-development}
-    export PORT=${PORT:-5002}
+    export PORT=${PORT:-5000}
     export WEBHOOK_PORT=${WEBHOOK_PORT:-3505}
 
     print_status "Environment: $NODE_ENV"
@@ -215,7 +215,7 @@ start_services() {
     # 1. Start Main Server (npm run dev equivalent)
     start_service "Main Server" "$PORT" "NODE_ENV=$NODE_ENV PORT=$PORT npx tsx server/index.ts" "$PROJECT_ROOT"
     if [ $? -eq 0 ]; then
-        print_port "Main Server: http://localhost:5002"
+        print_port "Main Server: http://localhost:5000"
     fi
 
     # 2. Start Webhook Server (for Resend webhooks)
@@ -260,7 +260,7 @@ case "$COMMAND" in
         ;;
     *)
         echo "Usage: $0 [start|stop|restart]"
-        echo "  start   - Start all services (kills existing processes on ports 5002 and 3505)"
+        echo "  start   - Start all services (kills existing processes on ports 5000 and 3505)"
         echo "  stop    - Stop all running services"
         echo "  restart - Restart all services"
         exit 1

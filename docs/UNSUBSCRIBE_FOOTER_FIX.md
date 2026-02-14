@@ -43,7 +43,7 @@ The following components were already in place and functioning correctly:
 <div style="padding: 20px 30px; border-top: 1px solid #e2e8f0; text-align: center; background-color: #f7fafc;">
     <p style="margin: 0; font-size: 0.8rem; color: #a0aec0; line-height: 1.4;">
         Don't want to receive birthday cards? 
-        <a href="http://localhost:5002/api/unsubscribe/birthday?token={TOKEN}" style="color: #667eea; text-decoration: none; font-weight: 500;">Unsubscribe here</a>
+        <a href="http://localhost:5000/api/unsubscribe/birthday?token={TOKEN}" style="color: #667eea; text-decoration: none; font-weight: 500;">Unsubscribe here</a>
     </p>
 </div>
 ```
@@ -91,7 +91,7 @@ go build -o /tmp/cardprocessor-test
 go run /tmp/test_unsubscribe.go
 # Results:
 # ✅ Unsubscribe footer test PASSED - Token is properly included
-# ✅ Unsubscribe URL: http://localhost:5002/api/unsubscribe/birthday?token=test123token456
+# ✅ Unsubscribe URL: http://localhost:5000/api/unsubscribe/birthday?token=test123token456
 # ✅ Footer styling PASSED - Background color included
 # ✅ Link styling PASSED - Font weight included
 ```
@@ -140,11 +140,11 @@ To verify the fix is working:
 
 ## Environment Configuration
 
-The unsubscribe URL uses `http://localhost:5002` by default. Update this in production:
+The unsubscribe URL uses `http://localhost:5000` by default. Update this in production:
 
 ```go
 // In templates.go, line ~322
-unsubscribeUrl := fmt.Sprintf("http://localhost:5002/api/unsubscribe/birthday?token=%s", params.UnsubscribeToken)
+unsubscribeUrl := fmt.Sprintf("http://localhost:5000/api/unsubscribe/birthday?token=%s", params.UnsubscribeToken)
 ```
 
 Change to your production domain:

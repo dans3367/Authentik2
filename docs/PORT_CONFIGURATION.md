@@ -38,10 +38,10 @@ PostgreSQL Database
 ### Via Proxy (Production Path)
 ```bash
 # Health check
-curl http://localhost:5002/health
+curl http://localhost:5000/health
 
 # Unsubscribe page
-curl "http://localhost:5002/api/unsubscribe/birthday?token=YOUR_TOKEN"
+curl "http://localhost:5000/api/unsubscribe/birthday?token=YOUR_TOKEN"
 ```
 
 ### Direct Access (Development)
@@ -127,7 +127,7 @@ lsof -i :3505
 ### Verify Services
 ```bash
 # Express server
-curl http://localhost:5002/health
+curl http://localhost:5000/health
 
 # Cardprocessor-go
 curl http://localhost:5004/health

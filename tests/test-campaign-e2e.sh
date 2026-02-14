@@ -10,7 +10,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-BASE_URL="http://localhost:5002"
+BASE_URL="http://localhost:5000"
 
 # Step 1: Register a test user
 echo "1️⃣ Registering test user..."

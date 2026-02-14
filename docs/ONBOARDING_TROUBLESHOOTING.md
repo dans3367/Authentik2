@@ -19,7 +19,7 @@ npm run dev:server
 ### 2. **Wrong API Endpoint**
 Check if the endpoint URL is correct.
 
-**Expected:** `http://localhost:5002/api/company/complete-onboarding`
+**Expected:** `http://localhost:5000/api/company/complete-onboarding`
 
 **To verify:**
 ```bash
@@ -40,7 +40,7 @@ If running frontend and backend on different ports without proper proxy setup.
 
 **Check your setup:**
 - Frontend: typically `http://localhost:5173` (Vite)
-- Backend: typically `http://localhost:5002`
+- Backend: typically `http://localhost:5000`
 - Vite proxy should be configured in `vite.config.ts`
 
 ### 5. **Route Import Missing**
@@ -83,7 +83,7 @@ Test the endpoint directly:
 # First, get your session cookie from browser DevTools
 # Application → Cookies → copy the auth cookie value
 
-curl -X POST http://localhost:5002/api/company/complete-onboarding \
+curl -X POST http://localhost:5000/api/company/complete-onboarding \
   -H "Content-Type: application/json" \
   -H "Cookie: better-auth.session_token=YOUR_TOKEN_HERE" \
   -d '{

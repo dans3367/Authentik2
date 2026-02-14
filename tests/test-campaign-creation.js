@@ -5,7 +5,7 @@ const axios = require('axios');
 async function testCampaignCreation() {
   console.log('🧪 Testing Campaign Creation API...\n');
 
-  const baseURL = 'http://localhost:5002';
+  const baseURL = 'http://localhost:5000';
 
   try {
     // Step 1: Login to get valid token

@@ -12,9 +12,9 @@ app.use(cors({
   origin: function (origin, callback) {
     const allowedOrigins = [
       'http://localhost:3000',
-      'http://localhost:5002', 
+      'http://localhost:5000', 
       'http://localhost:3002',
-      'http://localhost:5002',
+      'http://localhost:5000',
       /^https:\/\/.*\.replit\.dev$/,
       /^https:\/\/.*\.repl\.co$/,
       'https://janeway.replit.dev'
@@ -60,8 +60,8 @@ Fixed `fserver/package.json` by removing the invalid `--allowed-hosts` CLI flag:
 ✅ **Configuration Valid**: No more Vite CLI errors
 
 ## API Endpoints
-- `GET http://localhost:5002/api/forms/[UUID]` - Retrieve form data
-- `POST http://localhost:5002/api/forms/[UUID]/submit` - Submit form response
+- `GET http://localhost:5000/api/forms/[UUID]` - Retrieve form data
+- `POST http://localhost:5000/api/forms/[UUID]/submit` - Submit form response
 
 ## Status: RESOLVED
 The form server backend is now fully compatible with Replit's dynamic hostname system and can accept requests from any Replit-generated domain without CORS blocking issues.

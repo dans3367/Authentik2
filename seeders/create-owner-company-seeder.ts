@@ -198,7 +198,7 @@ async function createOwnerCompanySeeder() {
 
         // Fallback: Try using the handler method
         try {
-          const createUserRequest = new Request("http://localhost:5002/api/auth/sign-up/email", {
+          const createUserRequest = new Request("http://localhost:5000/api/auth/sign-up/email", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",

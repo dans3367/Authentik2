@@ -4,7 +4,7 @@
  */
 
 // Get the API server port from environment or default
-const API_PORT = import.meta.env.VITE_API_PORT || '5002';
+const API_PORT = import.meta.env.VITE_API_PORT || '5000';
 const FORMS_PORT = import.meta.env.VITE_FORMS_PORT || '3004';
 const CARDPROCESSOR_PORT = import.meta.env.VITE_CARDPROCESSOR_PORT || '5004';
 

@@ -53,7 +53,7 @@ async function createOwnerSeeder() {
 
     // Use better-auth's API to create the user properly
     // This follows better-auth best practices by using the framework's own methods
-    const createUserRequest = new Request("http://localhost:5002/api/auth/sign-up/email", {
+    const createUserRequest = new Request("http://localhost:5000/api/auth/sign-up/email", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

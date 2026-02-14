@@ -39,12 +39,12 @@ const getBaseURL = () => {
     }
     
     // If accessing via IP address, point directly to the API server port
-    const apiPort = import.meta.env.VITE_API_PORT || '5002';
+    const apiPort = import.meta.env.VITE_API_PORT || '5000';
     return `${protocol}//${hostname}:${apiPort}`;
   }
   
   // Final fallback for localhost development
-  return "http://localhost:5002";
+  return "http://localhost:5000";
 };
 
 export const authClient = createAuthClient({

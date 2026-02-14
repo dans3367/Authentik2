@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Test JWT token refresh functionality
-API_URL="http://localhost:5002/api"
+API_URL="http://localhost:5000/api"
 
 echo "🔄 Testing JWT Token Refresh"
 echo "============================"

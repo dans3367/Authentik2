@@ -1,5 +1,5 @@
 // Test script to create sample contacts with birthday data
-const BASE_URL = 'http://localhost:5002';
+const BASE_URL = 'http://localhost:5000';
 
 // Helper function to make API requests
 async function apiRequest(method, endpoint, body = null) {

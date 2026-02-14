@@ -123,7 +123,7 @@ export async function callInternalEndpoint(
   method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   payload?: object
 ): Promise<{ success: boolean; data?: any; error?: string }> {
-  const apiUrl = process.env.API_URL || 'http://localhost:5002';
+  const apiUrl = process.env.API_URL || 'http://localhost:5000';
   const secret = process.env.INTERNAL_SERVICE_SECRET;
 
   if (!secret) {
