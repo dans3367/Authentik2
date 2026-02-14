@@ -12,6 +12,7 @@ import { SpaceProps } from "./blocks/Space";
 import { ProductGridProps } from "./blocks/ProductGrid";
 import { ProductShowcaseProps } from "./blocks/ProductShowcase";
 import { ImageProps } from "./blocks/Image";
+import { TestimonialProps } from "./blocks/Testimonial";
 
 import { RootProps } from "./root";
 
@@ -31,6 +32,7 @@ export type Components = {
   ProductGrid: ProductGridProps;
   ProductShowcase: ProductShowcaseProps;
   Image: ImageProps;
+  Testimonial: TestimonialProps;
 };
 
 export type UserConfig = Config<{
