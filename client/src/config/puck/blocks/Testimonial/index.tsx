@@ -57,27 +57,24 @@ export const Testimonial: ComponentConfig<TestimonialProps> = {
 
     return (
       <Section>
-        <div style={{ width: `${CONTAINER_WIDTH}px`, maxWidth: "100%", margin: "0 auto" }}>
+        <div style={{ maxWidth: `${CONTAINER_WIDTH}px`, width: "100%", margin: "0 auto" }}>
           <table
             role="presentation"
             cellPadding={0}
             cellSpacing={0}
             border={0}
-            width={CONTAINER_WIDTH}
+            width="100%"
             style={{
-              width: `${CONTAINER_WIDTH}px`,
-              maxWidth: "100%",
+              width: "100%",
+              maxWidth: `${CONTAINER_WIDTH}px`,
               borderCollapse: "collapse" as const,
-              tableLayout: "fixed" as const,
             }}
           >
             <tbody>
               <tr>
                 <td
-                  width={CONTAINER_WIDTH}
                   align={textAlign}
                   style={{
-                    width: `${CONTAINER_WIDTH}px`,
                     padding: `${padPx} 0`,
                     textAlign,
                     fontFamily: "Arial, Helvetica, sans-serif",

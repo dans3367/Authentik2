@@ -122,13 +122,14 @@ const ImageInner: ComponentConfig<ImageProps> = {
     const totalGap = cellGap * (count - 1);
 
     const getImgWidth = () => {
-      if (sizing === "fill") return Math.max(1, Math.floor((CONTAINER_WIDTH - totalGap) / images.length));
+      if (sizing === "fill") return undefined;
       if (sizing === "preset") return AUTO_SIZES[autoSize ?? "xlarge"];
       if (sizing === "fixed") return Math.min(width ?? 520, CONTAINER_WIDTH);
-      return undefined; // auto
+      return undefined;
     };
 
     const imgWidth = getImgWidth();
+    const fillPercent = sizing === "fill" ? `${Math.floor(100 / count)}%` : undefined;
     const tdAlign = align === "left" ? "left" : align === "right" ? "right" : "center";
 
     const renderImage = (item: ImageItem, idx: number) => {
@@ -139,10 +140,11 @@ const ImageInner: ComponentConfig<ImageProps> = {
         textDecoration: "none",
         maxWidth: "100%",
         borderRadius: borderRadius ? `${borderRadius}px` : undefined,
-        ...(sizing === "fill" && { width: `${imgWidth}px` }),
+        ...(sizing === "fill" && { width: "100%" }),
         ...(sizing === "preset" && { width: `${imgWidth}px`, height: "auto" }),
         ...(sizing === "fixed" && {
           width: `${imgWidth}px`,
+          maxWidth: "100%",
           height: height ? `${height}px` : "auto",
         }),
       };
@@ -168,6 +170,7 @@ const ImageInner: ComponentConfig<ImageProps> = {
 
     return (
       <Section>
+        <div style={{ maxWidth: `${CONTAINER_WIDTH}px`, width: "100%", margin: "0 auto" }}>
         <table
           role="presentation"
           cellPadding={0}
@@ -185,11 +188,13 @@ const ImageInner: ComponentConfig<ImageProps> = {
                   )}
                   <td
                     align={tdAlign}
+                    {...(fillPercent ? { width: fillPercent } : {})}
                     style={{
                       padding: 0,
                       fontFamily: "Arial, Helvetica, sans-serif",
                       fontSize: 0,
                       lineHeight: 0,
+                      ...(fillPercent ? { width: fillPercent } : {}),
                     }}
                   >
                     {renderImage(item, idx)}
@@ -216,6 +221,7 @@ const ImageInner: ComponentConfig<ImageProps> = {
             )}
           </tbody>
         </table>
+        </div>
       </Section>
     );
   },

@@ -130,32 +130,26 @@ export const Hero: ComponentConfig<HeroProps> = {
       </a>
     );
 
-    // Content column width when inline image is present
-    const contentWidth = hasInlineImage ? Math.floor(CONTAINER_WIDTH * 0.55) : CONTAINER_WIDTH;
-    const imageWidth = hasInlineImage ? CONTAINER_WIDTH - contentWidth - 24 : 0; // 24px gap
-
     return (
       <Section>
-        <div style={{ width: `${CONTAINER_WIDTH}px`, maxWidth: "100%", margin: "0 auto" }}>
+        <div style={{ maxWidth: `${CONTAINER_WIDTH}px`, width: "100%", margin: "0 auto" }}>
           <table
             role="presentation"
             cellPadding={0}
             cellSpacing={0}
             border={0}
-            width={CONTAINER_WIDTH}
+            width="100%"
             style={{
-              width: `${CONTAINER_WIDTH}px`,
+              width: "100%",
+              maxWidth: `${CONTAINER_WIDTH}px`,
               borderCollapse: "collapse" as const,
-              tableLayout: "fixed" as const,
             }}
           >
             <tbody>
               <tr>
                 <td
-                  width={CONTAINER_WIDTH}
                   align={textAlign as "left" | "center"}
                   style={{
-                    width: `${CONTAINER_WIDTH}px`,
                     padding: `${padPx} 0`,
                     textAlign,
                     fontFamily: "Arial, Helvetica, sans-serif",
@@ -185,11 +179,11 @@ export const Hero: ComponentConfig<HeroProps> = {
                       <tr>
                         {/* Text content column */}
                         <td
-                          width={contentWidth}
+                          width={hasInlineImage ? "55%" : "100%"}
                           valign="middle"
                           align={textAlign as "left" | "center"}
                           style={{
-                            width: `${contentWidth}px`,
+                            width: hasInlineImage ? "55%" : "100%",
                             verticalAlign: "middle",
                             textAlign,
                           }}
@@ -271,7 +265,6 @@ export const Hero: ComponentConfig<HeroProps> = {
                         {/* Inline image column */}
                         {hasInlineImage && (
                           <>
-                            {/* Gap */}
                             <td
                               width={24}
                               style={{
@@ -283,20 +276,19 @@ export const Hero: ComponentConfig<HeroProps> = {
                               {"\u00A0"}
                             </td>
                             <td
-                              width={imageWidth}
+                              width="40%"
                               valign="middle"
                               style={{
-                                width: `${imageWidth}px`,
+                                width: "40%",
                                 verticalAlign: "middle",
                               }}
                             >
                               <img
                                 src={image!.url}
                                 alt={title}
-                                width={imageWidth}
                                 style={{
                                   display: "block",
-                                  width: `${imageWidth}px`,
+                                  width: "100%",
                                   height: "auto",
                                   maxWidth: "100%",
                                   border: 0,

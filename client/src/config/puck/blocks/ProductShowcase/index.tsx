@@ -158,34 +158,24 @@ const ProductShowcaseInner: ComponentConfig<ProductShowcaseProps> = {
     const cardRadius = Math.max(0, borderRadius ?? 12);
     const imgRadius = Math.max(0, imageBorderRadius ?? 12);
 
-    // Email content area: 600px email wrapper, 24px Section padding each side
-    const containerWidth = 552;
-    const textColWidth = 280;
-    const gapWidth = 20;
-    const imageColWidth = containerWidth - textColWidth - gapWidth;
-
     return (
       <Section>
         <div
           style={{
-            width: `${containerWidth}px`,
-            maxWidth: "100%",
+            maxWidth: "552px",
+            width: "100%",
             margin: "0 auto",
           }}
         >
-          {/*
-            Outer card table — provides the rounded background.
-            Using a wrapping table with bgcolor for maximum email client support.
-          */}
           <table
             role="presentation"
             cellPadding={0}
             cellSpacing={0}
             border={0}
-            width={containerWidth}
+            width="100%"
             {...({ bgcolor: bgColor } as any)}
             style={{
-              width: `${containerWidth}px`,
+              width: "100%",
               borderCollapse: "separate" as const,
               borderSpacing: 0,
               borderRadius: `${cardRadius}px`,
@@ -203,44 +193,24 @@ const ProductShowcaseInner: ComponentConfig<ProductShowcaseProps> = {
                     backgroundColor: bgColor,
                   }}
                 >
-                  {/*
-                    Inner layout table — two columns: text left, image right.
-                    Uses fixed table layout for reliable widths across email clients.
-                  */}
                   <table
                     role="presentation"
                     cellPadding={0}
                     cellSpacing={0}
                     border={0}
-                    width={containerWidth}
+                    width="100%"
                     style={{
-                      width: `${containerWidth}px`,
+                      width: "100%",
                       borderCollapse: "collapse" as const,
-                      tableLayout: "fixed" as const,
                     }}
                   >
-                    <colgroup>
-                      <col
-                        width={textColWidth}
-                        style={{ width: `${textColWidth}px` }}
-                      />
-                      <col
-                        width={gapWidth}
-                        style={{ width: `${gapWidth}px` }}
-                      />
-                      <col
-                        width={imageColWidth}
-                        style={{ width: `${imageColWidth}px` }}
-                      />
-                    </colgroup>
                     <tbody>
                       <tr>
-                        {/* Text column */}
                         <td
-                          width={textColWidth}
+                          width="55%"
                           valign="middle"
                           style={{
-                            width: `${textColWidth}px`,
+                            width: "55%",
                             verticalAlign: "middle",
                             padding: "40px 0 40px 40px",
                             fontFamily: "Arial, Helvetica, sans-serif",
@@ -300,36 +270,21 @@ const ProductShowcaseInner: ComponentConfig<ProductShowcaseProps> = {
                           </p>
                         </td>
 
-                        {/* Gap column */}
                         <td
-                          width={gapWidth}
-                          style={{
-                            width: `${gapWidth}px`,
-                            fontSize: "1px",
-                            lineHeight: "1px",
-                            msoLineHeightRule: "exactly",
-                          } as React.CSSProperties}
-                        >
-                          {"\u00A0"}
-                        </td>
-
-                        {/* Image column */}
-                        <td
-                          width={imageColWidth}
+                          width="45%"
                           valign="middle"
                           style={{
-                            width: `${imageColWidth}px`,
+                            width: "45%",
                             verticalAlign: "middle",
-                            padding: "24px 24px 24px 0",
+                            padding: "24px",
                           }}
                         >
                           <img
                             src={safeImageUrl}
                             alt={imageAlt}
-                            width={imageColWidth - 24}
                             style={{
                               display: "block",
-                              width: `${imageColWidth - 24}px`,
+                              width: "100%",
                               height: "auto",
                               maxWidth: "100%",
                               border: 0,
