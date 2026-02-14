@@ -83,22 +83,78 @@ export const Testimonial: ComponentConfig<TestimonialProps> = {
                     fontFamily: "Arial, Helvetica, sans-serif",
                   }}
                 >
-                  {/* Quote text */}
-                  <p
+                  {/* Quote with decorative marks in separate table cells */}
+                  <table
+                    role="presentation"
+                    cellPadding={0}
+                    cellSpacing={0}
+                    border={0}
+                    width="100%"
                     style={{
-                      margin: "0",
-                      padding: "0",
-                      fontSize: "18px",
-                      lineHeight: "1.6",
-                      color: "#1f2937",
-                      fontFamily: "Georgia, 'Times New Roman', Times, serif",
-                      fontWeight: 400,
-                      fontStyle: "italic",
-                      textAlign,
+                      width: "100%",
+                      borderCollapse: "collapse" as const,
                     }}
                   >
-                    &ldquo;{quote}&rdquo;
-                  </p>
+                    <tbody>
+                      <tr>
+                        <td
+                          width={24}
+                          valign="top"
+                          style={{
+                            width: "24px",
+                            verticalAlign: "top",
+                            fontSize: "32px",
+                            lineHeight: "1",
+                            color: "#d1d5db",
+                            fontFamily: "Georgia, 'Times New Roman', Times, serif",
+                            paddingTop: "4px",
+                            userSelect: "none" as const,
+                          }}
+                        >
+                          {"\u201C"}
+                        </td>
+                        <td
+                          valign="top"
+                          style={{
+                            verticalAlign: "top",
+                            fontFamily: "Georgia, 'Times New Roman', Times, serif",
+                          }}
+                        >
+                          <p
+                            style={{
+                              margin: "0",
+                              padding: "0",
+                              fontSize: "18px",
+                              lineHeight: "1.6",
+                              color: "#1f2937",
+                              fontFamily: "Georgia, 'Times New Roman', Times, serif",
+                              fontWeight: 400,
+                              fontStyle: "italic",
+                              textAlign,
+                            }}
+                          >
+                            {quote}
+                          </p>
+                        </td>
+                        <td
+                          width={24}
+                          valign="bottom"
+                          style={{
+                            width: "24px",
+                            verticalAlign: "bottom",
+                            fontSize: "32px",
+                            lineHeight: "1",
+                            color: "#d1d5db",
+                            fontFamily: "Georgia, 'Times New Roman', Times, serif",
+                            paddingBottom: "4px",
+                            userSelect: "none" as const,
+                          }}
+                        >
+                          {"\u201D"}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
 
                   {/* Spacer */}
                   <table
