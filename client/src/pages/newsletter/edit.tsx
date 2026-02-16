@@ -68,7 +68,7 @@ export default function NewsletterEditPage() {
         title: newsletter.title,
         subject: newsletter.subject,
         content: newsletter.content,
-        status: newsletter.status as "draft" | "scheduled" | "sent",
+        status: newsletter.status as "draft" | "ready_to_send" | "scheduled" | "sending" | "sent",
         scheduledAt: newsletter.scheduledAt ? new Date(newsletter.scheduledAt) : undefined,
         recipientType: newsletter.recipientType as "all" | "selected" | "tags",
         selectedContactIds: newsletter.selectedContactIds || [],
@@ -557,15 +557,15 @@ export default function NewsletterEditPage() {
                   <Label htmlFor="status">Status</Label>
                   <Select
                     value={form.watch("status")}
-                    onValueChange={(value) => form.setValue("status", value as "draft" | "scheduled" | "sent")}
+                    onValueChange={(value) => form.setValue("status", value as "draft" | "ready_to_send" | "scheduled" | "sent")}
                   >
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="draft">Draft</SelectItem>
+                      <SelectItem value="ready_to_send">Ready to Send</SelectItem>
                       <SelectItem value="scheduled">Scheduled</SelectItem>
-                      {/* Don't allow changing status to "sent" - use Send button instead */}
                     </SelectContent>
                   </Select>
                 </div>

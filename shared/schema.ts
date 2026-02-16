@@ -493,7 +493,7 @@ export const newsletters = pgTable("newsletters", {
   subject: text("subject").notNull(),
   content: text("content").notNull(), // HTML content of the newsletter
   puckData: text("puck_data"), // JSON string of Puck editor state for re-editing
-  status: text("status").notNull().default('draft'), // draft, scheduled, sent
+  status: text("status").notNull().default('draft'), // draft, ready_to_send, scheduled, sending, sent
   scheduledAt: timestamp("scheduled_at"),
   sentAt: timestamp("sent_at"),
   // Customer segmentation fields
@@ -1557,8 +1557,7 @@ export const createNewsletterSchema = z.object({
   subject: z.string().min(1, "Subject is required"),
   content: z.string().min(1, "Content is required"),
   puckData: z.string().optional(),
-  // On create, disallow setting status to "sent"; use the send endpoint instead
-  status: z.enum(['draft', 'scheduled']).default('draft'),
+  status: z.enum(['draft', 'ready_to_send', 'scheduled']).default('draft'),
   scheduledAt: z.date().optional(),
   recipientType: z.enum(['all', 'selected', 'tags']).default('all'),
   selectedContactIds: z.array(z.string()).optional(),
@@ -1570,7 +1569,7 @@ export const updateNewsletterSchema = z.object({
   subject: z.string().min(1, "Subject is required").optional(),
   content: z.string().min(1, "Content is required").optional(),
   puckData: z.string().optional(),
-  status: z.enum(['draft', 'scheduled', 'sent']).optional(),
+  status: z.enum(['draft', 'ready_to_send', 'scheduled', 'sending', 'sent']).optional(),
   scheduledAt: z.date().optional(),
   sentAt: z.date().optional(),
   recipientType: z.enum(['all', 'selected', 'tags']).optional(),

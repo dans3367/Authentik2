@@ -5,6 +5,7 @@ import config, { initialData } from "@/config/puck";
 import { UserData } from "@/config/puck/types";
 import { Monitor, Smartphone, ZoomIn, ZoomOut, Mail, Save, ArrowLeft, Loader2, X } from "lucide-react";
 import { SendPreviewDialog } from "@/components/SendPreviewDialog";
+import { SendNewsletterWizardModal } from "@/components/SendNewsletterWizardModal";
 import { extractPuckEmailHtml } from "@/utils/puck-to-email-html";
 import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
 import { useLocation, useParams } from "wouter";
@@ -47,6 +48,7 @@ export default function NewsletterCreatePage() {
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [showSendWizard, setShowSendWizard] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -111,7 +113,7 @@ export default function NewsletterCreatePage() {
   }, []);
 
   // Save newsletter to database (create or update)
-  const saveToDatabase = useCallback(async (status: 'draft' | 'scheduled' = 'draft') => {
+  const saveToDatabase = useCallback(async (status: 'draft' | 'ready_to_send' | 'scheduled' = 'draft') => {
     const htmlContent = extractPuckEmailHtml();
     const puckDataJson = JSON.stringify(dataRef.current);
     const currentTitle = title.trim() || "Untitled Newsletter";
@@ -252,11 +254,38 @@ export default function NewsletterCreatePage() {
     setData(publishData);
     dataRef.current = publishData;
     try {
-      await saveToDatabase('draft');
-      toast({ title: "Newsletter Saved", description: "Your newsletter has been saved." });
-      setLocation('/newsletter');
+      await saveToDatabase('ready_to_send');
+      setHasUnsavedChanges(false);
+      setShowSendWizard(true);
     } catch {
       // Error handled in saveToDatabase
+    }
+  };
+
+  const handleSegmentSelected = async (segmentData: {
+    segmentListId: string | null;
+    recipientType: "all" | "selected" | "tags";
+    selectedContactIds: string[];
+    selectedTagIds: string[];
+  }) => {
+    if (!newsletterId) return;
+    try {
+      await apiRequest('PUT', `/api/newsletters/${newsletterId}`, {
+        recipientType: segmentData.recipientType,
+        selectedContactIds: segmentData.selectedContactIds,
+        selectedTagIds: segmentData.selectedTagIds,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
+      toast({ title: "Recipients Selected", description: "Your newsletter recipients have been saved." });
+      setShowSendWizard(false);
+      setLocation('/newsletter');
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save recipients",
+        variant: "destructive",
+      });
     }
   };
 
@@ -807,6 +836,13 @@ export default function NewsletterCreatePage() {
           getHtmlContent={getHtmlContent}
           subject={subject || data.root?.props?.title || "Newsletter Preview"}
         />
+        <SendNewsletterWizardModal
+          isOpen={showSendWizard}
+          onClose={() => setShowSendWizard(false)}
+          newsletterId={newsletterId}
+          newsletterTitle={title || "Untitled Newsletter"}
+          onSegmentSelected={handleSegmentSelected}
+        />
         {exitDialog}
       </>
     );
@@ -929,6 +965,13 @@ export default function NewsletterCreatePage() {
         </div>
       </div>
     </div>
+    <SendNewsletterWizardModal
+      isOpen={showSendWizard}
+      onClose={() => setShowSendWizard(false)}
+      newsletterId={newsletterId}
+      newsletterTitle={title || "Untitled Newsletter"}
+      onSegmentSelected={handleSegmentSelected}
+    />
     {exitDialog}
     </>
   );

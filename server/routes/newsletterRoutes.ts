@@ -314,7 +314,7 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, 
   try {
     const { id } = req.params;
     const validatedData = updateNewsletterSchema.parse(req.body);
-    const { title, subject, content, puckData, scheduledAt, status } = validatedData;
+    const { title, subject, content, puckData, scheduledAt, status, recipientType, selectedContactIds, selectedTagIds } = validatedData;
 
     const newsletter = await db.query.newsletters.findFirst({
       where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId}`,
@@ -353,6 +353,18 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, 
 
     if (status !== undefined) {
       updateData.status = status;
+    }
+
+    if (recipientType !== undefined) {
+      updateData.recipientType = recipientType;
+    }
+
+    if (selectedContactIds !== undefined) {
+      updateData.selectedContactIds = selectedContactIds;
+    }
+
+    if (selectedTagIds !== undefined) {
+      updateData.selectedTagIds = selectedTagIds;
     }
 
     const updatedNewsletter = await db.update(newsletters)
