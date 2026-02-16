@@ -185,7 +185,6 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { updateProfile } = useReduxUpdateProfile();
   const updateMenuPreferenceMutation = useUpdateMenuPreference();
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [companyData, setCompanyData] = useState<any>(null);
   const onboardingCheckedRef = useRef(false);
   
   // Initialize sidebar open state from localStorage
@@ -247,6 +246,13 @@ useEffect(() => {
       return;
     }
 
+    // Skip the network call entirely if onboarding was already completed
+    const onboardingDone = localStorage.getItem('onboardingCompleted');
+    if (onboardingDone === 'true') {
+      onboardingCheckedRef.current = true;
+      return;
+    }
+
     const checkOnboardingStatus = async () => {
       onboardingCheckedRef.current = true;
 
@@ -257,10 +263,12 @@ useEffect(() => {
 
         if (response.ok) {
           const company = await response.json();
-          setCompanyData(company);
           
           if (company && !company.setupCompleted) {
             setShowOnboarding(true);
+          } else {
+            // Cache the completed state so we never re-check
+            localStorage.setItem('onboardingCompleted', 'true');
           }
         }
       } catch (error) {
@@ -274,20 +282,7 @@ useEffect(() => {
   // Handle onboarding completion
   const handleOnboardingComplete = async () => {
     setShowOnboarding(false);
-    
-    // Refresh company data
-    try {
-      const response = await fetch('/api/company', {
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const company = await response.json();
-        setCompanyData(company);
-      }
-    } catch (error) {
-      console.error('Failed to refresh company data:', error);
-    }
+    localStorage.setItem('onboardingCompleted', 'true');
   };
 
   // Listen for localStorage changes from other tabs and immediate changes
