@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import {
   useReduxAuth,
@@ -186,6 +186,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const updateMenuPreferenceMutation = useUpdateMenuPreference();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [companyData, setCompanyData] = useState<any>(null);
+  const onboardingCheckedRef = useRef(false);
   
   // Initialize sidebar open state from localStorage
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -241,49 +242,29 @@ useEffect(() => {
 }, [isInitialized, user?.menuExpanded, currentLanguage, sidebarOpen, updateMenuPreferenceMutation]);
 
 
-  // Check if company needs onboarding
   useEffect(() => {
-    const checkOnboardingStatus = async () => {
-      if (!user) {
-        console.log('🏢 [Onboarding] No user, skipping onboarding check');
-        return;
-      }
+    if (!user || onboardingCheckedRef.current) {
+      return;
+    }
 
-      console.log('🏢 [Onboarding] Checking onboarding status for user:', user.email);
+    const checkOnboardingStatus = async () => {
+      onboardingCheckedRef.current = true;
 
       try {
         const response = await fetch('/api/company', {
           credentials: 'include',
         });
 
-        console.log('🏢 [Onboarding] Company API response:', {
-          status: response.status,
-          ok: response.ok,
-        });
-
         if (response.ok) {
           const company = await response.json();
-          console.log('🏢 [Onboarding] Company data:', {
-            name: company?.name,
-            setupCompleted: company?.setupCompleted,
-          });
-          
           setCompanyData(company);
           
-          // Show onboarding wizard if setup is not completed
           if (company && !company.setupCompleted) {
-            console.log('🎯 [Onboarding] Showing onboarding modal (setupCompleted: false)');
             setShowOnboarding(true);
-          } else {
-            console.log('✅ [Onboarding] Onboarding already completed');
           }
-        } else {
-          console.warn('⚠️ [Onboarding] Company not found (status:', response.status, ')');
-          console.warn('   This might mean the user has no company record');
-          console.warn('   Onboarding modal will NOT show');
         }
       } catch (error) {
-        console.error('❌ [Onboarding] Failed to check onboarding status:', error);
+        console.error('Failed to check onboarding status:', error);
       }
     };
 

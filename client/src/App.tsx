@@ -148,41 +148,23 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   
   // Handle redirects in useEffect to prevent React warnings about updating during render
   useEffect(() => {
-    // Don't redirect until auth is initialized
     if (!isInitialized) {
-      console.log("🔒 [ProtectedRoute] Waiting for auth initialization...");
       return;
     }
 
-    console.log("🔒 [ProtectedRoute] Auth state:", {
-      isAuthenticated,
-      isEmailVerified,
-      location,
-      userEmail: user?.email,
-    });
-
     if (!isAuthenticated) {
-      // Allow certain routes for unauthenticated users
       if (!['/auth', '/verify-email', '/update-profile'].includes(location)) {
-        console.log("🔒 [ProtectedRoute] Redirecting unauthenticated user to /auth");
         setLocation('/auth');
       }
     } else if (isAuthenticated && isEmailVerified === false) {
-      // Allow certain routes for unverified users (strict false check only)
       if (!['/pending-verification', '/verify-email'].includes(location)) {
-        console.log("🔒 [ProtectedRoute] Redirecting unverified user to /pending-verification");
         setLocation('/pending-verification');
       }
     } else if (isAuthenticated && isEmailVerified === true) {
-      // Redirect auth page to dashboard for verified users
-      // 2FA handling is now done in the login flow itself
       if (['/auth', '/pending-verification'].includes(location)) {
-        console.log("🔒 [ProtectedRoute] Redirecting verified user to /dashboard");
         setLocation('/dashboard');
       }
     }
-    // If isEmailVerified is undefined/null (loading state), don't redirect
-    // This prevents premature redirects during authentication initialization
   }, [isAuthenticated, isEmailVerified, location, setLocation, isInitialized, user?.email]);
   
   return <>{children}</>;
@@ -197,20 +179,7 @@ function Router() {
     setGlobalAuthErrorHandler(handleAuthError);
   }, [handleAuthError]);
 
-  console.log("🔍 [Redux] Router state:", {
-    isAuthenticated,
-    isLoading,
-    hasUser: !!user,
-    isInitialized,
-    userEmail: user?.email,
-    userEmailVerified: user?.emailVerified
-  });
-
-  // Show loading state while authentication is being determined
   if (isLoading && !isInitialized) {
-    console.log(
-      "📱 [Redux] Showing loading screen - authentication in progress",
-    );
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -218,19 +187,7 @@ function Router() {
     );
   }
 
-  console.log("🚀 [Redux] Authentication check complete, determining route");
-
   const isEmailVerified = user ? user.emailVerified : undefined;
-
-  console.log("🔍 [Router] Route determination:", {
-    isAuthenticated,
-    isEmailVerified,
-    currentPath: window.location.pathname,
-    currentSearch: window.location.search
-  });
-  
-  // Debug: Log when routes are being rendered
-  console.log("🚀 [Router] Rendering routes for authenticated:", isAuthenticated, "emailVerified:", isEmailVerified);
 
   return (
     <ProtectedRoute>

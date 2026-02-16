@@ -57,14 +57,6 @@ export async function apiRequest(
   
   try {
     
-    console.log('🌐 [API Request] Making request:', {
-      method,
-      originalUrl: url,
-      baseURL: baseURL || 'relative',
-      fullUrl,
-      hasData: !!data
-    });
-
     const headers: Record<string, string> = {
       ...(data ? { "Content-Type": "application/json" } : {}),
     };
@@ -74,17 +66,6 @@ export async function apiRequest(
       headers,
       body: data ? JSON.stringify(data) : undefined,
       credentials: "include",
-    });
-
-    console.log('📨 [API Response] Received response:', {
-      status: res.status,
-      statusText: res.statusText,
-      ok: res.ok,
-      url: res.url,
-      headers: {
-        contentType: res.headers.get('content-type'),
-        accessControlAllowOrigin: res.headers.get('access-control-allow-origin')
-      }
     });
 
     await throwIfResNotOk(res);
@@ -125,7 +106,7 @@ export const getQueryFn: <T>(options: {
     } catch (error: any) {
       // Handle 401 errors globally through our error handler
       if (error.message?.includes("401") || error.message?.includes("Authentication failed")) {
-        console.log('🚨 [Query] 401 error detected in query:', queryKey.join("/"));
+        
         
         if (unauthorizedBehavior === "returnNull") {
           return null;
@@ -164,7 +145,7 @@ export const queryClient = new QueryClient({
           error?.message?.includes("401") ||
           error?.message?.includes("Authentication failed")
         ) {
-          console.log('🚨 [Query Retry] 401 detected, triggering global auth handler');
+          
           setTimeout(() => {
             triggerGlobalAuthError({
               showToast: true,
@@ -191,7 +172,7 @@ export const queryClient = new QueryClient({
       onError: (error: any) => {
         // Handle 401 errors in mutations globally
         if (error?.message?.includes("401") || error?.message?.includes("Authentication failed")) {
-          console.log('🚨 [Mutation] 401 error detected, triggering global auth handler');
+          
           setTimeout(() => {
             triggerGlobalAuthError({
               showToast: true,
