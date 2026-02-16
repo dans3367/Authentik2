@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "go-1.21", "bash", "web", "postgresql-16"]
+modules = ["nodejs-20", "go-1.21", "bash", "web"]
 run = "npm run dev"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
@@ -8,7 +8,7 @@ packages = ["lsof", "go", "jq"]
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["npm", "run", "start"]
+run = ["node", "./dist/index.cjs"]
 build = ["npm", "run", "build"]
 publicDir = "dist/public"
 
@@ -35,6 +35,10 @@ externalPort = 6000
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 5002
+externalPort = 8000
 
 [env]
 PORT = "5000"
