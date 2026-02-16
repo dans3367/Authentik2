@@ -41,6 +41,7 @@ import { signupRoutes } from "./routes/signupRoutes";
 import { tenantFixRoutes } from "./routes/tenantFixRoutes";
 import { segmentListRoutes } from "./routes/segmentListRoutes";
 import { activityRoutes } from "./routes/activityRoutes";
+import { axiomActivityRoutes } from "./routes/axiomActivityRoutes";
 import { accountUsageRoutes } from "./routes/accountUsageRoutes";
 import { roleRoutes } from "./routes/roleRoutes";
 import internalRoutes from "./routes/internalRoutes";
@@ -92,6 +93,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/templates", authenticateToken, requireTenant, templateRoutes);
   app.use("/api", segmentListRoutes);
   app.use("/api/activity-logs", authenticateToken, requireTenant, activityRoutes);
+  app.use("/api/axiom-activity-logs", authenticateToken, requireTenant, axiomActivityRoutes);
   app.use("/api/account-usage", accountUsageRoutes);
   app.use("/api/stats", statsRoutes);
 

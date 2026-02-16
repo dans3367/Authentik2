@@ -8,6 +8,7 @@
 import { db } from '../db';
 import { activityLogs } from '@shared/schema';
 import type { Request } from 'express';
+import { logActivityToAxiom } from './axiomActivityLogger';
 
 export interface LogActivityParams {
     tenantId: string;
@@ -56,6 +57,9 @@ export async function logActivity(params: LogActivityParams): Promise<void> {
             ipAddress,
             userAgent,
         });
+
+        // Dual-write to Axiom (fire-and-forget, never blocks)
+        logActivityToAxiom(params).catch(() => {});
     } catch (error) {
         // Log error but don't throw - activity logging should never break main flows
         console.error('[ActivityLogger] Failed to log activity:', error);
