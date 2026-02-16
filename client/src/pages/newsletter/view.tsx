@@ -96,10 +96,7 @@ export default function NewsletterViewPage() {
     enabled: !!id,
   });
 
-  // Fetch detailed email stats
-
-
-  const { data: detailedStatsData, isLoading: isDetailedStatsLoading, error: detailedStatsError } = useQuery<{
+  interface DetailedStatsData {
     newsletter: { id: string; title: string; status: string };
     totalEmails: number;
     emails: Array<{
@@ -114,7 +111,9 @@ export default function NewsletterViewPage() {
       lastActivity?: string;
       events: Array<{ type: string; timestamp: string; data?: any }>;
     }>;
-  }>({
+  }
+
+  const { data: detailedStatsData, isLoading: isDetailedStatsLoading, error: detailedStatsError } = useQuery<DetailedStatsData>({
     queryKey: ["/api/newsletters", id, "detailed-stats"],
     queryFn: async () => {
       const response = await apiRequest("GET", `/api/newsletters/${id}/detailed-stats`);
@@ -122,17 +121,9 @@ export default function NewsletterViewPage() {
       return data;
     },
     enabled: !!id && !!newsletter && newsletter.status === "sent",
-    refetchInterval: 30000, // Refresh every 30 seconds for sent newsletters
+    refetchInterval: 30000,
     retry: 3,
     retryDelay: 1000,
-    onError: (error) => {
-      console.error("📊 Detailed stats query error:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load detailed email statistics. Please try again.",
-        variant: "destructive",
-      });
-    },
   });
 
   // Initialize tasks if they don't exist
@@ -146,7 +137,6 @@ export default function NewsletterViewPage() {
     },
   });
 
-  // Open trajectory modal using detailed stats data
   const openTrajectoryModal = (resendId: string) => {
     if (!detailedStatsData?.emails) {
       toast({
@@ -505,9 +495,10 @@ export default function NewsletterViewPage() {
           <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
             <Button 
               variant="ghost" 
-              size="sm" 
+              size="icon" 
               onClick={() => navigate('/newsletter')}
-              className="hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0 mt-1"
+              className="shrink-0 mt-1"
+              data-testid="button-back"
             >
               <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
             </Button>
@@ -533,12 +524,13 @@ export default function NewsletterViewPage() {
                 variant="outline"
                 size="sm"
                 className="w-full sm:w-auto"
+                data-testid="button-edit"
               >
                 <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
                 <span className="sm:inline">Edit</span>
               </Button>
             )}
-            <Button onClick={() => window.print()} variant="outline" size="sm" className="w-full sm:w-auto">
+            <Button onClick={() => window.print()} variant="outline" size="sm" className="w-full sm:w-auto" data-testid="button-options">
               <Settings className="h-4 w-4 mr-2" strokeWidth={1.5} />
               <span className="sm:inline">Options</span>
             </Button>
@@ -547,121 +539,121 @@ export default function NewsletterViewPage() {
 
         {/* Key Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 lg:gap-6">
-        <Card>
-          <CardContent className="p-3 sm:p-4 lg:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400">
-                  Recipients
-                </p>
-                <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100">
-                  {(newsletter.recipientCount || 0).toLocaleString()}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Total sent to
-                </p>
+          <Card>
+            <CardContent className="p-4 lg:p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">
+                    Recipients
+                  </p>
+                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold" data-testid="text-recipients-count">
+                    {(newsletter.recipientCount || 0).toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Total sent to
+                  </p>
+                </div>
+                <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shrink-0">
+                  <Users className="text-white w-5 h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
+                </div>
               </div>
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                <Users className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardContent className="p-3 sm:p-4 lg:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm font-medium text-green-600 dark:text-green-400">
-                  Unique Opens
-                </p>
-                <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100">
-                  {newsletter.opens || 0}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {uniqueOpenRate}% unique rate
-                </p>
+          <Card>
+            <CardContent className="p-4 lg:p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">
+                    Unique Opens
+                  </p>
+                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold" data-testid="text-opens-count">
+                    {newsletter.opens || 0}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {uniqueOpenRate}% unique rate
+                  </p>
+                </div>
+                <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shrink-0">
+                  <Eye className="text-white w-5 h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
+                </div>
               </div>
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
-                <Eye className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardContent className="p-3 sm:p-4 lg:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm font-medium text-purple-600 dark:text-purple-400">
-                  Clicks
-                </p>
-                <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100">
-                  {newsletter.clickCount}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {clickThroughRate}% CTR
-                </p>
+          <Card>
+            <CardContent className="p-4 lg:p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">
+                    Clicks
+                  </p>
+                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold" data-testid="text-clicks-count">
+                    {newsletter.clickCount}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {clickThroughRate}% CTR
+                  </p>
+                </div>
+                <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shrink-0">
+                  <MousePointer className="text-white w-5 h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
+                </div>
               </div>
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <MousePointer className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardContent className="p-3 sm:p-4 lg:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm font-medium text-red-600 dark:text-red-400">
-                  Bounces
-                </p>
-                <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100">
-                  {detailedStatsData?.emails?.reduce((total, email) => total + (email.bounces || 0), 0) || 0}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Total delivery failures
-                </p>
+          <Card>
+            <CardContent className="p-4 lg:p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">
+                    Bounces
+                  </p>
+                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold" data-testid="text-bounces-count">
+                    {detailedStatsData?.emails?.reduce((total: number, email: { bounces: number }) => total + (email.bounces || 0), 0) || 0}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Total delivery failures
+                  </p>
+                </div>
+                <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center shrink-0">
+                  <AlertTriangle className="text-white w-5 h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
+                </div>
               </div>
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center">
-                <AlertTriangle className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardContent className="p-3 sm:p-4 lg:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm font-medium text-orange-600 dark:text-orange-400">
-                  Complaints
-                </p>
-                <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100">
-                  {detailedStatsData?.emails?.reduce((total, email) => total + (email.complaints || 0), 0) || 0}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Spam reports received
-                </p>
+          <Card>
+            <CardContent className="p-4 lg:p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">
+                    Complaints
+                  </p>
+                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold" data-testid="text-complaints-count">
+                    {detailedStatsData?.emails?.reduce((total: number, email: { complaints: number }) => total + (email.complaints || 0), 0) || 0}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Spam reports received
+                  </p>
+                </div>
+                <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shrink-0">
+                  <XCircle className="text-white w-5 h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
+                </div>
               </div>
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
-                <XCircle className="text-white w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 lg:space-y-8">
           <div className="overflow-x-auto">
             <TabsList className="grid w-full grid-cols-5 min-w-max">
-              <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
-              <TabsTrigger value="content" className="text-xs sm:text-sm">Content</TabsTrigger>
-              <TabsTrigger value="status" className="text-xs sm:text-sm">Task Status</TabsTrigger>
-              <TabsTrigger value="analytics" className="text-xs sm:text-sm">Analytics</TabsTrigger>
-              <TabsTrigger value="detailed-stats" className="text-xs sm:text-sm">Detailed Stats</TabsTrigger>
+              <TabsTrigger value="overview" className="text-xs sm:text-sm" data-testid="tab-overview">Overview</TabsTrigger>
+              <TabsTrigger value="content" className="text-xs sm:text-sm" data-testid="tab-content">Content</TabsTrigger>
+              <TabsTrigger value="status" className="text-xs sm:text-sm" data-testid="tab-status">Task Status</TabsTrigger>
+              <TabsTrigger value="analytics" className="text-xs sm:text-sm" data-testid="tab-analytics">Analytics</TabsTrigger>
+              <TabsTrigger value="detailed-stats" className="text-xs sm:text-sm" data-testid="tab-detailed-stats">Detailed Stats</TabsTrigger>
             </TabsList>
           </div>
 
@@ -1121,17 +1113,7 @@ export default function NewsletterViewPage() {
                 Detailed Email Statistics
               </CardTitle>
               <CardDescription>
-                Individual email delivery status and complete engagement activity for each recipient (includes all opens, clicks, etc.)
-                <p className="text-xs text-gray-400 mt-1">
-                  Debug: Query enabled: {!!id && !!newsletter && newsletter.status === "sent" ? "Yes" : "No"}, 
-                  ID: {!!id ? "Yes" : "No"}, 
-                  Newsletter: {!!newsletter ? "Yes" : "No"}, 
-                  Status: {newsletter?.status || "unknown"}, 
-                  Loading: {isDetailedStatsLoading ? "Yes" : "No"}, 
-                  Error: {detailedStatsError ? "Yes" : "No"}, 
-                  Data: {detailedStatsData ? "Yes" : "No"},
-                  EmailsCount: {detailedStatsData?.emails?.length || 0}
-                </p>
+                Individual email delivery status and engagement activity for each recipient
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1188,7 +1170,7 @@ export default function NewsletterViewPage() {
                       };
                       
                       return (
-                        <div key={email.emailId || index} className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
+                        <div key={email.emailId || index} className="border rounded-lg p-4 hover-elevate transition-colors">
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
