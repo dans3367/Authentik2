@@ -79,7 +79,9 @@ export function SendNewsletterWizardModal({
     enabled: isOpen && selectionMode === "custom" && customRecipientType === "tags",
   });
 
-  const segmentLists: SegmentListWithCount[] = segmentListsData || [];
+  const segmentLists: SegmentListWithCount[] = Array.isArray(segmentListsData)
+    ? segmentListsData
+    : (segmentListsData as any)?.lists || [];
   const contacts = (contactsData as any)?.contacts || [];
   const tags = (tagsData as any)?.tags || [];
 
