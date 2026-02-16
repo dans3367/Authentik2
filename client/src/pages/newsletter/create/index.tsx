@@ -49,6 +49,7 @@ export default function NewsletterCreatePage() {
   const [subject, setSubject] = useState("");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [showSendWizard, setShowSendWizard] = useState(false);
+  const [dataReady, setDataReady] = useState(!isEditMode);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -80,6 +81,7 @@ export default function NewsletterCreatePage() {
           // puckData was invalid JSON, start fresh
         }
       }
+      setDataReady(true);
     }
   }, [existingNewsletter]);
 
@@ -820,15 +822,21 @@ export default function NewsletterCreatePage() {
             </button>
           </div>
           <div style={{ flex: 1, minHeight: 0 }}>
-            <Puck
-              key={newsletterId || 'new'}
-              config={config}
-              data={data}
-              onChange={handleDataChange}
-              onPublish={handlePublish}
-              iframe={iframeConfig}
-              overrides={puckOverrides}
-            />
+            {dataReady ? (
+              <Puck
+                key={`${newsletterId || 'new'}-loaded`}
+                config={config}
+                data={data}
+                onChange={handleDataChange}
+                onPublish={handlePublish}
+                iframe={iframeConfig}
+                overrides={puckOverrides}
+              />
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                <Loader2 className="h-8 w-8 animate-spin" style={{ color: '#6b7280' }} />
+              </div>
+            )}
           </div>
         </div>
         <SendPreviewDialog
