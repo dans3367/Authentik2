@@ -1,6 +1,6 @@
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { 
   ArrowLeft,
   Mail, 
@@ -47,6 +47,7 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format, formatDistanceToNow } from "date-fns";
 import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
+import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
 import type { NewsletterWithUser, NewsletterTaskStatus } from "@shared/schema";
 
 // Using real task status data from backend via NewsletterTaskStatus type
@@ -69,6 +70,7 @@ export default function NewsletterViewPage() {
   const [trajectoryModalOpen, setTrajectoryModalOpen] = useState(false);
   const [selectedTrajectory, setSelectedTrajectory] = useState<any>(null);
   const tasksInitializedRef = useRef(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Fetch newsletter data with auto-refresh every 10 seconds for sent newsletters
   const { data: newsletterData, isLoading } = useQuery<{ newsletter: NewsletterWithUser }>({
@@ -95,6 +97,55 @@ export default function NewsletterViewPage() {
     },
     enabled: !!id,
   });
+
+  const { data: emailDesign } = useQuery<{
+    companyName?: string;
+    headerMode?: string;
+    logoUrl?: string;
+    logoSize?: string;
+    logoAlignment?: string;
+    bannerUrl?: string;
+    showCompanyName?: string;
+    primaryColor?: string;
+    fontFamily?: string;
+    headerText?: string;
+    footerText?: string;
+    socialLinks?: { facebook?: string; twitter?: string; instagram?: string; linkedin?: string } | string;
+  }>({
+    queryKey: ["/api/master-email-design"],
+    queryFn: async () => {
+      const response = await fetch("/api/master-email-design", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch email design");
+      return response.json();
+    },
+  });
+
+  const parsedSocialLinks = useMemo(() => {
+    const raw = emailDesign?.socialLinks;
+    if (!raw) return undefined;
+    if (typeof raw === "string") {
+      try { return JSON.parse(raw); } catch { return undefined; }
+    }
+    return raw;
+  }, [emailDesign]);
+
+  const emailPreviewHtml = useMemo(() => {
+    if (!newsletter?.content) return "";
+    return wrapInEmailPreview(newsletter.content, {
+      companyName: emailDesign?.companyName || "",
+      headerMode: emailDesign?.headerMode,
+      primaryColor: emailDesign?.primaryColor,
+      logoUrl: emailDesign?.logoUrl,
+      logoSize: emailDesign?.logoSize,
+      logoAlignment: emailDesign?.logoAlignment,
+      bannerUrl: emailDesign?.bannerUrl,
+      showCompanyName: emailDesign?.showCompanyName,
+      headerText: emailDesign?.headerText,
+      footerText: emailDesign?.footerText,
+      fontFamily: emailDesign?.fontFamily,
+      socialLinks: parsedSocialLinks,
+    });
+  }, [newsletter?.content, emailDesign, parsedSocialLinks]);
 
   interface DetailedStatsData {
     newsletter: { id: string; title: string; status: string };
@@ -795,26 +846,49 @@ export default function NewsletterViewPage() {
         <TabsContent value="content" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Newsletter Content</CardTitle>
-              <CardDescription>
-                Preview of the newsletter content as it appears to recipients
-              </CardDescription>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Eye className="h-5 w-5" strokeWidth={1.5} />
+                    Email Preview
+                  </CardTitle>
+                  <CardDescription>
+                    How this newsletter appears in your recipients' inbox
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="gap-1">
+                    <Mail className="h-3 w-3" strokeWidth={1.5} />
+                    {newsletter.subject}
+                  </Badge>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-900">
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Subject Line</p>
-                    <p className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                      {newsletter.subject}
-                    </p>
+              <div className="rounded-lg border bg-muted/30 p-3 sm:p-6 lg:p-8">
+                <div className="mx-auto max-w-[640px]">
+                  <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+                    <Mail className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    <span>From: {newsletter.user?.email || "your-company"}</span>
+                    <span className="mx-1">|</span>
+                    <span>Subject: {newsletter.subject}</span>
                   </div>
-                  <Separator />
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">Content Preview</p>
-                    <div 
-                      className="prose prose-sm max-w-none dark:prose-invert"
-                      dangerouslySetInnerHTML={{ __html: newsletter.content }}
+                  <div className="rounded-md border bg-white shadow-sm overflow-hidden">
+                    <iframe
+                      ref={iframeRef}
+                      srcDoc={emailPreviewHtml}
+                      title="Email preview"
+                      className="w-full border-0"
+                      style={{ minHeight: "600px" }}
+                      sandbox="allow-same-origin"
+                      onLoad={() => {
+                        const iframe = iframeRef.current;
+                        if (iframe?.contentDocument?.body) {
+                          const height = iframe.contentDocument.body.scrollHeight;
+                          iframe.style.height = `${Math.max(height + 20, 600)}px`;
+                        }
+                      }}
+                      data-testid="iframe-email-preview"
                     />
                   </div>
                 </div>
