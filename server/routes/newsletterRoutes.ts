@@ -334,7 +334,7 @@ newsletterRoutes.post("/:id/clone", authenticateToken, requireTenant, async (req
       userId: userRecord.id,
       title: `${source.title} (Copy)`,
       subject: source.subject,
-      content: source.content,
+      content: source.content || '',
       puckData: source.puckData || null,
       status: 'draft',
       recipientType: 'all',

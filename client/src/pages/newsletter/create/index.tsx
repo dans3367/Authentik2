@@ -821,6 +821,7 @@ export default function NewsletterCreatePage() {
           </div>
           <div style={{ flex: 1, minHeight: 0 }}>
             <Puck
+              key={newsletterId || 'new'}
               config={config}
               data={data}
               onChange={handleDataChange}
