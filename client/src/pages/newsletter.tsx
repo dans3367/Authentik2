@@ -16,7 +16,8 @@ import {
   Trash2,
   Send,
   FileText,
-  Pencil
+  Pencil,
+  Copy
 } from "lucide-react";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { Button } from "@/components/ui/button";
@@ -118,6 +119,21 @@ export default function NewsletterPage() {
         throw new Error("Failed to fetch email design");
       }
       return response.json();
+    },
+  });
+
+  const cloneMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest('POST', `/api/newsletters/${id}/clone`);
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({ title: "Design copied", description: "Opening the editor with your cloned newsletter." });
+      setLocation(`/newsletter/create/${data.id}`);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to copy newsletter design", variant: "destructive" });
     },
   });
 
@@ -402,6 +418,14 @@ export default function NewsletterPage() {
                                   Edit Settings
                                 </DropdownMenuItem>
                               )}
+                              <DropdownMenuItem
+                                onClick={() => cloneMutation.mutate(newsletter.id)}
+                                disabled={cloneMutation.isPending}
+                                data-testid={`button-copy-design-${newsletter.id}`}
+                              >
+                                <Copy className="h-4 w-4 mr-2" />
+                                {cloneMutation.isPending ? "Copying..." : "Copy Design"}
+                              </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem 
                                 className="text-red-600 focus:text-red-600"

@@ -309,6 +309,48 @@ newsletterRoutes.post("/", authenticateToken, requireTenant, async (req: any, re
   }
 });
 
+newsletterRoutes.post("/:id/clone", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+
+    const source = await db.query.newsletters.findFirst({
+      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId}`,
+    });
+
+    if (!source) {
+      return res.status(404).json({ message: "Newsletter not found" });
+    }
+
+    const userRecord = await db.query.betterAuthUser.findFirst({
+      where: sql`${betterAuthUser.email} = ${req.user.email}`,
+    });
+
+    if (!userRecord) {
+      return res.status(404).json({ message: "User account not found." });
+    }
+
+    const cloned = await db.insert(newsletters).values({
+      tenantId: req.user.tenantId,
+      userId: userRecord.id,
+      title: `${source.title} (Copy)`,
+      subject: source.subject,
+      content: source.content,
+      puckData: source.puckData || null,
+      status: 'draft',
+      recipientType: 'all',
+      recipientCount: 0,
+      openCount: 0,
+      uniqueOpenCount: 0,
+      clickCount: 0,
+    } as any).returning();
+
+    res.status(201).json(cloned[0]);
+  } catch (error) {
+    console.error("Clone newsletter error:", error);
+    res.status(500).json({ message: "Failed to clone newsletter" });
+  }
+});
+
 // Update newsletter
 newsletterRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, res) => {
   try {
