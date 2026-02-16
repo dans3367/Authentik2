@@ -186,6 +186,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   const updateMenuPreferenceMutation = useUpdateMenuPreference();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const onboardingCheckedRef = useRef(false);
+  const onboardingUserKeyRef = useRef<string | null>(null);
+  const onboardingCacheKey = user?.id ? `onboardingCompleted:${user.id}` : null;
   
   // Initialize sidebar open state from localStorage
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -240,14 +242,23 @@ useEffect(() => {
   }
 }, [isInitialized, user?.menuExpanded, currentLanguage, sidebarOpen, updateMenuPreferenceMutation]);
 
+  useEffect(() => {
+    const currentUserKey = user?.id ?? null;
+
+    if (onboardingUserKeyRef.current !== currentUserKey) {
+      onboardingUserKeyRef.current = currentUserKey;
+      onboardingCheckedRef.current = false;
+      setShowOnboarding(false);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user || onboardingCheckedRef.current) {
       return;
     }
 
-    // Skip the network call entirely if onboarding was already completed
-    const onboardingDone = localStorage.getItem('onboardingCompleted');
+    // Skip the network call entirely if onboarding was already completed for this user
+    const onboardingDone = onboardingCacheKey ? localStorage.getItem(onboardingCacheKey) : null;
     if (onboardingDone === 'true') {
       onboardingCheckedRef.current = true;
       return;
@@ -267,8 +278,10 @@ useEffect(() => {
           if (company && !company.setupCompleted) {
             setShowOnboarding(true);
           } else {
-            // Cache the completed state so we never re-check
-            localStorage.setItem('onboardingCompleted', 'true');
+            // Cache the completed state for this user
+            if (onboardingCacheKey) {
+              localStorage.setItem(onboardingCacheKey, 'true');
+            }
           }
         }
       } catch (error) {
@@ -277,12 +290,14 @@ useEffect(() => {
     };
 
     checkOnboardingStatus();
-  }, [user]);
+  }, [user, onboardingCacheKey]);
 
   // Handle onboarding completion
   const handleOnboardingComplete = async () => {
     setShowOnboarding(false);
-    localStorage.setItem('onboardingCompleted', 'true');
+    if (onboardingCacheKey) {
+      localStorage.setItem(onboardingCacheKey, 'true');
+    }
   };
 
   // Listen for localStorage changes from other tabs and immediate changes
