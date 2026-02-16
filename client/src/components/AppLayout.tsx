@@ -265,8 +265,6 @@ useEffect(() => {
     }
 
     const checkOnboardingStatus = async () => {
-      onboardingCheckedRef.current = true;
-
       try {
         const response = await fetch('/api/company', {
           credentials: 'include',
@@ -283,9 +281,14 @@ useEffect(() => {
               localStorage.setItem(onboardingCacheKey, 'true');
             }
           }
+          
+          // Only set to true after successful response
+          onboardingCheckedRef.current = true;
         }
       } catch (error) {
         console.error('Failed to check onboarding status:', error);
+        // Reset to false so the check can be retried
+        onboardingCheckedRef.current = false;
       }
     };
 

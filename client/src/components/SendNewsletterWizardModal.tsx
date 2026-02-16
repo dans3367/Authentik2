@@ -97,12 +97,12 @@ export function SendNewsletterWizardModal({
   }, [isOpen]);
 
   const filteredContacts = contacts.filter((contact: any) =>
-    contact.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    `${contact.firstName || ""} ${contact.lastName || ""}`.toLowerCase().includes(searchTerm.toLowerCase())
+    (contact.email || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+    `${contact.firstName || ""} ${contact.lastName || ""}`.toLowerCase().includes((searchTerm || "").toLowerCase())
   );
 
   const filteredTags = tags.filter((tag: any) =>
-    tag.name.toLowerCase().includes(searchTerm.toLowerCase())
+    (tag.name || "").toLowerCase().includes((searchTerm || "").toLowerCase())
   );
 
   const handleContactToggle = (contactId: string) => {
@@ -160,7 +160,7 @@ export function SendNewsletterWizardModal({
       return list ? `${list.name} (${list.contactCount || 0} recipients)` : "";
     }
     if (selectionMode === "custom") {
-      if (customRecipientType === "all") return `All customers (${contacts.length})`;
+      if (customRecipientType === "all") return contacts.length > 0 ? `All customers (${contacts.length})` : "All customers";
       if (customRecipientType === "selected") return `${selectedContactIds.length} selected customers`;
       if (customRecipientType === "tags") return `${selectedTagIds.length} tags selected`;
     }
@@ -413,8 +413,8 @@ export function SendNewsletterWizardModal({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setSelectedContactIds(contacts.map((c: any) => c.id))}
-                      disabled={selectedContactIds.length === contacts.length}
+                      onClick={() => setSelectedContactIds(filteredContacts.map((c: any) => c.id))}
+                      disabled={selectedContactIds.length === filteredContacts.length}
                     >
                       Select All
                     </Button>

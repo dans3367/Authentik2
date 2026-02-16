@@ -558,6 +558,7 @@ export default function NewsletterEditPage() {
                   <Select
                     value={form.watch("status")}
                     onValueChange={(value) => form.setValue("status", value as "draft" | "ready_to_send" | "scheduled" | "sent")}
+                    disabled={form.watch("status") === "sending"}
                   >
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Select status" />
@@ -566,8 +567,16 @@ export default function NewsletterEditPage() {
                       <SelectItem value="draft">Draft</SelectItem>
                       <SelectItem value="ready_to_send">Ready to Send</SelectItem>
                       <SelectItem value="scheduled">Scheduled</SelectItem>
+                      {form.watch("status") === "sending" && (
+                        <SelectItem value="sending" disabled>Sending...</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
+                  {form.watch("status") === "sending" && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                      Newsletter is currently being sent. Status cannot be changed during transmission.
+                    </p>
+                  )}
                 </div>
 
                 <div>
