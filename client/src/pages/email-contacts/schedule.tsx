@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -14,6 +14,7 @@ import { TemplateSelector } from "@/components/TemplateSelector";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TIMEZONE_OPTIONS } from "@/utils/appointment-utils";
 import { useToast } from "@/hooks/use-toast";
+import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
 
 // 40MB total limit (including base64 overhead ~33%)
 const MAX_TOTAL_RAW_SIZE = 30 * 1024 * 1024; // 30MB raw = ~40MB after base64
@@ -30,6 +31,15 @@ function getFileIcon(type: string) {
   if (type.includes("spreadsheet") || type.includes("excel") || type === "text/csv") return FileSpreadsheet;
   if (type.includes("pdf") || type.includes("word") || type.includes("document") || type === "text/plain") return FileText;
   return File;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 export default function ScheduleContactEmailPage() {
@@ -133,6 +143,50 @@ export default function ScheduleContactEmailPage() {
   });
 
   const isUnsubscribed = contact?.status === "unsubscribed" || contact?.status === "bounced" || !!bouncedCheck?.isBounced;
+
+  const parsedSocialLinks = useMemo(() => {
+    const raw = (masterDesign as any)?.socialLinks;
+    if (!raw) return undefined;
+    if (typeof raw === "string") {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return undefined;
+      }
+    }
+    return raw;
+  }, [masterDesign]);
+
+  const previewHtml = useMemo(() => {
+    const formattedContent = isUsingTemplate
+      ? (content || "<p style='color:#94a3b8;'>No content yet...</p>")
+      : (content
+        ? `<div style="white-space:pre-wrap;">${escapeHtml(content)}</div>`
+        : "<p style='color:#94a3b8;'>No content yet...</p>");
+
+    const bodyContent = `
+      <div style="padding:64px 48px;min-height:200px;">
+        <div style="font-size:16px;line-height:1.625;color:#334155;">
+          ${formattedContent}
+        </div>
+      </div>
+    `;
+
+    return wrapInEmailPreview(bodyContent, {
+      companyName: (masterDesign as any)?.companyName || "",
+      headerMode: (masterDesign as any)?.headerMode,
+      primaryColor: (masterDesign as any)?.primaryColor,
+      logoUrl: (masterDesign as any)?.logoUrl,
+      logoSize: (masterDesign as any)?.logoSize,
+      logoAlignment: (masterDesign as any)?.logoAlignment,
+      bannerUrl: (masterDesign as any)?.bannerUrl,
+      showCompanyName: (masterDesign as any)?.showCompanyName,
+      headerText: (masterDesign as any)?.headerText,
+      footerText: (masterDesign as any)?.footerText,
+      fontFamily: (masterDesign as any)?.fontFamily,
+      socialLinks: parsedSocialLinks,
+    });
+  }, [content, isUsingTemplate, masterDesign, parsedSocialLinks]);
 
   const isBounced = contact?.status === "bounced" || !!bouncedCheck?.isBounced;
   let suppressedTitle = "Suppressed Contact";
@@ -449,7 +503,7 @@ export default function ScheduleContactEmailPage() {
 
           <div className="flex-1 overflow-y-auto">
             <div className="mx-auto p-4 sm:p-6 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl">
-              <div className="bg-white text-slate-900 shadow-2xl mx-auto rounded overflow-hidden max-w-[600px] w-full" style={{ fontFamily: masterDesign?.fontFamily || "Arial, sans-serif" }}>
+              <div className="bg-white text-slate-900 shadow-2xl mx-auto rounded overflow-hidden max-w-[600px] w-full">
 
                 {/* Simulated email header */}
                 <div className="border-b bg-gray-50 p-4 text-xs sm:text-sm text-gray-500">
@@ -471,74 +525,13 @@ export default function ScheduleContactEmailPage() {
                   )}
                 </div>
 
-                {/* Hero header from email design */}
-                <div
-                  className="p-8 text-center"
-                  style={{ backgroundColor: masterDesign?.primaryColor || "#3B82F6", color: "#ffffff" }}
-                >
-                  {masterDesign?.logoUrl ? (
-                    <img
-                      src={masterDesign.logoUrl}
-                      alt="Logo"
-                      className="h-12 mx-auto mb-4 object-contain"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                    />
-                  ) : (
-                    <div className="h-12 w-12 bg-white/20 rounded-full mx-auto mb-4 flex items-center justify-center">
-                      <span className="text-xl font-bold opacity-80">{masterDesign?.companyName?.charAt(0) || "C"}</span>
-                    </div>
-                  )}
-                  <h1 className="text-2xl font-bold mb-2 tracking-tight">
-                    {masterDesign?.companyName || "Your Company"}
-                  </h1>
-                  {masterDesign?.headerText && (
-                    <p className="text-base opacity-95 max-w-sm mx-auto leading-normal">
-                      {masterDesign.headerText}
-                    </p>
-                  )}
-                </div>
-
-                {/* Email body content */}
-                <div className="p-8 flex-1">
-                  {isUsingTemplate ? (
-                    <div
-                      className="prose prose-sm max-w-none"
-                      dangerouslySetInnerHTML={{ __html: content || "<p style='color:#94a3b8;'>No content yet...</p>" }}
-                    />
-                  ) : (
-                    <div className="prose prose-sm max-w-none whitespace-pre-wrap">
-                      {content || <span style={{ color: "#94a3b8" }}>No content yet...</span>}
-                    </div>
-                  )}
-                </div>
-
-                {/* Footer from email design */}
-                <div className="bg-slate-100 p-8 text-center border-t border-slate-200">
-                  {(masterDesign?.socialLinks?.facebook || masterDesign?.socialLinks?.twitter || masterDesign?.socialLinks?.instagram || masterDesign?.socialLinks?.linkedin) && (
-                    <div className="flex justify-center gap-6 mb-6">
-                      {masterDesign?.socialLinks?.facebook && (
-                        <span className="text-slate-400 text-sm">Facebook</span>
-                      )}
-                      {masterDesign?.socialLinks?.twitter && (
-                        <span className="text-slate-400 text-sm">Twitter</span>
-                      )}
-                      {masterDesign?.socialLinks?.instagram && (
-                        <span className="text-slate-400 text-sm">Instagram</span>
-                      )}
-                      {masterDesign?.socialLinks?.linkedin && (
-                        <span className="text-slate-400 text-sm">LinkedIn</span>
-                      )}
-                    </div>
-                  )}
-                  <div className="text-xs text-slate-500 space-y-2 max-w-xs mx-auto">
-                    <p>{masterDesign?.footerText || "\u00A9 2025 All rights reserved."}</p>
-                    <p className="text-slate-400">
-                      You are receiving this email because you signed up on our website.
-                      <br />
-                      <span className="underline cursor-pointer hover:text-slate-600">Unsubscribe</span>
-                    </p>
-                  </div>
-                </div>
+                <iframe
+                  srcDoc={previewHtml}
+                  title="Email body preview"
+                  sandbox="allow-same-origin"
+                  className="w-full border-0"
+                  style={{ minHeight: "640px", background: "#fff" }}
+                />
 
               </div>
             </div>

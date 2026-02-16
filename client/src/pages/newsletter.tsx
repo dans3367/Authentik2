@@ -40,8 +40,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
 import { format, formatDistanceToNow } from "date-fns";
 import type { NewsletterWithUser } from "@shared/schema";
 
@@ -64,6 +72,7 @@ export default function NewsletterPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [previewNewsletter, setPreviewNewsletter] = useState<(NewsletterWithUser & { opens?: number; totalOpens?: number }) | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -84,6 +93,30 @@ export default function NewsletterPage() {
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
     retry: 2,
+  });
+
+  const { data: emailDesign } = useQuery<{
+    companyName?: string;
+    headerMode?: string;
+    logoUrl?: string;
+    logoSize?: string;
+    logoAlignment?: string;
+    bannerUrl?: string;
+    showCompanyName?: string;
+    primaryColor?: string;
+    fontFamily?: string;
+    headerText?: string;
+    footerText?: string;
+    socialLinks?: { facebook?: string; twitter?: string; instagram?: string; linkedin?: string } | string;
+  }>({
+    queryKey: ["/api/master-email-design"],
+    queryFn: async () => {
+      const response = await fetch("/api/master-email-design", { credentials: "include" });
+      if (!response.ok) {
+        throw new Error("Failed to fetch email design");
+      }
+      return response.json();
+    },
   });
 
   const deleteMutation = useMutation({
@@ -118,6 +151,40 @@ export default function NewsletterPage() {
     scheduled: newsletters.filter(n => n.status === 'scheduled').length,
     sent: newsletters.filter(n => n.status === 'sent').length,
   }), [newsletters]);
+
+  const parsedSocialLinks = useMemo(() => {
+    const raw = emailDesign?.socialLinks;
+    if (!raw) return undefined;
+    if (typeof raw === "string") {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return undefined;
+      }
+    }
+    return raw;
+  }, [emailDesign]);
+
+  const wrappedPreviewHtml = useMemo(() => {
+    if (!previewNewsletter) {
+      return "";
+    }
+
+    return wrapInEmailPreview(previewNewsletter.content || "", {
+      companyName: emailDesign?.companyName || "",
+      headerMode: emailDesign?.headerMode,
+      primaryColor: emailDesign?.primaryColor,
+      logoUrl: emailDesign?.logoUrl,
+      logoSize: emailDesign?.logoSize,
+      logoAlignment: emailDesign?.logoAlignment,
+      bannerUrl: emailDesign?.bannerUrl,
+      showCompanyName: emailDesign?.showCompanyName,
+      headerText: emailDesign?.headerText,
+      footerText: emailDesign?.footerText,
+      fontFamily: emailDesign?.fontFamily,
+      socialLinks: parsedSocialLinks,
+    });
+  }, [previewNewsletter, emailDesign, parsedSocialLinks]);
 
   if (error) {
     return (
@@ -317,6 +384,10 @@ export default function NewsletterPage() {
                                 <Eye className="h-4 w-4 mr-2" />
                                 View Details
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setPreviewNewsletter(newsletter)}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                Preview
+                              </DropdownMenuItem>
                               {isDraft && (
                                 <DropdownMenuItem onClick={() => setLocation(`/newsletter/create/${newsletter.id}`)}>
                                   <Pencil className="h-4 w-4 mr-2" />
@@ -433,6 +504,47 @@ export default function NewsletterPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!previewNewsletter} onOpenChange={(open) => !open && setPreviewNewsletter(null)}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              Newsletter Preview
+            </DialogTitle>
+            <DialogDescription>
+              Preview of how this newsletter appears in an email client.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto">
+            <div className="mx-auto p-4 sm:p-6 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl">
+              <div className="bg-white text-slate-900 shadow-2xl mx-auto rounded overflow-hidden max-w-[600px] w-full">
+                <div className="border-b bg-gray-50 p-4 text-xs sm:text-sm text-gray-500">
+                  <div className="flex gap-2 mb-1">
+                    <span className="font-semibold text-right w-16">Subject:</span>
+                    <span className="text-gray-900 font-semibold truncate">
+                      {previewNewsletter?.subject || previewNewsletter?.title || "(no subject)"}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-right w-16">Status:</span>
+                    <span className="text-gray-900 capitalize">{previewNewsletter?.status || "draft"}</span>
+                  </div>
+                </div>
+
+                <iframe
+                  srcDoc={wrappedPreviewHtml}
+                  title="Newsletter content preview"
+                  sandbox="allow-same-origin"
+                  className="w-full border-0"
+                  style={{ minHeight: "640px", background: "#fff" }}
+                />
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
