@@ -21,10 +21,21 @@ export const initNewsletterSend = mutation({
       .first();
 
     if (existing) {
-      // Update existing stats
+      // Reset all counters so a re-init behaves like a fresh send
       await ctx.db.patch(existing._id, {
         status: "sending",
         totalRecipients: args.totalRecipients,
+        queued: args.totalRecipients,
+        sent: 0,
+        delivered: 0,
+        opened: 0,
+        uniqueOpens: 0,
+        clicked: 0,
+        uniqueClicks: 0,
+        bounced: 0,
+        complained: 0,
+        failed: 0,
+        unsubscribed: 0,
         startedAt: Date.now(),
         lastEventAt: Date.now(),
       });
@@ -136,12 +147,20 @@ export const trackEmailEvent = mutation({
   handler: async (ctx, args) => {
     const now = Date.now();
 
-    // Find the send record by providerMessageId or recipientEmail+newsletterId
+    // Find the send record by providerMessageId, falling back to recipientEmail+newsletterId
     let sendRecord = null;
     if (args.providerMessageId) {
       sendRecord = await ctx.db
         .query("newsletterSends")
         .withIndex("by_provider_message", (q) => q.eq("providerMessageId", args.providerMessageId))
+        .first();
+    }
+    if (!sendRecord) {
+      sendRecord = await ctx.db
+        .query("newsletterSends")
+        .withIndex("by_recipient_and_newsletter", (q) =>
+          q.eq("recipientEmail", args.recipientEmail).eq("newsletterId", args.newsletterId)
+        )
         .first();
     }
 

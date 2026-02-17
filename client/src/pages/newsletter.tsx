@@ -157,13 +157,13 @@ export default function NewsletterPage() {
       const response = await apiRequest('POST', `/api/newsletters/${id}/send`);
       return response.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: any, variables: string) => {
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
       toast({ 
         title: "Newsletter Deployed", 
         description: data.message || "Newsletter is now being sent to recipients."
       });
-      setLocation(`/newsletters/${data.newsletterId || data.id}`);
+      setLocation(`/newsletters/${data.newsletterId || data.id || variables}`);
     },
     onError: (error: any) => {
       toast({ 

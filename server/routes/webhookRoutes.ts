@@ -412,10 +412,15 @@ async function handleEmailComplained(data: any) {
     const reason = 'spam_complaint';
     const description = 'Spam complaint received';
 
+    // Derive tenantId from the originating email_send record
+    let sourceTenantId: string | null = null;
+
     // Update email_sends if we have provider_message_id
     if (providerMessageId) {
       const emailSend = await findEmailSendByProviderId(providerMessageId);
       if (emailSend) {
+        sourceTenantId = emailSend.tenantId || null;
+
         // Create email_events record
         await createEmailEvent(emailSend.id, data, 'complained');
 
@@ -434,7 +439,7 @@ async function handleEmailComplained(data: any) {
       }
     }
 
-    // Add to bounced emails table
+    // Add to bounced emails table with tenant-scoped complaint
     if (email) {
       // Check if already exists
       const existingBounce = await db.query.bouncedEmails.findFirst({
@@ -444,11 +449,14 @@ async function handleEmailComplained(data: any) {
       if (!existingBounce) {
         await db.insert(db.bouncedEmails).values({
           email,
-          reason,
-          description,
-          bouncedAt: new Date(),
+          bounceType: 'complaint',
+          bounceReason: description,
+          firstBouncedAt: new Date(),
+          lastBouncedAt: new Date(),
+          sourceTenantId: sourceTenantId,
+          suppressionReason: reason,
         });
-        console.log(`Added spam complaint: ${email}`);
+        console.log(`Added spam complaint: ${email} (sourceTenantId=${sourceTenantId || 'unknown'})`);
       }
     }
   } catch (error) {

@@ -57,11 +57,10 @@ async function updateNewsletterStatusInternal(
   const apiUrl = process.env.API_URL;
   const secret = process.env.INTERNAL_SERVICE_SECRET;
 
-  // Skip status update if API_URL is not configured or points to localhost (unreachable from cloud)
-  if (!apiUrl || apiUrl.includes("localhost") || apiUrl.includes("127.0.0.1")) {
-    logger.warn("API_URL not configured or points to localhost, skipping newsletter status update");
-    return;
-  }
+  // Use web.zendwise.work as base host for status updates when API_URL points to localhost
+  const baseUrl = (!apiUrl || apiUrl.includes("localhost") || apiUrl.includes("127.0.0.1"))
+    ? "https://web.zendwise.work"
+    : apiUrl;
 
   if (!secret) {
     logger.warn("INTERNAL_SERVICE_SECRET not configured, skipping status update");
@@ -74,7 +73,7 @@ async function updateNewsletterStatusInternal(
   const signature = createHmac("sha256", secret).update(signaturePayload).digest("hex");
 
   try {
-    const response = await fetch(`${apiUrl}/api/newsletters/internal/${newsletterId}/status`, {
+    const response = await fetch(`${baseUrl}/api/newsletters/internal/${newsletterId}/status`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -102,11 +101,10 @@ async function getSuppressionList(tenantId: string): Promise<Set<string>> {
   const apiUrl = process.env.API_URL;
   const secret = process.env.INTERNAL_SERVICE_SECRET;
 
-  // Skip suppression check if API_URL is not configured or points to localhost (unreachable from cloud)
-  if (!apiUrl || apiUrl.includes("localhost") || apiUrl.includes("127.0.0.1")) {
-    logger.warn("API_URL not configured or points to localhost, skipping suppression check (emails will still send)");
-    return new Set();
-  }
+  // Use web.zendwise.work as base host for suppression checks when API_URL points to localhost
+  const baseUrl = (!apiUrl || apiUrl.includes("localhost") || apiUrl.includes("127.0.0.1"))
+    ? "https://web.zendwise.work"
+    : apiUrl;
 
   if (!secret) {
     logger.warn("INTERNAL_SERVICE_SECRET not configured, skipping suppression check");
@@ -114,11 +112,11 @@ async function getSuppressionList(tenantId: string): Promise<Set<string>> {
   }
 
   const timestamp = Date.now();
-  const signaturePayload = `${timestamp}.{}`;
+  const signaturePayload = `${timestamp}.${JSON.stringify({})}`;
   const signature = createHmac("sha256", secret).update(signaturePayload).digest("hex");
 
   try {
-    const response = await fetch(`${apiUrl}/api/newsletters/internal/suppression-list?tenantId=${tenantId}`, {
+    const response = await fetch(`${baseUrl}/api/newsletters/internal/suppression-list?tenantId=${tenantId}`, {
       method: "GET",
       headers: {
         "x-internal-service": "trigger.dev",

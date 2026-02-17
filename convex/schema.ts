@@ -25,6 +25,7 @@ export default defineSchema({
     .index("by_tenant_newsletter", ["tenantId", "newsletterId"])
     .index("by_provider_message", ["providerMessageId"])
     .index("by_recipient", ["tenantId", "recipientEmail"])
+    .index("by_recipient_and_newsletter", ["recipientEmail", "newsletterId"])
     .index("by_status", ["newsletterId", "status"]),
 
   // Tracks individual email events (opens, clicks, bounces, etc.)

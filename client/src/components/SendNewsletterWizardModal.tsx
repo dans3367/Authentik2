@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -178,8 +177,16 @@ export function SendNewsletterWizardModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+      <DialogContent 
+        className="max-w-2xl p-8" 
+        style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          maxHeight: '85vh',
+          overflow: 'hidden'
+        }}
+      >
+        <DialogHeader className="flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
               <Send className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -195,7 +202,7 @@ export function SendNewsletterWizardModal({
           </div>
         </DialogHeader>
 
-        <div className="flex items-center gap-2 px-1 py-2">
+        <div className="flex items-center gap-2 px-1 py-2 flex-shrink-0">
           <div className="flex items-center gap-1.5">
             <div className="w-7 h-7 rounded-full bg-blue-600 dark:bg-blue-500 text-white flex items-center justify-center text-xs font-semibold">
               1
@@ -211,9 +218,9 @@ export function SendNewsletterWizardModal({
           </div>
         </div>
 
-        <Separator />
+        <Separator className="flex-shrink-0" />
 
-        <div className="flex-1 overflow-hidden flex flex-col gap-4 py-2">
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }} className="flex flex-col gap-4 py-2 pr-1">
           <RadioGroup
             value={selectionMode}
             onValueChange={(val) => {
@@ -255,7 +262,7 @@ export function SendNewsletterWizardModal({
           </RadioGroup>
 
           {selectionMode === "segment_list" && (
-            <div className="flex-1 overflow-hidden flex flex-col gap-3">
+            <div className="flex-1 min-h-0 flex flex-col gap-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
@@ -267,7 +274,7 @@ export function SendNewsletterWizardModal({
                 />
               </div>
 
-              <ScrollArea className="flex-1 max-h-[320px]">
+              <div style={{ maxHeight: '280px', overflowY: 'auto', padding: '4px' }} className="rounded-md">
                 {segmentListsLoading ? (
                   <div className="space-y-3 p-1">
                     {[1, 2, 3].map((i) => (
@@ -333,12 +340,12 @@ export function SendNewsletterWizardModal({
                       })}
                   </div>
                 )}
-              </ScrollArea>
+              </div>
             </div>
           )}
 
           {selectionMode === "custom" && (
-            <div className="flex-1 overflow-hidden flex flex-col gap-3">
+            <div className="flex-1 min-h-0 flex flex-col gap-3">
               <RadioGroup
                 value={customRecipientType}
                 onValueChange={(val) => {
@@ -398,7 +405,7 @@ export function SendNewsletterWizardModal({
               )}
 
               {customRecipientType === "selected" && (
-                <div className="flex-1 overflow-hidden flex flex-col gap-2">
+                <div className="flex-1 min-h-0 flex flex-col gap-2">
                   <div className="flex items-center gap-2">
                     <div className="relative flex-1">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -430,7 +437,7 @@ export function SendNewsletterWizardModal({
                   <p className="text-xs text-muted-foreground px-1">
                     {selectedContactIds.length} of {filteredContacts.length} selected
                   </p>
-                  <ScrollArea className="flex-1 max-h-[220px] rounded-lg border">
+                  <div style={{ maxHeight: '220px', overflowY: 'auto' }} className="rounded-lg border">
                     {contactsLoading ? (
                       <div className="space-y-2 p-3">
                         {[1, 2, 3].map((i) => (
@@ -469,12 +476,12 @@ export function SendNewsletterWizardModal({
                         ))}
                       </div>
                     )}
-                  </ScrollArea>
+                  </div>
                 </div>
               )}
 
               {customRecipientType === "tags" && (
-                <div className="flex-1 overflow-hidden flex flex-col gap-2">
+                <div className="flex-1 min-h-0 flex flex-col gap-2">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
                     <Input
@@ -488,7 +495,7 @@ export function SendNewsletterWizardModal({
                   <p className="text-xs text-muted-foreground px-1">
                     {selectedTagIds.length} of {filteredTags.length} tags selected
                   </p>
-                  <ScrollArea className="flex-1 max-h-[220px]">
+                  <div style={{ maxHeight: '220px', overflowY: 'auto', padding: '4px' }} className="rounded-md">
                     {tagsLoading ? (
                       <div className="space-y-2 p-3">
                         {[1, 2, 3].map((i) => (
@@ -534,16 +541,16 @@ export function SendNewsletterWizardModal({
                         })}
                       </div>
                     )}
-                  </ScrollArea>
+                  </div>
                 </div>
               )}
             </div>
           )}
         </div>
 
-        <Separator />
+        <Separator className="flex-shrink-0" />
 
-        <DialogFooter className="flex-row items-center justify-between gap-4 sm:justify-between">
+        <DialogFooter className="flex-row items-center justify-between gap-4 sm:justify-between flex-shrink-0">
           <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
             {canContinue() && (
               <>
