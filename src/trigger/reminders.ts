@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import { createHmac } from "crypto";
 import { z } from "zod";
 import { wrapInEmailDesign } from "./emailWrapper";
+import { DB_RETRY_CONFIG, dbConnectionCatchError } from "./retryStrategy";
 
 // Initialize Resend for email sending
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -79,12 +80,8 @@ export type ReminderPayload = z.infer<typeof reminderPayloadSchema>;
 export const sendReminderTask = task({
   id: "send-appointment-reminder",
   maxDuration: 60,
-  retry: {
-    maxAttempts: 3,
-    minTimeoutInMs: 1000,
-    maxTimeoutInMs: 10000,
-    factor: 2,
-  },
+  retry: DB_RETRY_CONFIG,
+  catchError: dbConnectionCatchError,
   run: async (payload: ReminderPayload) => {
     const data = reminderPayloadSchema.parse(payload);
 
@@ -161,12 +158,8 @@ export const sendReminderTask = task({
 export const scheduleReminderTask = task({
   id: "schedule-appointment-reminder",
   maxDuration: 86400, // 24 hours max (reminders can be scheduled up to a day in advance)
-  retry: {
-    maxAttempts: 3,
-    minTimeoutInMs: 1000,
-    maxTimeoutInMs: 10000,
-    factor: 2,
-  },
+  retry: DB_RETRY_CONFIG,
+  catchError: dbConnectionCatchError,
   run: async (payload: ReminderPayload) => {
     const data = reminderPayloadSchema.parse(payload);
 
@@ -258,9 +251,8 @@ export const scheduleReminderTask = task({
 export const sendBulkRemindersTask = task({
   id: "send-bulk-reminders",
   maxDuration: 300, // 5 minutes for bulk operations
-  retry: {
-    maxAttempts: 2,
-  },
+  retry: DB_RETRY_CONFIG,
+  catchError: dbConnectionCatchError,
   run: async (payload: { reminders: ReminderPayload[] }) => {
     const reminders = z.array(reminderPayloadSchema).parse(payload.reminders);
     const results: { appointmentId: string; success: boolean; id?: string; error?: string }[] = [];

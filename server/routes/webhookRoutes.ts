@@ -3,6 +3,7 @@ import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { authenticateToken } from '../middleware/auth-middleware';
 import { createHmac } from 'crypto';
+import { trackNewsletterEvent } from '../utils/convexNewsletterTracker';
 
 export const webhookRoutes = Router();
 
@@ -268,6 +269,17 @@ async function handleEmailSent(data: any) {
       await updateContactMetrics(emailSend.contactId, 'sent');
     }
 
+    // Track in Convex for live updates (fire-and-forget)
+    if (emailSend.newsletterId) {
+      trackNewsletterEvent({
+        tenantId: emailSend.tenantId,
+        newsletterId: emailSend.newsletterId,
+        recipientEmail: emailSend.recipientEmail,
+        providerMessageId,
+        eventType: 'sent',
+      }).catch(() => {});
+    }
+
     console.log(`Successfully processed sent event for email_send: ${emailSend.id}`);
   } catch (error) {
     console.error('Error handling email sent event:', error);
@@ -311,6 +323,17 @@ async function handleEmailDelivered(data: any) {
       await updateContactMetrics(emailSend.contactId, 'delivered');
     }
 
+    // Track in Convex for live updates (fire-and-forget)
+    if (emailSend.newsletterId) {
+      trackNewsletterEvent({
+        tenantId: emailSend.tenantId,
+        newsletterId: emailSend.newsletterId,
+        recipientEmail: emailSend.recipientEmail,
+        providerMessageId,
+        eventType: 'delivered',
+      }).catch(() => {});
+    }
+
     console.log(`Successfully processed delivered event for email_send: ${emailSend.id}`);
   } catch (error) {
     console.error('Error handling email delivered event:', error);
@@ -341,6 +364,17 @@ async function handleEmailBounced(data: any) {
 
         // Create email_events record
         await createEmailEvent(emailSend.id, data, 'bounced');
+
+        // Track in Convex for live updates (fire-and-forget)
+        if (emailSend.newsletterId) {
+          trackNewsletterEvent({
+            tenantId: emailSend.tenantId,
+            newsletterId: emailSend.newsletterId,
+            recipientEmail: emailSend.recipientEmail,
+            providerMessageId,
+            eventType: 'bounced',
+          }).catch(() => {});
+        }
 
         console.log(`Updated email_send ${emailSend.id} as bounced`);
       }
@@ -384,6 +418,17 @@ async function handleEmailComplained(data: any) {
       if (emailSend) {
         // Create email_events record
         await createEmailEvent(emailSend.id, data, 'complained');
+
+        // Track in Convex for live updates (fire-and-forget)
+        if (emailSend.newsletterId) {
+          trackNewsletterEvent({
+            tenantId: emailSend.tenantId,
+            newsletterId: emailSend.newsletterId,
+            recipientEmail: emailSend.recipientEmail,
+            providerMessageId,
+            eventType: 'complained',
+          }).catch(() => {});
+        }
 
         console.log(`Recorded complaint event for email_send ${emailSend.id}`);
       }
@@ -439,6 +484,18 @@ async function handleEmailOpened(data: any) {
       await updateContactMetrics(emailSend.contactId, 'opened');
     }
 
+    // Track in Convex for live updates (fire-and-forget)
+    if (emailSend.newsletterId) {
+      trackNewsletterEvent({
+        tenantId: emailSend.tenantId,
+        newsletterId: emailSend.newsletterId,
+        recipientEmail: emailSend.recipientEmail,
+        providerMessageId,
+        eventType: 'opened',
+        metadata: { userAgent: data.user_agent, ipAddress: data.ip_address },
+      }).catch(() => {});
+    }
+
     console.log(`Successfully processed opened event for email_send: ${emailSend.id}`);
   } catch (error) {
     console.error('Error handling email opened event:', error);
@@ -471,6 +528,18 @@ async function handleEmailClicked(data: any) {
     // Update contact metrics if contact is linked
     if (emailSend.contactId) {
       await updateContactMetrics(emailSend.contactId, 'clicked');
+    }
+
+    // Track in Convex for live updates (fire-and-forget)
+    if (emailSend.newsletterId) {
+      trackNewsletterEvent({
+        tenantId: emailSend.tenantId,
+        newsletterId: emailSend.newsletterId,
+        recipientEmail: emailSend.recipientEmail,
+        providerMessageId,
+        eventType: 'clicked',
+        metadata: { userAgent: data.user_agent, ipAddress: data.ip_address, link: data.link || data.click?.link },
+      }).catch(() => {});
     }
 
     console.log(`Successfully processed clicked event for email_send: ${emailSend.id}`);

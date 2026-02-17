@@ -194,6 +194,30 @@ newsletterRoutes.post("/send-preview", authenticateToken, requireTenant, async (
   }
 });
 
+// Internal endpoint: Get suppression list (called by Trigger.dev tasks)
+// Must be defined BEFORE /:id routes to avoid 'internal' matching as :id
+newsletterRoutes.get('/internal/suppression-list', authenticateInternalService, async (req: any, res) => {
+  try {
+    const { tenantId } = req.query;
+
+    if (!tenantId) {
+      return res.status(400).json({ error: 'tenantId is required' });
+    }
+
+    const suppressed = await db.select({ email: bouncedEmails.email })
+      .from(bouncedEmails)
+      .where(sql`${bouncedEmails.isActive} = ${true}`);
+
+    const emails = suppressed.map((r: { email: string }) => r.email.toLowerCase().trim());
+
+    console.log(`[Newsletter Internal] Suppression list for tenant ${tenantId}: ${emails.length} emails`);
+    res.json({ emails });
+  } catch (error) {
+    console.error('[Newsletter Internal] Suppression list error:', error);
+    res.status(500).json({ error: 'Failed to get suppression list' });
+  }
+});
+
 // Get all newsletters
 newsletterRoutes.get("/", authenticateToken, requireTenant, async (req: any, res) => {
   try {
@@ -707,25 +731,53 @@ newsletterRoutes.post("/:id/initialize-tasks", authenticateToken, requireTenant,
       return res.status(404).json({ message: 'Newsletter not found' });
     }
 
-    // Initialize tasks for newsletter sending (placeholder)
+    // Derive task statuses from the newsletter's current state
+    const status = newsletter.status;
+
+    let validationStatus = 'pending';
+    let deliveryStatus = 'pending';
+    let analyticsStatus = 'pending';
+
+    if (status === 'ready_to_send' || status === 'sending' || status === 'sent') {
+      validationStatus = 'completed';
+    } else if (status === 'scheduled') {
+      validationStatus = 'running';
+    }
+
+    if (status === 'sent') {
+      deliveryStatus = 'completed';
+    } else if (status === 'sending') {
+      deliveryStatus = 'running';
+    }
+
+    if (status === 'sent' || status === 'sending') {
+      analyticsStatus = 'running';
+      if (newsletter.sentAt) {
+        const hoursSinceSent = (Date.now() - new Date(newsletter.sentAt).getTime()) / (1000 * 60 * 60);
+        if (hoursSinceSent >= 24) {
+          analyticsStatus = 'completed';
+        }
+      }
+    }
+
     const tasks = [
       {
         id: `task-${id}-1`,
         type: 'prepare_recipients',
-        status: 'pending',
-        progress: 0,
+        status: validationStatus,
+        progress: validationStatus === 'completed' ? 100 : validationStatus === 'running' ? 50 : 0,
       },
       {
         id: `task-${id}-2`,
         type: 'send_emails',
-        status: 'pending',
-        progress: 0,
+        status: deliveryStatus,
+        progress: deliveryStatus === 'completed' ? 100 : deliveryStatus === 'running' ? 50 : 0,
       },
       {
         id: `task-${id}-3`,
         type: 'track_results',
-        status: 'pending',
-        progress: 0,
+        status: analyticsStatus,
+        progress: analyticsStatus === 'completed' ? 100 : analyticsStatus === 'running' ? 50 : 0,
       },
     ];
 
@@ -859,88 +911,62 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
 
       console.log(`[Newsletter] Found ${recipients.length} recipients for newsletter ${id}. ${allowedRecipients.length} allowed after suppression filter.`);
 
-      // Send to Temporal Server via GRPC to create newsletter workflow
+      // Send via Trigger.dev
       try {
-        console.log(`[Newsletter] Sending to temporal server via GRPC for newsletter workflow creation`);
+        console.log(`[Newsletter] Triggering Trigger.dev sendNewsletterTask`);
         
-        // Prepare the request for temporal server
-        const temporalRequest = {
-          newsletter_id: newsletter.id,
-          tenant_id: req.user.tenantId,
-          user_id: req.user.id,
-          group_uuid: groupUUID,
+        // Wrap newsletter content in the tenant's global email design template
+        const wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content);
+        
+        // Import and trigger the Trigger.dev task
+        const { sendNewsletterTask } = await import('../../src/trigger/newsletter');
+        
+        const handle = await sendNewsletterTask.trigger({
+          jobId: `newsletter-${newsletter.id}-${Date.now()}`,
+          newsletterId: newsletter.id,
+          tenantId: req.user.tenantId,
+          userId: req.user.id,
+          groupUUID,
           subject: newsletter.subject,
-          content: newsletter.content,
+          content: wrappedContent,
           recipients: allowedRecipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => ({
             id: contact.id,
             email: contact.email,
-            first_name: contact.firstName || '',
-            last_name: contact.lastName || ''
+            firstName: contact.firstName || '',
+            lastName: contact.lastName || ''
           })),
-          metadata: {
-            tags: [`newsletter-${newsletter.id}`, `group-${groupUUID}`, `tenant-${req.user.tenantId}`]
-          },
-          batch_size: 50 // Add batch size configuration
-        };
-
-        // Send to server-node for temporal processing
-        console.log('📧 [Newsletter Proxy] Forwarding newsletter request to server-node');
-        
-        // Get the session token from cookies to forward to server-node
-        const sessionToken = req.cookies?.['better-auth.session_token'];
-        console.log('📧 [Newsletter Proxy] Session token found:', sessionToken ? 'Yes' : 'No');
-        
-        const response = await fetch('http://localhost:3502/api/newsletter/send', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': sessionToken ? `Bearer ${sessionToken}` : '',
-            'Cookie': sessionToken ? `better-auth.session_token=${sessionToken}` : '',
-          },
-          body: JSON.stringify(temporalRequest)
+          batchSize: 25,
+          priority: 'normal' as const,
         });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('❌ [Newsletter Proxy] server-node returned error:', response.status, errorText);
-          throw new Error(`server-node request failed: ${errorText}`);
-        }
-
-        const temporalResponse = await response.json();
-
-        if (!temporalResponse.success) {
-          throw new Error(`Temporal server returned error: ${temporalResponse.error}`);
-        }
-
-        console.log(`[Newsletter] Temporal newsletter workflow created:`, {
-          workflowId: temporalResponse.workflow_id,
-          runId: temporalResponse.run_id,
-          newsletterId: temporalResponse.newsletter_id
+        console.log(`[Newsletter] Trigger.dev task triggered:`, {
+          runId: handle.id,
+          newsletterId: newsletter.id,
+          recipientCount: allowedRecipients.length
         });
 
-        // Update newsletter status to sent
+        // Mark as sent once Trigger.dev accepts the job
         await db.update(newsletters)
           .set({
             status: 'sent',
-            recipientCount: recipients.length,
+            recipientCount: allowedRecipients.length,
             updatedAt: new Date(),
           })
           .where(eq(newsletters.id, id));
 
         // Return success response
         res.json({
-          message: 'Newsletter workflow started successfully',
-          workflowId: temporalResponse.workflow_id,
-          runId: temporalResponse.run_id,
-          newsletterId: temporalResponse.newsletter_id,
-          groupUUID: temporalResponse.group_uuid,
-          recipientCount: recipients.length
+          message: 'Newsletter send started successfully',
+          runId: handle.id,
+          newsletterId: newsletter.id,
+          groupUUID,
+          recipientCount: allowedRecipients.length
         });
 
-      } catch (temporalError: any) {
-        console.error(`[Newsletter] Failed to create temporal newsletter workflow:`, temporalError);
+      } catch (triggerError: any) {
+        console.error(`[Newsletter] Failed to trigger Trigger.dev task:`, triggerError);
         
-        // Fallback to direct sending if temporal server is unavailable
+        // Fallback to direct sending if Trigger.dev is unavailable
         console.log(`[Newsletter] Falling back to direct email sending`);
         
         // Generate or reuse unsubscribe tokens per recipient (single-use, long-lived until used)
@@ -1062,6 +1088,35 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
   } catch (error) {
     console.error('Send newsletter error:', error);
     res.status(500).json({ message: 'Failed to send newsletter' });
+  }
+});
+
+// Internal endpoint: Update newsletter status (called by Trigger.dev tasks)
+newsletterRoutes.put('/internal/:id/status', authenticateInternalService, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { status, sentCount, failedCount, totalCount } = req.body;
+
+    console.log(`[Newsletter Internal] Updating newsletter ${id} status to: ${status}`, { sentCount, failedCount, totalCount });
+
+    const updateData: any = {
+      status,
+      updatedAt: new Date(),
+    };
+
+    if (sentCount !== undefined) {
+      updateData.recipientCount = sentCount;
+    }
+
+    await db.update(newsletters)
+      .set(updateData)
+      .where(eq(newsletters.id, id));
+
+    console.log(`[Newsletter Internal] Newsletter ${id} status updated to: ${status}`);
+    res.json({ success: true, newsletterId: id, status });
+  } catch (error) {
+    console.error('[Newsletter Internal] Status update error:', error);
+    res.status(500).json({ error: 'Failed to update newsletter status' });
   }
 });
 

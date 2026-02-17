@@ -17,7 +17,8 @@ import {
   Send,
   FileText,
   Pencil,
-  Copy
+  Copy,
+  Rocket
 } from "lucide-react";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { Button } from "@/components/ui/button";
@@ -148,6 +149,28 @@ export default function NewsletterPage() {
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to delete newsletter", variant: "destructive" });
+    },
+  });
+
+  const deployMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest('POST', `/api/newsletters/${id}/send`);
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({ 
+        title: "Newsletter Deployed", 
+        description: data.message || "Newsletter is now being sent to recipients."
+      });
+      setLocation(`/newsletters/${data.newsletterId || data.id}`);
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Deploy Failed", 
+        description: error.message || "Failed to deploy newsletter", 
+        variant: "destructive" 
+      });
     },
   });
 
@@ -359,6 +382,7 @@ export default function NewsletterPage() {
                 : "0";
               const isDraft = newsletter.status === 'draft';
               const isSent = newsletter.status === 'sent';
+              const isReadyToSend = newsletter.status === 'ready_to_send';
 
               return (
                 <Card 
@@ -426,6 +450,20 @@ export default function NewsletterPage() {
                                 <Copy className="h-4 w-4 mr-2" />
                                 {cloneMutation.isPending ? "Copying..." : "Copy Design"}
                               </DropdownMenuItem>
+                              {isReadyToSend && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => deployMutation.mutate(newsletter.id)}
+                                    disabled={deployMutation.isPending}
+                                    className="text-emerald-600 focus:text-emerald-600 focus:bg-emerald-50 dark:focus:bg-emerald-950/30"
+                                    data-testid={`button-deploy-${newsletter.id}`}
+                                  >
+                                    <Rocket className="h-4 w-4 mr-2" />
+                                    {deployMutation.isPending ? "Deploying..." : "Deploy Now"}
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                               <DropdownMenuSeparator />
                               <DropdownMenuItem 
                                 className="text-red-600 focus:text-red-600"

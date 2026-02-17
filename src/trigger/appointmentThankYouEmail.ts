@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import { z } from "zod";
 import { createHmac } from "crypto";
 import { wrapInEmailDesign } from "./emailWrapper";
+import { DB_RETRY_CONFIG, dbConnectionCatchError } from "./retryStrategy";
 
 // Initialize Resend for email sending
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -106,12 +107,8 @@ export type ThankYouEmailPayload = z.infer<typeof thankYouEmailPayloadSchema>;
 export const sendThankYouEmailTask = task({
     id: "send-thank-you-email",
     maxDuration: 60,
-    retry: {
-        maxAttempts: 3,
-        minTimeoutInMs: 1000,
-        maxTimeoutInMs: 10000,
-        factor: 2,
-    },
+    retry: DB_RETRY_CONFIG,
+    catchError: dbConnectionCatchError,
     run: async (payload: ThankYouEmailPayload) => {
         const data = thankYouEmailPayloadSchema.parse(payload);
 

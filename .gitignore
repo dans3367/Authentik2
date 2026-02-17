@@ -36,3 +36,5 @@ xxcardprocessor-go/cardprocessor
 .kiro/steering/product.md
 .kiro/steering/structure.md
 .kiro/steering/tech.md
+
+.env.local

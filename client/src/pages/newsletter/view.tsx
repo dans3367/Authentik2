@@ -48,6 +48,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format, formatDistanceToNow } from "date-fns";
 import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
 import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
+import { LiveTrackingPanel } from "@/components/newsletter/LiveTrackingPanel";
 import type { NewsletterWithUser, NewsletterTaskStatus } from "@shared/schema";
 
 // Using real task status data from backend via NewsletterTaskStatus type
@@ -81,8 +82,11 @@ export default function NewsletterViewPage() {
     },
     enabled: !!id,
     refetchInterval: (query) => {
-      // Auto-refresh every 10 seconds if newsletter is sent to get latest engagement metrics
-      return query.state.data?.newsletter?.status === 'sent' ? 10000 : false;
+      const status = query.state.data?.newsletter?.status;
+      // Auto-refresh every 5 seconds while sending, every 10 seconds when sent
+      if (status === 'sending') return 5000;
+      if (status === 'sent') return 10000;
+      return false;
     },
   });
 
@@ -359,7 +363,9 @@ export default function NewsletterViewPage() {
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       draft: { label: 'Draft', variant: 'secondary' as const, icon: Edit },
+      ready_to_send: { label: 'Ready to Send', variant: 'outline' as const, icon: Send },
       scheduled: { label: 'Scheduled', variant: 'outline' as const, icon: Clock },
+      sending: { label: 'Sending', variant: 'outline' as const, icon: Send },
       sent: { label: 'Sent', variant: 'default' as const, icon: CheckCircle },
     };
 
@@ -422,14 +428,18 @@ export default function NewsletterViewPage() {
     
     switch (stepKey) {
       case 'validation':
-        // Content validation completes immediately for sent newsletters, or runs for scheduled
-        if (newsletter.status === 'sent') return 'completed';
+        // Content validation completes once sending begins or newsletter is sent
+        if (newsletter.status === 'sent' || newsletter.status === 'sending') return 'completed';
+        if (newsletter.status === 'ready_to_send') return 'completed';
         if (newsletter.status === 'scheduled') return 'running';
         return 'pending';
         
       case 'delivery':
         // Email delivery is completed if newsletter is sent
         if (newsletter.status === 'sent') return 'completed';
+        // Delivery is in progress if newsletter is currently sending
+        if (newsletter.status === 'sending') return 'running';
+        if (newsletter.status === 'ready_to_send') return 'pending';
         if (newsletter.status === 'scheduled') return 'pending';
         return 'pending';
         
@@ -442,7 +452,7 @@ export default function NewsletterViewPage() {
         const hoursSinceSent = (now.getTime() - sentTime.getTime()) / (1000 * 60 * 60);
         
         if (hoursSinceSent >= 24) return 'completed';
-        if (newsletter.status === 'sent') return 'running';
+        if (newsletter.status === 'sent' || newsletter.status === 'sending') return 'running';
         return 'pending';
         
       default:
@@ -454,7 +464,9 @@ export default function NewsletterViewPage() {
     if (!newsletter) return 1;
     
     if (newsletter.status === 'draft') return 1;
+    if (newsletter.status === 'ready_to_send') return 1;
     if (newsletter.status === 'scheduled') return 1;
+    if (newsletter.status === 'sending') return 2; // Delivery in progress
     if (newsletter.status === 'sent') {
       // Check analytics completion
       if (getTaskStepStatus('analytics') === 'completed') return 4; // All done
@@ -699,14 +711,22 @@ export default function NewsletterViewPage() {
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 lg:space-y-8">
           <div className="overflow-x-auto">
-            <TabsList className="grid w-full grid-cols-5 min-w-max">
+            <TabsList className="grid w-full grid-cols-6 min-w-max">
               <TabsTrigger value="overview" className="text-xs sm:text-sm" data-testid="tab-overview">Overview</TabsTrigger>
+              <TabsTrigger value="live-tracking" className="text-xs sm:text-sm" data-testid="tab-live-tracking">
+                <Activity className="h-3 w-3 mr-1" />
+                Live
+              </TabsTrigger>
               <TabsTrigger value="content" className="text-xs sm:text-sm" data-testid="tab-content">Content</TabsTrigger>
               <TabsTrigger value="status" className="text-xs sm:text-sm" data-testid="tab-status">Task Status</TabsTrigger>
               <TabsTrigger value="analytics" className="text-xs sm:text-sm" data-testid="tab-analytics">Analytics</TabsTrigger>
               <TabsTrigger value="detailed-stats" className="text-xs sm:text-sm" data-testid="tab-detailed-stats">Detailed Stats</TabsTrigger>
             </TabsList>
           </div>
+
+        <TabsContent value="live-tracking" className="space-y-6 lg:space-y-8">
+          <LiveTrackingPanel newsletterId={newsletter.id} />
+        </TabsContent>
 
         <TabsContent value="overview" className="space-y-6 lg:space-y-8">
           <div className="grid gap-4 lg:gap-6 md:grid-cols-2">
