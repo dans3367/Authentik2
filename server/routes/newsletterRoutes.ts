@@ -107,7 +107,7 @@ async function getNewsletterRecipients(newsletter: any, tenantId: string) {
             recipients = await db.query.emailContacts.findMany({
               where: and(
                 eq(emailContacts.tenantId, tenantId),
-                inArray(emailContacts.id, contactIds.map(c => c.contactId)),
+                inArray(emailContacts.id, contactIds.map((c: any) => c.contactId)),
                 eq(emailContacts.status, 'active')
               ),
               columns: {
@@ -161,7 +161,7 @@ newsletterRoutes.get("/preview-recipients", authenticateToken, requireTenant, as
 
     console.log(`[Newsletter Preview] Found ${limitedUsers.length} users for tenant ${tenantId}${hasMore ? ' (truncated)' : ''}`);
 
-    const recipients = limitedUsers.map(u => ({
+    const recipients = limitedUsers.map((u: any) => ({
       id: u.id,
       email: u.email,
       name: u.name || [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email,
@@ -799,7 +799,7 @@ newsletterRoutes.post("/:id/initialize-tasks", authenticateToken, requireTenant,
       {
         id: `task-${id}-1`,
         type: 'prepare_recipients',
-w        status: validationStatus,
+        status: validationStatus,
         progress: validationStatus === 'completed' ? 100 : validationStatus === 'running' ? 50 : 0,
       },
       {
@@ -1238,7 +1238,7 @@ newsletterRoutes.post('/:id/send-single', authenticateInternalService, async (re
 
       res.json({
         success: true,
-        messageId: result.id || result.messageId,
+        messageId: (result as any).id || (result as any).messageId,
         recipient: recipient.email
       });
 

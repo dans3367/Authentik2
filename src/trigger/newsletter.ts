@@ -281,7 +281,7 @@ export const processNewsletterBatchTask = task({
 
       // Small delay between emails to avoid rate limiting
       if (i < recipients.length - 1) {
-        await wait.for({ milliseconds: 500 });
+        await wait.for({ seconds: 0.5 });
       }
     }
 
@@ -521,13 +521,13 @@ export const sendNewsletterTask = task({
 
         // Small delay between emails
         if (j < batch.length - 1) {
-          await wait.for({ milliseconds: 500 });
+          await wait.for({ seconds: 0.5 });
         }
       }
 
       // Delay between batches
       if (i < batches.length - 1) {
-        await wait.for({ milliseconds: 2000 });
+        await wait.for({ seconds: 2 });
       }
     }
 

@@ -311,7 +311,7 @@ export const sendBulkRemindersTask = task({
 
       // Small delay between emails to avoid rate limiting
       if (i < reminders.length - 1) {
-        await wait.for({ milliseconds: 500 });
+        await wait.for({ seconds: 0.5 });
       }
     }
 
