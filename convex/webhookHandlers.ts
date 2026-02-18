@@ -61,6 +61,7 @@ export const resendWebhook = httpAction(async (ctx, request) => {
       "email.complained": "complained",
       "email.opened": "opened",
       "email.clicked": "clicked",
+      "email.suppressed": "suppressed",
     };
 
     const normalisedType = eventTypeMap[event.type];
@@ -256,6 +257,10 @@ function buildMetadata(data: any): Record<string, any> | undefined {
   if (data.link || data.click?.link)
     meta.link = data.link || data.click?.link;
   if (data.Geo) meta.geo = data.Geo;
+  if (data.suppressed) {
+    meta.message = data.suppressed.message;
+    meta.type = data.suppressed.type;
+  }
   return Object.keys(meta).length > 0 ? meta : undefined;
 }
 

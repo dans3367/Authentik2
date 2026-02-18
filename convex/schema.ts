@@ -65,6 +65,7 @@ export default defineSchema({
     bounced: v.number(),
     complained: v.number(),
     failed: v.number(),
+    suppressed: v.optional(v.number()),
     unsubscribed: v.number(),
     startedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),

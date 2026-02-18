@@ -35,6 +35,7 @@ export const initNewsletterSend = internalMutation({
         bounced: 0,
         complained: 0,
         failed: 0,
+        suppressed: 0,
         unsubscribed: 0,
         startedAt: Date.now(),
         lastEventAt: Date.now(),
@@ -58,6 +59,7 @@ export const initNewsletterSend = internalMutation({
       bounced: 0,
       complained: 0,
       failed: 0,
+      suppressed: 0,
       unsubscribed: 0,
       startedAt: Date.now(),
     });
@@ -168,7 +170,7 @@ export const trackEmailEvent = internalMutation({
     // we dedupe: if an identical event already exists, return early.
     // For repeatable events (opened, clicked) we allow multiple event records
     // but the counter logic already guards uniqueness via firstOpenedAt/firstClickedAt.
-    const oneTimeEvents = new Set(["delivered", "sent", "bounced", "complained", "failed", "unsubscribed"]);
+    const oneTimeEvents = new Set(["delivered", "sent", "bounced", "complained", "failed", "suppressed", "unsubscribed"]);
     const isOneTime = oneTimeEvents.has(args.eventType);
 
     if (isOneTime) {
@@ -257,6 +259,10 @@ export const trackEmailEvent = internalMutation({
         case "complained":
           sendUpdates.status = "complained";
           break;
+        case "suppressed":
+          sendUpdates.status = "suppressed";
+          sendUpdates.error = args.metadata?.message || args.metadata?.type || "Suppressed by Resend";
+          break;
         case "unsubscribed":
           // Don't change status, just record the event
           break;
@@ -307,6 +313,9 @@ export const trackEmailEvent = internalMutation({
           break;
         case "complained":
           statsUpdates.complained = stats.complained + 1;
+          break;
+        case "suppressed":
+          statsUpdates.suppressed = (stats.suppressed ?? 0) + 1;
           break;
         case "unsubscribed":
           statsUpdates.unsubscribed = stats.unsubscribed + 1;
@@ -519,6 +528,7 @@ export const getStatusBreakdown = query({
         bounced: stats.bounced,
         complained: stats.complained,
         failed: stats.failed,
+        suppressed: stats.suppressed ?? 0,
         unsubscribed: stats.unsubscribed,
       },
       rates: {
