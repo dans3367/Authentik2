@@ -1,5 +1,6 @@
 import { httpAction } from "./_generated/server";
 import { api } from "./_generated/api";
+import { internal } from "./_generated/api";
 
 // ─── RESEND ──────────────────────────────────────────────────────────────────
 
@@ -22,10 +23,16 @@ export const resendWebhook = httpAction(async (ctx, request) => {
     const body = await request.text();
     const event = JSON.parse(body);
 
-    // Optional signature verification
+    // Signature verification - required when webhookSecret is configured
     const signature = request.headers.get("resend-signature");
     const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
-    if (signature && webhookSecret) {
+    if (webhookSecret) {
+      if (!signature) {
+        return new Response(JSON.stringify({ message: "Missing signature" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
       const encoder = new TextEncoder();
       const key = await crypto.subtle.importKey(
         "raw",
@@ -76,7 +83,7 @@ export const resendWebhook = httpAction(async (ctx, request) => {
     const ids = await resolveIds(ctx, providerMessageId, recipientEmail);
 
     if (ids) {
-      await ctx.runMutation(api.newsletterTracking.trackEmailEvent, {
+      await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
         tenantId: ids.tenantId,
         newsletterId: ids.newsletterId,
         recipientEmail,
@@ -107,10 +114,16 @@ export const postmarkWebhook = httpAction(async (ctx, request) => {
     const body = await request.text();
     const event = JSON.parse(body);
 
-    // Optional signature verification
+    // Signature verification - required when webhookSecret is configured
     const signature = request.headers.get("x-postmark-signature");
     const webhookSecret = process.env.POSTMARK_WEBHOOK_SECRET;
-    if (signature && webhookSecret) {
+    if (webhookSecret) {
+      if (!signature) {
+        return new Response(JSON.stringify({ message: "Missing signature" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
       const encoder = new TextEncoder();
       const key = await crypto.subtle.importKey(
         "raw",
@@ -160,7 +173,7 @@ export const postmarkWebhook = httpAction(async (ctx, request) => {
     const ids = await resolveIds(ctx, providerMessageId, recipientEmail);
 
     if (ids) {
-      await ctx.runMutation(api.newsletterTracking.trackEmailEvent, {
+      await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
         tenantId: ids.tenantId,
         newsletterId: ids.newsletterId,
         recipientEmail,

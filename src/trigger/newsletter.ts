@@ -372,6 +372,22 @@ export const sendNewsletterTask = task({
 
     if (validRecipients.length === 0) {
       logger.warn("No valid recipients after filtering");
+      
+      // Complete Convex tracking since no emails will be sent
+      try {
+        const convex = getConvex();
+        if (convex) {
+          await convex.mutation("newsletterTracking:completeNewsletterSend" as any, {
+            newsletterId: data.newsletterId,
+            sentCount: 0,
+            failedCount: 0,
+          });
+          logger.info("Convex tracking completed for zero recipients");
+        }
+      } catch (err) {
+        logger.warn("Failed to complete Convex tracking for zero recipients (non-fatal)", { error: String(err) });
+      }
+      
       await updateNewsletterStatusInternal(data.newsletterId, "sent", {
         sentCount: 0,
         failedCount: 0,

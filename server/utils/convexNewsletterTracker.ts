@@ -6,7 +6,7 @@
  * the main email sending flow.
  */
 
-import { getConvexClient, api } from './convexClient';
+import { getConvexClient, internal } from './convexClient';
 
 /**
  * Initialize tracking for a newsletter send campaign.
@@ -20,7 +20,7 @@ export async function initNewsletterTracking(params: {
         const client = getConvexClient();
         if (!client) return;
 
-        await client.mutation(api.newsletterTracking.initNewsletterSend, {
+        await client.mutation(internal.newsletterTracking.initNewsletterSend as any, {
             tenantId: params.tenantId,
             newsletterId: params.newsletterId,
             totalRecipients: params.totalRecipients,
@@ -48,7 +48,7 @@ export async function trackNewsletterEmailSend(params: {
         const client = getConvexClient();
         if (!client) return;
 
-        await client.mutation(api.newsletterTracking.trackEmailSend, {
+        await client.mutation(internal.newsletterTracking.trackEmailSend as any, {
             tenantId: params.tenantId,
             newsletterId: params.newsletterId,
             groupUUID: params.groupUUID,
@@ -79,7 +79,7 @@ export async function trackNewsletterEvent(params: {
         const client = getConvexClient();
         if (!client) return;
 
-        await client.mutation(api.newsletterTracking.trackEmailEvent, {
+        await client.mutation(internal.newsletterTracking.trackEmailEvent as any, {
             tenantId: params.tenantId,
             newsletterId: params.newsletterId,
             recipientEmail: params.recipientEmail,
@@ -104,7 +104,7 @@ export async function completeNewsletterTracking(params: {
         const client = getConvexClient();
         if (!client) return;
 
-        await client.mutation(api.newsletterTracking.completeNewsletterSend, {
+        await client.mutation(internal.newsletterTracking.completeNewsletterSend as any, {
             newsletterId: params.newsletterId,
             sentCount: params.sentCount,
             failedCount: params.failedCount,

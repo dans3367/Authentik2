@@ -9,7 +9,7 @@
  */
 
 import { ConvexHttpClient } from "convex/browser";
-import { api } from "../../convex/_generated/api";
+import { api, internal } from "../../convex/_generated/api";
 
 let convexClient: ConvexHttpClient | null = null;
 
@@ -27,4 +27,4 @@ export function getConvexClient(): ConvexHttpClient | null {
     return convexClient;
 }
 
-export { api };
+export { api, internal };

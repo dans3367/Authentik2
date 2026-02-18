@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation } from "./_generated/server";
+import { query, internalMutation } from "./_generated/server";
 
 // ─── MUTATIONS ───────────────────────────────────────────────────────────────
 
@@ -7,7 +7,7 @@ import { mutation, query, internalMutation } from "./_generated/server";
  * Initialize tracking for a newsletter send campaign.
  * Called once when a newsletter starts sending.
  */
-export const initNewsletterSend = mutation({
+export const initNewsletterSend = internalMutation({
   args: {
     tenantId: v.string(),
     newsletterId: v.string(),
@@ -68,7 +68,7 @@ export const initNewsletterSend = mutation({
  * Track an individual email being queued/sent within a newsletter.
  * Called for each recipient when the email is dispatched.
  */
-export const trackEmailSend = mutation({
+export const trackEmailSend = internalMutation({
   args: {
     tenantId: v.string(),
     newsletterId: v.string(),
@@ -82,6 +82,22 @@ export const trackEmailSend = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+
+    // ── Idempotency guard: skip if a send record already exists for this recipient+newsletter ──
+    const existingSend = await ctx.db
+      .query("newsletterSends")
+      .withIndex("by_newsletter_recipient", (q) =>
+        q.eq("newsletterId", args.newsletterId).eq("recipientEmail", args.recipientEmail)
+      )
+      .first();
+
+    if (existingSend) {
+      // If the retry carries a providerMessageId we didn't have before, patch it in
+      if (args.providerMessageId && !existingSend.providerMessageId) {
+        await ctx.db.patch(existingSend._id, { providerMessageId: args.providerMessageId });
+      }
+      return existingSend._id;
+    }
 
     const sendId = await ctx.db.insert("newsletterSends", {
       tenantId: args.tenantId,
@@ -135,7 +151,7 @@ export const trackEmailSend = mutation({
  * Track a webhook event (delivered, opened, clicked, bounced, complained, unsubscribed).
  * Called from webhook handlers when email provider sends event data.
  */
-export const trackEmailEvent = mutation({
+export const trackEmailEvent = internalMutation({
   args: {
     tenantId: v.string(),
     newsletterId: v.string(),
@@ -146,6 +162,39 @@ export const trackEmailEvent = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+
+    // ── Idempotency guard ──────────────────────────────────────────────────
+    // For one-time events (delivered, bounced, complained, failed, unsubscribed)
+    // we dedupe: if an identical event already exists, return early.
+    // For repeatable events (opened, clicked) we allow multiple event records
+    // but the counter logic already guards uniqueness via firstOpenedAt/firstClickedAt.
+    const oneTimeEvents = new Set(["delivered", "sent", "bounced", "complained", "failed", "unsubscribed"]);
+    const isOneTime = oneTimeEvents.has(args.eventType);
+
+    if (isOneTime) {
+      let existingEvent = null;
+      if (args.providerMessageId) {
+        existingEvent = await ctx.db
+          .query("newsletterEvents")
+          .withIndex("by_provider_event", (q) =>
+            q.eq("providerMessageId", args.providerMessageId).eq("eventType", args.eventType)
+          )
+          .first();
+      }
+      if (!existingEvent) {
+        existingEvent = await ctx.db
+          .query("newsletterEvents")
+          .withIndex("by_recipient_newsletter_event", (q) =>
+            q.eq("recipientEmail", args.recipientEmail)
+              .eq("newsletterId", args.newsletterId)
+              .eq("eventType", args.eventType)
+          )
+          .first();
+      }
+      if (existingEvent) {
+        return existingEvent._id;
+      }
+    }
 
     // Find the send record by providerMessageId, falling back to recipientEmail+newsletterId
     let sendRecord = null;
@@ -277,7 +326,7 @@ export const trackEmailEvent = mutation({
 /**
  * Mark a newsletter send campaign as completed.
  */
-export const completeNewsletterSend = mutation({
+export const completeNewsletterSend = internalMutation({
   args: {
     newsletterId: v.string(),
     sentCount: v.number(),

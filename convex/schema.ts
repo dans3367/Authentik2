@@ -27,7 +27,8 @@ export default defineSchema({
     .index("by_recipient", ["tenantId", "recipientEmail"])
     .index("by_recipient_and_newsletter", ["recipientEmail", "newsletterId"])
     .index("by_status", ["newsletterId", "status"])
-    .index("by_recipient_email", ["recipientEmail"]),
+    .index("by_recipient_email", ["recipientEmail"])
+    .index("by_newsletter_recipient", ["newsletterId", "recipientEmail"]),
 
   // Tracks individual email events (opens, clicks, bounces, etc.)
   newsletterEvents: defineTable({
@@ -44,7 +45,9 @@ export default defineSchema({
     .index("by_tenant_newsletter", ["tenantId", "newsletterId"])
     .index("by_send", ["newsletterSendId"])
     .index("by_type", ["newsletterId", "eventType"])
-    .index("by_occurred", ["newsletterId", "occurredAt"]),
+    .index("by_occurred", ["newsletterId", "occurredAt"])
+    .index("by_provider_event", ["providerMessageId", "eventType"])
+    .index("by_recipient_newsletter_event", ["recipientEmail", "newsletterId", "eventType"]),
 
   // Aggregated real-time stats per newsletter (updated on each event)
   newsletterStats: defineTable({
