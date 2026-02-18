@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { 
-  Plus, 
-  Mail, 
-  Calendar, 
+import {
+  Plus,
+  Mail,
+  Calendar,
   Eye,
   Clock,
   Users,
@@ -15,7 +15,8 @@ import {
   Send,
   FileText,
   MoreVertical,
-  Pencil
+  Pencil,
+  Loader2
 } from "lucide-react";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { Button } from "@/components/ui/button";
@@ -77,7 +78,7 @@ export default function NewsletterPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
-  
+
   useSetBreadcrumbs([
     { label: "Dashboard", href: "/", icon: LayoutDashboard },
     { label: "Email Newsletters", icon: Mail }
@@ -141,17 +142,17 @@ export default function NewsletterPage() {
     },
     onSuccess: (data: any, variables: string) => {
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
-      toast({ 
-        title: "Newsletter Deployed", 
+      toast({
+        title: "Newsletter Deployed",
         description: data.message || "Newsletter is now being sent to recipients."
       });
       setLocation(`/newsletters/${data.newsletterId || data.id || variables}`);
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Deploy Failed", 
-        description: error.message || "Failed to deploy newsletter", 
-        variant: "destructive" 
+      toast({
+        title: "Deploy Failed",
+        description: error.message || "Failed to deploy newsletter",
+        variant: "destructive"
       });
     },
   });
@@ -160,7 +161,7 @@ export default function NewsletterPage() {
 
   const filteredNewsletters = useMemo(() => {
     return newsletters.filter((newsletter) => {
-      const matchesSearch = searchQuery === "" || 
+      const matchesSearch = searchQuery === "" ||
         newsletter.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         newsletter.subject.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === "all" || newsletter.status === statusFilter;
@@ -359,31 +360,41 @@ export default function NewsletterPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
             {filteredNewsletters.map((newsletter) => {
-              const openRate = (newsletter.recipientCount || 0) > 0 
+              const openRate = (newsletter.recipientCount || 0) > 0
                 ? ((newsletter.opens || 0) / (newsletter.recipientCount || 1) * 100).toFixed(1)
                 : "0";
               const isDraft = newsletter.status === 'draft';
               const isSent = newsletter.status === 'sent';
               const isReadyToSend = newsletter.status === 'ready_to_send';
 
+              const isDeleting = deleteMutation.isPending && deleteMutation.variables === newsletter.id;
+
+              if (isDeleting) {
+                return (
+                  <Card key={newsletter.id} className="h-64 flex flex-col items-center justify-center border-dashed border-2 border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 animate-pulse">
+                    <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-4" />
+                    <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Deleting newsletter...</p>
+                  </Card>
+                );
+              }
+
               return (
-                <Card 
-                  key={newsletter.id} 
+                <Card
+                  key={newsletter.id}
                   className="group relative border border-gray-200 dark:border-gray-700 rounded-xl hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 overflow-hidden cursor-pointer"
-                  onClick={() => isDraft 
+                  onClick={() => isDraft
                     ? setLocation(`/newsletter/create/${newsletter.id}`)
                     : setLocation(`/newsletters/${newsletter.id}`)
                   }
                 >
                   {/* Status color bar at top */}
-                  <div className={`h-1 w-full ${
-                    newsletter.status === 'sent' ? 'bg-green-500' :
+                  <div className={`h-1 w-full ${newsletter.status === 'sent' ? 'bg-green-500' :
                     newsletter.status === 'ready_to_send' ? 'bg-blue-500' :
-                    newsletter.status === 'scheduled' ? 'bg-blue-500' :
-                    newsletter.status === 'sending' ? 'bg-purple-500' :
-                    'bg-amber-400'
-                  }`} />
-                  
+                      newsletter.status === 'scheduled' ? 'bg-blue-500' :
+                        newsletter.status === 'sending' ? 'bg-purple-500' :
+                          'bg-amber-400'
+                    }`} />
+
                   <CardContent className="p-5">
                     <div className="space-y-4">
                       {/* Header: Status badge + Actions */}
@@ -462,11 +473,11 @@ export default function NewsletterPage() {
                           </span>
                         </div>
                         <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
-                          {newsletter.sentAt 
+                          {newsletter.sentAt
                             ? formatDistanceToNow(new Date(newsletter.sentAt), { addSuffix: true })
                             : newsletter.createdAt
-                            ? formatDistanceToNow(new Date(newsletter.createdAt), { addSuffix: true })
-                            : ''}
+                              ? formatDistanceToNow(new Date(newsletter.createdAt), { addSuffix: true })
+                              : ''}
                         </span>
                       </div>
 
@@ -535,9 +546,14 @@ export default function NewsletterPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
-              onClick={() => deleteId && deleteMutation.mutate(deleteId)}
+              onClick={() => {
+                if (deleteId) {
+                  deleteMutation.mutate(deleteId);
+                  setDeleteId(null);
+                }
+              }}
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,5 +1,55 @@
 import { v } from "convex/values";
 import { query, mutation, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
+
+// ─── INTERNAL STATS HELPERS ─────────────────────────────────────────────────
+// These small mutations ONLY touch the newsletterStats document.
+// By scheduling them separately, we avoid holding a write lock on the
+// high-contention stats row while also writing sends/events in the same
+// transaction.  If a stats update hits a write conflict Convex will
+// automatically retry it (up to the built-in limit).
+
+/**
+ * Atomically apply a delta to the newsletterStats counters for a given
+ * newsletter.  Each field in `deltas` is added to the current value.
+ */
+export const applyStatsDelta = internalMutation({
+  args: {
+    newsletterId: v.string(),
+    deltas: v.object({
+      queued: v.optional(v.number()),
+      sent: v.optional(v.number()),
+      delivered: v.optional(v.number()),
+      opened: v.optional(v.number()),
+      uniqueOpens: v.optional(v.number()),
+      clicked: v.optional(v.number()),
+      uniqueClicks: v.optional(v.number()),
+      bounced: v.optional(v.number()),
+      complained: v.optional(v.number()),
+      failed: v.optional(v.number()),
+      suppressed: v.optional(v.number()),
+      unsubscribed: v.optional(v.number()),
+    }),
+  },
+  handler: async (ctx, args) => {
+    const stats = await ctx.db
+      .query("newsletterStats")
+      .withIndex("by_newsletter", (q) => q.eq("newsletterId", args.newsletterId))
+      .first();
+
+    if (!stats) return;
+
+    const updates: any = { lastEventAt: Date.now() };
+    for (const [key, delta] of Object.entries(args.deltas)) {
+      if (delta !== undefined && delta !== 0) {
+        const current = (stats as any)[key] ?? 0;
+        updates[key] = Math.max(0, current + delta);
+      }
+    }
+
+    await ctx.db.patch(stats._id, updates);
+  },
+});
 
 // ─── MUTATIONS ───────────────────────────────────────────────────────────────
 
@@ -69,6 +119,9 @@ export const initNewsletterSend = mutation({
 /**
  * Track an individual email being queued/sent within a newsletter.
  * Called for each recipient when the email is dispatched.
+ *
+ * Stats update is scheduled as a SEPARATE mutation to avoid write-conflicts
+ * on the shared newsletterStats row.
  */
 export const trackEmailSend = mutation({
   args: {
@@ -122,27 +175,31 @@ export const trackEmailSend = mutation({
       newsletterId: args.newsletterId,
       newsletterSendId: sendId,
       recipientEmail: args.recipientEmail,
-      eventType: args.status === "sent" ? "sent" : args.status === "failed" ? "failed" : "queued",
+      eventType: args.status === "sent" ? "sent" : args.status === "failed" ? "failed" : args.status === "suppressed" ? "suppressed" : "queued",
       providerMessageId: args.providerMessageId,
       occurredAt: now,
     });
 
-    // Update aggregated stats
-    const stats = await ctx.db
-      .query("newsletterStats")
-      .withIndex("by_newsletter", (q) => q.eq("newsletterId", args.newsletterId))
-      .first();
+    // ── Schedule stats update in a SEPARATE mutation ──
+    // This avoids write-conflicts: the send/event inserts commit independently
+    // of the stats counter update.
+    const deltas: Record<string, number> = {};
+    if (args.status === "sent") {
+      deltas.sent = 1;
+      deltas.queued = -1;
+    } else if (args.status === "failed") {
+      deltas.failed = 1;
+      deltas.queued = -1;
+    } else if (args.status === "suppressed") {
+      deltas.suppressed = 1;
+      deltas.queued = -1;
+    }
 
-    if (stats) {
-      const updates: any = { lastEventAt: now };
-      if (args.status === "sent") {
-        updates.sent = stats.sent + 1;
-        updates.queued = Math.max(0, stats.queued - 1);
-      } else if (args.status === "failed") {
-        updates.failed = stats.failed + 1;
-        updates.queued = Math.max(0, stats.queued - 1);
-      }
-      await ctx.db.patch(stats._id, updates);
+    if (Object.keys(deltas).length > 0) {
+      await ctx.scheduler.runAfter(0, internal.newsletterTracking.applyStatsDelta, {
+        newsletterId: args.newsletterId,
+        deltas,
+      });
     }
 
     return sendId;
@@ -152,6 +209,9 @@ export const trackEmailSend = mutation({
 /**
  * Track a webhook event (delivered, opened, clicked, bounced, complained, unsubscribed).
  * Called from webhook handlers when email provider sends event data.
+ *
+ * The event record + send record update happen in this transaction.
+ * The aggregated stats update is scheduled separately to avoid contention.
  */
 export const trackEmailEvent = internalMutation({
   args: {
@@ -227,7 +287,7 @@ export const trackEmailEvent = internalMutation({
       occurredAt: now,
     });
 
-    // Update the send record status
+    // Update the send record status (this only touches ONE row, not the shared stats)
     if (sendRecord) {
       const sendUpdates: any = {};
 
@@ -277,55 +337,52 @@ export const trackEmailEvent = internalMutation({
       }
     }
 
-    // Update aggregated stats
-    const stats = await ctx.db
-      .query("newsletterStats")
-      .withIndex("by_newsletter", (q) => q.eq("newsletterId", args.newsletterId))
-      .first();
+    // ── Schedule stats update in a SEPARATE mutation ──
+    // Determine if this is a unique open/click based on send record state
+    const deltas: Record<string, number> = {};
 
-    if (stats) {
-      const statsUpdates: any = { lastEventAt: now };
+    switch (args.eventType) {
+      case "delivered":
+        deltas.delivered = 1;
+        break;
+      case "opened":
+        deltas.opened = 1;
+        if (sendRecord && !sendRecord.firstOpenedAt) {
+          deltas.uniqueOpens = 1;
+        }
+        break;
+      case "clicked":
+        deltas.clicked = 1;
+        if (sendRecord && !sendRecord.firstClickedAt) {
+          deltas.uniqueClicks = 1;
+        }
+        if (sendRecord && !sendRecord.firstOpenedAt) {
+          deltas.opened = (deltas.opened ?? 0) + 1;
+          deltas.uniqueOpens = 1;
+        }
+        break;
+      case "bounced":
+        deltas.bounced = 1;
+        break;
+      case "complained":
+        deltas.complained = 1;
+        break;
+      case "suppressed":
+        deltas.suppressed = 1;
+        break;
+      case "unsubscribed":
+        deltas.unsubscribed = 1;
+        break;
+      case "failed":
+        deltas.failed = 1;
+        break;
+    }
 
-      switch (args.eventType) {
-        case "delivered":
-          statsUpdates.delivered = stats.delivered + 1;
-          break;
-        case "opened":
-          statsUpdates.opened = stats.opened + 1;
-          // Check if this is a unique open (first open for this recipient)
-          if (sendRecord && !sendRecord.firstOpenedAt) {
-            statsUpdates.uniqueOpens = stats.uniqueOpens + 1;
-          }
-          break;
-        case "clicked":
-          statsUpdates.clicked = stats.clicked + 1;
-          if (sendRecord && !sendRecord.firstClickedAt) {
-            statsUpdates.uniqueClicks = stats.uniqueClicks + 1;
-          }
-          // Also count as unique open if first interaction
-          if (sendRecord && !sendRecord.firstOpenedAt) {
-            statsUpdates.opened = (statsUpdates.opened ?? stats.opened) + 1;
-            statsUpdates.uniqueOpens = stats.uniqueOpens + 1;
-          }
-          break;
-        case "bounced":
-          statsUpdates.bounced = stats.bounced + 1;
-          break;
-        case "complained":
-          statsUpdates.complained = stats.complained + 1;
-          break;
-        case "suppressed":
-          statsUpdates.suppressed = (stats.suppressed ?? 0) + 1;
-          break;
-        case "unsubscribed":
-          statsUpdates.unsubscribed = stats.unsubscribed + 1;
-          break;
-        case "failed":
-          statsUpdates.failed = stats.failed + 1;
-          break;
-      }
-
-      await ctx.db.patch(stats._id, statsUpdates);
+    if (Object.keys(deltas).length > 0) {
+      await ctx.scheduler.runAfter(0, internal.newsletterTracking.applyStatsDelta, {
+        newsletterId: args.newsletterId,
+        deltas,
+      });
     }
 
     return eventId;

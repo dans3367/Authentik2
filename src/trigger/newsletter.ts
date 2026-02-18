@@ -36,6 +36,7 @@ const newsletterJobSchema = z.object({
   subject: z.string(),
   content: z.string(),
   recipients: z.array(recipientSchema),
+  suppressedEmails: z.array(z.string()).optional(),
   batchSize: z.number().default(25),
   priority: z.enum(["low", "normal", "high"]).default("normal"),
   from: z.string().optional(),
@@ -156,8 +157,22 @@ export const sendNewsletterEmailTask = task({
     content: string;
     from?: string;
     replyTo?: string;
+    suppressedEmails?: string[];
   }) => {
     const { recipient, subject, content, newsletterId, groupUUID, tenantId, userId } = payload;
+
+    // Pre-send suppression check
+    const suppressedSet = new Set((payload.suppressedEmails || []).map(e => e.toLowerCase()));
+    if (suppressedSet.has(recipient.email.toLowerCase())) {
+      logger.warn("Skipping suppressed recipient", { recipientEmail: recipient.email, newsletterId });
+      return {
+        success: false,
+        recipientId: recipient.id,
+        email: recipient.email,
+        error: "Email is on the suppression list",
+        suppressed: true,
+      };
+    }
 
     logger.info("Sending newsletter email", {
       newsletterId,
@@ -236,12 +251,17 @@ export const processNewsletterBatchTask = task({
     totalBatches: number;
     from?: string;
     replyTo?: string;
+    suppressedEmails?: string[];
   }) => {
     const { recipients, batchNumber, totalBatches, newsletterId } = payload;
+
+    // Build suppression set for pre-send filtering
+    const suppressedSet = new Set((payload.suppressedEmails || []).map(e => e.toLowerCase()));
 
     logger.info(`Processing newsletter batch ${batchNumber}/${totalBatches}`, {
       newsletterId,
       recipientCount: recipients.length,
+      suppressedInBatch: recipients.filter(r => suppressedSet.has(r.email.toLowerCase())).length,
     });
 
     metadata.set("batchNumber", batchNumber);
@@ -252,6 +272,13 @@ export const processNewsletterBatchTask = task({
 
     for (let i = 0; i < recipients.length; i++) {
       const recipient = recipients[i];
+
+      // Skip suppressed recipients
+      if (suppressedSet.has(recipient.email.toLowerCase())) {
+        logger.warn(`Skipping suppressed recipient in batch: ${recipient.email}`);
+        results.push({ success: false, email: recipient.email, error: "Suppressed" });
+        continue;
+      }
 
       try {
         const { data: emailData, error } = await resend.emails.send({
@@ -340,23 +367,24 @@ export const sendNewsletterTask = task({
 
     metadata.set("status", "filtering");
 
-    // Initialize Convex newsletter tracking (fire-and-forget)
-    try {
-      const convex = getConvex();
-      if (convex) {
-        await convex.mutation("newsletterTracking:initNewsletterSend" as any, {
-          tenantId: data.tenantId,
-          newsletterId: data.newsletterId,
-          totalRecipients: data.recipients.length,
-        });
-        logger.info("Convex tracking initialized");
+    // NOTE: Convex tracking is initialized by the server (newsletterRoutes.ts) before
+    // triggering this task, with totalRecipients including suppressed contacts.
+    // Do NOT re-initialize here or it will reset the suppressed count.
+
+    // Build suppression set: prefer server-provided list (already computed before triggering),
+    // fall back to HTTP API call if not provided
+    let suppressedEmails: Set<string>;
+    if (data.suppressedEmails && data.suppressedEmails.length > 0) {
+      suppressedEmails = new Set(data.suppressedEmails.map(e => e.toLowerCase()));
+      logger.info("Using server-provided suppression list", { count: suppressedEmails.size });
+    } else {
+      logger.info("No server-provided suppression list, fetching via API");
+      suppressedEmails = await getSuppressionList(data.tenantId);
+      if (suppressedEmails.size === 0) {
+        logger.warn("Suppression list is empty — server may have already filtered recipients before triggering this task");
       }
-    } catch (err) {
-      logger.warn("Failed to init Convex tracking (non-fatal)", { error: String(err) });
     }
 
-    // Filter out suppressed emails
-    const suppressedEmails = await getSuppressionList(data.tenantId);
     const validRecipients = data.recipients.filter(
       (r) => !suppressedEmails.has(r.email.toLowerCase())
     );
@@ -365,14 +393,45 @@ export const sendNewsletterTask = task({
       original: data.recipients.length,
       valid: validRecipients.length,
       suppressed: data.recipients.length - validRecipients.length,
+      suppressionSource: (data.suppressedEmails && data.suppressedEmails.length > 0) ? "server-provided" : "api-fetched",
     });
 
     metadata.set("validRecipients", validRecipients.length);
     metadata.set("suppressedCount", data.recipients.length - validRecipients.length);
 
+    // Track suppressed recipients in Convex so the live dashboard reflects them
+    const suppressedRecipients = data.recipients.filter(
+      (r) => suppressedEmails.has(r.email.toLowerCase())
+    );
+    if (suppressedRecipients.length > 0) {
+      try {
+        const convex = getConvex();
+        if (convex) {
+          for (const recipient of suppressedRecipients) {
+            try {
+              await convex.mutation("newsletterTracking:trackEmailSend" as any, {
+                tenantId: data.tenantId,
+                newsletterId: data.newsletterId,
+                groupUUID: data.groupUUID,
+                recipientEmail: recipient.email,
+                recipientId: recipient.id,
+                status: "suppressed",
+                error: "Email is on the suppression list",
+              });
+            } catch (_) { }
+          }
+          logger.info("Tracked suppressed recipients in Convex", {
+            count: suppressedRecipients.length,
+          });
+        }
+      } catch (err) {
+        logger.warn("Failed to track suppressed recipients in Convex (non-fatal)", { error: String(err) });
+      }
+    }
+
     if (validRecipients.length === 0) {
       logger.warn("No valid recipients after filtering");
-      
+
       // Complete Convex tracking since no emails will be sent
       try {
         const convex = getConvex();
@@ -387,7 +446,7 @@ export const sendNewsletterTask = task({
       } catch (err) {
         logger.warn("Failed to complete Convex tracking for zero recipients (non-fatal)", { error: String(err) });
       }
-      
+
       await updateNewsletterStatusInternal(data.newsletterId, "sent", {
         sentCount: 0,
         failedCount: 0,
@@ -486,7 +545,7 @@ export const sendNewsletterTask = task({
                   error: error.message,
                 });
               }
-            } catch (_) {}
+            } catch (_) { }
           } else {
             totalSent++;
 
@@ -504,7 +563,7 @@ export const sendNewsletterTask = task({
                   status: "queued",
                 });
               }
-            } catch (_) {}
+            } catch (_) { }
           }
         } catch (err) {
           totalFailed++;
@@ -525,7 +584,7 @@ export const sendNewsletterTask = task({
                 error: errorMessage,
               });
             }
-          } catch (_) {}
+          } catch (_) { }
         }
 
         // Update progress

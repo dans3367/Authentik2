@@ -163,6 +163,9 @@ webhookRoutes.post("/resend", async (req, res) => {
       case 'email.clicked':
         await handleEmailClicked(event.data);
         break;
+      case 'email.suppressed':
+        await handleEmailSuppressed(event.data);
+        break;
       default:
         console.log(`Unhandled Resend event type: ${event.type}`);
     }
@@ -421,6 +424,87 @@ async function handleEmailComplained(data: any) {
     }
   } catch (error) {
     console.error('Error handling email complained event:', error);
+  }
+}
+
+async function handleEmailSuppressed(data: any) {
+  try {
+    console.log('Email suppressed event:', data);
+
+    // Use extractRecipientEmail to handle Resend's data.to array format (same as all other handlers)
+    const email = extractRecipientEmail(data) || data.email || data.Email;
+    const reason = data.reason || data.type || 'suppressed';
+    const description = data.description || data.message || 'Email suppressed by provider';
+
+    if (!email) {
+      console.error('Could not extract email from suppression webhook data:', JSON.stringify(data, null, 2));
+      return;
+    }
+
+    console.log(`Processing suppression event for: ${email}`);
+
+    // Derive sourceTenantId from the most recent email_send to this address
+    let sourceTenantId: string | null = null;
+    if (email) {
+      try {
+        const recentSend = await db.query.emailSends.findFirst({
+          where: sql`${schema.emailSends.recipientEmail} = ${email}`,
+          orderBy: sql`${schema.emailSends.createdAt} DESC`,
+        });
+        if (recentSend) {
+          sourceTenantId = recentSend.tenantId || null;
+        }
+      } catch (lookupErr) {
+        console.warn('Could not derive sourceTenantId for suppression:', lookupErr);
+      }
+    }
+
+    // Add to global suppression list (bouncedEmails table)
+    if (email) {
+      const emailLower = email.toLowerCase().trim();
+
+      const existingSuppression = await db.query.bouncedEmails.findFirst({
+        where: sql`${schema.bouncedEmails.email} = ${emailLower}`,
+      });
+
+      if (!existingSuppression) {
+        await db.insert(schema.bouncedEmails).values({
+          email: emailLower,
+          bounceType: 'suppressed',
+          bounceReason: description,
+          firstBouncedAt: new Date(),
+          lastBouncedAt: new Date(),
+          sourceTenantId,
+          suppressionReason: reason,
+        });
+        console.log(`Added suppressed email to global list: ${emailLower}`);
+      } else {
+        await db.update(schema.bouncedEmails)
+          .set({
+            lastBouncedAt: new Date(),
+            bounceCount: sql`COALESCE(${schema.bouncedEmails.bounceCount}, 1) + 1`,
+            isActive: true,
+            updatedAt: new Date(),
+          })
+          .where(sql`${schema.bouncedEmails.id} = ${existingSuppression.id}`);
+      }
+
+      // Update contact status to 'suppressed' for all tenants
+      try {
+        await db.update(schema.emailContacts)
+          .set({
+            status: 'suppressed',
+            lastActivity: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(sql`LOWER(${schema.emailContacts.email}) = ${emailLower} AND ${schema.emailContacts.status} != 'suppressed'`);
+        console.log(`Updated contact status to suppressed for: ${emailLower}`);
+      } catch (contactErr) {
+        console.error('Error updating contact status for suppressed email:', contactErr);
+      }
+    }
+  } catch (error) {
+    console.error('Error handling email suppressed event:', error);
   }
 }
 

@@ -158,6 +158,9 @@ webhookRoutes.post("/resend", async (req, res) => {
       case 'email.clicked':
         await handleEmailClicked(event.data);
         break;
+      case 'email.suppressed':
+        await handleEmailSuppressed(event.data);
+        break;
       default:
         console.log(`Unhandled Resend event type: ${event.type}`);
     }
@@ -464,6 +467,108 @@ async function handleEmailComplained(data: any) {
   }
 }
 
+async function handleEmailSuppressed(data: any) {
+  try {
+    console.log('Email suppressed event:', data);
+
+    const providerMessageId = extractProviderMessageId(data);
+    // Use extractRecipientEmail to handle Resend's data.to array format (same as all other handlers)
+    const email = extractRecipientEmail(data) || data.email || data.Email;
+    const reason = data.reason || data.type || 'suppressed';
+    const description = data.description || data.message || 'Email suppressed by provider';
+
+    if (!email) {
+      console.error('Could not extract email from suppression webhook data:', JSON.stringify(data, null, 2));
+      return;
+    }
+
+    console.log(`Processing suppression event for: ${email}`);
+
+    let sourceTenantId: string | null = null;
+
+    // Update email_sends if we have provider_message_id
+    if (providerMessageId) {
+      const emailSend = await findEmailSendByProviderId(providerMessageId);
+      if (emailSend) {
+        sourceTenantId = emailSend.tenantId || null;
+
+        await db.update(db.emailSends)
+          .set({
+            status: 'suppressed',
+            errorMessage: description,
+            updatedAt: new Date(),
+          })
+          .where(sql`${db.emailSends.id} = ${emailSend.id}`);
+
+        // Create email_events record
+        await createEmailEvent(emailSend.id, data, 'suppressed');
+
+        // Track in Convex for live updates (fire-and-forget)
+        if (emailSend.newsletterId) {
+          trackNewsletterEvent({
+            tenantId: emailSend.tenantId,
+            newsletterId: emailSend.newsletterId,
+            recipientEmail: emailSend.recipientEmail,
+            providerMessageId,
+            eventType: 'suppressed',
+            metadata: { reason, description },
+          }).catch(() => {});
+        }
+
+        console.log(`Updated email_send ${emailSend.id} as suppressed`);
+      }
+    }
+
+    // Add to global suppression list (bouncedEmails table)
+    if (email) {
+      const emailLower = email.toLowerCase().trim();
+
+      const existingSuppression = await db.query.bouncedEmails.findFirst({
+        where: sql`${db.bouncedEmails.email} = ${emailLower}`,
+      });
+
+      if (!existingSuppression) {
+        await db.insert(db.bouncedEmails).values({
+          email: emailLower,
+          bounceType: 'suppressed',
+          bounceReason: description,
+          firstBouncedAt: new Date(),
+          lastBouncedAt: new Date(),
+          sourceTenantId,
+          suppressionReason: reason,
+        });
+        console.log(`Added suppressed email to global list: ${emailLower}`);
+      } else {
+        // Update existing record with latest suppression info
+        await db.update(db.bouncedEmails)
+          .set({
+            lastBouncedAt: new Date(),
+            bounceCount: sql`COALESCE(${db.bouncedEmails.bounceCount}, 1) + 1`,
+            isActive: true,
+            updatedAt: new Date(),
+          })
+          .where(sql`${db.bouncedEmails.id} = ${existingSuppression.id}`);
+      }
+
+      // Update contact status to 'suppressed' for all tenants that have this contact
+      try {
+        await db.update(db.emailContacts)
+          .set({
+            status: 'suppressed',
+            lastActivity: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(sql`LOWER(${db.emailContacts.email}) = ${emailLower} AND ${db.emailContacts.status} != 'suppressed'`);
+        console.log(`Updated contact status to suppressed for: ${emailLower}`);
+      } catch (contactErr) {
+        console.error('Error updating contact status for suppressed email:', contactErr);
+      }
+    }
+  } catch (error) {
+    console.error('Error handling email suppressed event:', error);
+  }
+}
+
 async function handleEmailOpened(data: any) {
   try {
     console.log('Email opened event:', data);
@@ -574,6 +679,26 @@ function extractProviderMessageId(data: any): string | null {
   }
 
   console.error('Could not find provider_message_id in webhook data:', JSON.stringify(data, null, 2));
+  return null;
+}
+
+// Helper function to extract recipient email from webhook data
+function extractRecipientEmail(data: any): string | null {
+  // Resend format - uses 'to' as array of recipients
+  if (data.to && Array.isArray(data.to)) {
+    const recipient = data.to[0];
+    if (typeof recipient === 'string') return recipient;
+    if (recipient && recipient.email) return recipient.email;
+  } else if (data.to && typeof data.to === 'string') {
+    return data.to;
+  }
+
+  // Direct email field fallback
+  if (data.email) return data.email;
+
+  // Postmark format
+  if (data.Email) return data.Email;
+
   return null;
 }
 

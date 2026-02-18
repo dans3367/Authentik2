@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { emailActivity, emailSends, emailContent, emailContacts, masterEmailDesign, companies } from '@shared/schema';
+import { emailActivity, emailSends, emailContent, emailContacts, masterEmailDesign, companies, bouncedEmails } from '@shared/schema';
 import { authenticateInternalService, InternalServiceRequest } from '../middleware/internal-service-auth';
 import crypto from 'crypto';
 import { sql, eq, and } from 'drizzle-orm';
@@ -38,6 +38,44 @@ router.post(
       }
 
       console.log(`📧 [Internal API] Sending promotional email to ${recipientEmail}`);
+
+      // Pre-send suppression check: block sending to suppressed/bounced emails
+      const emailLower = recipientEmail.toLowerCase().trim();
+      const suppressionEntry = await db.query.bouncedEmails.findFirst({
+        where: and(
+          sql`LOWER(${bouncedEmails.email}) = ${emailLower}`,
+          eq(bouncedEmails.isActive, true as any)
+        ),
+      });
+
+      if (suppressionEntry) {
+        console.warn(`🚫 [Internal API] Blocked promotional email to suppressed address: ${recipientEmail} (type: ${suppressionEntry.bounceType})`);
+        return res.status(200).json({
+          success: false,
+          blocked: true,
+          reason: suppressionEntry.bounceType,
+          recipientEmail,
+          contactId,
+        });
+      }
+
+      // Also check contact status
+      if (contactId) {
+        const contact = await db.query.emailContacts.findFirst({
+          where: eq(emailContacts.id, contactId),
+          columns: { status: true },
+        });
+        if (contact && (contact.status === 'suppressed' || contact.status === 'bounced' || contact.status === 'unsubscribed')) {
+          console.warn(`🚫 [Internal API] Blocked promotional email - contact ${contactId} status: ${contact.status}`);
+          return res.status(200).json({
+            success: false,
+            blocked: true,
+            reason: `contact_${contact.status}`,
+            recipientEmail,
+            contactId,
+          });
+        }
+      }
 
       // Import email service
       const { enhancedEmailService } = await import('../emailService');

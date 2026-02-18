@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { sql, eq, and, like, desc, inArray } from 'drizzle-orm';
+import { sql, eq, ne, and, like, desc, inArray } from 'drizzle-orm';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { authenticateInternalService } from '../middleware/internal-service-auth';
 import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, betterAuthUser, emailContacts, contactTagAssignments, bouncedEmails, unsubscribeTokens } from '@shared/schema';
@@ -8,6 +8,7 @@ import { sanitizeString } from '../utils/sanitization';
 import { sanitizeEmailHtml } from './emailManagementRoutes';
 import { emailService, enhancedEmailService } from '../emailService';
 import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
+import { initNewsletterTracking, trackNewsletterEmailSend } from '../utils/convexNewsletterTracker';
 // Temporal service removed - now using server-node proxy
 import crypto from 'crypto';
 
@@ -132,6 +133,64 @@ async function getNewsletterRecipients(newsletter: any, tenantId: string) {
   } catch (error) {
     console.error(`[Newsletter] Error getting recipients for newsletter ${newsletter.id}:`, error);
     throw error;
+  }
+}
+
+// Helper: get contacts that WOULD be recipients but are excluded due to non-active status
+// (suppressed, bounced, unsubscribed). Used for Convex dashboard reporting.
+async function getSuppressedNewsletterContacts(newsletter: any, tenantId: string) {
+  try {
+    let contacts: Array<{ id: string; email: string; status: string }> = [];
+
+    switch (newsletter.recipientType) {
+      case 'all':
+        contacts = await db.query.emailContacts.findMany({
+          where: and(
+            eq(emailContacts.tenantId, tenantId),
+            ne(emailContacts.status, 'active')
+          ),
+          columns: { id: true, email: true, status: true },
+        });
+        break;
+
+      case 'selected':
+        if (newsletter.selectedContactIds && newsletter.selectedContactIds.length > 0) {
+          contacts = await db.query.emailContacts.findMany({
+            where: and(
+              eq(emailContacts.tenantId, tenantId),
+              inArray(emailContacts.id, newsletter.selectedContactIds),
+              ne(emailContacts.status, 'active')
+            ),
+            columns: { id: true, email: true, status: true },
+          });
+        }
+        break;
+
+      case 'tags':
+        if (newsletter.selectedTagIds && newsletter.selectedTagIds.length > 0) {
+          const contactIds = await db
+            .select({ contactId: contactTagAssignments.contactId })
+            .from(contactTagAssignments)
+            .where(inArray(contactTagAssignments.tagId, newsletter.selectedTagIds));
+
+          if (contactIds.length > 0) {
+            contacts = await db.query.emailContacts.findMany({
+              where: and(
+                eq(emailContacts.tenantId, tenantId),
+                inArray(emailContacts.id, contactIds.map((c: any) => c.contactId)),
+                ne(emailContacts.status, 'active')
+              ),
+              columns: { id: true, email: true, status: true },
+            });
+          }
+        }
+        break;
+    }
+
+    return contacts;
+  } catch (error) {
+    console.error('[Newsletter] Error getting suppressed contacts:', error);
+    return [];
   }
 }
 
@@ -969,7 +1028,54 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
         });
       }
 
-      console.log(`[Newsletter] Found ${recipients.length} recipients for newsletter ${id}. ${allowedRecipients.length} allowed after suppression filter.`);
+      // Also fetch contacts excluded at the DB level (status != 'active': suppressed, bounced, unsubscribed)
+      // These were filtered out by getNewsletterRecipients before the suppressionMap check
+      const locallySuppressedContacts = await getSuppressedNewsletterContacts(newsletter, req.user.tenantId);
+      const allSuppressedForTracking = [
+        ...blockedRecipients.map((r: any) => ({
+          id: r.id,
+          email: String(r.email),
+          reason: `bouncedEmails: ${suppressedMap.get(String(r.email).toLowerCase().trim()) || 'unknown'}`,
+        })),
+        ...locallySuppressedContacts.map((c) => ({
+          id: c.id,
+          email: c.email,
+          reason: `contact status: ${c.status}`,
+        })),
+      ];
+
+      console.log(`[Newsletter] Found ${recipients.length} active recipients for newsletter ${id}. ${allowedRecipients.length} allowed after suppression filter. ${locallySuppressedContacts.length} locally suppressed (non-active status). ${blockedRecipients.length} blocked by bouncedEmails.`);
+
+      // Initialize Convex tracking with TOTAL recipients (allowed + all suppressed)
+      // so the dashboard accurately reflects the full picture
+      const totalForTracking = allowedRecipients.length + allSuppressedForTracking.length;
+      try {
+        await initNewsletterTracking({
+          tenantId: req.user.tenantId,
+          newsletterId: id,
+          totalRecipients: totalForTracking,
+        });
+
+        // Track each suppressed recipient in Convex so the dashboard shows them
+        if (allSuppressedForTracking.length > 0) {
+          for (const suppressed of allSuppressedForTracking) {
+            try {
+              await trackNewsletterEmailSend({
+                tenantId: req.user.tenantId,
+                newsletterId: id,
+                groupUUID,
+                recipientEmail: suppressed.email,
+                recipientId: suppressed.id,
+                status: 'suppressed',
+                error: `Suppressed: ${suppressed.reason}`,
+              });
+            } catch (_) { /* fire-and-forget */ }
+          }
+          console.log(`[Newsletter] Tracked ${allSuppressedForTracking.length} suppressed recipient(s) in Convex`);
+        }
+      } catch (convexErr) {
+        console.warn('[Newsletter] Failed to init Convex tracking (non-fatal):', convexErr);
+      }
 
       // Send via Trigger.dev
       try {
@@ -995,6 +1101,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
             firstName: contact.firstName || '',
             lastName: contact.lastName || ''
           })),
+          suppressedEmails: Array.from(suppressedMap.keys()),
           batchSize: 25,
           priority: 'normal' as const,
         });

@@ -4,7 +4,7 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "npm run build:email-css && NODE_ENV=development tsx server/index.ts",
+    "dev": "node scripts/start-dev.js",
     "dev:server": "NODE_ENV=development tsx server/index.ts",
     "dev:temporal": "cd temporal-server && npm run dev",
     "dev:trigger": "npx trigger.dev@latest dev",

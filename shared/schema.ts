@@ -245,7 +245,7 @@ export const emailSends = pgTable("email_sends", {
   providerMessageId: text("provider_message_id"), // Provider's unique message ID (e.g., Resend email ID)
 
   // Status tracking
-  status: text("status").notNull().default('pending'), // 'pending', 'sent', 'delivered', 'bounced', 'failed'
+  status: text("status").notNull().default('pending'), // 'pending', 'sent', 'delivered', 'bounced', 'suppressed', 'failed'
   sendAttempts: integer("send_attempts").default(1),
   errorMessage: text("error_message"),
 
@@ -351,7 +351,7 @@ export const emailContacts = pgTable("email_contacts", {
   email: text("email").notNull(),
   firstName: text("first_name"),
   lastName: text("last_name"),
-  status: text("status").notNull().default('active'), // active, unsubscribed, bounced, pending
+  status: text("status").notNull().default('active'), // active, unsubscribed, bounced, suppressed, pending
   addedDate: timestamp("added_date").defaultNow(),
   lastActivity: timestamp("last_activity"),
   emailsSent: integer("emails_sent").default(0),
@@ -597,7 +597,7 @@ export const unsubscribeTokens = pgTable("unsubscribe_tokens", {
 export const bouncedEmails = pgTable("bounced_emails", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: text("email").notNull().unique(), // The bounced email address
-  bounceType: text("bounce_type").notNull().default('hard'), // 'hard', 'soft', 'complaint'
+  bounceType: text("bounce_type").notNull().default('hard'), // 'hard', 'soft', 'complaint', 'suppressed'
   bounceReason: text("bounce_reason"), // Detailed reason for the bounce
   bounceSubType: text("bounce_sub_type"), // More specific bounce classification
   firstBouncedAt: timestamp("first_bounced_at").notNull(), // When this email first bounced

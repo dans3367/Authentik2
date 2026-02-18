@@ -41,7 +41,7 @@ export async function trackNewsletterEmailSend(params: {
     recipientId?: string;
     recipientName?: string;
     providerMessageId?: string;
-    status: 'queued' | 'sent' | 'failed';
+    status: 'queued' | 'sent' | 'failed' | 'suppressed';
     error?: string;
 }): Promise<void> {
     try {
@@ -72,7 +72,7 @@ export async function trackNewsletterEvent(params: {
     newsletterId: string;
     recipientEmail: string;
     providerMessageId?: string;
-    eventType: 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'unsubscribed' | 'failed';
+    eventType: 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'unsubscribed' | 'failed' | 'suppressed';
     metadata?: Record<string, any>;
 }): Promise<void> {
     try {

@@ -11,7 +11,7 @@ export default defineSchema({
     recipientId: v.optional(v.string()), // Contact ID from PostgreSQL
     recipientName: v.optional(v.string()),
     providerMessageId: v.optional(v.string()), // Resend email ID
-    status: v.string(), // 'queued', 'sent', 'delivered', 'opened', 'clicked', 'bounced', 'failed', 'complained'
+    status: v.string(), // 'queued', 'sent', 'delivered', 'opened', 'clicked', 'bounced', 'failed', 'complained', 'suppressed'
     error: v.optional(v.string()),
     sentAt: v.optional(v.number()), // timestamp ms
     deliveredAt: v.optional(v.number()),
