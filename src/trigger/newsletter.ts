@@ -485,7 +485,7 @@ export const sendNewsletterTask = task({
                   recipientEmail: recipient.email,
                   recipientId: recipient.id,
                   providerMessageId: emailData?.id,
-                  status: "sent",
+                  status: "queued",
                 });
               }
             } catch (_) {}
