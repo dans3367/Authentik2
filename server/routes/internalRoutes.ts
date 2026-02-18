@@ -3,7 +3,7 @@ import { db } from '../db';
 import { emailActivity, emailSends, emailContent, emailContacts, masterEmailDesign, companies, bouncedEmails } from '@shared/schema';
 import { authenticateInternalService, InternalServiceRequest } from '../middleware/internal-service-auth';
 import crypto from 'crypto';
-import { sql, eq, and } from 'drizzle-orm';
+import { sql, eq, and, or, ne } from 'drizzle-orm';
 
 const router = Router();
 
@@ -44,7 +44,14 @@ router.post(
       const suppressionEntry = await db.query.bouncedEmails.findFirst({
         where: and(
           sql`LOWER(${bouncedEmails.email}) = ${emailLower}`,
-          eq(bouncedEmails.isActive, true as any)
+          eq(bouncedEmails.isActive, true as any),
+          or(
+            ne(bouncedEmails.bounceType, 'complaint'),
+            and(
+              eq(bouncedEmails.bounceType, 'complaint'),
+              eq(bouncedEmails.sourceTenantId, tenantId)
+            )
+          )
         ),
       });
 

@@ -37,11 +37,16 @@ if (dbType === 'neon') {
 } else {
   // Use standard PostgreSQL (non-SSL by default)
   const ssl = process.env.DB_SSL === 'true' ? true : false;
-  const connectionString = ssl
-    ? process.env.DATABASE_URL
-    : process.env.DATABASE_URL?.replace('?sslmode=require', '');
 
-  const client = postgres(connectionString!, {
+  // Parse URL to safely manipulate params
+  const dbUrl = new URL(process.env.DATABASE_URL!);
+  if (!ssl) {
+    dbUrl.searchParams.delete('sslmode');
+  }
+
+  const connectionString = dbUrl.toString();
+
+  const client = postgres(connectionString, {
     ssl: ssl ? 'require' : false,
     max: 1,
   });

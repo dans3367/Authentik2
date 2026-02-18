@@ -87,10 +87,16 @@ async function startServices() {
   try {
     const { spawn } = await import('child_process');
     await new Promise((resolve, reject) => {
-      const cssProcess = spawn('npm', ['run', 'build:email-css'], { 
-        cwd: projectRoot, 
+      const cssProcess = spawn('npm', ['run', 'build:email-css'], {
+        cwd: projectRoot,
         stdio: 'pipe'
       });
+
+      cssProcess.on('error', (err) => {
+        colorLog('yellow', '⚠️ Could not spawn npm for email CSS build, continuing... ' + String(err.message || err));
+        resolve();
+      });
+
       cssProcess.on('close', (code) => {
         if (code === 0) {
           colorLog('green', '✅ Email CSS built');
@@ -109,7 +115,7 @@ async function startServices() {
   for (const service of services) {
     await new Promise((resolve) => {
       colorLog(service.color, `🔧 Starting ${service.name}...`);
-      
+
       const child = spawn(service.command, service.args, {
         cwd: service.cwd,
         env: service.env,
@@ -120,7 +126,7 @@ async function startServices() {
       children.push(child);
 
       let started = false;
-      
+
       child.stdout.on('data', (data) => {
         const output = data.toString();
         if (!started) {

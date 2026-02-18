@@ -3,7 +3,7 @@ import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { authenticateToken } from '../middleware/auth-middleware';
 import { createHmac } from 'crypto';
-import { trackNewsletterEvent } from '../utils/convexNewsletterTracker';
+import { getConvexClient, internal } from '../utils/convexClient';
 
 export const webhookRoutes = Router();
 
@@ -138,7 +138,14 @@ webhookRoutes.post("/resend", async (req, res) => {
       timestamp: new Date().toISOString(),
     });
 
-    // Handle different event types
+    // Forward to Convex internal handler (fire-and-forget)
+    const client = getConvexClient();
+    if (client) {
+      client.action(internal.webhookHandlers.handleResendWebhook, { payload: event })
+        .catch(err => console.error('Convex Resend webhook handler failed:', err));
+    }
+
+    // Handle different event types (SQL updates)
     switch (event.type) {
       case 'email.sent':
         await handleEmailSent(event.data);
@@ -203,7 +210,14 @@ webhookRoutes.post("/postmark", async (req, res) => {
       timestamp: new Date().toISOString(),
     });
 
-    // Handle different event types
+    // Forward to Convex internal handler (fire-and-forget)
+    const client = getConvexClient();
+    if (client) {
+      client.action(internal.webhookHandlers.handlePostmarkWebhook, { payload: event })
+        .catch(err => console.error('Convex Postmark webhook handler failed:', err));
+    }
+
+    // Handle different event types (SQL updates)
     switch (event.RecordType) {
       case 'Sent':
         await handleEmailSent(event);
@@ -272,16 +286,7 @@ async function handleEmailSent(data: any) {
       await updateContactMetrics(emailSend.contactId, 'sent');
     }
 
-    // Track in Convex for live updates (fire-and-forget)
-    if (emailSend.newsletterId) {
-      trackNewsletterEvent({
-        tenantId: emailSend.tenantId,
-        newsletterId: emailSend.newsletterId,
-        recipientEmail: emailSend.recipientEmail,
-        providerMessageId,
-        eventType: 'sent',
-      }).catch(() => {});
-    }
+
 
     console.log(`Successfully processed sent event for email_send: ${emailSend.id}`);
   } catch (error) {
@@ -326,16 +331,7 @@ async function handleEmailDelivered(data: any) {
       await updateContactMetrics(emailSend.contactId, 'delivered');
     }
 
-    // Track in Convex for live updates (fire-and-forget)
-    if (emailSend.newsletterId) {
-      trackNewsletterEvent({
-        tenantId: emailSend.tenantId,
-        newsletterId: emailSend.newsletterId,
-        recipientEmail: emailSend.recipientEmail,
-        providerMessageId,
-        eventType: 'delivered',
-      }).catch(() => {});
-    }
+
 
     console.log(`Successfully processed delivered event for email_send: ${emailSend.id}`);
   } catch (error) {
@@ -346,7 +342,7 @@ async function handleEmailDelivered(data: any) {
 async function handleEmailBounced(data: any) {
   try {
     console.log('Email bounced event:', data);
-    
+
     // Extract provider_message_id from webhook data
     const providerMessageId = extractProviderMessageId(data);
     const email = data.email || data.Email;
@@ -368,16 +364,7 @@ async function handleEmailBounced(data: any) {
         // Create email_events record
         await createEmailEvent(emailSend.id, data, 'bounced');
 
-        // Track in Convex for live updates (fire-and-forget)
-        if (emailSend.newsletterId) {
-          trackNewsletterEvent({
-            tenantId: emailSend.tenantId,
-            newsletterId: emailSend.newsletterId,
-            recipientEmail: emailSend.recipientEmail,
-            providerMessageId,
-            eventType: 'bounced',
-          }).catch(() => {});
-        }
+
 
         console.log(`Updated email_send ${emailSend.id} as bounced`);
       }
@@ -408,7 +395,7 @@ async function handleEmailBounced(data: any) {
 async function handleEmailComplained(data: any) {
   try {
     console.log('Email complained event:', data);
-    
+
     // Extract provider_message_id from webhook data
     const providerMessageId = extractProviderMessageId(data);
     const email = data.email || data.Email;
@@ -427,16 +414,7 @@ async function handleEmailComplained(data: any) {
         // Create email_events record
         await createEmailEvent(emailSend.id, data, 'complained');
 
-        // Track in Convex for live updates (fire-and-forget)
-        if (emailSend.newsletterId) {
-          trackNewsletterEvent({
-            tenantId: emailSend.tenantId,
-            newsletterId: emailSend.newsletterId,
-            recipientEmail: emailSend.recipientEmail,
-            providerMessageId,
-            eventType: 'complained',
-          }).catch(() => {});
-        }
+
 
         console.log(`Recorded complaint event for email_send ${emailSend.id}`);
       }
@@ -503,17 +481,7 @@ async function handleEmailSuppressed(data: any) {
         // Create email_events record
         await createEmailEvent(emailSend.id, data, 'suppressed');
 
-        // Track in Convex for live updates (fire-and-forget)
-        if (emailSend.newsletterId) {
-          trackNewsletterEvent({
-            tenantId: emailSend.tenantId,
-            newsletterId: emailSend.newsletterId,
-            recipientEmail: emailSend.recipientEmail,
-            providerMessageId,
-            eventType: 'suppressed',
-            metadata: { reason, description },
-          }).catch(() => {});
-        }
+
 
         console.log(`Updated email_send ${emailSend.id} as suppressed`);
       }
@@ -597,17 +565,7 @@ async function handleEmailOpened(data: any) {
       await updateContactMetrics(emailSend.contactId, 'opened');
     }
 
-    // Track in Convex for live updates (fire-and-forget)
-    if (emailSend.newsletterId) {
-      trackNewsletterEvent({
-        tenantId: emailSend.tenantId,
-        newsletterId: emailSend.newsletterId,
-        recipientEmail: emailSend.recipientEmail,
-        providerMessageId,
-        eventType: 'opened',
-        metadata: { userAgent: data.user_agent, ipAddress: data.ip_address },
-      }).catch(() => {});
-    }
+
 
     console.log(`Successfully processed opened event for email_send: ${emailSend.id}`);
   } catch (error) {
@@ -643,17 +601,7 @@ async function handleEmailClicked(data: any) {
       await updateContactMetrics(emailSend.contactId, 'clicked');
     }
 
-    // Track in Convex for live updates (fire-and-forget)
-    if (emailSend.newsletterId) {
-      trackNewsletterEvent({
-        tenantId: emailSend.tenantId,
-        newsletterId: emailSend.newsletterId,
-        recipientEmail: emailSend.recipientEmail,
-        providerMessageId,
-        eventType: 'clicked',
-        metadata: { userAgent: data.user_agent, ipAddress: data.ip_address, link: data.link || data.click?.link },
-      }).catch(() => {});
-    }
+
 
     console.log(`Successfully processed clicked event for email_send: ${emailSend.id}`);
   } catch (error) {

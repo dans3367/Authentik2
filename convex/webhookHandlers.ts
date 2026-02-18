@@ -1,144 +1,130 @@
-import { httpAction } from "./_generated/server";
+import { internalAction } from "./_generated/server";
+import { v } from "convex/values";
 import { api } from "./_generated/api";
 import { internal } from "./_generated/api";
 
 // ─── RESEND ──────────────────────────────────────────────────────────────────
 
 /**
- * GET /webhooks/resend — health-check endpoint Resend pings on setup.
+ * Internal handler for Resend webhook events.
+ * Called from Express after signature verification.
  */
-export const resendHealthCheck = httpAction(async (_ctx, _request) => {
-  return new Response("Systems all good", {
-    status: 200,
-    headers: { "Content-Type": "text/plain" },
-  });
-});
+export const handleResendWebhook = internalAction({
+  args: { payload: v.any() },
+  handler: async (ctx, { payload: event }) => {
+    try {
+      // payload is already parsed JSON object passed from Express
 
-/**
- * POST /webhooks/resend — receives Resend webhook events and writes
- * directly into Convex newsletter tracking tables.
- */
-export const resendWebhook = httpAction(async (ctx, request) => {
-  try {
-    const body = await request.text();
-    const event = JSON.parse(body);
+      // Map Resend event type → normalised type
+      const eventTypeMap: Record<string, string> = {
+        "email.sent": "sent",
+        "email.delivered": "delivered",
+        "email.bounced": "bounced",
+        "email.complained": "complained",
+        "email.opened": "opened",
+        "email.clicked": "clicked",
+        "email.suppressed": "suppressed",
+      };
 
-    // Signature verification is handled externally; skip in Convex httpAction
-    // (Convex runtime does not support process.env)
+      const normalisedType = eventTypeMap[event.type];
+      if (!normalisedType) {
+        console.log(`Unhandled Resend event type: ${event.type}`);
+        return;
+      }
 
-    // Map Resend event type → normalised type
-    const eventTypeMap: Record<string, string> = {
-      "email.sent": "sent",
-      "email.delivered": "delivered",
-      "email.bounced": "bounced",
-      "email.complained": "complained",
-      "email.opened": "opened",
-      "email.clicked": "clicked",
-      "email.suppressed": "suppressed",
-    };
+      const data = event.data ?? {};
+      const providerMessageId: string | undefined =
+        data.email_id ?? data.id ?? undefined;
+      const recipientEmail = extractRecipientEmail(data);
 
-    const normalisedType = eventTypeMap[event.type];
-    if (!normalisedType) {
-      console.log(`Unhandled Resend event type: ${event.type}`);
-      return jsonResponse({ received: true, unhandled: true });
+      if (!recipientEmail) {
+        console.error("Could not extract recipient email from Resend webhook");
+        return;
+      }
+
+      // Derive tenantId + newsletterId from the existing newsletterSends record
+      const ids = await resolveIds(ctx, providerMessageId, recipientEmail);
+
+      if (ids) {
+        await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
+          tenantId: ids.tenantId,
+          newsletterId: ids.newsletterId,
+          recipientEmail,
+          providerMessageId,
+          eventType: normalisedType as any,
+          metadata: buildMetadata(data),
+        });
+      } else {
+        console.log(
+          `No matching newsletterSend for providerMessageId=${providerMessageId}, email=${recipientEmail}`,
+        );
+      }
+    } catch (error) {
+      console.error("Resend webhook error:", error);
+      throw error; // Let Express handle the error
     }
-
-    const data = event.data ?? {};
-    const providerMessageId: string | undefined =
-      data.email_id ?? data.id ?? undefined;
-    const recipientEmail = extractRecipientEmail(data);
-
-    if (!recipientEmail) {
-      console.error("Could not extract recipient email from Resend webhook");
-      return jsonResponse({ received: true, error: "no_recipient" });
-    }
-
-    // Derive tenantId + newsletterId from the existing newsletterSends record
-    const ids = await resolveIds(ctx, providerMessageId, recipientEmail);
-
-    if (ids) {
-      await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
-        tenantId: ids.tenantId,
-        newsletterId: ids.newsletterId,
-        recipientEmail,
-        providerMessageId,
-        eventType: normalisedType,
-        metadata: buildMetadata(data),
-      });
-    } else {
-      console.log(
-        `No matching newsletterSend for providerMessageId=${providerMessageId}, email=${recipientEmail}`,
-      );
-    }
-
-    return jsonResponse({ received: true });
-  } catch (error) {
-    console.error("Resend webhook error:", error);
-    return jsonResponse({ message: "Webhook processing failed" }, 500);
-  }
+  },
 });
 
 // ─── POSTMARK ────────────────────────────────────────────────────────────────
 
 /**
- * POST /webhooks/postmark — receives Postmark webhook events.
+ * Internal handler for Postmark webhook events.
+ * Called from Express after signature verification.
  */
-export const postmarkWebhook = httpAction(async (ctx, request) => {
-  try {
-    const body = await request.text();
-    const event = JSON.parse(body);
+export const handlePostmarkWebhook = internalAction({
+  args: { payload: v.any() },
+  handler: async (ctx, { payload: event }) => {
+    try {
+      // payload is already parsed JSON object passed from Express
 
-    // Signature verification is handled externally; skip in Convex httpAction
-    // (Convex runtime does not support process.env)
+      // Map Postmark RecordType → normalised type
+      const eventTypeMap: Record<string, string> = {
+        Sent: "sent",
+        Delivered: "delivered",
+        Bounce: "bounced",
+        SpamComplaint: "complained",
+        Open: "opened",
+        Click: "clicked",
+      };
 
-    // Map Postmark RecordType → normalised type
-    const eventTypeMap: Record<string, string> = {
-      Sent: "sent",
-      Delivered: "delivered",
-      Bounce: "bounced",
-      SpamComplaint: "complained",
-      Open: "opened",
-      Click: "clicked",
-    };
+      const normalisedType = eventTypeMap[event.RecordType];
+      if (!normalisedType) {
+        console.log(`Unhandled Postmark event type: ${event.RecordType}`);
+        return;
+      }
 
-    const normalisedType = eventTypeMap[event.RecordType];
-    if (!normalisedType) {
-      console.log(`Unhandled Postmark event type: ${event.RecordType}`);
-      return jsonResponse({ received: true, unhandled: true });
+      const providerMessageId: string | undefined =
+        event.MessageID ?? event.id ?? undefined;
+      const recipientEmail =
+        event.Email ?? event.Recipient ?? extractRecipientEmail(event);
+
+      if (!recipientEmail) {
+        console.error("Could not extract recipient email from Postmark webhook");
+        return;
+      }
+
+      const ids = await resolveIds(ctx, providerMessageId, recipientEmail);
+
+      if (ids) {
+        await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
+          tenantId: ids.tenantId,
+          newsletterId: ids.newsletterId,
+          recipientEmail,
+          providerMessageId,
+          eventType: normalisedType as any,
+          metadata: buildMetadata(event),
+        });
+      } else {
+        console.log(
+          `No matching newsletterSend for providerMessageId=${providerMessageId}, email=${recipientEmail}`,
+        );
+      }
+    } catch (error) {
+      console.error("Postmark webhook error:", error);
+      throw error; // Let Express handle the error
     }
-
-    const providerMessageId: string | undefined =
-      event.MessageID ?? event.id ?? undefined;
-    const recipientEmail =
-      event.Email ?? event.Recipient ?? extractRecipientEmail(event);
-
-    if (!recipientEmail) {
-      console.error("Could not extract recipient email from Postmark webhook");
-      return jsonResponse({ received: true, error: "no_recipient" });
-    }
-
-    const ids = await resolveIds(ctx, providerMessageId, recipientEmail);
-
-    if (ids) {
-      await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
-        tenantId: ids.tenantId,
-        newsletterId: ids.newsletterId,
-        recipientEmail,
-        providerMessageId,
-        eventType: normalisedType,
-        metadata: buildMetadata(event),
-      });
-    } else {
-      console.log(
-        `No matching newsletterSend for providerMessageId=${providerMessageId}, email=${recipientEmail}`,
-      );
-    }
-
-    return jsonResponse({ received: true });
-  } catch (error) {
-    console.error("Postmark webhook error:", error);
-    return jsonResponse({ message: "Webhook processing failed" }, 500);
-  }
+  },
 });
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -210,12 +196,3 @@ function buildMetadata(data: any): Record<string, any> | undefined {
   return Object.keys(meta).length > 0 ? meta : undefined;
 }
 
-/**
- * Convenience helper to return a JSON response.
- */
-function jsonResponse(body: any, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}

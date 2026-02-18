@@ -368,6 +368,7 @@ export default function NewsletterPage() {
               const isReadyToSend = newsletter.status === 'ready_to_send';
 
               const isDeleting = deleteMutation.isPending && deleteMutation.variables === newsletter.id;
+              const isDeploying = deployMutation.isPending && deployMutation.variables === newsletter.id;
 
               if (isDeleting) {
                 return (
@@ -440,10 +441,10 @@ export default function NewsletterPage() {
                                     e.stopPropagation();
                                     deployMutation.mutate(newsletter.id);
                                   }}
-                                  disabled={deployMutation.isPending}
+                                  disabled={isDeploying}
                                 >
                                   <Send className="h-4 w-4 mr-2" />
-                                  {deployMutation.isPending ? "Sending..." : "Send Now"}
+                                  {isDeploying ? "Sending..." : "Send Now"}
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuSeparator />

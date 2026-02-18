@@ -51,53 +51,47 @@ async function getSuppressionMap(tenantId: string): Promise<Map<string, string>>
   return map;
 }
 
-// Helper function to get newsletter recipients based on segmentation
-async function getNewsletterRecipients(newsletter: any, tenantId: string) {
-  console.log(`[Newsletter] Getting recipients for newsletter ${newsletter.id}, type: ${newsletter.recipientType}`);
-  
+// Helper: Base function to get newsletter recipients
+async function getNewsletterRecipientsBase(newsletter: any, tenantId: string, options: { filterActiveOnly: boolean }) {
+  const { filterActiveOnly } = options;
+  console.log(`[Newsletter] Getting recipients for newsletter ${newsletter.id}, type: ${newsletter.recipientType}, activeOnly: ${filterActiveOnly}`);
+
   try {
-    let recipients: Array<{ id: string; email: string; firstName?: string; lastName?: string; prefNewsletters?: boolean | null }> = [];
+    let recipients: Array<any> = [];
+    // Dynamically build columns selection
+    const columns = {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      ...(filterActiveOnly ? { prefNewsletters: true } : { status: true }),
+    };
 
     switch (newsletter.recipientType) {
       case 'all':
-        // Get all active email contacts for the tenant
         recipients = await db.query.emailContacts.findMany({
           where: and(
             eq(emailContacts.tenantId, tenantId),
-            eq(emailContacts.status, 'active')
+            filterActiveOnly ? eq(emailContacts.status, 'active') : undefined
           ),
-          columns: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            prefNewsletters: true,
-          }
+          columns,
         });
         break;
 
       case 'selected':
-        // Get specific contacts by IDs
         if (newsletter.selectedContactIds && newsletter.selectedContactIds.length > 0) {
           recipients = await db.query.emailContacts.findMany({
             where: and(
               eq(emailContacts.tenantId, tenantId),
               inArray(emailContacts.id, newsletter.selectedContactIds),
-              eq(emailContacts.status, 'active')
+              filterActiveOnly ? eq(emailContacts.status, 'active') : undefined
             ),
-            columns: {
-              id: true,
-              email: true,
-              firstName: true,
-              lastName: true,
-              prefNewsletters: true,
-            }
+            columns,
           });
         }
         break;
 
       case 'tags':
-        // Get contacts by tag IDs
         if (newsletter.selectedTagIds && newsletter.selectedTagIds.length > 0) {
           const contactIds = await db
             .select({ contactId: contactTagAssignments.contactId })
@@ -109,15 +103,9 @@ async function getNewsletterRecipients(newsletter: any, tenantId: string) {
               where: and(
                 eq(emailContacts.tenantId, tenantId),
                 inArray(emailContacts.id, contactIds.map((c: any) => c.contactId)),
-                eq(emailContacts.status, 'active')
+                filterActiveOnly ? eq(emailContacts.status, 'active') : undefined
               ),
-              columns: {
-                id: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                prefNewsletters: true,
-              }
+              columns,
             });
           }
         }
@@ -128,7 +116,7 @@ async function getNewsletterRecipients(newsletter: any, tenantId: string) {
         break;
     }
 
-    console.log(`[Newsletter] Found ${recipients.length} recipients for newsletter ${newsletter.id}`);
+    console.log(`[Newsletter] Found ${recipients.length} recipients for newsletter ${newsletter.id} (activeOnly: ${filterActiveOnly})`);
     return recipients;
   } catch (error) {
     console.error(`[Newsletter] Error getting recipients for newsletter ${newsletter.id}:`, error);
@@ -136,81 +124,14 @@ async function getNewsletterRecipients(newsletter: any, tenantId: string) {
   }
 }
 
+// Helper function to get newsletter recipients based on segmentation (Active only)
+async function getNewsletterRecipients(newsletter: any, tenantId: string) {
+  return getNewsletterRecipientsBase(newsletter, tenantId, { filterActiveOnly: true });
+}
+
 // Helper: get ALL original recipients regardless of status (for viewing in stats modal)
 async function getAllNewsletterRecipients(newsletter: any, tenantId: string) {
-  console.log(`[Newsletter] Getting ALL recipients (including suppressed) for newsletter ${newsletter.id}, type: ${newsletter.recipientType}`);
-  
-  try {
-    let recipients: Array<{ id: string; email: string; firstName?: string; lastName?: string; status: string }> = [];
-
-    switch (newsletter.recipientType) {
-      case 'all':
-        recipients = await db.query.emailContacts.findMany({
-          where: eq(emailContacts.tenantId, tenantId),
-          columns: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            status: true,
-          }
-        });
-        break;
-
-      case 'selected':
-        if (newsletter.selectedContactIds && newsletter.selectedContactIds.length > 0) {
-          recipients = await db.query.emailContacts.findMany({
-            where: and(
-              eq(emailContacts.tenantId, tenantId),
-              inArray(emailContacts.id, newsletter.selectedContactIds)
-            ),
-            columns: {
-              id: true,
-              email: true,
-              firstName: true,
-              lastName: true,
-              status: true,
-            }
-          });
-        }
-        break;
-
-      case 'tags':
-        if (newsletter.selectedTagIds && newsletter.selectedTagIds.length > 0) {
-          const contactIds = await db
-            .select({ contactId: contactTagAssignments.contactId })
-            .from(contactTagAssignments)
-            .where(inArray(contactTagAssignments.tagId, newsletter.selectedTagIds));
-
-          if (contactIds.length > 0) {
-            recipients = await db.query.emailContacts.findMany({
-              where: and(
-                eq(emailContacts.tenantId, tenantId),
-                inArray(emailContacts.id, contactIds.map((c: any) => c.contactId))
-              ),
-              columns: {
-                id: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                status: true,
-              }
-            });
-          }
-        }
-        break;
-
-      default:
-        console.warn(`[Newsletter] Unknown recipient type: ${newsletter.recipientType}`);
-        break;
-    }
-
-    console.log(`[Newsletter] Found ${recipients.length} total recipients (all statuses) for newsletter ${newsletter.id}`);
-    return recipients;
-  } catch (error) {
-    console.error(`[Newsletter] Error getting all recipients for newsletter ${newsletter.id}:`, error);
-    throw error;
-  }
+  return getNewsletterRecipientsBase(newsletter, tenantId, { filterActiveOnly: false });
 }
 
 // Helper: get contacts that WOULD be recipients but are excluded due to non-active status
@@ -305,10 +226,10 @@ newsletterRoutes.get("/preview-recipients", authenticateToken, requireTenant, as
       type: 'user' as const,
     }));
 
-    res.json({ 
-      recipients, 
+    res.json({
+      recipients,
       total: hasMore ? `${limit}+` : recipients.length,
-      truncated: hasMore 
+      truncated: hasMore
     });
   } catch (error) {
     console.error('Get preview recipients error:', error);
@@ -809,7 +730,7 @@ newsletterRoutes.put("/:id/status", authenticateInternalService, async (req: any
     }
 
     console.log(`[Newsletter] Successfully updated newsletter ${id} status to: ${status}`);
-    res.json({ 
+    res.json({
       message: 'Newsletter status updated successfully',
       newsletter: updatedNewsletter[0]
     });
@@ -835,8 +756,8 @@ newsletterRoutes.post("/:id/log", authenticateInternalService, async (req: any, 
 
     // Here you could store activity logs in a separate table if needed
     // For now, we just log to console and return success
-    
-    res.json({ 
+
+    res.json({
       message: 'Newsletter activity logged successfully',
       newsletterId: id,
       activity,
@@ -1087,13 +1008,6 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
         }
       }
 
-      if (allowedRecipients.length === 0) {
-        await db.update(newsletters)
-          .set({ status: 'draft', updatedAt: new Date() })
-          .where(eq(newsletters.id, id));
-        return res.status(400).json({ message: 'All recipients are suppressed (bounces or tenant-level complaints). No emails will be sent.' });
-      }
-      
       if (recipients.length === 0) {
         await db.update(newsletters)
           .set({
@@ -1102,9 +1016,16 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
           })
           .where(eq(newsletters.id, id));
 
-        return res.status(400).json({ 
-          message: 'No recipients found for newsletter. Please check your segmentation settings or add email contacts.' 
+        return res.status(400).json({
+          message: 'No recipients found for newsletter. Please check your segmentation settings or add email contacts.'
         });
+      }
+
+      if (allowedRecipients.length === 0) {
+        await db.update(newsletters)
+          .set({ status: 'draft', updatedAt: new Date() })
+          .where(eq(newsletters.id, id));
+        return res.status(400).json({ message: 'All recipients are suppressed (bounces or tenant-level complaints). No emails will be sent.' });
       }
 
       // Also fetch contacts excluded at the DB level (status != 'active': suppressed, bounced, unsubscribed)
@@ -1136,20 +1057,28 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
         });
 
         // Track each suppressed recipient in Convex so the dashboard shows them
+        // Track each suppressed recipient in Convex so the dashboard shows them
         if (allSuppressedForTracking.length > 0) {
-          for (const suppressed of allSuppressedForTracking) {
-            try {
-              await trackNewsletterEmailSend({
-                tenantId: req.user.tenantId,
-                newsletterId: id,
-                groupUUID,
-                recipientEmail: suppressed.email,
-                recipientId: suppressed.id,
-                status: 'suppressed',
-                error: `Suppressed: ${suppressed.reason}`,
-              });
-            } catch (_) { /* fire-and-forget */ }
-          }
+          const results = await Promise.allSettled(allSuppressedForTracking.map(suppressed =>
+            trackNewsletterEmailSend({
+              tenantId: req.user.tenantId,
+              newsletterId: id,
+              groupUUID,
+              recipientEmail: suppressed.email,
+              recipientId: suppressed.id,
+              status: 'suppressed',
+              error: `Suppressed: ${suppressed.reason}`,
+            })
+          ));
+
+          // Log failures
+          results.forEach((result, index) => {
+            if (result.status === 'rejected') {
+              const suppressed = allSuppressedForTracking[index];
+              console.error(`[Newsletter] Failed to track suppressed recipient ${suppressed.email} (id: ${suppressed.id}):`, result.reason);
+            }
+          });
+
           console.log(`[Newsletter] Tracked ${allSuppressedForTracking.length} suppressed recipient(s) in Convex`);
         }
       } catch (convexErr) {
@@ -1159,13 +1088,13 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
       // Send via Trigger.dev
       try {
         console.log(`[Newsletter] Triggering Trigger.dev sendNewsletterTask`);
-        
+
         // Wrap newsletter content in the tenant's global email design template
         const wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content);
-        
+
         // Import and trigger the Trigger.dev task
         const { sendNewsletterTask } = await import('../../src/trigger/newsletter');
-        
+
         const handle = await sendNewsletterTask.trigger({
           jobId: `newsletter-${newsletter.id}-${Date.now()}`,
           newsletterId: newsletter.id,
@@ -1211,10 +1140,10 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
 
       } catch (triggerError: any) {
         console.error(`[Newsletter] Failed to trigger Trigger.dev task:`, triggerError);
-        
+
         // Fallback to direct sending if Trigger.dev is unavailable
         console.log(`[Newsletter] Falling back to direct email sending`);
-        
+
         // Generate or reuse unsubscribe tokens per recipient (single-use, long-lived until used)
         const tokenMap = new Map<string, string>();
         for (const r of allowedRecipients) {
@@ -1317,7 +1246,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
 
     } catch (sendError) {
       console.error(`[Newsletter] Failed to send newsletter ${id}:`, sendError);
-      
+
       // Update newsletter status back to draft on failure
       await db.update(newsletters)
         .set({
@@ -1326,7 +1255,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
         })
         .where(eq(newsletters.id, id));
 
-      res.status(500).json({ 
+      res.status(500).json({
         message: 'Failed to create temporal workflow for newsletter sending',
         error: sendError instanceof Error ? sendError.message : 'Unknown error'
       });
@@ -1468,9 +1397,9 @@ newsletterRoutes.post('/:id/send-single', authenticateInternalService, async (re
 
   } catch (error) {
     console.error('[Newsletter] Send single email error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Internal server error' 
+      error: error instanceof Error ? error.message : 'Internal server error'
     });
   }
 });

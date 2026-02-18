@@ -3701,6 +3701,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
 
     // Send birthday cards to each contact
     const skippedOptOut: string[] = [];
+    const skippedSuppressed: string[] = [];
     for (const contact of contacts) {
       try {
         // Skip suppressed/bounced/unsubscribed contacts
@@ -3709,7 +3710,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
             ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
             : contact.email;
           console.log(`🚫 [ManualBirthdayCard] Skipping ${contact.email} - contact status: ${contact.status}`);
-          skippedOptOut.push(contactName);
+          skippedSuppressed.push(contactName);
           results.push({ contactId: contact.id, email: contact.email, success: false, error: `Contact status: ${contact.status}` });
           continue;
         }
@@ -4110,10 +4111,14 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
     const successCount = results.filter(r => r.success).length;
     const failureCount = results.filter(r => !r.success).length;
     const optOutCount = skippedOptOut.length;
+    const suppressedCount = skippedSuppressed.length;
 
     let message = `Birthday cards sent: ${successCount} successful, ${failureCount} failed`;
     if (optOutCount > 0) {
       message += `. ${optOutCount} contact(s) skipped (opted out of Customer Engagement): ${skippedOptOut.join(', ')}`;
+    }
+    if (suppressedCount > 0) {
+      message += `. ${suppressedCount} contact(s) skipped (suppressed/bounced/unsubscribed): ${skippedSuppressed.join(', ')}`;
     }
 
     res.json({
@@ -4125,7 +4130,9 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
         successful: successCount,
         failed: failureCount,
         optedOut: optOutCount,
+        suppressed: suppressedCount,
         optedOutContacts: skippedOptOut,
+        suppressedContacts: skippedSuppressed,
       },
     });
 
