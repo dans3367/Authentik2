@@ -415,6 +415,39 @@ export const getEmailTrajectory = query({
 /**
  * Get status breakdown counts for a newsletter (for pie/bar charts).
  */
+/**
+ * Find a newsletterSend record by providerMessageId.
+ * Used by Convex HTTP webhook handlers to resolve tenantId/newsletterId.
+ */
+export const findSendByProviderMessageId = query({
+  args: { providerMessageId: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("newsletterSends")
+      .withIndex("by_provider_message", (q) =>
+        q.eq("providerMessageId", args.providerMessageId)
+      )
+      .first();
+  },
+});
+
+/**
+ * Find the most recent newsletterSend record by recipientEmail.
+ * Fallback lookup used by Convex HTTP webhook handlers.
+ */
+export const findSendByRecipientEmail = query({
+  args: { recipientEmail: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("newsletterSends")
+      .withIndex("by_recipient_email", (q) =>
+        q.eq("recipientEmail", args.recipientEmail)
+      )
+      .order("desc")
+      .first();
+  },
+});
+
 export const getStatusBreakdown = query({
   args: { newsletterId: v.string() },
   handler: async (ctx, args) => {
