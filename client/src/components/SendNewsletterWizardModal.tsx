@@ -32,6 +32,9 @@ interface SendNewsletterWizardModalProps {
     selectedContactIds: string[];
     selectedTagIds: string[];
   }) => void;
+  initialRecipientType?: "all" | "selected" | "tags";
+  initialSelectedContactIds?: string[];
+  initialSelectedTagIds?: string[];
 }
 
 interface SegmentListWithCount extends SegmentList {
@@ -44,6 +47,9 @@ export function SendNewsletterWizardModal({
   newsletterId,
   newsletterTitle,
   onSegmentSelected,
+  initialRecipientType,
+  initialSelectedContactIds,
+  initialSelectedTagIds,
 }: SendNewsletterWizardModalProps) {
   const { toast } = useToast();
   const [step, setStep] = useState<1 | 2>(1);
@@ -91,17 +97,22 @@ export function SendNewsletterWizardModal({
 
   useEffect(() => {
     if (isOpen) {
+      const hasInitialRecipients = initialRecipientType && initialRecipientType !== "all";
+      const hasInitialContacts = initialSelectedContactIds && initialSelectedContactIds.length > 0;
+      const hasInitialTags = initialSelectedTagIds && initialSelectedTagIds.length > 0;
+      const shouldPreselect = hasInitialRecipients || hasInitialContacts || hasInitialTags;
+
       setStep(1);
-      setSelectionMode("segment_list");
+      setSelectionMode(shouldPreselect ? "custom" : "segment_list");
       setSelectedSegmentListId(null);
-      setCustomRecipientType("all");
+      setCustomRecipientType(initialRecipientType || "all");
       setSearchTerm("");
-      setSelectedContactIds([]);
-      setSelectedTagIds([]);
+      setSelectedContactIds(initialSelectedContactIds || []);
+      setSelectedTagIds(initialSelectedTagIds || []);
       setIsSending(false);
       setIsSavingLater(false);
     }
-  }, [isOpen]);
+  }, [isOpen, initialRecipientType, initialSelectedContactIds, initialSelectedTagIds]);
 
   const filteredContacts = contacts.filter((contact: any) =>
     (contact.email || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||

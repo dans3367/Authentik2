@@ -606,6 +606,9 @@ export default function NewsletterPage() {
         newsletterId={editRecipientsNewsletter?.id || null}
         newsletterTitle={editRecipientsNewsletter?.title || ""}
         onSegmentSelected={handleEditRecipientsSegmentSelected}
+        initialRecipientType={editRecipientsNewsletter?.recipientType as "all" | "selected" | "tags" | undefined}
+        initialSelectedContactIds={editRecipientsNewsletter?.selectedContactIds || []}
+        initialSelectedTagIds={editRecipientsNewsletter?.selectedTagIds || []}
       />
 
       <Dialog open={!!previewNewsletter} onOpenChange={(open) => !open && setPreviewNewsletter(null)}>
