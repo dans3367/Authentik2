@@ -656,7 +656,7 @@ export default function NewsletterViewPage() {
         </div>
 
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 lg:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
           <Card>
             <CardContent className="p-4 lg:p-6">
               <div className="flex items-center justify-between gap-3">
@@ -722,62 +722,32 @@ export default function NewsletterViewPage() {
 
           <Card>
             <CardContent className="p-4 lg:p-6">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">
-                    Bounces
-                  </p>
-                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold" data-testid="text-bounces-count">
-                    {detailedStatsData?.emails?.reduce((total: number, email: { bounces: number }) => total + (email.bounces || 0), 0) || 0}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Total delivery failures
-                  </p>
-                </div>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">
+                  Bounces
+                </p>
                 <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center shrink-0">
                   <AlertTriangle className="text-white w-5 h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4 lg:p-6">
-              <div className="flex items-center justify-between gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">
-                    Suppressed
+                  <p className="text-lg sm:text-xl lg:text-2xl font-bold" data-testid="text-bounces-count">
+                    {detailedStatsData?.emails?.reduce((total: number, email: { bounces: number }) => total + (email.bounces || 0), 0) || 0}
                   </p>
-                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold" data-testid="text-suppressed-count">
+                  <p className="text-xs text-muted-foreground">Bounced</p>
+                </div>
+                <div>
+                  <p className="text-lg sm:text-xl lg:text-2xl font-bold" data-testid="text-suppressed-count">
                     {detailedStatsData?.emails?.filter((email: { status: string }) => email.status === 'suppressed').length || 0}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Blocked by provider
-                  </p>
+                  <p className="text-xs text-muted-foreground">Suppressed</p>
                 </div>
-                <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shrink-0">
-                  <ShieldOff className="text-white w-5 h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4 lg:p-6">
-              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">
-                    Complaints
-                  </p>
-                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold" data-testid="text-complaints-count">
+                  <p className="text-lg sm:text-xl lg:text-2xl font-bold" data-testid="text-complaints-count">
                     {detailedStatsData?.emails?.reduce((total: number, email: { complaints: number }) => total + (email.complaints || 0), 0) || 0}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Spam reports received
-                  </p>
-                </div>
-                <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shrink-0">
-                  <XCircle className="text-white w-5 h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
+                  <p className="text-xs text-muted-foreground">Complaints</p>
                 </div>
               </div>
             </CardContent>
