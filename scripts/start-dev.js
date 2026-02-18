@@ -36,7 +36,7 @@ const services = [
     color: 'blue',
     command: 'tsx',
     args: ['server/index.ts'],
-    env: { ...process.env, NODE_ENV: 'development', PORT: '5002' },
+    env: { ...process.env, NODE_ENV: 'development', PORT: '5000' },
     cwd: projectRoot,
   },
   {
@@ -174,7 +174,7 @@ async function startServices() {
   colorLog('bright', '='.repeat(50));
   colorLog('green', '🎉 All services started!');
   colorLog('bright', '📍 Services:');
-  colorLog('blue', '   • Main Server:     http://localhost:5002');
+  colorLog('blue', '   • Main Server:     http://localhost:5000');
   colorLog('magenta', '   • Webhook Server:  http://localhost:3505');
   colorLog('cyan', '   • Bounce Server:   http://localhost:5003');
   colorLog('bright', '\n🔄 Press Ctrl+C to stop all services\n');

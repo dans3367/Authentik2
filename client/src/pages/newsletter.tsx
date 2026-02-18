@@ -16,9 +16,11 @@ import {
   FileText,
   MoreVertical,
   Pencil,
-  Loader2
+  Loader2,
+  UserCog
 } from "lucide-react";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
+import { SendNewsletterWizardModal } from "@/components/SendNewsletterWizardModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -75,6 +77,7 @@ export default function NewsletterPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [previewNewsletter, setPreviewNewsletter] = useState<(NewsletterWithUser & { opens?: number; totalOpens?: number }) | null>(null);
+  const [editRecipientsNewsletter, setEditRecipientsNewsletter] = useState<(NewsletterWithUser & { opens?: number; totalOpens?: number }) | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -156,6 +159,31 @@ export default function NewsletterPage() {
       });
     },
   });
+
+  const handleEditRecipientsSegmentSelected = async (segmentData: {
+    segmentListId: string | null;
+    recipientType: "all" | "selected" | "tags";
+    selectedContactIds: string[];
+    selectedTagIds: string[];
+  }) => {
+    if (!editRecipientsNewsletter) return;
+    try {
+      await apiRequest('PUT', `/api/newsletters/${editRecipientsNewsletter.id}`, {
+        recipientType: segmentData.recipientType,
+        selectedContactIds: segmentData.selectedContactIds,
+        selectedTagIds: segmentData.selectedTagIds,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({ title: "Recipients Updated", description: "Newsletter recipients have been updated successfully." });
+      setEditRecipientsNewsletter(null);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update recipients",
+        variant: "destructive",
+      });
+    }
+  };
 
   const newsletters: (NewsletterWithUser & { opens?: number; totalOpens?: number })[] = newslettersData || [];
 
@@ -435,6 +463,18 @@ export default function NewsletterPage() {
                                 <Pencil className="h-4 w-4 mr-2" />
                                 Edit
                               </DropdownMenuItem>
+                              {(isDraft || isReadyToSend) && (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditRecipientsNewsletter(newsletter);
+                                  }}
+                                  data-testid={`button-edit-recipients-${newsletter.id}`}
+                                >
+                                  <UserCog className="h-4 w-4 mr-2" />
+                                  Edit Recipients
+                                </DropdownMenuItem>
+                              )}
                               {isReadyToSend && (
                                 <DropdownMenuItem
                                   onClick={(e) => {
@@ -559,6 +599,14 @@ export default function NewsletterPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <SendNewsletterWizardModal
+        isOpen={!!editRecipientsNewsletter}
+        onClose={() => setEditRecipientsNewsletter(null)}
+        newsletterId={editRecipientsNewsletter?.id || null}
+        newsletterTitle={editRecipientsNewsletter?.title || ""}
+        onSegmentSelected={handleEditRecipientsSegmentSelected}
+      />
 
       <Dialog open={!!previewNewsletter} onOpenChange={(open) => !open && setPreviewNewsletter(null)}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
