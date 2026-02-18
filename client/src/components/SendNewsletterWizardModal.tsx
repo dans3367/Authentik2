@@ -182,8 +182,8 @@ export function SendNewsletterWizardModal({
         style={{ 
           display: 'flex', 
           flexDirection: 'column', 
-          maxHeight: '85vh',
-          overflow: 'hidden'
+          maxHeight: '90vh',
+          overflow: 'visible'
         }}
       >
         <DialogHeader className="flex-shrink-0">
@@ -220,7 +220,7 @@ export function SendNewsletterWizardModal({
 
         <Separator className="flex-shrink-0" />
 
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }} className="flex flex-col gap-4 py-2 pr-1">
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }} className="flex flex-col gap-4 py-2 px-1">
           <RadioGroup
             value={selectionMode}
             onValueChange={(val) => {
@@ -274,7 +274,7 @@ export function SendNewsletterWizardModal({
                 />
               </div>
 
-              <div style={{ maxHeight: '280px', overflowY: 'auto', padding: '4px' }} className="rounded-md">
+              <div style={{ maxHeight: '380px', overflowY: 'auto', padding: '6px' }} className="rounded-md">
                 {segmentListsLoading ? (
                   <div className="space-y-3 p-1">
                     {[1, 2, 3].map((i) => (
@@ -437,7 +437,7 @@ export function SendNewsletterWizardModal({
                   <p className="text-xs text-muted-foreground px-1">
                     {selectedContactIds.length} of {filteredContacts.length} selected
                   </p>
-                  <div style={{ maxHeight: '220px', overflowY: 'auto' }} className="rounded-lg border">
+                  <div style={{ maxHeight: '320px', overflowY: 'auto' }} className="rounded-lg border">
                     {contactsLoading ? (
                       <div className="space-y-2 p-3">
                         {[1, 2, 3].map((i) => (
@@ -495,7 +495,7 @@ export function SendNewsletterWizardModal({
                   <p className="text-xs text-muted-foreground px-1">
                     {selectedTagIds.length} of {filteredTags.length} tags selected
                   </p>
-                  <div style={{ maxHeight: '220px', overflowY: 'auto', padding: '4px' }} className="rounded-md">
+                  <div style={{ maxHeight: '320px', overflowY: 'auto', padding: '6px' }} className="rounded-md">
                     {tagsLoading ? (
                       <div className="space-y-2 p-3">
                         {[1, 2, 3].map((i) => (
