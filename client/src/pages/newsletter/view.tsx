@@ -121,7 +121,7 @@ export default function NewsletterViewPage() {
     },
   });
 
-  const { data: recipientsData, isLoading: recipientsLoading } = useQuery<{ recipients: Array<{ id: string; email: string; firstName: string; lastName: string }>; total: number }>({
+  const { data: recipientsData, isLoading: recipientsLoading } = useQuery<{ recipients: Array<{ id: string; email: string; firstName: string; lastName: string; status: string }>; total: number }>({
     queryKey: ['/api/newsletters', id, 'recipients'],
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/newsletters/${id}/recipients`);
@@ -1804,6 +1804,19 @@ export default function NewsletterViewPage() {
                         <p className="text-sm font-medium text-foreground truncate">{recipient.email}</p>
                       )}
                     </div>
+                    {recipient.status && recipient.status !== 'active' && (
+                      <Badge 
+                        variant="outline" 
+                        className={`text-xs shrink-0 ${
+                          recipient.status === 'suppressed' ? 'border-orange-500 text-orange-600' :
+                          recipient.status === 'bounced' ? 'border-red-500 text-red-600' :
+                          recipient.status === 'unsubscribed' ? 'border-gray-500 text-gray-600' :
+                          'border-muted-foreground text-muted-foreground'
+                        }`}
+                      >
+                        {recipient.status}
+                      </Badge>
+                    )}
                   </div>
                 ))}
               </div>

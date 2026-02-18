@@ -136,6 +136,83 @@ async function getNewsletterRecipients(newsletter: any, tenantId: string) {
   }
 }
 
+// Helper: get ALL original recipients regardless of status (for viewing in stats modal)
+async function getAllNewsletterRecipients(newsletter: any, tenantId: string) {
+  console.log(`[Newsletter] Getting ALL recipients (including suppressed) for newsletter ${newsletter.id}, type: ${newsletter.recipientType}`);
+  
+  try {
+    let recipients: Array<{ id: string; email: string; firstName?: string; lastName?: string; status: string }> = [];
+
+    switch (newsletter.recipientType) {
+      case 'all':
+        recipients = await db.query.emailContacts.findMany({
+          where: eq(emailContacts.tenantId, tenantId),
+          columns: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            status: true,
+          }
+        });
+        break;
+
+      case 'selected':
+        if (newsletter.selectedContactIds && newsletter.selectedContactIds.length > 0) {
+          recipients = await db.query.emailContacts.findMany({
+            where: and(
+              eq(emailContacts.tenantId, tenantId),
+              inArray(emailContacts.id, newsletter.selectedContactIds)
+            ),
+            columns: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              status: true,
+            }
+          });
+        }
+        break;
+
+      case 'tags':
+        if (newsletter.selectedTagIds && newsletter.selectedTagIds.length > 0) {
+          const contactIds = await db
+            .select({ contactId: contactTagAssignments.contactId })
+            .from(contactTagAssignments)
+            .where(inArray(contactTagAssignments.tagId, newsletter.selectedTagIds));
+
+          if (contactIds.length > 0) {
+            recipients = await db.query.emailContacts.findMany({
+              where: and(
+                eq(emailContacts.tenantId, tenantId),
+                inArray(emailContacts.id, contactIds.map((c: any) => c.contactId))
+              ),
+              columns: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                status: true,
+              }
+            });
+          }
+        }
+        break;
+
+      default:
+        console.warn(`[Newsletter] Unknown recipient type: ${newsletter.recipientType}`);
+        break;
+    }
+
+    console.log(`[Newsletter] Found ${recipients.length} total recipients (all statuses) for newsletter ${newsletter.id}`);
+    return recipients;
+  } catch (error) {
+    console.error(`[Newsletter] Error getting all recipients for newsletter ${newsletter.id}:`, error);
+    throw error;
+  }
+}
+
 // Helper: get contacts that WOULD be recipients but are excluded due to non-active status
 // (suppressed, bounced, unsubscribed). Used for Convex dashboard reporting.
 async function getSuppressedNewsletterContacts(newsletter: any, tenantId: string) {
@@ -396,7 +473,8 @@ newsletterRoutes.get("/:id/recipients", authenticateToken, requireTenant, async 
       return res.status(404).json({ message: 'Newsletter not found' });
     }
 
-    const recipients = await getNewsletterRecipients(newsletter, req.user.tenantId);
+    // Get ALL recipients regardless of status (so suppressed contacts are shown in the list)
+    const recipients = await getAllNewsletterRecipients(newsletter, req.user.tenantId);
 
     res.json({
       recipients: recipients.map((r: any) => ({
@@ -404,6 +482,7 @@ newsletterRoutes.get("/:id/recipients", authenticateToken, requireTenant, async 
         email: r.email,
         firstName: r.firstName || '',
         lastName: r.lastName || '',
+        status: r.status || 'active',
       })),
       total: recipients.length,
     });
