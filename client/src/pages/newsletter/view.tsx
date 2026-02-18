@@ -51,6 +51,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
 import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
 import { LiveTrackingPanel } from "@/components/newsletter/LiveTrackingPanel";
+import { useNewsletterStats } from "@/hooks/useNewsletterTracking";
 import type { NewsletterWithUser, NewsletterTaskStatus } from "@shared/schema";
 
 // Using real task status data from backend via NewsletterTaskStatus type
@@ -76,6 +77,8 @@ export default function NewsletterViewPage() {
   const [selectedTrajectory, setSelectedTrajectory] = useState<any>(null);
   const tasksInitializedRef = useRef(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  const liveStats = useNewsletterStats(id);
 
   // Fetch newsletter data with auto-refresh every 10 seconds for sent newsletters
   const { data: newsletterData, isLoading } = useQuery<{ newsletter: NewsletterWithUser }>({
@@ -733,19 +736,19 @@ export default function NewsletterViewPage() {
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <p className="text-lg sm:text-xl lg:text-2xl font-bold" data-testid="text-bounces-count">
-                    {detailedStatsData?.emails?.reduce((total: number, email: { bounces: number }) => total + (email.bounces || 0), 0) || 0}
+                    {liveStats?.bounced ?? 0}
                   </p>
                   <p className="text-xs text-muted-foreground">Bounced</p>
                 </div>
                 <div>
                   <p className="text-lg sm:text-xl lg:text-2xl font-bold" data-testid="text-suppressed-count">
-                    {detailedStatsData?.emails?.filter((email: { status: string }) => email.status === 'suppressed').length || 0}
+                    {liveStats?.suppressed ?? 0}
                   </p>
                   <p className="text-xs text-muted-foreground">Suppressed</p>
                 </div>
                 <div>
                   <p className="text-lg sm:text-xl lg:text-2xl font-bold" data-testid="text-complaints-count">
-                    {detailedStatsData?.emails?.reduce((total: number, email: { complaints: number }) => total + (email.complaints || 0), 0) || 0}
+                    {liveStats?.complained ?? 0}
                   </p>
                   <p className="text-xs text-muted-foreground">Complaints</p>
                 </div>
