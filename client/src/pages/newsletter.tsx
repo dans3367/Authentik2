@@ -7,30 +7,19 @@ import {
   Calendar, 
   Eye,
   Clock,
-  MoreHorizontal,
   Users,
   MousePointer,
   Search,
-  Edit,
   LayoutDashboard,
   Trash2,
   Send,
-  FileText,
-  Pencil,
-  Copy
+  FileText
 } from "lucide-react";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -59,7 +48,7 @@ const getStatusBadge = (status: string) => {
     case 'draft':
       return <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800"><FileText className="h-3 w-3 mr-1" />Draft</Badge>;
     case 'ready_to_send':
-      return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800"><Send className="h-3 w-3 mr-1" />Ready to Send</Badge>;
+      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800"><Send className="h-3 w-3 mr-1" />Ready to Send</Badge>;
     case 'scheduled':
       return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800"><Clock className="h-3 w-3 mr-1" />Scheduled</Badge>;
     case 'sending':
@@ -122,21 +111,6 @@ export default function NewsletterPage() {
     },
   });
 
-  const cloneMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await apiRequest('POST', `/api/newsletters/${id}/clone`);
-      return response.json();
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
-      toast({ title: "Design copied", description: "Opening the editor with your cloned newsletter." });
-      setLocation(`/newsletter/create/${data.id}`);
-    },
-    onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to copy newsletter design", variant: "destructive" });
-    },
-  });
-
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       await apiRequest('DELETE', `/api/newsletters/${id}`);
@@ -148,6 +122,28 @@ export default function NewsletterPage() {
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to delete newsletter", variant: "destructive" });
+    },
+  });
+
+  const deployMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest('POST', `/api/newsletters/${id}/send`);
+      return response.json();
+    },
+    onSuccess: (data: any, variables: string) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({ 
+        title: "Newsletter Deployed", 
+        description: data.message || "Newsletter is now being sent to recipients."
+      });
+      setLocation(`/newsletters/${data.newsletterId || data.id || variables}`);
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Deploy Failed", 
+        description: error.message || "Failed to deploy newsletter", 
+        variant: "destructive" 
+      });
     },
   });
 
@@ -359,6 +355,7 @@ export default function NewsletterPage() {
                 : "0";
               const isDraft = newsletter.status === 'draft';
               const isSent = newsletter.status === 'sent';
+              const isReadyToSend = newsletter.status === 'ready_to_send';
 
               return (
                 <Card 
@@ -372,6 +369,7 @@ export default function NewsletterPage() {
                   {/* Status color bar at top */}
                   <div className={`h-1 w-full ${
                     newsletter.status === 'sent' ? 'bg-green-500' :
+                    newsletter.status === 'ready_to_send' ? 'bg-blue-500' :
                     newsletter.status === 'scheduled' ? 'bg-blue-500' :
                     newsletter.status === 'sending' ? 'bg-purple-500' :
                     'bg-amber-400'
@@ -389,53 +387,23 @@ export default function NewsletterPage() {
                             {newsletter.subject}
                           </p>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="shrink-0 flex flex-col items-end gap-1.5">
                           {getStatusBadge(newsletter.status)}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                              <DropdownMenuItem onClick={() => setLocation(`/newsletters/${newsletter.id}`)}>
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setPreviewNewsletter(newsletter)}>
-                                <Eye className="h-4 w-4 mr-2" />
-                                Preview
-                              </DropdownMenuItem>
-                              {isDraft && (
-                                <DropdownMenuItem onClick={() => setLocation(`/newsletter/create/${newsletter.id}`)}>
-                                  <Pencil className="h-4 w-4 mr-2" />
-                                  Edit in Designer
-                                </DropdownMenuItem>
-                              )}
-                              {!isSent && (
-                                <DropdownMenuItem onClick={() => setLocation(`/newsletter/edit/${newsletter.id}`)}>
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit Settings
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem
-                                onClick={() => cloneMutation.mutate(newsletter.id)}
-                                disabled={cloneMutation.isPending}
-                                data-testid={`button-copy-design-${newsletter.id}`}
-                              >
-                                <Copy className="h-4 w-4 mr-2" />
-                                {cloneMutation.isPending ? "Copying..." : "Copy Design"}
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                className="text-red-600 focus:text-red-600"
-                                onClick={() => setDeleteId(newsletter.id)}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          {isReadyToSend && (
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700 text-white border-green-700"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deployMutation.mutate(newsletter.id);
+                              }}
+                              disabled={deployMutation.isPending}
+                              data-testid={`button-send-now-${newsletter.id}`}
+                            >
+                              <Send className="h-4 w-4 mr-1.5" />
+                              {deployMutation.isPending ? "Sending..." : "Send Now"}
+                            </Button>
+                          )}
                         </div>
                       </div>
 

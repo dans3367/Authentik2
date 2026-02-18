@@ -3,6 +3,7 @@ import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { authenticateToken } from '../middleware/auth-middleware';
 import { createHmac } from 'crypto';
+import { trackNewsletterEvent } from '../utils/convexNewsletterTracker';
 
 export const webhookRoutes = Router();
 
@@ -268,6 +269,17 @@ async function handleEmailSent(data: any) {
       await updateContactMetrics(emailSend.contactId, 'sent');
     }
 
+    // Track in Convex for live updates (fire-and-forget)
+    if (emailSend.newsletterId) {
+      trackNewsletterEvent({
+        tenantId: emailSend.tenantId,
+        newsletterId: emailSend.newsletterId,
+        recipientEmail: emailSend.recipientEmail,
+        providerMessageId,
+        eventType: 'sent',
+      }).catch(() => {});
+    }
+
     console.log(`Successfully processed sent event for email_send: ${emailSend.id}`);
   } catch (error) {
     console.error('Error handling email sent event:', error);
@@ -311,6 +323,17 @@ async function handleEmailDelivered(data: any) {
       await updateContactMetrics(emailSend.contactId, 'delivered');
     }
 
+    // Track in Convex for live updates (fire-and-forget)
+    if (emailSend.newsletterId) {
+      trackNewsletterEvent({
+        tenantId: emailSend.tenantId,
+        newsletterId: emailSend.newsletterId,
+        recipientEmail: emailSend.recipientEmail,
+        providerMessageId,
+        eventType: 'delivered',
+      }).catch(() => {});
+    }
+
     console.log(`Successfully processed delivered event for email_send: ${emailSend.id}`);
   } catch (error) {
     console.error('Error handling email delivered event:', error);
@@ -341,6 +364,17 @@ async function handleEmailBounced(data: any) {
 
         // Create email_events record
         await createEmailEvent(emailSend.id, data, 'bounced');
+
+        // Track in Convex for live updates (fire-and-forget)
+        if (emailSend.newsletterId) {
+          trackNewsletterEvent({
+            tenantId: emailSend.tenantId,
+            newsletterId: emailSend.newsletterId,
+            recipientEmail: emailSend.recipientEmail,
+            providerMessageId,
+            eventType: 'bounced',
+          }).catch(() => {});
+        }
 
         console.log(`Updated email_send ${emailSend.id} as bounced`);
       }
@@ -378,18 +412,34 @@ async function handleEmailComplained(data: any) {
     const reason = 'spam_complaint';
     const description = 'Spam complaint received';
 
+    // Derive tenantId from the originating email_send record
+    let sourceTenantId: string | null = null;
+
     // Update email_sends if we have provider_message_id
     if (providerMessageId) {
       const emailSend = await findEmailSendByProviderId(providerMessageId);
       if (emailSend) {
+        sourceTenantId = emailSend.tenantId || null;
+
         // Create email_events record
         await createEmailEvent(emailSend.id, data, 'complained');
+
+        // Track in Convex for live updates (fire-and-forget)
+        if (emailSend.newsletterId) {
+          trackNewsletterEvent({
+            tenantId: emailSend.tenantId,
+            newsletterId: emailSend.newsletterId,
+            recipientEmail: emailSend.recipientEmail,
+            providerMessageId,
+            eventType: 'complained',
+          }).catch(() => {});
+        }
 
         console.log(`Recorded complaint event for email_send ${emailSend.id}`);
       }
     }
 
-    // Add to bounced emails table
+    // Add to bounced emails table with tenant-scoped complaint
     if (email) {
       // Check if already exists
       const existingBounce = await db.query.bouncedEmails.findFirst({
@@ -399,11 +449,14 @@ async function handleEmailComplained(data: any) {
       if (!existingBounce) {
         await db.insert(db.bouncedEmails).values({
           email,
-          reason,
-          description,
-          bouncedAt: new Date(),
+          bounceType: 'complaint',
+          bounceReason: description,
+          firstBouncedAt: new Date(),
+          lastBouncedAt: new Date(),
+          sourceTenantId: sourceTenantId,
+          suppressionReason: reason,
         });
-        console.log(`Added spam complaint: ${email}`);
+        console.log(`Added spam complaint: ${email} (sourceTenantId=${sourceTenantId || 'unknown'})`);
       }
     }
   } catch (error) {
@@ -439,6 +492,18 @@ async function handleEmailOpened(data: any) {
       await updateContactMetrics(emailSend.contactId, 'opened');
     }
 
+    // Track in Convex for live updates (fire-and-forget)
+    if (emailSend.newsletterId) {
+      trackNewsletterEvent({
+        tenantId: emailSend.tenantId,
+        newsletterId: emailSend.newsletterId,
+        recipientEmail: emailSend.recipientEmail,
+        providerMessageId,
+        eventType: 'opened',
+        metadata: { userAgent: data.user_agent, ipAddress: data.ip_address },
+      }).catch(() => {});
+    }
+
     console.log(`Successfully processed opened event for email_send: ${emailSend.id}`);
   } catch (error) {
     console.error('Error handling email opened event:', error);
@@ -471,6 +536,18 @@ async function handleEmailClicked(data: any) {
     // Update contact metrics if contact is linked
     if (emailSend.contactId) {
       await updateContactMetrics(emailSend.contactId, 'clicked');
+    }
+
+    // Track in Convex for live updates (fire-and-forget)
+    if (emailSend.newsletterId) {
+      trackNewsletterEvent({
+        tenantId: emailSend.tenantId,
+        newsletterId: emailSend.newsletterId,
+        recipientEmail: emailSend.recipientEmail,
+        providerMessageId,
+        eventType: 'clicked',
+        metadata: { userAgent: data.user_agent, ipAddress: data.ip_address, link: data.link || data.click?.link },
+      }).catch(() => {});
     }
 
     console.log(`Successfully processed clicked event for email_send: ${emailSend.id}`);

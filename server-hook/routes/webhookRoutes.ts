@@ -381,10 +381,24 @@ async function handleEmailComplained(data: any) {
   try {
     console.log('Email complained event:', data);
     
-    // Add to bounced emails table with spam complaint reason
     const email = data.email || data.Email;
-    const bounceType = 'complaint';
     const bounceReason = 'Spam complaint received';
+
+    // Try to derive sourceTenantId from the most recent email_send to this address
+    let sourceTenantId: string | null = null;
+    if (email) {
+      try {
+        const recentSend = await db.query.emailSends.findFirst({
+          where: sql`${schema.emailSends.recipientEmail} = ${email}`,
+          orderBy: sql`${schema.emailSends.createdAt} DESC`,
+        });
+        if (recentSend) {
+          sourceTenantId = recentSend.tenantId || null;
+        }
+      } catch (lookupErr) {
+        console.warn('Could not derive sourceTenantId for complaint:', lookupErr);
+      }
+    }
 
     if (email) {
       // Check if already exists
@@ -395,12 +409,14 @@ async function handleEmailComplained(data: any) {
       if (!existingBounce) {
         await db.insert(schema.bouncedEmails).values({
           email,
-          bounceType,
+          bounceType: 'complaint',
           bounceReason,
           firstBouncedAt: new Date(),
           lastBouncedAt: new Date(),
+          sourceTenantId: sourceTenantId,
+          suppressionReason: 'spam_complaint',
         });
-        console.log(`Added spam complaint: ${email}`);
+        console.log(`Added spam complaint: ${email} (sourceTenantId=${sourceTenantId || 'unknown'})`);
       }
     }
   } catch (error) {

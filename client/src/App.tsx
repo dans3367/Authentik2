@@ -2,6 +2,7 @@ import { Switch, Route, useLocation } from "wouter";
 import { Provider } from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { store, persistor } from "@/store";
 import { queryClient } from "@/lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
@@ -11,6 +12,10 @@ import { AppLayout } from "@/components/AppLayout";
 import { setGlobalNavigate } from "@/lib/authErrorHandler";
 import { lazy, Suspense, useEffect, useState, Component, ReactNode } from "react";
 import { useAuthErrorHandler, setGlobalAuthErrorHandler } from "@/hooks/useAuthErrorHandler";
+
+// Initialize Convex client for real-time newsletter tracking
+const convexUrl = import.meta.env.VITE_CONVEX_URL;
+const convex = convexUrl ? new ConvexReactClient(convexUrl) : null;
 
 // Lazy load components for code splitting
 const AuthPage = lazy(() => import("@/pages/auth"));
@@ -265,6 +270,13 @@ function Router() {
   );
 }
 
+function AppWithProviders({ children }: { children: ReactNode }) {
+  if (convex) {
+    return <ConvexProvider client={convex}>{children}</ConvexProvider>;
+  }
+  return <>{children}</>;
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -278,10 +290,12 @@ function App() {
           persistor={persistor}
         >
           <QueryClientProvider client={queryClient}>
-            <TooltipProvider>
-              <Toaster />
-              <Router />
-            </TooltipProvider>
+            <AppWithProviders>
+              <TooltipProvider>
+                <Toaster />
+                <Router />
+              </TooltipProvider>
+            </AppWithProviders>
           </QueryClientProvider>
         </PersistGate>
       </Provider>

@@ -1,6 +1,7 @@
 import { task, wait, logger } from "@trigger.dev/sdk/v3";
 import { Resend } from "resend";
 import { z } from "zod";
+import { DB_RETRY_CONFIG, dbConnectionCatchError } from "./retryStrategy";
 
 // Initialize Resend for email sending
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -51,12 +52,8 @@ export type BatchEmailPayload = z.infer<typeof batchEmailPayloadSchema>;
 export const sendEmailTask = task({
   id: "send-email",
   maxDuration: 60,
-  retry: {
-    maxAttempts: 3,
-    minTimeoutInMs: 1000,
-    maxTimeoutInMs: 10000,
-    factor: 2,
-  },
+  retry: DB_RETRY_CONFIG,
+  catchError: dbConnectionCatchError,
   run: async (payload: EmailPayload) => {
     const data = emailPayloadSchema.parse(payload);
 
@@ -236,9 +233,8 @@ export const sendEmailTask = task({
 export const sendBatchEmailsTask = task({
   id: "send-batch-emails",
   maxDuration: 600, // 10 minutes for large batches
-  retry: {
-    maxAttempts: 2,
-  },
+  retry: DB_RETRY_CONFIG,
+  catchError: dbConnectionCatchError,
   run: async (payload: BatchEmailPayload) => {
     const data = batchEmailPayloadSchema.parse(payload);
     const { emails, from, batchSize, delayBetweenBatches } = data;
@@ -315,9 +311,8 @@ export const sendBatchEmailsTask = task({
 export const scheduleEmailTask = task({
   id: "schedule-email",
   maxDuration: 86400, // 24 hours max
-  retry: {
-    maxAttempts: 2,
-  },
+  retry: DB_RETRY_CONFIG,
+  catchError: dbConnectionCatchError,
   run: async (payload: EmailPayload & { scheduledFor: string }) => {
     const data = emailPayloadSchema.parse(payload);
 
@@ -377,12 +372,8 @@ export type PromotionalEmailPayload = z.infer<typeof promotionalEmailPayloadSche
 export const schedulePromotionalEmailTask = task({
   id: "schedule-promotional-email",
   maxDuration: 300, // 5 minutes max
-  retry: {
-    maxAttempts: 3,
-    minTimeoutInMs: 1000,
-    maxTimeoutInMs: 10000,
-    factor: 2,
-  },
+  retry: DB_RETRY_CONFIG,
+  catchError: dbConnectionCatchError,
   run: async (payload: PromotionalEmailPayload) => {
     const data = promotionalEmailPayloadSchema.parse(payload);
 

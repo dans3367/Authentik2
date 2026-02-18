@@ -2,6 +2,18 @@ import { task, wait, logger, metadata } from "@trigger.dev/sdk/v3";
 import { Resend } from "resend";
 import { createHmac } from "crypto";
 import { z } from "zod";
+import { ConvexHttpClient } from "convex/browser";
+import { DB_RETRY_CONFIG, dbConnectionCatchError } from "./retryStrategy";
+
+// Convex client for newsletter tracking (lazy init)
+let convexClient: ConvexHttpClient | null = null;
+function getConvex(): ConvexHttpClient | null {
+  if (convexClient) return convexClient;
+  const url = process.env.CONVEX_URL;
+  if (!url) return null;
+  convexClient = new ConvexHttpClient(url);
+  return convexClient;
+}
 
 // Initialize Resend for email sending
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -42,8 +54,13 @@ async function updateNewsletterStatusInternal(
   status: string,
   stats: { sentCount: number; failedCount: number; totalCount: number }
 ): Promise<void> {
-  const apiUrl = process.env.API_URL || "http://localhost:5000";
+  const apiUrl = process.env.API_URL;
   const secret = process.env.INTERNAL_SERVICE_SECRET;
+
+  // Use web.zendwise.work as base host for status updates when API_URL points to localhost
+  const baseUrl = (!apiUrl || apiUrl.includes("localhost") || apiUrl.includes("127.0.0.1"))
+    ? "https://web.zendwise.work"
+    : apiUrl;
 
   if (!secret) {
     logger.warn("INTERNAL_SERVICE_SECRET not configured, skipping status update");
@@ -56,7 +73,7 @@ async function updateNewsletterStatusInternal(
   const signature = createHmac("sha256", secret).update(signaturePayload).digest("hex");
 
   try {
-    const response = await fetch(`${apiUrl}/api/newsletters/internal/${newsletterId}/status`, {
+    const response = await fetch(`${baseUrl}/api/newsletters/internal/${newsletterId}/status`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -81,8 +98,13 @@ async function updateNewsletterStatusInternal(
  * Check if an email is suppressed (bounced/unsubscribed)
  */
 async function getSuppressionList(tenantId: string): Promise<Set<string>> {
-  const apiUrl = process.env.API_URL || "http://localhost:5000";
+  const apiUrl = process.env.API_URL;
   const secret = process.env.INTERNAL_SERVICE_SECRET;
+
+  // Use web.zendwise.work as base host for suppression checks when API_URL points to localhost
+  const baseUrl = (!apiUrl || apiUrl.includes("localhost") || apiUrl.includes("127.0.0.1"))
+    ? "https://web.zendwise.work"
+    : apiUrl;
 
   if (!secret) {
     logger.warn("INTERNAL_SERVICE_SECRET not configured, skipping suppression check");
@@ -90,11 +112,11 @@ async function getSuppressionList(tenantId: string): Promise<Set<string>> {
   }
 
   const timestamp = Date.now();
-  const signaturePayload = `${timestamp}.{}`;
+  const signaturePayload = `${timestamp}.${JSON.stringify({})}`;
   const signature = createHmac("sha256", secret).update(signaturePayload).digest("hex");
 
   try {
-    const response = await fetch(`${apiUrl}/api/newsletters/internal/suppression-list?tenantId=${tenantId}`, {
+    const response = await fetch(`${baseUrl}/api/newsletters/internal/suppression-list?tenantId=${tenantId}`, {
       method: "GET",
       headers: {
         "x-internal-service": "trigger.dev",
@@ -106,9 +128,11 @@ async function getSuppressionList(tenantId: string): Promise<Set<string>> {
     if (response.ok) {
       const data = await response.json();
       return new Set((data.emails || []).map((e: string) => e.toLowerCase()));
+    } else {
+      logger.warn(`Suppression list API returned ${response.status}, proceeding without suppression check`);
     }
   } catch (err) {
-    logger.warn(`Error fetching suppression list: ${err}`);
+    logger.warn(`Error fetching suppression list (non-fatal, emails will still send): ${err}`);
   }
 
   return new Set();
@@ -120,12 +144,8 @@ async function getSuppressionList(tenantId: string): Promise<Set<string>> {
 export const sendNewsletterEmailTask = task({
   id: "send-newsletter-email",
   maxDuration: 60,
-  retry: {
-    maxAttempts: 3,
-    minTimeoutInMs: 1000,
-    maxTimeoutInMs: 10000,
-    factor: 2,
-  },
+  retry: DB_RETRY_CONFIG,
+  catchError: dbConnectionCatchError,
   run: async (payload: {
     newsletterId: string;
     groupUUID: string;
@@ -202,9 +222,8 @@ export const sendNewsletterEmailTask = task({
 export const processNewsletterBatchTask = task({
   id: "process-newsletter-batch",
   maxDuration: 300, // 5 minutes per batch
-  retry: {
-    maxAttempts: 2,
-  },
+  retry: DB_RETRY_CONFIG,
+  catchError: dbConnectionCatchError,
   run: async (payload: {
     newsletterId: string;
     groupUUID: string;
@@ -262,7 +281,7 @@ export const processNewsletterBatchTask = task({
 
       // Small delay between emails to avoid rate limiting
       if (i < recipients.length - 1) {
-        await wait.for({ milliseconds: 500 });
+        await wait.for({ seconds: 0.5 });
       }
     }
 
@@ -291,9 +310,8 @@ export const processNewsletterBatchTask = task({
 export const sendNewsletterTask = task({
   id: "send-newsletter",
   maxDuration: 3600, // 1 hour max for large newsletters
-  retry: {
-    maxAttempts: 2,
-  },
+  retry: DB_RETRY_CONFIG,
+  catchError: dbConnectionCatchError,
   run: async (payload: NewsletterJobPayload) => {
     const data = newsletterJobSchema.parse(payload);
 
@@ -322,6 +340,21 @@ export const sendNewsletterTask = task({
 
     metadata.set("status", "filtering");
 
+    // Initialize Convex newsletter tracking (fire-and-forget)
+    try {
+      const convex = getConvex();
+      if (convex) {
+        await convex.mutation("newsletterTracking:initNewsletterSend" as any, {
+          tenantId: data.tenantId,
+          newsletterId: data.newsletterId,
+          totalRecipients: data.recipients.length,
+        });
+        logger.info("Convex tracking initialized");
+      }
+    } catch (err) {
+      logger.warn("Failed to init Convex tracking (non-fatal)", { error: String(err) });
+    }
+
     // Filter out suppressed emails
     const suppressedEmails = await getSuppressionList(data.tenantId);
     const validRecipients = data.recipients.filter(
@@ -339,6 +372,22 @@ export const sendNewsletterTask = task({
 
     if (validRecipients.length === 0) {
       logger.warn("No valid recipients after filtering");
+      
+      // Complete Convex tracking since no emails will be sent
+      try {
+        const convex = getConvex();
+        if (convex) {
+          await convex.mutation("newsletterTracking:completeNewsletterSend" as any, {
+            newsletterId: data.newsletterId,
+            sentCount: 0,
+            failedCount: 0,
+          });
+          logger.info("Convex tracking completed for zero recipients");
+        }
+      } catch (err) {
+        logger.warn("Failed to complete Convex tracking for zero recipients (non-fatal)", { error: String(err) });
+      }
+      
       await updateNewsletterStatusInternal(data.newsletterId, "sent", {
         sentCount: 0,
         failedCount: 0,
@@ -385,8 +434,21 @@ export const sendNewsletterTask = task({
         const recipient = batch[j];
 
         try {
+          // Verify Resend API key is configured
+          if (!process.env.RESEND_API_KEY) {
+            logger.error("RESEND_API_KEY is not configured in Trigger.dev environment");
+          }
+
+          const fromEmail = data.from || process.env.EMAIL_FROM || "admin@zendwise.com";
+          logger.info(`Sending email via Resend`, {
+            to: recipient.email,
+            from: fromEmail,
+            subject: data.subject,
+            hasApiKey: !!process.env.RESEND_API_KEY,
+          });
+
           const { data: emailData, error } = await resend.emails.send({
-            from: data.from || process.env.EMAIL_FROM || "admin@zendwise.com",
+            from: fromEmail,
             to: recipient.email,
             subject: data.subject,
             html: data.content,
@@ -400,16 +462,70 @@ export const sendNewsletterTask = task({
             ],
           });
 
+          logger.info("Resend API response", {
+            emailId: emailData?.id,
+            error: error ? JSON.stringify(error) : null,
+            hasData: !!emailData,
+          });
+
           if (error) {
             totalFailed++;
             errors.push({ email: recipient.email, error: error.message });
+
+            // Track failed send in Convex
+            try {
+              const convex = getConvex();
+              if (convex) {
+                await convex.mutation("newsletterTracking:trackEmailSend" as any, {
+                  tenantId: data.tenantId,
+                  newsletterId: data.newsletterId,
+                  groupUUID: data.groupUUID,
+                  recipientEmail: recipient.email,
+                  recipientId: recipient.id,
+                  status: "failed",
+                  error: error.message,
+                });
+              }
+            } catch (_) {}
           } else {
             totalSent++;
+
+            // Track successful send in Convex
+            try {
+              const convex = getConvex();
+              if (convex) {
+                await convex.mutation("newsletterTracking:trackEmailSend" as any, {
+                  tenantId: data.tenantId,
+                  newsletterId: data.newsletterId,
+                  groupUUID: data.groupUUID,
+                  recipientEmail: recipient.email,
+                  recipientId: recipient.id,
+                  providerMessageId: emailData?.id,
+                  status: "queued",
+                });
+              }
+            } catch (_) {}
           }
         } catch (err) {
           totalFailed++;
           const errorMessage = err instanceof Error ? err.message : "Unknown error";
           errors.push({ email: recipient.email, error: errorMessage });
+
+          // Track error in Convex
+          try {
+            const convex = getConvex();
+            if (convex) {
+              await convex.mutation("newsletterTracking:trackEmailSend" as any, {
+                tenantId: data.tenantId,
+                newsletterId: data.newsletterId,
+                groupUUID: data.groupUUID,
+                recipientEmail: recipient.email,
+                recipientId: recipient.id,
+                status: "failed",
+                error: errorMessage,
+              });
+            }
+          } catch (_) {}
         }
 
         // Update progress
@@ -421,13 +537,13 @@ export const sendNewsletterTask = task({
 
         // Small delay between emails
         if (j < batch.length - 1) {
-          await wait.for({ milliseconds: 500 });
+          await wait.for({ seconds: 0.5 });
         }
       }
 
       // Delay between batches
       if (i < batches.length - 1) {
-        await wait.for({ milliseconds: 2000 });
+        await wait.for({ seconds: 2 });
       }
     }
 
@@ -440,6 +556,20 @@ export const sendNewsletterTask = task({
       failedCount: totalFailed,
       totalCount: validRecipients.length,
     });
+
+    // Complete Convex tracking
+    try {
+      const convex = getConvex();
+      if (convex) {
+        await convex.mutation("newsletterTracking:completeNewsletterSend" as any, {
+          newsletterId: data.newsletterId,
+          sentCount: totalSent,
+          failedCount: totalFailed,
+        });
+      }
+    } catch (err) {
+      logger.warn("Failed to complete Convex tracking (non-fatal)", { error: String(err) });
+    }
 
     logger.info("Newsletter send completed", {
       jobId: data.jobId,
@@ -467,9 +597,8 @@ export const sendNewsletterTask = task({
 export const scheduleNewsletterTask = task({
   id: "schedule-newsletter",
   maxDuration: 86400, // 24 hours max
-  retry: {
-    maxAttempts: 2,
-  },
+  retry: DB_RETRY_CONFIG,
+  catchError: dbConnectionCatchError,
   run: async (payload: NewsletterJobPayload & { scheduledFor: string }) => {
     const data = newsletterJobSchema.parse(payload);
 

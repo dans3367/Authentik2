@@ -1,6 +1,7 @@
 import { task, wait, logger } from "@trigger.dev/sdk/v3";
 import { Resend } from "resend";
 import { z } from "zod";
+import { DB_RETRY_CONFIG, dbConnectionCatchError } from "./retryStrategy";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -41,12 +42,8 @@ export const scheduleContactEmailTask = task({
   id: "schedule-contact-email",
   // Allow scheduling up to 30 days out
   maxDuration: 2592000,
-  retry: {
-    maxAttempts: 3,
-    minTimeoutInMs: 2000,
-    maxTimeoutInMs: 30000,
-    factor: 2,
-  },
+  retry: DB_RETRY_CONFIG,
+  catchError: dbConnectionCatchError,
   run: async (payload: ScheduleContactEmailPayload) => {
     const data = scheduleContactEmailPayloadSchema.parse(payload);
 

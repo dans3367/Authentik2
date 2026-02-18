@@ -20,13 +20,13 @@ import {
   RefreshCw,
   Newspaper,
   Tag,
-  Settings,
   Activity,
   BarChart3,
   List,
   ExternalLink,
   History,
   Loader2,
+  Search,
   X
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +36,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -48,6 +49,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format, formatDistanceToNow } from "date-fns";
 import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
 import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
+import { LiveTrackingPanel } from "@/components/newsletter/LiveTrackingPanel";
 import type { NewsletterWithUser, NewsletterTaskStatus } from "@shared/schema";
 
 // Using real task status data from backend via NewsletterTaskStatus type
@@ -67,6 +69,8 @@ export default function NewsletterViewPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("overview");
+  const [showRecipientsModal, setShowRecipientsModal] = useState(false);
+  const [recipientSearch, setRecipientSearch] = useState("");
   const [trajectoryModalOpen, setTrajectoryModalOpen] = useState(false);
   const [selectedTrajectory, setSelectedTrajectory] = useState<any>(null);
   const tasksInitializedRef = useRef(false);
@@ -81,12 +85,52 @@ export default function NewsletterViewPage() {
     },
     enabled: !!id,
     refetchInterval: (query) => {
-      // Auto-refresh every 10 seconds if newsletter is sent to get latest engagement metrics
-      return query.state.data?.newsletter?.status === 'sent' ? 10000 : false;
+      const status = query.state.data?.newsletter?.status;
+      // Auto-refresh every 5 seconds while sending, every 10 seconds when sent
+      if (status === 'sending') return 5000;
+      if (status === 'sent') return 10000;
+      return false;
     },
   });
 
   const newsletter = (newsletterData as { newsletter: NewsletterWithUser & { opens?: number; totalOpens?: number } } | undefined)?.newsletter;
+
+  const sendNowMutation = useMutation({
+    mutationFn: async (newsletterId: string) => {
+      const response = await apiRequest('POST', `/api/newsletters/${newsletterId}/send`);
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({
+        title: "Newsletter Sent",
+        description: data.message || "Newsletter is now being sent to recipients.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Send Failed",
+        description: error.message || "Failed to send newsletter",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const { data: recipientsData, isLoading: recipientsLoading } = useQuery<{ recipients: Array<{ id: string; email: string; firstName: string; lastName: string }>; total: number }>({
+    queryKey: ['/api/newsletters', id, 'recipients'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/newsletters/${id}/recipients`);
+      return response.json();
+    },
+    enabled: !!id && showRecipientsModal,
+  });
+
+  const recipientsList = recipientsData?.recipients || [];
+  const filteredRecipients = recipientsList.filter((r) =>
+    r.email.toLowerCase().includes(recipientSearch.toLowerCase()) ||
+    `${r.firstName} ${r.lastName}`.toLowerCase().includes(recipientSearch.toLowerCase())
+  );
 
   // Fetch task status data
   const { data: taskStatusData, isLoading: isTaskStatusLoading } = useQuery<{ taskStatuses: NewsletterTaskStatus[] }>({
@@ -359,14 +403,17 @@ export default function NewsletterViewPage() {
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       draft: { label: 'Draft', variant: 'secondary' as const, icon: Edit },
+      ready_to_send: { label: 'Ready to Send', variant: 'outline' as const, icon: Send, className: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800' },
       scheduled: { label: 'Scheduled', variant: 'outline' as const, icon: Clock },
+      sending: { label: 'Sending', variant: 'outline' as const, icon: Send },
       sent: { label: 'Sent', variant: 'default' as const, icon: CheckCircle },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
     const Icon = config.icon;
+    const extraClass = 'className' in config ? (config as any).className : '';
     return (
-      <Badge variant={config.variant} className="flex items-center gap-1">
+      <Badge variant={config.variant} className={`flex items-center gap-1 ${extraClass}`}>
         <Icon className="h-3 w-3" strokeWidth={1.5} />
         {config.label}
       </Badge>
@@ -422,14 +469,18 @@ export default function NewsletterViewPage() {
     
     switch (stepKey) {
       case 'validation':
-        // Content validation completes immediately for sent newsletters, or runs for scheduled
-        if (newsletter.status === 'sent') return 'completed';
+        // Content validation completes once sending begins or newsletter is sent
+        if (newsletter.status === 'sent' || newsletter.status === 'sending') return 'completed';
+        if (newsletter.status === 'ready_to_send') return 'completed';
         if (newsletter.status === 'scheduled') return 'running';
         return 'pending';
         
       case 'delivery':
         // Email delivery is completed if newsletter is sent
         if (newsletter.status === 'sent') return 'completed';
+        // Delivery is in progress if newsletter is currently sending
+        if (newsletter.status === 'sending') return 'running';
+        if (newsletter.status === 'ready_to_send') return 'pending';
         if (newsletter.status === 'scheduled') return 'pending';
         return 'pending';
         
@@ -442,7 +493,7 @@ export default function NewsletterViewPage() {
         const hoursSinceSent = (now.getTime() - sentTime.getTime()) / (1000 * 60 * 60);
         
         if (hoursSinceSent >= 24) return 'completed';
-        if (newsletter.status === 'sent') return 'running';
+        if (newsletter.status === 'sent' || newsletter.status === 'sending') return 'running';
         return 'pending';
         
       default:
@@ -454,7 +505,9 @@ export default function NewsletterViewPage() {
     if (!newsletter) return 1;
     
     if (newsletter.status === 'draft') return 1;
+    if (newsletter.status === 'ready_to_send') return 1;
     if (newsletter.status === 'scheduled') return 1;
+    if (newsletter.status === 'sending') return 2; // Delivery in progress
     if (newsletter.status === 'sent') {
       // Check analytics completion
       if (getTaskStepStatus('analytics') === 'completed') return 4; // All done
@@ -558,8 +611,23 @@ export default function NewsletterViewPage() {
                 <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 truncate sm:flex-1">
                   {newsletter.title}
                 </h1>
-                <div className="sm:flex-shrink-0">
+                <div className="sm:flex-shrink-0 flex flex-col items-start sm:items-end gap-1.5">
                   {getStatusBadge(newsletter.status)}
+                  {newsletter.status === 'ready_to_send' && (
+                    <Button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        sendNowMutation.mutate(newsletter.id);
+                      }}
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 text-white border-green-700"
+                      disabled={sendNowMutation.isPending}
+                      data-testid="button-send-now"
+                    >
+                      <Send className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                      {sendNowMutation.isPending ? "Sending..." : "Send Now"}
+                    </Button>
+                  )}
                 </div>
               </div>
               <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 break-words">
@@ -581,10 +649,6 @@ export default function NewsletterViewPage() {
                 <span className="sm:inline">Edit</span>
               </Button>
             )}
-            <Button onClick={() => window.print()} variant="outline" size="sm" className="w-full sm:w-auto" data-testid="button-options">
-              <Settings className="h-4 w-4 mr-2" strokeWidth={1.5} />
-              <span className="sm:inline">Options</span>
-            </Button>
           </div>
         </div>
 
@@ -699,14 +763,22 @@ export default function NewsletterViewPage() {
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 lg:space-y-8">
           <div className="overflow-x-auto">
-            <TabsList className="grid w-full grid-cols-5 min-w-max">
+            <TabsList className="grid w-full grid-cols-6 min-w-max">
               <TabsTrigger value="overview" className="text-xs sm:text-sm" data-testid="tab-overview">Overview</TabsTrigger>
+              <TabsTrigger value="live-tracking" className="text-xs sm:text-sm" data-testid="tab-live-tracking">
+                <Activity className="h-3 w-3 mr-1" />
+                Live
+              </TabsTrigger>
               <TabsTrigger value="content" className="text-xs sm:text-sm" data-testid="tab-content">Content</TabsTrigger>
               <TabsTrigger value="status" className="text-xs sm:text-sm" data-testid="tab-status">Task Status</TabsTrigger>
               <TabsTrigger value="analytics" className="text-xs sm:text-sm" data-testid="tab-analytics">Analytics</TabsTrigger>
               <TabsTrigger value="detailed-stats" className="text-xs sm:text-sm" data-testid="tab-detailed-stats">Detailed Stats</TabsTrigger>
             </TabsList>
           </div>
+
+        <TabsContent value="live-tracking" className="space-y-6 lg:space-y-8">
+          <LiveTrackingPanel newsletterId={newsletter.id} />
+        </TabsContent>
 
         <TabsContent value="overview" className="space-y-6 lg:space-y-8">
           <div className="grid gap-4 lg:gap-6 md:grid-cols-2">
@@ -771,31 +843,36 @@ export default function NewsletterViewPage() {
                   </div>
                 </div>
 
-                {(newsletter.recipientType !== 'all' || newsletter.selectedContactIds?.length || newsletter.selectedTagIds?.length) && (
-                  <>
-                    <Separator />
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Targeting</p>
-                      <div className="space-y-2">
-                        <Badge variant="outline">
-                          <Tag className="h-3 w-3 mr-1" />
-                          {newsletter.recipientType === 'all' ? 'All Contacts' : 
-                           newsletter.recipientType === 'selected' ? 'Selected Contacts' : 'Tagged Contacts'}
-                        </Badge>
-                        {newsletter.selectedContactIds?.length && (
-                          <p className="text-xs text-gray-500">
-                            {newsletter.selectedContactIds.length} specific contacts
-                          </p>
-                        )}
-                        {newsletter.selectedTagIds?.length && (
-                          <p className="text-xs text-gray-500">
-                            {newsletter.selectedTagIds.length} tag groups
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
+                <Separator />
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Targeting</p>
+                  <div className="space-y-2">
+                    <Badge variant="outline">
+                      <Tag className="h-3 w-3 mr-1" />
+                      {newsletter.recipientType === 'all' ? 'All Contacts' : 
+                       newsletter.recipientType === 'selected' ? 'Selected Contacts' : 'Tagged Contacts'}
+                    </Badge>
+                    {newsletter.selectedContactIds?.length ? (
+                      <p className="text-xs text-gray-500">
+                        {newsletter.selectedContactIds.length} specific contacts
+                      </p>
+                    ) : null}
+                    {newsletter.selectedTagIds?.length ? (
+                      <p className="text-xs text-gray-500">
+                        {newsletter.selectedTagIds.length} tag groups
+                      </p>
+                    ) : null}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowRecipientsModal(true)}
+                      data-testid="button-view-recipients"
+                    >
+                      <Users className="h-4 w-4 mr-1.5" />
+                      View Recipients
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
@@ -1643,6 +1720,95 @@ export default function NewsletterViewPage() {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showRecipientsModal} onOpenChange={(open) => { setShowRecipientsModal(open); if (!open) setRecipientSearch(""); }}>
+        <DialogContent
+          className="max-w-lg p-6"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            maxHeight: '85vh',
+            overflow: 'visible',
+          }}
+        >
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" strokeWidth={1.5} />
+              Recipients
+              {recipientsData && (
+                <Badge variant="secondary" className="ml-1">
+                  {recipientsData.total}
+                </Badge>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {newsletter?.recipientType === 'all' ? 'All active contacts' :
+               newsletter?.recipientType === 'selected' ? 'Individually selected contacts' : 'Contacts matching selected tags'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="relative flex-shrink-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder="Search recipients..."
+              value={recipientSearch}
+              onChange={(e) => setRecipientSearch(e.target.value)}
+              className="pl-9"
+              data-testid="input-search-recipients"
+            />
+          </div>
+
+          {recipientSearch && (
+            <p className="text-xs text-muted-foreground flex-shrink-0">
+              {filteredRecipients.length} of {recipientsList.length} shown
+            </p>
+          )}
+
+          <div style={{ flex: 1, minHeight: 0, maxHeight: '400px', overflowY: 'auto' }} className="rounded-lg border">
+            {recipientsLoading ? (
+              <div className="space-y-2 p-4">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : filteredRecipients.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <Mail className="h-8 w-8 text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  {recipientSearch ? "No recipients match your search" : "No recipients found"}
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-border/50">
+                {filteredRecipients.map((recipient) => (
+                  <div
+                    key={recipient.id}
+                    className="flex items-center gap-3 px-4 py-3"
+                    data-testid={`recipient-row-${recipient.id}`}
+                  >
+                    <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-semibold shrink-0">
+                      {(recipient.firstName?.[0] || recipient.email[0] || '').toUpperCase()}
+                      {(recipient.lastName?.[0] || '').toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {(recipient.firstName || recipient.lastName) ? (
+                        <>
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {recipient.firstName} {recipient.lastName}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">{recipient.email}</p>
+                        </>
+                      ) : (
+                        <p className="text-sm font-medium text-foreground truncate">{recipient.email}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
       </div>

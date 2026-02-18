@@ -2,6 +2,7 @@ import { task, logger } from "@trigger.dev/sdk/v3";
 import { Resend } from "resend";
 import { z } from "zod";
 import { wrapInEmailDesign } from "./emailWrapper";
+import { DB_RETRY_CONFIG, dbConnectionCatchError } from "./retryStrategy";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -22,12 +23,8 @@ export type NewsletterPreviewPayload = z.infer<typeof previewPayloadSchema>;
 export const sendNewsletterPreviewTask = task({
   id: "send-newsletter-preview",
   maxDuration: 30,
-  retry: {
-    maxAttempts: 2,
-    minTimeoutInMs: 1000,
-    maxTimeoutInMs: 5000,
-    factor: 2,
-  },
+  retry: DB_RETRY_CONFIG,
+  catchError: dbConnectionCatchError,
   run: async (payload: NewsletterPreviewPayload) => {
     const data = previewPayloadSchema.parse(payload);
 
