@@ -83,6 +83,12 @@ export const trackEmailSend = mutation({
   handler: async (ctx, args) => {
     const now = Date.now();
 
+    // Normalise: treat any non-"failed" status as "queued" so that the
+    // authoritative "sent" transition only happens via webhook
+    // (trackEmailEvent).  This prevents double-counting when the
+    // Trigger.dev task passes status="sent".
+    const effectiveStatus = args.status === "failed" ? "failed" : "queued";
+
     const sendId = await ctx.db.insert("newsletterSends", {
       tenantId: args.tenantId,
       newsletterId: args.newsletterId,
@@ -91,9 +97,8 @@ export const trackEmailSend = mutation({
       recipientId: args.recipientId,
       recipientName: args.recipientName,
       providerMessageId: args.providerMessageId,
-      status: args.status,
+      status: effectiveStatus,
       error: args.error,
-      sentAt: args.status === "sent" ? now : undefined,
       openCount: 0,
       clickCount: 0,
     });
@@ -104,7 +109,7 @@ export const trackEmailSend = mutation({
       newsletterId: args.newsletterId,
       newsletterSendId: sendId,
       recipientEmail: args.recipientEmail,
-      eventType: args.status === "sent" ? "sent" : args.status === "failed" ? "failed" : "queued",
+      eventType: effectiveStatus === "failed" ? "failed" : "queued",
       providerMessageId: args.providerMessageId,
       occurredAt: now,
     });
@@ -117,10 +122,7 @@ export const trackEmailSend = mutation({
 
     if (stats) {
       const updates: any = { lastEventAt: now };
-      if (args.status === "sent") {
-        updates.sent = stats.sent + 1;
-        updates.queued = Math.max(0, stats.queued - 1);
-      } else if (args.status === "failed") {
+      if (effectiveStatus === "failed") {
         updates.failed = stats.failed + 1;
         updates.queued = Math.max(0, stats.queued - 1);
       }
