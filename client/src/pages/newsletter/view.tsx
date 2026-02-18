@@ -26,6 +26,7 @@ import {
   ExternalLink,
   History,
   Loader2,
+  Search,
   X
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +36,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -67,6 +69,8 @@ export default function NewsletterViewPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("overview");
+  const [showRecipientsModal, setShowRecipientsModal] = useState(false);
+  const [recipientSearch, setRecipientSearch] = useState("");
   const [trajectoryModalOpen, setTrajectoryModalOpen] = useState(false);
   const [selectedTrajectory, setSelectedTrajectory] = useState<any>(null);
   const tasksInitializedRef = useRef(false);
@@ -112,6 +116,21 @@ export default function NewsletterViewPage() {
       });
     },
   });
+
+  const { data: recipientsData, isLoading: recipientsLoading } = useQuery<{ recipients: Array<{ id: string; email: string; firstName: string; lastName: string }>; total: number }>({
+    queryKey: ['/api/newsletters', id, 'recipients'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/newsletters/${id}/recipients`);
+      return response.json();
+    },
+    enabled: !!id && showRecipientsModal,
+  });
+
+  const recipientsList = recipientsData?.recipients || [];
+  const filteredRecipients = recipientsList.filter((r) =>
+    r.email.toLowerCase().includes(recipientSearch.toLowerCase()) ||
+    `${r.firstName} ${r.lastName}`.toLowerCase().includes(recipientSearch.toLowerCase())
+  );
 
   // Fetch task status data
   const { data: taskStatusData, isLoading: isTaskStatusLoading } = useQuery<{ taskStatuses: NewsletterTaskStatus[] }>({
@@ -823,31 +842,36 @@ export default function NewsletterViewPage() {
                   </div>
                 </div>
 
-                {(newsletter.recipientType !== 'all' || newsletter.selectedContactIds?.length || newsletter.selectedTagIds?.length) && (
-                  <>
-                    <Separator />
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Targeting</p>
-                      <div className="space-y-2">
-                        <Badge variant="outline">
-                          <Tag className="h-3 w-3 mr-1" />
-                          {newsletter.recipientType === 'all' ? 'All Contacts' : 
-                           newsletter.recipientType === 'selected' ? 'Selected Contacts' : 'Tagged Contacts'}
-                        </Badge>
-                        {newsletter.selectedContactIds?.length && (
-                          <p className="text-xs text-gray-500">
-                            {newsletter.selectedContactIds.length} specific contacts
-                          </p>
-                        )}
-                        {newsletter.selectedTagIds?.length && (
-                          <p className="text-xs text-gray-500">
-                            {newsletter.selectedTagIds.length} tag groups
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
+                <Separator />
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Targeting</p>
+                  <div className="space-y-2">
+                    <Badge variant="outline">
+                      <Tag className="h-3 w-3 mr-1" />
+                      {newsletter.recipientType === 'all' ? 'All Contacts' : 
+                       newsletter.recipientType === 'selected' ? 'Selected Contacts' : 'Tagged Contacts'}
+                    </Badge>
+                    {newsletter.selectedContactIds?.length ? (
+                      <p className="text-xs text-gray-500">
+                        {newsletter.selectedContactIds.length} specific contacts
+                      </p>
+                    ) : null}
+                    {newsletter.selectedTagIds?.length ? (
+                      <p className="text-xs text-gray-500">
+                        {newsletter.selectedTagIds.length} tag groups
+                      </p>
+                    ) : null}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowRecipientsModal(true)}
+                      data-testid="button-view-recipients"
+                    >
+                      <Users className="h-4 w-4 mr-1.5" />
+                      View Recipients
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
@@ -1695,6 +1719,95 @@ export default function NewsletterViewPage() {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showRecipientsModal} onOpenChange={(open) => { setShowRecipientsModal(open); if (!open) setRecipientSearch(""); }}>
+        <DialogContent
+          className="max-w-lg p-6"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            maxHeight: '85vh',
+            overflow: 'visible',
+          }}
+        >
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" strokeWidth={1.5} />
+              Recipients
+              {recipientsData && (
+                <Badge variant="secondary" className="ml-1">
+                  {recipientsData.total}
+                </Badge>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {newsletter?.recipientType === 'all' ? 'All active contacts' :
+               newsletter?.recipientType === 'selected' ? 'Individually selected contacts' : 'Contacts matching selected tags'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="relative flex-shrink-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder="Search recipients..."
+              value={recipientSearch}
+              onChange={(e) => setRecipientSearch(e.target.value)}
+              className="pl-9"
+              data-testid="input-search-recipients"
+            />
+          </div>
+
+          {recipientSearch && (
+            <p className="text-xs text-muted-foreground flex-shrink-0">
+              {filteredRecipients.length} of {recipientsList.length} shown
+            </p>
+          )}
+
+          <div style={{ flex: 1, minHeight: 0, maxHeight: '400px', overflowY: 'auto' }} className="rounded-lg border">
+            {recipientsLoading ? (
+              <div className="space-y-2 p-4">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : filteredRecipients.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <Mail className="h-8 w-8 text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  {recipientSearch ? "No recipients match your search" : "No recipients found"}
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-border/50">
+                {filteredRecipients.map((recipient) => (
+                  <div
+                    key={recipient.id}
+                    className="flex items-center gap-3 px-4 py-3"
+                    data-testid={`recipient-row-${recipient.id}`}
+                  >
+                    <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-semibold shrink-0">
+                      {(recipient.firstName?.[0] || recipient.email[0] || '').toUpperCase()}
+                      {(recipient.lastName?.[0] || '').toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {(recipient.firstName || recipient.lastName) ? (
+                        <>
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {recipient.firstName} {recipient.lastName}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">{recipient.email}</p>
+                        </>
+                      ) : (
+                        <p className="text-sm font-medium text-foreground truncate">{recipient.email}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
       </div>

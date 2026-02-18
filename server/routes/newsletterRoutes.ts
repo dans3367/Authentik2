@@ -325,6 +325,35 @@ newsletterRoutes.get("/:id", authenticateToken, requireTenant, async (req: any, 
   }
 });
 
+newsletterRoutes.get("/:id/recipients", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+
+    const newsletter = await db.query.newsletters.findFirst({
+      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId}`,
+    });
+
+    if (!newsletter) {
+      return res.status(404).json({ message: 'Newsletter not found' });
+    }
+
+    const recipients = await getNewsletterRecipients(newsletter, req.user.tenantId);
+
+    res.json({
+      recipients: recipients.map((r: any) => ({
+        id: r.id,
+        email: r.email,
+        firstName: r.firstName || '',
+        lastName: r.lastName || '',
+      })),
+      total: recipients.length,
+    });
+  } catch (error) {
+    console.error('Get newsletter recipients error:', error);
+    res.status(500).json({ message: 'Failed to get newsletter recipients' });
+  }
+});
+
 // Create newsletter
 newsletterRoutes.post("/", authenticateToken, requireTenant, async (req: any, res) => {
   try {
