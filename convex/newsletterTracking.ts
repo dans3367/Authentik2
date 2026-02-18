@@ -181,6 +181,10 @@ export const trackEmailEvent = mutation({
       const sendUpdates: any = {};
 
       switch (args.eventType) {
+        case "sent":
+          sendUpdates.status = "sent";
+          sendUpdates.sentAt = now;
+          break;
         case "delivered":
           sendUpdates.status = "delivered";
           sendUpdates.deliveredAt = now;
@@ -232,6 +236,10 @@ export const trackEmailEvent = mutation({
       const statsUpdates: any = { lastEventAt: now };
 
       switch (args.eventType) {
+        case "sent":
+          statsUpdates.sent = stats.sent + 1;
+          statsUpdates.queued = Math.max(0, stats.queued - 1);
+          break;
         case "delivered":
           statsUpdates.delivered = stats.delivered + 1;
           break;

@@ -474,7 +474,7 @@ export const sendNewsletterTask = task({
           } else {
             totalSent++;
 
-            // Track successful send in Convex
+            // Track queued send in Convex (actual "sent" status comes via webhook)
             try {
               const convex = getConvex();
               if (convex) {
@@ -485,7 +485,7 @@ export const sendNewsletterTask = task({
                   recipientEmail: recipient.email,
                   recipientId: recipient.id,
                   providerMessageId: emailData?.id,
-                  status: "sent",
+                  status: "queued",
                 });
               }
             } catch (_) {}
