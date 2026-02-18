@@ -403,7 +403,7 @@ export default function NewsletterViewPage() {
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       draft: { label: 'Draft', variant: 'secondary' as const, icon: Edit },
-      ready_to_send: { label: 'Ready to Send', variant: 'outline' as const, icon: Send },
+      ready_to_send: { label: 'Ready to Send', variant: 'outline' as const, icon: Send, className: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800' },
       scheduled: { label: 'Scheduled', variant: 'outline' as const, icon: Clock },
       sending: { label: 'Sending', variant: 'outline' as const, icon: Send },
       sent: { label: 'Sent', variant: 'default' as const, icon: CheckCircle },
@@ -411,8 +411,9 @@ export default function NewsletterViewPage() {
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
     const Icon = config.icon;
+    const extraClass = 'className' in config ? (config as any).className : '';
     return (
-      <Badge variant={config.variant} className="flex items-center gap-1">
+      <Badge variant={config.variant} className={`flex items-center gap-1 ${extraClass}`}>
         <Icon className="h-3 w-3" strokeWidth={1.5} />
         {config.label}
       </Badge>
@@ -610,8 +611,23 @@ export default function NewsletterViewPage() {
                 <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 truncate sm:flex-1">
                   {newsletter.title}
                 </h1>
-                <div className="sm:flex-shrink-0">
+                <div className="sm:flex-shrink-0 flex flex-col items-start sm:items-end gap-1.5">
                   {getStatusBadge(newsletter.status)}
+                  {newsletter.status === 'ready_to_send' && (
+                    <Button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        sendNowMutation.mutate(newsletter.id);
+                      }}
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 text-white border-green-700"
+                      disabled={sendNowMutation.isPending}
+                      data-testid="button-send-now"
+                    >
+                      <Send className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                      {sendNowMutation.isPending ? "Sending..." : "Send Now"}
+                    </Button>
+                  )}
                 </div>
               </div>
               <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 break-words">
@@ -631,21 +647,6 @@ export default function NewsletterViewPage() {
               >
                 <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
                 <span className="sm:inline">Edit</span>
-              </Button>
-            )}
-            {newsletter.status === 'ready_to_send' && (
-              <Button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  sendNowMutation.mutate(newsletter.id);
-                }}
-                size="sm"
-                className="w-full sm:w-auto"
-                disabled={sendNowMutation.isPending}
-                data-testid="button-send-now"
-              >
-                <Send className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                <span className="sm:inline">{sendNowMutation.isPending ? "Sending..." : "Send Now"}</span>
               </Button>
             )}
           </div>
