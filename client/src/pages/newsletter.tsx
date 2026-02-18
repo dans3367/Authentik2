@@ -7,31 +7,19 @@ import {
   Calendar, 
   Eye,
   Clock,
-  MoreHorizontal,
   Users,
   MousePointer,
   Search,
-  Edit,
   LayoutDashboard,
   Trash2,
   Send,
-  FileText,
-  Pencil,
-  Copy,
-  Rocket
+  FileText
 } from "lucide-react";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -120,21 +108,6 @@ export default function NewsletterPage() {
         throw new Error("Failed to fetch email design");
       }
       return response.json();
-    },
-  });
-
-  const cloneMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await apiRequest('POST', `/api/newsletters/${id}/clone`);
-      return response.json();
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
-      toast({ title: "Design copied", description: "Opening the editor with your cloned newsletter." });
-      setLocation(`/newsletter/create/${data.id}`);
-    },
-    onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to copy newsletter design", variant: "destructive" });
     },
   });
 
@@ -415,65 +388,20 @@ export default function NewsletterPage() {
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           {getStatusBadge(newsletter.status)}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                              <DropdownMenuItem onClick={() => setLocation(`/newsletters/${newsletter.id}`)}>
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setPreviewNewsletter(newsletter)}>
-                                <Eye className="h-4 w-4 mr-2" />
-                                Preview
-                              </DropdownMenuItem>
-                              {isDraft && (
-                                <DropdownMenuItem onClick={() => setLocation(`/newsletter/create/${newsletter.id}`)}>
-                                  <Pencil className="h-4 w-4 mr-2" />
-                                  Edit in Designer
-                                </DropdownMenuItem>
-                              )}
-                              {!isSent && (
-                                <DropdownMenuItem onClick={() => setLocation(`/newsletter/edit/${newsletter.id}`)}>
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit Settings
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem
-                                onClick={() => cloneMutation.mutate(newsletter.id)}
-                                disabled={cloneMutation.isPending}
-                                data-testid={`button-copy-design-${newsletter.id}`}
-                              >
-                                <Copy className="h-4 w-4 mr-2" />
-                                {cloneMutation.isPending ? "Copying..." : "Copy Design"}
-                              </DropdownMenuItem>
-                              {isReadyToSend && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onClick={() => deployMutation.mutate(newsletter.id)}
-                                    disabled={deployMutation.isPending}
-                                    className="text-emerald-600 focus:text-emerald-600 focus:bg-emerald-50 dark:focus:bg-emerald-950/30"
-                                    data-testid={`button-deploy-${newsletter.id}`}
-                                  >
-                                    <Rocket className="h-4 w-4 mr-2" />
-                                    {deployMutation.isPending ? "Deploying..." : "Deploy Now"}
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                className="text-red-600 focus:text-red-600"
-                                onClick={() => setDeleteId(newsletter.id)}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          {isReadyToSend && (
+                            <Button
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deployMutation.mutate(newsletter.id);
+                              }}
+                              disabled={deployMutation.isPending}
+                              data-testid={`button-send-now-${newsletter.id}`}
+                            >
+                              <Send className="h-4 w-4 mr-1.5" />
+                              {deployMutation.isPending ? "Sending..." : "Send Now"}
+                            </Button>
+                          )}
                         </div>
                       </div>
 

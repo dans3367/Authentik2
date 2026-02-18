@@ -20,7 +20,6 @@ import {
   RefreshCw,
   Newspaper,
   Tag,
-  Settings,
   Activity,
   BarChart3,
   List,
@@ -91,6 +90,28 @@ export default function NewsletterViewPage() {
   });
 
   const newsletter = (newsletterData as { newsletter: NewsletterWithUser & { opens?: number; totalOpens?: number } } | undefined)?.newsletter;
+
+  const sendNowMutation = useMutation({
+    mutationFn: async (newsletterId: string) => {
+      const response = await apiRequest('POST', `/api/newsletters/${newsletterId}/send`);
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({
+        title: "Newsletter Sent",
+        description: data.message || "Newsletter is now being sent to recipients.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Send Failed",
+        description: error.message || "Failed to send newsletter",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Fetch task status data
   const { data: taskStatusData, isLoading: isTaskStatusLoading } = useQuery<{ taskStatuses: NewsletterTaskStatus[] }>({
@@ -593,10 +614,21 @@ export default function NewsletterViewPage() {
                 <span className="sm:inline">Edit</span>
               </Button>
             )}
-            <Button onClick={() => window.print()} variant="outline" size="sm" className="w-full sm:w-auto" data-testid="button-options">
-              <Settings className="h-4 w-4 mr-2" strokeWidth={1.5} />
-              <span className="sm:inline">Options</span>
-            </Button>
+            {newsletter.status === 'ready_to_send' && (
+              <Button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  sendNowMutation.mutate(newsletter.id);
+                }}
+                size="sm"
+                className="w-full sm:w-auto"
+                disabled={sendNowMutation.isPending}
+                data-testid="button-send-now"
+              >
+                <Send className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                <span className="sm:inline">{sendNowMutation.isPending ? "Sending..." : "Send Now"}</span>
+              </Button>
+            )}
           </div>
         </div>
 
