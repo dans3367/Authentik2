@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { query, internalMutation } from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
 
 // ─── MUTATIONS ───────────────────────────────────────────────────────────────
 
@@ -7,7 +7,7 @@ import { query, internalMutation } from "./_generated/server";
  * Initialize tracking for a newsletter send campaign.
  * Called once when a newsletter starts sending.
  */
-export const initNewsletterSend = internalMutation({
+export const initNewsletterSend = mutation({
   args: {
     tenantId: v.string(),
     newsletterId: v.string(),
@@ -70,7 +70,7 @@ export const initNewsletterSend = internalMutation({
  * Track an individual email being queued/sent within a newsletter.
  * Called for each recipient when the email is dispatched.
  */
-export const trackEmailSend = internalMutation({
+export const trackEmailSend = mutation({
   args: {
     tenantId: v.string(),
     newsletterId: v.string(),
@@ -335,7 +335,7 @@ export const trackEmailEvent = internalMutation({
 /**
  * Mark a newsletter send campaign as completed.
  */
-export const completeNewsletterSend = internalMutation({
+export const completeNewsletterSend = mutation({
   args: {
     newsletterId: v.string(),
     sentCount: v.number(),
@@ -536,6 +536,7 @@ export const getStatusBreakdown = query({
         openRate: stats.delivered > 0 ? ((stats.uniqueOpens / stats.delivered) * 100).toFixed(1) : "0",
         clickRate: stats.delivered > 0 ? ((stats.uniqueClicks / stats.delivered) * 100).toFixed(1) : "0",
         bounceRate: stats.sent > 0 ? ((stats.bounced / stats.sent) * 100).toFixed(1) : "0",
+        suppressionRate: stats.totalRecipients > 0 ? (((stats.suppressed ?? 0) / stats.totalRecipients) * 100).toFixed(1) : "0",
       },
     };
   },

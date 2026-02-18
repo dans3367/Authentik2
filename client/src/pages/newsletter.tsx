@@ -13,7 +13,9 @@ import {
   LayoutDashboard,
   Trash2,
   Send,
-  FileText
+  FileText,
+  MoreVertical,
+  Pencil
 } from "lucide-react";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { Button } from "@/components/ui/button";
@@ -37,6 +39,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
@@ -387,23 +396,58 @@ export default function NewsletterPage() {
                             {newsletter.subject}
                           </p>
                         </div>
-                        <div className="shrink-0 flex flex-col items-end gap-1.5">
+                        <div className="shrink-0 flex items-center gap-2">
                           {getStatusBadge(newsletter.status)}
-                          {isReadyToSend && (
-                            <Button
-                              size="sm"
-                              className="bg-green-600 hover:bg-green-700 text-white border-green-700"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deployMutation.mutate(newsletter.id);
-                              }}
-                              disabled={deployMutation.isPending}
-                              data-testid={`button-send-now-${newsletter.id}`}
-                            >
-                              <Send className="h-4 w-4 mr-1.5" />
-                              {deployMutation.isPending ? "Sending..." : "Send Now"}
-                            </Button>
-                          )}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPreviewNewsletter(newsletter);
+                                }}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                Preview
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setLocation(`/newsletter/create/${newsletter.id}`);
+                                }}
+                              >
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              {isReadyToSend && (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deployMutation.mutate(newsletter.id);
+                                  }}
+                                  disabled={deployMutation.isPending}
+                                >
+                                  <Send className="h-4 w-4 mr-2" />
+                                  {deployMutation.isPending ? "Sending..." : "Send Now"}
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteId(newsletter.id);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
 

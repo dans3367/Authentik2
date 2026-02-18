@@ -17,6 +17,7 @@ import {
   AlertCircle,
   AlertTriangle,
   XCircle,
+  ShieldOff,
   RefreshCw,
   Newspaper,
   Tag,
@@ -335,6 +336,8 @@ export default function NewsletterViewPage() {
         return `Email bounced for ${email}`;
       case 'complained':
         return `Spam complaint from ${email}`;
+      case 'suppressed':
+        return `Email to ${email} was suppressed by the provider`;
       default:
         return `Email ${type} for ${email}`;
     }
@@ -653,7 +656,7 @@ export default function NewsletterViewPage() {
         </div>
 
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 lg:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 lg:gap-6">
           <Card>
             <CardContent className="p-4 lg:p-6">
               <div className="flex items-center justify-between gap-3">
@@ -733,6 +736,27 @@ export default function NewsletterViewPage() {
                 </div>
                 <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center shrink-0">
                   <AlertTriangle className="text-white w-5 h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4 lg:p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">
+                    Suppressed
+                  </p>
+                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold" data-testid="text-suppressed-count">
+                    {detailedStatsData?.emails?.filter((email: { status: string }) => email.status === 'suppressed').length || 0}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Blocked by provider
+                  </p>
+                </div>
+                <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shrink-0">
+                  <ShieldOff className="text-white w-5 h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
                 </div>
               </div>
             </CardContent>
@@ -1316,6 +1340,7 @@ export default function NewsletterViewPage() {
                           case 'opened': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
                           case 'bounced': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
                           case 'complained': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
+                          case 'suppressed': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
                           default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
                         }
                       };
@@ -1594,6 +1619,7 @@ export default function NewsletterViewPage() {
                             event.type === 'clicked' ? 'bg-orange-100 dark:bg-orange-900' :
                             event.type === 'bounced' ? 'bg-red-100 dark:bg-red-900' :
                             event.type === 'complained' ? 'bg-yellow-100 dark:bg-yellow-900' :
+                            event.type === 'suppressed' ? 'bg-yellow-100 dark:bg-yellow-900' :
                             'bg-gray-100 dark:bg-gray-800'
                           }`}>
                             {event.type === 'sent' && <Send className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
@@ -1602,7 +1628,8 @@ export default function NewsletterViewPage() {
                             {event.type === 'clicked' && <MousePointer className="h-4 w-4 text-orange-600 dark:text-orange-400" />}
                             {event.type === 'bounced' && <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />}
                             {event.type === 'complained' && <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />}
-                            {!['sent', 'delivered', 'opened', 'clicked', 'bounced', 'complained'].includes(event.type) && 
+                            {event.type === 'suppressed' && <ShieldOff className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />}
+                            {!['sent', 'delivered', 'opened', 'clicked', 'bounced', 'complained', 'suppressed'].includes(event.type) && 
                               <Activity className="h-4 w-4 text-gray-600 dark:text-gray-400" />
                             }
                           </div>
