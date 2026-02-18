@@ -91,7 +91,7 @@ webhookRoutes.post("/resend", async (req, res) => {
       query: req.query,
       params: req.params,
       body: req.body,
-      rawBody: req.rawBody,
+      rawBody: (req as any).rawBody,
       cookies: req.cookies,
       hostname: req.hostname,
       subdomains: req.subdomains,
@@ -124,7 +124,7 @@ webhookRoutes.post("/resend", async (req, res) => {
 
     // Verify webhook signature (only if secret is configured)
     if (signature && webhookSecret) {
-      const expectedSignature = createHmac('sha256', webhookSecret)
+      const expectedSignature = createHmac('sha256', webhookSecret!)
         .update(JSON.stringify(req.body))
         .digest('hex');
 
@@ -195,7 +195,7 @@ webhookRoutes.post("/postmark", async (req, res) => {
       query: req.query,
       params: req.params,
       body: req.body,
-      rawBody: req.rawBody,
+      rawBody: (req as any).rawBody,
       cookies: req.cookies,
       hostname: req.hostname,
       subdomains: req.subdomains,
@@ -228,7 +228,7 @@ webhookRoutes.post("/postmark", async (req, res) => {
 
     // Verify webhook signature
     if (signature) {
-      const expectedSignature = createHmac('sha256', webhookSecret)
+      const expectedSignature = createHmac('sha256', webhookSecret!)
         .update(JSON.stringify(req.body))
         .digest('hex');
 
@@ -741,7 +741,7 @@ webhookRoutes.all("*", async (req, res, next) => {
     query: req.query,
     params: req.params,
     body: req.body,
-    rawBody: req.rawBody,
+    rawBody: (req as any).rawBody,
     cookies: req.cookies,
     hostname: req.hostname,
     subdomains: req.subdomains,
