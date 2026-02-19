@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as convexExport from "../convexExport.js";
 import type * as http from "../http.js";
 import type * as newsletterTracking from "../newsletterTracking.js";
 import type * as webhookHandlers from "../webhookHandlers.js";
@@ -19,6 +20,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  convexExport: typeof convexExport;
   http: typeof http;
   newsletterTracking: typeof newsletterTracking;
   webhookHandlers: typeof webhookHandlers;

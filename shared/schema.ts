@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, decimal, integer, uuid, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, decimal, integer, uuid, uniqueIndex, index, jsonb } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -642,6 +642,92 @@ export const scheduledEmails = pgTable("scheduled_emails", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// ─── Convex Newsletter Tracking Mirror Tables ────────────────────────────────
+// Local PostgreSQL copies of Convex real-time newsletter tracking data.
+// Used as a backup/fallback for webhook-driven email activity processing.
+
+export const convexNewsletterSends = pgTable("convex_newsletter_sends", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  convexId: text("convex_id").unique(),
+  tenantId: varchar("tenant_id").notNull(),
+  newsletterId: varchar("newsletter_id").notNull(),
+  groupUUID: text("group_uuid").notNull(),
+  recipientEmail: text("recipient_email").notNull(),
+  recipientId: text("recipient_id"),
+  recipientName: text("recipient_name"),
+  providerMessageId: text("provider_message_id"),
+  status: text("status").notNull().default('queued'),
+  error: text("error"),
+  sentAt: timestamp("sent_at"),
+  deliveredAt: timestamp("delivered_at"),
+  firstOpenedAt: timestamp("first_opened_at"),
+  lastOpenedAt: timestamp("last_opened_at"),
+  firstClickedAt: timestamp("first_clicked_at"),
+  openCount: integer("open_count").notNull().default(0),
+  clickCount: integer("click_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  newsletterIdx: index("idx_cvx_sends_newsletter").on(table.newsletterId),
+  tenantNewsletterIdx: index("idx_cvx_sends_tenant_newsletter").on(table.tenantId, table.newsletterId),
+  providerMessageIdx: index("idx_cvx_sends_provider_message").on(table.providerMessageId),
+  recipientIdx: index("idx_cvx_sends_recipient").on(table.tenantId, table.recipientEmail),
+  recipientNewsletterIdx: index("idx_cvx_sends_recipient_newsletter").on(table.recipientEmail, table.newsletterId),
+  statusIdx: index("idx_cvx_sends_status").on(table.newsletterId, table.status),
+  recipientEmailIdx: index("idx_cvx_sends_recipient_email").on(table.recipientEmail),
+  newsletterRecipientIdx: index("idx_cvx_sends_newsletter_recipient").on(table.newsletterId, table.recipientEmail),
+}));
+
+export const convexNewsletterEvents = pgTable("convex_newsletter_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  convexId: text("convex_id").unique(),
+  tenantId: varchar("tenant_id").notNull(),
+  newsletterId: varchar("newsletter_id").notNull(),
+  newsletterSendId: varchar("newsletter_send_id"),
+  recipientEmail: text("recipient_email").notNull(),
+  eventType: text("event_type").notNull(),
+  providerMessageId: text("provider_message_id"),
+  metadata: jsonb("metadata"), // Extra event data (link clicked, user agent, IP, etc.)
+  occurredAt: timestamp("occurred_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  newsletterIdx: index("idx_cvx_events_newsletter").on(table.newsletterId),
+  tenantNewsletterIdx: index("idx_cvx_events_tenant_newsletter").on(table.tenantId, table.newsletterId),
+  sendIdx: index("idx_cvx_events_send").on(table.newsletterSendId),
+  typeIdx: index("idx_cvx_events_type").on(table.newsletterId, table.eventType),
+  occurredIdx: index("idx_cvx_events_occurred").on(table.newsletterId, table.occurredAt),
+  providerEventIdx: index("idx_cvx_events_provider_event").on(table.providerMessageId, table.eventType),
+  recipientNewsletterEventIdx: index("idx_cvx_events_recipient_newsletter_event").on(table.recipientEmail, table.newsletterId, table.eventType),
+}));
+
+export const convexNewsletterStats = pgTable("convex_newsletter_stats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  convexId: text("convex_id").unique(),
+  tenantId: varchar("tenant_id").notNull(),
+  newsletterId: varchar("newsletter_id").notNull().unique(),
+  status: text("status").notNull().default('sending'),
+  totalRecipients: integer("total_recipients").notNull().default(0),
+  queued: integer("queued").notNull().default(0),
+  sent: integer("sent").notNull().default(0),
+  delivered: integer("delivered").notNull().default(0),
+  opened: integer("opened").notNull().default(0),
+  uniqueOpens: integer("unique_opens").notNull().default(0),
+  clicked: integer("clicked").notNull().default(0),
+  uniqueClicks: integer("unique_clicks").notNull().default(0),
+  bounced: integer("bounced").notNull().default(0),
+  complained: integer("complained").notNull().default(0),
+  failed: integer("failed").notNull().default(0),
+  suppressed: integer("suppressed").default(0),
+  unsubscribed: integer("unsubscribed").notNull().default(0),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  lastEventAt: timestamp("last_event_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  tenantIdx: index("idx_cvx_stats_tenant").on(table.tenantId),
+}));
 
 // Relations
 export const tenantRelations = relations(tenants, ({ many }) => ({
