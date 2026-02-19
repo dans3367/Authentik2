@@ -1,4 +1,4 @@
-import { action } from "./_generated/server";
+import { action, httpAction } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
 import { internal } from "./_generated/api";
@@ -195,4 +195,97 @@ function buildMetadata(data: any): Record<string, any> | undefined {
   }
   return Object.keys(meta).length > 0 ? meta : undefined;
 }
+
+// ─── HTTP ENDPOINTS ─────────────────────────────────────────────────────────────
+
+/**
+ * Direct HTTP endpoint for Resend health check.
+ * Called directly by Resend service.
+ */
+export const resendHealthCheck = httpAction(async (ctx, request) => {
+  return new Response("Systems all good", {
+    status: 200,
+    headers: { "Content-Type": "text/plain" },
+  });
+});
+
+/**
+ * Direct HTTP endpoint for Resend webhook events.
+ * Handles signature verification and forwards to the action.
+ */
+export const resendWebhook = httpAction(async (ctx, request) => {
+  const signature = request.headers.get("resend-signature");
+  const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    console.error("RESEND_WEBHOOK_SECRET not configured");
+    return new Response("Webhook secret not configured", { status: 500 });
+  }
+
+  // Verify webhook signature
+  if (signature) {
+    const body = await request.text();
+    const expectedSignature = await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(webhookSecret + body)
+    );
+    const expectedSignatureHex = Array.from(new Uint8Array(expectedSignature))
+      .map(b => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    if (signature !== expectedSignatureHex) {
+      console.error("Invalid webhook signature");
+      return new Response("Invalid signature", { status: 401 });
+    }
+
+    // Parse and forward to action
+    const event = JSON.parse(body);
+    await ctx.runAction(api.webhookHandlers.handleResendWebhook, { payload: event });
+  }
+
+  return new Response(JSON.stringify({ received: true }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+});
+
+/**
+ * Direct HTTP endpoint for Postmark webhook events.
+ * Handles signature verification and forwards to the action.
+ */
+export const postmarkWebhook = httpAction(async (ctx, request) => {
+  const signature = request.headers.get("x-postmark-signature");
+  const webhookSecret = process.env.POSTMARK_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    console.error("POSTMARK_WEBHOOK_SECRET not configured");
+    return new Response("Webhook secret not configured", { status: 500 });
+  }
+
+  // Verify webhook signature
+  if (signature) {
+    const body = await request.text();
+    const expectedSignature = await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(webhookSecret + body)
+    );
+    const expectedSignatureHex = Array.from(new Uint8Array(expectedSignature))
+      .map(b => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    if (signature !== expectedSignatureHex) {
+      console.error("Invalid Postmark webhook signature");
+      return new Response("Invalid signature", { status: 401 });
+    }
+
+    // Parse and forward to action
+    const event = JSON.parse(body);
+    await ctx.runAction(api.webhookHandlers.handlePostmarkWebhook, { payload: event });
+  }
+
+  return new Response(JSON.stringify({ received: true }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+});
 
