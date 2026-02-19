@@ -3,7 +3,7 @@ import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { authenticateToken } from '../middleware/auth-middleware';
 import { createHmac } from 'crypto';
-import { getConvexClient, internal } from '../utils/convexClient';
+import { getConvexClient, api } from '../utils/convexClient';
 
 export const webhookRoutes = Router();
 
@@ -141,7 +141,7 @@ webhookRoutes.post("/resend", async (req, res) => {
     // Forward to Convex internal handler (fire-and-forget)
     const client = getConvexClient();
     if (client) {
-      client.action(internal.webhookHandlers.handleResendWebhook, { payload: event })
+      client.action(api.webhookHandlers.handleResendWebhook, { payload: event })
         .catch(err => console.error('Convex Resend webhook handler failed:', err));
     }
 
@@ -213,7 +213,7 @@ webhookRoutes.post("/postmark", async (req, res) => {
     // Forward to Convex internal handler (fire-and-forget)
     const client = getConvexClient();
     if (client) {
-      client.action(internal.webhookHandlers.handlePostmarkWebhook, { payload: event })
+      client.action(api.webhookHandlers.handlePostmarkWebhook, { payload: event })
         .catch(err => console.error('Convex Postmark webhook handler failed:', err));
     }
 

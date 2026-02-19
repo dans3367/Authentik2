@@ -1,4 +1,4 @@
-import { internalAction } from "./_generated/server";
+import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
 import { internal } from "./_generated/api";
@@ -9,7 +9,7 @@ import { internal } from "./_generated/api";
  * Internal handler for Resend webhook events.
  * Called from Express after signature verification.
  */
-export const handleResendWebhook = internalAction({
+export const handleResendWebhook = action({
   args: { payload: v.any() },
   handler: async (ctx, { payload: event }) => {
     try {
@@ -72,7 +72,7 @@ export const handleResendWebhook = internalAction({
  * Internal handler for Postmark webhook events.
  * Called from Express after signature verification.
  */
-export const handlePostmarkWebhook = internalAction({
+export const handlePostmarkWebhook = action({
   args: { payload: v.any() },
   handler: async (ctx, { payload: event }) => {
     try {
