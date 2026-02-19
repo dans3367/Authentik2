@@ -220,7 +220,9 @@ export const resendHealthCheck = httpAction(async (ctx, request) => {
  * Handles signature verification and forwards to the action.
  */
 export const resendWebhook = httpAction(async (ctx, request) => {
-  const signatureHeader = request.headers.get("resend-signature");
+  const svixId = request.headers.get("svix-id");
+  const svixTimestamp = request.headers.get("svix-timestamp");
+  const svixSignature = request.headers.get("svix-signature");
   const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
 
   if (!webhookSecret) {
@@ -228,46 +230,60 @@ export const resendWebhook = httpAction(async (ctx, request) => {
     return new Response("Webhook secret not configured", { status: 500 });
   }
 
-  if (!signatureHeader) {
-    return new Response("Missing signature", { status: 401 });
+  if (!svixId || !svixTimestamp || !svixSignature) {
+    return new Response("Missing signature headers", { status: 401 });
+  }
+
+  // Reject timestamps older than 5 minutes to prevent replay attacks
+  const now = Math.floor(Date.now() / 1000);
+  const ts = parseInt(svixTimestamp, 10);
+  if (isNaN(ts) || Math.abs(now - ts) > 300) {
+    return new Response("Timestamp too old", { status: 401 });
   }
 
   const body = await request.text();
 
-  // Parse signature header
-  // Format: t=<timestamp>,v1=<signature>
-  const parts = signatureHeader.split(",");
-  const timestampPart = parts.find((p) => p.startsWith("t="));
-  const signaturePart = parts.find((p) => p.startsWith("v1="));
+  // Svix secret is base64-encoded after the "whsec_" prefix
+  const secretBase64 = webhookSecret.startsWith("whsec_")
+    ? webhookSecret.slice(6)
+    : webhookSecret;
 
-  if (!timestampPart || !signaturePart) {
-    return new Response("Invalid signature format", { status: 400 });
-  }
-
-  const timestamp = timestampPart.split("=")[1];
-  const signature = signaturePart.split("=")[1];
+  // Decode base64 secret to raw bytes
+  const secretBytes = Uint8Array.from(atob(secretBase64), (c) =>
+    c.charCodeAt(0),
+  );
 
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
-    enc.encode(webhookSecret),
+    secretBytes,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],
   );
 
-  const signedContent = `${timestamp}.${body}`;
+  // Svix signs: "${msgId}.${timestamp}.${body}"
+  const signedContent = `${svixId}.${svixTimestamp}.${body}`;
   const signatureBytes = await crypto.subtle.sign(
     "HMAC",
     key,
     enc.encode(signedContent),
   );
 
-  const expectedSignatureHex = Array.from(new Uint8Array(signatureBytes))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  // Convert to base64 for comparison
+  const expectedSignature = btoa(
+    String.fromCharCode(...new Uint8Array(signatureBytes)),
+  );
 
-  if (signature !== expectedSignatureHex) {
+  // svix-signature header can contain multiple signatures: "v1,<base64> v1,<base64>"
+  const signatures = svixSignature.split(" ");
+  const isValid = signatures.some((sig) => {
+    const parts = sig.split(",");
+    if (parts.length !== 2 || parts[0] !== "v1") return false;
+    return parts[1] === expectedSignature;
+  });
+
+  if (!isValid) {
     console.error("Invalid webhook signature");
     return new Response("Invalid signature", { status: 401 });
   }
