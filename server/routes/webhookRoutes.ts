@@ -132,9 +132,13 @@ webhookRoutes.post("/resend", async (req, res) => {
 
     const event = req.body;
 
+    // Extract newsletter tracking tags from webhook data for correlation
+    const newsletterTags = event.data ? extractNewsletterTags(event.data) : null;
+
     console.log('Resend webhook event received:', {
       type: event.type,
       data: event.data,
+      ...(newsletterTags && { newsletterTags }),
       timestamp: new Date().toISOString(),
     });
 
@@ -251,7 +255,8 @@ webhookRoutes.post("/postmark", async (req, res) => {
 // Helper functions for webhook event handling
 async function handleEmailSent(data: any) {
   try {
-    console.log('Email sent event:', data);
+    const nlTags = extractNewsletterTags(data);
+    console.log('Email sent event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
 
     // Extract provider_message_id from webhook data
     const providerMessageId = extractProviderMessageId(data);
@@ -260,7 +265,7 @@ async function handleEmailSent(data: any) {
       return;
     }
 
-    console.log(`Processing sent event for provider_message_id: ${providerMessageId}`);
+    console.log(`Processing sent event for provider_message_id: ${providerMessageId}`, nlTags ? `[trackingId=${nlTags.trackingId}]` : '');
 
     // Find the email_sends record
     const emailSend = await findEmailSendByProviderId(providerMessageId);
@@ -296,7 +301,8 @@ async function handleEmailSent(data: any) {
 
 async function handleEmailDelivered(data: any) {
   try {
-    console.log('Email delivered event:', data);
+    const nlTags = extractNewsletterTags(data);
+    console.log('Email delivered event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
 
     // Extract provider_message_id from webhook data
     const providerMessageId = extractProviderMessageId(data);
@@ -305,7 +311,7 @@ async function handleEmailDelivered(data: any) {
       return;
     }
 
-    console.log(`Processing delivered event for provider_message_id: ${providerMessageId}`);
+    console.log(`Processing delivered event for provider_message_id: ${providerMessageId}`, nlTags ? `[trackingId=${nlTags.trackingId}]` : '');
 
     // Find the email_sends record
     const emailSend = await findEmailSendByProviderId(providerMessageId);
@@ -341,7 +347,8 @@ async function handleEmailDelivered(data: any) {
 
 async function handleEmailBounced(data: any) {
   try {
-    console.log('Email bounced event:', data);
+    const nlTags = extractNewsletterTags(data);
+    console.log('Email bounced event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
 
     // Extract provider_message_id from webhook data
     const providerMessageId = extractProviderMessageId(data);
@@ -394,7 +401,8 @@ async function handleEmailBounced(data: any) {
 
 async function handleEmailComplained(data: any) {
   try {
-    console.log('Email complained event:', data);
+    const nlTags = extractNewsletterTags(data);
+    console.log('Email complained event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
 
     // Extract provider_message_id from webhook data
     const providerMessageId = extractProviderMessageId(data);
@@ -447,7 +455,8 @@ async function handleEmailComplained(data: any) {
 
 async function handleEmailSuppressed(data: any) {
   try {
-    console.log('Email suppressed event:', data);
+    const nlTags = extractNewsletterTags(data);
+    console.log('Email suppressed event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
 
     const providerMessageId = extractProviderMessageId(data);
     // Use extractRecipientEmail to handle Resend's data.to array format (same as all other handlers)
@@ -539,7 +548,8 @@ async function handleEmailSuppressed(data: any) {
 
 async function handleEmailOpened(data: any) {
   try {
-    console.log('Email opened event:', data);
+    const nlTags = extractNewsletterTags(data);
+    console.log('Email opened event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
 
     // Extract provider_message_id from webhook data
     const providerMessageId = extractProviderMessageId(data);
@@ -548,7 +558,7 @@ async function handleEmailOpened(data: any) {
       return;
     }
 
-    console.log(`Processing opened event for provider_message_id: ${providerMessageId}`);
+    console.log(`Processing opened event for provider_message_id: ${providerMessageId}`, nlTags ? `[trackingId=${nlTags.trackingId}]` : '');
 
     // Find the email_sends record
     const emailSend = await findEmailSendByProviderId(providerMessageId);
@@ -575,7 +585,8 @@ async function handleEmailOpened(data: any) {
 
 async function handleEmailClicked(data: any) {
   try {
-    console.log('Email clicked event:', data);
+    const nlTags = extractNewsletterTags(data);
+    console.log('Email clicked event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
 
     // Extract provider_message_id from webhook data
     const providerMessageId = extractProviderMessageId(data);
@@ -584,7 +595,7 @@ async function handleEmailClicked(data: any) {
       return;
     }
 
-    console.log(`Processing clicked event for provider_message_id: ${providerMessageId}`);
+    console.log(`Processing clicked event for provider_message_id: ${providerMessageId}`, nlTags ? `[trackingId=${nlTags.trackingId}]` : '');
 
     // Find the email_sends record
     const emailSend = await findEmailSendByProviderId(providerMessageId);
@@ -628,6 +639,23 @@ function extractProviderMessageId(data: any): string | null {
 
   console.error('Could not find provider_message_id in webhook data:', JSON.stringify(data, null, 2));
   return null;
+}
+
+// Helper function to extract newsletter tracking tags from Resend webhook data
+// Resend sends tags as an object: { tagName: tagValue } in the webhook payload
+function extractNewsletterTags(data: any): { type?: string; newsletterId?: string; groupUUID?: string; tenantId?: string; recipientId?: string; trackingId?: string } | null {
+  const tags = data.tags;
+  if (!tags || typeof tags !== 'object') return null;
+
+  const result: any = {};
+  if (tags.type) result.type = tags.type;
+  if (tags.newsletterId) result.newsletterId = tags.newsletterId;
+  if (tags.groupUUID) result.groupUUID = tags.groupUUID;
+  if (tags.tenantId) result.tenantId = tags.tenantId;
+  if (tags.recipientId) result.recipientId = tags.recipientId;
+  if (tags.trackingId) result.trackingId = tags.trackingId;
+
+  return Object.keys(result).length > 0 ? result : null;
 }
 
 // Helper function to extract recipient email from webhook data

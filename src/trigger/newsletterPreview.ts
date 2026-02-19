@@ -1,5 +1,6 @@
 import { task, logger } from "@trigger.dev/sdk/v3";
 import { Resend } from "resend";
+import { randomUUID } from "crypto";
 import { z } from "zod";
 import { wrapInEmailDesign } from "./emailWrapper";
 import { DB_RETRY_CONFIG, dbConnectionCatchError } from "./retryStrategy";
@@ -65,6 +66,7 @@ export const sendNewsletterPreviewTask = task({
         }
       }
 
+      const emailTrackingId = randomUUID();
       const { data: emailData, error } = await resend.emails.send({
         from: process.env.EMAIL_FROM || "admin@zendwise.com",
         to: data.to,
@@ -74,6 +76,7 @@ export const sendNewsletterPreviewTask = task({
         tags: [
           { name: "type", value: "newsletter-preview" },
           { name: "tenantId", value: data.tenantId },
+          { name: "trackingId", value: emailTrackingId },
         ],
       });
 

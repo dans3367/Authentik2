@@ -1,6 +1,6 @@
 import { task, wait, logger, metadata } from "@trigger.dev/sdk/v3";
 import { Resend } from "resend";
-import { createHmac } from "crypto";
+import { createHmac, randomUUID } from "crypto";
 import { z } from "zod";
 import { ConvexHttpClient } from "convex/browser";
 import { DB_RETRY_CONFIG, dbConnectionCatchError } from "./retryStrategy";
@@ -180,6 +180,7 @@ export const sendNewsletterEmailTask = task({
     });
 
     try {
+      const emailTrackingId = randomUUID();
       const { data: emailData, error } = await resend.emails.send({
         from: payload.from || process.env.EMAIL_FROM || "admin@zendwise.com",
         to: recipient.email,
@@ -193,6 +194,7 @@ export const sendNewsletterEmailTask = task({
           { name: "groupUUID", value: groupUUID },
           { name: "tenantId", value: tenantId },
           { name: "recipientId", value: recipient.id },
+          { name: "trackingId", value: emailTrackingId },
         ],
       });
 
@@ -281,6 +283,7 @@ export const processNewsletterBatchTask = task({
       }
 
       try {
+        const emailTrackingId = randomUUID();
         const { data: emailData, error } = await resend.emails.send({
           from: payload.from || process.env.EMAIL_FROM || "admin@zendwise.com",
           to: recipient.email,
@@ -293,6 +296,7 @@ export const processNewsletterBatchTask = task({
             { name: "newsletterId", value: payload.newsletterId },
             { name: "groupUUID", value: payload.groupUUID },
             { name: "tenantId", value: payload.tenantId },
+            { name: "trackingId", value: emailTrackingId },
           ],
         });
 
@@ -506,6 +510,7 @@ export const sendNewsletterTask = task({
             hasApiKey: !!process.env.RESEND_API_KEY,
           });
 
+          const emailTrackingId = randomUUID();
           const { data: emailData, error } = await resend.emails.send({
             from: fromEmail,
             to: recipient.email,
@@ -518,6 +523,7 @@ export const sendNewsletterTask = task({
               { name: "newsletterId", value: data.newsletterId },
               { name: "groupUUID", value: data.groupUUID },
               { name: "tenantId", value: data.tenantId },
+              { name: "trackingId", value: emailTrackingId },
             ],
           });
 

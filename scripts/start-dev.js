@@ -155,7 +155,15 @@ async function startServices() {
       });
 
       child.on('close', (code) => {
-        if (code !== 0 && started) {
+        if (!started) {
+          if (code !== 0) {
+            colorLog('red', `❌ ${service.name} exited before startup output with code ${code}`);
+          } else {
+            colorLog('yellow', `⚠️ ${service.name} exited cleanly before emitting startup output`);
+          }
+          started = true;
+          resolve();
+        } else if (code !== 0) {
           colorLog('red', `❌ ${service.name} exited with code ${code}`);
         }
       });

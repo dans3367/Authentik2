@@ -193,6 +193,12 @@ function buildMetadata(data: any): Record<string, any> | undefined {
     meta.message = data.suppressed.message;
     meta.type = data.suppressed.type;
   }
+  // Capture Resend tags for newsletter tracking correlation
+  if (data.tags && typeof data.tags === "object") {
+    meta.tags = data.tags;
+    if (data.tags.trackingId) meta.trackingId = data.tags.trackingId;
+    if (data.tags.groupUUID) meta.groupUUID = data.tags.groupUUID;
+  }
   return Object.keys(meta).length > 0 ? meta : undefined;
 }
 
@@ -214,7 +220,7 @@ export const resendHealthCheck = httpAction(async (ctx, request) => {
  * Handles signature verification and forwards to the action.
  */
 export const resendWebhook = httpAction(async (ctx, request) => {
-  const signature = request.headers.get("resend-signature");
+  const signatureHeader = request.headers.get("resend-signature");
   const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
 
   if (!webhookSecret) {
@@ -222,25 +228,58 @@ export const resendWebhook = httpAction(async (ctx, request) => {
     return new Response("Webhook secret not configured", { status: 500 });
   }
 
-  // Verify webhook signature
-  if (signature) {
-    const body = await request.text();
-    const expectedSignature = await crypto.subtle.digest(
-      "SHA-256",
-      new TextEncoder().encode(webhookSecret + body)
-    );
-    const expectedSignatureHex = Array.from(new Uint8Array(expectedSignature))
-      .map(b => b.toString(16).padStart(2, "0"))
-      .join("");
+  if (!signatureHeader) {
+    return new Response("Missing signature", { status: 401 });
+  }
 
-    if (signature !== expectedSignatureHex) {
-      console.error("Invalid webhook signature");
-      return new Response("Invalid signature", { status: 401 });
-    }
+  const body = await request.text();
 
-    // Parse and forward to action
+  // Parse signature header
+  // Format: t=<timestamp>,v1=<signature>
+  const parts = signatureHeader.split(",");
+  const timestampPart = parts.find((p) => p.startsWith("t="));
+  const signaturePart = parts.find((p) => p.startsWith("v1="));
+
+  if (!timestampPart || !signaturePart) {
+    return new Response("Invalid signature format", { status: 400 });
+  }
+
+  const timestamp = timestampPart.split("=")[1];
+  const signature = signaturePart.split("=")[1];
+
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(webhookSecret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+
+  const signedContent = `${timestamp}.${body}`;
+  const signatureBytes = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    enc.encode(signedContent),
+  );
+
+  const expectedSignatureHex = Array.from(new Uint8Array(signatureBytes))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  if (signature !== expectedSignatureHex) {
+    console.error("Invalid webhook signature");
+    return new Response("Invalid signature", { status: 401 });
+  }
+
+  try {
     const event = JSON.parse(body);
-    await ctx.runAction(api.webhookHandlers.handleResendWebhook, { payload: event });
+    await ctx.runAction(api.webhookHandlers.handleResendWebhook, {
+      payload: event,
+    });
+  } catch (error) {
+    console.error("Error parsing webhook body:", error);
+    return new Response("Invalid JSON body", { status: 400 });
   }
 
   return new Response(JSON.stringify({ received: true }), {

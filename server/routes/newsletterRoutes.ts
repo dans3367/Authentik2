@@ -228,7 +228,7 @@ newsletterRoutes.get("/preview-recipients", authenticateToken, requireTenant, as
 
     res.json({
       recipients,
-      total: hasMore ? `${limit}+` : recipients.length,
+      total: hasMore ? limit : recipients.length,
       truncated: hasMore
     });
   } catch (error) {
@@ -948,10 +948,19 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
     if (testEmail) {
       try {
         const wrappedTestHtml = await wrapNewsletterContent(req.user.tenantId, newsletter.content);
-        await emailService.sendCustomEmail(testEmail, newsletter.subject, wrappedTestHtml, 'test');
+        const testTrackingId = crypto.randomUUID();
+        await emailService.sendCustomEmail(testEmail, newsletter.subject, wrappedTestHtml, {
+          tags: [
+            { name: 'type', value: 'newsletter-test' },
+            { name: 'newsletterId', value: id },
+            { name: 'tenantId', value: req.user.tenantId },
+            { name: 'trackingId', value: testTrackingId },
+          ],
+        });
         res.json({
           message: 'Test newsletter sent successfully',
           testEmail,
+          trackingId: testTrackingId,
         });
       } catch (emailError) {
         console.error('Failed to send test newsletter:', emailError);
@@ -1165,6 +1174,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
         const emails = allowedRecipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => {
           const token = tokenMap.get(contact.id)!;
           const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(token)}&type=newsletters`;
+          const emailTrackingId = crypto.randomUUID();
           const html = `${wrappedContent}
             <div style="padding: 16px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
               <p style="margin: 0; font-size: 12px; color: #94a3b8;">
@@ -1181,12 +1191,19 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
               'List-Unsubscribe': `<${unsubscribeUrl}>`,
               'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
             },
+            tags: [
+              { name: 'type', value: 'newsletter' },
+              { name: 'newsletterId', value: newsletter.id },
+              { name: 'groupUUID', value: groupUUID },
+              { name: 'tenantId', value: req.user.tenantId },
+              { name: 'recipientId', value: contact.id },
+              { name: 'trackingId', value: emailTrackingId },
+            ],
             metadata: {
               type: 'newsletter',
               newsletterId: newsletter.id,
               groupUUID,
               recipientId: contact.id,
-              tags: [`newsletter-${newsletter.id}`, `groupUUID-${groupUUID}`]
             }
           };
         });
@@ -1203,7 +1220,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
               emailData.to,
               emailData.subject,
               emailData.html,
-              { text: emailData.text, headers: emailData.headers, metadata: emailData.metadata }
+              { text: emailData.text, headers: emailData.headers, tags: emailData.tags, metadata: emailData.metadata }
             );
             if (result.success) {
               successful++;
@@ -1355,10 +1372,12 @@ newsletterRoutes.post('/:id/send-single', authenticateInternalService, async (re
         </div>`,
       from: process.env.EMAIL_FROM || 'noreply@saas-app.com',
       tags: [
-        `newsletter-${id}`,
-        `groupUUID-${groupUUID}`,
-        `tenant-${tenantId}`,
-        `contact-${recipient.id}`
+        { name: 'type', value: 'newsletter' },
+        { name: 'newsletterId', value: id },
+        { name: 'groupUUID', value: groupUUID },
+        { name: 'tenantId', value: tenantId },
+        { name: 'recipientId', value: recipient.id },
+        { name: 'trackingId', value: crypto.randomUUID() },
       ]
     };
 
@@ -1374,7 +1393,8 @@ newsletterRoutes.post('/:id/send-single', authenticateInternalService, async (re
             'List-Unsubscribe': `<${unsubscribeUrl}>`,
             'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
           },
-          metadata: { tags: email.tags },
+          tags: email.tags,
+          metadata: { type: 'newsletter', newsletterId: id, groupUUID, recipientId: recipient.id },
         }
       );
 

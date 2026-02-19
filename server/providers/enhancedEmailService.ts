@@ -112,6 +112,7 @@ export class EnhancedEmailService {
       preferredProvider?: string;
       headers?: Record<string, string>;
       metadata?: Record<string, any>;
+      tags?: Array<{ name: string; value: string }>;
     } = {}
   ): Promise<EmailSendResult> {
     const recipients = Array.isArray(to) ? to : [to];
@@ -123,6 +124,7 @@ export class EnhancedEmailService {
       html,
       text: options.text,
       headers: options.headers,
+      tags: options.tags,
       metadata: {
         type: 'custom',
         ...options.metadata
