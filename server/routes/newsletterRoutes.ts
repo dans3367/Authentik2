@@ -1118,7 +1118,6 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
             firstName: contact.firstName || '',
             lastName: contact.lastName || ''
           })),
-          suppressedEmails: Array.from(suppressedMap.keys()),
           batchSize: 25,
           priority: 'normal' as const,
         });
