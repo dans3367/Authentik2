@@ -454,15 +454,17 @@ export default function NewsletterPage() {
                                 <Eye className="h-4 w-4 mr-2" />
                                 Preview
                               </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setLocation(`/newsletter/create/${newsletter.id}`);
-                                }}
-                              >
-                                <Pencil className="h-4 w-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
+                              {!isSent && (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setLocation(`/newsletter/create/${newsletter.id}`);
+                                  }}
+                                >
+                                  <Pencil className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                              )}
                               {(isDraft || isReadyToSend) && (
                                 <DropdownMenuItem
                                   onClick={(e) => {
