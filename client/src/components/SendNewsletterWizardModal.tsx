@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Users, Tag, User, Check, Search, CheckCircle, ChevronRight, ChevronLeft, Send, ListChecks, Clock, ArrowRight, Mail } from "lucide-react";
@@ -32,6 +32,9 @@ interface SendNewsletterWizardModalProps {
     selectedContactIds: string[];
     selectedTagIds: string[];
   }) => void;
+  initialRecipientType?: "all" | "selected" | "tags";
+  initialSelectedContactIds?: string[];
+  initialSelectedTagIds?: string[];
 }
 
 interface SegmentListWithCount extends SegmentList {
@@ -44,6 +47,9 @@ export function SendNewsletterWizardModal({
   newsletterId,
   newsletterTitle,
   onSegmentSelected,
+  initialRecipientType,
+  initialSelectedContactIds,
+  initialSelectedTagIds,
 }: SendNewsletterWizardModalProps) {
   const { toast } = useToast();
   const [step, setStep] = useState<1 | 2>(1);
@@ -55,6 +61,7 @@ export function SendNewsletterWizardModal({
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [isSavingLater, setIsSavingLater] = useState(false);
+  const prevIsOpen = useRef(isOpen);
 
   const { data: segmentListsData, isLoading: segmentListsLoading } = useQuery({
     queryKey: ["/api/segment-lists"],
@@ -90,18 +97,24 @@ export function SendNewsletterWizardModal({
   const tags = (tagsData as any)?.tags || [];
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !prevIsOpen.current) {
+      const hasInitialRecipients = initialRecipientType && initialRecipientType !== "all";
+      const hasInitialContacts = initialSelectedContactIds && initialSelectedContactIds.length > 0;
+      const hasInitialTags = initialSelectedTagIds && initialSelectedTagIds.length > 0;
+      const shouldPreselect = hasInitialRecipients || hasInitialContacts || hasInitialTags;
+
       setStep(1);
-      setSelectionMode("segment_list");
+      setSelectionMode(shouldPreselect ? "custom" : "segment_list");
       setSelectedSegmentListId(null);
-      setCustomRecipientType("all");
+      setCustomRecipientType(initialRecipientType || "all");
       setSearchTerm("");
-      setSelectedContactIds([]);
-      setSelectedTagIds([]);
+      setSelectedContactIds(initialSelectedContactIds || []);
+      setSelectedTagIds(initialSelectedTagIds || []);
       setIsSending(false);
       setIsSavingLater(false);
     }
-  }, [isOpen]);
+    prevIsOpen.current = isOpen;
+  }, [isOpen, initialRecipientType]);
 
   const filteredContacts = contacts.filter((contact: any) =>
     (contact.email || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
@@ -250,11 +263,11 @@ export function SendNewsletterWizardModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent 
-        className="max-w-2xl p-8" 
-        style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
+      <DialogContent
+        className="max-w-2xl p-8"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
           maxHeight: '90vh',
           overflow: 'visible'
         }}
@@ -277,18 +290,16 @@ export function SendNewsletterWizardModal({
 
         <div className="flex items-center gap-2 px-1 py-2 flex-shrink-0">
           <div className="flex items-center gap-1.5">
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold ${
-              step >= 1 ? "bg-blue-600 dark:bg-blue-500 text-white" : "bg-muted text-muted-foreground"
-            }`}>
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold ${step >= 1 ? "bg-blue-600 dark:bg-blue-500 text-white" : "bg-muted text-muted-foreground"
+              }`}>
               {step > 1 ? <Check className="h-3.5 w-3.5" /> : "1"}
             </div>
             <span className={`text-sm font-medium ${step >= 1 ? "text-foreground" : "text-muted-foreground"}`}>Select Recipients</span>
           </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
           <div className="flex items-center gap-1.5">
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold ${
-              step === 2 ? "bg-blue-600 dark:bg-blue-500 text-white" : "bg-muted text-muted-foreground"
-            }`}>
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold ${step === 2 ? "bg-blue-600 dark:bg-blue-500 text-white" : "bg-muted text-muted-foreground"
+              }`}>
               2
             </div>
             <span className={`text-sm ${step === 2 ? "font-medium text-foreground" : "text-muted-foreground"}`}>Review & Send</span>
@@ -310,11 +321,10 @@ export function SendNewsletterWizardModal({
               >
                 <Label
                   htmlFor="mode-segment"
-                  className={`flex-1 flex items-center gap-3 p-3.5 rounded-lg border-2 cursor-pointer transition-all ${
-                    selectionMode === "segment_list"
-                      ? "border-blue-400 dark:border-blue-500 bg-blue-50/50 dark:bg-blue-900/15"
-                      : "border-border"
-                  }`}
+                  className={`flex-1 flex items-center gap-3 p-3.5 rounded-lg border-2 cursor-pointer transition-all ${selectionMode === "segment_list"
+                    ? "border-blue-400 dark:border-blue-500 bg-blue-50/50 dark:bg-blue-900/15"
+                    : "border-border"
+                    }`}
                 >
                   <RadioGroupItem value="segment_list" id="mode-segment" />
                   <ListChecks className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -325,11 +335,10 @@ export function SendNewsletterWizardModal({
                 </Label>
                 <Label
                   htmlFor="mode-custom"
-                  className={`flex-1 flex items-center gap-3 p-3.5 rounded-lg border-2 cursor-pointer transition-all ${
-                    selectionMode === "custom"
-                      ? "border-blue-400 dark:border-blue-500 bg-blue-50/50 dark:bg-blue-900/15"
-                      : "border-border"
-                  }`}
+                  className={`flex-1 flex items-center gap-3 p-3.5 rounded-lg border-2 cursor-pointer transition-all ${selectionMode === "custom"
+                    ? "border-blue-400 dark:border-blue-500 bg-blue-50/50 dark:bg-blue-900/15"
+                    : "border-border"
+                    }`}
                 >
                   <RadioGroupItem value="custom" id="mode-custom" />
                   <Users className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
@@ -380,19 +389,17 @@ export function SendNewsletterWizardModal({
                             return (
                               <div
                                 key={list.id}
-                                className={`flex items-center gap-3 p-3.5 rounded-lg border-2 cursor-pointer transition-all ${
-                                  isSelected
-                                    ? "border-blue-400 dark:border-blue-500 bg-blue-50/50 dark:bg-blue-900/15 shadow-sm"
-                                    : "border-border hover:border-muted-foreground/30"
-                                }`}
+                                className={`flex items-center gap-3 p-3.5 rounded-lg border-2 cursor-pointer transition-all ${isSelected
+                                  ? "border-blue-400 dark:border-blue-500 bg-blue-50/50 dark:bg-blue-900/15 shadow-sm"
+                                  : "border-border hover:border-muted-foreground/30"
+                                  }`}
                                 onClick={() => setSelectedSegmentListId(list.id)}
                                 data-testid={`segment-list-${list.id}`}
                               >
-                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                                  isSelected
-                                    ? "bg-blue-100 dark:bg-blue-800/40"
-                                    : "bg-muted"
-                                }`}>
+                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isSelected
+                                  ? "bg-blue-100 dark:bg-blue-800/40"
+                                  : "bg-muted"
+                                  }`}>
                                   {getTypeIcon(list.type)}
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -435,11 +442,10 @@ export function SendNewsletterWizardModal({
                   >
                     <Label
                       htmlFor="type-all"
-                      className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 cursor-pointer text-center transition-all ${
-                        customRecipientType === "all"
-                          ? "border-blue-400 dark:border-blue-500 bg-blue-50/50 dark:bg-blue-900/15"
-                          : "border-border"
-                      }`}
+                      className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 cursor-pointer text-center transition-all ${customRecipientType === "all"
+                        ? "border-blue-400 dark:border-blue-500 bg-blue-50/50 dark:bg-blue-900/15"
+                        : "border-border"
+                        }`}
                     >
                       <RadioGroupItem value="all" id="type-all" className="sr-only" />
                       <Users className="h-5 w-5 text-blue-500" />
@@ -447,11 +453,10 @@ export function SendNewsletterWizardModal({
                     </Label>
                     <Label
                       htmlFor="type-selected"
-                      className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 cursor-pointer text-center transition-all ${
-                        customRecipientType === "selected"
-                          ? "border-blue-400 dark:border-blue-500 bg-blue-50/50 dark:bg-blue-900/15"
-                          : "border-border"
-                      }`}
+                      className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 cursor-pointer text-center transition-all ${customRecipientType === "selected"
+                        ? "border-blue-400 dark:border-blue-500 bg-blue-50/50 dark:bg-blue-900/15"
+                        : "border-border"
+                        }`}
                     >
                       <RadioGroupItem value="selected" id="type-selected" className="sr-only" />
                       <User className="h-5 w-5 text-indigo-500" />
@@ -459,11 +464,10 @@ export function SendNewsletterWizardModal({
                     </Label>
                     <Label
                       htmlFor="type-tags"
-                      className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 cursor-pointer text-center transition-all ${
-                        customRecipientType === "tags"
-                          ? "border-blue-400 dark:border-blue-500 bg-blue-50/50 dark:bg-blue-900/15"
-                          : "border-border"
-                      }`}
+                      className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 cursor-pointer text-center transition-all ${customRecipientType === "tags"
+                        ? "border-blue-400 dark:border-blue-500 bg-blue-50/50 dark:bg-blue-900/15"
+                        : "border-border"
+                        }`}
                     >
                       <RadioGroupItem value="tags" id="type-tags" className="sr-only" />
                       <Tag className="h-5 w-5 text-purple-500" />
@@ -533,9 +537,8 @@ export function SendNewsletterWizardModal({
                             {filteredContacts.map((contact: any) => (
                               <div
                                 key={contact.id}
-                                className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${
-                                  selectedContactIds.includes(contact.id) ? "bg-blue-50/50 dark:bg-blue-900/10" : ""
-                                }`}
+                                className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${selectedContactIds.includes(contact.id) ? "bg-blue-50/50 dark:bg-blue-900/10" : ""
+                                  }`}
                                 onClick={() => handleContactToggle(contact.id)}
                               >
                                 <Checkbox
@@ -593,11 +596,10 @@ export function SendNewsletterWizardModal({
                               return (
                                 <div
                                   key={tag.id}
-                                  className={`flex items-center gap-2.5 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                                    isSelected
-                                      ? "border-indigo-400 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"
-                                      : "border-border"
-                                  }`}
+                                  className={`flex items-center gap-2.5 p-3 rounded-lg border-2 cursor-pointer transition-all ${isSelected
+                                    ? "border-indigo-400 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"
+                                    : "border-border"
+                                    }`}
                                   onClick={() => handleTagToggle(tag.id)}
                                 >
                                   <div

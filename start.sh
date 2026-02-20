@@ -9,6 +9,10 @@ if [ $# -eq 0 ]; then
     echo "🚀 Starting Authentik Services..."
     echo "=================================="
     COMMAND="start"
+elif [ "$1" = "--npm-dev" ]; then
+    echo "🚀 Starting Authentik Services via npm run dev..."
+    echo "=================================="
+    COMMAND="npm-dev"
 else
     COMMAND="$1"
 fi
@@ -23,8 +27,8 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Define services and their ports (global scope for stop_services)
-SERVICE_NAMES=("Main Server" "Webhook Server")
-SERVICE_PORTS=("5002" "3505")
+SERVICE_NAMES=("Main Server" "Webhook Server" "Bounce Webhook Server")
+SERVICE_PORTS=("5002" "3505" "5003")
 
 # Function to print colored output
 print_status() {
@@ -149,6 +153,7 @@ cleanup() {
     # Also kill any remaining processes by name
     pkill -f "npx tsx server/index.ts" 2>/dev/null
     pkill -f "npx tsx server-hook" 2>/dev/null
+    pkill -f "npx tsx.*webhook-bounces" 2>/dev/null
     
     print_success "All services stopped"
     exit 0
@@ -172,8 +177,40 @@ stop_services() {
     # Also kill by process names
     pkill -f "npx tsx server/index.ts" 2>/dev/null
     pkill -f "npx tsx server-hook" 2>/dev/null
+    pkill -f "npx tsx.*webhook-bounces" 2>/dev/null
     
     print_success "All services stopped"
+}
+
+# Function to start services via npm run dev
+start_npm_dev() {
+    print_status "Starting services via npm run dev..."
+    
+    # Kill any existing processes on our ports first
+    for ((i=0; i<${#SERVICE_NAMES[@]}; i++)); do
+        service="${SERVICE_NAMES[$i]}"
+        port="${SERVICE_PORTS[$i]}"
+        if check_port $port; then
+            kill_port_process $port "$service"
+        else
+            print_success "Port $port ($service) is available"
+        fi
+    done
+    
+    # Set environment variables
+    export NODE_ENV=${NODE_ENV:-development}
+    export PORT=${PORT:-5002}
+    export WEBHOOK_PORT=${WEBHOOK_PORT:-3505}
+    export BOUNCE_WEBHOOK_PORT=${BOUNCE_WEBHOOK_PORT:-5003}
+    
+    print_status "Environment: $NODE_ENV"
+    print_status "Running: npm run dev"
+    echo ""
+    
+    # Run npm run dev
+    npm run dev
+    
+    # This will block until Ctrl+C
 }
 
 # Function to start all services
@@ -204,6 +241,7 @@ start_services() {
     export NODE_ENV=${NODE_ENV:-development}
     export PORT=${PORT:-5002}
     export WEBHOOK_PORT=${WEBHOOK_PORT:-3505}
+    export BOUNCE_WEBHOOK_PORT=${BOUNCE_WEBHOOK_PORT:-5003}
 
     print_status "Environment: $NODE_ENV"
     print_status "Starting services..."
@@ -228,6 +266,16 @@ start_services() {
         print_warning "Webhook Server directory (server-hook) not found, skipping..."
     fi
 
+    # 3. Start Bounce Webhook Server (for suppressed/bounced email events)
+    if [ -d "$PROJECT_ROOT/webhook-bounces" ]; then
+        start_service "Bounce Webhook Server" "$BOUNCE_WEBHOOK_PORT" "NODE_ENV=$NODE_ENV BOUNCE_WEBHOOK_PORT=$BOUNCE_WEBHOOK_PORT npx tsx index.ts" "$PROJECT_ROOT/webhook-bounces"
+        if [ $? -eq 0 ]; then
+            print_port "Bounce Webhook Server: http://localhost:5003"
+        fi
+    else
+        print_warning "Bounce Webhook Server directory (webhook-bounces) not found, skipping..."
+    fi
+
     echo ""
     print_success "All available services started successfully!"
     echo "=================================="
@@ -249,6 +297,9 @@ case "$COMMAND" in
     "start")
         start_services
         ;;
+    "npm-dev")
+        start_npm_dev
+        ;;
     "stop")
         stop_services
         ;;
@@ -259,10 +310,11 @@ case "$COMMAND" in
         start_services
         ;;
     *)
-        echo "Usage: $0 [start|stop|restart]"
-        echo "  start   - Start all services (kills existing processes on ports 5002 and 3505)"
-        echo "  stop    - Stop all running services"
-        echo "  restart - Restart all services"
+        echo "Usage: $0 [start|stop|restart|--npm-dev]"
+        echo "  start     - Start all services manually (kills existing processes on ports 5002, 3505, 5003)"
+        echo "  stop      - Stop all running services"
+        echo "  restart   - Restart all services"
+        echo "  --npm-dev - Start services via npm run dev (recommended for development)"
         exit 1
         ;;
 esac

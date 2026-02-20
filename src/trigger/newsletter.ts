@@ -1,9 +1,10 @@
 import { task, wait, logger, metadata } from "@trigger.dev/sdk/v3";
 import { Resend } from "resend";
-import { createHmac } from "crypto";
+import { createHmac, randomUUID } from "crypto";
 import { z } from "zod";
 import { ConvexHttpClient } from "convex/browser";
 import { DB_RETRY_CONFIG, dbConnectionCatchError } from "./retryStrategy";
+import { sendAhaEmail } from "./ahasend";
 
 // Convex client for newsletter tracking (lazy init)
 let convexClient: ConvexHttpClient | null = null;
@@ -16,7 +17,164 @@ function getConvex(): ConvexHttpClient | null {
 }
 
 // Initialize Resend for email sending
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY || "re_placeholder");
+
+// Threshold: 5+ emails in a batch triggers bulk send via batch API
+const BULK_THRESHOLD = 5;
+
+interface BulkSendResult {
+  recipientEmail: string;
+  recipientId: string;
+  success: boolean;
+  providerMessageId?: string;
+  error?: string;
+  provider: 'resend' | 'ahasend';
+}
+
+/**
+ * Send a batch of emails using Resend batch API (up to 100 per call).
+ * Falls back to AhaSend for the entire batch if Resend fails.
+ * Returns per-recipient results with provider message IDs for tracking.
+ */
+async function sendBulkEmails(opts: {
+  recipients: NewsletterRecipient[];
+  subject: string;
+  content: string;
+  from: string;
+  replyTo?: string;
+  newsletterId: string;
+  groupUUID: string;
+  tenantId: string;
+}): Promise<BulkSendResult[]> {
+  const { recipients, subject, content, from: fromEmail, replyTo, newsletterId, groupUUID, tenantId } = opts;
+  const results: BulkSendResult[] = [];
+
+  // Build Resend batch payload (max 100 per call)
+  const resendBatchPayload = recipients.map((r) => {
+    const emailTrackingId = randomUUID();
+    return {
+      from: fromEmail,
+      to: r.email,
+      subject,
+      html: content,
+      text: content.replace(/<[^>]*>/g, ""),
+      replyTo,
+      tags: [
+        { name: "type", value: "newsletter" },
+        { name: "newsletterId", value: newsletterId },
+        { name: "groupUUID", value: groupUUID },
+        { name: "tenantId", value: tenantId },
+        { name: "recipientId", value: r.id },
+        { name: "trackingId", value: emailTrackingId },
+      ],
+    };
+  });
+
+  try {
+    logger.info(`Sending ${recipients.length} emails via Resend batch API`, {
+      newsletterId,
+      recipientCount: recipients.length,
+    });
+
+    const { data: batchData, error: batchError } = await resend.batch.send(resendBatchPayload);
+
+    if (batchError) {
+      throw new Error(batchError.message || String(batchError));
+    }
+
+    // batchData.data is an array of { id } in the same order as the input
+    const messageIds = batchData?.data || [];
+
+    for (let i = 0; i < recipients.length; i++) {
+      const msgId = messageIds[i]?.id;
+      results.push({
+        recipientEmail: recipients[i].email,
+        recipientId: recipients[i].id,
+        success: true,
+        providerMessageId: msgId,
+        provider: 'resend',
+      });
+    }
+
+    logger.info(`Resend batch send completed`, {
+      newsletterId,
+      sent: results.length,
+      messageIds: messageIds.map((m: any) => m.id),
+    });
+
+    return results;
+  } catch (resendErr) {
+    const resendErrMsg = resendErr instanceof Error ? resendErr.message : String(resendErr);
+    logger.warn(`Resend batch failed, falling back to AhaSend for ${recipients.length} emails`, {
+      error: resendErrMsg,
+      newsletterId,
+    });
+
+    // Fallback: send all via AhaSend (natively sends separate message per recipient)
+    try {
+      const ahaResult = await sendAhaEmail({
+        from: { email: fromEmail },
+        recipients: recipients.map((r) => ({ email: r.email })),
+        subject,
+        html_content: content,
+        text_content: content.replace(/<[^>]*>/g, ""),
+        reply_to: replyTo,
+      });
+
+      // AhaSend v2 returns { data: [{ id, recipient: { email }, status }] }
+      const ahaMessages: any[] = ahaResult?.data || [];
+
+      // Build a map of email -> message ID from AhaSend response
+      const ahaIdMap = new Map<string, string>();
+      for (const msg of ahaMessages) {
+        const email = msg?.recipient?.email;
+        const id = msg?.id;
+        if (email && id) {
+          ahaIdMap.set(email.toLowerCase(), id);
+        }
+      }
+
+      for (const r of recipients) {
+        const msgId = ahaIdMap.get(r.email.toLowerCase());
+        results.push({
+          recipientEmail: r.email,
+          recipientId: r.id,
+          success: true,
+          providerMessageId: msgId || 'ahasend-bulk-success',
+          provider: 'ahasend',
+        });
+      }
+
+      logger.info(`AhaSend bulk fallback completed`, {
+        newsletterId,
+        sent: results.length,
+        messageIds: ahaMessages.map((m: any) => m.id),
+      });
+
+      return results;
+    } catch (ahaErr) {
+      const ahaErrMsg = ahaErr instanceof Error ? ahaErr.message : String(ahaErr);
+      logger.error(`Both Resend batch and AhaSend fallback failed`, {
+        resendError: resendErrMsg,
+        ahasendError: ahaErrMsg,
+        newsletterId,
+      });
+
+      // Mark all recipients as failed
+      for (const r of recipients) {
+        results.push({
+          recipientEmail: r.email,
+          recipientId: r.id,
+          success: false,
+          error: `Resend: ${resendErrMsg}; AhaSend: ${ahaErrMsg}`,
+          provider: 'resend',
+        });
+      }
+
+      return results;
+    }
+  }
+}
 
 // Schema for newsletter recipient
 const recipientSchema = z.object({
@@ -95,50 +253,6 @@ async function updateNewsletterStatusInternal(
 }
 
 /**
- * Check if an email is suppressed (bounced/unsubscribed)
- */
-async function getSuppressionList(tenantId: string): Promise<Set<string>> {
-  const apiUrl = process.env.API_URL;
-  const secret = process.env.INTERNAL_SERVICE_SECRET;
-
-  // Use web.zendwise.work as base host for suppression checks when API_URL points to localhost
-  const baseUrl = (!apiUrl || apiUrl.includes("localhost") || apiUrl.includes("127.0.0.1"))
-    ? "https://web.zendwise.work"
-    : apiUrl;
-
-  if (!secret) {
-    logger.warn("INTERNAL_SERVICE_SECRET not configured, skipping suppression check");
-    return new Set();
-  }
-
-  const timestamp = Date.now();
-  const signaturePayload = `${timestamp}.${JSON.stringify({})}`;
-  const signature = createHmac("sha256", secret).update(signaturePayload).digest("hex");
-
-  try {
-    const response = await fetch(`${baseUrl}/api/newsletters/internal/suppression-list?tenantId=${tenantId}`, {
-      method: "GET",
-      headers: {
-        "x-internal-service": "trigger.dev",
-        "x-internal-timestamp": timestamp.toString(),
-        "x-internal-signature": signature,
-      },
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      return new Set((data.emails || []).map((e: string) => e.toLowerCase()));
-    } else {
-      logger.warn(`Suppression list API returned ${response.status}, proceeding without suppression check`);
-    }
-  } catch (err) {
-    logger.warn(`Error fetching suppression list (non-fatal, emails will still send): ${err}`);
-  }
-
-  return new Set();
-}
-
-/**
  * Send a single newsletter email
  */
 export const sendNewsletterEmailTask = task({
@@ -165,8 +279,14 @@ export const sendNewsletterEmailTask = task({
     });
 
     try {
-      const { data: emailData, error } = await resend.emails.send({
-        from: payload.from || process.env.EMAIL_FROM || "admin@zendwise.com",
+      const emailTrackingId = randomUUID();
+      const fromEmail = payload.from || process.env.EMAIL_FROM || "admin@zendwise.com";
+
+      let emailData: any = null;
+      let sendError: any = null;
+
+      const { data: resendData, error: resendError } = await resend.emails.send({
+        from: fromEmail,
         to: recipient.email,
         subject,
         html: content,
@@ -178,16 +298,41 @@ export const sendNewsletterEmailTask = task({
           { name: "groupUUID", value: groupUUID },
           { name: "tenantId", value: tenantId },
           { name: "recipientId", value: recipient.id },
+          { name: "trackingId", value: emailTrackingId },
         ],
       });
 
-      if (error) {
-        logger.error("Failed to send newsletter email", { error });
+      emailData = resendData;
+      sendError = resendError;
+
+      if (sendError) {
+        logger.warn("Resend failed, falling back to AhaSend", { error: sendError.message, to: recipient.email });
+        try {
+          const ahaResult = await sendAhaEmail({
+            from: { email: fromEmail },
+            recipients: [{ email: recipient.email }],
+            subject,
+            html_content: content,
+            text_content: content.replace(/<[^>]*>/g, ""),
+            reply_to: payload.replyTo,
+          });
+          // Extract per-recipient message ID from AhaSend v2 response
+          const ahaMessages: any[] = ahaResult?.data || [];
+          const ahaMsg = ahaMessages.find((m: any) => m?.recipient?.email?.toLowerCase() === recipient.email.toLowerCase());
+          emailData = { id: ahaMsg?.id || ahaResult.id || ahaResult.message_id || 'ahasend-fallback-success' };
+          sendError = null;
+        } catch (ahaError) {
+          sendError = ahaError;
+        }
+      }
+
+      if (sendError) {
+        logger.error("Failed to send newsletter email via both providers", { error: sendError });
         return {
           success: false,
           recipientId: recipient.id,
           email: recipient.email,
-          error: error.message,
+          error: sendError.message || String(sendError),
         };
       }
 
@@ -248,40 +393,101 @@ export const processNewsletterBatchTask = task({
     metadata.set("totalBatches", totalBatches);
     metadata.set("recipientCount", recipients.length);
 
-    const results: { success: boolean; email: string; error?: string }[] = [];
+    const results: { success: boolean; email: string; error?: string; providerMessageId?: string }[] = [];
+    const fromEmail = payload.from || process.env.EMAIL_FROM || "admin@zendwise.com";
 
-    for (let i = 0; i < recipients.length; i++) {
-      const recipient = recipients[i];
-
-      try {
-        const { data: emailData, error } = await resend.emails.send({
-          from: payload.from || process.env.EMAIL_FROM || "admin@zendwise.com",
-          to: recipient.email,
-          subject: payload.subject,
-          html: payload.content,
-          text: payload.content.replace(/<[^>]*>/g, ""),
-          replyTo: payload.replyTo,
-          tags: [
-            { name: "type", value: "newsletter" },
-            { name: "newsletterId", value: payload.newsletterId },
-            { name: "groupUUID", value: payload.groupUUID },
-            { name: "tenantId", value: payload.tenantId },
-          ],
-        });
-
-        if (error) {
-          results.push({ success: false, email: recipient.email, error: error.message });
-        } else {
-          results.push({ success: true, email: recipient.email });
-        }
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Unknown error";
-        results.push({ success: false, email: recipient.email, error: errorMessage });
+    if (recipients.length >= BULK_THRESHOLD) {
+      // ── BULK SEND: use Resend batch API (or AhaSend fallback) ──
+      const bulkChunks: NewsletterRecipient[][] = [];
+      for (let c = 0; c < recipients.length; c += 100) {
+        bulkChunks.push(recipients.slice(c, c + 100));
       }
 
-      // Small delay between emails to avoid rate limiting
-      if (i < recipients.length - 1) {
-        await wait.for({ seconds: 0.5 });
+      for (const chunk of bulkChunks) {
+        const bulkResults = await sendBulkEmails({
+          recipients: chunk,
+          subject: payload.subject,
+          content: payload.content,
+          from: fromEmail,
+          replyTo: payload.replyTo,
+          newsletterId: payload.newsletterId,
+          groupUUID: payload.groupUUID,
+          tenantId: payload.tenantId,
+        });
+
+        for (const result of bulkResults) {
+          results.push({
+            success: result.success,
+            email: result.recipientEmail,
+            error: result.error,
+            providerMessageId: result.providerMessageId,
+          });
+        }
+      }
+    } else {
+      // ── INDIVIDUAL SEND: fewer than BULK_THRESHOLD recipients ──
+      for (let i = 0; i < recipients.length; i++) {
+        const recipient = recipients[i];
+
+        try {
+          const emailTrackingId = randomUUID();
+          let emailData: any = null;
+          let sendError: any = null;
+
+          const { data: resendData, error: resendError } = await resend.emails.send({
+            from: fromEmail,
+            to: recipient.email,
+            subject: payload.subject,
+            html: payload.content,
+            text: payload.content.replace(/<[^>]*>/g, ""),
+            replyTo: payload.replyTo,
+            tags: [
+              { name: "type", value: "newsletter" },
+              { name: "newsletterId", value: payload.newsletterId },
+              { name: "groupUUID", value: payload.groupUUID },
+              { name: "tenantId", value: payload.tenantId },
+              { name: "recipientId", value: recipient.id },
+              { name: "trackingId", value: emailTrackingId },
+            ],
+          });
+
+          emailData = resendData;
+          sendError = resendError;
+
+          if (sendError) {
+            logger.warn("Resend failed, falling back to AhaSend", { error: sendError.message, to: recipient.email });
+            try {
+              const ahaResult = await sendAhaEmail({
+                from: { email: fromEmail },
+                recipients: [{ email: recipient.email }],
+                subject: payload.subject,
+                html_content: payload.content,
+                text_content: payload.content.replace(/<[^>]*>/g, ""),
+                reply_to: payload.replyTo,
+              });
+              const ahaMessages: any[] = ahaResult?.data || [];
+              const ahaMsg = ahaMessages.find((m: any) => m?.recipient?.email?.toLowerCase() === recipient.email.toLowerCase());
+              emailData = { id: ahaMsg?.id || ahaResult.id || ahaResult.message_id || 'ahasend-fallback-success' };
+              sendError = null;
+            } catch (ahaError) {
+              sendError = ahaError;
+            }
+          }
+
+          if (sendError) {
+            results.push({ success: false, email: recipient.email, error: sendError.message || String(sendError) });
+          } else {
+            results.push({ success: true, email: recipient.email, providerMessageId: emailData?.id });
+          }
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : "Unknown error";
+          results.push({ success: false, email: recipient.email, error: errorMessage });
+        }
+
+        // Small delay between individual emails to avoid rate limiting
+        if (i < recipients.length - 1) {
+          await wait.for({ seconds: 0.5 });
+        }
       }
     }
 
@@ -292,6 +498,7 @@ export const processNewsletterBatchTask = task({
       newsletterId,
       success: successCount,
       failed: failedCount,
+      mode: recipients.length >= BULK_THRESHOLD ? "bulk" : "individual",
     });
 
     return {
@@ -338,41 +545,21 @@ export const sendNewsletterTask = task({
       }
     }
 
-    metadata.set("status", "filtering");
+    // NOTE: Suppression filtering is done by the server (newsletterRoutes.ts) BEFORE
+    // triggering this task. Recipients passed here are already filtered.
+    // Convex tracking for suppressed contacts is also handled server-side.
 
-    // Initialize Convex newsletter tracking (fire-and-forget)
-    try {
-      const convex = getConvex();
-      if (convex) {
-        await convex.mutation("newsletterTracking:initNewsletterSend" as any, {
-          tenantId: data.tenantId,
-          newsletterId: data.newsletterId,
-          totalRecipients: data.recipients.length,
-        });
-        logger.info("Convex tracking initialized");
-      }
-    } catch (err) {
-      logger.warn("Failed to init Convex tracking (non-fatal)", { error: String(err) });
-    }
+    const validRecipients = data.recipients;
 
-    // Filter out suppressed emails
-    const suppressedEmails = await getSuppressionList(data.tenantId);
-    const validRecipients = data.recipients.filter(
-      (r) => !suppressedEmails.has(r.email.toLowerCase())
-    );
-
-    logger.info("Recipients filtered", {
-      original: data.recipients.length,
-      valid: validRecipients.length,
-      suppressed: data.recipients.length - validRecipients.length,
+    logger.info("Processing recipients", {
+      count: validRecipients.length,
     });
 
     metadata.set("validRecipients", validRecipients.length);
-    metadata.set("suppressedCount", data.recipients.length - validRecipients.length);
 
     if (validRecipients.length === 0) {
       logger.warn("No valid recipients after filtering");
-      
+
       // Complete Convex tracking since no emails will be sent
       try {
         const convex = getConvex();
@@ -387,7 +574,7 @@ export const sendNewsletterTask = task({
       } catch (err) {
         logger.warn("Failed to complete Convex tracking for zero recipients (non-fatal)", { error: String(err) });
       }
-      
+
       await updateNewsletterStatusInternal(data.newsletterId, "sent", {
         sentCount: 0,
         failedCount: 0,
@@ -422,57 +609,169 @@ export const sendNewsletterTask = task({
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
       const batchNumber = i + 1;
+      const fromEmail = data.from || process.env.EMAIL_FROM || "admin@zendwise.com";
 
       logger.info(`Processing batch ${batchNumber}/${batches.length}`, {
         recipientCount: batch.length,
+        mode: batch.length >= BULK_THRESHOLD ? "bulk" : "individual",
       });
 
       metadata.set("currentBatch", batchNumber);
 
-      // Process each recipient in the batch
-      for (let j = 0; j < batch.length; j++) {
-        const recipient = batch[j];
+      if (batch.length >= BULK_THRESHOLD) {
+        // ── BULK SEND: use Resend batch API (or AhaSend fallback) ──
+        // Resend batch API supports up to 100 per call; split if needed
+        const bulkChunks: NewsletterRecipient[][] = [];
+        for (let c = 0; c < batch.length; c += 100) {
+          bulkChunks.push(batch.slice(c, c + 100));
+        }
 
-        try {
-          // Verify Resend API key is configured
-          if (!process.env.RESEND_API_KEY) {
-            logger.error("RESEND_API_KEY is not configured in Trigger.dev environment");
+        for (const chunk of bulkChunks) {
+          const bulkResults = await sendBulkEmails({
+            recipients: chunk,
+            subject: data.subject,
+            content: data.content,
+            from: fromEmail,
+            replyTo: data.replyTo,
+            newsletterId: data.newsletterId,
+            groupUUID: data.groupUUID,
+            tenantId: data.tenantId,
+          });
+
+          // Track each result individually in Convex
+          for (const result of bulkResults) {
+            if (result.success) {
+              totalSent++;
+              try {
+                const convex = getConvex();
+                if (convex) {
+                  await convex.mutation("newsletterTracking:trackEmailSend" as any, {
+                    tenantId: data.tenantId,
+                    newsletterId: data.newsletterId,
+                    groupUUID: data.groupUUID,
+                    recipientEmail: result.recipientEmail,
+                    recipientId: result.recipientId,
+                    providerMessageId: result.providerMessageId,
+                    status: "queued",
+                  });
+                }
+              } catch (_) { }
+            } else {
+              totalFailed++;
+              errors.push({ email: result.recipientEmail, error: result.error || "Unknown error" });
+              try {
+                const convex = getConvex();
+                if (convex) {
+                  await convex.mutation("newsletterTracking:trackEmailSend" as any, {
+                    tenantId: data.tenantId,
+                    newsletterId: data.newsletterId,
+                    groupUUID: data.groupUUID,
+                    recipientEmail: result.recipientEmail,
+                    recipientId: result.recipientId,
+                    status: "failed",
+                    error: result.error || "Unknown error",
+                  });
+                }
+              } catch (_) { }
+            }
           }
 
-          const fromEmail = data.from || process.env.EMAIL_FROM || "admin@zendwise.com";
-          logger.info(`Sending email via Resend`, {
-            to: recipient.email,
-            from: fromEmail,
-            subject: data.subject,
-            hasApiKey: !!process.env.RESEND_API_KEY,
-          });
+          // Update progress after each bulk chunk
+          const processed = totalSent + totalFailed;
+          const progress = Math.round((processed / validRecipients.length) * 100);
+          metadata.set("sentCount", totalSent);
+          metadata.set("failedCount", totalFailed);
+          metadata.set("progress", progress);
+        }
+      } else {
+        // ── INDIVIDUAL SEND: fewer than BULK_THRESHOLD recipients ──
+        for (let j = 0; j < batch.length; j++) {
+          const recipient = batch[j];
 
-          const { data: emailData, error } = await resend.emails.send({
-            from: fromEmail,
-            to: recipient.email,
-            subject: data.subject,
-            html: data.content,
-            text: data.content.replace(/<[^>]*>/g, ""),
-            replyTo: data.replyTo,
-            tags: [
-              { name: "type", value: "newsletter" },
-              { name: "newsletterId", value: data.newsletterId },
-              { name: "groupUUID", value: data.groupUUID },
-              { name: "tenantId", value: data.tenantId },
-            ],
-          });
+          try {
+            const emailTrackingId = randomUUID();
+            let emailData: any = null;
+            let sendError: any = null;
 
-          logger.info("Resend API response", {
-            emailId: emailData?.id,
-            error: error ? JSON.stringify(error) : null,
-            hasData: !!emailData,
-          });
+            const { data: resendData, error: resendError } = await resend.emails.send({
+              from: fromEmail,
+              to: recipient.email,
+              subject: data.subject,
+              html: data.content,
+              text: data.content.replace(/<[^>]*>/g, ""),
+              replyTo: data.replyTo,
+              tags: [
+                { name: "type", value: "newsletter" },
+                { name: "newsletterId", value: data.newsletterId },
+                { name: "groupUUID", value: data.groupUUID },
+                { name: "tenantId", value: data.tenantId },
+                { name: "recipientId", value: recipient.id },
+                { name: "trackingId", value: emailTrackingId },
+              ],
+            });
 
-          if (error) {
+            emailData = resendData;
+            sendError = resendError;
+
+            if (sendError) {
+              logger.warn("Resend failed, falling back to AhaSend", { error: sendError.message, to: recipient.email });
+              try {
+                const ahaResult = await sendAhaEmail({
+                  from: { email: fromEmail },
+                  recipients: [{ email: recipient.email }],
+                  subject: data.subject,
+                  html_content: data.content,
+                  text_content: data.content.replace(/<[^>]*>/g, ""),
+                  reply_to: data.replyTo,
+                });
+                // Extract per-recipient message ID from AhaSend v2 response
+                const ahaMessages: any[] = ahaResult?.data || [];
+                const ahaMsg = ahaMessages.find((m: any) => m?.recipient?.email?.toLowerCase() === recipient.email.toLowerCase());
+                emailData = { id: ahaMsg?.id || ahaResult.id || ahaResult.message_id || 'ahasend-fallback-success' };
+                sendError = null;
+              } catch (ahaError) {
+                sendError = ahaError;
+              }
+            }
+
+            if (sendError) {
+              totalFailed++;
+              errors.push({ email: recipient.email, error: sendError.message || String(sendError) });
+              try {
+                const convex = getConvex();
+                if (convex) {
+                  await convex.mutation("newsletterTracking:trackEmailSend" as any, {
+                    tenantId: data.tenantId,
+                    newsletterId: data.newsletterId,
+                    groupUUID: data.groupUUID,
+                    recipientEmail: recipient.email,
+                    recipientId: recipient.id,
+                    status: "failed",
+                    error: sendError.message || String(sendError),
+                  });
+                }
+              } catch (_) { }
+            } else {
+              totalSent++;
+              try {
+                const convex = getConvex();
+                if (convex) {
+                  await convex.mutation("newsletterTracking:trackEmailSend" as any, {
+                    tenantId: data.tenantId,
+                    newsletterId: data.newsletterId,
+                    groupUUID: data.groupUUID,
+                    recipientEmail: recipient.email,
+                    recipientId: recipient.id,
+                    providerMessageId: emailData?.id,
+                    status: "queued",
+                  });
+                }
+              } catch (_) { }
+            }
+          } catch (err) {
             totalFailed++;
-            errors.push({ email: recipient.email, error: error.message });
-
-            // Track failed send in Convex
+            const errorMessage = err instanceof Error ? err.message : "Unknown error";
+            errors.push({ email: recipient.email, error: errorMessage });
             try {
               const convex = getConvex();
               if (convex) {
@@ -483,61 +782,23 @@ export const sendNewsletterTask = task({
                   recipientEmail: recipient.email,
                   recipientId: recipient.id,
                   status: "failed",
-                  error: error.message,
+                  error: errorMessage,
                 });
               }
-            } catch (_) {}
-          } else {
-            totalSent++;
-
-            // Track successful send in Convex
-            try {
-              const convex = getConvex();
-              if (convex) {
-                await convex.mutation("newsletterTracking:trackEmailSend" as any, {
-                  tenantId: data.tenantId,
-                  newsletterId: data.newsletterId,
-                  groupUUID: data.groupUUID,
-                  recipientEmail: recipient.email,
-                  recipientId: recipient.id,
-                  providerMessageId: emailData?.id,
-                  status: "queued",
-                });
-              }
-            } catch (_) {}
+            } catch (_) { }
           }
-        } catch (err) {
-          totalFailed++;
-          const errorMessage = err instanceof Error ? err.message : "Unknown error";
-          errors.push({ email: recipient.email, error: errorMessage });
 
-          // Track error in Convex
-          try {
-            const convex = getConvex();
-            if (convex) {
-              await convex.mutation("newsletterTracking:trackEmailSend" as any, {
-                tenantId: data.tenantId,
-                newsletterId: data.newsletterId,
-                groupUUID: data.groupUUID,
-                recipientEmail: recipient.email,
-                recipientId: recipient.id,
-                status: "failed",
-                error: errorMessage,
-              });
-            }
-          } catch (_) {}
-        }
+          // Update progress
+          const processed = totalSent + totalFailed;
+          const progress = Math.round((processed / validRecipients.length) * 100);
+          metadata.set("sentCount", totalSent);
+          metadata.set("failedCount", totalFailed);
+          metadata.set("progress", progress);
 
-        // Update progress
-        const processed = totalSent + totalFailed;
-        const progress = Math.round((processed / validRecipients.length) * 100);
-        metadata.set("sentCount", totalSent);
-        metadata.set("failedCount", totalFailed);
-        metadata.set("progress", progress);
-
-        // Small delay between emails
-        if (j < batch.length - 1) {
-          await wait.for({ seconds: 0.5 });
+          // Small delay between individual emails
+          if (j < batch.length - 1) {
+            await wait.for({ seconds: 0.5 });
+          }
         }
       }
 

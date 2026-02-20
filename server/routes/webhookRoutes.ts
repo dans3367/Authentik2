@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
+import { emailSends, bouncedEmails, emailContacts, emailEvents } from '@shared/schema';
 import { authenticateToken } from '../middleware/auth-middleware';
 import { createHmac } from 'crypto';
-import { trackNewsletterEvent } from '../utils/convexNewsletterTracker';
+import { getConvexClient, api } from '../utils/convexClient';
 
 export const webhookRoutes = Router();
 
@@ -132,13 +133,24 @@ webhookRoutes.post("/resend", async (req, res) => {
 
     const event = req.body;
 
+    // Extract newsletter tracking tags from webhook data for correlation
+    const newsletterTags = event.data ? extractNewsletterTags(event.data) : null;
+
     console.log('Resend webhook event received:', {
       type: event.type,
       data: event.data,
+      ...(newsletterTags && { newsletterTags }),
       timestamp: new Date().toISOString(),
     });
 
-    // Handle different event types
+    // Forward to Convex internal handler (fire-and-forget)
+    const client = getConvexClient();
+    if (client) {
+      client.action(api.webhookHandlers.handleResendWebhook, { payload: event })
+        .catch(err => console.error('Convex Resend webhook handler failed:', err));
+    }
+
+    // Handle different event types (SQL updates)
     switch (event.type) {
       case 'email.sent':
         await handleEmailSent(event.data);
@@ -157,6 +169,9 @@ webhookRoutes.post("/resend", async (req, res) => {
         break;
       case 'email.clicked':
         await handleEmailClicked(event.data);
+        break;
+      case 'email.suppressed':
+        await handleEmailSuppressed(event.data);
         break;
       default:
         console.log(`Unhandled Resend event type: ${event.type}`);
@@ -200,7 +215,14 @@ webhookRoutes.post("/postmark", async (req, res) => {
       timestamp: new Date().toISOString(),
     });
 
-    // Handle different event types
+    // Forward to Convex internal handler (fire-and-forget)
+    const client = getConvexClient();
+    if (client) {
+      client.action(api.webhookHandlers.handlePostmarkWebhook, { payload: event })
+        .catch(err => console.error('Convex Postmark webhook handler failed:', err));
+    }
+
+    // Handle different event types (SQL updates)
     switch (event.RecordType) {
       case 'Sent':
         await handleEmailSent(event);
@@ -231,10 +253,137 @@ webhookRoutes.post("/postmark", async (req, res) => {
   }
 });
 
+// AhaSend webhook endpoint
+webhookRoutes.post("/ahasend", async (req, res) => {
+  try {
+    const webhookId = req.headers['webhook-id'] as string;
+    const webhookTimestamp = req.headers['webhook-timestamp'] as string;
+    const webhookSignature = req.headers['webhook-signature'] as string;
+    const webhookSecret = process.env.AHASEND_WEBHOOK_SECRET;
+
+    if (!webhookSecret) {
+      console.warn('⚠️ AHASEND_WEBHOOK_SECRET not configured - skipping signature verification');
+    }
+
+    // Verify Standard Webhooks signature if secret is configured
+    if (webhookSecret && webhookId && webhookTimestamp && webhookSignature) {
+      // Standard Webhooks: sign "${webhook-id}.${webhook-timestamp}.${body}"
+      const secretBase64 = webhookSecret.startsWith('whsec_')
+        ? webhookSecret.slice(6)
+        : webhookSecret;
+      const secretBuffer = Buffer.from(secretBase64, 'base64');
+      const signedContent = `${webhookId}.${webhookTimestamp}.${JSON.stringify(req.body)}`;
+      const expectedSignature = createHmac('sha256', secretBuffer)
+        .update(signedContent)
+        .digest('base64');
+
+      const signatures = webhookSignature.split(' ');
+      const isValid = signatures.some((sig) => {
+        const parts = sig.split(',');
+        if (parts.length !== 2 || parts[0] !== 'v1') return false;
+        return parts[1] === expectedSignature;
+      });
+
+      if (!isValid) {
+        console.error('Invalid AhaSend webhook signature');
+        return res.status(401).json({ message: 'Invalid signature' });
+      }
+      console.log('✅ AhaSend webhook signature verified');
+    }
+
+    const event = req.body;
+
+    // AhaSend event lifecycle:
+    //   message.reception  → AhaSend received & queued (maps to "sent")
+    //   message.delivered   → Recipient mail server accepted (maps to "delivered")
+    //   message.opened      → Recipient opened (requires open tracking enabled in AhaSend)
+    //   message.clicked     → Recipient clicked a link
+    // Note: AhaSend has NO separate "sent to recipient server" event.
+    // For delivered/opened/clicked we fire a synthetic "sent" first to ensure
+    // correct Queued → Sent → Delivered → Opened ordering.
+    const ahasendEventTypeMap: Record<string, string> = {
+      'message.reception': 'sent',
+      'message.delivered': 'delivered',
+      'message.opened': 'opened',
+      'message.clicked': 'clicked',
+      'message.bounced': 'bounced',
+      'message.failed': 'failed',
+      'message.suppressed': 'suppressed',
+      'message.deferred': 'deferred',
+      'message.transient_error': 'deferred',
+      'suppression.created': 'suppressed',
+    };
+
+    const normalisedType = ahasendEventTypeMap[event.type];
+
+    console.log('AhaSend webhook event received:', {
+      type: event.type,
+      normalisedType,
+      recipient: event.data?.recipient,
+      id: event.data?.id,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Forward to Convex internal handler (fire-and-forget)
+    const client = getConvexClient();
+    if (client) {
+      client.action(api.webhookHandlers.handleAhaSendWebhook, { payload: event })
+        .catch(err => console.error('Convex AhaSend webhook handler failed:', err));
+    }
+
+    // Handle SQL updates using existing handlers with normalized AhaSend data
+    if (normalisedType && normalisedType !== 'deferred' && event.data) {
+      // Normalize AhaSend data to match the format expected by existing handlers
+      const normalizedData = {
+        ...event.data,
+        to: event.data.recipient ? [event.data.recipient] : [],
+        email_id: event.data.id,
+      };
+
+      // For delivered/opened/clicked: fire synthetic "sent" first to ensure ordering
+      if (normalisedType === 'delivered' || normalisedType === 'opened' || normalisedType === 'clicked') {
+        await handleEmailSent(normalizedData);
+      }
+
+      switch (normalisedType) {
+        case 'sent':
+          await handleEmailSent(normalizedData);
+          break;
+        case 'delivered':
+          await handleEmailDelivered(normalizedData);
+          break;
+        case 'bounced':
+          await handleEmailBounced(normalizedData);
+          break;
+        case 'opened':
+          await handleEmailOpened(normalizedData);
+          break;
+        case 'clicked':
+          await handleEmailClicked(normalizedData);
+          break;
+        case 'suppressed':
+          await handleEmailSuppressed(normalizedData);
+          break;
+        case 'failed':
+          await handleEmailBounced(normalizedData);
+          break;
+        default:
+          console.log(`Unhandled AhaSend event type: ${event.type}`);
+      }
+    }
+
+    res.json({ received: true });
+  } catch (error) {
+    console.error('AhaSend webhook error:', error);
+    res.status(500).json({ message: 'Webhook processing failed' });
+  }
+});
+
 // Helper functions for webhook event handling
 async function handleEmailSent(data: any) {
   try {
-    console.log('Email sent event:', data);
+    const nlTags = extractNewsletterTags(data);
+    console.log('Email sent event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
 
     // Extract provider_message_id from webhook data
     const providerMessageId = extractProviderMessageId(data);
@@ -243,7 +392,7 @@ async function handleEmailSent(data: any) {
       return;
     }
 
-    console.log(`Processing sent event for provider_message_id: ${providerMessageId}`);
+    console.log(`Processing sent event for provider_message_id: ${providerMessageId}`, nlTags ? `[trackingId=${nlTags.trackingId}]` : '');
 
     // Find the email_sends record
     const emailSend = await findEmailSendByProviderId(providerMessageId);
@@ -253,13 +402,13 @@ async function handleEmailSent(data: any) {
     }
 
     // Update email_sends status
-    await db.update(db.emailSends)
+    await db.update(emailSends)
       .set({
         status: 'sent',
         sentAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(sql`${db.emailSends.id} = ${emailSend.id}`);
+      .where(sql`${emailSends.id} = ${emailSend.id}`);
 
     // Create email_events record
     await createEmailEvent(emailSend.id, data, 'sent');
@@ -269,16 +418,7 @@ async function handleEmailSent(data: any) {
       await updateContactMetrics(emailSend.contactId, 'sent');
     }
 
-    // Track in Convex for live updates (fire-and-forget)
-    if (emailSend.newsletterId) {
-      trackNewsletterEvent({
-        tenantId: emailSend.tenantId,
-        newsletterId: emailSend.newsletterId,
-        recipientEmail: emailSend.recipientEmail,
-        providerMessageId,
-        eventType: 'sent',
-      }).catch(() => {});
-    }
+
 
     console.log(`Successfully processed sent event for email_send: ${emailSend.id}`);
   } catch (error) {
@@ -288,7 +428,8 @@ async function handleEmailSent(data: any) {
 
 async function handleEmailDelivered(data: any) {
   try {
-    console.log('Email delivered event:', data);
+    const nlTags = extractNewsletterTags(data);
+    console.log('Email delivered event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
 
     // Extract provider_message_id from webhook data
     const providerMessageId = extractProviderMessageId(data);
@@ -297,7 +438,7 @@ async function handleEmailDelivered(data: any) {
       return;
     }
 
-    console.log(`Processing delivered event for provider_message_id: ${providerMessageId}`);
+    console.log(`Processing delivered event for provider_message_id: ${providerMessageId}`, nlTags ? `[trackingId=${nlTags.trackingId}]` : '');
 
     // Find the email_sends record
     const emailSend = await findEmailSendByProviderId(providerMessageId);
@@ -307,13 +448,13 @@ async function handleEmailDelivered(data: any) {
     }
 
     // Update email_sends status
-    await db.update(db.emailSends)
+    await db.update(emailSends)
       .set({
         status: 'delivered',
         deliveredAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(sql`${db.emailSends.id} = ${emailSend.id}`);
+      .where(sql`${emailSends.id} = ${emailSend.id}`);
 
     // Create email_events record
     await createEmailEvent(emailSend.id, data, 'delivered');
@@ -323,16 +464,7 @@ async function handleEmailDelivered(data: any) {
       await updateContactMetrics(emailSend.contactId, 'delivered');
     }
 
-    // Track in Convex for live updates (fire-and-forget)
-    if (emailSend.newsletterId) {
-      trackNewsletterEvent({
-        tenantId: emailSend.tenantId,
-        newsletterId: emailSend.newsletterId,
-        recipientEmail: emailSend.recipientEmail,
-        providerMessageId,
-        eventType: 'delivered',
-      }).catch(() => {});
-    }
+
 
     console.log(`Successfully processed delivered event for email_send: ${emailSend.id}`);
   } catch (error) {
@@ -342,8 +474,9 @@ async function handleEmailDelivered(data: any) {
 
 async function handleEmailBounced(data: any) {
   try {
-    console.log('Email bounced event:', data);
-    
+    const nlTags = extractNewsletterTags(data);
+    console.log('Email bounced event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
+
     // Extract provider_message_id from webhook data
     const providerMessageId = extractProviderMessageId(data);
     const email = data.email || data.Email;
@@ -354,27 +487,18 @@ async function handleEmailBounced(data: any) {
     if (providerMessageId) {
       const emailSend = await findEmailSendByProviderId(providerMessageId);
       if (emailSend) {
-        await db.update(db.emailSends)
+        await db.update(emailSends)
           .set({
             status: 'bounced',
             errorMessage: description,
             updatedAt: new Date(),
           })
-          .where(sql`${db.emailSends.id} = ${emailSend.id}`);
+          .where(sql`${emailSends.id} = ${emailSend.id}`);
 
         // Create email_events record
         await createEmailEvent(emailSend.id, data, 'bounced');
 
-        // Track in Convex for live updates (fire-and-forget)
-        if (emailSend.newsletterId) {
-          trackNewsletterEvent({
-            tenantId: emailSend.tenantId,
-            newsletterId: emailSend.newsletterId,
-            recipientEmail: emailSend.recipientEmail,
-            providerMessageId,
-            eventType: 'bounced',
-          }).catch(() => {});
-        }
+
 
         console.log(`Updated email_send ${emailSend.id} as bounced`);
       }
@@ -384,11 +508,11 @@ async function handleEmailBounced(data: any) {
     if (email) {
       // Check if already exists
       const existingBounce = await db.query.bouncedEmails.findFirst({
-        where: sql`${db.bouncedEmails.email} = ${email}`,
+        where: sql`${bouncedEmails.email} = ${email}`,
       });
 
       if (!existingBounce) {
-        await db.insert(db.bouncedEmails).values({
+        await db.insert(bouncedEmails).values({
           email,
           reason,
           description,
@@ -404,8 +528,9 @@ async function handleEmailBounced(data: any) {
 
 async function handleEmailComplained(data: any) {
   try {
-    console.log('Email complained event:', data);
-    
+    const nlTags = extractNewsletterTags(data);
+    console.log('Email complained event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
+
     // Extract provider_message_id from webhook data
     const providerMessageId = extractProviderMessageId(data);
     const email = data.email || data.Email;
@@ -424,16 +549,7 @@ async function handleEmailComplained(data: any) {
         // Create email_events record
         await createEmailEvent(emailSend.id, data, 'complained');
 
-        // Track in Convex for live updates (fire-and-forget)
-        if (emailSend.newsletterId) {
-          trackNewsletterEvent({
-            tenantId: emailSend.tenantId,
-            newsletterId: emailSend.newsletterId,
-            recipientEmail: emailSend.recipientEmail,
-            providerMessageId,
-            eventType: 'complained',
-          }).catch(() => {});
-        }
+
 
         console.log(`Recorded complaint event for email_send ${emailSend.id}`);
       }
@@ -443,11 +559,11 @@ async function handleEmailComplained(data: any) {
     if (email) {
       // Check if already exists
       const existingBounce = await db.query.bouncedEmails.findFirst({
-        where: sql`${db.bouncedEmails.email} = ${email}`,
+        where: sql`${bouncedEmails.email} = ${email}`,
       });
 
       if (!existingBounce) {
-        await db.insert(db.bouncedEmails).values({
+        await db.insert(bouncedEmails).values({
           email,
           bounceType: 'complaint',
           bounceReason: description,
@@ -464,9 +580,103 @@ async function handleEmailComplained(data: any) {
   }
 }
 
+async function handleEmailSuppressed(data: any) {
+  try {
+    const nlTags = extractNewsletterTags(data);
+    console.log('Email suppressed event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
+
+    const providerMessageId = extractProviderMessageId(data);
+    // Use extractRecipientEmail to handle Resend's data.to array format (same as all other handlers)
+    const email = extractRecipientEmail(data) || data.email || data.Email;
+    const reason = data.reason || data.type || 'suppressed';
+    const description = data.description || data.message || 'Email suppressed by provider';
+
+    if (!email) {
+      console.error('Could not extract email from suppression webhook data:', JSON.stringify(data, null, 2));
+      return;
+    }
+
+    console.log(`Processing suppression event for: ${email}`);
+
+    let sourceTenantId: string | null = null;
+
+    // Update email_sends if we have provider_message_id
+    if (providerMessageId) {
+      const emailSend = await findEmailSendByProviderId(providerMessageId);
+      if (emailSend) {
+        sourceTenantId = emailSend.tenantId || null;
+
+        await db.update(emailSends)
+          .set({
+            status: 'suppressed',
+            errorMessage: description,
+            updatedAt: new Date(),
+          })
+          .where(sql`${emailSends.id} = ${emailSend.id}`);
+
+        // Create email_events record
+        await createEmailEvent(emailSend.id, data, 'suppressed');
+
+
+
+        console.log(`Updated email_send ${emailSend.id} as suppressed`);
+      }
+    }
+
+    // Add to global suppression list (bouncedEmails table)
+    if (email) {
+      const emailLower = email.toLowerCase().trim();
+
+      const existingSuppression = await db.query.bouncedEmails.findFirst({
+        where: sql`${bouncedEmails.email} = ${emailLower}`,
+      });
+
+      if (!existingSuppression) {
+        await db.insert(bouncedEmails).values({
+          email: emailLower,
+          bounceType: 'suppressed',
+          bounceReason: description,
+          firstBouncedAt: new Date(),
+          lastBouncedAt: new Date(),
+          sourceTenantId,
+          suppressionReason: reason,
+        });
+        console.log(`Added suppressed email to global list: ${emailLower}`);
+      } else {
+        // Update existing record with latest suppression info
+        await db.update(bouncedEmails)
+          .set({
+            lastBouncedAt: new Date(),
+            bounceCount: sql`COALESCE(${bouncedEmails.bounceCount}, 1) + 1`,
+            isActive: true,
+            updatedAt: new Date(),
+          })
+          .where(sql`${bouncedEmails.id} = ${existingSuppression.id}`);
+      }
+
+      // Update contact status to 'suppressed' for all tenants that have this contact
+      try {
+        await db.update(emailContacts)
+          .set({
+            status: 'suppressed',
+            lastActivity: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(sql`LOWER(${emailContacts.email}) = ${emailLower} AND ${emailContacts.status} != 'suppressed'`);
+        console.log(`Updated contact status to suppressed for: ${emailLower}`);
+      } catch (contactErr) {
+        console.error('Error updating contact status for suppressed email:', contactErr);
+      }
+    }
+  } catch (error) {
+    console.error('Error handling email suppressed event:', error);
+  }
+}
+
 async function handleEmailOpened(data: any) {
   try {
-    console.log('Email opened event:', data);
+    const nlTags = extractNewsletterTags(data);
+    console.log('Email opened event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
 
     // Extract provider_message_id from webhook data
     const providerMessageId = extractProviderMessageId(data);
@@ -475,7 +685,7 @@ async function handleEmailOpened(data: any) {
       return;
     }
 
-    console.log(`Processing opened event for provider_message_id: ${providerMessageId}`);
+    console.log(`Processing opened event for provider_message_id: ${providerMessageId}`, nlTags ? `[trackingId=${nlTags.trackingId}]` : '');
 
     // Find the email_sends record
     const emailSend = await findEmailSendByProviderId(providerMessageId);
@@ -492,17 +702,7 @@ async function handleEmailOpened(data: any) {
       await updateContactMetrics(emailSend.contactId, 'opened');
     }
 
-    // Track in Convex for live updates (fire-and-forget)
-    if (emailSend.newsletterId) {
-      trackNewsletterEvent({
-        tenantId: emailSend.tenantId,
-        newsletterId: emailSend.newsletterId,
-        recipientEmail: emailSend.recipientEmail,
-        providerMessageId,
-        eventType: 'opened',
-        metadata: { userAgent: data.user_agent, ipAddress: data.ip_address },
-      }).catch(() => {});
-    }
+
 
     console.log(`Successfully processed opened event for email_send: ${emailSend.id}`);
   } catch (error) {
@@ -512,7 +712,8 @@ async function handleEmailOpened(data: any) {
 
 async function handleEmailClicked(data: any) {
   try {
-    console.log('Email clicked event:', data);
+    const nlTags = extractNewsletterTags(data);
+    console.log('Email clicked event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
 
     // Extract provider_message_id from webhook data
     const providerMessageId = extractProviderMessageId(data);
@@ -521,7 +722,7 @@ async function handleEmailClicked(data: any) {
       return;
     }
 
-    console.log(`Processing clicked event for provider_message_id: ${providerMessageId}`);
+    console.log(`Processing clicked event for provider_message_id: ${providerMessageId}`, nlTags ? `[trackingId=${nlTags.trackingId}]` : '');
 
     // Find the email_sends record
     const emailSend = await findEmailSendByProviderId(providerMessageId);
@@ -538,17 +739,7 @@ async function handleEmailClicked(data: any) {
       await updateContactMetrics(emailSend.contactId, 'clicked');
     }
 
-    // Track in Convex for live updates (fire-and-forget)
-    if (emailSend.newsletterId) {
-      trackNewsletterEvent({
-        tenantId: emailSend.tenantId,
-        newsletterId: emailSend.newsletterId,
-        recipientEmail: emailSend.recipientEmail,
-        providerMessageId,
-        eventType: 'clicked',
-        metadata: { userAgent: data.user_agent, ipAddress: data.ip_address, link: data.link || data.click?.link },
-      }).catch(() => {});
-    }
+
 
     console.log(`Successfully processed clicked event for email_send: ${emailSend.id}`);
   } catch (error) {
@@ -577,11 +768,48 @@ function extractProviderMessageId(data: any): string | null {
   return null;
 }
 
+// Helper function to extract newsletter tracking tags from Resend webhook data
+// Resend sends tags as an object: { tagName: tagValue } in the webhook payload
+function extractNewsletterTags(data: any): { type?: string; newsletterId?: string; groupUUID?: string; tenantId?: string; recipientId?: string; trackingId?: string } | null {
+  const tags = data.tags;
+  if (!tags || typeof tags !== 'object') return null;
+
+  const result: any = {};
+  if (tags.type) result.type = tags.type;
+  if (tags.newsletterId) result.newsletterId = tags.newsletterId;
+  if (tags.groupUUID) result.groupUUID = tags.groupUUID;
+  if (tags.tenantId) result.tenantId = tags.tenantId;
+  if (tags.recipientId) result.recipientId = tags.recipientId;
+  if (tags.trackingId) result.trackingId = tags.trackingId;
+
+  return Object.keys(result).length > 0 ? result : null;
+}
+
+// Helper function to extract recipient email from webhook data
+function extractRecipientEmail(data: any): string | null {
+  // Resend format - uses 'to' as array of recipients
+  if (data.to && Array.isArray(data.to)) {
+    const recipient = data.to[0];
+    if (typeof recipient === 'string') return recipient;
+    if (recipient && recipient.email) return recipient.email;
+  } else if (data.to && typeof data.to === 'string') {
+    return data.to;
+  }
+
+  // Direct email field fallback
+  if (data.email) return data.email;
+
+  // Postmark format
+  if (data.Email) return data.Email;
+
+  return null;
+}
+
 // Helper function to find email_sends by provider_message_id
 async function findEmailSendByProviderId(providerMessageId: string) {
   try {
     const emailSend = await db.query.emailSends.findFirst({
-      where: sql`${db.emailSends.providerMessageId} = ${providerMessageId}`,
+      where: sql`${emailSends.providerMessageId} = ${providerMessageId}`,
     });
 
     return emailSend;
@@ -605,20 +833,20 @@ async function updateContactMetrics(contactId: string, activityType: string) {
     // Update specific metrics based on activity type
     switch (activityType) {
       case 'sent':
-        updateData.emailsSent = sql`${db.emailContacts.emailsSent} + 1`;
+        updateData.emailsSent = sql`${emailContacts.emailsSent} + 1`;
         break;
       case 'opened':
-        updateData.emailsOpened = sql`${db.emailContacts.emailsOpened} + 1`;
+        updateData.emailsOpened = sql`${emailContacts.emailsOpened} + 1`;
         break;
       case 'clicked':
         // Clicks also count as opens
-        updateData.emailsOpened = sql`${db.emailContacts.emailsOpened} + 1`;
+        updateData.emailsOpened = sql`${emailContacts.emailsOpened} + 1`;
         break;
     }
 
-    await db.update(db.emailContacts)
+    await db.update(emailContacts)
       .set(updateData)
-      .where(sql`${db.emailContacts.id} = ${contactId}`);
+      .where(sql`${emailContacts.id} = ${contactId}`);
 
     console.log(`Updated contact ${contactId} metrics for ${activityType}`);
   } catch (error) {
@@ -634,7 +862,7 @@ async function createEmailEvent(emailSendId: string, webhookData: any, eventType
     const ipAddress = webhookData.ip_address || webhookData.IPAddress;
     const webhookId = webhookData.id || webhookData.MessageID || webhookData.email_id;
 
-    await db.insert(db.emailEvents).values({
+    await db.insert(emailEvents).values({
       emailSendId,
       eventType,
       eventData: JSON.stringify(webhookData),

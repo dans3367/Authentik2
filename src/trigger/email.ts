@@ -2,9 +2,10 @@ import { task, wait, logger } from "@trigger.dev/sdk/v3";
 import { Resend } from "resend";
 import { z } from "zod";
 import { DB_RETRY_CONFIG, dbConnectionCatchError } from "./retryStrategy";
+import { sendAhaEmail } from "./ahasend";
 
 // Initialize Resend for email sending
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY || "re_placeholder");
 
 // Schema for email attachment (base64 encoded)
 const emailAttachmentSchema = z.object({
@@ -125,7 +126,10 @@ export const sendEmailTask = task({
         content_type: att.contentType,
       }));
 
-      const { data: emailData, error } = await resend.emails.send({
+      let emailData: any = null;
+      let sendError: any = null;
+
+      const { data: resendData, error: resendError } = await resend.emails.send({
         from: data.from || process.env.EMAIL_FROM || "admin@zendwise.com",
         to: recipients,
         subject: data.subject,
@@ -140,8 +144,38 @@ export const sendEmailTask = task({
         ...(resendAttachments && resendAttachments.length > 0 && { attachments: resendAttachments }),
       });
 
-      if (error) {
-        logger.error("Failed to send email", { error });
+      emailData = resendData;
+      sendError = resendError;
+
+      if (sendError) {
+        logger.warn("Resend failed, falling back to AhaSend", { error: sendError.message, to: recipients });
+        try {
+          const ahaResult = await sendAhaEmail({
+            from: { email: data.from || process.env.EMAIL_FROM || "admin@zendwise.com" },
+            recipients: recipients.map(r => ({ email: r })),
+            subject: data.subject,
+            html_content: data.html,
+            text_content: data.text,
+            reply_to: data.replyTo,
+            attachments: data.attachments?.map(att => ({
+              filename: att.filename,
+              content: att.content,
+              content_type: att.contentType,
+            })),
+          });
+          // Extract per-recipient message ID from AhaSend v2 response
+          const ahaMessages: any[] = ahaResult?.data || [];
+          const firstMsg = ahaMessages[0];
+          emailData = { id: firstMsg?.id || ahaResult.id || ahaResult.message_id || 'ahasend-fallback-success' };
+          sendError = null; // Mark as success since fallback worked
+        } catch (ahaError) {
+          logger.error("AhaSend fallback also failed", { error: ahaError instanceof Error ? ahaError.message : String(ahaError) });
+          sendError = ahaError;
+        }
+      }
+
+      if (sendError) {
+        logger.error("Failed to send email via both providers", { error: sendError });
 
         // If available, mark email_sends as failed
         if (data.metadata?.emailTrackingId) {
@@ -161,7 +195,7 @@ export const sendEmailTask = task({
           success: false,
           to: recipients,
           subject: data.subject,
-          error: error.message,
+          error: sendError.message || String(sendError),
         };
       }
 
@@ -254,7 +288,10 @@ export const sendBatchEmailsTask = task({
 
       for (const emailItem of batch) {
         try {
-          const { data: emailData, error } = await resend.emails.send({
+          let emailData: any = null;
+          let sendError: any = null;
+
+          const { data: resendData, error: resendError } = await resend.emails.send({
             from: fromAddress,
             to: emailItem.to,
             subject: emailItem.subject,
@@ -267,8 +304,28 @@ export const sendBatchEmailsTask = task({
             })) : undefined,
           });
 
-          if (error) {
-            results.push({ email: emailItem.to, success: false, error: error.message });
+          emailData = resendData;
+          sendError = resendError;
+
+          if (sendError) {
+            logger.warn("Resend batch item failed, falling back to AhaSend", { error: sendError.message, to: emailItem.to });
+            try {
+              const ahaResult = await sendAhaEmail({
+                from: { email: fromAddress },
+                recipients: [{ email: emailItem.to }],
+                subject: emailItem.subject,
+                html_content: emailItem.html,
+                text_content: emailItem.text,
+              });
+              emailData = { id: ahaResult.id || ahaResult.message_id || 'ahasend-fallback-success' };
+              sendError = null;
+            } catch (ahaError) {
+              sendError = ahaError;
+            }
+          }
+
+          if (sendError) {
+            results.push({ email: emailItem.to, success: false, error: sendError.message || String(sendError) });
           } else {
             results.push({ email: emailItem.to, success: true, emailId: emailData?.id });
           }

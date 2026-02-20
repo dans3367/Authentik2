@@ -9,6 +9,7 @@ export interface EmailMessage {
   attachments?: EmailAttachment[];
   headers?: Record<string, string>;
   metadata?: Record<string, any>;
+  tags?: Array<{ name: string; value: string }>;
 }
 
 export interface EmailAttachment {

@@ -6,7 +6,7 @@ import { wrapInEmailDesign } from "./emailWrapper";
 import { DB_RETRY_CONFIG, dbConnectionCatchError } from "./retryStrategy";
 
 // Initialize Resend for email sending
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY || "re_placeholder");
 
 /**
  * Generate HMAC signature for internal service authentication

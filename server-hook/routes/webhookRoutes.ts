@@ -91,7 +91,7 @@ webhookRoutes.post("/resend", async (req, res) => {
       query: req.query,
       params: req.params,
       body: req.body,
-      rawBody: req.rawBody,
+      rawBody: (req as any).rawBody,
       cookies: req.cookies,
       hostname: req.hostname,
       subdomains: req.subdomains,
@@ -124,7 +124,7 @@ webhookRoutes.post("/resend", async (req, res) => {
 
     // Verify webhook signature (only if secret is configured)
     if (signature && webhookSecret) {
-      const expectedSignature = createHmac('sha256', webhookSecret)
+      const expectedSignature = createHmac('sha256', webhookSecret!)
         .update(JSON.stringify(req.body))
         .digest('hex');
 
@@ -137,9 +137,13 @@ webhookRoutes.post("/resend", async (req, res) => {
 
     const event = req.body;
 
+    // Extract newsletter tracking tags from webhook data for correlation
+    const newsletterTags = event.data ? extractNewsletterTags(event.data) : null;
+
     console.log('Resend webhook event received:', {
       type: event.type,
       data: event.data,
+      ...(newsletterTags && { newsletterTags }),
       timestamp: new Date().toISOString(),
     });
 
@@ -162,6 +166,9 @@ webhookRoutes.post("/resend", async (req, res) => {
         break;
       case 'email.clicked':
         await handleEmailClicked(event.data);
+        break;
+      case 'email.suppressed':
+        await handleEmailSuppressed(event.data);
         break;
       default:
         console.log(`Unhandled Resend event type: ${event.type}`);
@@ -192,7 +199,7 @@ webhookRoutes.post("/postmark", async (req, res) => {
       query: req.query,
       params: req.params,
       body: req.body,
-      rawBody: req.rawBody,
+      rawBody: (req as any).rawBody,
       cookies: req.cookies,
       hostname: req.hostname,
       subdomains: req.subdomains,
@@ -225,7 +232,7 @@ webhookRoutes.post("/postmark", async (req, res) => {
 
     // Verify webhook signature
     if (signature) {
-      const expectedSignature = createHmac('sha256', webhookSecret)
+      const expectedSignature = createHmac('sha256', webhookSecret!)
         .update(JSON.stringify(req.body))
         .digest('hex');
 
@@ -274,10 +281,127 @@ webhookRoutes.post("/postmark", async (req, res) => {
   }
 });
 
+// AhaSend webhook endpoint
+webhookRoutes.post("/ahasend", async (req, res) => {
+  try {
+    const webhookId = req.headers['webhook-id'] as string;
+    const webhookTimestamp = req.headers['webhook-timestamp'] as string;
+    const webhookSignature = req.headers['webhook-signature'] as string;
+    const webhookSecret = process.env.AHASEND_WEBHOOK_SECRET;
+
+    if (!webhookSecret) {
+      console.warn('⚠️ AHASEND_WEBHOOK_SECRET not configured - skipping signature verification');
+    }
+
+    // Verify Standard Webhooks signature if secret is configured
+    if (webhookSecret && webhookId && webhookTimestamp && webhookSignature) {
+      const secretBase64 = webhookSecret.startsWith('whsec_')
+        ? webhookSecret.slice(6)
+        : webhookSecret;
+      const secretBuffer = Buffer.from(secretBase64, 'base64');
+      const signedContent = `${webhookId}.${webhookTimestamp}.${JSON.stringify(req.body)}`;
+      const expectedSignature = createHmac('sha256', secretBuffer)
+        .update(signedContent)
+        .digest('base64');
+
+      const signatures = webhookSignature.split(' ');
+      const isValid = signatures.some((sig) => {
+        const parts = sig.split(',');
+        if (parts.length !== 2 || parts[0] !== 'v1') return false;
+        return parts[1] === expectedSignature;
+      });
+
+      if (!isValid) {
+        console.error('Invalid AhaSend webhook signature');
+        return res.status(401).json({ message: 'Invalid signature' });
+      }
+      console.log('✅ AhaSend webhook signature verified');
+    }
+
+    const event = req.body;
+
+    // AhaSend event lifecycle:
+    //   message.reception  → AhaSend received & queued (maps to "sent")
+    //   message.delivered   → Recipient mail server accepted (maps to "delivered")
+    //   message.opened      → Recipient opened (requires open tracking enabled)
+    //   message.clicked     → Recipient clicked a link
+    // For delivered/opened/clicked we fire a synthetic "sent" first to ensure
+    // correct Queued → Sent → Delivered → Opened ordering.
+    const ahasendEventTypeMap: Record<string, string> = {
+      'message.reception': 'sent',
+      'message.delivered': 'delivered',
+      'message.opened': 'opened',
+      'message.clicked': 'clicked',
+      'message.bounced': 'bounced',
+      'message.failed': 'failed',
+      'message.suppressed': 'suppressed',
+      'message.deferred': 'deferred',
+      'message.transient_error': 'deferred',
+      'suppression.created': 'suppressed',
+    };
+
+    const normalisedType = ahasendEventTypeMap[event.type];
+
+    console.log('AhaSend webhook event received:', {
+      type: event.type,
+      normalisedType,
+      recipient: event.data?.recipient,
+      id: event.data?.id,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Handle SQL updates using existing handlers with normalized AhaSend data
+    if (normalisedType && normalisedType !== 'deferred' && event.data) {
+      const normalizedData = {
+        ...event.data,
+        to: event.data.recipient ? [event.data.recipient] : [],
+        email_id: event.data.id,
+      };
+
+      // For delivered/opened/clicked: fire synthetic "sent" first to ensure ordering
+      if (normalisedType === 'delivered' || normalisedType === 'opened' || normalisedType === 'clicked') {
+        await handleEmailSent(normalizedData);
+      }
+
+      switch (normalisedType) {
+        case 'sent':
+          await handleEmailSent(normalizedData);
+          break;
+        case 'delivered':
+          await handleEmailDelivered(normalizedData);
+          break;
+        case 'bounced':
+          await handleEmailBounced(normalizedData);
+          break;
+        case 'opened':
+          await handleEmailOpened(normalizedData);
+          break;
+        case 'clicked':
+          await handleEmailClicked(normalizedData);
+          break;
+        case 'suppressed':
+          await handleEmailSuppressed(normalizedData);
+          break;
+        case 'failed':
+          await handleEmailBounced(normalizedData);
+          break;
+        default:
+          console.log(`Unhandled AhaSend event type: ${event.type}`);
+      }
+    }
+
+    res.json({ received: true });
+  } catch (error) {
+    console.error('AhaSend webhook error:', error);
+    res.status(500).json({ message: 'Webhook processing failed' });
+  }
+});
+
 // Helper functions for webhook event handling
 async function handleEmailSent(data: any) {
   try {
-    console.log('Email sent event:', data);
+    const nlTags = extractNewsletterTags(data);
+    console.log('Email sent event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
 
     // Extract recipient email from webhook data
     const recipientEmail = extractRecipientEmail(data);
@@ -313,7 +437,8 @@ async function handleEmailSent(data: any) {
 
 async function handleEmailDelivered(data: any) {
   try {
-    console.log('Email delivered event:', data);
+    const nlTags = extractNewsletterTags(data);
+    console.log('Email delivered event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
 
     // Extract recipient email from webhook data
     const recipientEmail = extractRecipientEmail(data);
@@ -348,7 +473,8 @@ async function handleEmailDelivered(data: any) {
 
 async function handleEmailBounced(data: any) {
   try {
-    console.log('Email bounced event:', data);
+    const nlTags = extractNewsletterTags(data);
+    console.log('Email bounced event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
     
     // Add to bounced emails table
     const email = data.email || data.Email;
@@ -379,7 +505,8 @@ async function handleEmailBounced(data: any) {
 
 async function handleEmailComplained(data: any) {
   try {
-    console.log('Email complained event:', data);
+    const nlTags = extractNewsletterTags(data);
+    console.log('Email complained event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
     
     const email = data.email || data.Email;
     const bounceReason = 'Spam complaint received';
@@ -424,9 +551,92 @@ async function handleEmailComplained(data: any) {
   }
 }
 
+async function handleEmailSuppressed(data: any) {
+  try {
+    const nlTags = extractNewsletterTags(data);
+    console.log('Email suppressed event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
+
+    // Use extractRecipientEmail to handle Resend's data.to array format (same as all other handlers)
+    const email = extractRecipientEmail(data) || data.email || data.Email;
+    const reason = data.reason || data.type || 'suppressed';
+    const description = data.description || data.message || 'Email suppressed by provider';
+
+    if (!email) {
+      console.error('Could not extract email from suppression webhook data:', JSON.stringify(data, null, 2));
+      return;
+    }
+
+    console.log(`Processing suppression event for: ${email}`);
+
+    // Derive sourceTenantId from the most recent email_send to this address
+    let sourceTenantId: string | null = null;
+    if (email) {
+      try {
+        const recentSend = await db.query.emailSends.findFirst({
+          where: sql`${schema.emailSends.recipientEmail} = ${email}`,
+          orderBy: sql`${schema.emailSends.createdAt} DESC`,
+        });
+        if (recentSend) {
+          sourceTenantId = recentSend.tenantId || null;
+        }
+      } catch (lookupErr) {
+        console.warn('Could not derive sourceTenantId for suppression:', lookupErr);
+      }
+    }
+
+    // Add to global suppression list (bouncedEmails table)
+    if (email) {
+      const emailLower = email.toLowerCase().trim();
+
+      const existingSuppression = await db.query.bouncedEmails.findFirst({
+        where: sql`${schema.bouncedEmails.email} = ${emailLower}`,
+      });
+
+      if (!existingSuppression) {
+        await db.insert(schema.bouncedEmails).values({
+          email: emailLower,
+          bounceType: 'suppressed',
+          bounceReason: description,
+          firstBouncedAt: new Date(),
+          lastBouncedAt: new Date(),
+          sourceTenantId,
+          suppressionReason: reason,
+        });
+        console.log(`Added suppressed email to global list: ${emailLower}`);
+      } else {
+        await db.update(schema.bouncedEmails)
+          .set({
+            lastBouncedAt: new Date(),
+            bounceCount: sql`COALESCE(${schema.bouncedEmails.bounceCount}, 1) + 1`,
+            isActive: true,
+            updatedAt: new Date(),
+          })
+          .where(sql`${schema.bouncedEmails.id} = ${existingSuppression.id}`);
+      }
+
+      // Update contact status to 'suppressed' for all tenants
+      try {
+        await db.update(schema.emailContacts)
+          .set({
+            status: 'suppressed',
+            lastActivity: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(sql`LOWER(${schema.emailContacts.email}) = ${emailLower} AND ${schema.emailContacts.status} != 'suppressed'`);
+        console.log(`Updated contact status to suppressed for: ${emailLower}`);
+      } catch (contactErr) {
+        console.error('Error updating contact status for suppressed email:', contactErr);
+      }
+    }
+  } catch (error) {
+    console.error('Error handling email suppressed event:', error);
+  }
+}
+
 async function handleEmailOpened(data: any) {
   try {
-    console.log('Email opened event:', data);
+    const nlTags = extractNewsletterTags(data);
+    console.log('Email opened event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
 
     // Extract recipient email from webhook data
     const recipientEmail = extractRecipientEmail(data);
@@ -461,7 +671,8 @@ async function handleEmailOpened(data: any) {
 
 async function handleEmailClicked(data: any) {
   try {
-    console.log('Email clicked event:', data);
+    const nlTags = extractNewsletterTags(data);
+    console.log('Email clicked event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
 
     // Extract recipient email from webhook data
     const recipientEmail = extractRecipientEmail(data);
@@ -492,6 +703,22 @@ async function handleEmailClicked(data: any) {
   } catch (error) {
     console.error('Error handling email clicked event:', error);
   }
+}
+
+// Helper function to extract newsletter tracking tags from Resend webhook data
+function extractNewsletterTags(data: any): { type?: string; newsletterId?: string; groupUUID?: string; tenantId?: string; recipientId?: string; trackingId?: string } | null {
+  const tags = data.tags;
+  if (!tags || typeof tags !== 'object') return null;
+
+  const result: any = {};
+  if (tags.type) result.type = tags.type;
+  if (tags.newsletterId) result.newsletterId = tags.newsletterId;
+  if (tags.groupUUID) result.groupUUID = tags.groupUUID;
+  if (tags.tenantId) result.tenantId = tags.tenantId;
+  if (tags.recipientId) result.recipientId = tags.recipientId;
+  if (tags.trackingId) result.trackingId = tags.trackingId;
+
+  return Object.keys(result).length > 0 ? result : null;
 }
 
 // Helper function to extract recipient email from webhook data
@@ -657,7 +884,7 @@ webhookRoutes.all("*", async (req, res, next) => {
     query: req.query,
     params: req.params,
     body: req.body,
-    rawBody: req.rawBody,
+    rawBody: (req as any).rawBody,
     cookies: req.cookies,
     hostname: req.hostname,
     subdomains: req.subdomains,
