@@ -163,7 +163,10 @@ export const sendEmailTask = task({
               content_type: att.contentType,
             })),
           });
-          emailData = { id: ahaResult.id || ahaResult.message_id || 'ahasend-fallback-success' };
+          // Extract per-recipient message ID from AhaSend v2 response
+          const ahaMessages: any[] = ahaResult?.data || [];
+          const firstMsg = ahaMessages[0];
+          emailData = { id: firstMsg?.id || ahaResult.id || ahaResult.message_id || 'ahasend-fallback-success' };
           sendError = null; // Mark as success since fallback worked
         } catch (ahaError) {
           logger.error("AhaSend fallback also failed", { error: ahaError instanceof Error ? ahaError.message : String(ahaError) });

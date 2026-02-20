@@ -27,8 +27,11 @@ interface LiveTrackingPanelProps {
   newsletterId: string;
 }
 
-function formatTime(timestamp: number) {
-  return new Date(timestamp).toLocaleTimeString([], {
+function formatEventDateTime(timestamp: number) {
+  return new Date(timestamp).toLocaleString([], {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
@@ -196,7 +199,7 @@ export function LiveTrackingPanel({ newsletterId }: LiveTrackingPanelProps) {
                       {event.recipientEmail}
                     </span>
                     <span className="text-muted-foreground flex-shrink-0">
-                      {formatTime(event.occurredAt)}
+                      {formatEventDateTime(event.occurredAt)}
                     </span>
                   </div>
                 );

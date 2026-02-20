@@ -210,7 +210,11 @@ export default function EmailContacts() {
       pending: { color: "bg-yellow-100 text-yellow-700", icon: AlertCircle, label: t('emailContacts.statusBadges.pending') },
     };
 
-    const config = statusConfig[status];
+    const config = statusConfig[status as keyof typeof statusConfig] ?? {
+      color: "bg-slate-100 text-slate-700",
+      icon: AlertCircle,
+      label: status ? String(status) : t('common.unknown', 'Unknown'),
+    };
     const Icon = config.icon;
 
     return (

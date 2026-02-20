@@ -168,21 +168,37 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
     }
   };
 
-  const getStatusBadge = (status: Contact["status"]) => {
-    const statusConfig = {
-      active: { color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400", icon: CheckCircle2, label: "Active" },
-      unsubscribed: { color: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400", icon: XCircle, label: "Unsubscribed" },
-      bounced: { color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", icon: AlertCircle, label: "Bounced" },
-      pending: { color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400", icon: AlertCircle, label: "Pending" },
-    };
+  const getStatusBadge = (status: any) => {
+    let color = "bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400";
+    let Icon = AlertCircle;
+    let label = status ? String(status) : "Unknown";
 
-    const config = statusConfig[status];
-    const Icon = config.icon;
+    if (status === "active") {
+      color = "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+      Icon = CheckCircle2;
+      label = "Active";
+    } else if (status === "unsubscribed") {
+      color = "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400";
+      Icon = XCircle;
+      label = "Unsubscribed";
+    } else if (status === "bounced") {
+      color = "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
+      Icon = AlertCircle;
+      label = "Bounced";
+    } else if (status === "pending") {
+      color = "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
+      Icon = AlertCircle;
+      label = "Pending";
+    }
+
+    if (!Icon) {
+      Icon = AlertCircle;
+    }
 
     return (
-      <Badge className={`${config.color} gap-1`}>
+      <Badge className={`${color} gap-1`}>
         <Icon className="w-3 h-3" />
-        {config.label}
+        {label}
       </Badge>
     );
   };
