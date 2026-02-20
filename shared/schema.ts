@@ -376,6 +376,7 @@ export const emailContacts = pgTable("email_contacts", {
   country: text("country"),
   // Contact fields
   phoneNumber: text("phone_number"),
+  dateOfBirth: text("date_of_birth"), // Date of birth in YYYY-MM-DD format
   // Email preference fields (segmented unsubscribe)
   prefTransactional: boolean("pref_transactional").notNull().default(true),
   prefMarketing: boolean("pref_marketing").notNull().default(true),

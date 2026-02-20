@@ -694,6 +694,7 @@ emailManagementRoutes.get("/email-contacts/:id", authenticateToken, requireTenan
         emailsOpened: true,
         birthday: true,
         birthdayEmailEnabled: true,
+        dateOfBirth: true,
         birthdayUnsubscribedAt: true,
         consentGiven: true,
         consentDate: true,
@@ -812,7 +813,7 @@ emailManagementRoutes.get("/email-contacts/:id/stats", authenticateToken, requir
 // Create email contact with batch operations
 emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, requirePermission('contacts.create'), async (req: any, res) => {
   try {
-    const { email, firstName, lastName, tags, lists, status, consentGiven, consentMethod, consentIpAddress, consentUserAgent, address, city, state, zipCode, country, phoneNumber } = req.body;
+    const { email, firstName, lastName, tags, lists, status, consentGiven, consentMethod, consentIpAddress, consentUserAgent, address, city, state, zipCode, country, phoneNumber, dateOfBirth } = req.body;
 
     if (!email) {
       return res.status(400).json({ message: 'Email is required' });
@@ -895,6 +896,7 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
         zipCode: sanitizedZipCode,
         country: sanitizedCountry,
         phoneNumber: sanitizedPhoneNumber,
+        dateOfBirth: dateOfBirth || null,
         createdAt: now,
         updatedAt: now,
       }).returning();
@@ -957,7 +959,7 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
 emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
   try {
     const { id } = req.params;
-    const { email, firstName, lastName, status, birthday, address, city, state, zipCode, country, phoneNumber } = req.body;
+    const { email, firstName, lastName, status, birthday, address, city, state, zipCode, country, phoneNumber, dateOfBirth } = req.body;
 
     const contact = await db.query.emailContacts.findFirst({
       where: sql`${emailContacts.id} = ${id} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
@@ -1034,6 +1036,19 @@ emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenan
       updateData.phoneNumber = phoneNumber ? sanitizeString(phoneNumber) : null;
     }
 
+    // Optional date of birth in YYYY-MM-DD format
+    if (dateOfBirth !== undefined) {
+      if (dateOfBirth) {
+        const isValidDob = typeof dateOfBirth === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth);
+        if (!isValidDob) {
+          return res.status(400).json({ message: 'Date of birth must be in YYYY-MM-DD format' });
+        }
+        updateData.dateOfBirth = dateOfBirth;
+      } else {
+        updateData.dateOfBirth = null;
+      }
+    }
+
     const updatedContact = await db.update(emailContacts)
       .set(updateData)
       .where(sql`${emailContacts.id} = ${id} AND ${emailContacts.tenantId} = ${req.user.tenantId}`)
@@ -1052,6 +1067,7 @@ emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenan
       'zipCode',
       'country',
       'phoneNumber',
+      'dateOfBirth',
     ]);
 
     if (changes) {
