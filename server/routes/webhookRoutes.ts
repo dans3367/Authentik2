@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
+import { emailSends, bouncedEmails, emailContacts, emailEvents } from '@shared/schema';
 import { authenticateToken } from '../middleware/auth-middleware';
 import { createHmac } from 'crypto';
 import { getConvexClient, api } from '../utils/convexClient';
@@ -401,13 +402,13 @@ async function handleEmailSent(data: any) {
     }
 
     // Update email_sends status
-    await db.update(db.emailSends)
+    await db.update(emailSends)
       .set({
         status: 'sent',
         sentAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(sql`${db.emailSends.id} = ${emailSend.id}`);
+      .where(sql`${emailSends.id} = ${emailSend.id}`);
 
     // Create email_events record
     await createEmailEvent(emailSend.id, data, 'sent');
@@ -447,13 +448,13 @@ async function handleEmailDelivered(data: any) {
     }
 
     // Update email_sends status
-    await db.update(db.emailSends)
+    await db.update(emailSends)
       .set({
         status: 'delivered',
         deliveredAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(sql`${db.emailSends.id} = ${emailSend.id}`);
+      .where(sql`${emailSends.id} = ${emailSend.id}`);
 
     // Create email_events record
     await createEmailEvent(emailSend.id, data, 'delivered');
@@ -486,13 +487,13 @@ async function handleEmailBounced(data: any) {
     if (providerMessageId) {
       const emailSend = await findEmailSendByProviderId(providerMessageId);
       if (emailSend) {
-        await db.update(db.emailSends)
+        await db.update(emailSends)
           .set({
             status: 'bounced',
             errorMessage: description,
             updatedAt: new Date(),
           })
-          .where(sql`${db.emailSends.id} = ${emailSend.id}`);
+          .where(sql`${emailSends.id} = ${emailSend.id}`);
 
         // Create email_events record
         await createEmailEvent(emailSend.id, data, 'bounced');
@@ -507,11 +508,11 @@ async function handleEmailBounced(data: any) {
     if (email) {
       // Check if already exists
       const existingBounce = await db.query.bouncedEmails.findFirst({
-        where: sql`${db.bouncedEmails.email} = ${email}`,
+        where: sql`${bouncedEmails.email} = ${email}`,
       });
 
       if (!existingBounce) {
-        await db.insert(db.bouncedEmails).values({
+        await db.insert(bouncedEmails).values({
           email,
           reason,
           description,
@@ -558,11 +559,11 @@ async function handleEmailComplained(data: any) {
     if (email) {
       // Check if already exists
       const existingBounce = await db.query.bouncedEmails.findFirst({
-        where: sql`${db.bouncedEmails.email} = ${email}`,
+        where: sql`${bouncedEmails.email} = ${email}`,
       });
 
       if (!existingBounce) {
-        await db.insert(db.bouncedEmails).values({
+        await db.insert(bouncedEmails).values({
           email,
           bounceType: 'complaint',
           bounceReason: description,
@@ -605,13 +606,13 @@ async function handleEmailSuppressed(data: any) {
       if (emailSend) {
         sourceTenantId = emailSend.tenantId || null;
 
-        await db.update(db.emailSends)
+        await db.update(emailSends)
           .set({
             status: 'suppressed',
             errorMessage: description,
             updatedAt: new Date(),
           })
-          .where(sql`${db.emailSends.id} = ${emailSend.id}`);
+          .where(sql`${emailSends.id} = ${emailSend.id}`);
 
         // Create email_events record
         await createEmailEvent(emailSend.id, data, 'suppressed');
@@ -627,11 +628,11 @@ async function handleEmailSuppressed(data: any) {
       const emailLower = email.toLowerCase().trim();
 
       const existingSuppression = await db.query.bouncedEmails.findFirst({
-        where: sql`${db.bouncedEmails.email} = ${emailLower}`,
+        where: sql`${bouncedEmails.email} = ${emailLower}`,
       });
 
       if (!existingSuppression) {
-        await db.insert(db.bouncedEmails).values({
+        await db.insert(bouncedEmails).values({
           email: emailLower,
           bounceType: 'suppressed',
           bounceReason: description,
@@ -643,25 +644,25 @@ async function handleEmailSuppressed(data: any) {
         console.log(`Added suppressed email to global list: ${emailLower}`);
       } else {
         // Update existing record with latest suppression info
-        await db.update(db.bouncedEmails)
+        await db.update(bouncedEmails)
           .set({
             lastBouncedAt: new Date(),
-            bounceCount: sql`COALESCE(${db.bouncedEmails.bounceCount}, 1) + 1`,
+            bounceCount: sql`COALESCE(${bouncedEmails.bounceCount}, 1) + 1`,
             isActive: true,
             updatedAt: new Date(),
           })
-          .where(sql`${db.bouncedEmails.id} = ${existingSuppression.id}`);
+          .where(sql`${bouncedEmails.id} = ${existingSuppression.id}`);
       }
 
       // Update contact status to 'suppressed' for all tenants that have this contact
       try {
-        await db.update(db.emailContacts)
+        await db.update(emailContacts)
           .set({
             status: 'suppressed',
             lastActivity: new Date(),
             updatedAt: new Date(),
           })
-          .where(sql`LOWER(${db.emailContacts.email}) = ${emailLower} AND ${db.emailContacts.status} != 'suppressed'`);
+          .where(sql`LOWER(${emailContacts.email}) = ${emailLower} AND ${emailContacts.status} != 'suppressed'`);
         console.log(`Updated contact status to suppressed for: ${emailLower}`);
       } catch (contactErr) {
         console.error('Error updating contact status for suppressed email:', contactErr);
@@ -808,7 +809,7 @@ function extractRecipientEmail(data: any): string | null {
 async function findEmailSendByProviderId(providerMessageId: string) {
   try {
     const emailSend = await db.query.emailSends.findFirst({
-      where: sql`${db.emailSends.providerMessageId} = ${providerMessageId}`,
+      where: sql`${emailSends.providerMessageId} = ${providerMessageId}`,
     });
 
     return emailSend;
@@ -832,20 +833,20 @@ async function updateContactMetrics(contactId: string, activityType: string) {
     // Update specific metrics based on activity type
     switch (activityType) {
       case 'sent':
-        updateData.emailsSent = sql`${db.emailContacts.emailsSent} + 1`;
+        updateData.emailsSent = sql`${emailContacts.emailsSent} + 1`;
         break;
       case 'opened':
-        updateData.emailsOpened = sql`${db.emailContacts.emailsOpened} + 1`;
+        updateData.emailsOpened = sql`${emailContacts.emailsOpened} + 1`;
         break;
       case 'clicked':
         // Clicks also count as opens
-        updateData.emailsOpened = sql`${db.emailContacts.emailsOpened} + 1`;
+        updateData.emailsOpened = sql`${emailContacts.emailsOpened} + 1`;
         break;
     }
 
-    await db.update(db.emailContacts)
+    await db.update(emailContacts)
       .set(updateData)
-      .where(sql`${db.emailContacts.id} = ${contactId}`);
+      .where(sql`${emailContacts.id} = ${contactId}`);
 
     console.log(`Updated contact ${contactId} metrics for ${activityType}`);
   } catch (error) {
@@ -861,7 +862,7 @@ async function createEmailEvent(emailSendId: string, webhookData: any, eventType
     const ipAddress = webhookData.ip_address || webhookData.IPAddress;
     const webhookId = webhookData.id || webhookData.MessageID || webhookData.email_id;
 
-    await db.insert(db.emailEvents).values({
+    await db.insert(emailEvents).values({
       emailSendId,
       eventType,
       eventData: JSON.stringify(webhookData),
