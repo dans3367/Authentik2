@@ -28,7 +28,10 @@ import {
   History,
   Loader2,
   Search,
-  X
+  X,
+  ShieldCheck,
+  ClipboardCheck,
+  MessageSquare
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,7 +41,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useReduxAuth } from "@/hooks/useReduxAuth";
 import {
   Dialog,
   DialogContent,
@@ -77,6 +82,12 @@ export default function NewsletterViewPage() {
   const [selectedTrajectory, setSelectedTrajectory] = useState<any>(null);
   const tasksInitializedRef = useRef(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const { user } = useReduxAuth();
+  const currentUserId = (user as any)?.id;
+
+  // Reviewer workflow state
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectNotes, setRejectNotes] = useState("");
 
   const liveStats = useNewsletterStats(id);
 
@@ -120,6 +131,88 @@ export default function NewsletterViewPage() {
       });
     },
   });
+
+  // Approve newsletter mutation
+  const approveMutation = useMutation({
+    mutationFn: async ({ id, notes }: { id: string; notes?: string }) => {
+      const response = await apiRequest('POST', `/api/newsletters/${id}/approve`, { notes });
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({
+        title: "Newsletter Approved",
+        description: data.message || "The newsletter has been approved and is ready to send.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Approval Failed",
+        description: error.message || "Failed to approve newsletter",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Reject newsletter mutation
+  const rejectMutation = useMutation({
+    mutationFn: async ({ id, notes }: { id: string; notes: string }) => {
+      const response = await apiRequest('POST', `/api/newsletters/${id}/reject`, { notes });
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      setShowRejectDialog(false);
+      setRejectNotes("");
+      toast({
+        title: "Newsletter Rejected",
+        description: data.message || "The newsletter has been returned to draft with your feedback.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Rejection Failed",
+        description: error.message || "Failed to reject newsletter",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Submit for review mutation
+  const submitForReviewMutation = useMutation({
+    mutationFn: async (newsletterId: string) => {
+      const response = await apiRequest('POST', `/api/newsletters/${newsletterId}/submit-for-review`);
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({
+        title: "Submitted for Review",
+        description: data.message || "Newsletter has been submitted for reviewer approval.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Submission Failed",
+        description: error.message || "Failed to submit newsletter for review",
+        variant: "destructive"
+      });
+    },
+  });
+
+  // Fetch reviewer settings
+  const { data: reviewerSettings } = useQuery<{ enabled: boolean; reviewerId: string | null; reviewer: any }>({
+    queryKey: ['/api/newsletters/reviewer-settings'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/newsletters/reviewer-settings');
+      return response.json();
+    },
+  });
+
+  const reviewerEnabled = reviewerSettings?.enabled ?? false;
 
   const { data: recipientsData, isLoading: recipientsLoading } = useQuery<{ recipients: Array<{ id: string; email: string; firstName: string; lastName: string; status: string }>; total: number }>({
     queryKey: ['/api/newsletters', id, 'recipients'],
@@ -410,6 +503,7 @@ export default function NewsletterViewPage() {
     const statusConfig = {
       draft: { label: 'Draft', variant: 'secondary' as const, icon: Edit },
       ready_to_send: { label: 'Ready to Send', variant: 'outline' as const, icon: Send, className: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800' },
+      pending_review: { label: 'Pending Review', variant: 'outline' as const, icon: ShieldCheck, className: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800' },
       scheduled: { label: 'Scheduled', variant: 'outline' as const, icon: Clock },
       sending: { label: 'Sending', variant: 'outline' as const, icon: Send },
       sent: { label: 'Sent', variant: 'default' as const, icon: CheckCircle },
@@ -634,6 +728,21 @@ export default function NewsletterViewPage() {
                       {sendNowMutation.isPending ? "Sending..." : "Send Now"}
                     </Button>
                   )}
+                  {reviewerEnabled && (newsletter.status === 'draft' || newsletter.status === 'ready_to_send') && (
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        submitForReviewMutation.mutate(newsletter.id);
+                      }}
+                      size="sm"
+                      variant="outline"
+                      className="border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-700 dark:text-orange-300 dark:hover:bg-orange-900/20"
+                      disabled={submitForReviewMutation.isPending}
+                    >
+                      <ClipboardCheck className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                      {submitForReviewMutation.isPending ? "Submitting..." : "Submit for Review"}
+                    </Button>
+                  )}
                 </div>
               </div>
               <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 break-words">
@@ -657,6 +766,86 @@ export default function NewsletterViewPage() {
             )}
           </div>
         </div>
+
+        {/* Reviewer Workflow Banner */}
+        {newsletter.status === 'pending_review' && (
+          <div className="rounded-xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/20 dark:border-orange-800/40 p-5 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-orange-900 dark:text-orange-100">Awaiting Reviewer Approval</h3>
+                  <p className="text-sm text-orange-700 dark:text-orange-300 mt-0.5">
+                    This newsletter has been submitted for review and is waiting for the designated reviewer to approve or reject it.
+                  </p>
+                </div>
+              </div>
+              {(newsletter as any).reviewerId === currentUserId && (
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <Button
+                    onClick={() => approveMutation.mutate({ id: newsletter.id })}
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-none"
+                    disabled={approveMutation.isPending}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                    {approveMutation.isPending ? "Approving..." : "Approve"}
+                  </Button>
+                  <Button
+                    onClick={() => setShowRejectDialog(true)}
+                    size="sm"
+                    variant="outline"
+                    className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/20 flex-1 sm:flex-none"
+                    disabled={rejectMutation.isPending}
+                  >
+                    <XCircle className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                    Reject
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Review status info (for approved/rejected newsletters) */}
+        {(newsletter as any).reviewStatus === 'approved' && (newsletter as any).reviewedAt && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-800/40 p-4 shadow-sm">
+            <div className="flex items-center gap-3">
+              <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">Approved by reviewer</p>
+                <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                  {format(new Date((newsletter as any).reviewedAt), 'PPP p')}
+                  {(newsletter as any).reviewNotes && ` — "${(newsletter as any).reviewNotes}"`}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {(newsletter as any).reviewStatus === 'rejected' && (newsletter as any).reviewedAt && (
+          <div className="rounded-xl border border-red-200 bg-red-50/50 dark:bg-red-950/20 dark:border-red-800/40 p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-red-900 dark:text-red-100">Rejected by reviewer</p>
+                <p className="text-xs text-red-700 dark:text-red-300">
+                  {format(new Date((newsletter as any).reviewedAt), 'PPP p')}
+                </p>
+                {(newsletter as any).reviewNotes && (
+                  <div className="mt-2 p-2 rounded-md bg-red-100/50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30">
+                    <div className="flex items-start gap-2">
+                      <MessageSquare className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
+                      <p className="text-xs text-red-800 dark:text-red-200 italic">"{(newsletter as any).reviewNotes}"</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Key Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
@@ -1008,12 +1197,12 @@ export default function NewsletterViewPage() {
                           )}
                           <div className="flex flex-col items-center text-center min-w-0">
                             <div className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-medium transition-colors mb-2 ${isCompleted
-                                ? 'bg-green-500 text-white'
-                                : isActive
-                                  ? 'bg-blue-500 text-white'
-                                  : isPending
-                                    ? 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
+                              ? 'bg-green-500 text-white'
+                              : isActive
+                                ? 'bg-blue-500 text-white'
+                                : isPending
+                                  ? 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                                  : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
                               }`}>
                               {isCompleted ? (
                                 <CheckCircle className="w-6 h-6" strokeWidth={1.5} />
@@ -1025,8 +1214,8 @@ export default function NewsletterViewPage() {
                             </div>
                             <div className="max-w-[120px]">
                               <p className={`text-sm font-medium mb-1 ${isActive
-                                  ? 'text-gray-900 dark:text-gray-100'
-                                  : 'text-gray-600 dark:text-gray-400'
+                                ? 'text-gray-900 dark:text-gray-100'
+                                : 'text-gray-600 dark:text-gray-400'
                                 }`}>
                                 {item.title}
                               </p>
@@ -1583,13 +1772,13 @@ export default function NewsletterViewPage() {
                         {selectedTrajectory.events.map((event: any, index: number) => (
                           <div key={`${event.type}-${index}`} className="flex items-start gap-3 pb-4 border-b last:border-b-0">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${event.type === 'sent' ? 'bg-blue-100 dark:bg-blue-900' :
-                                event.type === 'delivered' ? 'bg-green-100 dark:bg-green-900' :
-                                  event.type === 'opened' ? 'bg-purple-100 dark:bg-purple-900' :
-                                    event.type === 'clicked' ? 'bg-orange-100 dark:bg-orange-900' :
-                                      event.type === 'bounced' ? 'bg-red-100 dark:bg-red-900' :
-                                        event.type === 'complained' ? 'bg-yellow-100 dark:bg-yellow-900' :
-                                          event.type === 'suppressed' ? 'bg-yellow-100 dark:bg-yellow-900' :
-                                            'bg-gray-100 dark:bg-gray-800'
+                              event.type === 'delivered' ? 'bg-green-100 dark:bg-green-900' :
+                                event.type === 'opened' ? 'bg-purple-100 dark:bg-purple-900' :
+                                  event.type === 'clicked' ? 'bg-orange-100 dark:bg-orange-900' :
+                                    event.type === 'bounced' ? 'bg-red-100 dark:bg-red-900' :
+                                      event.type === 'complained' ? 'bg-yellow-100 dark:bg-yellow-900' :
+                                        event.type === 'suppressed' ? 'bg-yellow-100 dark:bg-yellow-900' :
+                                          'bg-gray-100 dark:bg-gray-800'
                               }`}>
                               {event.type === 'sent' && <Send className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
                               {event.type === 'delivered' && <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />}
@@ -1804,9 +1993,9 @@ export default function NewsletterViewPage() {
                         <Badge
                           variant="outline"
                           className={`text-xs shrink-0 ${recipient.status === 'suppressed' ? 'border-orange-500 text-orange-600' :
-                              recipient.status === 'bounced' ? 'border-red-500 text-red-600' :
-                                recipient.status === 'unsubscribed' ? 'border-gray-500 text-gray-600' :
-                                  'border-muted-foreground text-muted-foreground'
+                            recipient.status === 'bounced' ? 'border-red-500 text-red-600' :
+                              recipient.status === 'unsubscribed' ? 'border-gray-500 text-gray-600' :
+                                'border-muted-foreground text-muted-foreground'
                             }`}
                         >
                           {recipient.status}
@@ -1816,6 +2005,44 @@ export default function NewsletterViewPage() {
                   ))}
                 </div>
               )}
+            </div>
+          </DialogContent>
+        </Dialog>
+        {/* Reject Newsletter Dialog */}
+        <Dialog open={showRejectDialog} onOpenChange={(open) => { if (!open) { setShowRejectDialog(false); setRejectNotes(""); } }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <XCircle className="h-5 w-5 text-red-500" />
+                Reject Newsletter
+              </DialogTitle>
+              <DialogDescription>
+                Please provide feedback explaining why this newsletter is being rejected. The creator will see your notes and can make adjustments.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Rejection Notes <span className="text-red-500">*</span></label>
+                <Textarea
+                  placeholder="Explain what needs to change before this newsletter can be approved..."
+                  value={rejectNotes}
+                  onChange={(e) => setRejectNotes(e.target.value)}
+                  rows={4}
+                  className="resize-none"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => { setShowRejectDialog(false); setRejectNotes(""); }}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => rejectMutation.mutate({ id: newsletter.id, notes: rejectNotes })}
+                  disabled={!rejectNotes.trim() || rejectMutation.isPending}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  {rejectMutation.isPending ? "Rejecting..." : "Reject Newsletter"}
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>

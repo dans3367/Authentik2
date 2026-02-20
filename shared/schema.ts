@@ -494,7 +494,7 @@ export const newsletters = pgTable("newsletters", {
   subject: text("subject").notNull(),
   content: text("content").notNull(), // HTML content of the newsletter
   puckData: text("puck_data"), // JSON string of Puck editor state for re-editing
-  status: text("status").notNull().default('draft'), // draft, ready_to_send, scheduled, sending, sent
+  status: text("status").notNull().default('draft'), // draft, ready_to_send, pending_review, scheduled, sending, sent
   scheduledAt: timestamp("scheduled_at"),
   sentAt: timestamp("sent_at"),
   // Customer segmentation fields
@@ -505,6 +505,13 @@ export const newsletters = pgTable("newsletters", {
   openCount: integer("open_count").default(0),
   uniqueOpenCount: integer("unique_open_count").default(0),
   clickCount: integer("click_count").default(0),
+  // Reviewer approval fields
+  requiresReviewerApproval: boolean("requires_reviewer_approval").default(false),
+  reviewerId: varchar("reviewer_id").references(() => betterAuthUser.id),
+  reviewStatus: text("review_status").default('pending'), // pending, approved, rejected
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  deletedAt: timestamp("deleted_at"), // Soft delete: when set, newsletter is hidden from UI but preserved for analytics
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -524,6 +531,16 @@ export const newsletterTaskStatus = pgTable("newsletter_task_status", {
   details: text("details"), // Additional status information
   errorMessage: text("error_message"), // Error details if failed
   metadata: text("metadata"), // JSON string for additional data
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Newsletter reviewer settings for tenant-wide reviewer configuration
+export const newsletterReviewerSettings = pgTable("newsletter_reviewer_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }).unique(),
+  enabled: boolean("enabled").notNull().default(false), // Whether reviewer approval is required
+  reviewerId: varchar("reviewer_id").references(() => betterAuthUser.id, { onDelete: 'set null' }), // Default reviewer
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1624,6 +1641,11 @@ export const newsletterRelations = relations(newsletters, ({ one, many }) => ({
     fields: [newsletters.userId],
     references: [betterAuthUser.id],
   }),
+  reviewer: one(betterAuthUser, {
+    fields: [newsletters.reviewerId],
+    references: [betterAuthUser.id],
+    relationName: 'newsletterReviewer',
+  }),
   taskStatuses: many(newsletterTaskStatus),
 }));
 
@@ -1638,17 +1660,30 @@ export const newsletterTaskStatusRelations = relations(newsletterTaskStatus, ({ 
   }),
 }));
 
+export const newsletterReviewerSettingsRelations = relations(newsletterReviewerSettings, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [newsletterReviewerSettings.tenantId],
+    references: [tenants.id],
+  }),
+  reviewer: one(betterAuthUser, {
+    fields: [newsletterReviewerSettings.reviewerId],
+    references: [betterAuthUser.id],
+  }),
+}));
+
 // Newsletter schemas
 export const createNewsletterSchema = z.object({
   title: z.string().min(1, "Title is required"),
   subject: z.string().min(1, "Subject is required"),
   content: z.string().min(1, "Content is required"),
   puckData: z.string().optional(),
-  status: z.enum(['draft', 'ready_to_send', 'scheduled']).default('draft'),
+  status: z.enum(['draft', 'ready_to_send', 'pending_review', 'scheduled']).default('draft'),
   scheduledAt: z.date().optional(),
   recipientType: z.enum(['all', 'selected', 'tags']).default('all'),
   selectedContactIds: z.array(z.string()).optional(),
   selectedTagIds: z.array(z.string()).optional(),
+  requiresReviewerApproval: z.boolean().optional(),
+  reviewerId: z.string().optional(),
 });
 
 export const updateNewsletterSchema = z.object({
@@ -1656,7 +1691,7 @@ export const updateNewsletterSchema = z.object({
   subject: z.string().min(1, "Subject is required").optional(),
   content: z.string().min(1, "Content is required").optional(),
   puckData: z.string().optional(),
-  status: z.enum(['draft', 'ready_to_send', 'scheduled', 'sending', 'sent']).optional(),
+  status: z.enum(['draft', 'ready_to_send', 'pending_review', 'scheduled', 'sending', 'sent']).optional(),
   scheduledAt: z.date().optional(),
   sentAt: z.date().optional(),
   recipientType: z.enum(['all', 'selected', 'tags']).optional(),
@@ -1666,6 +1701,10 @@ export const updateNewsletterSchema = z.object({
   openCount: z.number().int().nonnegative().optional(),
   uniqueOpenCount: z.number().int().nonnegative().optional(),
   clickCount: z.number().int().nonnegative().optional(),
+  requiresReviewerApproval: z.boolean().optional(),
+  reviewerId: z.string().optional(),
+  reviewStatus: z.enum(['pending', 'approved', 'rejected']).optional(),
+  reviewNotes: z.string().optional(),
 });
 
 export const insertNewsletterSchema = createInsertSchema(newsletters).omit({
