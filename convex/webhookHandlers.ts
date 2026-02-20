@@ -127,6 +127,104 @@ export const handlePostmarkWebhook = action({
   },
 });
 
+// ─── AHASEND ──────────────────────────────────────────────────────────────────
+
+/**
+ * Internal handler for AhaSend webhook events.
+ * Called from Express after signature verification.
+ *
+ * AhaSend event types:
+ *   message.reception  → queued (email accepted)
+ *   message.delivered   → delivered
+ *   message.opened      → opened
+ *   message.clicked     → clicked
+ *   message.bounced     → bounced
+ *   message.failed      → failed
+ *   message.suppressed  → suppressed
+ *   suppression.created → suppressed
+ */
+export const handleAhaSendWebhook = action({
+  args: { payload: v.any() },
+  handler: async (ctx, { payload: event }) => {
+    try {
+      // AhaSend event lifecycle:
+      //   message.reception  → AhaSend received & queued the email (maps to "sent")
+      //   message.delivered   → Recipient mail server accepted it (maps to "delivered")
+      //   message.opened      → Recipient opened the email (requires open tracking enabled)
+      //   message.clicked     → Recipient clicked a link
+      //   message.bounced     → Delivery bounced
+      //   message.failed      → Permanent failure
+      //   message.suppressed  → Suppressed by AhaSend
+      //
+      // Note: AhaSend has NO separate "sent to recipient server" event.
+      // message.delivered implies the email was also sent, so we fire "sent"
+      // before "delivered" to ensure correct Queued → Sent → Delivered ordering.
+      const eventTypeMap: Record<string, string> = {
+        "message.reception": "sent",
+        "message.delivered": "delivered",
+        "message.opened": "opened",
+        "message.clicked": "clicked",
+        "message.bounced": "bounced",
+        "message.failed": "failed",
+        "message.suppressed": "suppressed",
+        "message.deferred": "deferred",
+        "message.transient_error": "deferred",
+        "suppression.created": "suppressed",
+      };
+
+      const normalisedType = eventTypeMap[event.type];
+      if (!normalisedType || normalisedType === "deferred") {
+        console.log(`Unhandled or skipped AhaSend event type: ${event.type}`);
+        return;
+      }
+
+      const data = event.data ?? {};
+      const providerMessageId: string | undefined = data.id ?? undefined;
+      const recipientEmail: string | undefined = data.recipient ?? undefined;
+
+      if (!recipientEmail) {
+        console.error("Could not extract recipient email from AhaSend webhook");
+        return;
+      }
+
+      const ids = await resolveIds(ctx, providerMessageId, recipientEmail);
+
+      if (ids) {
+        const metadata = buildAhaSendMetadata(data);
+
+        // For delivered/opened/clicked: ensure "sent" event exists first
+        // so the status progression is always Queued → Sent → Delivered → Opened
+        if (normalisedType === "delivered" || normalisedType === "opened" || normalisedType === "clicked") {
+          await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
+            tenantId: ids.tenantId,
+            newsletterId: ids.newsletterId,
+            recipientEmail,
+            providerMessageId,
+            eventType: "sent" as any,
+            metadata: { ...metadata, synthetic: true },
+          });
+        }
+
+        await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
+          tenantId: ids.tenantId,
+          newsletterId: ids.newsletterId,
+          recipientEmail,
+          providerMessageId,
+          eventType: normalisedType as any,
+          metadata,
+        });
+      } else {
+        console.log(
+          `No matching newsletterSend for AhaSend providerMessageId=${providerMessageId}, email=${recipientEmail}`,
+        );
+      }
+    } catch (error) {
+      console.error("AhaSend webhook error:", error);
+      throw error;
+    }
+  },
+});
+
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 /**
@@ -202,6 +300,21 @@ function buildMetadata(data: any): Record<string, any> | undefined {
   return Object.keys(meta).length > 0 ? meta : undefined;
 }
 
+/**
+ * Build a metadata object from AhaSend webhook data for storage.
+ */
+function buildAhaSendMetadata(data: any): Record<string, any> | undefined {
+  const meta: Record<string, any> = {};
+  if (data.from) meta.from = data.from;
+  if (data.subject) meta.subject = data.subject;
+  if (data.message_id_header) meta.messageIdHeader = data.message_id_header;
+  if (data.account_id) meta.accountId = data.account_id;
+  if (data.event) meta.event = data.event;
+  if (data.reason) meta.reason = data.reason;
+  if (data.sending_domain) meta.sendingDomain = data.sending_domain;
+  return Object.keys(meta).length > 0 ? meta : undefined;
+}
+
 // ─── HTTP ENDPOINTS ─────────────────────────────────────────────────────────────
 
 /**
@@ -272,7 +385,7 @@ export const resendWebhook = httpAction(async (ctx, request) => {
 
   // Convert to base64 for comparison
   const expectedSignature = btoa(
-    String.fromCharCode(...new Uint8Array(signatureBytes)),
+    Array.from(new Uint8Array(signatureBytes), (b) => String.fromCharCode(b)).join(""),
   );
 
   // svix-signature header can contain multiple signatures: "v1,<base64> v1,<base64>"
@@ -344,3 +457,70 @@ export const postmarkWebhook = httpAction(async (ctx, request) => {
   });
 });
 
+/**
+ * Direct HTTP endpoint for AhaSend webhook events.
+ * AhaSend uses Standard Webhooks spec: webhook-id, webhook-timestamp, webhook-signature headers.
+ */
+export const ahasendWebhook = httpAction(async (ctx, request) => {
+  const webhookId = request.headers.get("webhook-id");
+  const webhookTimestamp = request.headers.get("webhook-timestamp");
+  const webhookSignature = request.headers.get("webhook-signature");
+
+  const body = await request.text();
+
+  // Parse event early so we can log details
+  let event: any;
+  try {
+    event = JSON.parse(body);
+  } catch (error) {
+    console.error("Error parsing AhaSend webhook body:", error);
+    return new Response("Invalid JSON body", { status: 400 });
+  }
+
+  // Log incoming webhook with full details for debugging
+  console.log("AhaSend webhook received", {
+    webhookId,
+    webhookTimestamp,
+    hasSignature: !!webhookSignature,
+    eventType: event?.type,
+    recipient: event?.data?.recipient,
+    messageId: event?.data?.id,
+    subject: event?.data?.subject,
+    from: event?.data?.from,
+    timestamp: event?.timestamp,
+  });
+
+  // Basic replay protection: reject timestamps older than 5 minutes
+  if (webhookTimestamp) {
+    const now = Math.floor(Date.now() / 1000);
+    const ts = parseInt(webhookTimestamp, 10);
+    if (!isNaN(ts) && Math.abs(now - ts) > 300) {
+      console.warn("AhaSend webhook rejected: timestamp too old", { webhookTimestamp, now, diff: Math.abs(now - ts) });
+      return new Response("Timestamp too old", { status: 401 });
+    }
+  }
+
+  // TODO: Implement full Standard Webhooks HMAC signature verification
+  // AhaSend uses the standardwebhooks library with aha-whsec- prefixed secrets.
+  // For now, we accept events based on the presence of valid webhook headers
+  // and replay protection. Add full HMAC verification via the standardwebhooks
+  // npm package in the Express server layer (server/routes/webhookRoutes.ts).
+  if (!webhookId || !webhookSignature) {
+    console.error("Missing AhaSend webhook headers");
+    return new Response("Missing webhook headers", { status: 401 });
+  }
+
+  try {
+    await ctx.runAction(api.webhookHandlers.handleAhaSendWebhook, {
+      payload: event,
+    });
+  } catch (error) {
+    console.error("Error processing AhaSend webhook:", error);
+    return new Response("Webhook processing failed", { status: 500 });
+  }
+
+  return new Response(JSON.stringify({ received: true }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+});

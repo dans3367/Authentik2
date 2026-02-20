@@ -18,7 +18,7 @@ import helmet from 'helmet';
 import { webhookRoutes } from './routes/webhookRoutes';
 
 const app = express();
-const PORT = process.env.WEBHOOK_PORT || 3505;
+const PORT = parseInt(process.env.WEBHOOK_PORT || '3505', 10);
 
 // Security middleware
 app.use(helmet({

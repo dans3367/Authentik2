@@ -4,6 +4,7 @@ import { createHmac, randomUUID } from "crypto";
 import { z } from "zod";
 import { ConvexHttpClient } from "convex/browser";
 import { DB_RETRY_CONFIG, dbConnectionCatchError } from "./retryStrategy";
+import { sendAhaEmail } from "./ahasend";
 
 // Convex client for newsletter tracking (lazy init)
 let convexClient: ConvexHttpClient | null = null;
@@ -16,7 +17,7 @@ function getConvex(): ConvexHttpClient | null {
 }
 
 // Initialize Resend for email sending
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY || "re_placeholder");
 
 // Schema for newsletter recipient
 const recipientSchema = z.object({
@@ -122,8 +123,13 @@ export const sendNewsletterEmailTask = task({
 
     try {
       const emailTrackingId = randomUUID();
-      const { data: emailData, error } = await resend.emails.send({
-        from: payload.from || process.env.EMAIL_FROM || "admin@zendwise.com",
+      const fromEmail = payload.from || process.env.EMAIL_FROM || "admin@zendwise.com";
+
+      let emailData: any = null;
+      let sendError: any = null;
+
+      const { data: resendData, error: resendError } = await resend.emails.send({
+        from: fromEmail,
         to: recipient.email,
         subject,
         html: content,
@@ -139,13 +145,34 @@ export const sendNewsletterEmailTask = task({
         ],
       });
 
-      if (error) {
-        logger.error("Failed to send newsletter email", { error });
+      emailData = resendData;
+      sendError = resendError;
+
+      if (sendError) {
+        logger.warn("Resend failed, falling back to AhaSend", { error: sendError.message, to: recipient.email });
+        try {
+          const ahaResult = await sendAhaEmail({
+            from: { email: fromEmail },
+            recipients: [{ email: recipient.email }],
+            subject,
+            html_content: content,
+            text_content: content.replace(/<[^>]*>/g, ""),
+            reply_to: payload.replyTo,
+          });
+          emailData = { id: ahaResult.id || ahaResult.message_id || 'ahasend-fallback-success' };
+          sendError = null;
+        } catch (ahaError) {
+          sendError = ahaError;
+        }
+      }
+
+      if (sendError) {
+        logger.error("Failed to send newsletter email via both providers", { error: sendError });
         return {
           success: false,
           recipientId: recipient.id,
           email: recipient.email,
-          error: error.message,
+          error: sendError.message || String(sendError),
         };
       }
 
@@ -213,8 +240,12 @@ export const processNewsletterBatchTask = task({
 
       try {
         const emailTrackingId = randomUUID();
-        const { data: emailData, error } = await resend.emails.send({
-          from: payload.from || process.env.EMAIL_FROM || "admin@zendwise.com",
+        const fromEmail = payload.from || process.env.EMAIL_FROM || "admin@zendwise.com";
+        let emailData: any = null;
+        let sendError: any = null;
+
+        const { data: resendData, error: resendError } = await resend.emails.send({
+          from: fromEmail,
           to: recipient.email,
           subject: payload.subject,
           html: payload.content,
@@ -229,8 +260,29 @@ export const processNewsletterBatchTask = task({
           ],
         });
 
-        if (error) {
-          results.push({ success: false, email: recipient.email, error: error.message });
+        emailData = resendData;
+        sendError = resendError;
+
+        if (sendError) {
+          logger.warn("Resend batch item failed, falling back to AhaSend", { error: sendError.message, to: recipient.email });
+          try {
+            const ahaResult = await sendAhaEmail({
+              from: { email: fromEmail },
+              recipients: [{ email: recipient.email }],
+              subject: payload.subject,
+              html_content: payload.content,
+              text_content: payload.content.replace(/<[^>]*>/g, ""),
+              reply_to: payload.replyTo,
+            });
+            emailData = { id: ahaResult.id || ahaResult.message_id || 'ahasend-fallback-success' };
+            sendError = null;
+          } catch (ahaError) {
+            sendError = ahaError;
+          }
+        }
+
+        if (sendError) {
+          results.push({ success: false, email: recipient.email, error: sendError.message || String(sendError) });
         } else {
           results.push({ success: true, email: recipient.email });
         }
@@ -388,7 +440,9 @@ export const sendNewsletterTask = task({
           });
 
           const emailTrackingId = randomUUID();
-          const { data: emailData, error } = await resend.emails.send({
+          let emailData: any = null;
+          let sendError: any = null;
+          const { data: resendData, error: resendError } = await resend.emails.send({
             from: fromEmail,
             to: recipient.email,
             subject: data.subject,
@@ -404,15 +458,36 @@ export const sendNewsletterTask = task({
             ],
           });
 
-          logger.info("Resend API response", {
+          emailData = resendData;
+          sendError = resendError;
+
+          if (sendError) {
+            logger.warn("Resend loop item failed, falling back to AhaSend", { error: sendError.message, to: recipient.email });
+            try {
+              const ahaResult = await sendAhaEmail({
+                from: { email: fromEmail },
+                recipients: [{ email: recipient.email }],
+                subject: data.subject,
+                html_content: data.content,
+                text_content: data.content.replace(/<[^>]*>/g, ""),
+                reply_to: data.replyTo,
+              });
+              emailData = { id: ahaResult.id || ahaResult.message_id || 'ahasend-fallback-success' };
+              sendError = null;
+            } catch (ahaError) {
+              sendError = ahaError;
+            }
+          }
+
+          logger.info("Resend (or AhaSend) API response", {
             emailId: emailData?.id,
-            error: error ? JSON.stringify(error) : null,
+            error: sendError ? String(sendError) : null,
             hasData: !!emailData,
           });
 
-          if (error) {
+          if (sendError) {
             totalFailed++;
-            errors.push({ email: recipient.email, error: error.message });
+            errors.push({ email: recipient.email, error: sendError.message || String(sendError) });
 
             // Track failed send in Convex
             try {
@@ -425,7 +500,7 @@ export const sendNewsletterTask = task({
                   recipientEmail: recipient.email,
                   recipientId: recipient.id,
                   status: "failed",
-                  error: error.message,
+                  error: sendError.message || String(sendError),
                 });
               }
             } catch (_) { }

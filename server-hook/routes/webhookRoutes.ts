@@ -281,6 +281,122 @@ webhookRoutes.post("/postmark", async (req, res) => {
   }
 });
 
+// AhaSend webhook endpoint
+webhookRoutes.post("/ahasend", async (req, res) => {
+  try {
+    const webhookId = req.headers['webhook-id'] as string;
+    const webhookTimestamp = req.headers['webhook-timestamp'] as string;
+    const webhookSignature = req.headers['webhook-signature'] as string;
+    const webhookSecret = process.env.AHASEND_WEBHOOK_SECRET;
+
+    if (!webhookSecret) {
+      console.warn('⚠️ AHASEND_WEBHOOK_SECRET not configured - skipping signature verification');
+    }
+
+    // Verify Standard Webhooks signature if secret is configured
+    if (webhookSecret && webhookId && webhookTimestamp && webhookSignature) {
+      const secretBase64 = webhookSecret.startsWith('whsec_')
+        ? webhookSecret.slice(6)
+        : webhookSecret;
+      const secretBuffer = Buffer.from(secretBase64, 'base64');
+      const signedContent = `${webhookId}.${webhookTimestamp}.${JSON.stringify(req.body)}`;
+      const expectedSignature = createHmac('sha256', secretBuffer)
+        .update(signedContent)
+        .digest('base64');
+
+      const signatures = webhookSignature.split(' ');
+      const isValid = signatures.some((sig) => {
+        const parts = sig.split(',');
+        if (parts.length !== 2 || parts[0] !== 'v1') return false;
+        return parts[1] === expectedSignature;
+      });
+
+      if (!isValid) {
+        console.error('Invalid AhaSend webhook signature');
+        return res.status(401).json({ message: 'Invalid signature' });
+      }
+      console.log('✅ AhaSend webhook signature verified');
+    }
+
+    const event = req.body;
+
+    // AhaSend event lifecycle:
+    //   message.reception  → AhaSend received & queued (maps to "sent")
+    //   message.delivered   → Recipient mail server accepted (maps to "delivered")
+    //   message.opened      → Recipient opened (requires open tracking enabled)
+    //   message.clicked     → Recipient clicked a link
+    // For delivered/opened/clicked we fire a synthetic "sent" first to ensure
+    // correct Queued → Sent → Delivered → Opened ordering.
+    const ahasendEventTypeMap: Record<string, string> = {
+      'message.reception': 'sent',
+      'message.delivered': 'delivered',
+      'message.opened': 'opened',
+      'message.clicked': 'clicked',
+      'message.bounced': 'bounced',
+      'message.failed': 'failed',
+      'message.suppressed': 'suppressed',
+      'message.deferred': 'deferred',
+      'message.transient_error': 'deferred',
+      'suppression.created': 'suppressed',
+    };
+
+    const normalisedType = ahasendEventTypeMap[event.type];
+
+    console.log('AhaSend webhook event received:', {
+      type: event.type,
+      normalisedType,
+      recipient: event.data?.recipient,
+      id: event.data?.id,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Handle SQL updates using existing handlers with normalized AhaSend data
+    if (normalisedType && normalisedType !== 'deferred' && event.data) {
+      const normalizedData = {
+        ...event.data,
+        to: event.data.recipient ? [event.data.recipient] : [],
+        email_id: event.data.id,
+      };
+
+      // For delivered/opened/clicked: fire synthetic "sent" first to ensure ordering
+      if (normalisedType === 'delivered' || normalisedType === 'opened' || normalisedType === 'clicked') {
+        await handleEmailSent(normalizedData);
+      }
+
+      switch (normalisedType) {
+        case 'sent':
+          await handleEmailSent(normalizedData);
+          break;
+        case 'delivered':
+          await handleEmailDelivered(normalizedData);
+          break;
+        case 'bounced':
+          await handleEmailBounced(normalizedData);
+          break;
+        case 'opened':
+          await handleEmailOpened(normalizedData);
+          break;
+        case 'clicked':
+          await handleEmailClicked(normalizedData);
+          break;
+        case 'suppressed':
+          await handleEmailSuppressed(normalizedData);
+          break;
+        case 'failed':
+          await handleEmailBounced(normalizedData);
+          break;
+        default:
+          console.log(`Unhandled AhaSend event type: ${event.type}`);
+      }
+    }
+
+    res.json({ received: true });
+  } catch (error) {
+    console.error('AhaSend webhook error:', error);
+    res.status(500).json({ message: 'Webhook processing failed' });
+  }
+});
+
 // Helper functions for webhook event handling
 async function handleEmailSent(data: any) {
   try {

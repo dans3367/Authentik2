@@ -5,7 +5,7 @@ import { z } from "zod";
 import { wrapInEmailDesign } from "./emailWrapper";
 import { DB_RETRY_CONFIG, dbConnectionCatchError } from "./retryStrategy";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY || "re_placeholder");
 
 const previewPayloadSchema = z.object({
   to: z.string().email(),
