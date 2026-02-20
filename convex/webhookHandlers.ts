@@ -357,19 +357,30 @@ export const resendWebhook = httpAction(async (ctx, request) => {
   const body = await request.text();
 
   // Svix secret is base64-encoded after the "whsec_" prefix
-  const secretBase64 = webhookSecret.startsWith("whsec_")
-    ? webhookSecret.slice(6)
-    : webhookSecret;
+  if (!webhookSecret.startsWith("whsec_")) {
+    console.error("RESEND_WEBHOOK_SECRET has invalid format (expected whsec_<base64>)");
+    return new Response("Webhook secret misconfigured", { status: 500 });
+  }
+  const secretBase64 = webhookSecret.slice(6);
 
   // Decode base64 secret to raw bytes
-  const secretBytes = Uint8Array.from(atob(secretBase64), (c) =>
-    c.charCodeAt(0),
-  );
+  let secretBytes: ArrayBuffer;
+  try {
+    const decoded = atob(secretBase64);
+    const bytes = new Uint8Array(decoded.length);
+    for (let i = 0; i < decoded.length; i++) {
+      bytes[i] = decoded.charCodeAt(i);
+    }
+    secretBytes = bytes.buffer;
+  } catch (e) {
+    console.error("RESEND_WEBHOOK_SECRET is not valid base64:", e);
+    return new Response("Webhook secret misconfigured", { status: 500 });
+  }
 
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
-    secretBytes,
+    secretBytes as ArrayBuffer,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],
