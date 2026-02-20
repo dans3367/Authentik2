@@ -1687,9 +1687,9 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       return res.status(400).json({ message: 'Contact email is missing' });
     }
 
-    // Block scheduling for unsubscribed/bounced contacts unless override flags are provided
+    // Block scheduling for unsubscribed/bounced/suppressed contacts unless override flags are provided
     const { allowUnsubscribed, isTransactional } = req.body || {};
-    const isUnsubscribedOrBounced = contact.status === 'unsubscribed' || contact.status === 'bounced';
+    const isUnsubscribedOrBounced = contact.status === 'unsubscribed' || contact.status === 'bounced' || contact.status === 'suppressed';
 
     if (isUnsubscribedOrBounced) {
       // SECURITY: Only allow Administrators and Owners to override unsubscribe protection
@@ -3030,8 +3030,8 @@ emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken,
       return res.status(400).json({ message: 'Contact email is missing' });
     }
 
-    if (contact.status === 'unsubscribed' || contact.status === 'bounced') {
-      return res.status(400).json({ message: 'Contact is unsubscribed or bounced' });
+    if (contact.status === 'unsubscribed' || contact.status === 'bounced' || contact.status === 'suppressed') {
+      return res.status(400).json({ message: `Contact is ${contact.status}` });
     }
 
     const suppressed = await db.query.bouncedEmails.findFirst({
@@ -3701,8 +3701,20 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
 
     // Send birthday cards to each contact
     const skippedOptOut: string[] = [];
+    const skippedSuppressed: string[] = [];
     for (const contact of contacts) {
       try {
+        // Skip suppressed/bounced/unsubscribed contacts
+        if (contact.status === 'suppressed' || contact.status === 'bounced' || contact.status === 'unsubscribed') {
+          const contactName = contact.firstName || contact.lastName
+            ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
+            : contact.email;
+          console.log(`🚫 [ManualBirthdayCard] Skipping ${contact.email} - contact status: ${contact.status}`);
+          skippedSuppressed.push(contactName);
+          results.push({ contactId: contact.id, email: contact.email, success: false, error: `Contact status: ${contact.status}` });
+          continue;
+        }
+
         // Check if contact has opted out of Customer Engagement emails
         if (contact.prefCustomerEngagement === false) {
           const contactName = contact.firstName || contact.lastName
@@ -4099,10 +4111,14 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
     const successCount = results.filter(r => r.success).length;
     const failureCount = results.filter(r => !r.success).length;
     const optOutCount = skippedOptOut.length;
+    const suppressedCount = skippedSuppressed.length;
 
     let message = `Birthday cards sent: ${successCount} successful, ${failureCount} failed`;
     if (optOutCount > 0) {
       message += `. ${optOutCount} contact(s) skipped (opted out of Customer Engagement): ${skippedOptOut.join(', ')}`;
+    }
+    if (suppressedCount > 0) {
+      message += `. ${suppressedCount} contact(s) skipped (suppressed/bounced/unsubscribed): ${skippedSuppressed.join(', ')}`;
     }
 
     res.json({
@@ -4114,7 +4130,9 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
         successful: successCount,
         failed: failureCount,
         optedOut: optOutCount,
+        suppressed: suppressedCount,
         optedOutContacts: skippedOptOut,
+        suppressedContacts: skippedSuppressed,
       },
     });
 
@@ -4449,9 +4467,9 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
 
     console.log(`📧 [SendEmail] Found contact: ${maskEmail(String(contact.email))}, status: ${contact.status}`);
 
-    // Block sending for unsubscribed/bounced contacts unless override flags are provided
+    // Block sending for unsubscribed/bounced/suppressed contacts unless override flags are provided
     const { allowUnsubscribed, isTransactional } = req.body || {};
-    const isUnsubscribedOrBounced = contact.status === 'unsubscribed' || contact.status === 'bounced';
+    const isUnsubscribedOrBounced = contact.status === 'unsubscribed' || contact.status === 'bounced' || contact.status === 'suppressed';
 
     if (isUnsubscribedOrBounced) {
       // SECURITY: Only allow Administrators and Owners to override unsubscribe protection

@@ -332,7 +332,8 @@ export class EmailService {
         to: recipients,
         subject,
         html,
-        text: options.text
+        text: options.text,
+        ...(options.tags && Array.isArray(options.tags) && options.tags.length > 0 && { tags: options.tags }),
       });
 
       if (error) {

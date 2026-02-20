@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { 
-  Plus, 
-  Mail, 
-  Calendar, 
+import {
+  Plus,
+  Mail,
+  Calendar,
   Eye,
   Clock,
   Users,
@@ -13,9 +13,14 @@ import {
   LayoutDashboard,
   Trash2,
   Send,
-  FileText
+  FileText,
+  MoreVertical,
+  Pencil,
+  Loader2,
+  UserCog
 } from "lucide-react";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
+import { SendNewsletterWizardModal } from "@/components/SendNewsletterWizardModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +42,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
@@ -65,10 +77,11 @@ export default function NewsletterPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [previewNewsletter, setPreviewNewsletter] = useState<(NewsletterWithUser & { opens?: number; totalOpens?: number }) | null>(null);
+  const [editRecipientsNewsletter, setEditRecipientsNewsletter] = useState<(NewsletterWithUser & { opens?: number; totalOpens?: number }) | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
-  
+
   useSetBreadcrumbs([
     { label: "Dashboard", href: "/", icon: LayoutDashboard },
     { label: "Email Newsletters", icon: Mail }
@@ -132,26 +145,51 @@ export default function NewsletterPage() {
     },
     onSuccess: (data: any, variables: string) => {
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
-      toast({ 
-        title: "Newsletter Deployed", 
+      toast({
+        title: "Newsletter Deployed",
         description: data.message || "Newsletter is now being sent to recipients."
       });
       setLocation(`/newsletters/${data.newsletterId || data.id || variables}`);
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Deploy Failed", 
-        description: error.message || "Failed to deploy newsletter", 
-        variant: "destructive" 
+      toast({
+        title: "Deploy Failed",
+        description: error.message || "Failed to deploy newsletter",
+        variant: "destructive"
       });
     },
   });
+
+  const handleEditRecipientsSegmentSelected = async (segmentData: {
+    segmentListId: string | null;
+    recipientType: "all" | "selected" | "tags";
+    selectedContactIds: string[];
+    selectedTagIds: string[];
+  }) => {
+    if (!editRecipientsNewsletter) return;
+    try {
+      await apiRequest('PUT', `/api/newsletters/${editRecipientsNewsletter.id}`, {
+        recipientType: segmentData.recipientType,
+        selectedContactIds: segmentData.selectedContactIds,
+        selectedTagIds: segmentData.selectedTagIds,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({ title: "Recipients Updated", description: "Newsletter recipients have been updated successfully." });
+      setEditRecipientsNewsletter(null);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update recipients",
+        variant: "destructive",
+      });
+    }
+  };
 
   const newsletters: (NewsletterWithUser & { opens?: number; totalOpens?: number })[] = newslettersData || [];
 
   const filteredNewsletters = useMemo(() => {
     return newsletters.filter((newsletter) => {
-      const matchesSearch = searchQuery === "" || 
+      const matchesSearch = searchQuery === "" ||
         newsletter.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         newsletter.subject.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === "all" || newsletter.status === statusFilter;
@@ -350,31 +388,42 @@ export default function NewsletterPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
             {filteredNewsletters.map((newsletter) => {
-              const openRate = (newsletter.recipientCount || 0) > 0 
+              const openRate = (newsletter.recipientCount || 0) > 0
                 ? ((newsletter.opens || 0) / (newsletter.recipientCount || 1) * 100).toFixed(1)
                 : "0";
               const isDraft = newsletter.status === 'draft';
               const isSent = newsletter.status === 'sent';
               const isReadyToSend = newsletter.status === 'ready_to_send';
 
+              const isDeleting = deleteMutation.isPending && deleteMutation.variables === newsletter.id;
+              const isDeploying = deployMutation.isPending && deployMutation.variables === newsletter.id;
+
+              if (isDeleting) {
+                return (
+                  <Card key={newsletter.id} className="h-64 flex flex-col items-center justify-center border-dashed border-2 border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 animate-pulse">
+                    <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-4" />
+                    <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Deleting newsletter...</p>
+                  </Card>
+                );
+              }
+
               return (
-                <Card 
-                  key={newsletter.id} 
+                <Card
+                  key={newsletter.id}
                   className="group relative border border-gray-200 dark:border-gray-700 rounded-xl hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 overflow-hidden cursor-pointer"
-                  onClick={() => isDraft 
+                  onClick={() => isDraft
                     ? setLocation(`/newsletter/create/${newsletter.id}`)
                     : setLocation(`/newsletters/${newsletter.id}`)
                   }
                 >
                   {/* Status color bar at top */}
-                  <div className={`h-1 w-full ${
-                    newsletter.status === 'sent' ? 'bg-green-500' :
+                  <div className={`h-1 w-full ${newsletter.status === 'sent' ? 'bg-green-500' :
                     newsletter.status === 'ready_to_send' ? 'bg-blue-500' :
-                    newsletter.status === 'scheduled' ? 'bg-blue-500' :
-                    newsletter.status === 'sending' ? 'bg-purple-500' :
-                    'bg-amber-400'
-                  }`} />
-                  
+                      newsletter.status === 'scheduled' ? 'bg-blue-500' :
+                        newsletter.status === 'sending' ? 'bg-purple-500' :
+                          'bg-amber-400'
+                    }`} />
+
                   <CardContent className="p-5">
                     <div className="space-y-4">
                       {/* Header: Status badge + Actions */}
@@ -387,23 +436,72 @@ export default function NewsletterPage() {
                             {newsletter.subject}
                           </p>
                         </div>
-                        <div className="shrink-0 flex flex-col items-end gap-1.5">
+                        <div className="shrink-0 flex items-center gap-2">
                           {getStatusBadge(newsletter.status)}
-                          {isReadyToSend && (
-                            <Button
-                              size="sm"
-                              className="bg-green-600 hover:bg-green-700 text-white border-green-700"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deployMutation.mutate(newsletter.id);
-                              }}
-                              disabled={deployMutation.isPending}
-                              data-testid={`button-send-now-${newsletter.id}`}
-                            >
-                              <Send className="h-4 w-4 mr-1.5" />
-                              {deployMutation.isPending ? "Sending..." : "Send Now"}
-                            </Button>
-                          )}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <Button variant="ghost" size="icon" aria-label="Newsletter actions" className="h-8 w-8 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPreviewNewsletter(newsletter);
+                                }}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                Preview
+                              </DropdownMenuItem>
+                              {!isSent && (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setLocation(`/newsletter/create/${newsletter.id}`);
+                                  }}
+                                >
+                                  <Pencil className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                              )}
+                              {(isDraft || isReadyToSend) && (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditRecipientsNewsletter(newsletter);
+                                  }}
+                                  data-testid={`button-edit-recipients-${newsletter.id}`}
+                                >
+                                  <UserCog className="h-4 w-4 mr-2" />
+                                  Edit Recipients
+                                </DropdownMenuItem>
+                              )}
+                              {isReadyToSend && (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deployMutation.mutate(newsletter.id);
+                                  }}
+                                  disabled={isDeploying}
+                                >
+                                  <Send className="h-4 w-4 mr-2" />
+                                  {isDeploying ? "Sending..." : "Send Now"}
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteId(newsletter.id);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
 
@@ -418,11 +516,11 @@ export default function NewsletterPage() {
                           </span>
                         </div>
                         <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
-                          {newsletter.sentAt 
+                          {newsletter.sentAt
                             ? formatDistanceToNow(new Date(newsletter.sentAt), { addSuffix: true })
                             : newsletter.createdAt
-                            ? formatDistanceToNow(new Date(newsletter.createdAt), { addSuffix: true })
-                            : ''}
+                              ? formatDistanceToNow(new Date(newsletter.createdAt), { addSuffix: true })
+                              : ''}
                         </span>
                       </div>
 
@@ -491,13 +589,29 @@ export default function NewsletterPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
-              onClick={() => deleteId && deleteMutation.mutate(deleteId)}
+              onClick={() => {
+                if (deleteId) {
+                  deleteMutation.mutate(deleteId);
+                  setDeleteId(null);
+                }
+              }}
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <SendNewsletterWizardModal
+        isOpen={!!editRecipientsNewsletter}
+        onClose={() => setEditRecipientsNewsletter(null)}
+        newsletterId={editRecipientsNewsletter?.id || null}
+        newsletterTitle={editRecipientsNewsletter?.title || ""}
+        onSegmentSelected={handleEditRecipientsSegmentSelected}
+        initialRecipientType={editRecipientsNewsletter?.recipientType as "all" | "selected" | "tags" | undefined}
+        initialSelectedContactIds={editRecipientsNewsletter?.selectedContactIds || []}
+        initialSelectedTagIds={editRecipientsNewsletter?.selectedTagIds || []}
+      />
 
       <Dialog open={!!previewNewsletter} onOpenChange={(open) => !open && setPreviewNewsletter(null)}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">

@@ -20,14 +20,18 @@ import {
   Activity,
   TrendingUp,
   Mail,
+  ShieldOff,
 } from "lucide-react";
 
 interface LiveTrackingPanelProps {
   newsletterId: string;
 }
 
-function formatTime(timestamp: number) {
-  return new Date(timestamp).toLocaleTimeString([], {
+function formatEventDateTime(timestamp: number) {
+  return new Date(timestamp).toLocaleString([], {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
@@ -52,6 +56,7 @@ const eventTypeConfig: Record<string, { icon: typeof Send; color: string; label:
   clicked: { icon: MousePointer, color: "text-indigo-500", label: "Clicked" },
   bounced: { icon: AlertTriangle, color: "text-orange-500", label: "Bounced" },
   complained: { icon: XCircle, color: "text-red-500", label: "Complained" },
+  suppressed: { icon: ShieldOff, color: "text-yellow-600", label: "Suppressed" },
   failed: { icon: XCircle, color: "text-red-600", label: "Failed" },
   unsubscribed: { icon: XCircle, color: "text-yellow-600", label: "Unsubscribed" },
 };
@@ -81,7 +86,7 @@ export function LiveTrackingPanel({ newsletterId }: LiveTrackingPanelProps) {
   }
 
   const progress = stats.totalRecipients > 0
-    ? Math.round(((stats.sent + stats.failed) / stats.totalRecipients) * 100)
+    ? Math.round(((stats.sent + stats.failed + (stats.suppressed ?? 0)) / stats.totalRecipients) * 100)
     : 0;
 
   return (
@@ -113,7 +118,7 @@ export function LiveTrackingPanel({ newsletterId }: LiveTrackingPanelProps) {
         <CardContent>
           <div className="space-y-2">
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{stats.sent + stats.failed} / {stats.totalRecipients} processed</span>
+              <span>{stats.sent + stats.failed + (stats.suppressed ?? 0)} / {stats.totalRecipients} processed</span>
               <span>{progress}%</span>
             </div>
             <Progress value={progress} className="h-2" />
@@ -144,19 +149,21 @@ export function LiveTrackingPanel({ newsletterId }: LiveTrackingPanelProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <RateItem label="Delivery Rate" value={breakdown.rates.deliveryRate} />
               <RateItem label="Open Rate" value={breakdown.rates.openRate} />
               <RateItem label="Click Rate" value={breakdown.rates.clickRate} />
               <RateItem label="Bounce Rate" value={breakdown.rates.bounceRate} negative />
+              <RateItem label="Suppression Rate" value={breakdown.rates.suppressionRate} negative />
             </div>
           </CardContent>
         </Card>
       )}
 
       {/* Secondary Stats */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard icon={AlertTriangle} label="Bounced" value={stats.bounced} color="text-orange-500" small />
+        <StatCard icon={ShieldOff} label="Suppressed" value={stats.suppressed ?? 0} color="text-yellow-600" small />
         <StatCard icon={XCircle} label="Failed" value={stats.failed} color="text-red-500" small />
         <StatCard icon={XCircle} label="Complained" value={stats.complained} color="text-red-600" small />
       </div>
@@ -192,7 +199,7 @@ export function LiveTrackingPanel({ newsletterId }: LiveTrackingPanelProps) {
                       {event.recipientEmail}
                     </span>
                     <span className="text-muted-foreground flex-shrink-0">
-                      {formatTime(event.occurredAt)}
+                      {formatEventDateTime(event.occurredAt)}
                     </span>
                   </div>
                 );

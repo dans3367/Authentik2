@@ -3,6 +3,7 @@ import {
   resendHealthCheck,
   resendWebhook,
   postmarkWebhook,
+  ahasendWebhook,
 } from "./webhookHandlers";
 
 const http = httpRouter();
@@ -26,6 +27,13 @@ http.route({
   path: "/webhooks/postmark",
   method: "POST",
   handler: postmarkWebhook,
+});
+
+// AhaSend webhook events (delivered, opened, clicked, bounced, etc.)
+http.route({
+  path: "/webhooks/ahasend",
+  method: "POST",
+  handler: ahasendWebhook,
 });
 
 export default http;

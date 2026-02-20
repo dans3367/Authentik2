@@ -49,6 +49,7 @@ export class ResendProvider extends EmailProvider {
           html: message.html,
           ...(message.text && { text: message.text }),
           ...(message.headers && { headers: message.headers }),
+          ...(message.tags && message.tags.length > 0 && { tags: message.tags }),
           ...(message.attachments && { 
             attachments: message.attachments.map(att => ({
               filename: att.filename,
