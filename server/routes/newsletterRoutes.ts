@@ -9,6 +9,7 @@ import { sanitizeEmailHtml } from './emailManagementRoutes';
 import { emailService, enhancedEmailService } from '../emailService';
 import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
 import { initNewsletterTracking, trackNewsletterEmailSend } from '../utils/convexNewsletterTracker';
+import { logActivity, computeChanges, NEWSLETTER_TRACKED_FIELDS } from '../utils/activityLogger';
 // Temporal service removed - now using server-node proxy
 import crypto from 'crypto';
 
@@ -449,6 +450,19 @@ newsletterRoutes.post("/", authenticateToken, requireTenant, async (req: any, re
       clickCount: 0,
     } as any).returning();
 
+    // Log activity: newsletter created
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: userRecord.id,
+      entityType: 'newsletter',
+      entityId: newNewsletter[0].id,
+      entityName: sanitizedTitle,
+      activityType: 'created',
+      description: `Created newsletter "${sanitizedTitle}"`,
+      metadata: { subject: sanitizedSubject, status: status || 'draft' },
+      req,
+    });
+
     res.status(201).json(newNewsletter[0]);
   } catch (error) {
     console.error('Create newsletter error:', error);
@@ -490,6 +504,19 @@ newsletterRoutes.post("/:id/clone", authenticateToken, requireTenant, async (req
       uniqueOpenCount: 0,
       clickCount: 0,
     } as any).returning();
+
+    // Log activity: newsletter cloned
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: userRecord.id,
+      entityType: 'newsletter',
+      entityId: cloned[0].id,
+      entityName: `${source.title} (Copy)`,
+      activityType: 'created',
+      description: `Cloned newsletter from "${source.title}"`,
+      metadata: { sourceNewsletterId: source.id, sourceTitle: source.title },
+      req,
+    });
 
     res.status(201).json(cloned[0]);
   } catch (error) {
@@ -561,6 +588,21 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, 
       .where(sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId}`)
       .returning();
 
+    // Log activity: newsletter updated (compute changed fields)
+    const changes = computeChanges(newsletter as Record<string, any>, updateData, NEWSLETTER_TRACKED_FIELDS);
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      entityType: 'newsletter',
+      entityId: id,
+      entityName: updatedNewsletter[0]?.title || newsletter.title,
+      activityType: 'updated',
+      description: `Updated newsletter "${updatedNewsletter[0]?.title || newsletter.title}"`,
+      changes: changes || undefined,
+      metadata: { fieldsChanged: changes ? Object.keys(changes) : [] },
+      req,
+    });
+
     res.json(updatedNewsletter[0]);
   } catch (error) {
     console.error('Update newsletter error:', error);
@@ -583,6 +625,24 @@ newsletterRoutes.delete("/:id", authenticateToken, requireTenant, async (req: an
     if (!newsletter) {
       return res.status(404).json({ message: 'Newsletter not found' });
     }
+
+    // Log activity: newsletter deleted (before actual deletion so we still have the data)
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      entityType: 'newsletter',
+      entityId: id,
+      entityName: newsletter.title,
+      activityType: 'deleted',
+      description: `Deleted newsletter "${newsletter.title}"`,
+      metadata: {
+        subject: newsletter.subject,
+        status: newsletter.status,
+        recipientCount: newsletter.recipientCount,
+        sentAt: newsletter.sentAt,
+      },
+      req,
+    });
 
     // Delete newsletter
     await db.delete(newsletters)
@@ -978,6 +1038,22 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
       })
       .where(eq(newsletters.id, id));
 
+    // Log activity: newsletter send initiated
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      entityType: 'newsletter',
+      entityId: id,
+      entityName: newsletter.title,
+      activityType: 'sent',
+      description: `Started sending newsletter "${newsletter.title}"`,
+      metadata: {
+        subject: newsletter.subject,
+        recipientType: newsletter.recipientType,
+      },
+      req,
+    });
+
     try {
       // Generate unique group UUID for tracking
       const groupUUID = crypto.randomUUID();
@@ -1270,6 +1346,21 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
           updatedAt: new Date(),
         })
         .where(eq(newsletters.id, id));
+
+      // Log activity: send failure
+      await logActivity({
+        tenantId: req.user.tenantId,
+        userId: req.user.id,
+        entityType: 'newsletter',
+        entityId: id,
+        entityName: newsletter.title,
+        activityType: 'failed',
+        description: `Failed to send newsletter "${newsletter.title}"`,
+        metadata: {
+          error: sendError instanceof Error ? sendError.message : 'Unknown error',
+        },
+        req,
+      });
 
       res.status(500).json({
         message: 'Failed to create temporal workflow for newsletter sending',
